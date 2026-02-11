@@ -1,0 +1,161 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 217 91% 40%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 152 69% 31%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 217 91% 40%;
+
+    --radius: 0.5rem;
+
+    /* Custom tokens */
+    --success: 152 69% 31%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 215 16% 47%;
+    --sidebar-primary: 217 91% 40%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent-foreground: 217 91% 40%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 217 91% 40%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(217, 91%, 40%) 0%, hsl(217, 91%, 30%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(152, 69%, 31%) 0%, hsl(152, 69%, 25%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0, 0%, 100%) 0%, hsl(210, 40%, 98%) 100%);
+  }
+
+  .dark {
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 15%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 15%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 11%;
+
+    --secondary: 217 32% 20%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 32% 20%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 152 69% 40%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 32% 20%;
+    --input: 217 32% 20%;
+    --ring: 212 27% 84%;
+
+    --sidebar-background: 222 47% 11%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 32% 20%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 32% 20%;
+    --sidebar-ring: 217 91% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+@layer components {
+  .stat-card {
+    @apply bg-card rounded-xl p-6 shadow-sm border border-border transition-all duration-200 hover:shadow-md relative overflow-hidden;
+  }
+
+  .stat-card-primary {
+    background: var(--gradient-primary);
+    @apply text-primary-foreground rounded-xl p-6 shadow-lg relative overflow-hidden;
+  }
+
+  .stat-card-accent {
+    background: var(--gradient-accent);
+    @apply text-accent-foreground rounded-xl p-6 shadow-lg relative overflow-hidden;
+  }
+
+  .data-table {
+    @apply w-full bg-card rounded-xl shadow-sm border border-border overflow-hidden;
+  }
+
+  .page-header {
+    @apply mb-8;
+  }
+
+  .page-title {
+    @apply text-3xl font-bold text-foreground tracking-tight;
+  }
+
+  .page-subtitle {
+    @apply text-muted-foreground mt-1;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
