@@ -55,7 +55,7 @@ import { formatCurrency } from '@/lib/utils';
 
 
 export default function Dashboard() {
-  const { atividades, empenhos } = useData();
+  const { atividades, empenhos, descentralizacoes, getTotalDescentralizado, getADescentralizar } = useData();
 
   // --- Filtros ---
   const [filterDimensao, setFilterDimensao] = useState('all');
@@ -68,8 +68,9 @@ export default function Dashboard() {
     const origens = new Set<string>();
     atividades.forEach(a => { if (a.origemRecurso) origens.add(a.origemRecurso); });
     empenhos.forEach(e => { if (e.origemRecurso) origens.add(e.origemRecurso); });
+    descentralizacoes.forEach(d => { if (d.origemRecurso) origens.add(d.origemRecurso); });
     return Array.from(origens).sort();
-  }, [atividades, empenhos]);
+  }, [atividades, empenhos, descentralizacoes]);
 
   // --- Dados Filtrados ---
   const filteredData = useMemo(() => {
@@ -96,12 +97,21 @@ export default function Dashboard() {
       return matchDimensao && matchOrigem && matchDate && e.status !== 'cancelado';
     });
 
-    return { atividades: filteredAtividades, empenhos: filteredEmpenhos };
-  }, [atividades, empenhos, filterDimensao, filterOrigem, dateStart, dateEnd]);
+    // Filtrar Descentralizações
+    const filteredDescentralizacoes = descentralizacoes.filter(d => {
+      const matchDimensao = filterDimensao === 'all' || d.dimensao.includes(filterDimensao);
+      const matchOrigem = filterOrigem === 'all' || d.origemRecurso === filterOrigem;
+      return matchDimensao && matchOrigem;
+    });
+
+    return { atividades: filteredAtividades, empenhos: filteredEmpenhos, descentralizacoes: filteredDescentralizacoes };
+  }, [atividades, empenhos, descentralizacoes, filterDimensao, filterOrigem, dateStart, dateEnd]);
 
   // --- KPI Calculations ---
   const totalPlanejado = filteredData.atividades.reduce((acc, a) => acc + a.valorTotal, 0);
   const totalEmpenhado = filteredData.empenhos.reduce((acc, e) => acc + e.valor, 0);
+  const totalDescentralizado = filteredData.descentralizacoes.reduce((acc, d) => acc + d.valor, 0);
+  const aDescentralizar = totalPlanejado - totalDescentralizado;
   const saldoTotal = totalPlanejado - totalEmpenhado;
   const percentualExecutado = totalPlanejado > 0 ? (totalEmpenhado / totalPlanejado) * 100 : 0;
 
@@ -305,7 +315,6 @@ export default function Dashboard() {
 
       {/* KPI Cards (rest of the dashboard remains the same) */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* ... (Same Stats) */}
         <StatCard
           title="Total Planejado"
           value={formatCurrency(totalPlanejado)}
@@ -314,25 +323,25 @@ export default function Dashboard() {
           variant="primary"
         />
         <StatCard
-          title="Total Empenhado"
-          value={formatCurrency(totalEmpenhado)}
-          subtitle={`${filteredData.empenhos.length} empenhos filtrados`}
+          title="Descentralizado"
+          value={formatCurrency(totalDescentralizado)}
+          subtitle={`${filteredData.descentralizacoes.length} descentralizações`}
           icon={Receipt}
           variant="accent"
         />
         <StatCard
-          title="Saldo Disponível"
-          value={formatCurrency(saldoTotal)}
-          subtitle={saldoTotal >= 0 ? 'Dentro do orçamento' : 'Orçamento excedido'}
-          icon={saldoTotal >= 0 ? PiggyBank : ArrowDownRight}
-          variant={saldoTotal >= 0 ? 'default' : 'warning'}
-        />
-        <StatCard
-          title="Execução"
-          value={`${percentualExecutado.toFixed(1)}%`}
-          subtitle="do orçamento filtrado"
+          title="Total Empenhado"
+          value={formatCurrency(totalEmpenhado)}
+          subtitle={`${filteredData.empenhos.length} empenhos filtrados`}
           icon={TrendingUp}
           variant="default"
+        />
+        <StatCard
+          title="A descentralizar"
+          value={formatCurrency(aDescentralizar)}
+          subtitle={aDescentralizar >= 0 ? 'Dentro do orçamento' : 'Descentralizado excede planejado'}
+          icon={aDescentralizar >= 0 ? PiggyBank : ArrowDownRight}
+          variant={aDescentralizar >= 0 ? 'default' : 'warning'}
         />
       </div>
 

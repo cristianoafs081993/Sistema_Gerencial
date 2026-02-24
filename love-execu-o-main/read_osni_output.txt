@@ -1,0 +1,484 @@
+--- Reading c:\Users\3128880\Desktop\Programação\IFRN\love-execu-o-main\love-execu-o-main\docs\Dissertação versão final Osni Cristiano Reisch.pdf ---
+
+--- Page 1 ---
+ 
+ 
+ 
+ 
+UNIVERSIDADE DO SUL DE SANTA CATARINA 
+  OSNI CRISTIANO REISCH 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ALINHAMENTO ENTRE PLANEJAMENTO ESTRATÉGICO E A EXECUÇÃO 
+ORÇAMENTÁRIA EM UMA INSTITUIÇÃO FEDERAL DE ENSINO 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Florianópolis 
+2020 
+
+--- Page 2 ---
+OSNI CRISTIANO REISCH 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ALINHAMENTO ENTRE PLANEJAMENTO ESTRATÉGICO E A EXECUÇÃO 
+ORÇAMENTÁRIA EM UMA INSTITUIÇÃO FEDERAL DE ENSINO 
+ 
+ 
+ 
+ 
+Dissertação apresentada ao Curso de Mestrado 
+em Administração da Universidade do Sul de 
+Santa Catarina como requisito parcial à 
+obtenção do título de Mestr e em 
+Administração. 
+ 
+ 
+ 
+ 
+ 
+Orientador: Prof. Thiago Coelho Soares, Dr. 
+ 
+ 
+ 
+ 
+Florianópolis 
+2020 
+--- Page 3 ---
+  
+
+--- Page 4 ---
+
+--- Page 5 ---
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Este trabalho é dedicado aos meus amores, 
+Fabiana, Gabriela e Heloí sa. E a todos que, 
+assim como eu, acreditam em uma gestão mai s 
+estratégica para a administração pública 
+--- Page 6 ---
+AGRADECIMENTOS 
+Agradeço em primeiro lugar a minha família pelo incentivo, paciência, compreensão e 
+colaboração durante os dois anos do mestrado e para o desenvolvimento deste trabalho. 
+Ao Instituto Federal de Sant a Catarina  que, ao longo dos anos tem me propiciado 
+aprendizado e experiência, contribuindo para o meu desenvo lvimento pessoal e profissional e 
+por propiciar um mestrado voltado aos Técnicos Administrativos em Educação (TAE). 
+Aos gestores, sujeitos da pesq uisa, que aceitaram em conceder a entrevista 
+prontamente e contribuíram para o presente estudo.  
+Agradeço, especialmente, aos colegas do Departamento de Administração e Materiais 
+do IF SC Campus Gaspar e a os meus colegas de mestrado , pelas parcerias, troca de 
+experiências e apoio. 
+Ao meu orientador Professor Dr. Thiago Coelho Soares por todo auxílio para a 
+realização deste estudo, por todo o conhecimento transmitido e pelo incentivo dado. 
+Por fim, agradeço aos membros da banca, Prof. Dr.  Sandro Vieira Soares , Prof. Dr. 
+Thiago Meneghel Rodrigues  e Prof. Dr. Darlan José Roman , pela gentileza e disposição em 
+aceitar o convite para fazer parte da banca examinadora e pelas contribuições a este trabalho. 
+  
+--- Page 7 ---
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+“A estratégia sem tática é o  caminho mais lento para a vitória. Tática sem estratégia é 
+o ruído antes da derrota” (SUN TZU).  
+  
+--- Page 8 ---
+RESUMO 
+Cada vez mais se exige das instituições públicas o desenvolvimento de estratégias para que os 
+recursos - materiais, financeiros ou humanos – sejam utilizados da melhor maneira e que, em 
+contrapartida, haja a satisfação dos cidadãos com os serviços oferecidos pelos órgãos 
+públicos. Para certificar -se que os objetivos propostos no planejamento obtiveram 
+desempenho desejado, seja por meio de iniciativas ou  projetos, é preciso analisar se há 
+correspondência na execução orçamentária, ou seja, se existe alinhamento entre o 
+Planejamento Estratégico e a Execução Orçamentária. Assim, este estudo tem por objetivo 
+verificar o nível de alinhamento entre os processos  de planejamento estratégico e a execução 
+orçamentária no Instituto Federal de Santa Catarina - IFSC. Deste modo, a pesquisa fez uma 
+abordagem qualitativa do problema, de natureza explicativa e descritiva. A pesquisa 
+bibliográfica serviu como parâmetro para  identificação de fatores que proporcionaram o 
+diagnóstico, por meio do estudo de caso, de como a instituição busca alinhar os processos de 
+planejamento estratégico e a execução orçamentária. Para tanto, foram utilizados como coleta 
+de dados, a análise doc umental, entrevistas e o registro de arquivos. Os resultados obtidos 
+demonstram que dos 15 fatores analisados, 11 podem ser considerados como parcialmente 
+presentes na instituição, destoando do que a literatura apresenta para influenciar 
+positivamente o al inhamento entre o planejamento estratégico e orçamento. Assim, podemos 
+compreender que a vinculação do orçamento com o planejamento estratégico ocorre de forma 
+parcial na instituição pesquisada. Contudo, na percepção dos gestores, a implantação do 
+planejamento estratégico e do plano anual de trabalho – PAT trouxe significativos avanços 
+para a gestão estratégica da instituição. Conclui -se que ainda há a necessidade de maior 
+consolidação do processo de vinculação do orçamento com o planejamento estratégico, u ma 
+vez  que, com a falta de alinhamento, possivelmente, a instituição não conseguirá executar 
+integralmente os objetivos constantes do seu planejamento estratégico. Ainda, esta situação 
+deve impulsionar a instituição na revisão dos fatores apresentados e n o desenvolvimento de 
+estratégias a fim de minimizar seus efeitos negativos.  
+ 
+Palavras-chave: Alinhamento. Planejamento Estratégico. Execução Orçamentária. 
+  
+--- Page 9 ---
+ABSTRACT 
+Public institutions are increasingly required to develop strategies so that resources - material, 
+financial or human - are used in the best way and that, in return, citizens are satisfied with the 
+services offered by public agencies. To make sure that the objectives proposed in the planning 
+achieved the desired performance, whether through ini tiatives or projects, it is necessary to 
+analyze whether there is correspondence in budget execution, that is, whether there is 
+alignment between Strategic Planning and Budget Execution. Thus, this study aims to verify 
+the level of alignment between strate gic planning processes and budget execution at the 
+Federal Institute of Santa Catarina - IFSC. In this way, the research made a qualitative 
+approach to the problem, of an explanatory and descriptive nature. The bibliographic research 
+served as a parameter to identify factors that provided the diagnosis, through the case study, 
+of how the institution seeks to align the processes of strategic planning and budget execution. 
+For this, data collection, document analysis, interviews and file registration were use d. The 
+results obtained demonstrate that, of the 15 factors analyzed, 11 can be considered as partially 
+present in the institution, in disagreement with what the literature presents to positively 
+influence the alignment between strategic planning and budge t. Thus, we can understand that 
+the link between the budget and strategic planning occurs partially in the researched 
+institution. However, in the managers' perception, the implementation of the strategic 
+planning and the annual work plan - PAT brought sig nificant advances to the institution's 
+strategic management. It is concluded that there is still a need for further consolidation of the 
+budget linking process with strategic planning, since, with the lack of alignment, the 
+institution will not be able to fully implement the objectives contained in its strategic 
+planning. In addition, this situation should encourage the institution to review the factors 
+presented and develop strategies to minimize its negative effects. 
+ 
+Keywords: Alignment.  Budget.  Strategic Planning. 
+--- Page 10 ---
+LISTA DE ILUSTRAÇÕES 
+Figura 1 – Evolução do orçamento público .................................................................. 20 
+Figura 2 – Processo orçamentário. ................................................................................ 21 
+Figura 3 – Processo integrado de planejamento e orçamento. ...................................... 24 
+Figura 4 – Hierarquia dos órgãos orçamentários .......................................................... 25 
+Figura 5 – Níveis de decisão e tipos de planejamento. ................................................. 31 
+Figura 6 – Momentos do Planejamento Estratégico. .................................................... 33 
+Figura 7 – Conceituação geral da função controle e avaliação..................................... 36 
+Figura 8 – A evolução do conceito do Balanced Scorecard......................................... 38 
+Figura 9 – Princípios da organização orientada à estratégia ......................................... 40 
+Figura 10 – Arquitetura do BSC para organizações que não visam ao lucro. .............. 43 
+Figura 11- Mapa com as localidades dos campi do IFSC............................................. 63 
+Figura 12- Mapa estratégico do IFSC ........................................................................... 66 
+Figura 13 – Metodologia de elaboração do planejamento anual do IFSC .................... 68 
+--- Page 11 ---
+LISTA DE QUADROS 
+Quadro 1–Estágios da despesa orçamentária ............................................................................ 27 
+Quadro 2 - Fatores que podem influenciar o Alinhamento ...................................................... 49 
+Quadro 3–Vinculação dos sujeitos da pesquisa aos objetivos específicos. .............................. 57 
+Quadro 4–Vinculação das técnicas de coleta de dados aos sujeitos e objetivos específicos.... 59 
+Quadro 5 – Fatores que contribuíram e fatores que dificultaram a implementação do PE.. .... 76 
+Quadro 6– Fatores que contribuíram e fatores que dificultaram a execução orçamentária. .... 92 
+Quadro 7– Situação e comparação dos fatores que podem influenciar o alinhamento .......... 102 
+--- Page 12 ---
+ LISTA DE TABELAS 
+Tabela 1 - Limites orçamentários do IFSC em 2019 ................................................................ 88 
+--- Page 13 ---
+SUMÁRIO 
+1 INTRODUÇÃO ........................................................................................................ 13 
+1.1 CONTEXTUALIZAÇÃO DO TEMA ....................................................................... 13 
+1.2 OBJETIVOS ............................................................................................................... 15 
+1.2.1 Objetivos específicos................................................................................................. 15 
+1.3 JUSTIFICATIVA ....................................................................................................... 16 
+2 REVISÃO BIBLIOGRÁFICA ................................................................................ 19 
+2.1 ORÇAMENTO PÚBLICO......................................................................................... 19 
+2.1.1 Processo Orçamentário e a Fase de Planejamento ................................................ 22 
+2.1.2 Processo Orçamentário e a Fase de Execução ....................................................... 26 
+2.1.3 Processo Orçamentário e a Fase de Controle ........................................................ 28 
+2.2 PLANEJAMENTO ESTRATÉGICO ........................................................................ 30 
+2.2.1 Avaliação e controle do Planejamento Estratégico ............................................... 35 
+2.2.1.1 Balanced Scorecard .................................................................................................... 38 
+2.3 ALINHAMENTO ENTRE PL ANEJAMENTO ESTRATÉGI CO E EXECUÇÃO 
+ORÇAMENTÁRIA. ................................................................................................................. 45 
+2.4 ESTUDOS ANTERIORES S OBRE PLANEJAMENTO ES TRATÉGICO E 
+EXECUÇÃO ORÇAMENTÁRIA EM INSTITUIÇÕES FEDERAIS DE ENSINO. ............. 50 
+3 METODOLOGIA DA PESQUISA ......................................................................... 53 
+3.1 CARACTERIZAÇÃO DA PESQUISA ..................................................................... 53 
+3.2 SUJEITOS DA PESQUISA ....................................................................................... 55 
+3.3 COLETA E ANÁLISE DE DADOS.......................................................................... 58 
+4 APRESENTAÇÃO E DISCUSSÃO DOS RESULTADOS .................................. 62 
+4.1 O INSTITUTO FEDERAL DE SANTA CATARINA – IFSC ................................. 62 
+4.2 PLANEJAMENTO ESTRATÉGICO NO IFSC ........................................................ 65 
+4.2.1 Plano Anual de Trabalho (PAT) ............................................................................. 68 
+4.3 A EXECUÇÃO ORÇAMENTÁRIA NO IFSC ......................................................... 87 
+4.4 ALINHAMENTO ENTRE O PLANEJAMENTO ESTRATÉ GICO E O 
+ORÇAMENTO NO IFSC ......................................................................................................... 94 
+4.5 O BSC COMO MÉTODO DE ALINHAMENTO ................................................... 103 
+5 CONSIDERAÇÕES FINAIS................................................................................. 106 
+REFERÊNCIAS.................................................................................................................... 110 
+APÊNDICE A – ROTEIRO DE ENTREVISTA –INSTITUCIONAL............................ 117 
+--- Page 14 ---
+APÊNDICE B – ROTEIRO DE ENTREVISTA - LOCAL .............................................. 118 
+APÊNDICE C – TERMO DE CONSENTIMENTO LIVRE E ESCLARECIDO ......... 119 
+ 
+ 
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+--- Page 15 ---
+ 
+ 
+13 
+1 INTRODUÇÃO 
+Este capítulo aborda a contextualização do tema estudado, o problema de pesquisa, o 
+objetivo geral e os específicos, e a justificativa para a realização do estudo. 
+1.1 CONTEXTUALIZAÇÃO DO TEMA 
+Cada vez mais se exige das instituiç ões públicas a implantação de mudanças 
+consistentes em seus procedimentos com a finalidade de incrementar qualidade e eficiência 
+aos serviços públicos (OLIVEIRA, 2018). Isso sugere uma revisão nos métodos e 
+instrumentos que predominam nos padrões adotados pela tecnocracia, sobretudo nos 
+processos decisórios e na implementação das ações, introduzindo uma nova composição 
+organizacional e de processos de gestão. Para tanto, os gestores precisam desenvolver 
+estratégias para que a utilização dos recursos - materiais, financeiros ou humanos – seja 
+executada da melhor maneira e que, em contrapartida, haja a satisfação dos cidadãos com os 
+serviços oferecidos pelos órgãos públicos. 
+Neste contexto, o uso do planejamento torna -se imprescindível, uma vez que consiste 
+em “uma metodologia administrativa que procura criar uma situação de otimização da 
+empresa perante as mutações de seu ambiente, visando usufruir, da melhor maneira possível, 
+das oportunidades, bem como evitar as ameaças” (OLIVEIRA, 2018, p. 278).  
+A Constitu ição Federal de 1988 enfatizou a função de planejamento ao introduzir 
+significativas mudanças durante o processo orçamentário, aliando o orçamento público ao 
+planejamento e integrando os instrumentos de planejamento: o Plano Plurianual (PPA), a Lei 
+de Dire trizes Orçamentárias (LDO) e a Lei Orçamentária Anual (LOA) (CATAPAN; 
+BERNARDONI; CRUZ, 2013; GIACOMONI, 2017).  
+Com os novos instrumentos as administrações obrigam -se a elaborar planos de médio 
+prazo e estes mantêm vínculos estreitos com os orçamentos anu ais. “Ao definir 
+detalhadamente a composição da lei orçamentária anual, a Constituição criou condições 
+objetivas para a efetiva observância do princípio da universalidade, ou seja, a inclusão de 
+todas as receitas e despesas no processo orçamentário comum” (GIACOMONI, 2017, p. 234). 
+O orçamento público, reconhecido como instrumento de planejamento e de controle da 
+Administração Pública, pode ser entendido como uma técnica capaz de permitir que os 
+objetivos governamentais sejam periodicamente reavaliados, bem  como a avaliação 
+comparativa de diversas funções e programas entre si e o relacionamento de seus custos 
+--- Page 16 ---
+ 
+ 
+14 
+(MATIAS-PEREIRA, 2017).  O autor ainda ressalta que o orçamento é instrumento essencial 
+para os planejadores, uma vez que necessitam de recursos financ eiros para tornar seus planos 
+operacionais viáveis. 
+ De acordo com Frezatti (2017, p. 5), após as fases iniciais do orçamento, é preciso 
+implementar o controle orçamentário. “Analogamente ao orçamento, o controle orçamen tário 
+é a forma de se monitorar o plano estratégico da organização no que se refere   sua parcela de 
+horizonte imediato. Serve para corrigir desvios e realimentar o seu processo de 
+planejamento”. Ainda segundo o autor, a elaboração do orçamento impõe que  sejam 
+considerados e almejados os objetivos definidos pela instituição. Caso isso não ocorra, o 
+orçamento deve ser revisado e ajustado, uma vez que se configura como instrumento 
+gerencial que deve proporcionar a realização dos objetivos e pode contribuir de forma 
+qualitativa. 
+Em relação ao Planejamento Estratégico, este tem por objetivo o desenvolvimento de 
+processos, técnicas e atitudes administrativas que possibilitem avaliar as implicações futuras 
+de decisões presentes de modo a reduzir a incerteza envo lvida no processo decisório, 
+aumentando a probabilidade de alcance dos objetivos estabelecidos, maximizando resultados 
+e minimizando deficiências (OLIVEIRA, 2018). Para Castanheira (2008, p. 29), “o 
+planejamento deve ser visto como um processo contínuo que  levará os gestores a indagações 
+sobre o que fazer , como, quando, quanto, para quem e onde .” Assim , o planejamento 
+estratégico na administração p blica está relacionado com o ê ito na e ecução de seus 
+serviços públicos (REZENDE, 2015). 
+Ainda, segundo o au tor, o controle do Planejamento Estratégico está relacionado com 
+a monitoração, acompanhamento e avaliação do processo de administração estratégica tem 
+como objetivo principal cuidar para que o Planejamento Estratégico seja implantado na sua 
+plenitude (PE REIRA, 2010). Para tanto , uma das ferramentas que pode ser usada é o 
+Balanced Scorecard (BSC), uma vez que não é apenas uma ferramenta de medição de 
+desempenho abrangente e integrada, mas também é um sistema de gestão com a nova 
+abordagem de gestão estrat égica (FOOLADVAND; YARMOHAMMADIAN; 
+SHAHTALEBI, 2015). 
+Contudo, para que o planejamento estratégico possa ser efetivamente executado é 
+essencial que este esteja alinhando à execução orçamentária da organização.  Para Bornia e 
+Lunkes (2007, p. 44), “ a falta d e alinhamento com  o planejamento estratégico torna o 
+processo orçamentário pouco eficiente no gerenciamento estratégico” sendo imprescindível, 
+--- Page 17 ---
+ 
+ 
+15 
+para tanto, construir uma forte integração entre os planos estratégicos e o orçamento 
+(BORNIA; LUNKES, 2007). Ainda, de acordo com Souza, Parreira e Fontenelle  (2016), 
+deve-se considerar a influência de alguns fatores que podem fomentar esse alinhamento, ou 
+dificultá-lo. 
+O Instituto Federal de Santa Catarina utiliza ferramentas de gestão que contribuem 
+para atingir seus objetivos, entre elas o Balanced Scorecard  (BSC), como instrumento de 
+planejamento estratégico (PE).  Desta maneira, para certificar -se que os objetivos propostos 
+no planejamento obtiveram desempenho desejado, seja por meio de iniciativas ou projetos,  é 
+preciso analisar se há correspondência na execução orçamentária, ou seja, se existe 
+alinhamento entre o Planejamento Estratégico e a Execução Orçamentária, tema desta 
+dissertação.  
+Dessa maneira, a pesquisa assume um papel fundamental e oportuno à medid a 
+considera a perspectiva de transformar tais resultados em direcionamento estratégico, 
+contribuindo com o desenvolvimento institucional. Assim, A análise e avaliação da 
+implementação do Plano de Desenvolvimento Institucional - PDI e o Planejamento estratégico 
+do IFSC propiciará uma visão mais ampla na consecução dos objetivos estratégicos da 
+instituição.  
+Portanto, considerando a relevância do orçamento para a gestão das organizações, e 
+visando cumprir os objetivos e metas institucionais, o estudo tem o pr opósito de responder a 
+seguinte questão: Como ocorre o  alinhamento entre o planejamento estratégico e a 
+execução orçamentária em uma Instituição Federal de Ensino? 
+1.2 OBJETIVOS 
+ Com a finalidade de responder à pergunta da pesquisa, este trabalho tem como 
+objetivo: Verificar o nível de alinhamento entre os processos de planejamento estratégico 
+e a execução orçamentária no Instituto Federal de Santa Catarina- IFSC. 
+1.2.1 Objetivos específicos 
+a) Identificar os principais fatores  que influenciaram a implantação do Planeja mento 
+Estratégico 2015-2019 no IFSC. 
+b) Identificar os principais fatores  que influenciaram a execução orçamentária durante o 
+Planejamento Estratégico 2015-2019 no IFSC. 
+--- Page 18 ---
+ 
+ 
+16 
+c) Verificar os fatores que podem influenciar o alinhamento entre os processos de 
+planejamento estratégico e a execução orçamentária no Instituto Federal de Santa 
+Catarina- IFSC 
+d) Identificar a aderência do Balanced Scorecard - BSC como metodologia para alinhar o 
+planejamento estratégico e execução orçamentária do IFSC. 
+1.3 JUSTIFICATIVA 
+Segundo Marcon i e Lakatos (2017, p. 106), a justificativa “consiste numa e posição 
+sucinta, porém completa das razões de ordem teórica e dos motivos de ordem prática que 
+tornam importante a realização da pesquisa”. Para Roesch (2013, p. 99), em termos gerais, é 
+possível justificar um projeto levando em consideração sua “importância, oportunidade e 
+viabilidade”.  
+Em um contexto de restrições orçamentárias, as limitações podem ser atenuadas com 
+aperfeiçoamentos normativos e com melhorias nas práticas orçamentárias que elim inem 
+desperdícios e permita reorientar os recursos livres de acordo com as prioridades do 
+desenvolvimento organizacional (REZENDE; CUNHA, 2005).  
+De acordo com Lindoso (2016), o  grande desafio das organizações públicas é elaborar 
+um planejamento que possa atender suas diversas demandas, e vincular este plano a um 
+orçamento que depende de diversos fatores externos para sua efetiva execução. No entanto, 
+apesar de ser essencial para a gestão na administração pública, o alinhamento entre 
+planejamento e orçament o ainda é pouco e plorado: “trata -se da tradicional relação 
+“planejamento, orçamento e controle”, tão tradicional quanto, muitas vezes, pouco e plorada 
+em seu  potencial  para  desempenho  organizacional  no  setor  p blico” (REZENDE; 
+CUNHA, 2005, p. 122). 
+Assim, considerando o critério da importância, entende -se que este trabalho é 
+importante, para que os gestores do IFSC identifiquem meios que possibilitem o 
+planejamento, a execução e o controle dos recursos orçamentários disponíveis. Conhecendo 
+os problemas, os gestores podem buscar mecanismos que amenizem, ou mesmo eliminem os 
+fatores que limitam a utilização do orçamento como ferramenta de controle gerencial. A 
+pesquisa também pode ser considerada importante para a comunidade acadêmica do IFSC, 
+pois pode refletir em uma maior eficiência na aplicação dos recursos públicos e numa melhor 
+prestação de serviço por parte da instituição.  
+--- Page 19 ---
+ 
+ 
+17 
+Dessa maneira, a pesquisa assume um papel fundamental e oportuno à medida que se 
+considere a perspectiva de transformar tais  resultados em direcionamento estratégico para a 
+Instituição. Além disso, este estudo é oportuno uma vez que pode subsidiar a instituição na 
+aplicação da legislação vigente acerca da utilização de recursos públicos, bem como na 
+prestação de contas aos órgãos de controle. 
+Quanto ao argumento de viabilidade o estudo é viável tendo em vista que o 
+pesquisador é servidor efetivo na instituição, conhece os processos internos e os setores 
+responsáveis para solicitação, obtenção de dados e informações acerca do tema.  
+Ainda, de acordo com Rodrigues, Silva e Krüger (2014), o interesse pelo tema 
+orçamento tem sido recorrente por décadas, mas o tema integração do orçamento com a 
+estratégia vem sendo ainda estudado de forma incipiente. Conforme será apresentado no item 
+2.4, relativo a estudos anteriores sobre planejamento estratégico e execução orçamentária em 
+Instituições Federais de Ensino, somente os estudos de Lucas (2015), Lindoso (2016) e 
+Silveira et al. (2017)  pesquisaram diretamente o alinhamento do orçamento ao planejamento 
+estratégico. Os trabalhos de Erasmo, Duarte e Lima (2019), Maciel e Lavarda (2017) Souza 
+(2016), Queiroz, Queiroz e Hekis (2011), embora não tenham o alinhamento do orçamento ao 
+planejamento estratégico como objeto central de estudo, trazem co ntribuições e achados sobre 
+o tema, abordando -o indiretamente, como fatores críticos, barreiras e facilitadores ao 
+alinhamento estratégico (GAROZZI; RAUPP, 2020). 
+Dentre os estudos anteriores, o desenvolvido por Silveira et al. (2017) apresenta 
+especial interesse, uma vez que o estudo foi realizado no Instituto Federal de Santa Catarina – 
+IFSC e verificou a presença de elementos constantes na literatura que favorecem o 
+alinhamento, como também, fatores que dificultam o alinhamento. Ainda, os autores sugerem  
+o desenvolvimento de nova pesquisa ao final do planejamento estratégico (2019), uma vez 
+que a pesquisa foi realizada em 2015, considerando apenas o primeiro ano do Planejamento 
+Estratégico 2015 -2019. Desta forma, torna -se necessário uma pesquisa mais abra ngente, 
+tomando por base todo o período do Planejamento Estratégico, a fim de que se possa 
+contribuir com os achados de Silveira et al. (2017). 
+Assim, além dos pontos já citados, esta pesquisa se justifica como forma a explorar a 
+escassez de pesquisas rela tivas ao alinhamento do orçamento com planejamento estratégico, 
+bem como, subsidiar pesquisas na área de administração pública no que se refere ao avanço 
+no entendimento dos fatores necessários à promoção deste alinhamento, essenciais para o 
+alcance dos objetivos da organização.  
+--- Page 20 ---
+ 
+ 
+18 
+ 

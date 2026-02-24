@@ -27,6 +27,7 @@ export const empenhosService = {
             dataEmpenho: new Date(item.data_empenho),
             status: item.status,
             atividadeId: item.atividade_id || undefined,
+            processo: item.processo || undefined,
             createdAt: new Date(item.created_at),
             updatedAt: new Date(item.updated_at),
         }));
@@ -46,6 +47,7 @@ export const empenhosService = {
                 plano_interno: empenho.planoInterno,
                 favorecido_nome: empenho.favorecidoNome,
                 favorecido_documento: empenho.favorecidoDocumento,
+                processo: empenho.processo,
                 valor_liquidado: empenho.valorLiquidado || 0,
                 data_empenho: empenho.dataEmpenho.toISOString(),
                 status: empenho.status,
@@ -68,6 +70,7 @@ export const empenhosService = {
             planoInterno: data.plano_interno || undefined,
             favorecidoNome: data.favorecido_nome || undefined,
             favorecidoDocumento: data.favorecido_documento || undefined,
+            processo: data.processo || undefined,
             valorLiquidado: data.valor_liquidado ? Number(data.valor_liquidado) : 0,
             dataEmpenho: new Date(data.data_empenho),
             status: data.status,
@@ -92,6 +95,7 @@ export const empenhosService = {
         if (empenho.planoInterno !== undefined) updates.plano_interno = empenho.planoInterno;
         if (empenho.favorecidoNome !== undefined) updates.favorecido_nome = empenho.favorecidoNome;
         if (empenho.favorecidoDocumento !== undefined) updates.favorecido_documento = empenho.favorecidoDocumento;
+        if (empenho.processo !== undefined) updates.processo = empenho.processo;
         if (empenho.valorLiquidado !== undefined) updates.valor_liquidado = empenho.valorLiquidado;
         if (empenho.dataEmpenho) updates.data_empenho = empenho.dataEmpenho.toISOString();
         if (empenho.status) updates.status = empenho.status;

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Search, Filter, Upload } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Filter, Upload, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Atividade, DIMENSOES, NATUREZAS_DESPESA } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -60,6 +60,9 @@ export default function Atividades() {
   const [filterOrigem, setFilterOrigem] = useState('all');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
+  // Sorting
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Atividade; direction: 'asc' | 'desc' } | null>(null);
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
@@ -85,6 +88,43 @@ export default function Atividades() {
     return matchesSearch && matchesDimensao && matchesComponente && matchesOrigem;
   });
 
+  const sortedAtividades = [...filteredAtividades].sort((a, b) => {
+    if (!sortConfig) return 0;
+
+    const { key, direction } = sortConfig;
+    let aValue = a[key] ?? '';
+    let bValue = b[key] ?? '';
+
+    if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+    if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+
+    if (aValue < bValue) {
+      return direction === 'asc' ? -1 : 1;
+    }
+    if (aValue > bValue) {
+      return direction === 'asc' ? 1 : -1;
+    }
+    return 0;
+  });
+
+  const requestSort = (key: keyof Atividade) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (columnName: keyof Atividade) => {
+    if (!sortConfig || sortConfig.key !== columnName) {
+      return <ArrowUpDown className="ml-2 h-4 w-4" />;
+    }
+    if (sortConfig.direction === 'asc') {
+      return <ArrowUp className="ml-2 h-4 w-4" />;
+    }
+    return <ArrowDown className="ml-2 h-4 w-4" />;
+  };
+
   const handleOpenDialog = (atividade?: Atividade) => {
     if (atividade) {
       setSelectedAtividade(atividade);
@@ -107,10 +147,18 @@ export default function Atividades() {
   };
 
   const handleSubmit = () => {
+    let origemFormatada = formData.origemRecurso;
+    const ptresMatch = origemFormatada.match(/\b(\d{6})\b/);
+    if (ptresMatch) {
+      origemFormatada = ptresMatch[1];
+    }
+
+    const dataToSubmit = { ...formData, origemRecurso: origemFormatada };
+
     if (selectedAtividade) {
-      updateAtividade(selectedAtividade.id, formData);
+      updateAtividade(selectedAtividade.id, dataToSubmit);
     } else {
-      addAtividade(formData);
+      addAtividade(dataToSubmit);
     }
     setIsDialogOpen(false);
     setFormData(initialFormState);
@@ -131,7 +179,7 @@ export default function Atividades() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedIds(new Set(filteredAtividades.map((a) => a.id)));
+      setSelectedIds(new Set(sortedAtividades.map((a) => a.id)));
     } else {
       setSelectedIds(new Set());
     }
@@ -158,6 +206,13 @@ export default function Atividades() {
   const handleJsonImport = (data: Record<string, string>[]) => {
     let importCount = 0;
     data.forEach((row) => {
+      // Formata a origem recurso para extrair o PTRES se vier no formato AA.BBBB.CCCCCC.D
+      let origemRecurso = row['origemrecurso'] || '';
+      const ptresMatch = origemRecurso.match(/\b(\d{6})\b/);
+      if (ptresMatch) {
+        origemRecurso = ptresMatch[1];
+      }
+
       const atividade = {
         dimensao: row['dimensao'] || '',
         componenteFuncional: row['componentefuncional'] || row['componente'] || '',
@@ -165,7 +220,7 @@ export default function Atividades() {
         atividade: row['atividade'] || '',
         descricao: row['descricao'] || '',
         valorTotal: parseCurrency(row['valortotal'] || row['valor'] || '0'),
-        origemRecurso: row['origemrecurso'] || '',
+        origemRecurso: origemRecurso,
         naturezaDespesa: row['naturezadespesa'] || '',
         planoInterno: row['planointerno'] || '',
       };
@@ -313,22 +368,42 @@ export default function Atividades() {
                   <th className="py-3 px-4 w-[40px]">
                     <Checkbox
                       checked={
-                        filteredAtividades.length > 0 &&
-                        filteredAtividades.every((a) => selectedIds.has(a.id))
+                        sortedAtividades.length > 0 &&
+                        sortedAtividades.every((a) => selectedIds.has(a.id))
                       }
                       onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
                     />
                   </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Atividade</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Dimensão</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Componente Funcional</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Origem de Recurso</th>
-                  <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Valor</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
+                    <Button variant="ghost" className="hover:bg-transparent px-0 font-medium" onClick={() => requestSort('atividade')}>
+                      Atividade {getSortIcon('atividade')}
+                    </Button>
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
+                    <Button variant="ghost" className="hover:bg-transparent px-0 font-medium" onClick={() => requestSort('dimensao')}>
+                      Dimensão {getSortIcon('dimensao')}
+                    </Button>
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
+                    <Button variant="ghost" className="hover:bg-transparent px-0 font-medium" onClick={() => requestSort('componenteFuncional')}>
+                      Componente Funcional {getSortIcon('componenteFuncional')}
+                    </Button>
+                  </th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
+                    <Button variant="ghost" className="hover:bg-transparent px-0 font-medium" onClick={() => requestSort('origemRecurso')}>
+                      Origem de Recurso {getSortIcon('origemRecurso')}
+                    </Button>
+                  </th>
+                  <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">
+                    <Button variant="ghost" className="hover:bg-transparent px-0 font-medium justify-end w-full" onClick={() => requestSort('valorTotal')}>
+                      Valor {getSortIcon('valorTotal')}
+                    </Button>
+                  </th>
                   <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Ações</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredAtividades.map((atividade) => (
+                {sortedAtividades.map((atividade) => (
                   <tr key={atividade.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
                     <td className="py-4 px-4">
                       <Checkbox

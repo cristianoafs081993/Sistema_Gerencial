@@ -1,8 +1,10 @@
 import { useState, useMemo, useRef } from 'react';
-import { Plus, Pencil, Trash2, Search, Filter, Calendar, Upload, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Filter, Calendar, Upload, FileSpreadsheet, Loader2, RefreshCw } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
-import { Empenho, DIMENSOES, NATUREZAS_DESPESA } from '@/types';
+import { Empenho, DIMENSOES, NATUREZAS_DESPESA, COMPONENTES_POR_DIMENSAO } from '@/types';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { transparenciaService } from '@/services/transparencia';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -67,6 +69,7 @@ const initialFormState: {
   planoInterno: string;
   favorecidoNome: string;
   favorecidoDocumento: string;
+  processo: string;
 } = {
   numero: '',
   descricao: '',
@@ -81,10 +84,11 @@ const initialFormState: {
   planoInterno: '',
   favorecidoNome: '',
   favorecidoDocumento: '',
+  processo: '',
 };
 
 export default function Empenhos() {
-  const { empenhos, atividades, addEmpenho, updateEmpenho, deleteEmpenho } = useData();
+  const { empenhos, atividades, addEmpenho, updateEmpenho, deleteEmpenho, refreshData } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterDimensao, setFilterDimensao] = useState('all');
@@ -101,6 +105,7 @@ export default function Empenhos() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isUpdatingSaldos, setIsUpdatingSaldos] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const saldosInputRef = useRef<HTMLInputElement>(null);
   const [selectedEmpenho, setSelectedEmpenho] = useState<Empenho | null>(null);
   const [formData, setFormData] = useState(initialFormState);
@@ -152,6 +157,7 @@ export default function Empenhos() {
         dataEmpenho: empenho.dataEmpenho,
         status: empenho.status,
         atividadeId: empenho.atividadeId || '',
+        processo: empenho.processo || '',
       });
     } else {
       setSelectedEmpenho(null);
@@ -297,11 +303,30 @@ export default function Empenhos() {
     }
   };
 
+  const handleSyncApi = async () => {
+    setIsSyncing(true);
+    let lastMessage = '';
+    const toastId = toast.loading('Iniciando sincronização...');
+
+    try {
+      await transparenciaService.syncEmpenhosSequencial((msg) => {
+        lastMessage = msg;
+        toast.loading(msg, { id: toastId });
+      });
+      toast.success(lastMessage || 'Sincronização concluída!', { id: toastId });
+      await refreshData();
+    } catch (error) {
+      console.error(error);
+      toast.error('Erro na sincronização', { id: toastId });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const dimensoesDisponiveis = useMemo(() => {
-    const dimensoesAtividades = [...new Set(atividades.map(a => a.dimensao).filter(Boolean))];
-    const dimensoesFixas = DIMENSOES.map(d => d.nome);
-    return [...new Set([...dimensoesFixas, ...dimensoesAtividades])];
-  }, [atividades]);
+    // Agora usando apenas as dimensões estáticas definidas
+    return DIMENSOES.map(d => d.nome);
+  }, []);
 
   const origensDisponiveis = useMemo(() => {
     return [...new Set(
@@ -346,13 +371,14 @@ export default function Empenhos() {
               </>
             )}
           </Button>
-          <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} className="gap-2">
-            <Upload className="h-4 w-4" />
-            Importar JSON
-          </Button>
-          <Button onClick={() => handleOpenDialog()} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Novo Empenho
+          <Button
+            variant="outline"
+            onClick={handleSyncApi}
+            className="gap-2"
+            disabled={isSyncing}
+          >
+            <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
           </Button>
         </div>
       </div>
@@ -502,165 +528,75 @@ export default function Empenhos() {
         </CardContent>
       </Card>
 
-      {/* Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">
-            {filteredEmpenhos.length} empenho{filteredEmpenhos.length !== 1 ? 's' : ''} encontrado{filteredEmpenhos.length !== 1 ? 's' : ''}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Número</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground min-w-[200px]">Descrição</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground min-w-[150px]">Favorecido</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Componente / Dimensão</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Origem / Plano</th>
-                  <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Empenhado / Liquidado</th>
-                  <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Saldo</th>
-                  <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredEmpenhos.map((empenho) => (
-                  <tr key={empenho.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
-                    <td className="py-4 px-4 align-top">
-                      <span className="font-mono text-sm font-medium whitespace-nowrap">{empenho.numero}</span>
-                    </td>
-                    <td className="py-4 px-4 align-top">
-                      <p className="text-sm line-clamp-2" title={empenho.descricao}>{empenho.descricao}</p>
-                    </td>
-                    <td className="py-4 px-4 align-top">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium truncate max-w-[150px]" title={empenho.favorecidoNome}>{empenho.favorecidoNome || '-'}</span>
-                        <span className="text-xs text-muted-foreground">{empenho.favorecidoDocumento}</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 align-top">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-sm font-medium">{empenho.componenteFuncional}</span>
-                        <Badge variant="secondary" className="w-fit whitespace-nowrap">
-                          {empenho.dimensao.split(' - ')[0]}
-                        </Badge>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 align-top">
-                      <div className="flex flex-col gap-1">
-                        <p className="text-sm font-medium whitespace-nowrap">{empenho.origemRecurso}</p>
-                        {empenho.planoInterno && (
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">{empenho.planoInterno}</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 text-right align-top whitespace-nowrap">
-                      <div className="flex flex-col gap-1 items-end">
-                        <span className="font-medium" title="Empenhado">{formatCurrency(empenho.valor)}</span>
-                        <span className={`text-xs ${(empenho.valorLiquidado || 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`} title="Liquidado">
-                          Liq: {formatCurrency(empenho.valorLiquidado || 0)}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 text-right align-top whitespace-nowrap">
-                      {(() => {
-                        const saldo = empenho.valor - (empenho.valorLiquidado || 0);
-                        return (
-                          <span className={`font-medium ${saldo > 0 ? 'text-green-600' : saldo < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
-                            {formatCurrency(saldo)}
-                          </span>
-                        );
-                      })()}
-                    </td>
-                    <td className="py-4 px-4 align-top whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenDialog(empenho)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openDeleteDialog(empenho)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+
+
+      <Tabs defaultValue="execucao" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+          <TabsTrigger value="execucao">Execução {new Date().getFullYear()}</TabsTrigger>
+          <TabsTrigger value="restos">Restos a Pagar</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="execucao">
+          <EmpenhosTable
+            empenhos={filteredEmpenhos.filter(e => e.numero.includes(String(new Date().getFullYear())))}
+            type="execucao"
+            handleOpenDialog={handleOpenDialog}
+            openDeleteDialog={openDeleteDialog}
+          />
+        </TabsContent>
+
+        <TabsContent value="restos">
+          <EmpenhosTable
+            empenhos={filteredEmpenhos.filter(e => !e.numero.includes(String(new Date().getFullYear())))}
+            type="restos"
+            handleOpenDialog={handleOpenDialog}
+            openDeleteDialog={openDeleteDialog}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Form Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {selectedEmpenho ? 'Editar Empenho' : 'Novo Empenho'}
+              {selectedEmpenho ? `Editar Empenho ${selectedEmpenho.numero}` : 'Detalhes do Empenho'}
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="numero">Número do Empenho</Label>
-                <Input
-                  id="numero"
-                  value={formData.numero}
-                  onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
-                  placeholder="Ex: 2024NE000123"
-                />
+            {/* Informações Read-Only */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted/30 p-3 rounded-md">
+              <div className="grid gap-1">
+                <span className="text-sm font-medium text-muted-foreground">Número</span>
+                <span>{formData.numero}</span>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="dataEmpenho">Data do Empenho</Label>
-                <Input
-                  id="dataEmpenho"
-                  type="date"
-                  value={format(new Date(formData.dataEmpenho), 'yyyy-MM-dd')}
-                  onChange={(e) => setFormData({ ...formData, dataEmpenho: new Date(e.target.value) })}
-                />
+              <div className="grid gap-1">
+                <span className="text-sm font-medium text-muted-foreground">Data</span>
+                <span>{format(new Date(formData.dataEmpenho), 'dd/MM/yyyy')}</span>
               </div>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="descricao">Descrição</Label>
-              <Textarea
-                id="descricao"
-                value={formData.descricao}
-                onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
-                placeholder="Descrição do empenho"
-              />
-            </div>
-
-            {/* Favorecido Section */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="grid gap-2 sm:col-span-2">
-                <Label htmlFor="favorecidoNome">Favorecido (Nome/Razão Social)</Label>
-                <Input
-                  id="favorecidoNome"
-                  value={formData.favorecidoNome}
-                  onChange={(e) => setFormData({ ...formData, favorecidoNome: e.target.value })}
-                  placeholder="Nome do favorecido"
-                />
+              <div className="grid gap-1 sm:col-span-2">
+                <span className="text-sm font-medium text-muted-foreground">Descrição</span>
+                <p className="text-sm">{formData.descricao}</p>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="favorecidoDocumento">CPF/CNPJ</Label>
-                <Input
-                  id="favorecidoDocumento"
-                  value={formData.favorecidoDocumento}
-                  onChange={(e) => setFormData({ ...formData, favorecidoDocumento: e.target.value })}
-                  placeholder="Documento"
-                />
+              <div className="grid gap-1">
+                <span className="text-sm font-medium text-muted-foreground">Processo</span>
+                <span>{formData.processo || '-'}</span>
+              </div>
+              <div className="grid gap-1">
+                <span className="text-sm font-medium text-muted-foreground">Favorecido</span>
+                <span>{formData.favorecidoNome}</span>
+              </div>
+              <div className="grid gap-1">
+                <span className="text-sm font-medium text-muted-foreground">Valor</span>
+                <span>{formatCurrency(formData.valor)}</span>
+              </div>
+              <div className="grid gap-1 sm:col-span-2">
+                <span className="text-sm font-medium text-muted-foreground">Natureza de Despesa</span>
+                <span>{formData.naturezaDespesa}</span>
               </div>
             </div>
 
+            {/* Campos Editáveis */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="dimensao">Dimensão</Label>
@@ -682,12 +618,27 @@ export default function Empenhos() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="componenteFuncional">Componente Funcional</Label>
-                <Input
-                  id="componenteFuncional"
+                <Select
                   value={formData.componenteFuncional}
-                  onChange={(e) => setFormData({ ...formData, componenteFuncional: e.target.value })}
-                  placeholder="Ex: Gestão Administrativa"
-                />
+                  onValueChange={(v) => setFormData({ ...formData, componenteFuncional: v })}
+                  disabled={!formData.dimensao}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={formData.dimensao ? "Selecione o componente" : "Selecione a dimensão primeiro"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {formData.dimensao && (() => {
+                      // Extrair código da dimensão (ex: "AD - Administração" -> "AD")
+                      const dimCodigo = formData.dimensao.split(' - ')[0];
+                      const componentes = COMPONENTES_POR_DIMENSAO[dimCodigo] || [];
+                      return componentes.map((comp) => (
+                        <SelectItem key={comp} value={comp}>
+                          {comp}
+                        </SelectItem>
+                      ));
+                    })()}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="origemRecurso">Origem de Recurso</Label>
@@ -714,61 +665,13 @@ export default function Empenhos() {
                 />
               </div>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="valor">Valor (R$)</Label>
-                <Input
-                  id="valor"
-                  type="number"
-                  value={formData.valor}
-                  onChange={(e) => setFormData({ ...formData, valor: parseFloat(e.target.value) || 0 })}
-                  placeholder="0,00"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="status">Status</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(v) => setFormData({ ...formData, status: v as any })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pendente">Pendente</SelectItem>
-                    <SelectItem value="liquidado">Liquidado</SelectItem>
-                    <SelectItem value="pago">Pago</SelectItem>
-                    <SelectItem value="cancelado">Cancelado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="naturezaDespesa">Natureza de Despesa</Label>
-              <Select
-                value={formData.naturezaDespesa}
-                onValueChange={(v) => setFormData({ ...formData, naturezaDespesa: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a natureza de despesa" />
-                </SelectTrigger>
-                <SelectContent>
-                  {NATUREZAS_DESPESA.map((n) => (
-                    <SelectItem key={n} value={n}>
-                      {n}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancelar
             </Button>
             <Button onClick={handleSubmit}>
-              {selectedEmpenho ? 'Salvar' : 'Criar'}
+              Salvar
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -793,14 +696,138 @@ export default function Empenhos() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* JSON Import Dialog */}
-      <JsonImportDialog
-        open={isImportDialogOpen}
-        onOpenChange={setIsImportDialogOpen}
-        onImport={handleJsonImport}
-        title="Importar Empenhos"
-        expectedFields={empenhosJsonFields}
-      />
-    </div>
+
+    </div >
   );
 }
+
+// Extracted Component for Table Reuse inside Tabs
+function EmpenhosTable({ empenhos, type, handleOpenDialog, openDeleteDialog }: {
+  empenhos: Empenho[],
+  type: 'execucao' | 'restos',
+  handleOpenDialog: (e: Empenho) => void,
+  openDeleteDialog: (e: Empenho) => void
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">
+          {empenhos.length} empenho{empenhos.length !== 1 ? 's' : ''} encontrado{empenhos.length !== 1 ? 's' : ''}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Número</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground min-w-[150px]">Favorecido</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Componente / Dimensão</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Origem / Plano</th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">
+                  {type === 'execucao' ? 'Empenhado / Liquidado' : 'Inscrito / Pago'}
+                </th>
+                <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Saldo</th>
+                <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {empenhos.map((empenho) => (
+                <tr key={empenho.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
+                  <td className="py-4 px-4 align-top">
+                    <div className="flex flex-col gap-1">
+                      <span className="font-mono text-sm font-medium whitespace-nowrap">{empenho.numero}</span>
+                      {empenho.processo && (
+                        <span className="text-xs text-muted-foreground whitespace-nowrap" title="Processo">
+                          Proc: {empenho.processo}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-4 px-4 align-top">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium truncate max-w-[150px]" title={empenho.favorecidoNome}>{empenho.favorecidoNome || '-'}</span>
+                      <span className="text-xs text-muted-foreground">{empenho.favorecidoDocumento}</span>
+                    </div>
+                  </td>
+                  <td className="py-4 px-4 align-top">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm font-medium">{empenho.componenteFuncional}</span>
+                      <Badge variant="secondary" className="w-fit whitespace-nowrap">
+                        {empenho.dimensao.split(' - ')[0]}
+                      </Badge>
+                    </div>
+                  </td>
+                  <td className="py-4 px-4 align-top">
+                    <div className="flex flex-col gap-1">
+                      <p className="text-sm font-medium whitespace-nowrap">{empenho.origemRecurso}</p>
+                      {empenho.planoInterno && (
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">{empenho.planoInterno}</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-4 px-4 text-right align-top whitespace-nowrap">
+                    <div className="flex flex-col gap-1 items-end">
+                      <span className="font-medium" title={type === 'execucao' ? "Empenhado" : "Inscrito"}>
+                        {formatCurrency(empenho.valor)}
+                      </span>
+                      {type === 'execucao' ? (
+                        <>
+                          <span className={`text-xs ${(empenho.valorLiquidado || 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`} title="Liquidado">
+                            Liq: {formatCurrency(empenho.valorLiquidado || 0)}
+                          </span>
+                          {(empenho.valorPago || 0) > 0 && (
+                            <span className="text-[10px] text-green-600" title="Pago">
+                              Pg: {formatCurrency(empenho.valorPago || 0)}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className={`text-xs ${(empenho.valorPago || 0) > 0 ? 'text-green-600' : 'text-muted-foreground'}`} title="Pago">
+                          Pg: {formatCurrency(empenho.valorPago || 0)}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-4 px-4 text-right align-top whitespace-nowrap">
+                    {(() => {
+                      // Saldo logic: 
+                      // For Execução: Empenho - Liquidado
+                      // For Restos (RP): Inscrito - Liquidado (User specific request)
+                      const saldo = empenho.valor - (empenho.valorLiquidado || 0);
+                      return (
+                        <span className={`font-medium ${saldo > 0 ? 'text-green-600' : saldo < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                          {formatCurrency(saldo)}
+                        </span>
+                      );
+                    })()}
+                  </td>
+                  <td className="py-4 px-4 align-top whitespace-nowrap">
+                    <div className="flex items-center justify-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleOpenDialog(empenho)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openDeleteDialog(empenho)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+

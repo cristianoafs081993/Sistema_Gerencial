@@ -1,0 +1,243 @@
+--- Analyzing Dissertação versão final Osni Cristiano Reisch.pdf ---
+Found mention of '15 fatores' or 'Quadro 2' (Fatores). Extracting context...
+
+Match at line 230: Quadro 2 - Fatores que podem influenciar o Alinhamento ...................................................... 49
+Quadro 2 - Fatores que podem influenciar o Alinhamento ...................................................... 49 
+Quadro 3–Vinculação dos sujeitos da pesquisa aos objetivos específicos. .............................. 57 
+Quadro 4–Vinculação das técnicas de coleta de dados aos sujeitos e objetivos específicos.... 59 
+Quadro 5 – Fatores que contribuíram e fatores que dificultaram a implementação do PE.. .... 76 
+Quadro 6– Fatores que contribuíram e fatores que dificultaram a execução orçamentária. .... 92 
+Quadro 7– Situação e comparação dos fatores que podem influenciar o alinhamento .......... 102 
+ LISTA DE TABELAS 
+Tabela 1 - Limites orçamentários do IFSC em 2019 ................................................................ 88 
+SUMÁRIO 
+1 INTRODUÇÃO ........................................................................................................ 13 
+1.1 CONTEXTUALIZAÇÃO DO TEMA ....................................................................... 13 
+1.2 OBJETIVOS ............................................................................................................... 15 
+1.2.1 Objetivos específicos................................................................................................. 15 
+1.3 JUSTIFICATIVA ....................................................................................................... 16 
+2 REVISÃO BIBLIOGRÁFICA ................................................................................ 19 
+2.1 ORÇAMENTO PÚBLICO......................................................................................... 19 
+2.1.1 Processo Orçamentário e a Fase de Planejamento ................................................ 22 
+2.1.2 Processo Orçamentário e a Fase de Execução ....................................................... 26 
+2.1.3 Processo Orçamentário e a Fase de Controle ........................................................ 28 
+2.2 PLANEJAMENTO ESTRATÉGICO ........................................................................ 30 
+2.2.1 Avaliação e controle do Planejamento Estratégico ............................................... 35 
+2.2.1.1 Balanced Scorecard .................................................................................................... 38 
+2.3 ALINHAMENTO ENTRE PL ANEJAMENTO ESTRATÉGI CO E EXECUÇÃO 
+ORÇAMENTÁRIA. ................................................................................................................. 45 
+2.4 ESTUDOS ANTERIORES S OBRE PLANEJAMENTO ES TRATÉGICO E 
+EXECUÇÃO ORÇAMENTÁRIA EM INSTITUIÇÕES FEDERAIS DE ENSINO. ............. 50 
+3 METODOLOGIA DA PESQUISA ......................................................................... 53 
+3.1 CARACTERIZAÇÃO DA PESQUISA ..................................................................... 53 
+3.2 SUJEITOS DA PESQUISA ....................................................................................... 55 
+3.3 COLETA E ANÁLISE DE DADOS.......................................................................... 58 
+4 APRESENTAÇÃO E DISCUSSÃO DOS RESULTADOS .................................. 62 
+4.1 O INSTITUTO FEDERAL DE SANTA CATARINA – IFSC ................................. 62 
+4.2 PLANEJAMENTO ESTRATÉGICO NO IFSC ........................................................ 65 
+4.2.1 Plano Anual de Trabalho (PAT) ............................................................................. 68 
+4.3 A EXECUÇÃO ORÇAMENTÁRIA NO IFSC ......................................................... 87 
+4.4 ALINHAMENTO ENTRE O PLANEJAMENTO ESTRATÉ GICO E O 
+ORÇAMENTO NO IFSC ......................................................................................................... 94 
+4.5 O BSC COMO MÉTODO DE ALINHAMENTO ................................................... 103 
+5 CONSIDERAÇÕES FINAIS................................................................................. 106 
+REFERÊNCIAS.................................................................................................................... 110 
+APÊNDICE A – ROTEIRO DE ENTREVISTA –INSTITUCIONAL............................ 117 
+APÊNDICE B – ROTEIRO DE ENTREVISTA - LOCAL .............................................. 118 
+APÊNDICE C – TERMO DE CONSENTIMENTO LIVRE E ESCLARECIDO ......... 119 
+ 
+ 
+ 
+ 
+ 
+ 
+  
+--------------------
+
+Match at line 1492: O Quadro 2 apresenta um resumo, contendo 15 que  fatores que podem influenciar o
+O Quadro 2 apresenta um resumo, contendo 15 que  fatores que podem influenciar o 
+alinhamento ente o planejamento estratégico e o orçamento. 
+ 
+ 
+ 
+49 
+Quadro 2 - Fatores que podem influenciar o Alinhamento 
+Nº do 
+Fator 
+Fatores que podem influenciar o 
+Alinhamento Autores 
+ 
+1 Necessidade de sequenciamento entre 
+planejamento estratégico e orçamento 
+Leahy (2002); Blumentritt (2006); Frezatti et al. 
+(2009); Ferreira e Diehl (2012) 
+2 Função do Orçamento e do 
+Planejamento Estratégico  Blumentritt (2006); Ribeiro (2011) 
+ 
+3 
+Sinergia entre as áreas, departamentos 
+ou unidades organizacionais 
+Welsch (1983); Diehl (2004); Kaplan e Norton 
+(2006) Almeida et al. (2009) Ribeiro (2011);  
+Ferreira e Diehl (2012) 
+ 
+4 
+Acompanhamento da execução 
+orçamentária 
+Rezende e Cunha (2005) Almeida et al. (2009) 
+Lunkes, Ripoll e Rosa (2011) 
+ 
+5 
+Ferramentas de comunicação e definição de 
+responsabilidades entre as áreas 
+ 
+Shim e Siegel (2009) 
+6 Informações contábeis precisas, 
+confiáveis e oportunas 
+Shim e Siegel (2009)  
+7 Compatibilidade e 
+compreensibilidade das informações 
+Shim e Siegel (2009) 
+8 Suporte em todos os níveis da 
+organização 
+Shim e Siegel (2009) 
+9 Eficiência dos sistemas de apoio Rezende e Nogueira (2004); Blumentritt (2006) 
+10 Comprometimento dos colaboradores 
+com a execução orçamentária 
+Rezende e Nogueira (2004); Kaplan e Norton 
+--------------------
+
+Match at line 1498: Quadro 2 - Fatores que podem influenciar o Alinhamento
+Quadro 2 - Fatores que podem influenciar o Alinhamento 
+Nº do 
+Fator 
+Fatores que podem influenciar o 
+Alinhamento Autores 
+ 
+1 Necessidade de sequenciamento entre 
+planejamento estratégico e orçamento 
+Leahy (2002); Blumentritt (2006); Frezatti et al. 
+(2009); Ferreira e Diehl (2012) 
+2 Função do Orçamento e do 
+Planejamento Estratégico  Blumentritt (2006); Ribeiro (2011) 
+ 
+3 
+Sinergia entre as áreas, departamentos 
+ou unidades organizacionais 
+Welsch (1983); Diehl (2004); Kaplan e Norton 
+(2006) Almeida et al. (2009) Ribeiro (2011);  
+Ferreira e Diehl (2012) 
+ 
+4 
+Acompanhamento da execução 
+orçamentária 
+Rezende e Cunha (2005) Almeida et al. (2009) 
+Lunkes, Ripoll e Rosa (2011) 
+ 
+5 
+Ferramentas de comunicação e definição de 
+responsabilidades entre as áreas 
+ 
+Shim e Siegel (2009) 
+6 Informações contábeis precisas, 
+confiáveis e oportunas 
+Shim e Siegel (2009)  
+7 Compatibilidade e 
+compreensibilidade das informações 
+Shim e Siegel (2009) 
+8 Suporte em todos os níveis da 
+organização 
+Shim e Siegel (2009) 
+9 Eficiência dos sistemas de apoio Rezende e Nogueira (2004); Blumentritt (2006) 
+10 Comprometimento dos colaboradores 
+com a execução orçamentária 
+Rezende e Nogueira (2004); Kaplan e Norton 
+(2006); Almeida et al. (2009) Ribeiro (2011) 
+11 Políticas e diretrizes adequadas Blumentritt (2006); Leite et al. (2008) 
+ 
+12 
+Pessoas e áreas envolvidas na 
+construção das duas ferramentas de 
+--------------------
+
+--- Checking 'Future Work' in 101_00130.pdf ---
+
+--- Checking 'Future Work' in 720-BOAS-PRATICAS-NA-ELABORACAO-DO-PLANO-ESTRATEGICO.pdf ---
+Potential Header Found: e registro das informações. Como sugestões, podem ser utilizadas planilhas, questionários ou
+> e registro das informações. Como sugestões, podem ser utilizadas planilhas, questionários ou 
+> páginas interativas com períodos para captação das necessidades. Dependendo do acesso que o 
+>  
+>  
+> município possui a essas tecnologias, materiais impressos são outras formas pa ra registrar a 
+> participação. 
+> Podem ser solicitadas informações gerais ou específicas, dependendo do público. Por 
+> exemplo, para os discentes as questões podem ser direcionadas no sentido de captar quais áreas 
+> são percebidas como críticas na instituição, como laboratórios, acessibilidade, biblioteca, salas 
+> de aula, etc. Para os atores externos à unidade, podem ser levantadas questões relacionadas aos 
+> serviços prestados (atendimento público, transparência das informações), à qualidade das 
+> instalações, à participação da unidade em eventos ou ações locais. 
+> As instituições da Rede Federal também desenvolvem projetos de pesquisa, extensão e 
+> inovação. Logo, esse processo de escuta permite que a unidade identifique de que forma suas 
+> práticas educacionais podem impact ar no mundo real, solucionando problemas práticos da 
+> sociedade e do mercado (Gorard et al., 2020). Nesse momento é importante dar uma direção ao 
+> que se pretende discutir, sem cercear as ideias que possam surgir. Como já mencionado, esse 
+> processo faz com que os atores dos diferentes segmentos se sintam motivados a participar e 
+> contribuir. 
+>  
+--------------------
+
+--- Checking 'Future Work' in d06a0058d90d768aac34a81de1a5a2037f4d.pdf ---
+Potential Header Found: Cabe esclarecer que as sugestões e contribuições foram ponderadas pelas grades áreas,
+> Cabe esclarecer que as sugestões e contribuições foram ponderadas pelas grades áreas, 
+> acatando ou justificando o motivo de não considerar a sugestão. 
+> Julgando que a continuidade da Gestão, o desempenho, e o comprometimento de todos 
+> são cruciais para o processo , foram desenvolvidos indicadores e metas para cada objetivo 
+> estratégico. Para conseguir cumprir essa etapa, foi preciso estruturar um levantamento de dados 
+> PLANEJAMENTO ESTRATÉGICO COMO FERRAMENTA DE ALINHAMENTO INSTITUCIONAL: 
+> APONTAMENTOS DO PROCESSO DE IMPLANTAÇÃO DE UM INSTITUTO FEDERAL DE 
+> EDUCAÇÃO PROFISSIONAL, CIENTÍFICA E TECNOLÓGICA  
+> 45 
+> REPAE, São Paulo, v. 7, n.2, p. 36-53, maio/ago. 2021. ISSN: 2447-6129 
+>  
+> prévios (anos 2016 e 2017) , criando assim um histórico  para os Gestores  de cada Campi  e 
+> Reitoria.  
+> Ansoff e Mcdonnell (1993, p.75) comentam que é  comum as organizações carecerem 
+> de “informações sobre si próprias e seu ambiente, que são necessárias para um planejamento 
+> estratégico eficaz;”. Assim, foram organizadas reuniões para traçar as metas para o período de 
+> vigência do Planejamento Estratégico da Instituição (2018-2021). Esse esforço foi fundamental 
+> para o controle e acompanhamento dos desafios traçados para todos os envolvidos. Em seguida, 
+> os Campi puderam alinhar e desenvolver os planos operacionais à sua realidade. 
+> Os planejamentos estratégicos, táticos e operacionais do Instituto Federal Catarinense 
+--------------------
+
+--- Checking 'Future Work' in Dissertação versão final Osni Cristiano Reisch.pdf ---
+
+--- Checking 'Future Work' in download (1).pdf ---
+
+--- Checking 'Future Work' in normas-academicas-atualizado-em-05-06-2025.pdf ---
+Potential Header Found: a) Análise situacional e Recomendações ou
+> a) Análise situacional e Recomendações ou 
+> b) Análise situacional e Plano de Ação ou 
+> c) Análise situacional e Produto Técnico/Tecnológico 
+>  
+>  
+> Para ambos os formatos de TCC adotados pela Rede Profiap (Dissertação ou Artigo), deverá 
+> ser gerado um Relatório Técnico Conclusivo, podendo ser: 
+> a) Relatório contendo a Análise situacional realizada e as Recomendações para a solução da 
+> situação problema analisada ou 
+> b) Relatório contendo a Análise situacional e um Plano de Ação para a solução da situação 
+> problema analisada ou 
+> c) Relatório contendo a Análise situacional e a descrição do Produto Técnico/Tecnológico 
+> proposto (uma norma, um software, uma base de dados, um curso, um material didático, 
+> etc.) a ser utilizado na solução da situação problema analisada. 
+>  
+>  
+> 2 – Formatação 
+>  
+> São adotadas as normas da ABNT e as normas de cada instituição associada à Rede 
+> PROFIAP. 
+--------------------
+
+--- Checking 'Future Work' in PCAD1187-T.pdf ---
+
+--- Checking 'Future Work' in Regimento-061023.pdf ---

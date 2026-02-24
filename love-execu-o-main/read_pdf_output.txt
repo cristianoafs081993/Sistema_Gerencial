@@ -1,0 +1,422 @@
+--- Searching in c:\Users\3128880\Desktop\Programação\IFRN\love-execu-o-main\love-execu-o-main\docs\Regimento-061023.pdf ---
+Match on line 472: discente, o seu plano de estudos e o seu projeto de Trabalho de Conclusão de Curso (TCC).
+  > § 3º Será designado um Professor Orientador que acompanhará o desenvolvimento de
+  > cada discente ao longo do curso, sendo que este Orientador construirá, em conjunto com o
+  > discente, o seu plano de estudos e o seu projeto de Trabalho de Conclusão de Curso (TCC).
+  > 
+  > Art. 32º. Os discentes regularmente matriculados no PROFIAP em cada Instituição Associada
+--------------------
+Match on line 528: II. Trabalho de Conclusão de Curso (TCC): 8 créditos ou 120 horas.
+  > didáticas, correspondentes a 32 (trinta e dois) créditos, assim divididos:
+  > I. Disciplinas (obrigatórias e optativas): 24 créditos ou 360 horas;
+  > II. Trabalho de Conclusão de Curso (TCC): 8 créditos ou 120 horas.
+  > 
+  > § 1º O Trabalho de Conclusão de Curso deve observar as normas da NBR/ABNT e as
+--------------------
+Match on line 530: § 1º O Trabalho de Conclusão de Curso deve observar as normas da NBR/ABNT e as
+  > II. Trabalho de Conclusão de Curso (TCC): 8 créditos ou 120 horas.
+  > 
+  > § 1º O Trabalho de Conclusão de Curso deve observar as normas da NBR/ABNT e as
+  > premissas do método científico.
+  > 
+--------------------
+Match on line 533: § 2º As modalidades de Trabalho de Conclusão de Curso adotadas pela Rede Profiap
+  > premissas do método científico.
+  > 
+  > § 2º As modalidades de Trabalho de Conclusão de Curso adotadas pela Rede Profiap
+  > estão definidas nas Normas Acadêmicas Nacionais.
+  > 
+--------------------
+Match on line 542: Art. 38º. A aprovação do Trabalho de Conclusão de Curso ocorre em duas etapas:
+  > CONCLUSÃO DE CURSO
+  > 
+  > Art. 38º. A aprovação do Trabalho de Conclusão de Curso ocorre em duas etapas:
+  > 
+  > a) Defesa de um Projeto de TCC mediante uma banca examinadora denominada Banca
+--------------------
+--- Searching in c:\Users\3128880\Desktop\Programação\IFRN\love-execu-o-main\love-execu-o-main\docs\normas-academicas-atualizado-em-05-06-2025.pdf ---
+Match on line 46: 10 TRABALHO DE CONCLUSÃO DE CURSO ........................................................................................... 7
+  > 8 RENDIMENTO ACADÊMICO DOS DISCENTES ................................................................................. 6
+  > 9 ORIENTAÇÃO DISCENTE ....................................................................................................................... 6
+  > 10 TRABALHO DE CONCLUSÃO DE CURSO ........................................................................................... 7
+  > 11 REQUISITOS PARA OBTENÇÃO DO GRAU DE MESTRE ................................................................ 8
+  > 12 REQUISITOS PARA MARCAÇÃO DAS BANCAS DE DEFESA DE PROJETO E DE  TCC ........... 8
+--------------------
+Match on line 50: 14 PRAZOS PARA DEFESA DO TRABALHO DE CONCLUSÃO DE CURSO..................................... 10
+  > 12 REQUISITOS PARA MARCAÇÃO DAS BANCAS DE DEFESA DE PROJETO E DE  TCC ........... 8
+  > 13 COMPOSIÇÃO DAS BANCAS DE DEFESA DE PROJETO E DE TCC ............................................. 9
+  > 14 PRAZOS PARA DEFESA DO TRABALHO DE CONCLUSÃO DE CURSO..................................... 10
+  > 15 PUBLICAÇÃO DOS TRABALHOS DE CONCLUSÃO DE CURSO .................................................. 10
+  > 16 TRANSFERÊNCIA E REINTEGRAÇÃO DE DISCENTES ................................................................ 10
+--------------------
+Match on line 58: ANEXO I - ESTRUTURA DO PROJETO DE PESQUISA E DO TRABALHO DE CONCLUSÃO DE
+  > 19 CONVÊNIOS ............................................................................................................................................. 14
+  > 20 DISPOSIÇÕES FINAIS ............................................................................................................................. 15
+  > ANEXO I - ESTRUTURA DO PROJETO DE PESQUISA E DO TRABALHO DE CONCLUSÃO DE
+  > CURSO (TCC) ............................................................................................................................................ 16
+  > 
+--------------------
+Match on line 170: Oficina de Elaboração de Projeto, Trabalho de Conclusão de
+  > Pública
+  > 30
+  > Oficina de Elaboração de Projeto, Trabalho de Conclusão de
+  > Curso, Produto Técnico e Artigo Científico 30
+  > Políticas Públicas 60
+--------------------
+Match on line 171: Curso, Produto Técnico e Artigo Científico 30
+  > 30
+  > Oficina de Elaboração de Projeto, Trabalho de Conclusão de
+  > Curso, Produto Técnico e Artigo Científico 30
+  > Políticas Públicas 60
+  > Gestão Socioambiental Sustentável 60
+--------------------
+Match on line 206: Trabalho de Conclusão de Curso (TCC) I 60 Obrigatória
+  > Seminários em Administração Pública 30
+  > Participação em Atividades Técnico-Científicas 30
+  > Trabalho de Conclusão de Curso (TCC) I 60 Obrigatória
+  > para TCC
+  > 
+--------------------
+Match on line 210: Trabalho de Conclusão de Curso (TCC) II 60
+  > 
+  > Todas
+  > Trabalho de Conclusão de Curso (TCC) II 60
+  > 
+  > 
+--------------------
+Match on line 273: 10 TRABALHO DE CONCLUSÃO DE CURSO
+  > quadriênio.
+  > 
+  > 10 TRABALHO DE CONCLUSÃO DE CURSO
+  > 
+  > 10.1 O Trabalho de Conclusão de Curso (TCC) poderá ser em dois formatos:
+--------------------
+Match on line 275: 10.1 O Trabalho de Conclusão de Curso (TCC) poderá ser em dois formatos:
+  > 10 TRABALHO DE CONCLUSÃO DE CURSO
+  > 
+  > 10.1 O Trabalho de Conclusão de Curso (TCC) poderá ser em dois formatos:
+  > I. Dissertação;
+  > II. Artigo Científico.
+--------------------
+Match on line 276: I. Dissertação;
+  > 
+  > 10.1 O Trabalho de Conclusão de Curso (TCC) poderá ser em dois formatos:
+  > I. Dissertação;
+  > II. Artigo Científico.
+  > 
+--------------------
+Match on line 279: 10.1.1. O Trabalho de Conclusão de Curso em ambos os formatos deverá seguir a estrutura
+  > II. Artigo Científico.
+  > 
+  > 10.1.1. O Trabalho de Conclusão de Curso em ambos os formatos deverá seguir a estrutura
+  > constante no Anexo I. (Incluído no Fórum de Coordenadores em Maceió, 22 a 25 ago. 2023)
+  > 
+--------------------
+Match on line 282: 10.2 O Trabalho de Conclusão de Curso no formato Dissertação deverá versar sobre temas
+  > constante no Anexo I. (Incluído no Fórum de Coordenadores em Maceió, 22 a 25 ago. 2023)
+  > 
+  > 10.2 O Trabalho de Conclusão de Curso no formato Dissertação deverá versar sobre temas
+  > relacionados à Administração Pública que se constitui nas seguintes modalidades:
+  > III. Análise situacional e recomendações;
+--------------------
+Match on line 282: 10.2 O Trabalho de Conclusão de Curso no formato Dissertação deverá versar sobre temas
+  > constante no Anexo I. (Incluído no Fórum de Coordenadores em Maceió, 22 a 25 ago. 2023)
+  > 
+  > 10.2 O Trabalho de Conclusão de Curso no formato Dissertação deverá versar sobre temas
+  > relacionados à Administração Pública que se constitui nas seguintes modalidades:
+  > III. Análise situacional e recomendações;
+--------------------
+Match on line 286: V. Análise situacional e produto técnico/tecnológico;
+  > III. Análise situacional e recomendações;
+  > IV. Análise situacional e plano de ação;
+  > V. Análise situacional e produto técnico/tecnológico;
+  > 
+  > 10.3 O Trabalho de Conclusão de Curso no formato Artigo Científico deverá ser um artigo
+--------------------
+Match on line 286: V. Análise situacional e produto técnico/tecnológico;
+  > III. Análise situacional e recomendações;
+  > IV. Análise situacional e plano de ação;
+  > V. Análise situacional e produto técnico/tecnológico;
+  > 
+  > 10.3 O Trabalho de Conclusão de Curso no formato Artigo Científico deverá ser um artigo
+--------------------
+Match on line 288: 10.3 O Trabalho de Conclusão de Curso no formato Artigo Científico deverá ser um artigo
+  > V. Análise situacional e produto técnico/tecnológico;
+  > 
+  > 10.3 O Trabalho de Conclusão de Curso no formato Artigo Científico deverá ser um artigo
+  > publicado ou aceito para publicação em revista científica com estrato mínimo A4 do  Qualis
+  > 
+--------------------
+Match on line 312: b) ter cursado ou estar matriculado na disciplina Trabalho de Conclusão de Curso I (TCC
+  > 12.1. Para solicitação de Banca de Defesa do Projeto de TCC o discente deverá:
+  > a) ter cumprido os créditos mínimos necessários do programa;
+  > b) ter cursado ou estar matriculado na disciplina Trabalho de Conclusão de Curso I (TCC
+  > I);
+  > c) apresentar comprovação de autoria ou coautoria de pelo menos uma produção
+--------------------
+Match on line 321: c) um Produto Técnico-Tecnológico.
+  > a) um artigo apresentado em congresso técnico-científico ou
+  > b) um artigo publicado em revista científica com estrato mínimo B3 do Qualis vigente ou
+  > c) um Produto Técnico-Tecnológico.
+  > 
+  > 12.3. Para solicitação de Banca de Defesa de TCC o discente deverá:
+--------------------
+Match on line 321: c) um Produto Técnico-Tecnológico.
+  > a) um artigo apresentado em congresso técnico-científico ou
+  > b) um artigo publicado em revista científica com estrato mínimo B3 do Qualis vigente ou
+  > c) um Produto Técnico-Tecnológico.
+  > 
+  > 12.3. Para solicitação de Banca de Defesa de TCC o discente deverá:
+--------------------
+Match on line 325: b) ter cursado ou estar matriculado na disciplina Trabalho de Conclusão de Curso II
+  > 12.3. Para solicitação de Banca de Defesa de TCC o discente deverá:
+  > a) ter sido aprovado na Banca de Defesa de Projeto de TCC;
+  > b) ter cursado ou estar matriculado na disciplina Trabalho de Conclusão de Curso II
+  > (TCC II);
+  > c) apresentar comprovação de cumprimento dos requisitos de produção intelectual de
+--------------------
+Match on line 328: acordo com a modalidade de TCC escolhida (Dissertação ou Artigo).
+  > (TCC II);
+  > c) apresentar comprovação de cumprimento dos requisitos de produção intelectual de
+  > acordo com a modalidade de TCC escolhida (Dissertação ou Artigo).
+  > 
+  > 12.4 A produção intelectual citada no item 12.3 para o formato de Dissertação deverá ser:
+--------------------
+Match on line 330: 12.4 A produção intelectual citada no item 12.3 para o formato de Dissertação deverá ser:
+  > acordo com a modalidade de TCC escolhida (Dissertação ou Artigo).
+  > 
+  > 12.4 A produção intelectual citada no item 12.3 para o formato de Dissertação deverá ser:
+  > a) um artigo aceito para avaliação em revista científica com estrato mínimo B2 do
+  > Qualis vigente (diferente do artigo utilizado para a Defesa de Projeto do TCC); e
+--------------------
+Match on line 333: b) um Produto Técnico-Tecnológico derivado da Dissertação.
+  > a) um artigo aceito para avaliação em revista científica com estrato mínimo B2 do
+  > Qualis vigente (diferente do artigo utilizado para a Defesa de Projeto do TCC); e
+  > b) um Produto Técnico-Tecnológico derivado da Dissertação.
+  > 
+  > 
+--------------------
+Match on line 333: b) um Produto Técnico-Tecnológico derivado da Dissertação.
+  > a) um artigo aceito para avaliação em revista científica com estrato mínimo B2 do
+  > Qualis vigente (diferente do artigo utilizado para a Defesa de Projeto do TCC); e
+  > b) um Produto Técnico-Tecnológico derivado da Dissertação.
+  > 
+  > 
+--------------------
+Match on line 333: b) um Produto Técnico-Tecnológico derivado da Dissertação.
+  > a) um artigo aceito para avaliação em revista científica com estrato mínimo B2 do
+  > Qualis vigente (diferente do artigo utilizado para a Defesa de Projeto do TCC); e
+  > b) um Produto Técnico-Tecnológico derivado da Dissertação.
+  > 
+  > 
+--------------------
+Match on line 341: b) um Produto Técnico-Tecnológico derivado do artigo. (Redação dada no Fórum de
+  > mínimo A4 do Qualis vigente (diferente do artigo utilizado para a Defesa de Projeto
+  > do TCC); e
+  > b) um Produto Técnico-Tecnológico derivado do artigo. (Redação dada no Fórum de
+  > Coordenadores em Vitória, 28 a 30 nov. 2023)
+  > 
+--------------------
+Match on line 341: b) um Produto Técnico-Tecnológico derivado do artigo. (Redação dada no Fórum de
+  > mínimo A4 do Qualis vigente (diferente do artigo utilizado para a Defesa de Projeto
+  > do TCC); e
+  > b) um Produto Técnico-Tecnológico derivado do artigo. (Redação dada no Fórum de
+  > Coordenadores em Vitória, 28 a 30 nov. 2023)
+  > 
+--------------------
+Match on line 372: b) Trabalho de Conclusão de Curso a ser defendido (Dissertação ou Artigo);
+  > 13.7 Deverão ser anexados ao pedido de aprovação de Bancas ao Comitê Gestor:
+  > a) Formulário preenchido com dados do discente, do TCC e de cada membro da banca;
+  > b) Trabalho de Conclusão de Curso a ser defendido (Dissertação ou Artigo);
+  > c) Comprovação de cumprimento dos requisitos de produção intelectual de acordo com
+  > a modalidade escolhida da banca (Projeto ou Defesa Final) e do TCC (Dissertação ou
+--------------------
+Match on line 372: b) Trabalho de Conclusão de Curso a ser defendido (Dissertação ou Artigo);
+  > 13.7 Deverão ser anexados ao pedido de aprovação de Bancas ao Comitê Gestor:
+  > a) Formulário preenchido com dados do discente, do TCC e de cada membro da banca;
+  > b) Trabalho de Conclusão de Curso a ser defendido (Dissertação ou Artigo);
+  > c) Comprovação de cumprimento dos requisitos de produção intelectual de acordo com
+  > a modalidade escolhida da banca (Projeto ou Defesa Final) e do TCC (Dissertação ou
+--------------------
+Match on line 374: a modalidade escolhida da banca (Projeto ou Defesa Final) e do TCC (Dissertação ou
+  > b) Trabalho de Conclusão de Curso a ser defendido (Dissertação ou Artigo);
+  > c) Comprovação de cumprimento dos requisitos de produção intelectual de acordo com
+  > a modalidade escolhida da banca (Projeto ou Defesa Final) e do TCC (Dissertação ou
+  > Artigo) (conforme Item 12 das Normas Acadêmicas).
+  > 
+--------------------
+Match on line 389: 14 PRAZOS PARA DEFESA DO TRABALHO DE CONCLUSÃO DE CURSO
+  > Natal/RN, 03 a 05 jun. 2025)
+  > 
+  > 14 PRAZOS PARA DEFESA DO TRABALHO DE CONCLUSÃO DE CURSO
+  > 
+  > 14.1 O prazo para defesa do Projeto de TCC é de até 15 meses.
+--------------------
+Match on line 393: 14.2 O prazo para defesa do Trabalho de Conclusão de Curso é de 24 meses, podendo ser
+  > 14.1 O prazo para defesa do Projeto de TCC é de até 15 meses.
+  > 
+  > 14.2 O prazo para defesa do Trabalho de Conclusão de Curso é de 24 meses, podendo ser
+  > prorrogável por 6 meses, assim definido:
+  > a) prorrogação de 3 meses, sem necessidade de justificativa;
+--------------------
+Match on line 399: 14.3 Caso não ocorra a defesa da Trabalho de Conclusão de Curso em, no máximo 30 meses,
+  > Comissão Acadêmica Local;
+  > 
+  > 14.3 Caso não ocorra a defesa da Trabalho de Conclusão de Curso em, no máximo 30 meses,
+  > o discente estará automaticamente desligado do PROFIAP.
+  > 
+--------------------
+Match on line 411: 15.3 A inclusão dos dados da defesa do Trabalho de Conclusão de Curso na Plataforma
+  > Conclusão de Curso no sítio eletrônico da Instituições Associadas.
+  > 
+  > 15.3 A inclusão dos dados da defesa do Trabalho de Conclusão de Curso na Plataforma
+  > Sucupira não poderá exceder o prazo de 60 dias após a defesa.
+  > 
+--------------------
+Match on line 604: A Rede PROFIAP adota dois formatos de relatório para o Trabalho de Conclusão de Curso:
+  > 1 - Modalidades de Trabalhos de Conclusão de Curso
+  > 
+  > A Rede PROFIAP adota dois formatos de relatório para o Trabalho de Conclusão de Curso:
+  > a) Formato Dissertação
+  > b) Formato Artigo Científico
+--------------------
+Match on line 605: a) Formato Dissertação
+  > 
+  > A Rede PROFIAP adota dois formatos de relatório para o Trabalho de Conclusão de Curso:
+  > a) Formato Dissertação
+  > b) Formato Artigo Científico
+  > 
+--------------------
+Match on line 612: c) Análise situacional e Produto Técnico/Tecnológico
+  > a) Análise situacional e Recomendações ou
+  > b) Análise situacional e Plano de Ação ou
+  > c) Análise situacional e Produto Técnico/Tecnológico
+  > 
+  > 
+--------------------
+Match on line 612: c) Análise situacional e Produto Técnico/Tecnológico
+  > a) Análise situacional e Recomendações ou
+  > b) Análise situacional e Plano de Ação ou
+  > c) Análise situacional e Produto Técnico/Tecnológico
+  > 
+  > 
+--------------------
+Match on line 615: Para ambos os formatos de TCC adotados pela Rede Profiap (Dissertação ou Artigo), deverá
+  > 
+  > 
+  > Para ambos os formatos de TCC adotados pela Rede Profiap (Dissertação ou Artigo), deverá
+  > ser gerado um Relatório Técnico Conclusivo, podendo ser:
+  > a) Relatório contendo a Análise situacional realizada e as Recomendações para a solução da
+--------------------
+Match on line 621: c) Relatório contendo a Análise situacional e a descrição do Produto Técnico/Tecnológico
+  > b) Relatório contendo a Análise situacional e um Plano de Ação para a solução da situação
+  > problema analisada ou
+  > c) Relatório contendo a Análise situacional e a descrição do Produto Técnico/Tecnológico
+  > proposto (uma norma, um software, uma base de dados, um curso, um material didático,
+  > etc.) a ser utilizado na solução da situação problema analisada.
+--------------------
+Match on line 621: c) Relatório contendo a Análise situacional e a descrição do Produto Técnico/Tecnológico
+  > b) Relatório contendo a Análise situacional e um Plano de Ação para a solução da situação
+  > problema analisada ou
+  > c) Relatório contendo a Análise situacional e a descrição do Produto Técnico/Tecnológico
+  > proposto (uma norma, um software, uma base de dados, um curso, um material didático,
+  > etc.) a ser utilizado na solução da situação problema analisada.
+--------------------
+Match on line 650: 4 - Estrutura do TCC na Modalidade Dissertação
+  > Referências
+  > 
+  > 4 - Estrutura do TCC na Modalidade Dissertação
+  > 
+  > 
+--------------------
+Match on line 671: 5. Recomendações / Plano de Ação / Produto Técnico-Tecnológico
+  > 4. Análise Situacional
+  > (Obs.: Deve conter resultados e discussões)
+  > 5. Recomendações / Plano de Ação / Produto Técnico-Tecnológico
+  > 6. Considerações Finais ou Conclusões
+  > Referências
+--------------------
+Match on line 671: 5. Recomendações / Plano de Ação / Produto Técnico-Tecnológico
+  > 4. Análise Situacional
+  > (Obs.: Deve conter resultados e discussões)
+  > 5. Recomendações / Plano de Ação / Produto Técnico-Tecnológico
+  > 6. Considerações Finais ou Conclusões
+  > Referências
+--------------------
+Match on line 675: Apêndices (Relatório Técnico: recomendações, plano de ação, produto técnico-tecnológico).
+  > Referências
+  > Anexos
+  > Apêndices (Relatório Técnico: recomendações, plano de ação, produto técnico-tecnológico).
+  > 
+  > 
+--------------------
+Match on line 675: Apêndices (Relatório Técnico: recomendações, plano de ação, produto técnico-tecnológico).
+  > Referências
+  > Anexos
+  > Apêndices (Relatório Técnico: recomendações, plano de ação, produto técnico-tecnológico).
+  > 
+  > 
+--------------------
+Match on line 699: 5. Produto Técnico e Tecnológico - PTT
+  > 
+  > 
+  > 5. Produto Técnico e Tecnológico - PTT
+  > 6. Conclusões
+  > (Obs.: Deve conter conclusões gerais da pesquisa)
+--------------------
+Match on line 699: 5. Produto Técnico e Tecnológico - PTT
+  > 
+  > 
+  > 5. Produto Técnico e Tecnológico - PTT
+  > 6. Conclusões
+  > (Obs.: Deve conter conclusões gerais da pesquisa)
+--------------------
+Match on line 699: 5. Produto Técnico e Tecnológico - PTT
+  > 
+  > 
+  > 5. Produto Técnico e Tecnológico - PTT
+  > 6. Conclusões
+  > (Obs.: Deve conter conclusões gerais da pesquisa)
+--------------------
+Match on line 706: 6 - Estrutura do Produto Técnico (PTT) derivado do TCC (Modalidade Dissertação ou
+  > 
+  > 
+  > 6 - Estrutura do Produto Técnico (PTT) derivado do TCC (Modalidade Dissertação ou
+  > Artigo)
+  > 
+--------------------
+Match on line 706: 6 - Estrutura do Produto Técnico (PTT) derivado do TCC (Modalidade Dissertação ou
+  > 
+  > 
+  > 6 - Estrutura do Produto Técnico (PTT) derivado do TCC (Modalidade Dissertação ou
+  > Artigo)
+  > 
+--------------------
+Match on line 706: 6 - Estrutura do Produto Técnico (PTT) derivado do TCC (Modalidade Dissertação ou
+  > 
+  > 
+  > 6 - Estrutura do Produto Técnico (PTT) derivado do TCC (Modalidade Dissertação ou
+  > Artigo)
+  > 
+--------------------
+Match on line 724: (Obs.: Deve conter síntese das ações - recomendação ou plano de ação ou descrição do PTT proposto.)
+  > (Obs.: Deve conter a análise situacional realizada.)
+  > Recomendações de intervenção
+  > (Obs.: Deve conter síntese das ações - recomendação ou plano de ação ou descrição do PTT proposto.)
+  > Responsáveis
+  > (Obs.: Deve conter egresso e orientador.)
+--------------------
+Match on line 732: Obs.: O Produto Técnico Tecnológico deve ser elaborado utilizando o modelo editável
+  > 
+  > 
+  > Obs.: O Produto Técnico Tecnológico deve ser elaborado utilizando o modelo editável
+  > preparado pela Diretoria de Comunicação do Comitê Gestor Nacional.
+  > 
+--------------------
+Match on line 732: Obs.: O Produto Técnico Tecnológico deve ser elaborado utilizando o modelo editável
+  > 
+  > 
+  > Obs.: O Produto Técnico Tecnológico deve ser elaborado utilizando o modelo editável
+  > preparado pela Diretoria de Comunicação do Comitê Gestor Nacional.
+  > 
+--------------------

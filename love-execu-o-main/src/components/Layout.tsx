@@ -7,7 +7,8 @@ import {
   Menu,
   X,
   ChevronRight,
-  Banknote
+  Banknote,
+  ArrowDownRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,7 @@ interface LayoutProps {
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Atividades', href: '/atividades', icon: FileText },
+  { name: 'Descentralizações', href: '/descentralizacoes', icon: ArrowDownRight },
   { name: 'Empenhos', href: '/empenhos', icon: Receipt },
   { name: 'Liquidações', href: '/liquidacoes-pagamentos', icon: Banknote },
 ];
@@ -46,7 +48,7 @@ export function Layout({ children }: LayoutProps) {
       >
         <div className="flex h-16 items-center justify-between px-6 border-b border-sidebar-border">
           <span className="text-xl font-bold text-sidebar-foreground">
-            Gestão Orçamentária
+            Sistema Gerencial
           </span>
           <Button
             variant="ghost"

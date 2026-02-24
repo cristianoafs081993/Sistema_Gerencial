@@ -27,3 +27,15 @@
 ## External Integrations
 - **Portal da Transparencia API**: Accessed via a proxy (configured in `vite.config.ts`) to avoid CORS issues. Used in `transparenciaService` to fetch real-time expenditure data.
 - **Supabase**: Primary data store for Activities and Commitments.
+
+## Database Schema (Key Tables)
+### `transparencia_documentos`
+Stores liquidations and payments fetched from the Transparency Portal.
+- `documento` (PK): Unique document ID.
+- `empenho_documento`: (Added Feb 2026) Links to the simplified empenho number (e.g., `2026NE000001`) in the `empenhos` table. Essential for "Restos a Pagar" association.
+- `fase`: "Liquidação" or "Pagamento".
+
+### `empenhos`
+Stores commitment data.
+- `numero`: Simplified empenho number (e.g., `2026NE000001`).
+- `valor_liquidado`, `valor_pago`: Calculated fields based on associated documents.

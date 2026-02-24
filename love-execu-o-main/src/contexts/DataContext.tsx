@@ -1,14 +1,16 @@
 
 import React, { createContext, useContext, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Atividade, Empenho, ResumoOrcamentario } from '@/types';
+import { Atividade, Empenho, Descentralizacao, ResumoOrcamentario } from '@/types';
 import { atividadesService } from '@/services/atividades';
 import { empenhosService } from '@/services/empenhos';
+import { descentralizacoesService } from '@/services/descentralizacoes';
 import { toast } from 'sonner';
 
 interface DataContextType {
   atividades: Atividade[];
   empenhos: Empenho[];
+  descentralizacoes: Descentralizacao[];
   isLoading: boolean;
   addAtividade: (atividade: Omit<Atividade, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateAtividade: (id: string, atividade: Partial<Atividade>) => void;
@@ -16,10 +18,16 @@ interface DataContextType {
   addEmpenho: (empenho: Omit<Empenho, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateEmpenho: (id: string, empenho: Partial<Empenho>) => void;
   deleteEmpenho: (id: string) => void;
+  addDescentralizacao: (d: Omit<Descentralizacao, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateDescentralizacao: (id: string, d: Partial<Descentralizacao>) => void;
+  deleteDescentralizacao: (id: string) => void;
   getResumoOrcamentario: () => ResumoOrcamentario[];
   getTotalPlanejado: () => number;
   getTotalEmpenhado: () => number;
+  getTotalDescentralizado: () => number;
+  getADescentralizar: () => number;
   getSaldoTotal: () => number;
+  refreshData: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -38,7 +46,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     queryFn: empenhosService.getAll,
   });
 
-  const isLoading = isLoadingAtividades || isLoadingEmpenhos;
+  const { data: descentralizacoes = [], isLoading: isLoadingDescentralizacoes } = useQuery({
+    queryKey: ['descentralizacoes'],
+    queryFn: descentralizacoesService.getAll,
+  });
+
+  const isLoading = isLoadingAtividades || isLoadingEmpenhos || isLoadingDescentralizacoes;
 
   // --- Mutations: Atividades ---
   const createAtividadeMutation = useMutation({
@@ -116,6 +129,44 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     },
   });
 
+  // --- Mutations: Descentralizações ---
+  const createDescentralizacaoMutation = useMutation({
+    mutationFn: descentralizacoesService.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['descentralizacoes'] });
+      toast.success('Descentralização criada com sucesso!');
+    },
+    onError: (error) => {
+      console.error(error);
+      toast.error('Erro ao criar descentralização.');
+    },
+  });
+
+  const updateDescentralizacaoMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<Descentralizacao> }) =>
+      descentralizacoesService.update(id, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['descentralizacoes'] });
+      toast.success('Descentralização atualizada com sucesso!');
+    },
+    onError: (error) => {
+      console.error(error);
+      toast.error('Erro ao atualizar descentralização.');
+    },
+  });
+
+  const deleteDescentralizacaoMutation = useMutation({
+    mutationFn: descentralizacoesService.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['descentralizacoes'] });
+      toast.success('Descentralização excluída com sucesso!');
+    },
+    onError: (error) => {
+      console.error(error);
+      toast.error('Erro ao excluir descentralização.');
+    },
+  });
+
   // --- Wrappers ---
   const addAtividade = useCallback(
     (atividade: Omit<Atividade, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -157,6 +208,27 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       deleteEmpenhoMutation.mutate(id);
     },
     [deleteEmpenhoMutation]
+  );
+
+  const addDescentralizacao = useCallback(
+    (d: Omit<Descentralizacao, 'id' | 'createdAt' | 'updatedAt'>) => {
+      createDescentralizacaoMutation.mutate(d);
+    },
+    [createDescentralizacaoMutation]
+  );
+
+  const updateDescentralizacao = useCallback(
+    (id: string, updates: Partial<Descentralizacao>) => {
+      updateDescentralizacaoMutation.mutate({ id, updates });
+    },
+    [updateDescentralizacaoMutation]
+  );
+
+  const deleteDescentralizacao = useCallback(
+    (id: string) => {
+      deleteDescentralizacaoMutation.mutate(id);
+    },
+    [deleteDescentralizacaoMutation]
   );
 
   // --- Derived Data (KPIs) ---
@@ -211,14 +283,29 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       .reduce((sum, e) => sum + e.valor, 0);
   }, [empenhos]);
 
+  const getTotalDescentralizado = useCallback(() => {
+    return descentralizacoes.reduce((sum, d) => sum + d.valor, 0);
+  }, [descentralizacoes]);
+
+  const getADescentralizar = useCallback(() => {
+    return getTotalPlanejado() - getTotalDescentralizado();
+  }, [getTotalPlanejado, getTotalDescentralizado]);
+
   const getSaldoTotal = useCallback(() => {
     return getTotalPlanejado() - getTotalEmpenhado();
   }, [getTotalPlanejado, getTotalEmpenhado]);
+
+  const refreshData = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['atividades'] });
+    await queryClient.invalidateQueries({ queryKey: ['empenhos'] });
+    await queryClient.invalidateQueries({ queryKey: ['descentralizacoes'] });
+  }, [queryClient]);
 
   const value = useMemo(
     () => ({
       atividades,
       empenhos,
+      descentralizacoes,
       isLoading,
       addAtividade,
       updateAtividade,
@@ -226,14 +313,21 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       addEmpenho,
       updateEmpenho,
       deleteEmpenho,
+      addDescentralizacao,
+      updateDescentralizacao,
+      deleteDescentralizacao,
       getResumoOrcamentario,
       getTotalPlanejado,
       getTotalEmpenhado,
+      getTotalDescentralizado,
+      getADescentralizar,
       getSaldoTotal,
+      refreshData,
     }),
     [
       atividades,
       empenhos,
+      descentralizacoes,
       isLoading,
       addAtividade,
       updateAtividade,
@@ -241,10 +335,16 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       addEmpenho,
       updateEmpenho,
       deleteEmpenho,
+      addDescentralizacao,
+      updateDescentralizacao,
+      deleteDescentralizacao,
       getResumoOrcamentario,
       getTotalPlanejado,
       getTotalEmpenhado,
+      getTotalDescentralizado,
+      getADescentralizar,
       getSaldoTotal,
+      refreshData,
     ]
   );
 

@@ -332,6 +332,11 @@ export default function LiquidacoesPagamentos() {
                                             <TableCell>
                                                 <div className="flex flex-col">
                                                     <span className="font-mono text-xs font-medium">{doc.documentoResumido}</span>
+                                                    {doc.empenhoDocumento && (
+                                                        <span className="text-[10px] text-muted-foreground" title="Empenho Associado">
+                                                            Ref: {doc.empenhoDocumento}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </TableCell>
                                             <TableCell>
@@ -349,7 +354,10 @@ export default function LiquidacoesPagamentos() {
                                                 <span className="text-xs text-muted-foreground line-clamp-1 max-w-[250px]" title={doc.observacao}>{doc.observacao}</span>
                                             </TableCell>
                                             <TableCell className="text-right font-medium text-xs">
-                                                {doc.valor === 0 ? '-' : formatCurrency(doc.valor)}
+                                                {(() => {
+                                                    const valor = doc.valorLiquidado || doc.valorRestoPago || doc.valor;
+                                                    return valor === 0 ? '-' : formatCurrency(valor);
+                                                })()}
                                             </TableCell>
                                             <TableCell>
                                                 <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleViewDetails(doc)}>
