@@ -1,12 +1,12 @@
 {
     "rewrites": [
         {
-            "source": "/(.*)",
-            "destination": "/index.html"
-        },
-        {
             "source": "/api-transparencia/:path*",
             "destination": "https://api.portaldatransparencia.gov.br/:path*"
+        },
+        {
+            "source": "/(.*)",
+            "destination": "/index.html"
         }
     ]
 }
