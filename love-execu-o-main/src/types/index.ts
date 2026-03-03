@@ -1,16 +1,28 @@
 export interface Atividade {
   id: string;
   dimensao: string;
+  dimensaoId?: string;
   componenteFuncional: string;
-  processo: string;
+  componenteFuncionalId?: string;
+  processo?: string;
   atividade: string;
   descricao: string;
   valorTotal: number;
   origemRecurso: string;
+  origemRecursoId?: string;
   naturezaDespesa: string;
+  naturezaDespesaId?: string;
   planoInterno: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface OperacaoEmpenho {
+  data: string;
+  operacao: 'INCLUSAO' | 'REFORCO' | 'ANULACAO' | string;
+  quantidade: number;
+  valorUnitario: number;
+  valorTotal: number;
 }
 
 export interface Empenho {
@@ -19,9 +31,13 @@ export interface Empenho {
   descricao: string;
   valor: number;
   dimensao: string;
+  dimensaoId?: string;
   componenteFuncional: string;
+  componenteFuncionalId?: string;
   origemRecurso: string;
+  origemRecursoId?: string;
   naturezaDespesa: string;
+  naturezaDespesaId?: string;
   planoInterno?: string;
   favorecidoNome?: string;
   favorecidoDocumento?: string;
@@ -31,6 +47,7 @@ export interface Empenho {
   status: 'pendente' | 'liquidado' | 'pago' | 'cancelado';
   atividadeId?: string;
   processo?: string;
+  historicoOperacoes?: OperacaoEmpenho[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -47,11 +64,38 @@ export interface ResumoOrcamentario {
 export interface Descentralizacao {
   id: string;
   dimensao: string;
+  dimensaoId?: string;
   origemRecurso: string;
+  origemRecursoId?: string;
   planoInterno?: string;
   valor: number;
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Interfaces de Domínio (tabelas de lookup)
+export interface DimensaoDB {
+  id: string;
+  codigo: string;
+  nome: string;
+}
+
+export interface NaturezaDespesaDB {
+  id: string;
+  codigo: string;
+  nome: string;
+}
+
+export interface OrigemRecursoDB {
+  id: string;
+  codigo: string;
+  descricao?: string;
+}
+
+export interface ComponenteFuncionalDB {
+  id: string;
+  dimensaoId: string;
+  nome: string;
 }
 
 export type Dimensao = {
@@ -81,8 +125,7 @@ export const COMPONENTES_POR_DIMENSAO: Record<string, string[]> = {
     '10 - Compras e Licitações',
     '11 - Contratos',
     '12 - Material',
-    '13 - Patrimônio',
-    '5 - Contratos'
+    '13 - Patrimônio'
   ],
   'AE': [
     '1 - Política de Atividades Estudantis',
@@ -90,11 +133,7 @@ export const COMPONENTES_POR_DIMENSAO: Record<string, string[]> = {
     '3 - Saúde Estudantil',
     '4 - Psicologia Escolar',
     '5 - Alimentação e Nutrição',
-    'Programas e Projetos de Protagonismo Estudantil',
-    'Serviço Social',
-    'Saúde Estudantil',
-    'Psicologia Escolar',
-    'Alimentação e Nutrição'
+    'Programas e Projetos de Protagonismo Estudantil'
   ],
   'CI': [
     '13 - Apoio a Eventos Institucionais'
@@ -177,16 +216,6 @@ export const COMPONENTES_POR_DIMENSAO: Record<string, string[]> = {
   ]
 };
 
-export const NATUREZAS_DESPESA = [
-  '339014 - Diárias - Civil',
-  '339033 - Passagens e Despesas com Locomoção',
-  '339039 - Outros Serviços de Terceiros - Pessoa Jurídica',
-  '339030 - Material de Consumo',
-  '339036 - Outros Serviços de Terceiros - Pessoa Física',
-  '449052 - Equipamentos e Material Permanente',
-  '339000 - Não Especificado',
-];
-
 export interface DocumentoDespesaAPI {
   data: string;
   documento: string;
@@ -216,6 +245,7 @@ export interface DocumentoDespesa {
   elementoDespesa: string;
   naturezaDespesa: string;
   fonteRecurso?: string;
+  empenho_id?: string;
   empenhoDocumento?: string;
   valorLiquidado?: number;
   valorRestoPago?: number;

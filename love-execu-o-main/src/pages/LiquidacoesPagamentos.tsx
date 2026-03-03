@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { transparenciaService } from '@/services/transparencia';
 import { DocumentoDespesa } from '@/types';
 import { formatCurrency } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -82,15 +82,18 @@ export default function LiquidacoesPagamentos() {
         try {
             setIsSyncing(true);
             setSyncProgress(0);
-            setSyncStatus('Iniciando sincronização...');
+            setSyncStatus('Identificando ponto de partida...');
 
-            // Data inicial fixa conforme solicitado ou pegar do .env/config
-            const dataInicio = new Date(2026, 0, 1); // 01/01/2026
+            // Buscamos a última data apenas para o cálculo da porcentagem na UI
+            const lastDateFound = await transparenciaService.getLastDocumentoDate();
+            const dataInicioBase = lastDateFound ? addDays(lastDateFound, 1) : new Date(2026, 0, 1);
 
-            await transparenciaService.syncDados(dataInicio, (currentDate, total, fase) => {
+            await transparenciaService.syncDados(undefined, (currentDate, total, fase) => {
                 setSyncStatus(`Sincronizando ${format(currentDate, 'dd/MM/yyyy')} - ${fase}... (${total} processados)`);
-                const totalDias = (new Date().getTime() - dataInicio.getTime()) / (1000 * 3600 * 24);
-                const diasProcessados = (currentDate.getTime() - dataInicio.getTime()) / (1000 * 3600 * 24);
+                
+                // Cálculo de progresso baseado na data de início identificada
+                const totalDias = Math.max(1, (new Date().getTime() - dataInicioBase.getTime()) / (1000 * 3600 * 24));
+                const diasProcessados = (currentDate.getTime() - dataInicioBase.getTime()) / (1000 * 3600 * 24);
                 const porcentagem = Math.min(100, Math.max(0, (diasProcessados / totalDias) * 100));
                 setSyncProgress(porcentagem);
             });

@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Plus, Pencil, Trash2, Search, Filter, Upload, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { useData } from '@/contexts/DataContext';
-import { Atividade, DIMENSOES, NATUREZAS_DESPESA } from '@/types';
+import { Atividade, DIMENSOES, COMPONENTES_POR_DIMENSAO } from '@/types';
+import { dominioService } from '@/services/dominio';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,13 +42,16 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 const initialFormState = {
   dimensao: '',
+  dimensaoId: '',
   componenteFuncional: '',
-  processo: '',
+  componenteFuncionalId: '',
   atividade: '',
   descricao: '',
   valorTotal: 0,
   origemRecurso: '',
+  origemRecursoId: '',
   naturezaDespesa: '',
+  naturezaDespesaId: '',
   planoInterno: '',
 };
 
@@ -70,18 +75,44 @@ export default function Atividades() {
   const [formData, setFormData] = useState(initialFormState);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  // Buscar naturezas de despesa do banco
+  const { data: naturezasDespesa = [] } = useQuery({
+    queryKey: ['naturezas_despesa'],
+    queryFn: dominioService.getNaturezasDespesa,
+  });
+
+  // Buscar dimensões do banco
+  const { data: dimensoesDB = [] } = useQuery({
+    queryKey: ['dimensoes'],
+    queryFn: dominioService.getDimensoes,
+  });
+
+  // Resolver dimensaoId baseada no nome selecionado no formData
+  const selectedDimId = useMemo(() => {
+    if (!formData.dimensao) return undefined;
+    const codigo = formData.dimensao.split(' - ')[0];
+    return dimensoesDB.find(d => d.codigo === codigo)?.id;
+  }, [formData.dimensao, dimensoesDB]);
+
+  // Buscar componentes funcionais do banco baseados na dimensão selecionada
+  const { data: componentesDB = [] } = useQuery({
+    queryKey: ['componentes_funcionais', selectedDimId],
+    queryFn: () => dominioService.getComponentesFuncionais(selectedDimId),
+    enabled: !!selectedDimId,
+  });
+
   // Extrair opções únicas para os filtros
   const componentesUnicos = Array.from(new Set(atividades.map(a => a.componenteFuncional).filter(Boolean))).sort();
   const origensUnicas = Array.from(new Set(atividades.map(a => a.origemRecurso).filter(Boolean))).sort();
 
   const filteredAtividades = atividades.filter((a) => {
     const matchesSearch =
-      a.atividade.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.origemRecurso.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.componenteFuncional?.toLowerCase().includes(searchTerm.toLowerCase());
+      (a.atividade || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (a.descricao || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (a.origemRecurso || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (a.componenteFuncional || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesDimensao = filterDimensao === 'all' || a.dimensao.includes(filterDimensao);
+    const matchesDimensao = filterDimensao === 'all' || (a.dimensao || '').includes(filterDimensao);
     const matchesComponente = filterComponente === 'all' || a.componenteFuncional === filterComponente;
     const matchesOrigem = filterOrigem === 'all' || a.origemRecurso === filterOrigem;
 
@@ -130,13 +161,16 @@ export default function Atividades() {
       setSelectedAtividade(atividade);
       setFormData({
         dimensao: atividade.dimensao,
+        dimensaoId: atividade.dimensaoId || '',
         componenteFuncional: atividade.componenteFuncional,
-        processo: atividade.processo,
+        componenteFuncionalId: atividade.componenteFuncionalId || '',
         atividade: atividade.atividade,
         descricao: atividade.descricao,
         valorTotal: atividade.valorTotal,
         origemRecurso: atividade.origemRecurso,
+        origemRecursoId: atividade.origemRecursoId || '',
         naturezaDespesa: atividade.naturezaDespesa,
+        naturezaDespesaId: atividade.naturezaDespesaId || '',
         planoInterno: atividade.planoInterno,
       });
     } else {
@@ -146,22 +180,68 @@ export default function Atividades() {
     setIsDialogOpen(true);
   };
 
-  const handleSubmit = () => {
-    let origemFormatada = formData.origemRecurso;
-    const ptresMatch = origemFormatada.match(/\b(\d{6})\b/);
-    if (ptresMatch) {
-      origemFormatada = ptresMatch[1];
-    }
+  const handleSubmit = async () => {
+    try {
+      let origemFormatada = formData.origemRecurso;
+      const ptresMatch = origemFormatada.match(/\b(\d{6})\b/);
+      if (ptresMatch) {
+        origemFormatada = ptresMatch[1];
+      }
 
-    const dataToSubmit = { ...formData, origemRecurso: origemFormatada };
+      const dataToSubmit = { 
+      ...formData, 
+      origemRecurso: origemFormatada,
+      dimensaoId: formData.dimensaoId || null,
+      componenteFuncionalId: formData.componenteFuncionalId || null,
+      naturezaDespesaId: formData.naturezaDespesaId || null,
+      origemRecursoId: formData.origemRecursoId || null,
+    };
 
-    if (selectedAtividade) {
-      updateAtividade(selectedAtividade.id, dataToSubmit);
-    } else {
-      addAtividade(dataToSubmit);
+      // 1. Resolver ID de Dimensão (Opcional)
+      try {
+        if (!dataToSubmit.dimensaoId && dataToSubmit.dimensao) {
+          const dimCodigo = dataToSubmit.dimensao.split(' - ')[0];
+          const dims = await dominioService.getDimensoes();
+          const match = dims?.find(d => d.codigo === dimCodigo);
+          if (match) dataToSubmit.dimensaoId = match.id;
+        }
+      } catch (e) {
+        console.warn('Falha ao resolver ID de Dimensão:', e);
+      }
+
+      // 2. Resolver ID de Componente Funcional (Opcional)
+      try {
+        if (!dataToSubmit.componenteFuncionalId && dataToSubmit.componenteFuncional && dataToSubmit.dimensaoId) {
+          const comps = await dominioService.getComponentesFuncionais(dataToSubmit.dimensaoId);
+          const match = comps?.find(c => c.nome === dataToSubmit.componenteFuncional);
+          if (match) dataToSubmit.componenteFuncionalId = match.id;
+        }
+      } catch (e) {
+        console.warn('Falha ao resolver ID de Componente Funcional:', e);
+      }
+
+      // 3. Resolver/Upsert ID de Origem de Recurso (Opcional)
+      try {
+        if (origemFormatada && !dataToSubmit.origemRecursoId) {
+          const oid = await dominioService.upsertOrigemRecurso(origemFormatada);
+          if (oid) dataToSubmit.origemRecursoId = oid;
+        }
+      } catch (e) {
+        console.warn('Falha ao resolver ID de Origem:', e);
+      }
+
+      if (selectedAtividade) {
+        await updateAtividade(selectedAtividade.id, dataToSubmit);
+      } else {
+        await addAtividade(dataToSubmit);
+      }
+      setIsDialogOpen(false);
+      setFormData(initialFormState);
+    } catch (error: any) {
+      console.error('Erro ao salvar atividade:', error);
+      const detail = error.message || error.details || 'Verifique os dados e tente novamente.';
+      toast.error(`Erro ao salvar: ${detail}`);
     }
-    setIsDialogOpen(false);
-    setFormData(initialFormState);
   };
 
   const handleDelete = () => {
@@ -203,37 +283,69 @@ export default function Atividades() {
   };
 
 
-  const handleJsonImport = (data: Record<string, string>[]) => {
+  const handleJsonImport = async (data: Record<string, string>[]) => {
     let importCount = 0;
-    data.forEach((row) => {
-      // Formata a origem recurso para extrair o PTRES se vier no formato AA.BBBB.CCCCCC.D
-      let origemRecurso = row['origemrecurso'] || '';
-      const ptresMatch = origemRecurso.match(/\b(\d{6})\b/);
-      if (ptresMatch) {
-        origemRecurso = ptresMatch[1];
-      }
+    const toastId = toast.loading(`Importando ${data.length} atividades...`);
 
-      const atividade = {
-        dimensao: row['dimensao'] || '',
-        componenteFuncional: row['componentefuncional'] || row['componente'] || '',
-        processo: row['processo'] || '',
-        atividade: row['atividade'] || '',
-        descricao: row['descricao'] || '',
-        valorTotal: parseCurrency(row['valortotal'] || row['valor'] || '0'),
-        origemRecurso: origemRecurso,
-        naturezaDespesa: row['naturezadespesa'] || '',
-        planoInterno: row['planointerno'] || '',
-      };
-      if (atividade.atividade && atividade.dimensao) {
-        addAtividade(atividade);
-        importCount++;
+    try {
+      const dims = await dominioService.getDimensoes();
+
+      for (const row of data) {
+        // Formata a origem recurso para extrair o PTRES se vier no formato AA.BBBB.CCCCCC.D
+        let origemRecurso = row['origemrecurso'] || '';
+        const ptresMatch = origemRecurso.match(/\b(\d{6})\b/);
+        if (ptresMatch) {
+          origemRecurso = ptresMatch[1];
+        }
+
+        const nomeDimensao = row['dimensao'] || '';
+        const dimCodigo = nomeDimensao.split(' - ')[0];
+        const dimensaoId = dims.find(d => d.codigo === dimCodigo)?.id;
+
+        let componenteFuncionalId = '';
+        const nomeComponente = row['componentefuncional'] || row['componente'] || '';
+        if (dimensaoId && nomeComponente) {
+          const comps = await dominioService.getComponentesFuncionais(dimensaoId);
+          componenteFuncionalId = comps.find(c => c.nome === nomeComponente)?.id || '';
+        }
+
+        let naturezaDespesaId = '';
+        const naturezaStr = row['naturezadespesa'] || '';
+        if (naturezaStr) {
+          const nParts = naturezaStr.split(' - ');
+          const nCodigo = nParts[0].trim();
+          const nNome = nParts.length > 1 ? nParts.slice(1).join(' - ').trim() : '';
+          naturezaDespesaId = await dominioService.upsertNaturezaDespesa(nCodigo, nNome) || '';
+        }
+
+        const atividade = {
+          dimensao: nomeDimensao,
+          dimensaoId,
+          componenteFuncional: nomeComponente,
+          componenteFuncionalId,
+          atividade: row['atividade'] || '',
+          descricao: row['descricao'] || '',
+          valorTotal: parseCurrency(row['valortotal'] || row['valor'] || '0'),
+          origemRecurso: origemRecurso,
+          naturezaDespesa: naturezaStr,
+          naturezaDespesaId,
+          planoInterno: row['planointerno'] || '',
+        };
+
+        if (atividade.atividade && atividade.dimensao) {
+          addAtividade(atividade);
+          importCount++;
+        }
       }
-    });
-    toast.success(`${importCount} atividade(s) importada(s) com sucesso!`);
+      toast.success(`${importCount} atividade(s) importada(s) com sucesso!`, { id: toastId });
+    } catch (error) {
+      console.error('Erro na importação:', error);
+      toast.error('Erro ao importar atividades.', { id: toastId });
+    }
   };
 
   const atividadesJsonFields = [
-    'dimensao', 'componentefuncional', 'processo', 'atividade', 'descricao', 'valortotal', 'origemrecurso', 'naturezadespesa', 'planointerno'
+    'dimensao', 'componentefuncional', 'atividade', 'descricao', 'valortotal', 'origemrecurso', 'naturezadespesa', 'planointerno'
   ];
 
   return (
@@ -416,7 +528,7 @@ export default function Atividades() {
                     </td>
                     <td className="py-4 px-4">
                       <Badge variant="secondary" className="whitespace-nowrap">
-                        {atividade.dimensao.split(' - ')[0]}
+                        {(atividade.dimensao || 'N/D').split(' - ')[0]}
                       </Badge>
                     </td>
                     <td className="py-4 px-4">
@@ -467,7 +579,15 @@ export default function Atividades() {
               <Label htmlFor="dimensao">Dimensão</Label>
               <Select
                 value={formData.dimensao}
-                onValueChange={(v) => setFormData({ ...formData, dimensao: v })}
+                onValueChange={(v) => {
+                  setFormData({ 
+                    ...formData, 
+                    dimensao: v, 
+                    dimensaoId: '', 
+                    componenteFuncional: '', 
+                    componenteFuncionalId: '' 
+                  });
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione a dimensão" />
@@ -483,21 +603,27 @@ export default function Atividades() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="componenteFuncional">Componente Funcional</Label>
-              <Input
-                id="componenteFuncional"
-                value={formData.componenteFuncional}
-                onChange={(e) => setFormData({ ...formData, componenteFuncional: e.target.value })}
-                placeholder="Ex: Gestão Administrativa"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="processo">Processo</Label>
-              <Input
-                id="processo"
-                value={formData.processo}
-                onChange={(e) => setFormData({ ...formData, processo: e.target.value })}
-                placeholder="Ex: 3 - Secretariado Executivo"
-              />
+              <Select
+                value={formData.componenteFuncionalId || ''}
+                onValueChange={(v) => {
+                  const selected = componentesDB.find(c => c.id === v);
+                  if (selected) {
+                    setFormData({ ...formData, componenteFuncional: selected.nome, componenteFuncionalId: v });
+                  }
+                }}
+                disabled={!formData.dimensao}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={formData.dimensao ? "Selecione o componente" : "Selecione a dimensão primeiro"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {componentesDB.map((comp) => (
+                    <SelectItem key={comp.id} value={comp.id}>
+                      {comp.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="atividade">Atividade</Label>
@@ -541,16 +667,25 @@ export default function Atividades() {
             <div className="grid gap-2">
               <Label htmlFor="naturezaDespesa">Natureza de Despesa</Label>
               <Select
-                value={formData.naturezaDespesa}
-                onValueChange={(v) => setFormData({ ...formData, naturezaDespesa: v })}
+                value={formData.naturezaDespesaId}
+                onValueChange={(v) => {
+                  const selected = naturezasDespesa.find(n => n.id === v);
+                  if (selected) {
+                    setFormData({
+                      ...formData,
+                      naturezaDespesaId: v,
+                      naturezaDespesa: `${selected.codigo} - ${selected.nome}`
+                    });
+                  }
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione a natureza de despesa" />
                 </SelectTrigger>
                 <SelectContent>
-                  {NATUREZAS_DESPESA.map((n) => (
-                    <SelectItem key={n} value={n}>
-                      {n}
+                  {naturezasDespesa.map((n) => (
+                    <SelectItem key={n.id} value={n.id}>
+                      {n.codigo} - {n.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>

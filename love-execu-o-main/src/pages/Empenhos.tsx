@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
-import { Plus, Pencil, Trash2, Search, Filter, Calendar, Upload, FileSpreadsheet, Loader2, RefreshCw } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Filter, Calendar, Upload, FileSpreadsheet, Loader2, RefreshCw, History } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
-import { Empenho, DIMENSOES, NATUREZAS_DESPESA, COMPONENTES_POR_DIMENSAO } from '@/types';
+import { Empenho, DIMENSOES, COMPONENTES_POR_DIMENSAO } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { transparenciaService } from '@/services/transparencia';
@@ -596,6 +596,68 @@ export default function Empenhos() {
               </div>
             </div>
 
+            {/* Histórico de Operações */}
+            {selectedEmpenho?.historicoOperacoes && selectedEmpenho.historicoOperacoes.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <History className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-semibold">Histórico de Operações ({selectedEmpenho.historicoOperacoes.length})</span>
+                </div>
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-muted/50">
+                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Data</th>
+                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Operação</th>
+                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...selectedEmpenho.historicoOperacoes]
+                        .sort((a, b) => {
+                          // Sort by date ascending
+                          const parseDate = (d: string) => {
+                            const parts = d.split('/');
+                            return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                          };
+                          return parseDate(a.data).getTime() - parseDate(b.data).getTime();
+                        })
+                        .map((op, idx) => (
+                          <tr key={idx} className="border-t border-border/50">
+                            <td className="py-2 px-3 text-muted-foreground">{op.data}</td>
+                            <td className="py-2 px-3">
+                              <Badge
+                                variant="secondary"
+                                className={`text-xs ${op.operacao === 'INCLUSAO' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                                    op.operacao === 'REFORCO' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                      op.operacao === 'ANULACAO' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                        ''
+                                  }`}
+                              >
+                                {op.operacao === 'INCLUSAO' ? 'Inclusão' :
+                                  op.operacao === 'REFORCO' ? 'Reforço' :
+                                    op.operacao === 'ANULACAO' ? 'Anulação' :
+                                      op.operacao}
+                              </Badge>
+                            </td>
+                            <td className={`py-2 px-3 text-right font-medium ${op.operacao === 'ANULACAO' ? 'text-red-600' : 'text-green-600'
+                              }`}>
+                              {op.operacao === 'ANULACAO' ? '-' : '+'}{formatCurrency(op.valorTotal)}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-border bg-muted/30">
+                        <td colSpan={2} className="py-2 px-3 font-semibold">Valor Consolidado</td>
+                        <td className="py-2 px-3 text-right font-bold">{formatCurrency(formData.valor)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {/* Campos Editáveis */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
@@ -740,6 +802,12 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, openDeleteDialog }: {
                       {empenho.processo && (
                         <span className="text-xs text-muted-foreground whitespace-nowrap" title="Processo">
                           Proc: {empenho.processo}
+                        </span>
+                      )}
+                      {empenho.historicoOperacoes && empenho.historicoOperacoes.length > 1 && (
+                        <span className="text-[10px] text-blue-500 flex items-center gap-0.5" title="Empenho com histórico de alterações">
+                          <History className="h-3 w-3" />
+                          {empenho.historicoOperacoes.length} ops
                         </span>
                       )}
                     </div>

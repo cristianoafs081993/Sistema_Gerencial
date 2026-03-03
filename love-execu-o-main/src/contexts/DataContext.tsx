@@ -56,8 +56,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   // --- Mutations: Atividades ---
   const createAtividadeMutation = useMutation({
     mutationFn: atividadesService.create,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['atividades'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['atividades'] });
+      await queryClient.refetchQueries({ queryKey: ['atividades'] });
       toast.success('Atividade criada com sucesso!');
     },
     onError: (error) => {
@@ -69,8 +70,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const updateAtividadeMutation = useMutation({
     mutationFn: ({ id, updates }: { id: string; updates: Partial<Atividade> }) =>
       atividadesService.update(id, updates),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['atividades'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['atividades'] });
+      await queryClient.refetchQueries({ queryKey: ['atividades'] });
       toast.success('Atividade atualizada com sucesso!');
     },
     onError: (error) => {
@@ -81,8 +83,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const deleteAtividadeMutation = useMutation({
     mutationFn: atividadesService.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['atividades'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['atividades'] });
+      await queryClient.refetchQueries({ queryKey: ['atividades'] });
       toast.success('Atividade excluída com sucesso!');
     },
     onError: (error) => {
@@ -94,8 +97,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   // --- Mutations: Empenhos ---
   const createEmpenhoMutation = useMutation({
     mutationFn: empenhosService.create,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['empenhos'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['empenhos'] });
+      await queryClient.refetchQueries({ queryKey: ['empenhos'] });
       toast.success('Empenho criado com sucesso!');
     },
     onError: (error) => {
@@ -107,8 +111,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const updateEmpenhoMutation = useMutation({
     mutationFn: ({ id, updates }: { id: string; updates: Partial<Empenho> }) =>
       empenhosService.update(id, updates),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['empenhos'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['empenhos'] });
+      await queryClient.refetchQueries({ queryKey: ['empenhos'] });
       toast.success('Empenho atualizado com sucesso!');
     },
     onError: (error) => {
@@ -119,8 +124,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const deleteEmpenhoMutation = useMutation({
     mutationFn: empenhosService.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['empenhos'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['empenhos'] });
+      await queryClient.refetchQueries({ queryKey: ['empenhos'] });
       toast.success('Empenho excluído com sucesso!');
     },
     onError: (error) => {
@@ -132,8 +138,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   // --- Mutations: Descentralizações ---
   const createDescentralizacaoMutation = useMutation({
     mutationFn: descentralizacoesService.create,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['descentralizacoes'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['descentralizacoes'] });
+      await queryClient.refetchQueries({ queryKey: ['descentralizacoes'] });
       toast.success('Descentralização criada com sucesso!');
     },
     onError: (error) => {
@@ -145,8 +152,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const updateDescentralizacaoMutation = useMutation({
     mutationFn: ({ id, updates }: { id: string; updates: Partial<Descentralizacao> }) =>
       descentralizacoesService.update(id, updates),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['descentralizacoes'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['descentralizacoes'] });
+      await queryClient.refetchQueries({ queryKey: ['descentralizacoes'] });
       toast.success('Descentralização atualizada com sucesso!');
     },
     onError: (error) => {
@@ -157,8 +165,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const deleteDescentralizacaoMutation = useMutation({
     mutationFn: descentralizacoesService.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['descentralizacoes'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['descentralizacoes'] });
+      await queryClient.refetchQueries({ queryKey: ['descentralizacoes'] });
       toast.success('Descentralização excluída com sucesso!');
     },
     onError: (error) => {
@@ -169,64 +178,64 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   // --- Wrappers ---
   const addAtividade = useCallback(
-    (atividade: Omit<Atividade, 'id' | 'createdAt' | 'updatedAt'>) => {
-      createAtividadeMutation.mutate(atividade);
+    async (atividade: Omit<Atividade, 'id' | 'createdAt' | 'updatedAt'>) => {
+      return createAtividadeMutation.mutateAsync(atividade);
     },
     [createAtividadeMutation]
   );
 
   const updateAtividade = useCallback(
-    (id: string, updates: Partial<Atividade>) => {
-      updateAtividadeMutation.mutate({ id, updates });
+    async (id: string, updates: Partial<Atividade>) => {
+      return updateAtividadeMutation.mutateAsync({ id, updates });
     },
     [updateAtividadeMutation]
   );
 
   const deleteAtividade = useCallback(
-    (id: string) => {
-      deleteAtividadeMutation.mutate(id);
+    async (id: string) => {
+      return deleteAtividadeMutation.mutateAsync(id);
     },
     [deleteAtividadeMutation]
   );
 
   const addEmpenho = useCallback(
-    (empenho: Omit<Empenho, 'id' | 'createdAt' | 'updatedAt'>) => {
-      createEmpenhoMutation.mutate(empenho);
+    async (empenho: Omit<Empenho, 'id' | 'createdAt' | 'updatedAt'>) => {
+      return createEmpenhoMutation.mutateAsync(empenho);
     },
     [createEmpenhoMutation]
   );
 
   const updateEmpenho = useCallback(
-    (id: string, updates: Partial<Empenho>) => {
-      updateEmpenhoMutation.mutate({ id, updates });
+    async (id: string, updates: Partial<Empenho>) => {
+      return updateEmpenhoMutation.mutateAsync({ id, updates });
     },
     [updateEmpenhoMutation]
   );
 
   const deleteEmpenho = useCallback(
-    (id: string) => {
-      deleteEmpenhoMutation.mutate(id);
+    async (id: string) => {
+      return deleteEmpenhoMutation.mutateAsync(id);
     },
     [deleteEmpenhoMutation]
   );
 
   const addDescentralizacao = useCallback(
-    (d: Omit<Descentralizacao, 'id' | 'createdAt' | 'updatedAt'>) => {
-      createDescentralizacaoMutation.mutate(d);
+    async (d: Omit<Descentralizacao, 'id' | 'createdAt' | 'updatedAt'>) => {
+      return createDescentralizacaoMutation.mutateAsync(d);
     },
     [createDescentralizacaoMutation]
   );
 
   const updateDescentralizacao = useCallback(
-    (id: string, updates: Partial<Descentralizacao>) => {
-      updateDescentralizacaoMutation.mutate({ id, updates });
+    async (id: string, updates: Partial<Descentralizacao>) => {
+      return updateDescentralizacaoMutation.mutateAsync({ id, updates });
     },
     [updateDescentralizacaoMutation]
   );
 
   const deleteDescentralizacao = useCallback(
-    (id: string) => {
-      deleteDescentralizacaoMutation.mutate(id);
+    async (id: string) => {
+      return deleteDescentralizacaoMutation.mutateAsync(id);
     },
     [deleteDescentralizacaoMutation]
   );

@@ -1,9 +1,11 @@
 import { supabase } from '@/lib/supabase';
-import { DocumentoDespesa, DocumentoDespesaAPI } from '@/types';
+import { DocumentoDespesa, DocumentoDespesaAPI, OperacaoEmpenho } from '@/types';
 import { parseCurrency } from '@/lib/utils';
 import { addDays, format, isAfter, isBefore, parse } from 'date-fns';
+import { dominioService } from './dominio';
 
 const API_BASE = '/api-transparencia/api-de-dados/despesas/documentos';
+const API_HISTORICO = '/api-transparencia/api-de-dados/despesas/itens-de-empenho/historico';
 const UNIDADE_GESTORA = '158366';
 const GESTAO = '26435';
 const API_KEY = '931d4d57337bef94e775337c318342e9';
@@ -114,13 +116,39 @@ export const transparenciaService = {
         }
     },
 
+    // Buscar a data do último documento sincronizado
+    async getLastDocumentoDate(): Promise<Date | null> {
+        const { data, error } = await supabase
+            .from('transparencia_documentos')
+            .select('data_emissao')
+            .order('data_emissao', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (error) {
+            console.error('Erro ao buscar última data de documento:', error);
+            return null;
+        }
+
+        return data ? new Date(`${data.data_emissao}T12:00:00`) : null;
+    },
+
     // Sincronizar dados da API para o Supabase (Liquidação/Pagamento)
     async syncDados(
-        startDate: Date,
-        onProgress: (date: Date, total: number, currentPhase: string) => void
+        startDate?: Date,
+        onProgress?: (date: Date, total: number, currentPhase: string) => void
     ): Promise<void> {
         const today = new Date();
+
+        // Se não informar startDate, busca a última data no banco
         let currentDate = startDate;
+        if (!currentDate) {
+            const lastDate = await this.getLastDocumentoDate();
+            // Inicia do MESMO dia do último encontrado para garantir captura de atualizações tardias
+            // Se vazio, inicia de 01/01/2026
+            currentDate = lastDate || new Date(2026, 0, 1);
+        }
+
         let totalProcessed = 0;
 
         // Fases: 2 - Liquidação, 3 - Pagamento
@@ -172,6 +200,12 @@ export const transparenciaService = {
 
                             const impacto = await this.getEmpenhoImpactado(doc.documento, fase.codigo);
 
+                            let empenhoId = null;
+                            // Se houver empenho impactado, verifica se ele existe no banco
+                            if (impacto?.empenhoResumido && impacto?.empenho) {
+                                empenhoId = await this.ensureEmpenhoExists(impacto.empenhoResumido, impacto.empenho);
+                            }
+
                             documentosParaSalvar.push({
                                 documento: doc.documento,
                                 data_emissao: parse(doc.data, 'dd/MM/yyyy', new Date()),
@@ -184,15 +218,11 @@ export const transparenciaService = {
                                 elemento_despesa: doc.elemento,
                                 natureza_despesa: `${doc.categoria} - ${doc.grupo} - ${doc.modalidade} - ${doc.elemento}`,
                                 empenho_documento: impacto?.empenhoResumido || null,
+                                empenho_id: empenhoId,
                                 valorLiquidado: impacto?.valorLiquidado,
                                 valorRestoPago: impacto?.valorRestoPago,
                                 updated_at: new Date(),
                             });
-
-                            // Se houver empenho impactado, verifica se ele existe no banco
-                            if (impacto?.empenhoResumido && impacto?.empenho) {
-                                await this.ensureEmpenhoExists(impacto.empenhoResumido, impacto.empenho);
-                            }
                         }
 
                         // Upsert
@@ -270,8 +300,7 @@ export const transparenciaService = {
         }
     },
 
-    // Garantir que o empenho existe no banco (Lazy Sync)
-    async ensureEmpenhoExists(numeroResumido: string, numeroCompleto: string) {
+    async ensureEmpenhoExists(numeroResumido: string, numeroCompleto: string): Promise<string | null> {
         // Verifica se já existe
         const { data } = await supabase
             .from('empenhos')
@@ -279,7 +308,7 @@ export const transparenciaService = {
             .eq('numero', numeroResumido)
             .maybeSingle();
 
-        if (data) return; // Já existe
+        if (data) return data.id; // Já existe
 
         console.log(`[Lazy Sync] Empenho ${numeroResumido} não encontrado. Buscando : ${numeroCompleto}...`);
 
@@ -313,14 +342,22 @@ export const transparenciaService = {
 
                 const naturezaDespesaCompleta = `${categoriaCode}${grupoCode}${modalidadeCode}${elementoCode} - ${elementoNome}`;
 
+                // Upsert natureza de despesa e obter ID
+                let naturezaDespesaId = null;
+                const codigoNatureza = `${categoriaCode}${grupoCode}${modalidadeCode}${elementoCode}`;
+                if (codigoNatureza) {
+                    naturezaDespesaId = await dominioService.upsertNaturezaDespesa(codigoNatureza, elementoNome);
+                }
+
                 empenhoParaSalvar = {
                     numero: numeroResumido,
-                    descricao: data.observacao || '',
+                    descricao: '', // Deixando em branco por enquanto conforme solicitado
                     valor: parseCurrency(data.valor),
                     dimensao: 'NÃO DEFINIDA', // Será necessário classificar depois
                     componente_funcional: '', // Removido preenchimento automático
                     origem_recurso: 'NÃO DEFINIDA',
                     natureza_despesa: naturezaDespesaCompleta.trim().startsWith('-') ? '' : naturezaDespesaCompleta,
+                    natureza_despesa_id: naturezaDespesaId,
                     plano_interno: data.planoOrcamentario ? data.planoOrcamentario.split(' - ')[0] : '',
                     favorecido_nome: data.nomeFavorecido,
                     favorecido_documento: data.codigoFavorecido,
@@ -336,8 +373,10 @@ export const transparenciaService = {
             }
 
             if (empenhoParaSalvar) {
-                await supabase.from('empenhos').insert(empenhoParaSalvar);
+                const { data: insertedData, error: insertError } = await supabase.from('empenhos').insert(empenhoParaSalvar).select('id').single();
+                if (insertError) throw insertError;
                 console.log(`[Lazy Sync] Empenho ${numeroResumido} criado.`);
+                return insertedData?.id || null;
             }
 
         } catch (error) {
@@ -365,9 +404,12 @@ export const transparenciaService = {
                 updated_at: new Date()
             };
 
-            await supabase.from('empenhos').insert(stubEmpenho);
+            const { data: insertedData, error: stubInsertError } = await supabase.from('empenhos').insert(stubEmpenho).select('id').single();
+            if (stubInsertError) console.error(stubInsertError);
             console.log(`[Lazy Sync] Stub criado para ${numeroResumido}.`);
+            return insertedData?.id || null;
         }
+        return null;
     },
 
     // Buscar último número de empenho cadastrado
@@ -394,29 +436,93 @@ export const transparenciaService = {
         return 0;
     },
 
+    // Buscar histórico de operações de um empenho (reforços, anulações, inclusão)
+    async fetchHistoricoEmpenho(codigoDocumento: string): Promise<OperacaoEmpenho[]> {
+        const allItems: OperacaoEmpenho[] = [];
+        try {
+            for (let seq = 1; seq <= 10; seq++) {
+                await delay(300);
+                const url = `${API_HISTORICO}?codigoDocumento=${codigoDocumento}&sequencial=${seq}&pagina=1`;
+                const response = await fetch(url, {
+                    headers: {
+                        'accept': '*/*',
+                        'chave-api-dados': API_KEY,
+                    },
+                });
+
+                if (!response.ok) {
+                    console.warn(`[Historico] Erro seq ${seq} para ${codigoDocumento}: ${response.status}`);
+                    break;
+                }
+
+                let data;
+                try {
+                    const text = await response.text();
+                    if (!text || text.trim() === '' || text.trim() === '[]') {
+                        break; // Sem mais itens
+                    }
+                    data = JSON.parse(text);
+                } catch {
+                    break;
+                }
+
+                if (!Array.isArray(data) || data.length === 0) {
+                    break;
+                }
+
+                for (const item of data) {
+                    allItems.push({
+                        data: item.data,
+                        operacao: item.operacao,
+                        quantidade: parseCurrency(item.quantidade),
+                        valorUnitario: parseCurrency(item.valorUnitario),
+                        valorTotal: parseCurrency(item.valorTotal),
+                    });
+                }
+            }
+        } catch (error) {
+            console.error(`[Historico] Erro ao buscar histórico de ${codigoDocumento}:`, error);
+        }
+        return allItems;
+    },
+
+    // Calcular valor real a partir do histórico de operações
+    calcularValorReal(historico: OperacaoEmpenho[]): number {
+        let valor = 0;
+        for (const op of historico) {
+            if (op.operacao === 'INCLUSAO' || op.operacao === 'REFORCO') {
+                valor += op.valorTotal;
+            } else if (op.operacao === 'ANULACAO') {
+                valor -= op.valorTotal;
+            }
+        }
+        return Math.max(valor, 0); // Proteger contra negativo
+    },
+
     // Sincronizar dados da API (Sequencial)
     async syncEmpenhosSequencial(
         onProgress: (message: string) => void
     ): Promise<void> {
         const UG = '158366';
         const GESTAO = '26435';
-        const ANO = '2026'; // Poderia ser dinâmico
+        const ANO = '2026';
         const TIPO = 'NE';
 
         let sequence = await this.getLastEmpenhoSequence() + 1;
-        let errors = 0;
-        const maxErrors = 20; // Revertido para 20 conforme solicitado
+        let consecutiveErrors = 0;
+        const maxConsecutiveErrors = 3; 
+        let empenhosSincronizados = 0;
+        const maxTotalSkips = 10; // Limite total de buracos na sequência
+        let totalSkips = 0;
 
-        // Limite de segurança para loop infinito
-        while (errors < maxErrors) {
+        onProgress(`Buscando atualizações no Portal da Transparência...`);
+
+        while (consecutiveErrors < maxConsecutiveErrors && totalSkips < maxTotalSkips) {
             const sequenceStr = sequence.toString().padStart(6, '0');
             const codigoDocumento = `${UG}${GESTAO}${ANO}${TIPO}${sequenceStr}`;
             const numeroEmpenho = `${ANO}${TIPO}${sequenceStr}`;
 
-            onProgress(`Buscando empenho ${numeroEmpenho}... (Erros seguidos: ${errors})`);
-
             try {
-                // Usando delay maior para evitar rate limiting e garantir estabilidade
                 await delay(500);
 
                 const response = await fetch(
@@ -424,50 +530,41 @@ export const transparenciaService = {
                     {
                         headers: {
                             'accept': '*/*',
-                            'chave-api-dados': API_KEY, // Ensure API_KEY matches the one defined at top of file
+                            'chave-api-dados': API_KEY,
                         },
                     }
                 );
 
-                if (response.status === 404) {
-                    errors++;
-                    console.log(`[Sync] Empenho ${numeroEmpenho} não encontrado (404). Erros seguidos: ${errors}/${maxErrors}`);
-                    sequence++; // Pula para o próximo
-                    continue; // Continua o loop
-                }
-
                 if (!response.ok) {
-                    throw new Error(`Erro API: ${response.status}`);
-                }
-
-                let data;
-                try {
-                    const text = await response.text();
-                    if (!text || text.trim() === '') {
-                        // Se não tiver corpo, trata como erro ou skip
-                        console.warn(`Resposta vazia para ${numeroEmpenho}`);
-                        errors++;
-                        sequence++;
-                        continue;
-                    }
-                    data = JSON.parse(text);
-                } catch (jsonError) {
-                    console.error(`Erro ao fazer parse do JSON para ${numeroEmpenho}:`, jsonError);
-                    errors++;
+                    consecutiveErrors++;
+                    totalSkips++;
+                    console.log(`[Sync] ${numeroEmpenho} indisponível.`);
                     sequence++;
                     continue;
                 }
 
+                const text = await response.text();
+                if (!text || text.trim() === '') {
+                    consecutiveErrors++;
+                    totalSkips++;
+                    sequence++;
+                    continue;
+                }
+
+                const data = JSON.parse(text);
                 if (!data || !data.documento) {
-                    errors++;
+                    consecutiveErrors++;
+                    totalSkips++;
                     sequence++;
                     continue;
                 }
 
-                errors = 0; // Resetar contador de erros se encontrar sucesso
+                // SUCESSO: Encontrou um empenho válido
+                consecutiveErrors = 0; 
+                empenhosSincronizados++;
+                onProgress(`Sincronizando empenho ${numeroEmpenho}...`);
 
-                // Mapear para o formato do banco (tabela empenhos)
-                // Extrair códigos da natureza de despesa
+                // Mapeamento e Salvamento
                 const categoriaCode = data.categoria ? data.categoria.split(' - ')[0] : '';
                 const grupoCode = data.grupo ? data.grupo.split(' - ')[0] : '';
                 const modalidadeCode = data.modalidade ? data.modalidade.split(' - ')[0] : '';
@@ -476,63 +573,63 @@ export const transparenciaService = {
 
                 const naturezaDespesaCompleta = `${categoriaCode}${grupoCode}${modalidadeCode}${elementoCode} - ${elementoNome}`;
 
+                let naturezaDespesaId = null;
+                const codigoNatureza = `${categoriaCode}${grupoCode}${modalidadeCode}${elementoCode}`;
+                if (codigoNatureza) {
+                    naturezaDespesaId = await dominioService.upsertNaturezaDespesa(codigoNatureza, elementoNome);
+                }
+
+                const historico = await this.fetchHistoricoEmpenho(codigoDocumento);
+                const valorReal = historico.length > 0
+                    ? this.calcularValorReal(historico)
+                    : parseCurrency(data.valor);
+
                 const empenhoParaSalvar = {
                     numero: data.documentoResumido || numeroEmpenho,
-                    descricao: '', // API não retorna descrição útil, deixar em branco para edição manual
-                    valor: parseCurrency(data.valor),
+                    descricao: '', 
+                    valor: valorReal,
                     dimensao: 'NÃO DEFINIDA',
-                    componente_funcional: '', // Removido preenchimento automático
+                    componente_funcional: '',
                     origem_recurso: 'NÃO DEFINIDA',
                     natureza_despesa: naturezaDespesaCompleta.trim().startsWith('-') ? '' : naturezaDespesaCompleta,
+                    natureza_despesa_id: naturezaDespesaId,
                     plano_interno: data.planoOrcamentario ? data.planoOrcamentario.split(' - ')[0] : '',
                     favorecido_nome: data.nomeFavorecido,
                     favorecido_documento: data.codigoFavorecido,
-                    processo: data.numeroProcesso, // Adicionado campo processo
+                    processo: data.numeroProcesso,
                     valor_liquidado: 0,
                     data_empenho: parse(data.data, 'dd/MM/yyyy', new Date()),
                     status: 'pendente',
                     atividade_id: null,
+                    historico_operacoes: historico,
                     updated_at: new Date()
                 };
 
-                // Verificar se já existe
-                const { data: existingEmpenho, error: searchError } = await supabase
+                const { data: existingEmpenho } = await supabase
                     .from('empenhos')
                     .select('id')
                     .eq('numero', empenhoParaSalvar.numero)
                     .maybeSingle();
 
-                if (searchError) {
-                    console.error(`Erro ao buscar empenho ${numeroEmpenho}:`, searchError);
-                }
-
-                let error;
                 if (existingEmpenho) {
-                    const { error: updateError } = await supabase
-                        .from('empenhos')
-                        .update(empenhoParaSalvar)
-                        .eq('id', existingEmpenho.id);
-                    error = updateError;
+                    await supabase.from('empenhos').update(empenhoParaSalvar).eq('id', existingEmpenho.id);
                 } else {
-                    const { error: insertError } = await supabase
-                        .from('empenhos')
-                        .insert(empenhoParaSalvar);
-                    error = insertError;
-                }
-
-                if (error) {
-                    console.error(`Erro ao salvar empenho ${numeroEmpenho}:`, error);
+                    await supabase.from('empenhos').insert(empenhoParaSalvar);
                 }
 
                 sequence++;
 
             } catch (error) {
-                console.error(`[Sync] Erro crítico ao processar ${numeroEmpenho}:`, error);
-                errors++;
+                consecutiveErrors++;
+                totalSkips++;
                 sequence++;
             }
         }
 
-        onProgress(`Sincronização finalizada. Último verificado: ${ANO}${TIPO}${(sequence - 1).toString().padStart(6, '0')}`);
+        if (empenhosSincronizados > 0) {
+            onProgress(`Sincronização concluída. ${empenhosSincronizados} novos empenhos encontrados.`);
+        } else {
+            onProgress(`Nenhum empenho novo encontrado.`);
+        }
     }
 };
