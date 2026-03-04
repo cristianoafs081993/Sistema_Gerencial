@@ -478,12 +478,18 @@ const {
 ### Order of Execution
 
 1. Read (first or next) task
-2. Implement task and its subtasks
-3. Write tests
-4. Execute validations
-5. **Only if ALL pass**: Mark task checkbox [x]
-6. Update story File List (ensure all created/modified/deleted files listed)
-7. Repeat until all tasks complete
+2. **Code Intelligence Check (IDS G4)** — Before creating new files or functions:
+   - If code intelligence is available (`isCodeIntelAvailable()` from `.aios-core/core/code-intel`):
+     - Call `checkBeforeWriting(fileName, description)` from `.aios-core/core/code-intel/helpers/dev-helper`
+     - If result is not null, display as **"Code Intelligence Suggestion"** (non-blocking advisory)
+     - Log suggestion in decision-log if in YOLO mode
+   - If code intelligence is NOT available: skip silently (zero impact on workflow)
+3. Implement task and its subtasks
+4. Write tests
+5. Execute validations
+6. **Only if ALL pass**: Mark task checkbox [x]
+7. Update story File List (ensure all created/modified/deleted files listed)
+8. Repeat until all tasks complete
 
 ### Story File Updates (All Modes)
 
@@ -553,7 +559,7 @@ Execute **AFTER** all tasks are complete but **BEFORE** running the DOD checklis
 │  WHILE iteration < max_iterations:                           │
 │    ┌────────────────────────────────────────────────────┐   │
 │    │ 1. Run CodeRabbit CLI                              │   │
-│    │    wsl bash -c 'cd /mnt/c/.../@synkra/aios-core &&    │   │
+│    │    wsl bash -c 'cd /mnt/c/.../aios-core &&    │   │
 │    │    ~/.local/bin/coderabbit --prompt-only           │   │
 │    │    -t uncommitted'                                  │   │
 │    │                                                     │   │
@@ -908,3 +914,11 @@ Found 5 technical decisions needed.
 - **Decision Logs**: Persisted in `.ai/decision-log-{story-id}.md` for future reference and review
 - **Educational Value**: Interactive mode explanations help developers learn framework patterns
 - **Scope Drift Prevention**: Pre-flight mode eliminates mid-development ambiguity
+
+## Handoff
+next_agent: @qa
+next_command: *review {story-id}
+condition: Story status is Ready for Review
+alternatives:
+  - agent: @qa, command: *gate {story-id}, condition: Quick gate decision needed
+  - agent: @dev, command: *apply-qa-fixes, condition: Self-identified issues during dev

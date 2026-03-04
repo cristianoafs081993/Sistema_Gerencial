@@ -39,6 +39,9 @@ import { ptBR } from 'date-fns/locale';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { toast } from 'sonner';
 import { formatCurrency, parseCurrency } from '@/lib/utils';
+import { parseSiafiCsv, syncSiafiDataToDb } from '@/lib/siafi-parser';
+import { AlertCircle } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 
 const statusColors: Record<string, string> = {
@@ -237,64 +240,45 @@ export default function Empenhos() {
     if (!file) return;
 
     setIsUpdatingSaldos(true);
+    const toastId = toast.loading('Processando arquivo do SIAFI...');
 
     try {
-      const XLSX = await import('xlsx');
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
+      // 1. Parsear o CSV do SIAFI
+      const parsedData = await parseSiafiCsv(file);
 
-      let updatedCount = 0;
-      let notFoundCount = 0;
+      if (parsedData.length === 0) {
+        toast.error('Nenhum dado válido encontrado no arquivo CSV.', { id: toastId });
+        return;
+      }
 
-      jsonData.forEach((row) => {
-        const empenhoKey = Object.keys(row).find(k =>
-          k.toLowerCase().includes('empenho') || k.toLowerCase() === 'numero'
-        );
-        const movimentoKey = Object.keys(row).find(k =>
-          k.toLowerCase().includes('movimento') || k.toLowerCase().includes('liquidado')
-        );
+      toast.loading(`Atualizando saldos de ${parsedData.length} empenhos no banco...`, { id: toastId });
 
-        if (!empenhoKey || !movimentoKey) return;
-
-        const numeroEmpenho = String(row[empenhoKey]).trim();
-        const valorMovimento = typeof row[movimentoKey] === 'number'
-          ? row[movimentoKey] as number
-          : parseCurrency(String(row[movimentoKey]));
-
-        const empenho = empenhos.find(e =>
-          e.numero === numeroEmpenho ||
-          e.numero.includes(numeroEmpenho) ||
-          numeroEmpenho.includes(e.numero)
-        );
-
-        if (empenho) {
-          const novoValorLiquidado = (empenho.valorLiquidado || 0) + valorMovimento;
-          updateEmpenho(empenho.id, {
-            valorLiquidado: novoValorLiquidado,
-            status: novoValorLiquidado > 0 ? 'liquidado' : 'pendente',
-          });
-          updatedCount++;
-        } else {
-          notFoundCount++;
-          console.warn(`Empenho não encontrado: ${numeroEmpenho}`);
+      // 2. Sincronizar com o Supabase
+      const result = await syncSiafiDataToDb(parsedData, (processed, total) => {
+        if (processed % 50 === 0) {
+          toast.loading(`Atualizando... ${processed}/${total}`, { id: toastId });
         }
       });
 
-      if (updatedCount > 0) {
-        toast.success(`${updatedCount} saldo(s) atualizado(s) com sucesso!`);
+      // 3. Atualizar UI
+      await refreshData();
+
+      if (result.atualizados > 0 || result.criados > 0) {
+        let msg = '';
+        if (result.atualizados > 0) msg += `${result.atualizados} atualizado(s)`;
+        if (result.criados > 0) msg += `${msg ? ', ' : ''}${result.criados} RAP criado(s)`;
+        toast.success(`SIAFI: ${msg}!`, { id: toastId });
+      } else {
+        toast.info('Nenhum empenho do arquivo foi encontrado no sistema.', { id: toastId });
       }
-      if (notFoundCount > 0) {
-        toast.warning(`${notFoundCount} empenho(s) da planilha não encontrado(s) no sistema`);
+
+      if (result.erros > 0) {
+        toast.error(`Houve erro ao salvar ${result.erros} registros.`, { duration: 5000 });
       }
-      if (updatedCount === 0 && notFoundCount === 0) {
-        toast.error('Nenhum dado válido encontrado na planilha. Verifique as colunas "Empenho" e "Movimento".');
-      }
-    } catch (error) {
-      console.error('Erro ao importar planilha:', error);
-      toast.error('Erro ao ler a planilha. Verifique o formato do arquivo.');
+
+    } catch (error: any) {
+      console.error('Erro ao processar SIAFI CSV:', error);
+      toast.error(error.message || 'Erro ao ler a planilha. Verifique o formato do arquivo.', { id: toastId });
     } finally {
       setIsUpdatingSaldos(false);
       if (saldosInputRef.current) {
@@ -350,27 +334,36 @@ export default function Empenhos() {
             type="file"
             ref={saldosInputRef}
             onChange={handleImportSaldos}
-            accept=".xlsx,.xls,.csv"
+            accept=".csv"
             className="hidden"
           />
-          <Button
-            variant="outline"
-            onClick={() => saldosInputRef.current?.click()}
-            className="gap-2"
-            disabled={isUpdatingSaldos}
-          >
-            {isUpdatingSaldos ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Atualizando...
-              </>
-            ) : (
-              <>
-                <FileSpreadsheet className="h-4 w-4" />
-                Atualizar Saldos
-              </>
-            )}
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  onClick={() => saldosInputRef.current?.click()}
+                  className="gap-2"
+                  disabled={isUpdatingSaldos}
+                >
+                  {isUpdatingSaldos ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Lendo SIAFI...
+                    </>
+                  ) : (
+                    <>
+                      <FileSpreadsheet className="h-4 w-4 text-green-600" />
+                      Importar SIAFI
+                    </>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Importar CSV SIAFI (Exec_NE_Exercicio_RAP_UG_Executora.csv)</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <Button
             variant="outline"
             onClick={handleSyncApi}
@@ -538,7 +531,7 @@ export default function Empenhos() {
 
         <TabsContent value="execucao">
           <EmpenhosTable
-            empenhos={filteredEmpenhos.filter(e => e.numero.includes(String(new Date().getFullYear())))}
+            empenhos={filteredEmpenhos.filter(e => e.tipo === 'exercicio' || (!e.tipo && e.numero.includes(String(new Date().getFullYear()))))}
             type="execucao"
             handleOpenDialog={handleOpenDialog}
             openDeleteDialog={openDeleteDialog}
@@ -547,7 +540,7 @@ export default function Empenhos() {
 
         <TabsContent value="restos">
           <EmpenhosTable
-            empenhos={filteredEmpenhos.filter(e => !e.numero.includes(String(new Date().getFullYear())))}
+            empenhos={filteredEmpenhos.filter(e => e.tipo === 'rap' || (!e.tipo && !e.numero.includes(String(new Date().getFullYear()))))}
             type="restos"
             handleOpenDialog={handleOpenDialog}
             openDeleteDialog={openDeleteDialog}
@@ -629,9 +622,9 @@ export default function Empenhos() {
                               <Badge
                                 variant="secondary"
                                 className={`text-xs ${op.operacao === 'INCLUSAO' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                                    op.operacao === 'REFORCO' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                                      op.operacao === 'ANULACAO' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                                        ''
+                                  op.operacao === 'REFORCO' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                    op.operacao === 'ANULACAO' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                      ''
                                   }`}
                               >
                                 {op.operacao === 'INCLUSAO' ? 'Inclusão' :
@@ -770,6 +763,76 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, openDeleteDialog }: {
   handleOpenDialog: (e: Empenho) => void,
   openDeleteDialog: (e: Empenho) => void
 }) {
+  const [sortKey, setSortKey] = useState<string>('numero');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const sortedEmpenhos = useMemo(() => {
+    const sorted = [...empenhos].sort((a, b) => {
+      let valA: number | string = 0;
+      let valB: number | string = 0;
+
+      switch (sortKey) {
+        case 'numero':
+          valA = a.numero;
+          valB = b.numero;
+          break;
+        case 'favorecido':
+          valA = a.favorecidoNome || '';
+          valB = b.favorecidoNome || '';
+          break;
+        case 'valor':
+          valA = type === 'restos' ? (a.rapInscrito || a.valor) : a.valor;
+          valB = type === 'restos' ? (b.rapInscrito || b.valor) : b.valor;
+          break;
+        case 'saldo':
+          if (type === 'restos') {
+            valA = a.rapALiquidar || 0;
+            valB = b.rapALiquidar || 0;
+          } else {
+            valA = a.valor - (a.valorLiquidado || 0);
+            valB = b.valor - (b.valorLiquidado || 0);
+          }
+          break;
+        case 'pago':
+          valA = type === 'restos' ? (a.rapPago || 0) : (a.valorPago || 0);
+          valB = type === 'restos' ? (b.rapPago || 0) : (b.valorPago || 0);
+          break;
+        default:
+          valA = a.numero;
+          valB = b.numero;
+      }
+
+      if (typeof valA === 'string') {
+        return sortDir === 'asc' ? valA.localeCompare(valB as string) : (valB as string).localeCompare(valA);
+      }
+      return sortDir === 'asc' ? (valA as number) - (valB as number) : (valB as number) - (valA as number);
+    });
+    return sorted;
+  }, [empenhos, sortKey, sortDir, type]);
+
+  const SortHeader = ({ label, colKey, align = 'left' }: { label: string; colKey: string; align?: 'left' | 'right' | 'center' }) => (
+    <th
+      className={`text-${align} py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap cursor-pointer hover:text-foreground select-none transition-colors`}
+      onClick={() => handleSort(colKey)}
+    >
+      <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
+        {label}
+        {sortKey === colKey && (
+          <span className="text-primary text-xs">{sortDir === 'asc' ? '▲' : '▼'}</span>
+        )}
+      </span>
+    </th>
+  );
+
   return (
     <Card>
       <CardHeader>
@@ -782,19 +845,26 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, openDeleteDialog }: {
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Número</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground min-w-[150px]">Favorecido</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Componente / Dimensão</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Origem / Plano</th>
-                <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">
-                  {type === 'execucao' ? 'Empenhado / Liquidado' : 'Inscrito / Pago'}
-                </th>
-                <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Saldo</th>
+                <SortHeader label="Número" colKey="numero" />
+                <SortHeader label="Favorecido" colKey="favorecido" />
+                {type === 'execucao' ? (
+                  <>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Componente / Dimensão</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Origem / Plano</th>
+                  </>
+                ) : (
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Descrição</th>
+                )}
+                <SortHeader label={type === 'execucao' ? 'Empenhado / Liquidado' : 'Inscrito / A Liq / Liq / Pago'} colKey="valor" align="right" />
+                <SortHeader label={type === 'execucao' ? 'Saldo' : 'A Liquidar'} colKey="saldo" align="right" />
+                {type === 'execucao' && (
+                  <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Status SIAFI</th>
+                )}
                 <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {empenhos.map((empenho) => (
+              {sortedEmpenhos.map((empenho) => (
                 <tr key={empenho.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
                   <td className="py-4 px-4 align-top">
                     <div className="flex flex-col gap-1">
@@ -818,50 +888,82 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, openDeleteDialog }: {
                       <span className="text-xs text-muted-foreground">{empenho.favorecidoDocumento}</span>
                     </div>
                   </td>
-                  <td className="py-4 px-4 align-top">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-sm font-medium">{empenho.componenteFuncional}</span>
-                      <Badge variant="secondary" className="w-fit whitespace-nowrap">
-                        {empenho.dimensao.split(' - ')[0]}
-                      </Badge>
-                    </div>
-                  </td>
-                  <td className="py-4 px-4 align-top">
-                    <div className="flex flex-col gap-1">
-                      <p className="text-sm font-medium whitespace-nowrap">{empenho.origemRecurso}</p>
-                      {empenho.planoInterno && (
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">{empenho.planoInterno}</span>
-                      )}
-                    </div>
-                  </td>
+                  {type === 'execucao' ? (
+                    <>
+                      <td className="py-4 px-4 align-top">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-sm font-medium">{empenho.componenteFuncional}</span>
+                          <Badge variant="secondary" className="w-fit whitespace-nowrap">
+                            {empenho.dimensao ? empenho.dimensao.split(' - ')[0] : '-'}
+                          </Badge>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 align-top">
+                        <div className="flex flex-col gap-1">
+                          <p className="text-sm font-medium whitespace-nowrap">{empenho.origemRecurso || '-'}</p>
+                          {empenho.planoInterno && (
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">{empenho.planoInterno}</span>
+                          )}
+                        </div>
+                      </td>
+                    </>
+                  ) : (
+                    <td className="py-4 px-4 align-top">
+                      <span className="text-sm line-clamp-2" title={empenho.descricao}>{empenho.descricao || '-'}</span>
+                    </td>
+                  )}
                   <td className="py-4 px-4 text-right align-top whitespace-nowrap">
                     <div className="flex flex-col gap-1 items-end">
-                      <span className="font-medium" title={type === 'execucao' ? "Empenhado" : "Inscrito"}>
-                        {formatCurrency(empenho.valor)}
-                      </span>
-                      {type === 'execucao' ? (
+                      {type === 'restos' && empenho.rapInscrito != null ? (
                         <>
-                          <span className={`text-xs ${(empenho.valorLiquidado || 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`} title="Liquidado">
-                            Liq: {formatCurrency(empenho.valorLiquidado || 0)}
+                          <span className="font-medium" title="Inscrito (original)">
+                            {formatCurrency(empenho.rapInscrito || 0)}
                           </span>
-                          {(empenho.valorPago || 0) > 0 && (
-                            <span className="text-[10px] text-green-600" title="Pago">
+                          <span className={`text-xs ${(empenho.rapALiquidar || 0) > 0 ? 'text-orange-500' : 'text-muted-foreground'}`} title="A Liquidar">
+                            A Liq: {formatCurrency(empenho.rapALiquidar || 0)}
+                          </span>
+                          <span className={`text-xs ${(empenho.rapLiquidado || 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`} title="Liquidado">
+                            Liq: {formatCurrency(empenho.rapLiquidado || 0)}
+                          </span>
+                          <span className={`text-xs ${(empenho.rapPago || 0) > 0 ? 'text-green-600' : 'text-muted-foreground'}`} title="Pago">
+                            Pg: {formatCurrency(empenho.rapPago || 0)}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="font-medium" title={type === 'execucao' ? 'Empenhado' : 'Inscrito'}>
+                            {formatCurrency(empenho.valor)}
+                          </span>
+                          {type === 'execucao' ? (
+                            <>
+                              <span className={`text-xs ${(empenho.valorLiquidado || 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`} title="Liquidado">
+                                Liq: {formatCurrency(empenho.valorLiquidado || 0)}
+                              </span>
+                              {(empenho.valorPago || 0) > 0 && (
+                                <span className="text-[10px] text-green-600" title="Pago">
+                                  Pg: {formatCurrency(empenho.valorPago || 0)}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className={`text-xs ${(empenho.valorPago || 0) > 0 ? 'text-green-600' : 'text-muted-foreground'}`} title="Pago">
                               Pg: {formatCurrency(empenho.valorPago || 0)}
                             </span>
                           )}
                         </>
-                      ) : (
-                        <span className={`text-xs ${(empenho.valorPago || 0) > 0 ? 'text-green-600' : 'text-muted-foreground'}`} title="Pago">
-                          Pg: {formatCurrency(empenho.valorPago || 0)}
-                        </span>
                       )}
                     </div>
                   </td>
                   <td className="py-4 px-4 text-right align-top whitespace-nowrap">
                     {(() => {
-                      // Saldo logic: 
-                      // For Execução: Empenho - Liquidado
-                      // For Restos (RP): Inscrito - Liquidado (User specific request)
+                      if (type === 'restos') {
+                        const aLiquidar = empenho.rapALiquidar || 0;
+                        return (
+                          <span className={`font-medium ${aLiquidar > 0 ? 'text-orange-500' : 'text-muted-foreground'}`}>
+                            {formatCurrency(aLiquidar)}
+                          </span>
+                        );
+                      }
                       const saldo = empenho.valor - (empenho.valorLiquidado || 0);
                       return (
                         <span className={`font-medium ${saldo > 0 ? 'text-green-600' : saldo < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
@@ -870,6 +972,73 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, openDeleteDialog }: {
                       );
                     })()}
                   </td>
+                  {type === 'execucao' && (
+                    <td className="py-4 px-4 text-right align-top whitespace-nowrap">
+                      {(() => {
+                        if (!empenho.ultimaAtualizacaoSiafi) {
+                          return <span className="text-xs text-muted-foreground opacity-50">SIAFI ñ Import.</span>;
+                        }
+
+                        const sistLiq = empenho.valorLiquidado || 0;
+                        const siafiLiq = empenho.valorLiquidadoOficial || 0;
+                        const sistPago = empenho.valorPago || 0;
+                        const siafiPago = empenho.valorPagoOficial || 0;
+
+                        const hasDivergence = Math.abs(sistLiq - siafiLiq) > 0.05 || Math.abs(sistPago - siafiPago) > 0.05;
+
+                        return (
+                          <div className="flex flex-col gap-1 items-end">
+                            {hasDivergence ? (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-1 text-red-600 bg-red-50 dark:bg-red-950/30 px-2 py-1 rounded cursor-help">
+                                      <AlertCircle className="h-4 w-4" />
+                                      <span className="text-xs font-semibold">Divergente</span>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="left" className="w-[280px]">
+                                    <div className="grid gap-2 text-sm">
+                                      <p className="font-semibold border-b pb-1">Valores Oficiais do SIAFI</p>
+                                      <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                                        <span className="text-muted-foreground">Liq SIAFI:</span>
+                                        <span className="text-right">{formatCurrency(siafiLiq)}</span>
+                                        <span className="text-muted-foreground">Liq Sist:</span>
+                                        <span className="text-right border-b border-opacity-20 pb-1">{formatCurrency(sistLiq)}</span>
+                                        <span className="text-muted-foreground">Pago SIAFI:</span>
+                                        <span className="text-right">{formatCurrency(siafiPago)}</span>
+                                        <span className="text-muted-foreground">Pago Sist:</span>
+                                        <span className="text-right">{formatCurrency(sistPago)}</span>
+                                      </div>
+                                      <p className="text-[10px] text-muted-foreground text-right mt-2">
+                                        Atualizado: {format(new Date(empenho.ultimaAtualizacaoSiafi), "dd/MM 'às' HH:mm")}
+                                      </p>
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-1 text-green-600 bg-green-50 dark:bg-green-950/30 px-2 py-1 rounded cursor-help">
+                                      <span className="text-xs font-semibold">Conciliado</span>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="left">
+                                    <p className="text-sm">Valores idênticos ao último CSV do SIAFI.</p>
+                                    <p className="text-[10px] text-muted-foreground text-right mt-1">
+                                      Atualizado: {format(new Date(empenho.ultimaAtualizacaoSiafi), "dd/MM 'às' HH:mm")}
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </td>
+                  )}
                   <td className="py-4 px-4 align-top whitespace-nowrap">
                     <div className="flex items-center justify-center gap-2">
                       <Button
@@ -879,13 +1048,15 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, openDeleteDialog }: {
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openDeleteDialog(empenho)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      {type === 'execucao' && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openDeleteDialog(empenho)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -1,12 +1,20 @@
-version: 4.2.13
-installed_at: '2026-02-23T11:00:46.463Z'
+version: 4.4.6
+installed_at: '2026-03-03T18:03:30.770Z'
 install_type: full
 files:
   - core\code-intel-client.js
   - core\code-intel-enricher.js
+  - core\creation-helper.js
+  - core\dev-helper.js
+  - core\devops-helper.js
+  - core\planning-helper.js
+  - core\qa-helper.js
+  - core\story-helper.js
+  - core\hook-runtime.js
   - core\index.js
   - core\code-graph-provider.js
   - core\provider-interface.js
+  - core\registry-provider.js
   - core\registry-syncer.js
   - core\config-cache.js
   - core\config-loader.js
@@ -18,12 +26,33 @@ files:
   - core\local-config.schema.json
   - core\project-config.schema.json
   - core\user-config.schema.json
+  - core\template-overrides.js
   - core\user-config.yaml
   - core\component-creation-guide.md
   - core\session-update-pattern.md
   - core\SHARD-TRANSLATION-GUIDE.md
   - core\template-syntax.md
   - core\troubleshooting-guide.md
+  - core\agent-memory.js
+  - core\claude-md.js
+  - core\code-intel.js
+  - core\commands-count.js
+  - core\core-config.js
+  - core\entity-registry.js
+  - core\git-hooks.js
+  - core\graph-dashboard.js
+  - core\hooks-claude-count.js
+  - core\ide-sync.js
+  - core\index.js
+  - core\node-version.js
+  - core\npm-packages.js
+  - core\rules-files.js
+  - core\settings-json.js
+  - core\skills-count.js
+  - core\fix-handler.js
+  - core\json.js
+  - core\text.js
+  - core\index.js
   - core\agent-elicitation.js
   - core\elicitation-engine.js
   - core\session-manager.js
@@ -43,6 +72,18 @@ files:
   - core\semantic-merge-engine.js
   - core\subagent-dispatcher.js
   - core\wave-executor.js
+  - core\cli.js
+  - core\code-intel-source.js
+  - core\metrics-source.js
+  - core\registry-source.js
+  - core\dot-formatter.js
+  - core\html-formatter.js
+  - core\json-formatter.js
+  - core\mermaid-formatter.js
+  - core\index.js
+  - core\stats-renderer.js
+  - core\status-renderer.js
+  - core\tree-renderer.js
   - core\base-check.js
   - core\check-registry.js
   - core\build-config.js
@@ -102,6 +143,7 @@ files:
   - core\g4-dev-context.js
   - core\incremental-decision-engine.js
   - core\index.js
+  - core\layer-classifier.js
   - core\README.md
   - core\registry-healer.js
   - core\registry-loader.js
@@ -208,10 +250,12 @@ files:
   - core\l7-star-command.js
   - core\layer-processor.js
   - core\memory-bridge.js
+  - core\synapse-memory-provider.js
   - core\formatter.js
   - core\hook-runtime.js
   - core\generate-constitution.js
   - core\session-manager.js
+  - core\atomic-write.js
   - core\paths.js
   - core\tokens.js
   - core\index.js
@@ -226,19 +270,31 @@ files:
   - development\team-no-ui.yaml
   - development\team-qa-focused.yaml
   - development\aios-master.md
+  - development\MEMORY.md
   - development\analyst.md
+  - development\MEMORY.md
   - development\architect.md
+  - development\MEMORY.md
   - development\data-engineer.md
+  - development\MEMORY.md
   - development\dev.md
+  - development\MEMORY.md
   - development\devops.md
+  - development\MEMORY.md
   - development\pm.md
+  - development\MEMORY.md
   - development\po.md
+  - development\MEMORY.md
   - development\qa.md
+  - development\MEMORY.md
   - development\sm.md
   - development\squad-creator.md
+  - development\MEMORY.md
   - development\ux-design-expert.md
   - development\agent-quality-gate.md
   - development\brownfield-compatibility-checklist.md
+  - development\issue-triage-checklist.md
+  - development\memory-audit-checklist.md
   - development\self-critique-checklist.md
   - development\decision-heuristics-framework.md
   - development\quality-dimensions-framework.md
@@ -272,6 +328,7 @@ files:
   - development\greeting-builder.js
   - development\greeting-config-cli.js
   - development\greeting-preference-manager.js
+  - development\issue-triage.js
   - development\manifest-preview.js
   - development\metrics-tracker.js
   - development\migrate-task-to-v2.js
@@ -404,6 +461,7 @@ files:
   - development\github-devops-pre-push-quality-gate.md
   - development\github-devops-repository-cleanup.md
   - development\github-devops-version-management.md
+  - development\github-issue-triage.md
   - development\gotcha.md
   - development\gotchas.md
   - development\health-check.yaml
@@ -466,6 +524,8 @@ files:
   - development\release-management.md
   - development\remove-mcp.md
   - development\remove-worktree.md
+  - development\resolve-github-issue.md
+  - development\review-contributor-pr.md
   - development\run-design-system-pipeline.md
   - development\run-workflow-engine.md
   - development\run-workflow.md
@@ -503,6 +563,7 @@ files:
   - development\tailwind-upgrade.md
   - development\test-as-user.md
   - development\test-validation-task.md
+  - development\triage-github-issues.md
   - development\undo-last.md
   - development\update-aios.md
   - development\update-manifest.md
@@ -517,7 +578,12 @@ files:
   - development\verify-subtask.md
   - development\waves.md
   - development\yolo-toggle.md
+  - development\agent-handoff-tmpl.yaml
   - development\aios-doc-template.md
+  - development\code-intel-integration-pattern.md
+  - development\ptc-entity-validation.md
+  - development\ptc-qa-gate.md
+  - development\ptc-research-aggregation.md
   - development\research-prompt-tmpl.md
   - development\client.ts.hbs
   - development\errors.ts.hbs
@@ -729,6 +795,7 @@ files:
   - infrastructure\codebase-mapper.js
   - infrastructure\index.js
   - infrastructure\validate.js
+  - infrastructure\collect-tool-usage.js
   - infrastructure\commit-message-generator.js
   - infrastructure\component-generator.js
   - infrastructure\component-metadata.js
@@ -750,6 +817,8 @@ files:
   - infrastructure\mode-detector.js
   - infrastructure\documentation-synchronizer.js
   - infrastructure\framework-analyzer.js
+  - infrastructure\generate-optimization-report.js
+  - infrastructure\generate-settings-json.js
   - infrastructure\git-config-detector.js
   - infrastructure\post-commit.js
   - infrastructure\git-wrapper.js
@@ -762,6 +831,7 @@ files:
   - infrastructure\antigravity.js
   - infrastructure\claude-code.js
   - infrastructure\cursor.js
+  - infrastructure\github-copilot.js
   - infrastructure\validator.js
   - infrastructure\improvement-engine.js
   - infrastructure\improvement-validator.js
@@ -843,7 +913,6 @@ files:
   - infrastructure\tech-stack-tmpl.md
   - infrastructure\project-status-loader.test.js
   - infrastructure\regression-suite-v2.md
-  - infrastructure\utilities-audit-results.json
   - infrastructure\validate-module.js
   - infrastructure\worktree-manager.test.js
   - infrastructure\github-cli.yaml
@@ -863,35 +932,32 @@ files:
   - infrastructure\README.md
   - data\agent-config-requirements.yaml
   - data\aios-kb.md
+  - data\capability-detection.js
   - data\entity-registry.yaml
   - data\learned-patterns.yaml
-  - data\registry-update-log.jsonl
+  - data\mcp-discipline.js
+  - data\mcp-tool-examples.yaml
   - data\nextjs-react.md
   - data\_template.md
   - data\technical-preferences.md
+  - data\tok2-validation.js
+  - data\tok3-token-comparison.js
+  - data\tool-registry.yaml
+  - data\tool-search-validation.js
+  - data\workflow-chains.yaml
   - data\workflow-patterns.yaml
   - data\workflow-state-schema.yaml
-  - docs\component-creation-guide.md
-  - docs\session-update-pattern.md
-  - docs\SHARD-TRANSLATION-GUIDE.md
   - docs\AGENT-PERSONALIZATION-STANDARD-V1.md
   - docs\AIOS-COLOR-PALETTE-QUICK-REFERENCE.md
   - docs\AIOS-COLOR-PALETTE-V2.1.md
-  - docs\AIOS-FRAMEWORK-MASTER.md
   - docs\AIOS-LIVRO-DE-OURO-V2.1-COMPLETE.md
-  - docs\AIOS-LIVRO-DE-OURO-V2.1-SUMMARY.md
-  - docs\AIOS-LIVRO-DE-OURO-V2.1.md
   - docs\AIOS-LIVRO-DE-OURO-V2.2-SUMMARY.md
-  - docs\AIOS-LIVRO-DE-OURO.md
   - docs\EXECUTOR-DECISION-TREE.md
   - docs\OPEN-SOURCE-VS-SERVICE-DIFFERENCES.md
   - docs\QUALITY-GATES-SPECIFICATION.md
   - docs\STANDARDS-INDEX.md
   - docs\STORY-TEMPLATE-V2-SPECIFICATION.md
   - docs\TASK-FORMAT-SPECIFICATION-V1.md
-  - docs\V3-ARCHITECTURAL-DECISIONS.md
-  - docs\template-syntax.md
-  - docs\troubleshooting-guide.md
   - elicitation\agent-elicitation.js
   - elicitation\task-elicitation.js
   - elicitation\workflow-elicitation.js
@@ -991,10 +1057,7 @@ files:
   - cli\index.js
   - cli\output-formatter-cli.js
   - cli\score-calculator.js
-  - manifests\agents.csv
   - manifests\manifest-schema.json
-  - manifests\tasks.csv
-  - manifests\workers.csv
   - schemas\agent-v3-schema.json
   - schemas\README.md
   - schemas\squad-design-schema.json

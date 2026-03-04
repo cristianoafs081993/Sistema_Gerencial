@@ -1,7 +1,7 @@
 {
     "version": "1.0",
-    "project": "love-execu-o-main",
-    "workspace": "C:/Users/3128880/Desktop/Programação/IFRN/love-execu-o-main",
+    "project": "Sistema_Gerencial",
+    "workspace": "C:/Users/crist/OneDrive/Desktop/Obsidian/01 - Projetos/Apps/Sistema_Gerencial",
     "agents": {
         "enabled": true,
         "directory": ".antigravity\\agents",

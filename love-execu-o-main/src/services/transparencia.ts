@@ -206,6 +206,36 @@ export const transparenciaService = {
                                 empenhoId = await this.ensureEmpenhoExists(impacto.empenhoResumido, impacto.empenho);
                             }
 
+                            // Priorizar valor do impacto (especialmente para Restos a Pagar onde o valor principal vem "-")
+                            let valorDocumento = parseCurrency(doc.valor);
+                            const vLiq = impacto?.valorLiquidado || 0;
+                            const vPag = impacto?.valorRestoPago || 0;
+                            
+                            if (valorDocumento === 0) {
+                                valorDocumento = vLiq > 0 ? vLiq : vPag;
+                            }
+
+                            // Fallback 3: Buscar valor via detalhe individual do documento (resolve Restos a Pagar zerados)
+                            if (valorDocumento === 0) {
+                                try {
+                                    await delay(100);
+                                    const detailResp = await fetch(
+                                        `${API_BASE}/${doc.documento}`,
+                                        { headers: { 'accept': '*/*', 'chave-api-dados': API_KEY } }
+                                    );
+                                    if (detailResp.ok) {
+                                        const detailData = await detailResp.json();
+                                        const detailVal = parseCurrency(detailData?.valor);
+                                        if (detailVal > 0) {
+                                            valorDocumento = detailVal;
+                                            console.log(`[Sync] Valor recuperado via detalhe: ${doc.documentoResumido} = R$ ${detailVal}`);
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.warn(`[Sync] Falha ao buscar detalhe de ${doc.documentoResumido}`, e);
+                                }
+                            }
+
                             documentosParaSalvar.push({
                                 documento: doc.documento,
                                 data_emissao: parse(doc.data, 'dd/MM/yyyy', new Date()),
@@ -214,13 +244,13 @@ export const transparenciaService = {
                                 observacao: doc.observacao,
                                 favorecido_nome: doc.nomeFavorecido,
                                 favorecido_documento: doc.codigoFavorecido,
-                                valor: parseCurrency(doc.valor),
+                                valor: valorDocumento,
                                 elemento_despesa: doc.elemento,
                                 natureza_despesa: `${doc.categoria} - ${doc.grupo} - ${doc.modalidade} - ${doc.elemento}`,
                                 empenho_documento: impacto?.empenhoResumido || null,
                                 empenho_id: empenhoId,
-                                valorLiquidado: impacto?.valorLiquidado,
-                                valorRestoPago: impacto?.valorRestoPago,
+                                valorLiquidado: vLiq,
+                                valorRestoPago: vPag,
                                 updated_at: new Date(),
                             });
                         }
@@ -259,41 +289,36 @@ export const transparenciaService = {
     // Recalcular saldo de um empenho com base nos documentos salvos
     async recalcularSaldoEmpenho(numeroEmpenho: string) {
         // Buscar totais de liquidação e pagamento
-        const { data: liquidacoes } = await supabase
+        const { data: documents } = await supabase
             .from('transparencia_documentos')
-            .select('valor')
-            .eq('empenho_documento', numeroEmpenho)
-            .eq('fase', 'Liquidação');
+            .select('valor, valorLiquidado, valorRestoPago, fase')
+            .eq('empenho_documento', numeroEmpenho);
 
-        const { data: pagamentos } = await supabase
-            .from('transparencia_documentos')
-            .select('valor')
-            .eq('empenho_documento', numeroEmpenho)
-            .eq('fase', 'Pagamento');
+        if (!documents) return;
 
-        const totalLiquidado = liquidacoes?.reduce((sum, item) => sum + item.valor, 0) || 0;
-        const totalPago = pagamentos?.reduce((sum, item) => sum + item.valor, 0) || 0;
+        const liquidacoes = documents.filter(d => d.fase === 'Liquidação');
+        const pagamentos = documents.filter(d => d.fase === 'Pagamento');
+
+        const totalLiquidado = liquidacoes.reduce((sum, item) => sum + (item.valorLiquidado || item.valor || 0), 0);
+        const totalPago = pagamentos.reduce((sum, item) => sum + (item.valorRestoPago || item.valor || 0), 0);
 
         // Atualizar empenho
         // Determinar status
         let status = 'pendente';
-        // Se tem pagamento parcial ou total -> 'pago' ou 'liquidado'? 
-        // Simplificação: se totalPago >= totalLiquidado > 0 -> pago?
-        // Vamos manter simples: se liquidado > 0 -> liquidado.
         if (totalLiquidado > 0) status = 'liquidado';
 
         // Buscar empenho para verificar se existe e valor total
         const { data: empenho } = await supabase.from('empenhos').select('id, valor').eq('numero', numeroEmpenho).single();
 
         if (empenho) {
-            // Se totalPago >= empenho.valor -> status = pago (ou quase)
-            if (totalPago >= empenho.valor) status = 'pago';
+            // Se totalPago >= empenho.valor -> status = pago
+            if (totalPago >= empenho.valor && empenho.valor > 0) status = 'pago';
 
             await supabase
                 .from('empenhos')
                 .update({
                     valor_liquidado: totalLiquidado,
-                    valor_pago: totalPago,
+                    // Removido valor_pago pois a coluna não existe no banco
                     status: status
                 })
                 .eq('id', empenho.id);

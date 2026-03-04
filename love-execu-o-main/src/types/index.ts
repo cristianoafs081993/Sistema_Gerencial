@@ -43,6 +43,15 @@ export interface Empenho {
   favorecidoDocumento?: string;
   valorLiquidado?: number;
   valorPago?: number;
+  valorLiquidadoOficial?: number;
+  valorPagoOficial?: number;
+  saldoRapOficial?: number;
+  ultimaAtualizacaoSiafi?: Date;
+  tipo: 'exercicio' | 'rap';
+  rapInscrito?: number;
+  rapALiquidar?: number;
+  rapLiquidado?: number;
+  rapPago?: number;
   dataEmpenho: Date;
   status: 'pendente' | 'liquidado' | 'pago' | 'cancelado';
   atividadeId?: string;

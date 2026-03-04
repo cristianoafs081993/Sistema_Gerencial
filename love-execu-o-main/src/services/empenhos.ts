@@ -28,6 +28,15 @@ export const empenhosService = {
             favorecidoNome: item.favorecido_nome || undefined,
             favorecidoDocumento: item.favorecido_documento || undefined,
             valorLiquidado: item.valor_liquidado ? Number(item.valor_liquidado) : 0,
+            valorLiquidadoOficial: item.valor_liquidado_oficial != null ? Number(item.valor_liquidado_oficial) : undefined,
+            valorPagoOficial: item.valor_pago_oficial != null ? Number(item.valor_pago_oficial) : undefined,
+            saldoRapOficial: item.saldo_rap_oficial != null ? Number(item.saldo_rap_oficial) : undefined,
+            ultimaAtualizacaoSiafi: item.ultima_atualizacao_siafi || undefined,
+            tipo: item.tipo || 'exercicio',
+            rapInscrito: item.rap_inscrito != null ? Number(item.rap_inscrito) : undefined,
+            rapALiquidar: item.rap_a_liquidar != null ? Number(item.rap_a_liquidar) : undefined,
+            rapLiquidado: item.rap_liquidado != null ? Number(item.rap_liquidado) : undefined,
+            rapPago: item.rap_pago != null ? Number(item.rap_pago) : undefined,
             dataEmpenho: new Date(item.data_empenho),
             status: item.status,
             atividadeId: item.atividade_id || undefined,
@@ -58,10 +67,15 @@ export const empenhosService = {
                 favorecido_documento: empenho.favorecidoDocumento,
                 processo: empenho.processo,
                 valor_liquidado: empenho.valorLiquidado || 0,
-                data_empenho: empenho.dataEmpenho.toISOString(),
+                data_empenho: empenho.dataEmpenho instanceof Date ? empenho.dataEmpenho.toISOString() : empenho.dataEmpenho,
                 status: empenho.status,
                 atividade_id: empenho.atividadeId || null,
                 historico_operacoes: empenho.historicoOperacoes || [],
+                tipo: empenho.tipo || 'exercicio',
+                rap_inscrito: empenho.rapInscrito ?? null,
+                rap_a_liquidar: empenho.rapALiquidar ?? null,
+                rap_liquidado: empenho.rapLiquidado ?? null,
+                rap_pago: empenho.rapPago ?? null,
             })
             .select()
             .single();
@@ -86,6 +100,11 @@ export const empenhosService = {
             favorecidoDocumento: data.favorecido_documento || undefined,
             processo: data.processo || undefined,
             valorLiquidado: data.valor_liquidado ? Number(data.valor_liquidado) : 0,
+            tipo: data.tipo || 'exercicio',
+            rapInscrito: data.rap_inscrito != null ? Number(data.rap_inscrito) : undefined,
+            rapALiquidar: data.rap_a_liquidar != null ? Number(data.rap_a_liquidar) : undefined,
+            rapLiquidado: data.rap_liquidado != null ? Number(data.rap_liquidado) : undefined,
+            rapPago: data.rap_pago != null ? Number(data.rap_pago) : undefined,
             dataEmpenho: new Date(data.data_empenho),
             status: data.status,
             atividadeId: data.atividade_id || undefined,
@@ -116,10 +135,15 @@ export const empenhosService = {
         if (empenho.favorecidoDocumento !== undefined) updates.favorecido_documento = empenho.favorecidoDocumento;
         if (empenho.processo !== undefined) updates.processo = empenho.processo;
         if (empenho.valorLiquidado !== undefined) updates.valor_liquidado = empenho.valorLiquidado;
-        if (empenho.dataEmpenho) updates.data_empenho = empenho.dataEmpenho.toISOString();
+        if (empenho.dataEmpenho) updates.data_empenho = empenho.dataEmpenho instanceof Date ? empenho.dataEmpenho.toISOString() : empenho.dataEmpenho;
         if (empenho.status) updates.status = empenho.status;
         if (empenho.atividadeId !== undefined) updates.atividade_id = empenho.atividadeId || null;
         if (empenho.historicoOperacoes) updates.historico_operacoes = empenho.historicoOperacoes;
+        if (empenho.tipo) updates.tipo = empenho.tipo;
+        if (empenho.rapInscrito !== undefined) updates.rap_inscrito = empenho.rapInscrito;
+        if (empenho.rapALiquidar !== undefined) updates.rap_a_liquidar = empenho.rapALiquidar;
+        if (empenho.rapLiquidado !== undefined) updates.rap_liquidado = empenho.rapLiquidado;
+        if (empenho.rapPago !== undefined) updates.rap_pago = empenho.rapPago;
 
         const { error } = await supabase
             .from('empenhos')
