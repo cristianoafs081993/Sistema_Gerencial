@@ -1,11 +1,13 @@
 {
+    "outputDirectory": "dist",
+    "cleanUrls": true,
     "rewrites": [
         {
             "source": "/api-transparencia/:path*",
             "destination": "https://api.portaldatransparencia.gov.br/:path*"
         },
         {
-            "source": "/(.*)",
+            "source": "/((?!assets/).*)",
             "destination": "/index.html"
         }
     ]
