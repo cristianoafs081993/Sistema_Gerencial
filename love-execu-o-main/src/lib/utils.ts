@@ -37,3 +37,34 @@ export const parseCurrency = (value: string | number): number => {
 
   return parseFloat(cleaned) || 0;
 };
+
+export const formatarDocumento = (doc: string): string => {
+  if (!doc) return doc;
+  const cleanDoc = doc.replace(/\D/g, '');
+  if (!cleanDoc) return doc;
+
+  // CNPJ (14 dígitos)
+  if (cleanDoc.length === 14) {
+    return cleanDoc.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+  }
+
+  // CPF (11 dígitos)
+  if (cleanDoc.length === 11) {
+    return cleanDoc.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
+  }
+
+  // Se tiver entre 12 e 13 dígitos, provavelmente é um CNPJ que perdeu zero à esquerda no Excel
+  if (cleanDoc.length > 11 && cleanDoc.length < 14) {
+    const padded = cleanDoc.padStart(14, '0');
+    return padded.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+  }
+
+  // Se tiver 9 ou 10 dígitos, é provavelmente um CPF que perdeu zero à esquerda
+  if (cleanDoc.length >= 9 && cleanDoc.length <= 10) {
+    const padded = cleanDoc.padStart(11, '0');
+    return padded.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4");
+  }
+
+  // Outros formatos (como UG de 6 dígitos) não são modificados
+  return cleanDoc;
+};

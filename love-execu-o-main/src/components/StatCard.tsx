@@ -25,7 +25,7 @@ export function StatCard({
     default: 'stat-card',
     primary: 'stat-card-primary',
     accent: 'stat-card-accent',
-    warning: 'bg-warning text-warning-foreground rounded-xl p-6 shadow-lg',
+    warning: 'stat-card-warning',
   };
 
   const iconBgStyles = {

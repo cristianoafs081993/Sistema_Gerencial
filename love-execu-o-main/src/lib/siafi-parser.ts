@@ -1,4 +1,4 @@
-import { parseCurrency } from '@/lib/utils';
+import { parseCurrency, formatarDocumento } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 
 export interface SiafiEmpenhoData {
@@ -21,6 +21,36 @@ export interface SiafiEmpenhoData {
     rapLiquidado: number;  // = inscrito - a liquidar
     rapPago: number;
     rapAPagar: number;     // saldo restante
+    valorLiquidadoAPagar: number;
+}
+
+/**
+ * Faz o parse de uma linha de CSV lidando com aspas que encapsulam o delimitador.
+ */
+function parseCsvLine(line: string, delimiter: string): string[] {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+            inQuotes = !inQuotes;
+        } else if (char === delimiter && !inQuotes) {
+            result.push(current);
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    result.push(current);
+
+    return result.map(s => {
+        let val = s.trim();
+        if (val.startsWith('"') && val.endsWith('"') && val.length >= 2) {
+            val = val.substring(1, val.length - 1);
+        }
+        return val.replace(/""/g, '"');
+    });
 }
 
 /**
@@ -38,12 +68,26 @@ export async function parseSiafiCsv(file: File): Promise<SiafiEmpenhoData[]> {
                 if (lines.length < 2) {
                     throw new Error('Arquivo vazio ou com formato inválido.');
                 }
-
-                const headers = lines[0].split(';');
-                const data: SiafiEmpenhoData[] = [];
-
                 // Normalizar removendo acentos para comparação segura
                 const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+
+                // Procurar a linha de cabeçalho
+                let headerIndex = -1;
+                let delimiter = ';';
+                for (let i = 0; i < Math.min(15, lines.length); i++) {
+                    const lineNorm = normalize(lines[i]);
+                    if (lineNorm.includes('NE CCOR')) {
+                        headerIndex = i;
+                        delimiter = lines[i].includes(';') ? ';' : (lines[i].includes('\t') ? '\t' : ',');
+                        break;
+                    }
+                }
+
+                if (headerIndex === -1) {
+                    throw new Error('Coluna "NE CCor" não encontrada nas primeiras linhas do arquivo. Verifique o padrão do CSV.');
+                }
+
+                const headers = parseCsvLine(lines[headerIndex], delimiter);
 
                 const findCol = (keyword: string) => {
                     const nk = normalize(keyword);
@@ -70,6 +114,7 @@ export async function parseSiafiCsv(file: File): Promise<SiafiEmpenhoData[]> {
                 const colEmpenhadas = findCol('DESPESAS EMPENHADAS (CONTROLE EMPENHO)');
                 const colLiquidadas = findCol('DESPESAS LIQUIDADAS (CONTROLE EMPENHO)');
                 const colPagas = findCol('DESPESAS PAGAS (CONTROLE EMPENHO)');
+                const colLiquidadasAPagar = findCol('DESPESAS LIQUIDADAS A PAGAR (CONTROLE EMPENHO)');
 
                 // Restos a Pagar (RAP) - 4 estágios
                 const colRapInscritos = findCol('RESTOS A PAGAR INSCRITOS');
@@ -81,13 +126,23 @@ export async function parseSiafiCsv(file: File): Promise<SiafiEmpenhoData[]> {
                     throw new Error('Coluna "NE CCor" não encontrada. Verifique o padrão do CSV.');
                 }
 
-                const currentYear = new Date().getFullYear();
+                let maxAnoEmpenho = 0;
+                for (let i = headerIndex + 1; i < lines.length; i++) {
+                    const matchAno = lines[i].match(/(\d{4})NE\d+/);
+                    if (matchAno) {
+                        const ano = parseInt(matchAno[1], 10);
+                        if (ano > maxAnoEmpenho) maxAnoEmpenho = ano;
+                    }
+                }
+                const currentYear = maxAnoEmpenho > 0 ? maxAnoEmpenho : new Date().getFullYear();
 
-                for (let i = 1; i < lines.length; i++) {
+                const data: SiafiEmpenhoData[] = [];
+
+                for (let i = headerIndex + 1; i < lines.length; i++) {
                     const line = lines[i].trim();
                     if (!line) continue;
 
-                    const cols = line.split(';');
+                    const cols = parseCsvLine(line, delimiter);
                     if (cols.length < 3) continue;
 
                     const numeroCompleto = cols[colNE];
@@ -104,7 +159,12 @@ export async function parseSiafiCsv(file: File): Promise<SiafiEmpenhoData[]> {
 
                     const processo = safeCol(colProcesso);
                     const favorecidoNome = safeCol(colFavorecidoNome);
-                    const favorecidoDocumento = safeCol(colFavorecidoNum);
+                    let favorecidoDocumento = safeCol(colFavorecidoNum);
+
+                    if (favorecidoDocumento) {
+                        favorecidoDocumento = formatarDocumento(favorecidoDocumento);
+                    }
+
                     const descricao = safeCol(colDescricao);
                     const naturezaDespesa = safeCol(colNatureza);
                     const planoInterno = safeCol(colPI);
@@ -113,6 +173,11 @@ export async function parseSiafiCsv(file: File): Promise<SiafiEmpenhoData[]> {
                     const valorEmpenhado = parseCurrency(safeCol(colEmpenhadas));
                     const valorLiquidadoOficial = parseCurrency(safeCol(colLiquidadas));
                     const valorPagoOficial = parseCurrency(safeCol(colPagas));
+
+                    let valorLiquidadoAPagar = parseCurrency(safeCol(colLiquidadasAPagar));
+                    if (colLiquidadasAPagar === -1 && valorLiquidadoOficial !== undefined && valorPagoOficial !== undefined) {
+                        valorLiquidadoAPagar = valorLiquidadoOficial - valorPagoOficial;
+                    }
 
                     const rapInscrito = parseCurrency(safeCol(colRapInscritos));
                     const rapALiquidar = parseCurrency(safeCol(colRapALiquidar));
@@ -132,6 +197,7 @@ export async function parseSiafiCsv(file: File): Promise<SiafiEmpenhoData[]> {
                         isRap,
                         valorLiquidadoOficial,
                         valorPagoOficial,
+                        valorLiquidadoAPagar,
                         valorEmpenhado,
                         rapInscrito,
                         rapALiquidar,
@@ -165,6 +231,10 @@ export async function syncSiafiDataToDb(
     let criados = 0;
     let erros = 0;
 
+    const uploadDate = new Date();
+    uploadDate.setHours(3, 0, 0, 0);
+    const ultimaAtualizacaoSiafiStr = uploadDate.toISOString();
+
     for (let i = 0; i < data.length; i++) {
         const item = data[i];
 
@@ -181,7 +251,8 @@ export async function syncSiafiDataToDb(
                 const updatePayload: Record<string, any> = {
                     valor_liquidado_oficial: item.valorLiquidadoOficial,
                     valor_pago_oficial: item.valorPagoOficial,
-                    ultima_atualizacao_siafi: new Date().toISOString(),
+                    valor_liquidado_a_pagar: item.valorLiquidadoAPagar,
+                    ultima_atualizacao_siafi: ultimaAtualizacaoSiafiStr,
                 };
 
                 if (item.isRap) {
@@ -192,6 +263,26 @@ export async function syncSiafiDataToDb(
                     updatePayload.rap_pago = item.rapPago;
                     updatePayload.saldo_rap_oficial = item.rapAPagar;
                     updatePayload.valor = item.rapInscrito;
+                    // Also update descriptive fields from CSV
+                    if (item.descricao) updatePayload.descricao = item.descricao;
+                    if (item.processo) updatePayload.processo = item.processo;
+                    if (item.favorecidoNome) updatePayload.favorecido_nome = item.favorecidoNome;
+                    if (item.favorecidoDocumento) updatePayload.favorecido_documento = item.favorecidoDocumento;
+                    if (item.naturezaDespesa) updatePayload.natureza_despesa = item.naturezaDespesa;
+                    if (item.planoInterno) updatePayload.plano_interno = item.planoInterno;
+                } else {
+                    // Exercício corrente — CSV é a fonte única de saldos
+                    updatePayload.valor = item.valorEmpenhado;
+                    updatePayload.valor_liquidado = item.valorLiquidadoOficial;
+
+                    if (item.valorPagoOficial > 0 && item.valorPagoOficial >= item.valorEmpenhado) {
+                        updatePayload.status = 'pago';
+                    } else if (item.valorLiquidadoOficial > 0 && item.valorLiquidadoOficial >= item.valorEmpenhado) {
+                        updatePayload.status = 'liquidado';
+                    } else {
+                        updatePayload.status = 'pendente';
+                    }
+
                     // Also update descriptive fields from CSV
                     if (item.descricao) updatePayload.descricao = item.descricao;
                     if (item.processo) updatePayload.processo = item.processo;
@@ -238,7 +329,7 @@ export async function syncSiafiDataToDb(
                         valor_liquidado_oficial: item.valorLiquidadoOficial,
                         valor_pago_oficial: item.valorPagoOficial,
                         saldo_rap_oficial: item.rapAPagar,
-                        ultima_atualizacao_siafi: new Date().toISOString(),
+                        ultima_atualizacao_siafi: ultimaAtualizacaoSiafiStr,
                     });
 
                 if (error) {
@@ -247,8 +338,46 @@ export async function syncSiafiDataToDb(
                 } else {
                     criados++;
                 }
+            } else {
+                // Exercício corrente que não existe no sistema — CRIAR automaticamente a partir do CSV
+                let status: 'pendente' | 'liquidado' | 'pago' | 'cancelado' = 'pendente';
+                if (item.valorPagoOficial > 0 && item.valorPagoOficial >= item.valorEmpenhado) {
+                    status = 'pago';
+                } else if (item.valorLiquidadoOficial > 0 && item.valorLiquidadoOficial >= item.valorEmpenhado) {
+                    status = 'liquidado';
+                }
+
+                const { error } = await supabase
+                    .from('empenhos')
+                    .insert({
+                        numero: item.numeroResumido,
+                        descricao: item.descricao || `Empenho ${item.numeroResumido}`,
+                        valor: item.valorEmpenhado,
+                        dimensao: '',               // Será preenchido manualmente depois
+                        componente_funcional: '',
+                        origem_recurso: '',
+                        natureza_despesa: item.naturezaDespesa || '',
+                        plano_interno: item.planoInterno || null,
+                        favorecido_nome: item.favorecidoNome || null,
+                        favorecido_documento: item.favorecidoDocumento || null,
+                        processo: item.processo || null,
+                        data_empenho: `${item.numeroResumido.substring(0, 4)}-01-01`,
+                        status: status,
+                        tipo: 'exercicio',
+                        valor_liquidado: item.valorLiquidadoOficial,
+                        valor_liquidado_a_pagar: item.valorLiquidadoAPagar,
+                        valor_liquidado_oficial: item.valorLiquidadoOficial,
+                        valor_pago_oficial: item.valorPagoOficial,
+                        ultima_atualizacao_siafi: ultimaAtualizacaoSiafiStr,
+                    });
+
+                if (error) {
+                    console.error(`Erro criando Empenho corrente ${item.numeroResumido}:`, error);
+                    erros++;
+                } else {
+                    criados++;
+                }
             }
-            // Exercício corrente que não existe no sistema: skip (são criados pela sincronização)
         } catch (e) {
             console.error(`Exceção ${item.numeroResumido}:`, e);
             erros++;

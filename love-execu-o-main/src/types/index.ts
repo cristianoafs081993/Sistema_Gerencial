@@ -45,6 +45,7 @@ export interface Empenho {
   valorPago?: number;
   valorLiquidadoOficial?: number;
   valorPagoOficial?: number;
+  valorLiquidadoAPagar?: number;
   saldoRapOficial?: number;
   ultimaAtualizacaoSiafi?: Date;
   tipo: 'exercicio' | 'rap';

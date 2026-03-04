@@ -1,10 +1,10 @@
 import { useState, useMemo, useRef } from 'react';
-import { Plus, Pencil, Trash2, Search, Filter, Calendar, Upload, FileSpreadsheet, Loader2, RefreshCw, History } from 'lucide-react';
+import { Plus, Pencil, Search, Filter, Calendar, Upload, FileSpreadsheet, Loader2, History } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Empenho, DIMENSOES, COMPONENTES_POR_DIMENSAO } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { transparenciaService } from '@/services/transparencia';
+
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -23,24 +23,13 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { toast } from 'sonner';
-import { formatCurrency, parseCurrency } from '@/lib/utils';
+import { formatCurrency, parseCurrency, formatarDocumento } from '@/lib/utils';
 import { parseSiafiCsv, syncSiafiDataToDb } from '@/lib/siafi-parser';
-import { AlertCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 
@@ -105,10 +94,9 @@ export default function Empenhos() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isUpdatingSaldos, setIsUpdatingSaldos] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
+
   const saldosInputRef = useRef<HTMLInputElement>(null);
   const [selectedEmpenho, setSelectedEmpenho] = useState<Empenho | null>(null);
   const [formData, setFormData] = useState(initialFormState);
@@ -179,18 +167,7 @@ export default function Empenhos() {
     setFormData(initialFormState);
   };
 
-  const handleDelete = () => {
-    if (selectedEmpenho) {
-      deleteEmpenho(selectedEmpenho.id);
-      setIsDeleteDialogOpen(false);
-      setSelectedEmpenho(null);
-    }
-  };
 
-  const openDeleteDialog = (empenho: Empenho) => {
-    setSelectedEmpenho(empenho);
-    setIsDeleteDialogOpen(true);
-  };
 
   const handleJsonImport = (data: Record<string, string>[]) => {
     let importCount = 0;
@@ -287,25 +264,7 @@ export default function Empenhos() {
     }
   };
 
-  const handleSyncApi = async () => {
-    setIsSyncing(true);
-    let lastMessage = '';
-    const toastId = toast.loading('Iniciando sincronização...');
 
-    try {
-      await transparenciaService.syncEmpenhosSequencial((msg) => {
-        lastMessage = msg;
-        toast.loading(msg, { id: toastId });
-      });
-      toast.success(lastMessage || 'Sincronização concluída!', { id: toastId });
-      await refreshData();
-    } catch (error) {
-      console.error(error);
-      toast.error('Erro na sincronização', { id: toastId });
-    } finally {
-      setIsSyncing(false);
-    }
-  };
 
   const dimensoesDisponiveis = useMemo(() => {
     // Agora usando apenas as dimensões estáticas definidas
@@ -321,13 +280,27 @@ export default function Empenhos() {
     )];
   }, [atividades, formData.dimensao]);
 
+  const lastUpdate = empenhos.reduce((max, e) => {
+    if (!e.ultimaAtualizacaoSiafi) return max;
+    const date = new Date(e.ultimaAtualizacaoSiafi);
+    return date > max ? date : max;
+  }, new Date(0));
+  const hasLastUpdate = lastUpdate.getTime() > 0;
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
         <div>
           <h2 className="text-2xl font-bold text-foreground">Empenhos</h2>
-          <p className="text-muted-foreground">Gerencie a execução orçamentária</p>
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center mt-1">
+            <p className="text-muted-foreground">Gerencie a execução orçamentária</p>
+            {hasLastUpdate && (
+              <Badge variant="outline" className="text-xs font-normal">
+                Última importação CSV: {format(lastUpdate, "dd/MM/yyyy 'às' HH:mm")}
+              </Badge>
+            )}
+          </div>
         </div>
         <div className="flex gap-2">
           <input
@@ -364,15 +337,6 @@ export default function Empenhos() {
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          <Button
-            variant="outline"
-            onClick={handleSyncApi}
-            className="gap-2"
-            disabled={isSyncing}
-          >
-            <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-            {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
-          </Button>
         </div>
       </div>
 
@@ -534,7 +498,6 @@ export default function Empenhos() {
             empenhos={filteredEmpenhos.filter(e => e.tipo === 'exercicio' || (!e.tipo && e.numero.includes(String(new Date().getFullYear()))))}
             type="execucao"
             handleOpenDialog={handleOpenDialog}
-            openDeleteDialog={openDeleteDialog}
           />
         </TabsContent>
 
@@ -543,7 +506,6 @@ export default function Empenhos() {
             empenhos={filteredEmpenhos.filter(e => e.tipo === 'rap' || (!e.tipo && !e.numero.includes(String(new Date().getFullYear()))))}
             type="restos"
             handleOpenDialog={handleOpenDialog}
-            openDeleteDialog={openDeleteDialog}
           />
         </TabsContent>
       </Tabs>
@@ -583,6 +545,18 @@ export default function Empenhos() {
                 <span className="text-sm font-medium text-muted-foreground">Valor</span>
                 <span>{formatCurrency(formData.valor)}</span>
               </div>
+              {formData.tipo === 'exercicio' && (
+                <>
+                  <div className="grid gap-1">
+                    <span className="text-sm font-medium text-muted-foreground">A Pagar (Liquidado)</span>
+                    <span>{formatCurrency(formData.valorLiquidadoAPagar || 0)}</span>
+                  </div>
+                  <div className="grid gap-1">
+                    <span className="text-sm font-medium text-muted-foreground">Pago Oficial</span>
+                    <span>{formatCurrency(formData.valorPagoOficial || 0)}</span>
+                  </div>
+                </>
+              )}
               <div className="grid gap-1 sm:col-span-2">
                 <span className="text-sm font-medium text-muted-foreground">Natureza de Despesa</span>
                 <span>{formData.naturezaDespesa}</span>
@@ -731,37 +705,15 @@ export default function Empenhos() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Delete Confirmation */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir o empenho "{selectedEmpenho?.numero}"?
-              Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-
-    </div >
+    </div>
   );
 }
 
 // Extracted Component for Table Reuse inside Tabs
-function EmpenhosTable({ empenhos, type, handleOpenDialog, openDeleteDialog }: {
+function EmpenhosTable({ empenhos, type, handleOpenDialog }: {
   empenhos: Empenho[],
   type: 'execucao' | 'restos',
-  handleOpenDialog: (e: Empenho) => void,
-  openDeleteDialog: (e: Empenho) => void
+  handleOpenDialog: (e: Empenho) => void
 }) {
   const [sortKey, setSortKey] = useState<string>('numero');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -857,9 +809,7 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, openDeleteDialog }: {
                 )}
                 <SortHeader label={type === 'execucao' ? 'Empenhado / Liquidado' : 'Inscrito / A Liq / Liq / Pago'} colKey="valor" align="right" />
                 <SortHeader label={type === 'execucao' ? 'Saldo' : 'A Liquidar'} colKey="saldo" align="right" />
-                {type === 'execucao' && (
-                  <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Status SIAFI</th>
-                )}
+
                 <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Ações</th>
               </tr>
             </thead>
@@ -885,7 +835,9 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, openDeleteDialog }: {
                   <td className="py-4 px-4 align-top">
                     <div className="flex flex-col">
                       <span className="text-sm font-medium truncate max-w-[150px]" title={empenho.favorecidoNome}>{empenho.favorecidoNome || '-'}</span>
-                      <span className="text-xs text-muted-foreground">{empenho.favorecidoDocumento}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatarDocumento(empenho.favorecidoDocumento || '')}
+                      </span>
                     </div>
                   </td>
                   {type === 'execucao' ? (
@@ -972,73 +924,7 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, openDeleteDialog }: {
                       );
                     })()}
                   </td>
-                  {type === 'execucao' && (
-                    <td className="py-4 px-4 text-right align-top whitespace-nowrap">
-                      {(() => {
-                        if (!empenho.ultimaAtualizacaoSiafi) {
-                          return <span className="text-xs text-muted-foreground opacity-50">SIAFI ñ Import.</span>;
-                        }
 
-                        const sistLiq = empenho.valorLiquidado || 0;
-                        const siafiLiq = empenho.valorLiquidadoOficial || 0;
-                        const sistPago = empenho.valorPago || 0;
-                        const siafiPago = empenho.valorPagoOficial || 0;
-
-                        const hasDivergence = Math.abs(sistLiq - siafiLiq) > 0.05 || Math.abs(sistPago - siafiPago) > 0.05;
-
-                        return (
-                          <div className="flex flex-col gap-1 items-end">
-                            {hasDivergence ? (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div className="flex items-center gap-1 text-red-600 bg-red-50 dark:bg-red-950/30 px-2 py-1 rounded cursor-help">
-                                      <AlertCircle className="h-4 w-4" />
-                                      <span className="text-xs font-semibold">Divergente</span>
-                                    </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="left" className="w-[280px]">
-                                    <div className="grid gap-2 text-sm">
-                                      <p className="font-semibold border-b pb-1">Valores Oficiais do SIAFI</p>
-                                      <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-                                        <span className="text-muted-foreground">Liq SIAFI:</span>
-                                        <span className="text-right">{formatCurrency(siafiLiq)}</span>
-                                        <span className="text-muted-foreground">Liq Sist:</span>
-                                        <span className="text-right border-b border-opacity-20 pb-1">{formatCurrency(sistLiq)}</span>
-                                        <span className="text-muted-foreground">Pago SIAFI:</span>
-                                        <span className="text-right">{formatCurrency(siafiPago)}</span>
-                                        <span className="text-muted-foreground">Pago Sist:</span>
-                                        <span className="text-right">{formatCurrency(sistPago)}</span>
-                                      </div>
-                                      <p className="text-[10px] text-muted-foreground text-right mt-2">
-                                        Atualizado: {format(new Date(empenho.ultimaAtualizacaoSiafi), "dd/MM 'às' HH:mm")}
-                                      </p>
-                                    </div>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            ) : (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div className="flex items-center gap-1 text-green-600 bg-green-50 dark:bg-green-950/30 px-2 py-1 rounded cursor-help">
-                                      <span className="text-xs font-semibold">Conciliado</span>
-                                    </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="left">
-                                    <p className="text-sm">Valores idênticos ao último CSV do SIAFI.</p>
-                                    <p className="text-[10px] text-muted-foreground text-right mt-1">
-                                      Atualizado: {format(new Date(empenho.ultimaAtualizacaoSiafi), "dd/MM 'às' HH:mm")}
-                                    </p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </td>
-                  )}
                   <td className="py-4 px-4 align-top whitespace-nowrap">
                     <div className="flex items-center justify-center gap-2">
                       <Button
@@ -1048,15 +934,6 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, openDeleteDialog }: {
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      {type === 'execucao' && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openDeleteDialog(empenho)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      )}
                     </div>
                   </td>
                 </tr>

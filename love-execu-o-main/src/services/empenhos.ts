@@ -30,6 +30,7 @@ export const empenhosService = {
             valorLiquidado: item.valor_liquidado ? Number(item.valor_liquidado) : 0,
             valorLiquidadoOficial: item.valor_liquidado_oficial != null ? Number(item.valor_liquidado_oficial) : undefined,
             valorPagoOficial: item.valor_pago_oficial != null ? Number(item.valor_pago_oficial) : undefined,
+            valorLiquidadoAPagar: item.valor_liquidado_a_pagar != null ? Number(item.valor_liquidado_a_pagar) : undefined,
             saldoRapOficial: item.saldo_rap_oficial != null ? Number(item.saldo_rap_oficial) : undefined,
             ultimaAtualizacaoSiafi: item.ultima_atualizacao_siafi || undefined,
             tipo: item.tipo || 'exercicio',
@@ -72,6 +73,7 @@ export const empenhosService = {
                 atividade_id: empenho.atividadeId || null,
                 historico_operacoes: empenho.historicoOperacoes || [],
                 tipo: empenho.tipo || 'exercicio',
+                valor_liquidado_a_pagar: empenho.valorLiquidadoAPagar ?? null,
                 rap_inscrito: empenho.rapInscrito ?? null,
                 rap_a_liquidar: empenho.rapALiquidar ?? null,
                 rap_liquidado: empenho.rapLiquidado ?? null,
@@ -100,6 +102,7 @@ export const empenhosService = {
             favorecidoDocumento: data.favorecido_documento || undefined,
             processo: data.processo || undefined,
             valorLiquidado: data.valor_liquidado ? Number(data.valor_liquidado) : 0,
+            valorLiquidadoAPagar: data.valor_liquidado_a_pagar != null ? Number(data.valor_liquidado_a_pagar) : undefined,
             tipo: data.tipo || 'exercicio',
             rapInscrito: data.rap_inscrito != null ? Number(data.rap_inscrito) : undefined,
             rapALiquidar: data.rap_a_liquidar != null ? Number(data.rap_a_liquidar) : undefined,
@@ -140,6 +143,7 @@ export const empenhosService = {
         if (empenho.atividadeId !== undefined) updates.atividade_id = empenho.atividadeId || null;
         if (empenho.historicoOperacoes) updates.historico_operacoes = empenho.historicoOperacoes;
         if (empenho.tipo) updates.tipo = empenho.tipo;
+        if (empenho.valorLiquidadoAPagar !== undefined) updates.valor_liquidado_a_pagar = empenho.valorLiquidadoAPagar;
         if (empenho.rapInscrito !== undefined) updates.rap_inscrito = empenho.rapInscrito;
         if (empenho.rapALiquidar !== undefined) updates.rap_a_liquidar = empenho.rapALiquidar;
         if (empenho.rapLiquidado !== undefined) updates.rap_liquidado = empenho.rapLiquidado;
