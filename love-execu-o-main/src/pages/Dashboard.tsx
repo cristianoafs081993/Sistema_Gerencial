@@ -150,7 +150,7 @@ export default function Dashboard() {
   const percentualExecutado = totalPlanejado > 0 ? (totalEmpenhado / totalPlanejado) * 100 : 0;
 
   const totalLiquidado = filteredData.empenhosCorrente.reduce((acc, e) => acc + ((e.valorLiquidadoOficial || e.valorLiquidado) || 0), 0);
-  const totalPago = filteredData.empenhosCorrente.filter(e => e.status === 'pago').reduce((acc, e) => acc + e.valor, 0);
+  const totalPago = filteredData.empenhosCorrente.reduce((acc, e) => acc + (e.valorPagoOficial || e.valorPago || 0), 0);
 
   // --- KPI Calculations (RAP) ---
   const rapTotalInscrito = filteredData.empenhosRap.reduce((acc, e) => acc + (e.rapInscrito || 0), 0);
@@ -243,7 +243,7 @@ export default function Dashboard() {
       const mes = format(new Date(e.dataEmpenho), 'MMM/yy', { locale: ptBR });
       mapEmpenhado.set(mes, (mapEmpenhado.get(mes) || 0) + e.valor);
 
-      const vPago = e.status === 'pago' ? e.valor : 0;
+      const vPago = e.valorPagoOficial || e.valorPago || 0;
       mapPago.set(mes, (mapPago.get(mes) || 0) + vPago);
 
       const vLiq = e.valorLiquidadoOficial || e.valorLiquidado || 0;

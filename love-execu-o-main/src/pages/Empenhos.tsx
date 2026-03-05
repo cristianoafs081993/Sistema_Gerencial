@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
-import { Plus, Pencil, Search, Filter, Calendar, Upload, FileSpreadsheet, Loader2, History } from 'lucide-react';
+import { Plus, Pencil, Search, Filter, Calendar, Upload, FileSpreadsheet, Loader2, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Empenho, DIMENSOES, COMPONENTES_POR_DIMENSAO } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -724,6 +724,8 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog }: {
 }) {
   const [sortKey, setSortKey] = useState<string>('numero');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -732,6 +734,7 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog }: {
       setSortKey(key);
       setSortDir('asc');
     }
+    setPage(1);
   };
 
   const sortedEmpenhos = useMemo(() => {
@@ -778,9 +781,13 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog }: {
     return sorted;
   }, [empenhos, sortKey, sortDir, type]);
 
+  const totalRecords = sortedEmpenhos.length;
+  const totalPages = Math.ceil(totalRecords / perPage);
+  const paginatedEmpenhos = sortedEmpenhos.slice((page - 1) * perPage, page * perPage);
+
   const SortHeader = ({ label, colKey, align = 'left' }: { label: string; colKey: string; align?: 'left' | 'right' | 'center' }) => (
     <th
-      className={`text-${align} py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap cursor-pointer hover:text-foreground select-none transition-colors`}
+      className={`text-${align} py-2 px-2 text-sm font-medium text-muted-foreground whitespace-nowrap cursor-pointer hover:text-foreground select-none transition-colors`}
       onClick={() => handleSort(colKey)}
     >
       <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
@@ -807,23 +814,20 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog }: {
                 <SortHeader label="Número" colKey="numero" />
                 <SortHeader label="Favorecido" colKey="favorecido" />
                 {type === 'execucao' ? (
-                  <>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Componente / Dimensão</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Origem / Plano</th>
-                  </>
+                  <th className="text-left py-2 px-2 text-sm font-medium text-muted-foreground whitespace-nowrap">Origem / Plano</th>
                 ) : (
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Descrição</th>
+                  <th className="text-left py-2 px-2 text-sm font-medium text-muted-foreground">Descrição</th>
                 )}
                 <SortHeader label={type === 'execucao' ? 'Empenhado / Liquidado' : 'Inscrito / A Liq / Liq / Pago'} colKey="valor" align="right" />
                 <SortHeader label={type === 'execucao' ? 'Saldo' : 'A Liquidar'} colKey="saldo" align="right" />
 
-                <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground whitespace-nowrap">Ações</th>
+                <th className="text-center py-2 px-2 text-sm font-medium text-muted-foreground whitespace-nowrap">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {sortedEmpenhos.map((empenho) => (
-                <tr key={empenho.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
-                  <td className="py-4 px-4 align-top">
+              {paginatedEmpenhos.map((empenho) => (
+                <tr key={empenho.id} className="border-b border-border/50 hover:bg-muted/50 even:bg-muted/20 transition-colors">
+                  <td className="py-2 px-2 align-top">
                     <div className="flex flex-col gap-1">
                       <span className="font-mono text-sm font-medium whitespace-nowrap">{empenho.numero}</span>
                       {empenho.processo && (
@@ -839,7 +843,7 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog }: {
                       )}
                     </div>
                   </td>
-                  <td className="py-4 px-4 align-top">
+                  <td className="py-2 px-2 align-top">
                     <div className="flex flex-col">
                       <span className="text-sm font-medium truncate max-w-[150px]" title={empenho.favorecidoNome}>{empenho.favorecidoNome || '-'}</span>
                       <span className="text-xs text-muted-foreground">
@@ -848,30 +852,20 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog }: {
                     </div>
                   </td>
                   {type === 'execucao' ? (
-                    <>
-                      <td className="py-4 px-4 align-top">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-sm font-medium">{empenho.componenteFuncional}</span>
-                          <Badge variant="secondary" className="w-fit whitespace-nowrap">
-                            {empenho.dimensao ? empenho.dimensao.split(' - ')[0] : '-'}
-                          </Badge>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4 align-top">
-                        <div className="flex flex-col gap-1">
-                          <p className="text-sm font-medium whitespace-nowrap">{empenho.origemRecurso || '-'}</p>
-                          {empenho.planoInterno && (
-                            <span className="text-xs text-muted-foreground whitespace-nowrap">{empenho.planoInterno}</span>
-                          )}
-                        </div>
-                      </td>
-                    </>
+                    <td className="py-2 px-2 align-top">
+                      <div className="flex flex-col gap-1">
+                        <p className="text-sm font-medium whitespace-nowrap">{empenho.origemRecurso || '-'}</p>
+                        {empenho.planoInterno && (
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">{empenho.planoInterno}</span>
+                        )}
+                      </div>
+                    </td>
                   ) : (
-                    <td className="py-4 px-4 align-top">
+                    <td className="py-2 px-2 align-top">
                       <span className="text-sm line-clamp-2" title={empenho.descricao}>{empenho.descricao || '-'}</span>
                     </td>
                   )}
-                  <td className="py-4 px-4 text-right align-top whitespace-nowrap">
+                  <td className="py-2 px-2 text-right align-top whitespace-nowrap">
                     <div className="flex flex-col gap-1 items-end">
                       {type === 'restos' && empenho.rapInscrito != null ? (
                         <>
@@ -913,7 +907,7 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog }: {
                       )}
                     </div>
                   </td>
-                  <td className="py-4 px-4 text-right align-top whitespace-nowrap">
+                  <td className="py-2 px-2 text-right align-top whitespace-nowrap">
                     {(() => {
                       if (type === 'restos') {
                         const aLiquidar = empenho.rapALiquidar || 0;
@@ -932,7 +926,7 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog }: {
                     })()}
                   </td>
 
-                  <td className="py-4 px-4 align-top whitespace-nowrap">
+                  <td className="py-2 px-2 align-top whitespace-nowrap">
                     <div className="flex items-center justify-center gap-2">
                       <Button
                         variant="ghost"
@@ -947,6 +941,69 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog }: {
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Footer Paginação */}
+        <div className="flex items-center justify-between px-2 py-4 border-t mt-4">
+          <div className="text-xs text-muted-foreground">
+            Mostrando <strong>{totalRecords === 0 ? 0 : ((page - 1) * perPage) + 1}</strong> a <strong>{Math.min(page * perPage, totalRecords)}</strong> de <strong>{totalRecords}</strong> registros
+          </div>
+          <div className="flex items-center space-x-2">
+            <Select value={String(perPage)} onValueChange={(val) => { setPerPage(Number(val)); setPage(1); }}>
+              <SelectTrigger className="h-8 w-[70px]">
+                <SelectValue placeholder={String(perPage)} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="20">20</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex w-[100px] items-center justify-center text-sm font-medium">
+              Página {page} de {totalPages || 1}
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setPage(1)}
+              disabled={page <= 1}
+              title="Primeira página"
+            >
+              <ChevronsLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setPage(page - 1)}
+              disabled={page <= 1}
+              title="Página anterior"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setPage(page + 1)}
+              disabled={page >= totalPages}
+              title="Próxima página"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setPage(totalPages)}
+              disabled={page >= totalPages}
+              title="Última página"
+            >
+              <ChevronsRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

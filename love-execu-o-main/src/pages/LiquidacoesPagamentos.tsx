@@ -24,7 +24,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, Search, Loader2, ChevronLeft, ChevronRight, ArrowUpDown, Filter as FilterIcon, X, Eye } from 'lucide-react';
+import { RefreshCw, Search, Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUpDown, Filter as FilterIcon, X, Eye } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import {
@@ -73,6 +73,11 @@ export default function LiquidacoesPagamentos() {
             orderDirection: sortDirection
         }),
         placeholderData: (previousData) => previousData, // Keep previous data while fetching new
+    });
+
+    const { data: lastUpdateDate } = useQuery({
+        queryKey: ['transparencia-last-update'],
+        queryFn: () => transparenciaService.getLastDocumentoDate(),
     });
 
     const documentos = queryData?.data || [];
@@ -156,64 +161,9 @@ export default function LiquidacoesPagamentos() {
                 documento={selectedDocumento}
             />
 
-            <HeaderSubtitle>Portal da Transparência (01/01/2026 em diante)</HeaderSubtitle>
-            <HeaderActions>
-                <div className="flex gap-2">
-                    <Button
-                        onClick={handleSync}
-                        disabled={isSyncing}
-                        className="gap-2 h-8 text-xs sm:h-9 sm:text-sm"
-                        variant="outline"
-                    >
-                        {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                        {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
-                    </Button>
-                </div>
-            </HeaderActions>
-
-            {isSyncing && (
-                <Card className="bg-muted/50 border-primary/20">
-                    <CardContent className="pt-6 pb-6">
-                        <div className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                                <span>{syncStatus}</span>
-                                <span>{Math.round(syncProgress)}%</span>
-                            </div>
-                            <Progress value={syncProgress} className="h-2" />
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* KPI Resumo */}
-            <div className="grid gap-4 md:grid-cols-3">
-                <Card className="">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Total Registros (Filtro)</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{totalRecords}</div>
-                    </CardContent>
-                </Card>
-                <Card className="">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Valor (Página Atual)</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-primary">{formatCurrency(pageTotalValue)}</div>
-                    </CardContent>
-                </Card>
-                <Card className="">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Última Atualização</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-muted-foreground">
-                            {format(new Date(), 'dd/MM HH:mm')}
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
+            <HeaderSubtitle>
+                Portal da Transparência {lastUpdateDate ? `(Atualizado até: ${format(lastUpdateDate, 'dd/MM/yyyy')})` : ''}
+            </HeaderSubtitle>
 
             {/* Filtros em Grid */}
             <Card className="">
@@ -361,7 +311,7 @@ export default function LiquidacoesPagamentos() {
                                                 })()}
                                             </TableCell>
                                             <TableCell>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleViewDetails(doc)}>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors" onClick={() => handleViewDetails(doc)}>
                                                     <Eye className="h-4 w-4" />
                                                 </Button>
                                             </TableCell>
@@ -396,8 +346,19 @@ export default function LiquidacoesPagamentos() {
                                 variant="outline"
                                 size="icon"
                                 className="h-8 w-8"
+                                onClick={() => setPage(1)}
+                                disabled={page <= 1 || isLoading}
+                                title="Primeira página"
+                            >
+                                <ChevronsLeft className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
                                 onClick={() => setPage(page - 1)}
                                 disabled={page <= 1 || isLoading}
+                                title="Página anterior"
                             >
                                 <ChevronLeft className="h-4 w-4" />
                             </Button>
@@ -407,8 +368,19 @@ export default function LiquidacoesPagamentos() {
                                 className="h-8 w-8"
                                 onClick={() => setPage(page + 1)}
                                 disabled={page >= totalPages || isLoading}
+                                title="Próxima página"
                             >
                                 <ChevronRight className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => setPage(totalPages)}
+                                disabled={page >= totalPages || isLoading}
+                                title="Última página"
+                            >
+                                <ChevronsRight className="h-4 w-4" />
                             </Button>
                         </div>
                     </div>
