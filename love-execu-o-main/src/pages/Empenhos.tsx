@@ -27,6 +27,7 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
+import { HeaderSubtitle, HeaderActions } from '@/components/HeaderParts';
 import { toast } from 'sonner';
 import { formatCurrency, parseCurrency, formatarDocumento } from '@/lib/utils';
 import { parseSiafiCsv, syncSiafiDataToDb } from '@/lib/siafi-parser';
@@ -62,6 +63,9 @@ const initialFormState: {
   favorecidoNome: string;
   favorecidoDocumento: string;
   processo: string;
+  tipo: 'exercicio' | 'rap';
+  valorLiquidadoAPagar?: number;
+  valorPagoOficial?: number;
 } = {
   numero: '',
   descricao: '',
@@ -77,6 +81,7 @@ const initialFormState: {
   favorecidoNome: '',
   favorecidoDocumento: '',
   processo: '',
+  tipo: 'exercicio',
 };
 
 export default function Empenhos() {
@@ -149,6 +154,9 @@ export default function Empenhos() {
         status: empenho.status,
         atividadeId: empenho.atividadeId || '',
         processo: empenho.processo || '',
+        tipo: empenho.tipo,
+        valorLiquidadoAPagar: empenho.valorLiquidadoAPagar,
+        valorPagoOficial: empenho.valorPagoOficial,
       });
     } else {
       setSelectedEmpenho(null);
@@ -199,6 +207,7 @@ export default function Empenhos() {
         dataEmpenho: parseDate(row['dataempenho'] || row['data'] || ''),
         status: (row['status'] || 'pendente') as 'pendente' | 'liquidado' | 'pago' | 'cancelado',
         atividadeId: row['atividadeid'] || '',
+        tipo: 'exercicio' as const,
       };
       if (empenho.numero && empenho.dimensao) {
         addEmpenho(empenho);
@@ -289,19 +298,17 @@ export default function Empenhos() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Empenhos</h2>
-          <div className="flex flex-col sm:flex-row gap-2 sm:items-center mt-1">
-            <p className="text-muted-foreground">Gerencie a execução orçamentária</p>
-            {hasLastUpdate && (
-              <Badge variant="outline" className="text-xs font-normal">
-                Última importação CSV: {format(lastUpdate, "dd/MM/yyyy 'às' HH:mm")}
-              </Badge>
-            )}
-          </div>
+      <HeaderSubtitle>
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <span>Gerencie a execução orçamentária</span>
+          {hasLastUpdate && (
+            <Badge variant="outline" className="text-[10px] sm:text-xs font-normal py-0 sm:py-0.5">
+              Última importação CSV: {format(lastUpdate, "dd/MM/yyyy 'às' HH:mm")}
+            </Badge>
+          )}
         </div>
+      </HeaderSubtitle>
+      <HeaderActions>
         <div className="flex gap-2">
           <input
             type="file"
@@ -316,7 +323,7 @@ export default function Empenhos() {
                 <Button
                   variant="outline"
                   onClick={() => saldosInputRef.current?.click()}
-                  className="gap-2"
+                  className="gap-2 h-8 text-xs sm:h-9 sm:text-sm bg-white"
                   disabled={isUpdatingSaldos}
                 >
                   {isUpdatingSaldos ? (
@@ -338,10 +345,10 @@ export default function Empenhos() {
             </Tooltip>
           </TooltipProvider>
         </div>
-      </div>
+      </HeaderActions>
 
       {/* Filters */}
-      <Card>
+      <Card className="">
         <CardHeader className="pb-3">
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
@@ -594,12 +601,12 @@ export default function Empenhos() {
                             <td className="py-2 px-3 text-muted-foreground">{op.data}</td>
                             <td className="py-2 px-3">
                               <Badge
-                                variant="secondary"
-                                className={`text-xs ${op.operacao === 'INCLUSAO' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                                  op.operacao === 'REFORCO' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                                    op.operacao === 'ANULACAO' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                                      ''
-                                  }`}
+                                variant={
+                                  op.operacao === 'INCLUSAO' ? 'info' :
+                                    op.operacao === 'REFORCO' ? 'success' :
+                                      op.operacao === 'ANULACAO' ? 'danger' : 'default'
+                                }
+                                className="text-xs"
                               >
                                 {op.operacao === 'INCLUSAO' ? 'Inclusão' :
                                   op.operacao === 'REFORCO' ? 'Reforço' :
@@ -786,7 +793,7 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog }: {
   );
 
   return (
-    <Card>
+    <Card className="">
       <CardHeader>
         <CardTitle className="text-lg">
           {empenhos.length} empenho{empenhos.length !== 1 ? 's' : ''} encontrado{empenhos.length !== 1 ? 's' : ''}

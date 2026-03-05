@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Gestão de Empenhos - Dashboard Gerencial</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#195de6",
+                        "background-light": "#f8fafc",
+                        "background-dark": "#111621",
+                        "slate-50": "#f8fafc",
+                        "slate-100": "#f1f5f9",
+                        "slate-200": "#e2e8f0",
+                        "slate-300": "#cbd5e1",
+                        "slate-400": "#94a3b8",
+                        "slate-500": "#64748b",
+                        "slate-600": "#475569",
+                        "slate-700": "#334155",
+                        "slate-800": "#1e293b",
+                        "slate-900": "#0f172a",
+                        "vibrant-blue": "#3b82f6",
+                        "purple": "#a855f7",
+                        "amber": "#f59e0b",
+                        "emerald-green": "#10b981",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-background-light text-slate-900 font-display flex h-screen overflow-hidden">
+<!-- Sidebar -->
+<aside class="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 h-full">
+<div class="p-6 flex items-center gap-3 border-b border-slate-100">
+<div class="bg-primary/10 text-primary w-10 h-10 rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined">account_balance</span>
+</div>
+<div>
+<h1 class="text-slate-900 text-base font-semibold leading-tight">Gestão de Empenhos</h1>
+<p class="text-slate-500 text-xs font-medium">Admin</p>
+</div>
+</div>
+<nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary/10 text-primary font-medium transition-colors" href="#">
+<span class="material-symbols-outlined text-xl">monitoring</span>
+<span class="text-sm">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium transition-colors" href="#">
+<span class="material-symbols-outlined text-xl">visibility</span>
+<span class="text-sm">Transparência</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium transition-colors" href="#">
+<span class="material-symbols-outlined text-xl">description</span>
+<span class="text-sm">Empenhos</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium transition-colors" href="#">
+<span class="material-symbols-outlined text-xl">cloud_upload</span>
+<span class="text-sm">Upload</span>
+</a>
+</nav>
+<div class="p-4 border-t border-slate-200">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors" href="#">
+<span class="material-symbols-outlined text-xl">settings</span>
+<span class="text-sm font-medium">Configurações</span>
+</a>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 flex flex-col h-full overflow-hidden">
+<!-- Header -->
+<header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between shrink-0">
+<div class="flex items-center gap-4">
+<h2 class="text-slate-900 text-xl font-bold tracking-tight">Dashboard Gerencial</h2>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 gap-2 text-sm font-medium text-slate-700 shadow-sm">
+<span class="material-symbols-outlined text-slate-400 text-lg">calendar_month</span>
+<span>Exercício 2026</span>
+<span class="material-symbols-outlined text-slate-400 text-lg ml-1">expand_more</span>
+</div>
+<button class="relative p-2 text-slate-400 hover:text-slate-600 transition-colors rounded-full hover:bg-slate-100">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+</button>
+<div class="w-9 h-9 rounded-full bg-slate-200 border border-slate-300 overflow-hidden ml-2" data-alt="User profile avatar placeholder" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDmCdhlrJuHSWhrnRA_P9mh7Ds3YrW3cYN5zjOhyKLwxSEBv-U9JEDywkrvpD3MJ2OTb30DiIuJ6TYPJg6oUqZkVkmh029XRw5acu21wCZ4C06ZaJPNOKLlmUkFR4RKiuWDHn-g-M2jB4JT4O7RbggN0LSrS-DJCG83eFBoconljhgQ3UqvGNzHdJk24L3MLVuM08bPzZ6SUETyE8CDQHx1dYm0RPlAgeQVBkV682v2oXCogk98NNrfpIAuyFwwx-CK95Q0oLy02dU");'></div>
+</div>
+</header>
+<!-- Scrollable Content Area -->
+<div class="flex-1 overflow-y-auto p-8 space-y-6">
+<!-- Segmented Control -->
+<div class="flex justify-start">
+<div class="bg-slate-200/50 p-1 rounded-lg flex inline-flex text-sm font-medium">
+<label class="cursor-pointer">
+<input checked="" class="peer sr-only" name="view-type" type="radio"/>
+<div class="px-4 py-1.5 rounded-md peer-checked:bg-white peer-checked:text-slate-900 peer-checked:shadow-sm text-slate-500 transition-all">
+                            Exercício Atual
+                        </div>
+</label>
+<label class="cursor-pointer">
+<input class="peer sr-only" name="view-type" type="radio"/>
+<div class="px-4 py-1.5 rounded-md peer-checked:bg-white peer-checked:text-slate-900 peer-checked:shadow-sm text-slate-500 transition-all">
+                            Restos a Pagar (RAP)
+                        </div>
+</label>
+</div>
+</div>
+<!-- Stat Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+<!-- Planejado -->
+<div class="bg-white rounded-xl p-6 shadow-sm border border-slate-100 relative overflow-hidden flex flex-col gap-2">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-vibrant-blue"></div>
+<div class="flex items-center justify-between">
+<p class="text-slate-500 text-sm font-medium">Planejado</p>
+<div class="bg-vibrant-blue/10 p-1.5 rounded-md text-vibrant-blue">
+<span class="material-symbols-outlined text-sm">flag</span>
+</div>
+</div>
+<p class="text-slate-900 text-2xl font-bold mt-1">R$ 12.450.000,00</p>
+<div class="flex items-center text-xs mt-2 text-emerald-green font-medium">
+<span class="material-symbols-outlined text-[16px]">trending_up</span>
+<span class="ml-1">100% do total</span>
+</div>
+</div>
+<!-- Empenhado -->
+<div class="bg-white rounded-xl p-6 shadow-sm border border-slate-100 relative overflow-hidden flex flex-col gap-2">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-purple"></div>
+<div class="flex items-center justify-between">
+<p class="text-slate-500 text-sm font-medium">Empenhado</p>
+<div class="bg-purple/10 p-1.5 rounded-md text-purple">
+<span class="material-symbols-outlined text-sm">lock</span>
+</div>
+</div>
+<p class="text-slate-900 text-2xl font-bold mt-1">R$ 8.200.000,00</p>
+<div class="flex flex-col mt-2 gap-1.5">
+<div class="w-full bg-slate-100 rounded-full h-1.5">
+<div class="bg-purple h-1.5 rounded-full" style="width: 65.8%"></div>
+</div>
+<p class="text-slate-500 text-xs">65.8% do Planejado</p>
+</div>
+</div>
+<!-- Liquidado -->
+<div class="bg-white rounded-xl p-6 shadow-sm border border-slate-100 relative overflow-hidden flex flex-col gap-2">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-amber"></div>
+<div class="flex items-center justify-between">
+<p class="text-slate-500 text-sm font-medium">Liquidado</p>
+<div class="bg-amber/10 p-1.5 rounded-md text-amber">
+<span class="material-symbols-outlined text-sm">receipt_long</span>
+</div>
+</div>
+<p class="text-slate-900 text-2xl font-bold mt-1">R$ 5.100.000,00</p>
+<div class="flex flex-col mt-2 gap-1.5">
+<div class="w-full bg-slate-100 rounded-full h-1.5">
+<div class="bg-amber h-1.5 rounded-full" style="width: 62.1%"></div>
+</div>
+<p class="text-slate-500 text-xs">62.1% do Empenhado</p>
+</div>
+</div>
+<!-- Pago -->
+<div class="bg-white rounded-xl p-6 shadow-sm border border-slate-100 relative overflow-hidden flex flex-col gap-2">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-emerald-green"></div>
+<div class="flex items-center justify-between">
+<p class="text-slate-500 text-sm font-medium">Pago</p>
+<div class="bg-emerald-green/10 p-1.5 rounded-md text-emerald-green">
+<span class="material-symbols-outlined text-sm">payments</span>
+</div>
+</div>
+<p class="text-slate-900 text-2xl font-bold mt-1">R$ 4.900.000,00</p>
+<div class="flex flex-col mt-2 gap-1.5">
+<div class="w-full bg-slate-100 rounded-full h-1.5">
+<div class="bg-emerald-green h-1.5 rounded-full" style="width: 96%"></div>
+</div>
+<p class="text-slate-500 text-xs">96% do Liquidado</p>
+</div>
+</div>
+</div>
+<!-- Charts & Funnel Row -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<!-- Main Chart -->
+<div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col">
+<div class="flex items-center justify-between mb-6">
+<div>
+<h3 class="text-slate-900 font-semibold text-base">Evolução da Execução</h3>
+<p class="text-slate-500 text-sm mt-1">Planejado vs Empenhado vs Pago (Acumulado)</p>
+</div>
+<div class="flex items-center gap-4 text-xs font-medium text-slate-600">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-vibrant-blue"></span> Planejado
+                            </div>
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-purple"></span> Empenhado
+                            </div>
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-emerald-green"></span> Pago
+                            </div>
+</div>
+</div>
+<div class="flex-1 min-h-[240px] relative w-full flex flex-col">
+<!-- Y-axis labels -->
+<div class="absolute left-0 top-0 bottom-8 w-12 flex flex-col justify-between text-xs text-slate-400 font-medium z-10">
+<span>12M</span>
+<span>9M</span>
+<span>6M</span>
+<span>3M</span>
+<span>0</span>
+</div>
+<!-- Chart Area -->
+<div class="flex-1 ml-12 relative border-l border-b border-slate-100 mb-6">
+<!-- Grid lines -->
+<div class="absolute inset-0 flex flex-col justify-between">
+<div class="w-full border-t border-slate-100/50"></div>
+<div class="w-full border-t border-slate-100/50"></div>
+<div class="w-full border-t border-slate-100/50"></div>
+<div class="w-full border-t border-slate-100/50"></div>
+<div class="w-full border-t border-slate-100/50"></div>
+</div>
+<!-- SVG Chart Lines/Areas -->
+<svg class="absolute inset-0 w-full h-full" preserveaspectratio="none" viewbox="0 0 100 100">
+<!-- Planejado Area & Line -->
+<path d="M0,10 L10,10 L20,10 L30,10 L40,10 L50,10 L60,10 L70,10 L80,10 L90,10 L100,10 L100,100 L0,100 Z" fill="url(#blue-gradient)" opacity="0.1"></path>
+<polyline fill="none" points="0,10 10,10 20,10 30,10 40,10 50,10 60,10 70,10 80,10 90,10 100,10" stroke="#3b82f6" stroke-dasharray="4,4" stroke-width="2"></polyline>
+<!-- Empenhado Area & Line -->
+<path d="M0,90 L10,80 L20,65 L30,55 L40,45 L50,38 L60,35 L70,33 L80,33 L90,33 L100,33 L100,100 L0,100 Z" fill="url(#purple-gradient)" opacity="0.2"></path>
+<polyline fill="none" points="0,90 10,80 20,65 30,55 40,45 50,38 60,35 70,33 80,33 90,33 100,33" stroke="#a855f7" stroke-width="2"></polyline>
+<!-- Pago Area & Line -->
+<path d="M0,100 L10,95 L20,85 L30,75 L40,65 L50,60 L60,58 L70,55 L80,55 L90,55 L100,55 L100,100 L0,100 Z" fill="url(#green-gradient)" opacity="0.3"></path>
+<polyline fill="none" points="0,100 10,95 20,85 30,75 40,65 50,60 60,58 70,55 80,55 90,55 100,55" stroke="#10b981" stroke-width="2"></polyline>
+<defs>
+<lineargradient id="blue-gradient" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#3b82f6"></stop>
+<stop offset="100%" stop-color="#3b82f6" stop-opacity="0"></stop>
+</lineargradient>
+<lineargradient id="purple-gradient" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#a855f7"></stop>
+<stop offset="100%" stop-color="#a855f7" stop-opacity="0"></stop>
+</lineargradient>
+<lineargradient id="green-gradient" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#10b981"></stop>
+<stop offset="100%" stop-color="#10b981" stop-opacity="0"></stop>
+</lineargradient>
+</defs>
+</svg>
+</div>
+<!-- X-axis labels -->
+<div class="ml-12 flex justify-between text-xs text-slate-400 font-medium">
+<span>Jan</span>
+<span>Fev</span>
+<span>Mar</span>
+<span>Abr</span>
+<span>Mai</span>
+<span>Jun</span>
+<span>Jul</span>
+<span>Ago</span>
+<span>Set</span>
+<span>Out</span>
+<span>Nov</span>
+<span>Dez</span>
+</div>
+</div>
+</div>
+<!-- Execution Funnel -->
+<div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col">
+<h3 class="text-slate-900 font-semibold text-base mb-6">Funil de Execução</h3>
+<div class="flex-1 flex flex-col justify-center gap-4 relative">
+<!-- Connecting lines behind -->
+<div class="absolute left-1/2 top-0 bottom-0 w-px bg-slate-100 -translate-x-1/2 z-0"></div>
+<!-- Funnel Steps -->
+<div class="relative z-10 flex flex-col items-center">
+<div class="bg-vibrant-blue text-white px-4 py-3 rounded-lg w-full text-center shadow-sm max-w-[240px]">
+<p class="text-xs font-medium text-blue-100 uppercase tracking-wider mb-1">Planejado</p>
+<p class="font-bold text-lg">R$ 12.45M</p>
+</div>
+<div class="h-6 flex items-center justify-center">
+<span class="material-symbols-outlined text-slate-300 text-sm">arrow_downward</span>
+</div>
+<div class="bg-purple text-white px-4 py-3 rounded-lg w-11/12 text-center shadow-sm max-w-[220px]">
+<div class="absolute -right-2 top-1/2 -translate-y-1/2 bg-white text-purple text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-slate-100">65.8%</div>
+<p class="text-xs font-medium text-purple-100 uppercase tracking-wider mb-1">Empenhado</p>
+<p class="font-bold text-lg">R$ 8.20M</p>
+</div>
+<div class="h-6 flex items-center justify-center">
+<span class="material-symbols-outlined text-slate-300 text-sm">arrow_downward</span>
+</div>
+<div class="bg-amber text-white px-4 py-3 rounded-lg w-5/6 text-center shadow-sm max-w-[200px]">
+<div class="absolute -right-2 top-1/2 -translate-y-1/2 bg-white text-amber text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-slate-100">62.1%</div>
+<p class="text-xs font-medium text-amber-100 uppercase tracking-wider mb-1">Liquidado</p>
+<p class="font-bold text-lg">R$ 5.10M</p>
+</div>
+<div class="h-6 flex items-center justify-center">
+<span class="material-symbols-outlined text-slate-300 text-sm">arrow_downward</span>
+</div>
+<div class="bg-emerald-green text-white px-4 py-3 rounded-lg w-4/5 text-center shadow-sm max-w-[180px]">
+<div class="absolute -right-2 top-1/2 -translate-y-1/2 bg-white text-emerald-green text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-slate-100">96.0%</div>
+<p class="text-xs font-medium text-green-100 uppercase tracking-wider mb-1">Pago</p>
+<p class="font-bold text-lg">R$ 4.90M</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Data Table -->
+<div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+<div class="p-6 border-b border-slate-100 flex items-center justify-between">
+<div>
+<h3 class="text-slate-900 font-semibold text-base">Detalhamento por Origem de Recurso</h3>
+<p class="text-slate-500 text-sm mt-1">Acompanhamento detalhado da execução orçamentária</p>
+</div>
+<button class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/5 rounded-lg transition-colors">
+<span class="material-symbols-outlined text-sm">download</span>
+                        Exportar
+                    </button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-slate-50/50 text-slate-500 text-xs uppercase tracking-wider font-semibold">
+<th class="px-6 py-4 border-b border-slate-100 font-medium">Código / Fonte</th>
+<th class="px-6 py-4 border-b border-slate-100 font-medium text-right">Planejado</th>
+<th class="px-6 py-4 border-b border-slate-100 font-medium text-right">Empenhado</th>
+<th class="px-6 py-4 border-b border-slate-100 font-medium text-right">Saldo</th>
+<th class="px-6 py-4 border-b border-slate-100 font-medium w-48">Execução (%)</th>
+</tr>
+</thead>
+<tbody class="text-sm divide-y divide-slate-100">
+<tr class="hover:bg-slate-50/50 transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold">100</div>
+<div>
+<p class="font-medium text-slate-900">Recursos Ordinários</p>
+<p class="text-xs text-slate-500">Tesouro Municipal</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-right font-medium text-slate-700">R$ 5.500.000,00</td>
+<td class="px-6 py-4 text-right font-medium text-slate-700">R$ 4.125.000,00</td>
+<td class="px-6 py-4 text-right font-medium text-slate-700">R$ 1.375.000,00</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<div class="w-full bg-slate-100 rounded-full h-1.5 flex-1">
+<div class="bg-primary h-1.5 rounded-full" style="width: 75%"></div>
+</div>
+<span class="text-xs font-semibold text-slate-700 w-8 text-right">75%</span>
+</div>
+</td>
+</tr>
+<tr class="hover:bg-slate-50/50 transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold">210</div>
+<div>
+<p class="font-medium text-slate-900">Saúde - Geral</p>
+<p class="text-xs text-slate-500">Transferências Fundo a Fundo</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-right font-medium text-slate-700">R$ 3.200.000,00</td>
+<td class="px-6 py-4 text-right font-medium text-slate-700">R$ 2.816.000,00</td>
+<td class="px-6 py-4 text-right font-medium text-slate-700">R$ 384.000,00</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<div class="w-full bg-slate-100 rounded-full h-1.5 flex-1">
+<div class="bg-primary h-1.5 rounded-full" style="width: 88%"></div>
+</div>
+<span class="text-xs font-semibold text-slate-700 w-8 text-right">88%</span>
+</div>
+</td>
+</tr>
+<tr class="hover:bg-slate-50/50 transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold">220</div>
+<div>
+<p class="font-medium text-slate-900">Educação - FUNDEB</p>
+<p class="text-xs text-slate-500">Valorização do Magistério</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-right font-medium text-slate-700">R$ 2.800.000,00</td>
+<td class="px-6 py-4 text-right font-medium text-slate-700">R$ 980.000,00</td>
+<td class="px-6 py-4 text-right font-medium text-slate-700">R$ 1.820.000,00</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<div class="w-full bg-slate-100 rounded-full h-1.5 flex-1">
+<div class="bg-amber h-1.5 rounded-full" style="width: 35%"></div>
+</div>
+<span class="text-xs font-semibold text-slate-700 w-8 text-right">35%</span>
+</div>
+</td>
+</tr>
+<tr class="hover:bg-slate-50/50 transition-colors">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold">500</div>
+<div>
+<p class="font-medium text-slate-900">Convênios</p>
+<p class="text-xs text-slate-500">Obras e Infraestrutura</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 text-right font-medium text-slate-700">R$ 950.000,00</td>
+<td class="px-6 py-4 text-right font-medium text-slate-700">R$ 279.000,00</td>
+<td class="px-6 py-4 text-right font-medium text-slate-700">R$ 671.000,00</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<div class="w-full bg-slate-100 rounded-full h-1.5 flex-1">
+<div class="bg-red-500 h-1.5 rounded-full" style="width: 29.3%"></div>
+</div>
+<span class="text-xs font-semibold text-slate-700 w-8 text-right">29%</span>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</main>
+</body></html>

@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
+import { HeaderSubtitle, HeaderActions } from '@/components/HeaderParts';
 import { toast } from 'sonner';
 import { formatCurrency, parseCurrency } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -197,32 +198,26 @@ export default function Descentralizacoes() {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-                <div>
-                    <h2 className="text-2xl font-bold text-foreground">Descentralizações</h2>
-                    <p className="text-muted-foreground">Gerencie os recursos descentralizados pela reitoria</p>
-                </div>
-            </div>
-            <div className="flex gap-2">
+            <HeaderSubtitle>Gerencie os recursos descentralizados pela reitoria</HeaderSubtitle>
+            <HeaderActions>
                 {selectedIds.size > 0 && (
-                    <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)} className="gap-2">
+                    <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)} className="gap-2 h-8 text-xs sm:h-9 sm:text-sm">
                         <Trash2 className="h-4 w-4" />
                         Excluir ({selectedIds.size})
                     </Button>
                 )}
-                <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} className="gap-2">
+                <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} className="gap-2 h-8 text-xs sm:h-9 sm:text-sm">
                     <Upload className="h-4 w-4" />
                     Importar JSON
                 </Button>
-                <Button onClick={() => handleOpenDialog()} className="gap-2">
+                <Button onClick={() => handleOpenDialog()} className="gap-2 h-8 text-xs sm:h-9 sm:text-sm">
                     <Plus className="h-4 w-4" />
                     Nova Descentralização
                 </Button>
-            </div>
+            </HeaderActions>
 
             {/* Filters */}
-            <Card>
+            <Card className="">
                 <CardHeader className="pb-3">
                     <CardTitle>Filtros</CardTitle>
                 </CardHeader>
@@ -297,7 +292,7 @@ export default function Descentralizacoes() {
             </Card>
 
             {/* Table */}
-            <Card>
+            <Card className="">
                 <CardHeader>
                     <CardTitle className="text-lg flex items-center justify-between">
                         <span>

@@ -11,6 +11,8 @@ interface StatCardProps {
     value: number;
     label: string;
   };
+  stitchColor?: 'vibrant-blue' | 'purple' | 'amber' | 'emerald-green' | 'red-500';
+  progress?: number;
 }
 
 export function StatCard({
@@ -19,8 +21,58 @@ export function StatCard({
   subtitle,
   icon: Icon,
   variant = 'default',
-  trend
+  trend,
+  stitchColor,
+  progress,
 }: StatCardProps) {
+
+  if (stitchColor) {
+    // New Stitch Premium Layout
+    const bgColorMap = {
+      'vibrant-blue': 'bg-vibrant-blue',
+      'purple': 'bg-purple',
+      'amber': 'bg-amber',
+      'emerald-green': 'bg-emerald-green',
+      'red-500': 'bg-red-500',
+    };
+
+    const textColorMap = {
+      'vibrant-blue': 'text-vibrant-blue',
+      'purple': 'text-purple',
+      'amber': 'text-amber',
+      'emerald-green': 'text-emerald-green',
+      'red-500': 'text-red-500',
+    };
+
+    const bgLightMap = {
+      'vibrant-blue': 'bg-vibrant-blue/10',
+      'purple': 'bg-purple/10',
+      'amber': 'bg-amber/10',
+      'emerald-green': 'bg-emerald-green/10',
+      'red-500': 'bg-red-500/10',
+    };
+
+    return (
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden animate-fade-in">
+        <div className={cn("absolute left-0 top-0 bottom-0 w-1", bgColorMap[stitchColor])}></div>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-medium text-slate-500">{title}</p>
+          <div className={cn("p-1.5 rounded-md", bgLightMap[stitchColor], textColorMap[stitchColor])}>
+            <Icon className="w-5 h-5" />
+          </div>
+        </div>
+        <h3 className="text-2xl font-bold text-slate-900">{value}</h3>
+        {subtitle && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>}
+        {progress !== undefined && (
+          <div className="mt-3 w-full bg-slate-100 rounded-full h-1.5">
+            <div className={cn("h-1.5 rounded-full", bgColorMap[stitchColor])} style={{ width: `${progress}%` }}></div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Legacy Layout
   const variantStyles = {
     default: 'stat-card',
     primary: 'stat-card-primary',

@@ -30,7 +30,7 @@ export function Layout({ children }: LayoutProps) {
   const location = useLocation();
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background-light">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
@@ -42,7 +42,7 @@ export function Layout({ children }: LayoutProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-sidebar text-sidebar-foreground transform transition-transform duration-200 ease-in-out lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 w-64 bg-sidebar text-sidebar-foreground border-r border-sidebar-border shadow-sm transform transition-transform duration-200 ease-in-out lg:translate-x-0",
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -95,11 +95,13 @@ export function Layout({ children }: LayoutProps) {
           >
             <Menu className="h-5 w-5" />
           </Button>
-          <div className="flex-1">
-            <h1 className="text-lg font-semibold text-foreground">
+          <div className="flex-1 flex flex-col justify-center">
+            <h1 className="text-lg font-semibold text-foreground leading-tight">
               {navigation.find((n) => n.href === location.pathname)?.name || 'Sistema'}
             </h1>
+            <div id="header-subtitle" className="text-xs text-muted-foreground"></div>
           </div>
+          <div id="header-actions" className="flex items-center gap-2"></div>
         </header>
 
         {/* Page content */}

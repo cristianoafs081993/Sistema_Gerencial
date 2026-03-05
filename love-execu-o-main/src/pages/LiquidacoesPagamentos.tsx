@@ -35,6 +35,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { DocumentoDetalhesDialog } from '@/components/DocumentoDetalhesDialog';
+import { HeaderSubtitle, HeaderActions } from '@/components/HeaderParts';
 
 export default function LiquidacoesPagamentos() {
     const queryClient = useQueryClient();
@@ -90,7 +91,7 @@ export default function LiquidacoesPagamentos() {
 
             await transparenciaService.syncDados(undefined, (currentDate, total, fase) => {
                 setSyncStatus(`Sincronizando ${format(currentDate, 'dd/MM/yyyy')} - ${fase}... (${total} processados)`);
-                
+
                 // Cálculo de progresso baseado na data de início identificada
                 const totalDias = Math.max(1, (new Date().getTime() - dataInicioBase.getTime()) / (1000 * 3600 * 24));
                 const diasProcessados = (currentDate.getTime() - dataInicioBase.getTime()) / (1000 * 3600 * 24);
@@ -155,23 +156,20 @@ export default function LiquidacoesPagamentos() {
                 documento={selectedDocumento}
             />
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-                <div>
-                    <h2 className="text-2xl font-bold text-foreground">Liquidações e Pagamentos</h2>
-                    <p className="text-muted-foreground">Portal da Transparência (01/01/2026 em diante)</p>
-                </div>
+            <HeaderSubtitle>Portal da Transparência (01/01/2026 em diante)</HeaderSubtitle>
+            <HeaderActions>
                 <div className="flex gap-2">
                     <Button
                         onClick={handleSync}
                         disabled={isSyncing}
-                        className="gap-2"
+                        className="gap-2 h-8 text-xs sm:h-9 sm:text-sm"
                         variant="outline"
                     >
                         {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                         {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
                     </Button>
                 </div>
-            </div>
+            </HeaderActions>
 
             {isSyncing && (
                 <Card className="bg-muted/50 border-primary/20">
@@ -189,7 +187,7 @@ export default function LiquidacoesPagamentos() {
 
             {/* KPI Resumo */}
             <div className="grid gap-4 md:grid-cols-3">
-                <Card>
+                <Card className="">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium text-muted-foreground">Total Registros (Filtro)</CardTitle>
                     </CardHeader>
@@ -197,7 +195,7 @@ export default function LiquidacoesPagamentos() {
                         <div className="text-2xl font-bold">{totalRecords}</div>
                     </CardContent>
                 </Card>
-                <Card>
+                <Card className="">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium text-muted-foreground">Valor (Página Atual)</CardTitle>
                     </CardHeader>
@@ -205,7 +203,7 @@ export default function LiquidacoesPagamentos() {
                         <div className="text-2xl font-bold text-primary">{formatCurrency(pageTotalValue)}</div>
                     </CardContent>
                 </Card>
-                <Card>
+                <Card className="">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium text-muted-foreground">Última Atualização</CardTitle>
                     </CardHeader>
@@ -218,7 +216,7 @@ export default function LiquidacoesPagamentos() {
             </div>
 
             {/* Filtros em Grid */}
-            <Card>
+            <Card className="">
                 <CardHeader className="pb-3 flex flex-row items-center justify-between">
                     <CardTitle className="text-base font-semibold flex items-center gap-2">
                         <FilterIcon className="h-4 w-4" /> Filtros
@@ -275,7 +273,7 @@ export default function LiquidacoesPagamentos() {
             </Card>
 
             {/* Tabela */}
-            <Card>
+            <Card className="">
                 <CardContent className="p-0">
                     <div className="rounded-md border">
                         <Table>

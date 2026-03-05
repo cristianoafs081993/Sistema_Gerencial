@@ -6,7 +6,9 @@
 
 @layer base {
   :root {
+    /* Stitch Base Palette */
     --background: 210 20% 98%;
+    /* #f8fafc */
     --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
@@ -15,7 +17,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    --primary: 217 91% 40%;
+    /* Stitch Primary: #195de6 (HSL ~ 220, 80%, 50%) */
+    --primary: 220 80% 50%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 210 40% 96%;
@@ -36,22 +39,25 @@
 
     --radius: 0.5rem;
 
-    /* Custom tokens */
-    --success: 152 69% 31%;
+    /* Custom tokens mapped for shadcn components that rely on HSL */
+    /* Emerald Green #10b981 */
+    --success: 160 84% 39%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
+    /* Amber #f59e0b */
+    --warning: 45 93% 47%;
     --warning-foreground: 0 0% 100%;
-    --info: 199 89% 48%;
+    /* Vibrant Blue #3b82f6 */
+    --info: 217 91% 60%;
     --info-foreground: 0 0% 100%;
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 215 16% 47%;
-    --sidebar-primary: 217 91% 40%;
+    --sidebar-primary: 220 80% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 210 40% 96%;
-    --sidebar-accent-foreground: 217 91% 40%;
+    --sidebar-accent-foreground: 220 80% 50%;
     --sidebar-border: 214 32% 91%;
-    --sidebar-ring: 217 91% 40%;
+    --sidebar-ring: 220 80% 50%;
 
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(217, 91%, 40%) 0%, hsl(217, 91%, 30%) 100%);

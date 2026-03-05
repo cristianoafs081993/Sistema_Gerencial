@@ -7,7 +7,10 @@ import {
   ArrowDownRight,
   Filter,
   X,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Flag,
+  Lock,
+  ArrowDown
 } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { StatCard } from '@/components/StatCard';
@@ -225,33 +228,105 @@ export default function Dashboard() {
     return Array.from(map.entries())
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
-      .slice(0, 10);
+      .slice(0, 7);
   }, [filteredData]);
 
   // 4. Evolução Mensal
   const dadosMensais = useMemo(() => {
-    const mapAcumulado = new Map<string, number>();
+    const mapEmpenhado = new Map<string, number>();
+    const mapPago = new Map<string, number>();
+    const mapLiquidado = new Map<string, number>();
+
     const sortedEmpenhos = [...filteredData.empenhosCorrente].sort((a, b) => new Date(a.dataEmpenho).getTime() - new Date(b.dataEmpenho).getTime());
 
     sortedEmpenhos.forEach(e => {
       const mes = format(new Date(e.dataEmpenho), 'MMM/yy', { locale: ptBR });
-      mapAcumulado.set(mes, (mapAcumulado.get(mes) || 0) + e.valor);
+      mapEmpenhado.set(mes, (mapEmpenhado.get(mes) || 0) + e.valor);
+
+      const vPago = e.status === 'pago' ? e.valor : 0;
+      mapPago.set(mes, (mapPago.get(mes) || 0) + vPago);
+
+      const vLiq = e.valorLiquidadoOficial || e.valorLiquidado || 0;
+      mapLiquidado.set(mes, (mapLiquidado.get(mes) || 0) + vLiq);
     });
 
-    let acc = 0;
-    return Array.from(mapAcumulado.entries()).map(([mes, val]) => {
-      acc += val;
-      return { name: mes, empenhado: val, acumulado: acc };
+    let accEmpenhado = 0;
+    let accPago = 0;
+
+    // As "Planejado" is mostly static in the context of year budget unless broken by project, we use totalPlanejado 
+    return Array.from(mapEmpenhado.entries()).map(([mes, valEmp]) => {
+      accEmpenhado += valEmp;
+      accPago += mapPago.get(mes) || 0;
+
+      return {
+        name: mes,
+        planejado: totalPlanejado > 0 ? totalPlanejado : accEmpenhado * 1.2,
+        empenhado: accEmpenhado,
+        pago: accPago,
+      };
     });
-  }, [filteredData]);
+  }, [filteredData, totalPlanejado]);
 
   // 5. Funil (Exercício Corrente)
   const dadosFunil = [
-    { name: 'Planejado', value: totalPlanejado, fill: '#1e5bb0' },
-    { name: 'Empenhado', value: totalEmpenhado, fill: '#f59e0b' },
-    { name: 'Liquidado', value: totalLiquidado, fill: '#3b82f6' },
-    { name: 'Pago', value: totalPago, fill: '#22c55e' },
+    { name: 'Planejado', value: totalPlanejado, fill: '#3b82f6' }, // vibrant-blue
+    { name: 'Empenhado', value: totalEmpenhado, fill: '#a855f7' }, // purple
+    { name: 'Liquidado', value: totalLiquidado, fill: '#f59e0b' }, // amber
+    { name: 'Pago', value: totalPago, fill: '#10b981' }, // emerald-green
   ];
+
+  // 5.1 Stack de Dimensão x Componente Funcional
+  const { dadosStack, uniqueComponents } = useMemo(() => {
+    // Dimensão -> { name: Dimensao, Componente A: valor, Componente B: valor, ... }
+    const dimMap = new Map<string, Record<string, any>>();
+    const compSet = new Set<string>();
+
+    filteredData.atividades.forEach(a => {
+      const dim = a.dimensao || 'Sem Dimensão';
+      const comp = a.componenteFuncional || 'Sem Componente';
+
+      compSet.add(comp);
+
+      const dimObj = dimMap.get(dim) || { name: dim };
+      dimObj[comp] = ((dimObj[comp] as number) || 0) + a.valorTotal;
+      dimMap.set(dim, dimObj);
+    });
+
+    return {
+      dadosStack: Array.from(dimMap.values()).sort((a, b) => {
+        const totalA = Object.keys(a).filter(k => k !== 'name').reduce((sum, k) => sum + (a[k] as number), 0);
+        const totalB = Object.keys(b).filter(k => k !== 'name').reduce((sum, k) => sum + (b[k] as number), 0);
+        return totalB - totalA;
+      }),
+      uniqueComponents: Array.from(compSet)
+    };
+  }, [filteredData]);
+
+  // 5.2 Descentralizações por Dimensão e Origem
+  const { dadosDescentralizacao, uniqueOrigens } = useMemo(() => {
+    const dimMap = new Map<string, Record<string, any>>();
+    const origemSet = new Set<string>();
+
+    filteredData.descentralizacoes.forEach(d => {
+      const dim = d.dimensao || 'Sem Dimensão';
+      const origem = d.origemRecurso || 'Sem Origem';
+
+      origemSet.add(origem);
+
+      const dimObj = dimMap.get(dim) || { name: dim };
+      dimObj[origem] = ((dimObj[origem] as number) || 0) + d.valor;
+      dimMap.set(dim, dimObj);
+    });
+
+    return {
+      dadosDescentralizacao: Array.from(dimMap.values()).sort((a, b) => {
+        const totalA = Object.keys(a).filter(k => k !== 'name').reduce((sum, k) => sum + (a[k] as number), 0);
+        const totalB = Object.keys(b).filter(k => k !== 'name').reduce((sum, k) => sum + (b[k] as number), 0);
+        return totalB - totalA;
+      }),
+      uniqueOrigens: Array.from(origemSet)
+    };
+  }, [filteredData]);
 
   // 6. Resumo RAP por Origem
   const dadosRapPorOrigem = useMemo(() => {
@@ -288,98 +363,95 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
-
-      {/* Header com Botão de Filtro */}
-      <div className="flex justify-end mb-2">
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="outline" className="gap-2 relative">
-              <SlidersHorizontal className="h-4 w-4" />
-              Filtros
-              {activeFiltersCount > 0 && (
-                <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 flex items-center justify-center rounded-full bg-primary text-primary-foreground">
-                  {activeFiltersCount}
-                </Badge>
-              )}
-            </Button>
-          </SheetTrigger>
-          <SheetContent>
-            <SheetHeader>
-              <SheetTitle>Filtrar Dashboard</SheetTitle>
-              <SheetDescription>
-                Selecione os critérios para visualizar os dados.
-              </SheetDescription>
-            </SheetHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label>Dimensão</Label>
-                <Select value={filterDimensao} onValueChange={setFilterDimensao}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    {DIMENSOES.map((d) => (
-                      <SelectItem key={d.codigo} value={d.codigo}>{d.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Origem de Recurso</Label>
-                <Select value={filterOrigem} onValueChange={setFilterOrigem}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    {origensDisponiveis.map((o) => (
-                      <SelectItem key={o} value={o}>{o}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Período de Início</Label>
-                <Input
-                  type="date"
-                  value={dateStart}
-                  onChange={e => setDateStart(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Período Final</Label>
-                <Input
-                  type="date"
-                  value={dateEnd}
-                  onChange={e => setDateEnd(e.target.value)}
-                />
-              </div>
-            </div>
-            <SheetFooter className="flex-col gap-2 sm:flex-col sm:space-x-0">
-              {hasActiveFilters && (
-                <Button variant="ghost" onClick={clearFilters} className="w-full">
-                  <X className="mr-2 h-4 w-4" />
-                  Limpar Filtros
-                </Button>
-              )}
-              <SheetClose asChild>
-                <Button type="submit" className="w-full">Aplicar</Button>
-              </SheetClose>
-            </SheetFooter>
-          </SheetContent>
-        </Sheet>
-      </div>
-
-      {/* KPI Cards (rest of the dashboard remains the same) */}
       <Tabs defaultValue="corrente" className="space-y-6">
-        <TabsList className="bg-muted/50 w-full sm:w-auto grid w-full grid-cols-2 lg:w-[400px]">
-          <TabsTrigger value="corrente" className="data-[state=active]:bg-background">Exercício Atual</TabsTrigger>
-          <TabsTrigger value="rap" className="data-[state=active]:bg-background">Restos a Pagar (RAP)</TabsTrigger>
-        </TabsList>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <TabsList className="bg-slate-100 p-1 rounded-lg h-auto">
+            <TabsTrigger value="corrente" className="px-6 py-2 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm text-slate-500 hover:text-slate-900 rounded-md text-sm font-semibold transition-all">Exercício Atual</TabsTrigger>
+            <TabsTrigger value="rap" className="px-6 py-2 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm text-slate-500 hover:text-slate-900 rounded-md text-sm font-semibold transition-all">Restos a Pagar (RAP)</TabsTrigger>
+          </TabsList>
+
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" className="gap-2 relative bg-white border-slate-200 shadow-sm hover:bg-slate-50 text-slate-700">
+                <SlidersHorizontal className="h-4 w-4" />
+                Filtros
+                {activeFiltersCount > 0 && (
+                  <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 flex items-center justify-center rounded-full bg-primary text-primary-foreground absolute -top-2 -right-2">
+                    {activeFiltersCount}
+                  </Badge>
+                )}
+              </Button>
+            </SheetTrigger>
+            <SheetContent>
+              <SheetHeader>
+                <SheetTitle>Filtrar Dashboard</SheetTitle>
+                <SheetDescription>
+                  Selecione os critérios para visualizar os dados.
+                </SheetDescription>
+              </SheetHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label>Dimensão</Label>
+                  <Select value={filterDimensao} onValueChange={setFilterDimensao}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      {DIMENSOES.map((d) => (
+                        <SelectItem key={d.codigo} value={d.codigo}>{d.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Origem de Recurso</Label>
+                  <Select value={filterOrigem} onValueChange={setFilterOrigem}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      {origensDisponiveis.map((o) => (
+                        <SelectItem key={o} value={o}>{o}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Período de Início</Label>
+                  <Input
+                    type="date"
+                    value={dateStart}
+                    onChange={e => setDateStart(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Período Final</Label>
+                  <Input
+                    type="date"
+                    value={dateEnd}
+                    onChange={e => setDateEnd(e.target.value)}
+                  />
+                </div>
+              </div>
+              <SheetFooter className="flex-col gap-2 sm:flex-col sm:space-x-0">
+                {hasActiveFilters && (
+                  <Button variant="ghost" onClick={clearFilters} className="w-full text-slate-500 hover:text-slate-700 hover:bg-slate-100">
+                    <X className="mr-2 h-4 w-4" />
+                    Limpar Filtros
+                  </Button>
+                )}
+                <SheetClose asChild>
+                  <Button type="submit" className="w-full bg-primary hover:bg-brand-700 text-white shadow-sm">Aplicar</Button>
+                </SheetClose>
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
+        </div>
 
         <TabsContent value="corrente" className="space-y-6 border-none p-0">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -388,28 +460,32 @@ export default function Dashboard() {
               value={formatCurrency(totalPlanejado)}
               subtitle={`${filteredData.atividades.length} atividades filtradas`}
               icon={Wallet}
-              variant="primary"
+              stitchColor="vibrant-blue"
+              progress={100}
             />
             <StatCard
               title="Descentralizado"
               value={formatCurrency(totalDescentralizado)}
               subtitle={`${filteredData.descentralizacoes.length} descentralizações`}
               icon={Receipt}
-              variant="accent"
+              stitchColor="emerald-green"
+              progress={totalPlanejado > 0 ? (totalDescentralizado / totalPlanejado) * 100 : 0}
             />
             <StatCard
               title="Total Empenhado"
               value={formatCurrency(totalEmpenhado)}
               subtitle={`${filteredData.empenhosCorrente.length} empenhos filtrados`}
               icon={TrendingUp}
-              variant="default"
+              stitchColor="purple"
+              progress={totalPlanejado > 0 ? (totalEmpenhado / totalPlanejado) * 100 : 0}
             />
             <StatCard
               title="A descentralizar"
               value={formatCurrency(aDescentralizar)}
-              subtitle={aDescentralizar >= 0 ? 'Dentro do orçamento' : 'Descentralizado excede planejado'}
-              icon={aDescentralizar >= 0 ? PiggyBank : ArrowDownRight}
-              variant={aDescentralizar >= 0 ? 'default' : 'warning'}
+              subtitle={aDescentralizar >= 0 ? "Dentro do orçamento" : "Acima do orçamento"}
+              icon={PiggyBank}
+              stitchColor="amber"
+              progress={totalPlanejado > 0 ? (Math.max(0, aDescentralizar) / totalPlanejado) * 100 : 0}
             />
           </div>
 
@@ -444,24 +520,26 @@ export default function Dashboard() {
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={dadosMensais} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                       <defs>
-                        <linearGradient id="colorAcumulado" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#1e5bb0" stopOpacity={0.8} />
-                          <stop offset="95%" stopColor="#1e5bb0" stopOpacity={0} />
+                        <linearGradient id="colorPlanejado" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
+                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="colorEmpenhado" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#a855f7" stopOpacity={0.8} />
+                          <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="colorPago" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <XAxis dataKey="name" />
-                      <YAxis tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <YAxis tickFormatter={(v) => `R$${(v / 1000000).toFixed(1)}M`} />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                       <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                      <Area
-                        type="monotone"
-                        dataKey="acumulado"
-                        stroke="#1e5bb0"
-                        fillOpacity={1}
-                        fill="url(#colorAcumulado)"
-                        name="Acumulado"
-                      />
-                      <Line type="monotone" dataKey="empenhado" stroke="#f59e0b" name="Mensal" strokeDasharray="5 5" />
+                      <Area type="monotone" dataKey="planejado" stroke="#3b82f6" fillOpacity={1} fill="url(#colorPlanejado)" name="Planejado" />
+                      <Area type="monotone" dataKey="empenhado" stroke="#a855f7" fillOpacity={1} fill="url(#colorEmpenhado)" name="Empenhado" />
+                      <Area type="monotone" dataKey="pago" stroke="#10b981" fillOpacity={1} fill="url(#colorPago)" name="Pago" />
                       <Legend />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -469,26 +547,84 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="">
               <CardHeader>
                 <CardTitle>Funil de Execução</CardTitle>
                 <CardDescription>Eficiência da despesa</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-[300px]">
+                <div className="flex-1 flex flex-col justify-center gap-2 relative py-4 min-h-[300px]">
+                  {/* Connecting lines behind */}
+                  <div className="absolute left-1/2 top-0 bottom-0 w-px bg-slate-100 -translate-x-1/2 z-0 hidden md:block"></div>
+
+                  {/* Funnel Steps */}
+                  <div className="relative z-10 flex flex-col items-center">
+                    <div className="bg-vibrant-blue text-white px-4 py-2 rounded-lg w-full text-center shadow-sm max-w-[240px]">
+                      <p className="text-[10px] font-medium text-blue-100 uppercase tracking-wider mb-0.5">Planejado</p>
+                      <p className="font-bold text-sm">{formatCurrency(totalPlanejado)}</p>
+                    </div>
+
+                    <div className="h-4 flex items-center justify-center">
+                      <ArrowDown className="text-slate-300 w-4 h-4" />
+                    </div>
+
+                    <div className="bg-purple text-white px-4 py-2 rounded-lg w-11/12 text-center shadow-sm max-w-[220px] relative">
+                      <div className="absolute -right-2 top-1/2 -translate-y-1/2 bg-white text-purple text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-slate-100 hidden md:block">
+                        {totalPlanejado ? ((totalEmpenhado / totalPlanejado) * 100).toFixed(1) : '0'}%
+                      </div>
+                      <p className="text-[10px] font-medium text-purple-100 uppercase tracking-wider mb-0.5">Empenhado</p>
+                      <p className="font-bold text-sm">{formatCurrency(totalEmpenhado)}</p>
+                    </div>
+
+                    <div className="h-4 flex items-center justify-center">
+                      <ArrowDown className="text-slate-300 w-4 h-4" />
+                    </div>
+
+                    <div className="bg-amber text-white px-4 py-2 rounded-lg w-5/6 text-center shadow-sm max-w-[200px] relative">
+                      <div className="absolute -right-2 top-1/2 -translate-y-1/2 bg-white text-amber text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-slate-100 hidden md:block">
+                        {totalEmpenhado ? ((totalLiquidado / totalEmpenhado) * 100).toFixed(1) : '0'}%
+                      </div>
+                      <p className="text-[10px] font-medium text-amber-100 uppercase tracking-wider mb-0.5">Liquidado</p>
+                      <p className="font-bold text-sm">{formatCurrency(totalLiquidado)}</p>
+                    </div>
+
+                    <div className="h-4 flex items-center justify-center">
+                      <ArrowDown className="text-slate-300 w-4 h-4" />
+                    </div>
+
+                    <div className="bg-emerald-green text-white px-4 py-2 rounded-lg w-4/5 text-center shadow-sm max-w-[180px] relative">
+                      <div className="absolute -right-2 top-1/2 -translate-y-1/2 bg-white text-emerald-green text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-slate-100 hidden md:block">
+                        {totalLiquidado ? ((totalPago / totalLiquidado) * 100).toFixed(1) : '0'}%
+                      </div>
+                      <p className="text-[10px] font-medium text-green-100 uppercase tracking-wider mb-0.5">Pago</p>
+                      <p className="font-bold text-sm">{formatCurrency(totalPago)}</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Gráficos Linha 2: Distribuição Stacked */}
+          <div className="grid gap-6 md:grid-cols-1">
+            <Card>
+              <CardHeader>
+                <CardTitle>Distribuição do Orçamento (Dimensão x Componentes Funcionais)</CardTitle>
+                <CardDescription>Composição do Planejado por área de atuação e programas</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={dadosFunil} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
-                      <XAxis type="number" hide />
-                      <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 12 }} />
-                      <Tooltip
-                        cursor={{ fill: 'transparent' }}
-                        formatter={(value: number) => formatCurrency(value)}
-                      />
-                      <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={40}>
-                        {dadosFunil.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.fill} />
-                        ))}
-                      </Bar>
+                    <BarChart data={dadosStack} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                      <Legend />
+                      {uniqueComponents.map((comp, index) => {
+                        const colors = ['#3b82f6', '#10b981', '#a855f7', '#f59e0b', '#ec4899', '#6366f1', '#14b8a6', '#f43f5e', '#8b5cf6', '#06b6d4'];
+                        return <Bar key={comp} dataKey={comp} stackId="a" fill={colors[index % colors.length]} radius={index === uniqueComponents.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
+                      })}
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -496,31 +632,33 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          {/* Gráficos Linha 2 */}
+          {/* Gráficos Linha 3: Radar & Naturezas */}
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Top 5 Componentes</CardTitle>
-                <CardDescription>Maiores orçamentos</CardDescription>
+                <CardTitle>Descentralizações</CardTitle>
+                <CardDescription>Volume distribuído por Dimensão</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-[350px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={dadosPorComponente} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <BarChart data={dadosDescentralizacao} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" />
                       <XAxis type="number" tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
                       <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 11 }} />
                       <Tooltip formatter={(value: number) => formatCurrency(value)} />
                       <Legend />
-                      <Bar dataKey="planejado" fill="#1e5bb0" name="Planejado" radius={[0, 4, 4, 0]} />
-                      <Bar dataKey="empenhado" fill="#f59e0b" name="Empenhado" radius={[0, 4, 4, 0]} />
+                      {uniqueOrigens.map((origem, index) => {
+                        const colors = ['#3b82f6', '#10b981', '#a855f7', '#f59e0b', '#ec4899', '#6366f1', '#14b8a6', '#f43f5e'];
+                        return <Bar key={origem} dataKey={origem} stackId="a" fill={colors[index % colors.length]} radius={index === uniqueOrigens.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]} barSize={24} />
+                      })}
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="">
               <CardHeader>
                 <CardTitle>Top Naturezas</CardTitle>
                 <CardDescription>Maiores gastos por categoria</CardDescription>
@@ -529,11 +667,11 @@ export default function Dashboard() {
                 <div className="h-[350px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={dadosPorNatureza} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                      <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" />
                       <XAxis type="number" tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
                       <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 11 }} />
                       <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                      <Bar dataKey="value" fill="#2a8f5c" name="Valor Gasto" radius={[0, 4, 4, 0]} barSize={30} />
+                      <Bar dataKey="value" fill="#10b981" name="Valor Gasto" radius={[0, 4, 4, 0]} barSize={20} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -542,7 +680,7 @@ export default function Dashboard() {
           </div>
 
           {/* Tabela de Resumo */}
-          <Card>
+          <Card className="">
             <CardHeader>
               <CardTitle>Detalhamento por Origem</CardTitle>
               <CardDescription>Execução financeira por fonte de recurso</CardDescription>
@@ -591,30 +729,34 @@ export default function Dashboard() {
               title="Inscrito"
               value={formatCurrency(rapTotalInscrito)}
               subtitle={`${filteredData.empenhosRap.length} RAPs`}
-              icon={Wallet}
-              variant="primary"
+              icon={Flag}
+              stitchColor="vibrant-blue"
+              progress={100}
             />
             <StatCard
               title="Em Liquidação"
               value={formatCurrency(rapTotalALiquidar)}
               icon={Receipt}
-              variant="warning"
+              stitchColor="amber"
+              progress={rapTotalInscrito > 0 ? (rapTotalALiquidar / rapTotalInscrito) * 100 : 0}
             />
             <StatCard
               title="Liquidado"
               value={formatCurrency(rapTotalLiquidado)}
-              icon={TrendingUp}
-              variant="accent"
+              icon={Lock}
+              stitchColor="purple"
+              progress={rapTotalInscrito > 0 ? (rapTotalLiquidado / rapTotalInscrito) * 100 : 0}
             />
             <StatCard
               title="Pago"
               value={formatCurrency(rapTotalPago)}
-              icon={PiggyBank}
-              variant="default"
+              icon={Wallet}
+              stitchColor="emerald-green"
+              progress={rapTotalLiquidado > 0 ? (rapTotalPago / rapTotalLiquidado) * 100 : 0}
             />
           </div>
 
-          <Card>
+          <Card className="">
             <CardHeader>
               <CardTitle>Resumo de RAPs por Origem</CardTitle>
               <CardDescription>Acompanhamento de inscritos vs pagamentos efetivados</CardDescription>

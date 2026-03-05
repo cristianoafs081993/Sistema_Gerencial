@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Design System - Gestão de Empenhos</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#195de6",
+                        "background-light": "#f8fafc",
+                        "background-dark": "#111621",
+                        "vibrant-blue": "#3b82f6",
+                        "purple": "#a855f7",
+                        "amber": "#f59e0b",
+                        "emerald-green": "#10b981",
+                        // Mapped for backwards compatibility in this HTML demo
+                        "brand": { 50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#195de6', 900: '#1e3a8a' },
+                        "ui": { bg: '#f8fafc', card: '#ffffff', border: '#e2e8f0', muted: '#f1f5f9' },
+                        "status": {
+                            success: { bg: '#d1fae5', text: '#065f46', base: '#10b981' },
+                            warning: { bg: '#fef3c7', text: '#92400e', base: '#f59e0b' },
+                            danger: { bg: '#fee2e2', text: '#991b1b', base: '#ef4444' },
+                            info: { bg: '#f3e8ff', text: '#6b21a8', base: '#a855f7' },
+                        }
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"],
+                        "sans": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                    boxShadow: {
+                        'soft': '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+                        'card': '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
+        }
+
+        .ds-section {
+            margin-bottom: 3rem;
+        }
+
+        .ds-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 0.5rem;
+        }
+    </style>
+</head>
+
+<body class="p-8 pb-20">
+
+    <div class="max-w-6xl mx-auto space-y-12">
+
+        <header class="mb-12">
+            <h1 class="text-4xl font-bold text-slate-800 tracking-tight">Gestão de Empenhos</h1>
+            <p class="text-slate-500 mt-2 text-lg">Design System (Light Mode) - Stitch Redesign</p>
+        </header>
+
+        <!-- Cores -->
+        <section class="ds-section">
+            <h2 class="ds-title">1. Tokens de Cores</h2>
+
+            <div class="space-y-6">
+                <div>
+                    <h3 class="font-medium text-slate-700 mb-3">Marca & Superfícies</h3>
+                    <div class="flex gap-4 flex-wrap">
+                        <!-- Cor Principal -->
+                        <div class="w-32">
+                            <div class="h-20 w-full rounded-lg shadow-sm bg-primary mb-2"></div>
+                            <p class="text-sm font-semibold">Primary Theme</p>
+                            <p class="text-xs text-slate-500">bg-primary</p>
+                        </div>
+                        <!-- UI BG -->
+                        <div class="w-32">
+                            <div
+                                class="h-20 w-full rounded-lg shadow-sm bg-background-light border border-slate-200 mb-2">
+                            </div>
+                            <p class="text-sm font-semibold">App Background</p>
+                            <p class="text-xs text-slate-500">bg-background-light</p>
+                        </div>
+                        <!-- Card BG -->
+                        <div class="w-32">
+                            <div class="h-20 w-full rounded-lg shadow-sm bg-white border border-slate-200 mb-2"></div>
+                            <p class="text-sm font-semibold">Card</p>
+                            <p class="text-xs text-slate-500">bg-white</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="font-medium text-slate-700 mb-3">Cores Semânticas (KPIs & Status)</h3>
+                    <div class="flex gap-4 flex-wrap">
+                        <div class="w-32">
+                            <div
+                                class="h-20 w-full rounded-lg shadow-sm bg-emerald-green mb-2 flex flex-col justify-between p-2">
+                                <div class="w-full h-4 bg-emerald-green/20 rounded-sm"></div>
+                            </div>
+                            <p class="text-sm font-semibold">Emerald (Pago)</p>
+                            <p class="text-xs text-slate-500">bg-emerald-green</p>
+                        </div>
+                        <div class="w-32">
+                            <div
+                                class="h-20 w-full rounded-lg shadow-sm bg-amber mb-2 flex flex-col justify-between p-2">
+                                <div class="w-full h-4 bg-amber/20 rounded-sm"></div>
+                            </div>
+                            <p class="text-sm font-semibold">Amber (Liquid)</p>
+                            <p class="text-xs text-slate-500">bg-amber</p>
+                        </div>
+                        <div class="w-32">
+                            <div
+                                class="h-20 w-full rounded-lg shadow-sm bg-red-500 mb-2 flex flex-col justify-between p-2">
+                                <div class="w-full h-4 bg-red-500/20 rounded-sm"></div>
+                            </div>
+                            <p class="text-sm font-semibold">Red (A Liquidar)</p>
+                            <p class="text-xs text-slate-500">bg-red-500</p>
+                        </div>
+                        <div class="w-32">
+                            <div
+                                class="h-20 w-full rounded-lg shadow-sm bg-purple mb-2 flex flex-col justify-between p-2">
+                                <div class="w-full h-4 bg-purple/20 rounded-sm"></div>
+                            </div>
+                            <p class="text-sm font-semibold">Purple (Empenh.)</p>
+                            <p class="text-xs text-slate-500">bg-purple</p>
+                        </div>
+                        <div class="w-32">
+                            <div
+                                class="h-20 w-full rounded-lg shadow-sm bg-vibrant-blue mb-2 flex flex-col justify-between p-2">
+                                <div class="w-full h-4 bg-vibrant-blue/20 rounded-sm"></div>
+                            </div>
+                            <p class="text-sm font-semibold">Blue (Planejado)</p>
+                            <p class="text-xs text-slate-500">bg-vibrant-blue</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tipografia -->
+        <section class="ds-section">
+            <h2 class="ds-title">2. Tipografia (Inter)</h2>
+            <div class="bg-white p-6 rounded-xl shadow-card border border-slate-200 space-y-4">
+                <div class="flex items-end gap-6 border-b border-slate-200 pb-4">
+                    <span class="text-4xl font-bold text-slate-800">Heading 1</span>
+                    <span class="text-sm text-slate-400 mb-1">text-4xl font-bold</span>
+                </div>
+                <div class="flex items-end gap-6 border-b border-slate-200 pb-4">
+                    <span class="text-2xl font-semibold text-slate-800">Heading 2 (Card Titles)</span>
+                    <span class="text-sm text-slate-400 mb-1">text-2xl font-semibold</span>
+                </div>
+                <div class="flex items-end gap-6 border-b border-slate-200 pb-4">
+                    <span class="text-lg font-medium text-slate-800">Heading 3 (Section Titles)</span>
+                    <span class="text-sm text-slate-400 mb-1">text-lg font-medium</span>
+                </div>
+                <div class="flex items-end gap-6 border-b border-slate-200 pb-4">
+                    <span class="text-base font-normal text-slate-600">Paragraph / Body Text - Usado para descrições
+                        longas.</span>
+                    <span class="text-sm text-slate-400 mb-1">text-base text-slate-600</span>
+                </div>
+                <div class="flex items-end gap-6 border-b border-slate-200 pb-4">
+                    <span class="text-sm font-medium text-slate-700">Table Headers & Small Labels</span>
+                    <span class="text-sm text-slate-400 mb-1">text-sm font-medium</span>
+                </div>
+                <div class="flex items-end gap-6 pb-2">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Overline Metrics</span>
+                    <span class="text-sm text-slate-400 mb-1">text-xs uppercase tracking-wider</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Components - Badges -->
+        <section class="ds-section">
+            <h2 class="ds-title">3. Átomos: Badges de Status</h2>
+            <div class="bg-white p-6 rounded-xl shadow-card border border-slate-200 flex gap-4 flex-wrap items-center">
+                <!-- Success -->
+                <span
+                    class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-green/10 text-emerald-green border border-[#a7f3d0]">
+                    Pago / Sucesso
+                </span>
+                <!-- Warning -->
+                <span
+                    class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber/10 text-amber border border-[#fde68a]">
+                    Liquidado / Processando
+                </span>
+                <!-- Danger -->
+                <span
+                    class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-500 border border-[#fecaca]">
+                    A Liquidar / Erro
+                </span>
+                <!-- Info -->
+                <span
+                    class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple/10 text-purple border border-[#ddd6fe]">
+                    Empenhado
+                </span>
+                <!-- Default -->
+                <span
+                    class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                    Pendente
+                </span>
+            </div>
+        </section>
+
+        <!-- Components - Buttons -->
+        <section class="ds-section">
+            <h2 class="ds-title">4. Átomos: Botões</h2>
+            <div class="bg-white p-6 rounded-xl shadow-card border border-slate-200 flex gap-4 flex-wrap items-center">
+                <button
+                    class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition shadow-sm">Botão
+                    Primário</button>
+                <button
+                    class="px-4 py-2 bg-white text-slate-700 border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 shadow-sm transition">Botão
+                    Secundário</button>
+                <button
+                    class="px-4 py-2 text-primary rounded-lg text-sm font-medium hover:bg-primary/10 transition">Botão
+                    Ghost</button>
+
+                <div class="flex items-center bg-slate-100 p-1 rounded-lg">
+                    <button
+                        class="px-4 py-1.5 bg-white text-slate-800 rounded-md text-sm font-medium shadow-sm">Exercício
+                        Atual</button>
+                    <button
+                        class="px-4 py-1.5 text-slate-500 hover:text-slate-700 rounded-md text-sm font-medium">Restos a
+                        Pagar (RAP)</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Components - Cards -->
+        <section class="ds-section">
+            <h2 class="ds-title">5. Moléculas: Stat Cards (Dashboard)</h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+
+                <!-- Card 1 -->
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-soft relative overflow-hidden">
+                    <div class="absolute left-0 top-0 bottom-0 w-1 bg-vibrant-blue"></div>
+                    <p class="text-sm font-medium text-slate-500 mb-1">Planejado</p>
+                    <h3 class="text-2xl font-bold text-slate-800">R$ 12.450.000,00</h3>
+                    <p class="text-xs text-status-success-base font-medium mt-2 flex items-center">
+                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                        +12% vs último ano
+                    </p>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-soft relative overflow-hidden">
+                    <div class="absolute left-0 top-0 bottom-0 w-1 bg-purple"></div>
+                    <p class="text-sm font-medium text-slate-500 mb-1">Empenhado</p>
+                    <h3 class="text-2xl font-bold text-slate-800">R$ 8.200.000,00</h3>
+                    <div class="mt-3 w-full bg-slate-100 rounded-full h-1.5">
+                        <div class="bg-purple h-1.5 rounded-full" style="width: 65%"></div>
+                    </div>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-soft relative overflow-hidden">
+                    <div class="absolute left-0 top-0 bottom-0 w-1 bg-amber"></div>
+                    <p class="text-sm font-medium text-slate-500 mb-1">Liquidado</p>
+                    <h3 class="text-2xl font-bold text-slate-800">R$ 5.100.000,00</h3>
+                    <div class="mt-3 w-full bg-slate-100 rounded-full h-1.5">
+                        <div class="bg-amber h-1.5 rounded-full" style="width: 45%"></div>
+                    </div>
+                </div>
+
+                <!-- Card 4 -->
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-soft relative overflow-hidden">
+                    <div class="absolute left-0 top-0 bottom-0 w-1 bg-emerald-green"></div>
+                    <p class="text-sm font-medium text-slate-500 mb-1">Pago</p>
+                    <h3 class="text-2xl font-bold text-slate-800">R$ 4.900.000,00</h3>
+                    <div class="mt-3 w-full bg-slate-100 rounded-full h-1.5">
+                        <div class="bg-emerald-green h-1.5 rounded-full" style="width: 40%"></div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Organisms - Table -->
+        <section class="ds-section">
+            <h2 class="ds-title">6. Organismos: Tabela de Dados</h2>
+            <div class="bg-white rounded-xl shadow-card border border-slate-200 overflow-hidden">
+                <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-white">
+                    <h3 class="font-semibold text-slate-800">Listagem de Empenhos</h3>
+                    <div class="relative">
+                        <input type="text" placeholder="Buscar por NE ou Favorecido..."
+                            class="pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm w-64 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                            <th class="px-4 py-3 font-medium">Nota de Empenho (NE)</th>
+                            <th class="px-4 py-3 font-medium">Favorecido</th>
+                            <th class="px-4 py-3 font-medium text-right">Valor (R$)</th>
+                            <th class="px-4 py-3 font-medium truncate">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-sm divide-y divide-ui-border">
+                        <tr class="hover:bg-slate-50 cursor-pointer transition">
+                            <td class="px-4 py-3 font-medium text-slate-800">2026NE000123</td>
+                            <td class="px-4 py-3 text-slate-600">TECH CORP SOLUCOES LTDA</td>
+                            <td class="px-4 py-3 text-slate-800 font-medium text-right">150.000,00</td>
+                            <td class="px-4 py-3">
+                                <span
+                                    class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-green/10 text-emerald-green border border-[#a7f3d0]">Pago</span>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 cursor-pointer transition">
+                            <td class="px-4 py-3 font-medium text-slate-800">2026NE000456</td>
+                            <td class="px-4 py-3 text-slate-600">CONSTRUTORA ALFA LTDA</td>
+                            <td class="px-4 py-3 text-slate-800 font-medium text-right">32.450,50</td>
+                            <td class="px-4 py-3">
+                                <span
+                                    class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber/10 text-amber border border-[#fde68a]">Liquidado</span>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 cursor-pointer transition">
+                            <td class="px-4 py-3 font-medium text-slate-800">2026NE000789</td>
+                            <td class="px-4 py-3 text-slate-600">SERVICOS GERAIS ME</td>
+                            <td class="px-4 py-3 text-slate-800 font-medium text-right">8.900,00</td>
+                            <td class="px-4 py-3">
+                                <span
+                                    class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-500 border border-[#fecaca]">A
+                                    Liquidar</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="px-4 py-3 border-t border-slate-200 flex items-center justify-between text-sm">
+                    <span class="text-slate-500">Mostrando 1 a 3 de 45 registros</span>
+                    <div class="flex gap-2">
+                        <button
+                            class="px-3 py-1 border border-slate-200 rounded-md hover:bg-slate-50 disabled:opacity-50"
+                            disabled>Anterior</button>
+                        <button
+                            class="px-3 py-1 border border-slate-200 rounded-md hover:bg-slate-50 font-medium text-primary">Próxima</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Organisms - Drag and Drop -->
+        <section class="ds-section">
+            <h2 class="ds-title">7. Organismos: Importação (Drag & Drop)</h2>
+            <div
+                class="bg-white p-10 rounded-xl shadow-card border-2 border-dashed border-primary text-center hover:bg-primary/10 transition cursor-pointer flex flex-col items-center justify-center">
+                <div class="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mb-4 text-primary">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12">
+                        </path>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-800 mb-1">Arraste seus arquivos CSV do Tesouro Gerencial
+                    aqui</h3>
+                <p class="text-slate-500">Ou clique para procurar em seu computador.</p>
+                <button
+                    class="mt-6 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-brand-700 transition shadow-sm">Selecionar
+                    Arquivos</button>
+            </div>
+        </section>
+
+        <!-- Moléculas - Progress Bar -->
+        <section class="ds-section">
+            <h2 class="ds-title">8. Moléculas: Progress Bar (Execução)</h2>
+            <div class="bg-white p-6 rounded-xl shadow-card border border-slate-200 flex flex-col gap-6">
+
+                <div class="w-full max-w-md">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-sm font-medium text-slate-700">Origem 231796</span>
+                        <span class="text-sm font-semibold text-primary">75%</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-2">
+                        <div class="bg-vibrant-blue h-2 rounded-full" style="width: 75%"></div>
+                    </div>
+                </div>
+
+                <div class="w-full max-w-md">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-sm font-medium text-slate-700">Origem 261941</span>
+                        <span class="text-sm font-semibold text-status-success-base">100%</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-2">
+                        <div class="bg-emerald-green h-2 rounded-full" style="width: 100%"></div>
+                    </div>
+                </div>
+
+                <div class="w-full max-w-md">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-sm font-medium text-slate-700">Origem 100000</span>
+                        <span class="text-sm font-semibold text-status-danger-base">15%</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-2">
+                        <div class="bg-red-500 h-2 rounded-full" style="width: 15%"></div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Templates - Layout Sidebar & Topbar -->
+        <section class="ds-section">
+            <h2 class="ds-title">9. Layout: Navegação (Sidebar & Topbar)</h2>
+
+            <div class="flex h-[400px] border border-slate-200 rounded-xl overflow-hidden shadow-card">
+                <!-- Sidebar -->
+                <aside class="w-64 bg-white border-r border-slate-200 flex flex-col">
+                    <div class="p-6 border-b border-slate-200">
+                        <h2 class="text-xl font-bold text-slate-800">Gestão de <span
+                                class="text-primary">Empenhos</span></h2>
+                    </div>
+                    <nav class="flex-1 p-4 space-y-1">
+                        <a href="#"
+                            class="flex items-center gap-3 px-3 py-2.5 bg-primary/10 text-primary rounded-lg font-medium text-sm">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6">
+                                </path>
+                            </svg>
+                            Dashboard
+                        </a>
+                        <a href="#"
+                            class="flex items-center gap-3 px-3 py-2.5 text-slate-600 hover:bg-slate-50 rounded-lg font-medium text-sm transition">
+                            <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                </path>
+                            </svg>
+                            Empenhos
+                        </a>
+                    </nav>
+                </aside>
+
+                <!-- Main Content Placeholder -->
+                <div class="flex-1 flex flex-col bg-background-light">
+                    <!-- Topbar -->
+                    <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6">
+                        <h1 class="text-lg font-semibold text-slate-800">Dashboard Gerencial</h1>
+                        <div class="flex items-center gap-4">
+                            <div
+                                class="hidden md:flex items-center bg-slate-50 rounded-full px-3 py-1.5 text-sm text-slate-600">
+                                <svg class="w-4 h-4 mr-1.5 text-slate-400" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z">
+                                    </path>
+                                </svg>
+                                Exercício: 2026
+                            </div>
+                            <div
+                                class="w-8 h-8 bg-primary/20 text-primary rounded-full flex items-center justify-center font-bold text-sm">
+                                CD</div>
+                        </div>
+                    </header>
+                    <main class="p-6 flex-1 overflow-y-auto">
+                        <div
+                            class="w-full h-full border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center text-slate-400">
+                            Conteúdo da Página
+                        </div>
+                    </main>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pages - Dashboard Completo -->
+        <section class="ds-section">
+            <h2 class="ds-title">10. Composição: Dashboard</h2>
+
+            <div class="bg-background-light p-6 rounded-xl border border-slate-200 shadow-sm">
+
+                <!-- Tabs -->
+                <div class="flex justify-start mb-8">
+                    <div class="inline-flex bg-slate-100 p-1 rounded-lg">
+                        <button
+                            class="px-6 py-2 bg-white text-slate-900 rounded-md text-sm font-semibold shadow-sm transition-all">Exercício
+                            Atual</button>
+                        <button
+                            class="px-6 py-2 text-slate-500 hover:text-slate-900 rounded-md text-sm font-medium transition-all">Restos
+                            a Pagar (RAP)</button>
+                    </div>
+                </div>
+
+                <!-- KPI Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm relative overflow-hidden">
+                        <div class="absolute left-0 top-0 bottom-0 w-1 bg-vibrant-blue"></div>
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-sm font-medium text-slate-500">Planejado</p>
+                            <div class="bg-vibrant-blue/10 p-1.5 rounded-md text-vibrant-blue">
+                                <span class="material-symbols-outlined text-sm">flag</span>
+                            </div>
+                        </div>
+                        <h3 class="text-2xl font-bold text-slate-900">R$ 12.4M</h3>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm relative overflow-hidden">
+                        <div class="absolute left-0 top-0 bottom-0 w-1 bg-purple"></div>
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-sm font-medium text-slate-500">Empenhado</p>
+                            <div class="bg-purple/10 p-1.5 rounded-md text-purple">
+                                <span class="material-symbols-outlined text-sm">lock</span>
+                            </div>
+                        </div>
+                        <h3 class="text-2xl font-bold text-slate-900">R$ 8.2M</h3>
+                        <div class="mt-3 w-full bg-slate-100 rounded-full h-1.5">
+                            <div class="bg-purple h-1.5 rounded-full" style="width: 65%"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm relative overflow-hidden">
+                        <div class="absolute left-0 top-0 bottom-0 w-1 bg-amber"></div>
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-sm font-medium text-slate-500">Liquidado</p>
+                            <div class="bg-amber/10 p-1.5 rounded-md text-amber">
+                                <span class="material-symbols-outlined text-sm">receipt_long</span>
+                            </div>
+                        </div>
+                        <h3 class="text-2xl font-bold text-slate-900">R$ 5.1M</h3>
+                        <div class="mt-3 w-full bg-slate-100 rounded-full h-1.5">
+                            <div class="bg-amber h-1.5 rounded-full" style="width: 62%"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm relative overflow-hidden">
+                        <div class="absolute left-0 top-0 bottom-0 w-1 bg-emerald-green"></div>
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-sm font-medium text-slate-500">Pago</p>
+                            <div class="bg-emerald-green/10 p-1.5 rounded-md text-emerald-green">
+                                <span class="material-symbols-outlined text-sm">payments</span>
+                            </div>
+                        </div>
+                        <h3 class="text-2xl font-bold text-slate-900">R$ 4.9M</h3>
+                        <div class="mt-3 w-full bg-slate-100 rounded-full h-1.5">
+                            <div class="bg-emerald-green h-1.5 rounded-full" style="width: 96%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chart and Table Area -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                    <!-- Main Chart (from Stitch) -->
+                    <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col">
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 class="text-slate-900 font-semibold text-base">Evolução da Execução</h3>
+                                <p class="text-slate-500 text-sm mt-1">Planejado vs Empenhado vs Pago (Acumulado)</p>
+                            </div>
+                            <div class="flex items-center gap-4 text-xs font-medium text-slate-600">
+                                <div class="flex items-center gap-1.5"><span
+                                        class="w-2 h-2 rounded-full bg-vibrant-blue"></span> Planejado</div>
+                                <div class="flex items-center gap-1.5"><span
+                                        class="w-2 h-2 rounded-full bg-purple"></span> Empenhado</div>
+                                <div class="flex items-center gap-1.5"><span
+                                        class="w-2 h-2 rounded-full bg-emerald-green"></span> Pago</div>
+                            </div>
+                        </div>
+                        <div class="flex-1 min-h-[240px] relative w-full flex flex-col">
+                            <!-- Y-axis labels -->
+                            <div
+                                class="absolute left-0 top-0 bottom-8 w-12 flex flex-col justify-between text-xs text-slate-400 font-medium z-10">
+                                <span>12M</span><span>9M</span><span>6M</span><span>3M</span><span>0</span>
+                            </div>
+                            <!-- Chart Area -->
+                            <div class="flex-1 ml-12 relative border-l border-b border-slate-100 mb-6">
+                                <!-- Grid lines -->
+                                <div class="absolute inset-0 flex flex-col justify-between">
+                                    <div class="w-full border-t border-slate-100/50"></div>
+                                    <div class="w-full border-t border-slate-100/50"></div>
+                                    <div class="w-full border-t border-slate-100/50"></div>
+                                    <div class="w-full border-t border-slate-100/50"></div>
+                                    <div class="w-full border-t border-slate-100/50"></div>
+                                </div>
+                                <!-- SVG Chart Lines/Areas -->
+                                <svg class="absolute inset-0 w-full h-full" preserveAspectratio="none"
+                                    viewBox="0 0 100 100">
+                                    <!-- Planejado Area & Line -->
+                                    <path
+                                        d="M0,10 L10,10 L20,10 L30,10 L40,10 L50,10 L60,10 L70,10 L80,10 L90,10 L100,10 L100,100 L0,100 Z"
+                                        fill="url(#blue-gradient)" opacity="0.1"></path>
+                                    <polyline fill="none"
+                                        points="0,10 10,10 20,10 30,10 40,10 50,10 60,10 70,10 80,10 90,10 100,10"
+                                        stroke="#3b82f6" stroke-dasharray="4,4" stroke-width="2"></polyline>
+                                    <!-- Empenhado Area & Line -->
+                                    <path
+                                        d="M0,90 L10,80 L20,65 L30,55 L40,45 L50,38 L60,35 L70,33 L80,33 L90,33 L100,33 L100,100 L0,100 Z"
+                                        fill="url(#purple-gradient)" opacity="0.2"></path>
+                                    <polyline fill="none"
+                                        points="0,90 10,80 20,65 30,55 40,45 50,38 60,35 70,33 80,33 90,33 100,33"
+                                        stroke="#a855f7" stroke-width="2"></polyline>
+                                    <!-- Pago Area & Line -->
+                                    <path
+                                        d="M0,100 L10,95 L20,85 L30,75 L40,65 L50,60 L60,58 L70,55 L80,55 L90,55 L100,55 L100,100 L0,100 Z"
+                                        fill="url(#green-gradient)" opacity="0.3"></path>
+                                    <polyline fill="none"
+                                        points="0,100 10,95 20,85 30,75 40,65 50,60 60,58 70,55 80,55 90,55 100,55"
+                                        stroke="#10b981" stroke-width="2"></polyline>
+                                    <defs>
+                                        <lineargradient id="blue-gradient" x1="0" x2="0" y1="0" y2="1">
+                                            <stop offset="0%" stop-color="#3b82f6"></stop>
+                                            <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"></stop>
+                                        </lineargradient>
+                                        <lineargradient id="purple-gradient" x1="0" x2="0" y1="0" y2="1">
+                                            <stop offset="0%" stop-color="#a855f7"></stop>
+                                            <stop offset="100%" stop-color="#a855f7" stop-opacity="0"></stop>
+                                        </lineargradient>
+                                        <lineargradient id="green-gradient" x1="0" x2="0" y1="0" y2="1">
+                                            <stop offset="0%" stop-color="#10b981"></stop>
+                                            <stop offset="100%" stop-color="#10b981" stop-opacity="0"></stop>
+                                        </lineargradient>
+                                    </defs>
+                                </svg>
+                            </div>
+                            <!-- X-axis labels -->
+                            <div class="ml-12 flex justify-between text-xs text-slate-400 font-medium">
+                                <span>Jan</span><span>Fev</span><span>Mar</span><span>Abr</span><span>Mai</span><span>Jun</span><span>Jul</span><span>Ago</span><span>Set</span><span>Out</span><span>Nov</span><span>Dez</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mini Table/List -->
+                    <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm flex flex-col">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-base font-semibold text-slate-900">Detalhamento por Origem</h3>
+                            <span
+                                class="material-symbols-outlined text-slate-400 cursor-pointer hover:text-primary transition">more_vert</span>
+                        </div>
+                        <div class="flex-1 space-y-5">
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-sm font-medium text-slate-700">Origem 231796</span>
+                                    <span class="text-sm font-semibold text-slate-900">R$ 1.2M</span>
+                                </div>
+                                <div class="flex justify-between items-center mb-1 text-xs text-slate-500">
+                                    <span>Execução</span>
+                                    <span>85%</span>
+                                </div>
+                                <div class="w-full bg-slate-100 rounded-full h-1.5 flex flex-row">
+                                    <div class="bg-primary h-1.5 rounded-full" style="width: 85%"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-sm font-medium text-slate-700">Origem 261941</span>
+                                    <span class="text-sm font-semibold text-slate-900">R$ 800K</span>
+                                </div>
+                                <div class="flex justify-between items-center mb-1 text-xs text-slate-500">
+                                    <span>Execução</span>
+                                    <span>40%</span>
+                                </div>
+                                <div class="w-full bg-slate-100 rounded-full h-1.5">
+                                    <div class="bg-amber h-1.5 rounded-full" style="width: 40%"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-sm font-medium text-slate-700">Origem 100000</span>
+                                    <span class="text-sm font-semibold text-slate-900">R$ 2.4M</span>
+                                </div>
+                                <div class="flex justify-between items-center mb-1 text-xs text-slate-500">
+                                    <span>Execução</span>
+                                    <span class="text-emerald-green">100%</span>
+                                </div>
+                                <div class="w-full bg-slate-100 rounded-full h-1.5">
+                                    <div class="bg-emerald-green h-1.5 rounded-full" style="width: 100%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <button
+                            class="mt-6 w-full py-2.5 text-primary rounded-lg text-sm font-medium hover:bg-primary/5 transition border border-primary/20 flex justify-center items-center gap-2">
+                            Ver Todas as Origens
+                            <span class="material-symbols-outlined text-sm">arrow_forward</span>
+                        </button>
+                    </div>
+
+                </div>
+
+                <!-- Execution Funnel Row -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+                    <!-- Execution Funnel -->
+                    <div class="lg:col-span-1 bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col">
+                        <h3 class="text-slate-900 font-semibold text-base mb-6">Funil de Execução</h3>
+                        <div class="flex-1 flex flex-col justify-center gap-4 relative">
+                            <!-- Connecting lines behind -->
+                            <div class="absolute left-1/2 top-0 bottom-0 w-px bg-slate-100 -translate-x-1/2 z-0"></div>
+                            <!-- Funnel Steps -->
+                            <div class="relative z-10 flex flex-col items-center">
+                                <div
+                                    class="bg-vibrant-blue text-white px-4 py-3 rounded-lg w-full text-center shadow-sm max-w-[240px]">
+                                    <p class="text-xs font-medium text-blue-100 uppercase tracking-wider mb-1">Planejado
+                                    </p>
+                                    <p class="font-bold text-lg">R$ 12.45M</p>
+                                </div>
+                                <div class="h-6 flex items-center justify-center">
+                                    <span class="material-symbols-outlined text-slate-300 text-sm">arrow_downward</span>
+                                </div>
+                                <div
+                                    class="bg-purple text-white px-4 py-3 rounded-lg w-11/12 text-center shadow-sm max-w-[220px]">
+                                    <div
+                                        class="absolute -right-2 top-1/2 -translate-y-1/2 bg-white text-purple text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-slate-100">
+                                        65.8%</div>
+                                    <p class="text-xs font-medium text-purple-100 uppercase tracking-wider mb-1">
+                                        Empenhado</p>
+                                    <p class="font-bold text-lg">R$ 8.20M</p>
+                                </div>
+                                <div class="h-6 flex items-center justify-center">
+                                    <span class="material-symbols-outlined text-slate-300 text-sm">arrow_downward</span>
+                                </div>
+                                <div
+                                    class="bg-amber text-white px-4 py-3 rounded-lg w-5/6 text-center shadow-sm max-w-[200px]">
+                                    <div
+                                        class="absolute -right-2 top-1/2 -translate-y-1/2 bg-white text-amber text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-slate-100">
+                                        62.1%</div>
+                                    <p class="text-xs font-medium text-amber-100 uppercase tracking-wider mb-1">
+                                        Liquidado</p>
+                                    <p class="font-bold text-lg">R$ 5.10M</p>
+                                </div>
+                                <div class="h-6 flex items-center justify-center">
+                                    <span class="material-symbols-outlined text-slate-300 text-sm">arrow_downward</span>
+                                </div>
+                                <div
+                                    class="bg-emerald-green text-white px-4 py-3 rounded-lg w-4/5 text-center shadow-sm max-w-[180px]">
+                                    <div
+                                        class="absolute -right-2 top-1/2 -translate-y-1/2 bg-white text-emerald-green text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-slate-100">
+                                        96.0%</div>
+                                    <p class="text-xs font-medium text-green-100 uppercase tracking-wider mb-1">Pago</p>
+                                    <p class="font-bold text-lg">R$ 4.90M</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </div>
+
+</body>
+
+</html>

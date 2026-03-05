@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Gestão de Empenhos - Lista de Empenhos</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#3b82f6",
+            "background-light": "#f8fafc",
+            "background-dark": "#0f172a",
+            "surface-dark": "#1e293b",
+            "border-dark": "#334155",
+            "text-muted": "#94a3b8",
+            "text-default": "#f8fafc",
+          },
+          fontFamily: {
+            "display": ["Inter", "sans-serif"]
+          },
+          borderRadius: {
+            "DEFAULT": "0.375rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+        },
+      },
+    }
+  </script>
+<style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display min-h-screen flex flex-col antialiased">
+<div class="flex h-screen w-full overflow-hidden">
+<!-- Sidebar -->
+<aside class="w-64 bg-surface-dark border-r border-border-dark flex flex-col justify-between hidden md:flex shrink-0">
+<div class="flex flex-col gap-6 p-4">
+<!-- Brand -->
+<div class="flex items-center gap-3 px-2 py-2">
+<div class="bg-primary/20 text-primary rounded-lg p-2 flex items-center justify-center">
+<span class="material-symbols-outlined text-2xl">account_balance</span>
+</div>
+<div class="flex flex-col">
+<h1 class="text-text-default text-base font-semibold leading-tight">Gestão de Empenhos</h1>
+<p class="text-text-muted text-xs font-medium uppercase tracking-wider">Financial Commitments</p>
+</div>
+</div>
+<!-- Navigation -->
+<nav class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-muted hover:bg-slate-800 hover:text-text-default transition-colors group" href="#">
+<span class="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors">dashboard</span>
+<span class="text-sm font-medium">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-muted hover:bg-slate-800 hover:text-text-default transition-colors group" href="#">
+<span class="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors">visibility</span>
+<span class="text-sm font-medium">Transparência</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary/10 text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">description</span>
+<span class="text-sm font-medium">Empenhos</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-muted hover:bg-slate-800 hover:text-text-default transition-colors group" href="#">
+<span class="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors">upload_file</span>
+<span class="text-sm font-medium">Upload</span>
+</a>
+</nav>
+</div>
+<!-- Bottom Section -->
+<div class="p-4 border-t border-border-dark">
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-muted hover:bg-slate-800 hover:text-text-default transition-colors group" href="#">
+<span class="material-symbols-outlined text-[20px] group-hover:text-red-400 transition-colors">logout</span>
+<span class="text-sm font-medium">Sair</span>
+</a>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 flex flex-col h-full overflow-hidden">
+<!-- Header -->
+<header class="h-16 flex items-center justify-between px-6 border-b border-border-dark bg-surface-dark/50 backdrop-blur-sm sticky top-0 z-10 shrink-0">
+<div class="flex items-center gap-4">
+<button class="md:hidden text-text-muted hover:text-text-default">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h2 class="text-xl font-semibold tracking-tight text-text-default">Listagem de Empenhos</h2>
+</div>
+<div class="flex items-center gap-6">
+<!-- Search -->
+<div class="relative hidden sm:block w-72">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-text-muted text-[20px]">search</span>
+</div>
+<input class="block w-full pl-10 pr-3 py-2 border border-border-dark rounded-lg leading-5 bg-slate-800/50 text-text-default placeholder-text-muted focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm transition-colors" placeholder="Buscar por NE, NP ou CNPJ..." type="text"/>
+</div>
+<!-- Profile -->
+<button class="flex items-center gap-2 focus:outline-none">
+<div class="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-indigo-500 flex items-center justify-center text-white font-medium text-sm border-2 border-surface-dark shadow-sm">
+                JS
+             </div>
+</button>
+</div>
+</header>
+<!-- Scrollable Content -->
+<div class="flex-1 overflow-auto p-6 flex flex-col gap-6">
+<!-- Controls Bar -->
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+<!-- Segmented Control -->
+<div class="inline-flex bg-slate-800/50 backdrop-blur-md p-1 rounded-lg border border-border-dark">
+<button class="px-4 py-1.5 rounded-md bg-surface-dark shadow-sm text-sm font-medium text-text-default transition-all">
+              Exercício Atual
+            </button>
+<button class="px-4 py-1.5 rounded-md text-sm font-medium text-text-muted hover:text-text-default hover:bg-slate-700/50 transition-all">
+              Restos a Pagar (RAP)
+            </button>
+</div>
+<!-- Actions -->
+<div class="flex items-center gap-3 w-full sm:w-auto">
+<button class="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 border border-border-dark rounded-lg text-sm font-medium text-text-default hover:bg-slate-700 transition-colors w-full sm:w-auto">
+<span class="material-symbols-outlined text-[18px]">filter_list</span>
+                Filtros
+             </button>
+<button class="flex items-center justify-center gap-2 px-4 py-2 bg-primary rounded-lg text-sm font-medium text-white hover:bg-blue-600 transition-colors w-full sm:w-auto shadow-md shadow-primary/20">
+<span class="material-symbols-outlined text-[18px]">download</span>
+                Exportar
+             </button>
+</div>
+</div>
+<!-- Data Grid -->
+<div class="bg-surface-dark/80 backdrop-blur-sm border border-border-dark rounded-xl shadow-lg overflow-hidden flex flex-col flex-1 min-h-[400px]">
+<div class="overflow-x-auto flex-1">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-border-dark bg-slate-800/80 backdrop-blur-md">
+<th class="py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider sticky top-0 bg-slate-800/90 z-10 w-32">NE</th>
+<th class="py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider sticky top-0 bg-slate-800/90 z-10 min-w-[200px]">Favorecido</th>
+<th class="py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider sticky top-0 bg-slate-800/90 z-10 w-28">Emissão</th>
+<th class="py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider sticky top-0 bg-slate-800/90 z-10 w-32 text-right">Valor (R$)</th>
+<th class="py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider sticky top-0 bg-slate-800/90 z-10 w-32 text-right">Liquidado</th>
+<th class="py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider sticky top-0 bg-slate-800/90 z-10 w-32 text-right">Pago</th>
+<th class="py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider sticky top-0 bg-slate-800/90 z-10 w-32 text-right">Saldo</th>
+<th class="py-3 px-4 text-xs font-semibold text-text-muted uppercase tracking-wider sticky top-0 bg-slate-800/90 z-10 w-32 text-center">Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-dark">
+<!-- Row 1 -->
+<tr class="hover:bg-slate-800/50 transition-colors group cursor-pointer">
+<td class="py-3 px-4 text-sm font-medium text-text-default whitespace-nowrap">2026NE000123</td>
+<td class="py-3 px-4">
+<div class="flex flex-col">
+<span class="text-sm font-medium text-text-default truncate">TECH CORP LTDA</span>
+<span class="text-xs text-text-muted">12.345.678/0001-90</span>
+</div>
+</td>
+<td class="py-3 px-4 text-sm text-text-muted whitespace-nowrap">15/10/2026</td>
+<td class="py-3 px-4 text-sm font-medium text-text-default text-right whitespace-nowrap">50.000,00</td>
+<td class="py-3 px-4 text-sm text-text-muted text-right whitespace-nowrap">50.000,00</td>
+<td class="py-3 px-4 text-sm text-text-muted text-right whitespace-nowrap">50.000,00</td>
+<td class="py-3 px-4 text-sm font-medium text-text-default text-right whitespace-nowrap">0,00</td>
+<td class="py-3 px-4 text-center">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      Pago
+                    </span>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-slate-800/50 transition-colors group cursor-pointer">
+<td class="py-3 px-4 text-sm font-medium text-text-default whitespace-nowrap">2026NE000124</td>
+<td class="py-3 px-4">
+<div class="flex flex-col">
+<span class="text-sm font-medium text-text-default truncate">SERVICOS GERAIS SA</span>
+<span class="text-xs text-text-muted">98.765.432/0001-10</span>
+</div>
+</td>
+<td class="py-3 px-4 text-sm text-text-muted whitespace-nowrap">16/10/2026</td>
+<td class="py-3 px-4 text-sm font-medium text-text-default text-right whitespace-nowrap">25.000,00</td>
+<td class="py-3 px-4 text-sm text-text-muted text-right whitespace-nowrap">25.000,00</td>
+<td class="py-3 px-4 text-sm text-text-muted text-right whitespace-nowrap">0,00</td>
+<td class="py-3 px-4 text-sm font-medium text-text-default text-right whitespace-nowrap">25.000,00</td>
+<td class="py-3 px-4 text-center">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                      Liquidado
+                    </span>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-slate-800/50 transition-colors group cursor-pointer">
+<td class="py-3 px-4 text-sm font-medium text-text-default whitespace-nowrap">2026NE000125</td>
+<td class="py-3 px-4">
+<div class="flex flex-col">
+<span class="text-sm font-medium text-text-default truncate">IT SOLUTIONS INC</span>
+<span class="text-xs text-text-muted">45.678.901/0001-23</span>
+</div>
+</td>
+<td class="py-3 px-4 text-sm text-text-muted whitespace-nowrap">17/10/2026</td>
+<td class="py-3 px-4 text-sm font-medium text-text-default text-right whitespace-nowrap">100.000,00</td>
+<td class="py-3 px-4 text-sm text-text-muted text-right whitespace-nowrap">0,00</td>
+<td class="py-3 px-4 text-sm text-text-muted text-right whitespace-nowrap">0,00</td>
+<td class="py-3 px-4 text-sm font-medium text-text-default text-right whitespace-nowrap">100.000,00</td>
+<td class="py-3 px-4 text-center">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                      A Liquidar
+                    </span>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-slate-800/50 transition-colors group cursor-pointer">
+<td class="py-3 px-4 text-sm font-medium text-text-default whitespace-nowrap">2026NE000126</td>
+<td class="py-3 px-4">
+<div class="flex flex-col">
+<span class="text-sm font-medium text-text-default truncate">CONSTRUTORA ALFA</span>
+<span class="text-xs text-text-muted">11.222.333/0001-44</span>
+</div>
+</td>
+<td class="py-3 px-4 text-sm text-text-muted whitespace-nowrap">18/10/2026</td>
+<td class="py-3 px-4 text-sm font-medium text-text-default text-right whitespace-nowrap">75.500,00</td>
+<td class="py-3 px-4 text-sm text-text-muted text-right whitespace-nowrap">75.500,00</td>
+<td class="py-3 px-4 text-sm text-text-muted text-right whitespace-nowrap">30.000,00</td>
+<td class="py-3 px-4 text-sm font-medium text-text-default text-right whitespace-nowrap">45.500,00</td>
+<td class="py-3 px-4 text-center">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                      Liquidado
+                    </span>
+</td>
+</tr>
+<!-- Row 5 -->
+<tr class="hover:bg-slate-800/50 transition-colors group cursor-pointer">
+<td class="py-3 px-4 text-sm font-medium text-text-default whitespace-nowrap">2026NE000127</td>
+<td class="py-3 px-4">
+<div class="flex flex-col">
+<span class="text-sm font-medium text-text-default truncate">COMERCIAL BETA EIRELI</span>
+<span class="text-xs text-text-muted">55.666.777/0001-88</span>
+</div>
+</td>
+<td class="py-3 px-4 text-sm text-text-muted whitespace-nowrap">19/10/2026</td>
+<td class="py-3 px-4 text-sm font-medium text-text-default text-right whitespace-nowrap">12.800,00</td>
+<td class="py-3 px-4 text-sm text-text-muted text-right whitespace-nowrap">12.800,00</td>
+<td class="py-3 px-4 text-sm text-text-muted text-right whitespace-nowrap">12.800,00</td>
+<td class="py-3 px-4 text-sm font-medium text-text-default text-right whitespace-nowrap">0,00</td>
+<td class="py-3 px-4 text-center">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      Pago
+                    </span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="flex items-center justify-between px-4 py-3 border-t border-border-dark bg-surface-dark/90">
+<div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+<div>
+<p class="text-sm text-text-muted">
+                  Mostrando <span class="font-medium text-text-default">1</span> a <span class="font-medium text-text-default">5</span> de <span class="font-medium text-text-default">97</span> resultados
+                </p>
+</div>
+<div>
+<nav aria-label="Pagination" class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+<a class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-border-dark bg-slate-800 text-sm font-medium text-text-muted hover:bg-slate-700 hover:text-text-default transition-colors" href="#">
+<span class="sr-only">Anterior</span>
+<span class="material-symbols-outlined text-[18px]">chevron_left</span>
+</a>
+<a aria-current="page" class="z-10 bg-primary/20 border-primary text-primary relative inline-flex items-center px-4 py-2 border text-sm font-medium" href="#">
+                    1
+                  </a>
+<a class="bg-slate-800 border-border-dark text-text-muted hover:bg-slate-700 hover:text-text-default relative inline-flex items-center px-4 py-2 border text-sm font-medium transition-colors" href="#">
+                    2
+                  </a>
+<a class="bg-slate-800 border-border-dark text-text-muted hover:bg-slate-700 hover:text-text-default hidden md:inline-flex relative items-center px-4 py-2 border text-sm font-medium transition-colors" href="#">
+                    3
+                  </a>
+<span class="relative inline-flex items-center px-4 py-2 border border-border-dark bg-slate-800 text-sm font-medium text-text-muted">
+                    ...
+                  </span>
+<a class="bg-slate-800 border-border-dark text-text-muted hover:bg-slate-700 hover:text-text-default relative inline-flex items-center px-4 py-2 border text-sm font-medium transition-colors" href="#">
+                    12
+                  </a>
+<a class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-border-dark bg-slate-800 text-sm font-medium text-text-muted hover:bg-slate-700 hover:text-text-default transition-colors" href="#">
+<span class="sr-only">Próximo</span>
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</a>
+</nav>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>
