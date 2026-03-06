@@ -31,6 +31,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { HeaderSubtitle, HeaderActions } from '@/components/HeaderParts';
 import { toast } from 'sonner';
@@ -45,7 +46,7 @@ const initialFormState = {
 };
 
 export default function Descentralizacoes() {
-    const { descentralizacoes, addDescentralizacao, updateDescentralizacao, deleteDescentralizacao } = useData();
+    const { descentralizacoes, isLoading, addDescentralizacao, updateDescentralizacao, deleteDescentralizacao } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [filterDimensao, setFilterDimensao] = useState('all');
     const [filterOrigem, setFilterOrigem] = useState('all');
@@ -62,7 +63,7 @@ export default function Descentralizacoes() {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
     // Extrair opções únicas para os filtros
-    const origensUnicas = Array.from(new Set(descentralizacoes.map(d => d.origemRecurso).filter(Boolean))).sort();
+    const origensUnicas = Array.from(new Set(descentralizacoes.map(d => d.origemRecurso?.trim()).filter(Boolean))).sort();
 
     const filteredDescentralizacoes = descentralizacoes.filter((d) => {
         const matchesSearch =
@@ -71,7 +72,7 @@ export default function Descentralizacoes() {
             (d.planoInterno || '').toLowerCase().includes(searchTerm.toLowerCase());
 
         const matchesDimensao = filterDimensao === 'all' || d.dimensao.includes(filterDimensao);
-        const matchesOrigem = filterOrigem === 'all' || d.origemRecurso === filterOrigem;
+        const matchesOrigem = filterOrigem === 'all' || d.origemRecurso?.trim() === filterOrigem;
 
         return matchesSearch && matchesDimensao && matchesOrigem;
     });
@@ -296,7 +297,7 @@ export default function Descentralizacoes() {
                 <CardHeader>
                     <CardTitle className="text-lg flex items-center justify-between">
                         <span>
-                            {sortedDescentralizacoes.length} descentralização{sortedDescentralizacoes.length !== 1 ? 'ões' : ''} encontrada{sortedDescentralizacoes.length !== 1 ? 's' : ''}
+                            {sortedDescentralizacoes.length} {sortedDescentralizacoes.length !== 1 ? 'descentralizações' : 'descentralização'} encontrada{sortedDescentralizacoes.length !== 1 ? 's' : ''}
                         </span>
                         <Badge variant="secondary" className="text-base px-3 py-1">
                             Total: {formatCurrency(totalFiltrado)}
@@ -341,48 +342,65 @@ export default function Descentralizacoes() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {sortedDescentralizacoes.map((descentralizacao) => (
-                                    <tr key={descentralizacao.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
-                                        <td className="py-4 px-4">
-                                            <Checkbox
-                                                checked={selectedIds.has(descentralizacao.id)}
-                                                onCheckedChange={(checked) => handleSelectOne(descentralizacao.id, checked as boolean)}
-                                            />
-                                        </td>
-                                        <td className="py-4 px-4">
-                                            <Badge variant="secondary" className="whitespace-nowrap">
-                                                {descentralizacao.dimensao.split(' - ')[0]}
-                                            </Badge>
-                                        </td>
-                                        <td className="py-4 px-4">
-                                            <span className="text-sm font-medium">{descentralizacao.origemRecurso}</span>
-                                        </td>
-                                        <td className="py-4 px-4">
-                                            <span className="text-sm text-muted-foreground">{descentralizacao.planoInterno || '-'}</span>
-                                        </td>
-                                        <td className="py-4 px-4 text-right">
-                                            <span className="font-medium">{formatCurrency(descentralizacao.valor)}</span>
-                                        </td>
-                                        <td className="py-4 px-4">
-                                            <div className="flex items-center justify-center gap-2">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() => handleOpenDialog(descentralizacao)}
-                                                >
-                                                    <Pencil className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() => openDeleteDialog(descentralizacao)}
-                                                >
-                                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                                </Button>
-                                            </div>
-                                        </td>
+                                {isLoading ? (
+                                    Array.from({ length: 5 }).map((_, i) => (
+                                        <tr key={i} className="border-b border-border/50">
+                                            <td className="py-4 px-4"><Skeleton className="h-4 w-4 rounded" /></td>
+                                            <td className="py-4 px-4"><Skeleton className="h-5 w-16" /></td>
+                                            <td className="py-4 px-4"><Skeleton className="h-4 w-24" /></td>
+                                            <td className="py-4 px-4"><Skeleton className="h-4 w-32" /></td>
+                                            <td className="py-4 px-4"><Skeleton className="h-4 w-24 ml-auto" /></td>
+                                            <td className="py-4 px-4"><Skeleton className="h-8 w-16 mx-auto" /></td>
+                                        </tr>
+                                    ))
+                                ) : sortedDescentralizacoes.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={6} className="text-center py-6 text-muted-foreground italic">Nenhuma descentralização encontrada.</td>
                                     </tr>
-                                ))}
+                                ) : (
+                                    sortedDescentralizacoes.map((descentralizacao) => (
+                                        <tr key={descentralizacao.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
+                                            <td className="py-4 px-4">
+                                                <Checkbox
+                                                    checked={selectedIds.has(descentralizacao.id)}
+                                                    onCheckedChange={(checked) => handleSelectOne(descentralizacao.id, checked as boolean)}
+                                                />
+                                            </td>
+                                            <td className="py-4 px-4">
+                                                <Badge variant="secondary" className="whitespace-nowrap">
+                                                    {descentralizacao.dimensao.split(' - ')[0]}
+                                                </Badge>
+                                            </td>
+                                            <td className="py-4 px-4">
+                                                <span className="text-sm font-medium">{descentralizacao.origemRecurso}</span>
+                                            </td>
+                                            <td className="py-4 px-4">
+                                                <span className="text-sm text-muted-foreground">{descentralizacao.planoInterno || '-'}</span>
+                                            </td>
+                                            <td className="py-4 px-4 text-right">
+                                                <span className="font-medium">{formatCurrency(descentralizacao.valor)}</span>
+                                            </td>
+                                            <td className="py-4 px-4">
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => handleOpenDialog(descentralizacao)}
+                                                    >
+                                                        <Pencil className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => openDeleteDialog(descentralizacao)}
+                                                    >
+                                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                                    </Button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                     </div>

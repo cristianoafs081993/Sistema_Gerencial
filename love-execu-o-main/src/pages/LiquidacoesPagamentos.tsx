@@ -24,6 +24,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { RefreshCw, Search, Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUpDown, Filter as FilterIcon, X, Eye } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
@@ -260,14 +261,17 @@ export default function LiquidacoesPagamentos() {
                             </TableHeader>
                             <TableBody>
                                 {isLoading ? (
-                                    <TableRow>
-                                        <TableCell colSpan={7} className="text-center py-10">
-                                            <div className="flex flex-col items-center gap-2">
-                                                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                                                <span className="text-sm text-muted-foreground">Carregando dados...</span>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
+                                    Array.from({ length: 5 }).map((_, i) => (
+                                        <TableRow key={i}>
+                                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                                            <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-full max-w-[200px]" /></TableCell>
+                                            <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                                            <TableCell><Skeleton className="h-8 w-8 mx-auto" /></TableCell>
+                                        </TableRow>
+                                    ))
                                 ) : documentos.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">

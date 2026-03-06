@@ -24,6 +24,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
@@ -85,7 +86,7 @@ const initialFormState: {
 };
 
 export default function Empenhos() {
-  const { empenhos, atividades, addEmpenho, updateEmpenho, deleteEmpenho, refreshData } = useData();
+  const { empenhos, atividades, isLoading, addEmpenho, updateEmpenho, deleteEmpenho, refreshData } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterDimensao, setFilterDimensao] = useState('all');
@@ -97,6 +98,7 @@ export default function Empenhos() {
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [activeTab, setActiveTab] = useState('execucao');
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
@@ -107,9 +109,9 @@ export default function Empenhos() {
   const [formData, setFormData] = useState(initialFormState);
 
   // Extrair opções únicas para filtros
-  const componentesUnicos = Array.from(new Set(empenhos.map(e => e.componenteFuncional).filter(Boolean))).sort();
-  const origensUnicas = Array.from(new Set(empenhos.map(e => e.origemRecurso).filter(Boolean))).sort();
-  const planosUnicos = Array.from(new Set(empenhos.map(e => e.planoInterno).filter(Boolean))).sort();
+  const componentesUnicos = Array.from(new Set(empenhos.map(e => e.componenteFuncional?.trim()).filter(Boolean))).sort();
+  const origensUnicas = Array.from(new Set(empenhos.map(e => e.origemRecurso?.trim()).filter(Boolean))).sort();
+  const planosUnicos = Array.from(new Set(empenhos.map(e => e.planoInterno?.trim()).filter(Boolean))).sort();
 
   const filteredEmpenhos = empenhos.filter((e) => {
     const matchesSearch =
@@ -119,9 +121,9 @@ export default function Empenhos() {
 
     const matchesStatus = filterStatus === 'all' || e.status === filterStatus;
     const matchesDimensao = filterDimensao === 'all' || e.dimensao.includes(filterDimensao);
-    const matchesComponente = filterComponente === 'all' || e.componenteFuncional === filterComponente;
-    const matchesOrigem = filterOrigem === 'all' || e.origemRecurso === filterOrigem;
-    const matchesPlano = filterPlanoInterno === 'all' || e.planoInterno === filterPlanoInterno;
+    const matchesComponente = filterComponente === 'all' || e.componenteFuncional?.trim() === filterComponente;
+    const matchesOrigem = filterOrigem === 'all' || e.origemRecurso?.trim() === filterOrigem;
+    const matchesPlano = filterPlanoInterno === 'all' || e.planoInterno?.trim() === filterPlanoInterno;
 
     // Filtro de Data
     let matchesData = true;
@@ -387,7 +389,7 @@ export default function Empenhos() {
                 <SelectContent>
                   <SelectItem value="all">Todos status</SelectItem>
                   <SelectItem value="pendente">Pendente</SelectItem>
-                  <SelectItem value="liquidado">Liquidado</SelectItem>
+                  {activeTab !== 'restos' && <SelectItem value="liquidado">Liquidado</SelectItem>}
                   <SelectItem value="pago">Pago</SelectItem>
                   <SelectItem value="cancelado">Cancelado</SelectItem>
                 </SelectContent>
@@ -494,7 +496,7 @@ export default function Empenhos() {
 
 
 
-      <Tabs defaultValue="execucao" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
           <TabsTrigger value="execucao">Execução {new Date().getFullYear()}</TabsTrigger>
           <TabsTrigger value="restos">Restos a Pagar</TabsTrigger>
@@ -505,6 +507,7 @@ export default function Empenhos() {
             empenhos={filteredEmpenhos.filter(e => e.tipo === 'exercicio' || (!e.tipo && e.numero.includes(String(new Date().getFullYear()))))}
             type="execucao"
             handleOpenDialog={handleOpenDialog}
+            isLoading={isLoading}
           />
         </TabsContent>
 
@@ -513,6 +516,7 @@ export default function Empenhos() {
             empenhos={filteredEmpenhos.filter(e => e.tipo === 'rap' || (!e.tipo && !e.numero.includes(String(new Date().getFullYear()))))}
             type="restos"
             handleOpenDialog={handleOpenDialog}
+            isLoading={isLoading}
           />
         </TabsContent>
       </Tabs>
@@ -717,10 +721,11 @@ export default function Empenhos() {
 }
 
 // Extracted Component for Table Reuse inside Tabs
-function EmpenhosTable({ empenhos, type, handleOpenDialog }: {
+function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
   empenhos: Empenho[],
   type: 'execucao' | 'restos',
-  handleOpenDialog: (e: Empenho) => void
+  handleOpenDialog: (e: Empenho) => void,
+  isLoading?: boolean
 }) {
   const [sortKey, setSortKey] = useState<string>('numero');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -825,120 +830,137 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog }: {
               </tr>
             </thead>
             <tbody>
-              {paginatedEmpenhos.map((empenho) => (
-                <tr key={empenho.id} className="border-b border-border/50 hover:bg-muted/50 even:bg-muted/20 transition-colors">
-                  <td className="py-2 px-2 align-top">
-                    <div className="flex flex-col gap-1">
-                      <span className="font-mono text-sm font-medium whitespace-nowrap">{empenho.numero}</span>
-                      {empenho.processo && (
-                        <span className="text-xs text-muted-foreground whitespace-nowrap" title="Processo">
-                          Proc: {empenho.processo}
-                        </span>
-                      )}
-                      {empenho.historicoOperacoes && empenho.historicoOperacoes.length > 1 && (
-                        <span className="text-[10px] text-blue-500 flex items-center gap-0.5" title="Empenho com histórico de alterações">
-                          <History className="h-3 w-3" />
-                          {empenho.historicoOperacoes.length} ops
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-2 px-2 align-top">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium truncate max-w-[150px]" title={empenho.favorecidoNome}>{empenho.favorecidoNome || '-'}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {formatarDocumento(empenho.favorecidoDocumento || '')}
-                      </span>
-                    </div>
-                  </td>
-                  {type === 'execucao' ? (
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="border-b border-border/50">
+                    <td className="py-2 px-2"><Skeleton className="h-8 w-24" /></td>
+                    <td className="py-2 px-2"><Skeleton className="h-8 w-32" /></td>
+                    <td className="py-2 px-2"><Skeleton className="h-8 w-24" /></td>
+                    <td className="py-2 px-2"><Skeleton className="h-8 w-24 ml-auto" /></td>
+                    <td className="py-2 px-2"><Skeleton className="h-8 w-16 ml-auto" /></td>
+                    <td className="py-2 px-2"><Skeleton className="h-8 w-16 mx-auto" /></td>
+                  </tr>
+                ))
+              ) : paginatedEmpenhos.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-6 text-muted-foreground italic">Nenhum empenho encontrado.</td>
+                </tr>
+              ) : (
+                paginatedEmpenhos.map((empenho) => (
+                  <tr key={empenho.id} className="border-b border-border/50 hover:bg-muted/50 even:bg-muted/20 transition-colors">
                     <td className="py-2 px-2 align-top">
                       <div className="flex flex-col gap-1">
-                        <p className="text-sm font-medium whitespace-nowrap">{empenho.origemRecurso || '-'}</p>
-                        {empenho.planoInterno && (
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">{empenho.planoInterno}</span>
+                        <span className="font-mono text-sm font-medium whitespace-nowrap">{empenho.numero}</span>
+                        {empenho.processo && (
+                          <span className="text-xs text-muted-foreground whitespace-nowrap" title="Processo">
+                            Proc: {empenho.processo}
+                          </span>
+                        )}
+                        {empenho.historicoOperacoes && empenho.historicoOperacoes.length > 1 && (
+                          <span className="text-[10px] text-blue-500 flex items-center gap-0.5" title="Empenho com histórico de alterações">
+                            <History className="h-3 w-3" />
+                            {empenho.historicoOperacoes.length} ops
+                          </span>
                         )}
                       </div>
                     </td>
-                  ) : (
                     <td className="py-2 px-2 align-top">
-                      <span className="text-sm line-clamp-2" title={empenho.descricao}>{empenho.descricao || '-'}</span>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium truncate max-w-[150px]" title={empenho.favorecidoNome}>{empenho.favorecidoNome || '-'}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatarDocumento(empenho.favorecidoDocumento || '')}
+                        </span>
+                      </div>
                     </td>
-                  )}
-                  <td className="py-2 px-2 text-right align-top whitespace-nowrap">
-                    <div className="flex flex-col gap-1 items-end">
-                      {type === 'restos' && empenho.rapInscrito != null ? (
-                        <>
-                          <span className="font-medium" title="Inscrito (original)">
-                            {formatCurrency(empenho.rapInscrito || 0)}
-                          </span>
-                          <span className={`text-xs ${(empenho.rapALiquidar || 0) > 0 ? 'text-orange-500' : 'text-muted-foreground'}`} title="A Liquidar">
-                            A Liq: {formatCurrency(empenho.rapALiquidar || 0)}
-                          </span>
-                          <span className={`text-xs ${(empenho.rapLiquidado || 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`} title="Liquidado">
-                            Liq: {formatCurrency(empenho.rapLiquidado || 0)}
-                          </span>
-                          <span className={`text-xs ${(empenho.rapPago || 0) > 0 ? 'text-green-600' : 'text-muted-foreground'}`} title="Pago">
-                            Pg: {formatCurrency(empenho.rapPago || 0)}
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="font-medium" title={type === 'execucao' ? 'Empenhado' : 'Inscrito'}>
-                            {formatCurrency(empenho.valor)}
-                          </span>
-                          {type === 'execucao' ? (
-                            <>
-                              <span className={`text-xs ${(empenho.valorLiquidado || 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`} title="Liquidado">
-                                Liq: {formatCurrency(empenho.valorLiquidado || 0)}
-                              </span>
-                              {(empenho.valorPago || 0) > 0 && (
-                                <span className="text-[10px] text-green-600" title="Pago">
-                                  Pg: {formatCurrency(empenho.valorPago || 0)}
-                                </span>
-                              )}
-                            </>
-                          ) : (
-                            <span className={`text-xs ${(empenho.valorPago || 0) > 0 ? 'text-green-600' : 'text-muted-foreground'}`} title="Pago">
-                              Pg: {formatCurrency(empenho.valorPago || 0)}
-                            </span>
+                    {type === 'execucao' ? (
+                      <td className="py-2 px-2 align-top">
+                        <div className="flex flex-col gap-1">
+                          <p className="text-sm font-medium whitespace-nowrap">{empenho.origemRecurso || '-'}</p>
+                          {empenho.planoInterno && (
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">{empenho.planoInterno}</span>
                           )}
-                        </>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-2 px-2 text-right align-top whitespace-nowrap">
-                    {(() => {
-                      if (type === 'restos') {
-                        const aLiquidar = empenho.rapALiquidar || 0;
+                        </div>
+                      </td>
+                    ) : (
+                      <td className="py-2 px-2 align-top">
+                        <span className="text-sm line-clamp-2" title={empenho.descricao}>{empenho.descricao || '-'}</span>
+                      </td>
+                    )}
+                    <td className="py-2 px-2 text-right align-top whitespace-nowrap">
+                      <div className="flex flex-col gap-1 items-end">
+                        {type === 'restos' && empenho.rapInscrito != null ? (
+                          <>
+                            <span className="font-medium" title="Inscrito (original)">
+                              {formatCurrency(empenho.rapInscrito || 0)}
+                            </span>
+                            <span className={`text-xs ${(empenho.rapALiquidar || 0) > 0 ? 'text-orange-500' : 'text-muted-foreground'}`} title="A Liquidar">
+                              A Liq: {formatCurrency(empenho.rapALiquidar || 0)}
+                            </span>
+                            <span className={`text-xs ${(empenho.rapLiquidado || 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`} title="Liquidado">
+                              Liq: {formatCurrency(empenho.rapLiquidado || 0)}
+                            </span>
+                            <span className={`text-xs ${(empenho.rapPago || 0) > 0 ? 'text-green-600' : 'text-muted-foreground'}`} title="Pago">
+                              Pg: {formatCurrency(empenho.rapPago || 0)}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="font-medium" title={type === 'execucao' ? 'Empenhado' : 'Inscrito'}>
+                              {formatCurrency(empenho.valor)}
+                            </span>
+                            {type === 'execucao' ? (
+                              <>
+                                <span className={`text-xs ${(empenho.valorLiquidado || 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`} title="Liquidado">
+                                  Liq: {formatCurrency(empenho.valorLiquidado || 0)}
+                                </span>
+                                {(empenho.valorPago || 0) > 0 && (
+                                  <span className="text-[10px] text-green-600" title="Pago">
+                                    Pg: {formatCurrency(empenho.valorPago || 0)}
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <span className={`text-xs ${(empenho.valorPago || 0) > 0 ? 'text-green-600' : 'text-muted-foreground'}`} title="Pago">
+                                Pg: {formatCurrency(empenho.valorPago || 0)}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-2 px-2 text-right align-top whitespace-nowrap">
+                      {(() => {
+                        if (type === 'restos') {
+                          const aLiquidar = empenho.rapALiquidar || 0;
+                          return (
+                            <span className={`font-medium ${aLiquidar > 0 ? 'text-orange-500' : 'text-muted-foreground'}`}>
+                              {formatCurrency(aLiquidar)}
+                            </span>
+                          );
+                        }
+                        const saldo = empenho.valor - (empenho.valorLiquidado || 0);
                         return (
-                          <span className={`font-medium ${aLiquidar > 0 ? 'text-orange-500' : 'text-muted-foreground'}`}>
-                            {formatCurrency(aLiquidar)}
+                          <span className={`font-medium ${saldo > 0 ? 'text-green-600' : saldo < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                            {formatCurrency(saldo)}
                           </span>
                         );
-                      }
-                      const saldo = empenho.valor - (empenho.valorLiquidado || 0);
-                      return (
-                        <span className={`font-medium ${saldo > 0 ? 'text-green-600' : saldo < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
-                          {formatCurrency(saldo)}
-                        </span>
-                      );
-                    })()}
-                  </td>
+                      })()}
+                    </td>
 
-                  <td className="py-2 px-2 align-top whitespace-nowrap">
-                    <div className="flex items-center justify-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleOpenDialog(empenho)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    <td className="py-2 px-2 align-top whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenDialog(empenho)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

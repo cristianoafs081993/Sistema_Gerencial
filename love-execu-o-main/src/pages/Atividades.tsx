@@ -34,6 +34,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { HeaderSubtitle, HeaderActions } from '@/components/HeaderParts';
 import { toast } from 'sonner';
@@ -57,7 +58,7 @@ const initialFormState = {
 };
 
 export default function Atividades() {
-  const { atividades, addAtividade, updateAtividade, deleteAtividade } = useData();
+  const { atividades, isLoading, addAtividade, updateAtividade, deleteAtividade } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDimensao, setFilterDimensao] = useState('all');
 
@@ -103,8 +104,8 @@ export default function Atividades() {
   });
 
   // Extrair opções únicas para os filtros
-  const componentesUnicos = Array.from(new Set(atividades.map(a => a.componenteFuncional).filter(Boolean))).sort();
-  const origensUnicas = Array.from(new Set(atividades.map(a => a.origemRecurso).filter(Boolean))).sort();
+  const componentesUnicos = Array.from(new Set(atividades.map(a => a.componenteFuncional?.trim()).filter(Boolean))).sort();
+  const origensUnicas = Array.from(new Set(atividades.map(a => a.origemRecurso?.trim()).filter(Boolean))).sort();
 
   const filteredAtividades = atividades.filter((a) => {
     const matchesSearch =
@@ -114,8 +115,8 @@ export default function Atividades() {
       (a.componenteFuncional || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesDimensao = filterDimensao === 'all' || (a.dimensao || '').includes(filterDimensao);
-    const matchesComponente = filterComponente === 'all' || a.componenteFuncional === filterComponente;
-    const matchesOrigem = filterOrigem === 'all' || a.origemRecurso === filterOrigem;
+    const matchesComponente = filterComponente === 'all' || a.componenteFuncional?.trim() === filterComponente;
+    const matchesOrigem = filterOrigem === 'all' || a.origemRecurso?.trim() === filterOrigem;
 
     return matchesSearch && matchesDimensao && matchesComponente && matchesOrigem;
   });
@@ -510,51 +511,69 @@ export default function Atividades() {
                 </tr>
               </thead>
               <tbody>
-                {sortedAtividades.map((atividade) => (
-                  <tr key={atividade.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
-                    <td className="py-4 px-4">
-                      <Checkbox
-                        checked={selectedIds.has(atividade.id)}
-                        onCheckedChange={(checked) => handleSelectOne(atividade.id, checked as boolean)}
-                      />
-                    </td>
-                    <td className="py-4 px-4">
-                      <p className="font-medium text-sm">{atividade.atividade}</p>
-                    </td>
-                    <td className="py-4 px-4">
-                      <Badge variant="secondary" className="whitespace-nowrap">
-                        {(atividade.dimensao || 'N/D').split(' - ')[0]}
-                      </Badge>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="text-sm">{atividade.componenteFuncional}</span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="text-sm text-muted-foreground">{atividade.origemRecurso}</span>
-                    </td>
-                    <td className="py-4 px-4 text-right">
-                      <span className="font-medium">{formatCurrency(atividade.valorTotal)}</span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center justify-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenDialog(atividade)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openDeleteDialog(atividade)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </td>
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i} className="border-b border-border/50">
+                      <td className="py-4 px-4"><Skeleton className="h-4 w-4 rounded" /></td>
+                      <td className="py-4 px-4"><Skeleton className="h-4 w-3/4" /></td>
+                      <td className="py-4 px-4"><Skeleton className="h-5 w-16" /></td>
+                      <td className="py-4 px-4"><Skeleton className="h-4 w-1/2" /></td>
+                      <td className="py-4 px-4"><Skeleton className="h-4 w-1/3" /></td>
+                      <td className="py-4 px-4"><Skeleton className="h-4 w-20 ml-auto" /></td>
+                      <td className="py-4 px-4"><Skeleton className="h-8 w-16 mx-auto" /></td>
+                    </tr>
+                  ))
+                ) : sortedAtividades.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-6 text-muted-foreground italic">Nenhuma atividade encontrada.</td>
                   </tr>
-                ))}
+                ) : (
+                  sortedAtividades.map((atividade) => (
+                    <tr key={atividade.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
+                      <td className="py-4 px-4">
+                        <Checkbox
+                          checked={selectedIds.has(atividade.id)}
+                          onCheckedChange={(checked) => handleSelectOne(atividade.id, checked as boolean)}
+                        />
+                      </td>
+                      <td className="py-4 px-4">
+                        <p className="font-medium text-sm">{atividade.atividade}</p>
+                      </td>
+                      <td className="py-4 px-4">
+                        <Badge variant="secondary" className="whitespace-nowrap">
+                          {(atividade.dimensao || 'N/D').split(' - ')[0]}
+                        </Badge>
+                      </td>
+                      <td className="py-4 px-4">
+                        <span className="text-sm">{atividade.componenteFuncional}</span>
+                      </td>
+                      <td className="py-4 px-4">
+                        <span className="text-sm text-muted-foreground">{atividade.origemRecurso}</span>
+                      </td>
+                      <td className="py-4 px-4 text-right">
+                        <span className="font-medium">{formatCurrency(atividade.valorTotal)}</span>
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="flex items-center justify-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenDialog(atividade)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openDeleteDialog(atividade)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

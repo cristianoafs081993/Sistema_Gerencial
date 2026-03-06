@@ -64,7 +64,7 @@ import { formatCurrency } from '@/lib/utils';
 
 
 export default function Dashboard() {
-  const { atividades, empenhos, descentralizacoes, getTotalDescentralizado, getADescentralizar } = useData();
+  const { atividades, empenhos, descentralizacoes, getTotalDescentralizado, getADescentralizar, isLoading } = useData();
 
   // --- Filtros ---
   const [filterDimensao, setFilterDimensao] = useState('all');
@@ -462,6 +462,7 @@ export default function Dashboard() {
               icon={Wallet}
               stitchColor="vibrant-blue"
               progress={100}
+              isLoading={isLoading}
             />
             <StatCard
               title="Descentralizado"
@@ -470,6 +471,7 @@ export default function Dashboard() {
               icon={Receipt}
               stitchColor="emerald-green"
               progress={totalPlanejado > 0 ? (totalDescentralizado / totalPlanejado) * 100 : 0}
+              isLoading={isLoading}
             />
             <StatCard
               title="Total Empenhado"
@@ -478,6 +480,7 @@ export default function Dashboard() {
               icon={TrendingUp}
               stitchColor="purple"
               progress={totalPlanejado > 0 ? (totalEmpenhado / totalPlanejado) * 100 : 0}
+              isLoading={isLoading}
             />
             <StatCard
               title="A descentralizar"
@@ -486,6 +489,7 @@ export default function Dashboard() {
               icon={PiggyBank}
               stitchColor="amber"
               progress={totalPlanejado > 0 ? (Math.max(0, aDescentralizar) / totalPlanejado) * 100 : 0}
+              isLoading={isLoading}
             />
           </div>
 
@@ -661,7 +665,7 @@ export default function Dashboard() {
             <Card className="">
               <CardHeader>
                 <CardTitle>Top Naturezas</CardTitle>
-                <CardDescription>Maiores gastos por categoria</CardDescription>
+                <CardDescription>Valor emepnhado por Naturezade Despesa</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-[350px]">
@@ -732,13 +736,15 @@ export default function Dashboard() {
               icon={Flag}
               stitchColor="vibrant-blue"
               progress={100}
+              isLoading={isLoading}
             />
             <StatCard
-              title="Em Liquidação"
+              title="A liquidar"
               value={formatCurrency(rapTotalALiquidar)}
               icon={Receipt}
               stitchColor="amber"
               progress={rapTotalInscrito > 0 ? (rapTotalALiquidar / rapTotalInscrito) * 100 : 0}
+              isLoading={isLoading}
             />
             <StatCard
               title="Liquidado"
@@ -746,6 +752,7 @@ export default function Dashboard() {
               icon={Lock}
               stitchColor="purple"
               progress={rapTotalInscrito > 0 ? (rapTotalLiquidado / rapTotalInscrito) * 100 : 0}
+              isLoading={isLoading}
             />
             <StatCard
               title="Pago"
@@ -753,6 +760,7 @@ export default function Dashboard() {
               icon={Wallet}
               stitchColor="emerald-green"
               progress={rapTotalLiquidado > 0 ? (rapTotalPago / rapTotalLiquidado) * 100 : 0}
+              isLoading={isLoading}
             />
           </div>
 

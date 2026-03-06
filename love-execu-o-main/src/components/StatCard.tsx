@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
 import { LucideIcon } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface StatCardProps {
   title: string;
@@ -13,6 +14,7 @@ interface StatCardProps {
   };
   stitchColor?: 'vibrant-blue' | 'purple' | 'amber' | 'emerald-green' | 'red-500';
   progress?: number;
+  isLoading?: boolean;
 }
 
 export function StatCard({
@@ -24,6 +26,7 @@ export function StatCard({
   trend,
   stitchColor,
   progress,
+  isLoading,
 }: StatCardProps) {
 
   if (stitchColor) {
@@ -61,11 +64,23 @@ export function StatCard({
             <Icon className="w-5 h-5" />
           </div>
         </div>
-        <h3 className="text-2xl font-bold text-slate-900">{value}</h3>
-        {subtitle && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>}
+        {isLoading ? (
+          <Skeleton className="h-8 w-1/2 mt-1 mb-1" />
+        ) : (
+          <h3 className="text-2xl font-bold text-slate-900">{value}</h3>
+        )}
+        {isLoading && subtitle ? (
+          <Skeleton className="h-4 w-3/4 mt-2" />
+        ) : (
+          subtitle && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>
+        )}
         {progress !== undefined && (
-          <div className="mt-3 w-full bg-slate-100 rounded-full h-1.5">
-            <div className={cn("h-1.5 rounded-full", bgColorMap[stitchColor])} style={{ width: `${progress}%` }}></div>
+          <div className="mt-3 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+            {isLoading ? (
+              <Skeleton className="h-full w-full" />
+            ) : (
+              <div className={cn("h-full rounded-full", bgColorMap[stitchColor])} style={{ width: `${progress}%` }}></div>
+            )}
           </div>
         )}
       </div>
@@ -102,19 +117,27 @@ export function StatCard({
         )}>
           {title}
         </p>
-        <p className={cn(
-          "text-3xl font-bold mt-2 tracking-tight",
-          variant === 'default' ? 'text-foreground' : 'text-white'
-        )}>
-          {value}
-        </p>
-        {subtitle && (
+        {isLoading ? (
+          <Skeleton className="h-9 w-1/2 mt-2 mb-1" />
+        ) : (
           <p className={cn(
-            "text-sm mt-1",
-            variant === 'default' ? 'text-muted-foreground' : 'text-white/70'
+            "text-3xl font-bold mt-2 tracking-tight",
+            variant === 'default' ? 'text-foreground' : 'text-white'
           )}>
-            {subtitle}
+            {value}
           </p>
+        )}
+        {isLoading && subtitle ? (
+          <Skeleton className="h-4 w-3/4 mt-2" />
+        ) : (
+          subtitle && (
+            <p className={cn(
+              "text-sm mt-1",
+              variant === 'default' ? 'text-muted-foreground' : 'text-white/70'
+            )}>
+              {subtitle}
+            </p>
+          )
         )}
         {trend && (
           <div className={cn(
