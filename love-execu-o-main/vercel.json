@@ -10,7 +10,7 @@
             "destination": "https://api.portaldatransparencia.gov.br/:path*"
         },
         {
-            "source": "/((?!assets/).*)",
+            "source": "/(.*)",
             "destination": "/index.html"
         }
     ]
