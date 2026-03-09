@@ -283,7 +283,10 @@ export default function Dashboard() {
 
     filteredData.atividades.forEach(a => {
       const dim = a.dimensao || 'Sem Dimensão';
-      const comp = a.componenteFuncional || 'Sem Componente';
+      const comp = a.componenteFuncional?.trim();
+
+      // Filter out empty components or "Sem Componente"
+      if (!comp || comp.toLowerCase() === 'sem componente') return;
 
       compSet.add(comp);
 
@@ -624,7 +627,6 @@ export default function Dashboard() {
                       <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                       <YAxis tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
                       <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                      <Legend />
                       {uniqueComponents.map((comp, index) => {
                         const colors = ['#3b82f6', '#10b981', '#a855f7', '#f59e0b', '#ec4899', '#6366f1', '#14b8a6', '#f43f5e', '#8b5cf6', '#06b6d4'];
                         return <Bar key={comp} dataKey={comp} stackId="a" fill={colors[index % colors.length]} radius={index === uniqueComponents.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
