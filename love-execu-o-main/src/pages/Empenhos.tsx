@@ -1,8 +1,9 @@
-import { useState, useMemo, useRef } from 'react';
-import { Plus, Pencil, Search, Filter, Calendar, Upload, FileSpreadsheet, Loader2, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Fragment, useState, useMemo, useRef } from 'react';
+import { Plus, Pencil, Search, Filter, Calendar, Upload, FileSpreadsheet, Loader2, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, Layers } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Empenho, DIMENSOES, COMPONENTES_POR_DIMENSAO } from '@/types';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { Input } from '@/components/ui/input';
@@ -23,7 +24,6 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -88,7 +88,7 @@ const initialFormState: {
 export default function Empenhos() {
   const { empenhos, atividades, isLoading, addEmpenho, updateEmpenho, deleteEmpenho, refreshData } = useData();
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('pendente');
   const [filterDimensao, setFilterDimensao] = useState('all');
 
   // Novos Filtros
@@ -112,14 +112,32 @@ export default function Empenhos() {
   const componentesUnicos = Array.from(new Set(empenhos.map(e => e.componenteFuncional?.trim()).filter(Boolean))).sort();
   const origensUnicas = Array.from(new Set(empenhos.map(e => e.origemRecurso?.trim()).filter(Boolean))).sort();
   const planosUnicos = Array.from(new Set(empenhos.map(e => e.planoInterno?.trim()).filter(Boolean))).sort();
+  const normalizeString = (str: string) =>
+    str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
   const filteredEmpenhos = empenhos.filter((e) => {
-    const matchesSearch =
-      e.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      e.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      e.componenteFuncional?.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchNormalized = normalizeString(searchTerm);
+    const searchDigits = searchTerm.replace(/\D/g, '');
 
-    const matchesStatus = filterStatus === 'all' || e.status === filterStatus;
+    const matchesSearch =
+      normalizeString(e.numero).includes(searchNormalized) ||
+      normalizeString(e.descricao).includes(searchNormalized) ||
+      normalizeString(e.componenteFuncional || '').includes(searchNormalized) ||
+      normalizeString(e.favorecidoNome || '').includes(searchNormalized) ||
+      (searchDigits !== '' && (e.favorecidoDocumento || '').replace(/\D/g, '').includes(searchDigits));
+
+    const matchesStatus = filterStatus === 'all' || (() => {
+      // Regra específica para Restos a Pagar
+      if (e.tipo === 'rap') {
+        const isCompletamentePago = (e.rapALiquidar || 0) <= 0 && (e.saldoRapOficial || 0) <= 0 && (e.rapPago || 0) > 0;
+
+        if (filterStatus === 'pago') return isCompletamentePago;
+        if (filterStatus === 'liquidado') return (e.rapLiquidado || 0) > 0 && !isCompletamentePago;
+        if (filterStatus === 'pendente') return !isCompletamentePago;
+      }
+
+      return e.status === filterStatus;
+    })();
     const matchesDimensao = filterDimensao === 'all' || e.dimensao.includes(filterDimensao);
     const matchesComponente = filterComponente === 'all' || e.componenteFuncional?.trim() === filterComponente;
     const matchesOrigem = filterOrigem === 'all' || e.origemRecurso?.trim() === filterOrigem;
@@ -336,7 +354,7 @@ export default function Empenhos() {
                   ) : (
                     <>
                       <FileSpreadsheet className="h-4 w-4 text-green-600" />
-                      Importar SIAFI
+                      Importar CSV
                     </>
                   )}
                 </Button>
@@ -720,6 +738,133 @@ export default function Empenhos() {
   );
 }
 
+function EmpenhoRow({
+  empenho,
+  type,
+  handleOpenDialog,
+  isChild = false
+}: {
+  empenho: Empenho;
+  type: 'execucao' | 'restos';
+  handleOpenDialog: (e: Empenho) => void;
+  isChild?: boolean;
+}) {
+  return (
+    <tr className={`border-b border-border/50 hover:bg-muted/50 transition-colors ${isChild ? 'bg-white' : 'even:bg-muted/20'}`}>
+      <td className={`py-2 px-2 align-top ${isChild ? 'pl-8' : ''}`}>
+        <div className="flex flex-col gap-1">
+          <span className="font-mono text-sm font-medium whitespace-nowrap">{empenho.numero}</span>
+          {empenho.processo && (
+            <span className="text-xs text-muted-foreground whitespace-nowrap" title="Processo">
+              Proc: {empenho.processo}
+            </span>
+          )}
+          {empenho.historicoOperacoes && empenho.historicoOperacoes.length > 1 && (
+            <span className="text-[10px] text-blue-500 flex items-center gap-0.5" title="Empenho com histórico de alterações">
+              <History className="h-3 w-3" />
+              {empenho.historicoOperacoes.length} ops
+            </span>
+          )}
+        </div>
+      </td>
+      <td className="py-2 px-2 align-top">
+        <div className="flex flex-col">
+          <span className="text-sm font-medium truncate max-w-[150px]" title={empenho.favorecidoNome}>{empenho.favorecidoNome || '-'}</span>
+          <span className="text-xs text-muted-foreground">
+            {formatarDocumento(empenho.favorecidoDocumento || '')}
+          </span>
+        </div>
+      </td>
+      {type === 'execucao' ? (
+        <td className="py-2 px-2 align-top">
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium whitespace-nowrap">{empenho.origemRecurso || '-'}</p>
+            {empenho.planoInterno && (
+              <span className="text-xs text-muted-foreground whitespace-nowrap">{empenho.planoInterno}</span>
+            )}
+          </div>
+        </td>
+      ) : (
+        <td className="py-2 px-2 align-top">
+          <span className="text-sm line-clamp-2" title={empenho.descricao}>{empenho.descricao || '-'}</span>
+        </td>
+      )}
+      <td className="py-2 px-2 text-right align-top whitespace-nowrap">
+        <div className="flex flex-col gap-1 items-end">
+          {type === 'restos' && empenho.rapInscrito != null ? (
+            <>
+              <span className="font-medium" title="Inscrito (original)">
+                {formatCurrency(empenho.rapInscrito || 0)}
+              </span>
+              <span className={`text-xs ${(empenho.rapALiquidar || 0) > 0 ? 'text-orange-500' : 'text-muted-foreground'}`} title="A Liquidar">
+                A Liq: {formatCurrency(empenho.rapALiquidar || 0)}
+              </span>
+              <span className={`text-xs ${(empenho.rapLiquidado || 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`} title="Liquidado">
+                Liq: {formatCurrency(empenho.rapLiquidado || 0)}
+              </span>
+              <span className={`text-xs ${(empenho.rapPago || 0) > 0 ? 'text-green-600' : 'text-muted-foreground'}`} title="Pago">
+                Pg: {formatCurrency(empenho.rapPago || 0)}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="font-medium" title={type === 'execucao' ? 'Empenhado' : 'Inscrito'}>
+                {formatCurrency(empenho.valor)}
+              </span>
+              {type === 'execucao' ? (
+                <>
+                  <span className={`text-xs ${(empenho.valorLiquidado || 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`} title="Liquidado">
+                    Liq: {formatCurrency(empenho.valorLiquidado || 0)}
+                  </span>
+                  {(empenho.valorPago || 0) > 0 && (
+                    <span className="text-[10px] text-green-600" title="Pago">
+                      Pg: {formatCurrency(empenho.valorPago || 0)}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className={`text-xs ${(empenho.valorPago || 0) > 0 ? 'text-green-600' : 'text-muted-foreground'}`} title="Pago">
+                  Pg: {formatCurrency(empenho.valorPago || 0)}
+                </span>
+              )}
+            </>
+          )}
+        </div>
+      </td>
+      <td className="py-2 px-2 text-right align-top whitespace-nowrap">
+        {(() => {
+          if (type === 'restos') {
+            const aLiquidar = empenho.rapALiquidar || 0;
+            return (
+              <span className={`font-medium ${aLiquidar > 0 ? 'text-orange-500' : 'text-muted-foreground'}`}>
+                {formatCurrency(aLiquidar)}
+              </span>
+            );
+          }
+          const saldo = empenho.valor - (empenho.valorLiquidado || 0);
+          return (
+            <span className={`font-medium ${saldo > 0 ? 'text-green-600' : saldo < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+              {formatCurrency(saldo)}
+            </span>
+          );
+        })()}
+      </td>
+
+      <td className="py-2 px-2 align-top whitespace-nowrap">
+        <div className="flex items-center justify-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handleOpenDialog(empenho)}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 // Extracted Component for Table Reuse inside Tabs
 function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
   empenhos: Empenho[],
@@ -742,40 +887,69 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
     setPage(1);
   };
 
-  const sortedEmpenhos = useMemo(() => {
-    const sorted = [...empenhos].sort((a, b) => {
+  const [groupBy, setGroupBy] = useState<'none' | 'favorecido'>('none');
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+
+  const toggleGroup = (name: string) => {
+    setExpandedGroups(prev => ({ ...prev, [name]: !prev[name] }));
+  };
+
+  const processData = useMemo(() => {
+    if (groupBy === 'none') {
+      return empenhos.map(e => ({ isGroup: false as const, item: e }));
+    }
+
+    const groups = new Map<string, Empenho[]>();
+    empenhos.forEach(e => {
+      const key = e.favorecidoNome || 'Não informado';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(e);
+    });
+
+    return Array.from(groups.entries()).map(([name, items]) => ({
+      isGroup: true as const,
+      name,
+      items,
+      valorTotal: items.reduce((acc, e) => acc + (type === 'restos' ? (e.rapInscrito || e.valor) : e.valor), 0),
+      saldoTotal: items.reduce((acc, e) => acc + (type === 'restos' ? (e.rapALiquidar || 0) : (e.valor - (e.valorLiquidado || 0))), 0),
+      pagoTotal: items.reduce((acc, e) => acc + (type === 'restos' ? (e.rapPago || 0) : (e.valorPago || 0)), 0),
+      liquidadoTotal: items.reduce((acc, e) => acc + (type === 'restos' ? (e.rapLiquidado || 0) : (e.valorLiquidado || 0)), 0),
+    }));
+  }, [empenhos, groupBy, type]);
+
+  const sortedData = useMemo(() => {
+    const sorted = [...processData].sort((a, b) => {
       let valA: number | string = 0;
       let valB: number | string = 0;
 
-      switch (sortKey) {
-        case 'numero':
-          valA = a.numero;
-          valB = b.numero;
-          break;
-        case 'favorecido':
-          valA = a.favorecidoNome || '';
-          valB = b.favorecidoNome || '';
-          break;
-        case 'valor':
-          valA = type === 'restos' ? (a.rapInscrito || a.valor) : a.valor;
-          valB = type === 'restos' ? (b.rapInscrito || b.valor) : b.valor;
-          break;
-        case 'saldo':
-          if (type === 'restos') {
-            valA = a.rapALiquidar || 0;
-            valB = b.rapALiquidar || 0;
-          } else {
-            valA = a.valor - (a.valorLiquidado || 0);
-            valB = b.valor - (b.valorLiquidado || 0);
-          }
-          break;
-        case 'pago':
-          valA = type === 'restos' ? (a.rapPago || 0) : (a.valorPago || 0);
-          valB = type === 'restos' ? (b.rapPago || 0) : (b.valorPago || 0);
-          break;
-        default:
-          valA = a.numero;
-          valB = b.numero;
+      if (a.isGroup && b.isGroup) {
+        switch (sortKey) {
+          case 'favorecido': valA = a.name; valB = b.name; break;
+          case 'valor': valA = a.valorTotal; valB = b.valorTotal; break;
+          case 'saldo': valA = a.saldoTotal; valB = b.saldoTotal; break;
+          case 'pago': valA = a.pagoTotal; valB = b.pagoTotal; break;
+          default: valA = a.name; valB = b.name; break;
+        }
+      } else if (!a.isGroup && !b.isGroup) {
+        const itemA = a.item!;
+        const itemB = b.item!;
+        switch (sortKey) {
+          case 'numero': valA = itemA.numero; valB = itemB.numero; break;
+          case 'favorecido': valA = itemA.favorecidoNome || ''; valB = itemB.favorecidoNome || ''; break;
+          case 'valor':
+            valA = type === 'restos' ? (itemA.rapInscrito || itemA.valor) : itemA.valor;
+            valB = type === 'restos' ? (itemB.rapInscrito || itemB.valor) : itemB.valor;
+            break;
+          case 'saldo':
+            valA = type === 'restos' ? (itemA.rapALiquidar || 0) : (itemA.valor - (itemA.valorLiquidado || 0));
+            valB = type === 'restos' ? (itemB.rapALiquidar || 0) : (itemB.valor - (itemB.valorLiquidado || 0));
+            break;
+          case 'pago':
+            valA = type === 'restos' ? (itemA.rapPago || 0) : (itemA.valorPago || 0);
+            valB = type === 'restos' ? (itemB.rapPago || 0) : (itemB.valorPago || 0);
+            break;
+          default: valA = itemA.numero; valB = itemB.numero;
+        }
       }
 
       if (typeof valA === 'string') {
@@ -784,11 +958,11 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
       return sortDir === 'asc' ? (valA as number) - (valB as number) : (valB as number) - (valA as number);
     });
     return sorted;
-  }, [empenhos, sortKey, sortDir, type]);
+  }, [processData, sortKey, sortDir, type]);
 
-  const totalRecords = sortedEmpenhos.length;
+  const totalRecords = sortedData.length;
   const totalPages = Math.ceil(totalRecords / perPage);
-  const paginatedEmpenhos = sortedEmpenhos.slice((page - 1) * perPage, page * perPage);
+  const paginatedData = sortedData.slice((page - 1) * perPage, page * perPage);
 
   const SortHeader = ({ label, colKey, align = 'left' }: { label: string; colKey: string; align?: 'left' | 'right' | 'center' }) => (
     <th
@@ -806,17 +980,26 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
 
   return (
     <Card className="">
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-lg">
           {empenhos.length} empenho{empenhos.length !== 1 ? 's' : ''} encontrado{empenhos.length !== 1 ? 's' : ''}
         </CardTitle>
+        <Button
+          variant={groupBy === 'favorecido' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setGroupBy(g => g === 'none' ? 'favorecido' : 'none')}
+          className="h-8 gap-2"
+        >
+          <Layers className="h-4 w-4" />
+          {groupBy === 'favorecido' ? 'Desagrupar' : 'Agrupar por Favorecido'}
+        </Button>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                <SortHeader label="Número" colKey="numero" />
+                {groupBy === 'none' && <SortHeader label="Número" colKey="numero" />}
                 <SortHeader label="Favorecido" colKey="favorecido" />
                 {type === 'execucao' ? (
                   <th className="text-left py-2 px-2 text-sm font-medium text-muted-foreground whitespace-nowrap">Origem / Plano</th>
@@ -841,125 +1024,88 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
                     <td className="py-2 px-2"><Skeleton className="h-8 w-16 mx-auto" /></td>
                   </tr>
                 ))
-              ) : paginatedEmpenhos.length === 0 ? (
+              ) : paginatedData.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-center py-6 text-muted-foreground italic">Nenhum empenho encontrado.</td>
                 </tr>
               ) : (
-                paginatedEmpenhos.map((empenho) => (
-                  <tr key={empenho.id} className="border-b border-border/50 hover:bg-muted/50 even:bg-muted/20 transition-colors">
-                    <td className="py-2 px-2 align-top">
-                      <div className="flex flex-col gap-1">
-                        <span className="font-mono text-sm font-medium whitespace-nowrap">{empenho.numero}</span>
-                        {empenho.processo && (
-                          <span className="text-xs text-muted-foreground whitespace-nowrap" title="Processo">
-                            Proc: {empenho.processo}
-                          </span>
-                        )}
-                        {empenho.historicoOperacoes && empenho.historicoOperacoes.length > 1 && (
-                          <span className="text-[10px] text-blue-500 flex items-center gap-0.5" title="Empenho com histórico de alterações">
-                            <History className="h-3 w-3" />
-                            {empenho.historicoOperacoes.length} ops
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-2 px-2 align-top">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium truncate max-w-[150px]" title={empenho.favorecidoNome}>{empenho.favorecidoNome || '-'}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {formatarDocumento(empenho.favorecidoDocumento || '')}
-                        </span>
-                      </div>
-                    </td>
-                    {type === 'execucao' ? (
-                      <td className="py-2 px-2 align-top">
-                        <div className="flex flex-col gap-1">
-                          <p className="text-sm font-medium whitespace-nowrap">{empenho.origemRecurso || '-'}</p>
-                          {empenho.planoInterno && (
-                            <span className="text-xs text-muted-foreground whitespace-nowrap">{empenho.planoInterno}</span>
-                          )}
-                        </div>
-                      </td>
-                    ) : (
-                      <td className="py-2 px-2 align-top">
-                        <span className="text-sm line-clamp-2" title={empenho.descricao}>{empenho.descricao || '-'}</span>
-                      </td>
-                    )}
-                    <td className="py-2 px-2 text-right align-top whitespace-nowrap">
-                      <div className="flex flex-col gap-1 items-end">
-                        {type === 'restos' && empenho.rapInscrito != null ? (
-                          <>
-                            <span className="font-medium" title="Inscrito (original)">
-                              {formatCurrency(empenho.rapInscrito || 0)}
-                            </span>
-                            <span className={`text-xs ${(empenho.rapALiquidar || 0) > 0 ? 'text-orange-500' : 'text-muted-foreground'}`} title="A Liquidar">
-                              A Liq: {formatCurrency(empenho.rapALiquidar || 0)}
-                            </span>
-                            <span className={`text-xs ${(empenho.rapLiquidado || 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`} title="Liquidado">
-                              Liq: {formatCurrency(empenho.rapLiquidado || 0)}
-                            </span>
-                            <span className={`text-xs ${(empenho.rapPago || 0) > 0 ? 'text-green-600' : 'text-muted-foreground'}`} title="Pago">
-                              Pg: {formatCurrency(empenho.rapPago || 0)}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="font-medium" title={type === 'execucao' ? 'Empenhado' : 'Inscrito'}>
-                              {formatCurrency(empenho.valor)}
-                            </span>
-                            {type === 'execucao' ? (
-                              <>
-                                <span className={`text-xs ${(empenho.valorLiquidado || 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`} title="Liquidado">
-                                  Liq: {formatCurrency(empenho.valorLiquidado || 0)}
-                                </span>
-                                {(empenho.valorPago || 0) > 0 && (
-                                  <span className="text-[10px] text-green-600" title="Pago">
-                                    Pg: {formatCurrency(empenho.valorPago || 0)}
-                                  </span>
-                                )}
-                              </>
-                            ) : (
-                              <span className={`text-xs ${(empenho.valorPago || 0) > 0 ? 'text-green-600' : 'text-muted-foreground'}`} title="Pago">
-                                Pg: {formatCurrency(empenho.valorPago || 0)}
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-2 px-2 text-right align-top whitespace-nowrap">
-                      {(() => {
-                        if (type === 'restos') {
-                          const aLiquidar = empenho.rapALiquidar || 0;
-                          return (
-                            <span className={`font-medium ${aLiquidar > 0 ? 'text-orange-500' : 'text-muted-foreground'}`}>
-                              {formatCurrency(aLiquidar)}
-                            </span>
-                          );
-                        }
-                        const saldo = empenho.valor - (empenho.valorLiquidado || 0);
-                        return (
-                          <span className={`font-medium ${saldo > 0 ? 'text-green-600' : saldo < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
-                            {formatCurrency(saldo)}
-                          </span>
-                        );
-                      })()}
-                    </td>
-
-                    <td className="py-2 px-2 align-top whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenDialog(empenho)}
+                paginatedData.map((row, idx) => {
+                  if (row.isGroup) {
+                    const isExpanded = expandedGroups[row.name];
+                    return (
+                      <Fragment key={`group-${idx}`}>
+                        <tr
+                          className="border-b border-border/50 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
+                          onClick={() => toggleGroup(row.name)}
                         >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                          <td className="py-3 px-2 align-middle font-medium" colSpan={2}>
+                            <div className="flex items-center gap-2">
+                              <ChevronRight className={`h-4 w-4 text-slate-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                              <span>{row.name}</span>
+                              <Badge variant="secondary" className="ml-2 bg-white">{row.items.length}</Badge>
+                            </div>
+                          </td>
+                          {type === 'execucao' ? (
+                            <td className="py-3 px-2 align-middle text-sm text-muted-foreground">-</td>
+                          ) : (
+                            <td className="py-3 px-2 align-middle text-sm text-muted-foreground">-</td>
+                          )}
+                          <td className="py-3 px-2 text-right align-middle">
+                            <div className="flex flex-col gap-1 items-end">
+                              <span className="font-bold">{formatCurrency(row.valorTotal)}</span>
+                              {type === 'execucao' ? (
+                                <>
+                                  <span className={`text-xs ${(row.liquidadoTotal || 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`} title="Liquidado">
+                                    Liq: {formatCurrency(row.liquidadoTotal)}
+                                  </span>
+                                  {(row.pagoTotal || 0) > 0 && (
+                                    <span className="text-[10px] text-green-600" title="Pago">
+                                      Pg: {formatCurrency(row.pagoTotal)}
+                                    </span>
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  <span className={`text-xs ${(row.saldoTotal || 0) > 0 ? 'text-orange-500' : 'text-muted-foreground'}`} title="A Liquidar">
+                                    A Liq: {formatCurrency(row.saldoTotal)}
+                                  </span>
+                                  <span className={`text-xs ${(row.liquidadoTotal || 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`} title="Liquidado">
+                                    Liq: {formatCurrency(row.liquidadoTotal)}
+                                  </span>
+                                  <span className={`text-xs ${(row.pagoTotal || 0) > 0 ? 'text-green-600' : 'text-muted-foreground'}`} title="Pago">
+                                    Pg: {formatCurrency(row.pagoTotal)}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-2 text-right align-middle font-bold">
+                            {(() => {
+                              if (type === 'restos') {
+                                return (
+                                  <span className={`font-medium ${row.saldoTotal > 0 ? 'text-orange-500' : 'text-muted-foreground'}`}>
+                                    {formatCurrency(row.saldoTotal)}
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span className={`font-medium ${row.saldoTotal > 0 ? 'text-green-600' : row.saldoTotal < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                                  {formatCurrency(row.saldoTotal)}
+                                </span>
+                              );
+                            })()}
+                          </td>
+                          <td className="py-3 px-2 align-middle text-center"></td>
+                        </tr>
+                        {isExpanded && row.items.map(empenho => (
+                          <EmpenhoRow key={empenho.id} empenho={empenho} type={type} handleOpenDialog={handleOpenDialog} isChild />
+                        ))}
+                      </Fragment>
+                    );
+                  } else {
+                    return <EmpenhoRow key={row.item.id} empenho={row.item} type={type} handleOpenDialog={handleOpenDialog} />;
+                  }
+                })
               )}
             </tbody>
           </table>
