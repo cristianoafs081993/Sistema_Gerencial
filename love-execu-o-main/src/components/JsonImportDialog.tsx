@@ -17,6 +17,8 @@ interface JsonImportDialogProps {
   onImport: (data: Record<string, string>[]) => void;
   title: string;
   expectedFields: string[];
+  acceptCsv?: boolean;
+  csvSeparator?: string;
 }
 
 export function JsonImportDialog({
@@ -25,6 +27,8 @@ export function JsonImportDialog({
   onImport,
   title,
   expectedFields,
+  acceptCsv = false,
+  csvSeparator = ';',
 }: JsonImportDialogProps) {
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<Record<string, string>[]>([]);
@@ -48,12 +52,95 @@ export function JsonImportDialog({
       .replace(/\s+/g, '');
   };
 
+  const parseCsvText = (text: string): Record<string, string>[] => {
+    const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+    if (lines.length < 2) {
+      throw new Error('O CSV deve ter pelo menos um cabeçalho e uma linha de dados.');
+    }
+
+    const headers = lines[0].split(csvSeparator).map(h => normalizeKey(h));
+    const data: Record<string, string>[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(csvSeparator);
+      const row: Record<string, string> = {};
+      headers.forEach((header, idx) => {
+        row[header] = (values[idx] || '').trim();
+      });
+      data.push(row);
+    }
+
+    return data;
+  };
+
+  const processFileText = (text: string, isCsv: boolean) => {
+    // Remove Byte Order Mark (BOM) if present, common in Windows files
+    if (text.charCodeAt(0) === 0xFEFF) {
+      text = text.slice(1);
+    }
+
+    let normalizedData: Record<string, string>[];
+
+    if (isCsv) {
+      // Parse CSV
+      normalizedData = parseCsvText(text);
+    } else {
+      // Parse JSON
+      // SANITIZATION: Replace invalid JSON values like NaN with "0"
+      text = text.replace(/:\s*NaN\b/g, ': "0"');
+
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch (e) {
+        throw new Error('Sintaxe JSON inválida. Verifique vírgulas, aspas e formato.');
+      }
+
+      const dataArray: Record<string, unknown>[] = Array.isArray(json) ? json : [json];
+
+      if (dataArray.length === 0) {
+        setError('O arquivo JSON está vazio.');
+        return;
+      }
+
+      normalizedData = dataArray.map((item) => {
+        const normalized: Record<string, string> = {};
+        for (const [key, value] of Object.entries(item)) {
+          normalized[normalizeKey(key)] = String(value ?? '');
+        }
+        return normalized;
+      });
+    }
+
+    // Check for expected fields (using normalized versions)
+    const normalizedExpected = expectedFields.map(normalizeKey);
+    const sampleItem = normalizedData[0];
+
+    const hasSomeValidField = normalizedExpected.some(
+      (field) => field in sampleItem
+    );
+
+    if (!hasSomeValidField) {
+      const foundKeys = Object.keys(sampleItem).join(', ');
+      setError(`Campos não identificados. Encontrado: ${foundKeys}. Esperado: ${expectedFields.join(', ')}`)
+      return;
+    }
+
+    setParsedData(normalizedData);
+    setSuccess(true);
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
-    if (!selectedFile.name.endsWith('.json')) {
-      setError('Por favor, selecione um arquivo JSON.');
+    const isJson = selectedFile.name.endsWith('.json');
+    const isCsv = selectedFile.name.endsWith('.csv');
+
+    if (!isJson && !(acceptCsv && isCsv)) {
+      setError(acceptCsv
+        ? 'Por favor, selecione um arquivo JSON ou CSV.'
+        : 'Por favor, selecione um arquivo JSON.');
       return;
     }
 
@@ -64,61 +151,27 @@ export function JsonImportDialog({
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
-        let text = event.target?.result as string;
+        const text = event.target?.result as string;
 
-        // Remove Byte Order Mark (BOM) if present, common in Windows files
-        if (text.charCodeAt(0) === 0xFEFF) {
-          text = text.slice(1);
-        }
-
-        // SANITIZATION: Replace invalid JSON values like NaN with "0"
-        // This handles cases where values are unquoted NaN which is invalid in JSON but common in some exports
-        text = text.replace(/:\s*NaN\b/g, ': "0"');
-
-        let json;
-        try {
-          json = JSON.parse(text);
-        } catch (e) {
-          throw new Error('Sintaxe JSON inválida. Verifique vírgulas, aspas e formato.');
-        }
-
-        // Handle both array and single object
-        const dataArray: Record<string, unknown>[] = Array.isArray(json) ? json : [json];
-
-        if (dataArray.length === 0) {
-          setError('O arquivo JSON está vazio.');
+        // Check if UTF-8 produced replacement characters (U+FFFD)
+        // This means the file is likely encoded in Windows-1252/Latin-1
+        if (text.includes('\uFFFD')) {
+          // Re-read with Windows-1252 encoding
+          const fallbackReader = new FileReader();
+          fallbackReader.onload = (fallbackEvent) => {
+            try {
+              const fallbackText = fallbackEvent.target?.result as string;
+              processFileText(fallbackText, isCsv);
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : 'Erro desconhecido';
+              setError(`Erro ao processar arquivo: ${msg}`);
+            }
+          };
+          fallbackReader.readAsText(selectedFile, 'windows-1252');
           return;
         }
 
-        // Normalize keys for each object
-        const normalizedData: Record<string, string>[] = dataArray.map((item) => {
-          const normalized: Record<string, string> = {};
-          for (const [key, value] of Object.entries(item)) {
-            normalized[normalizeKey(key)] = String(value ?? '');
-          }
-          return normalized;
-        });
-
-        // Check for expected fields (using normalized versions)
-        const normalizedExpected = expectedFields.map(normalizeKey);
-        // Check first item to validate structure
-        const sampleItem = normalizedData[0];
-
-        // Relaxed validation: Check if AT LEAST ONE of the expected fields exists
-        // This prevents blocking imports just because one optional field is missing
-        const hasSomeValidField = normalizedExpected.some(
-          (field) => field in sampleItem
-        );
-
-        if (!hasSomeValidField) {
-          // If strict matching fails, try to show what IS there to help user
-          const foundKeys = Object.keys(sampleItem).join(', ');
-          setError(`Campos não identificados. Encontrado: ${foundKeys}. Esperado: ${expectedFields.join(', ')}`);
-          return;
-        }
-
-        setParsedData(normalizedData);
-        setSuccess(true);
+        processFileText(text, isCsv);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Erro desconhecido';
         setError(`Erro ao processar arquivo: ${msg}`);
@@ -140,6 +193,9 @@ export function JsonImportDialog({
     resetState();
   };
 
+  const acceptAttr = acceptCsv ? '.json,.csv' : '.json';
+  const fileTypeLabel = acceptCsv ? 'JSON ou CSV' : 'JSON';
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg">
@@ -149,7 +205,7 @@ export function JsonImportDialog({
             {title}
           </DialogTitle>
           <DialogDescription>
-            Importe dados de um arquivo JSON
+            Importe dados de um arquivo {fileTypeLabel}
           </DialogDescription>
         </DialogHeader>
 
@@ -170,7 +226,7 @@ export function JsonImportDialog({
             <input
               ref={fileInputRef}
               type="file"
-              accept=".json"
+              accept={acceptAttr}
               onChange={handleFileChange}
               className="hidden"
             />
@@ -179,7 +235,7 @@ export function JsonImportDialog({
               <p className="text-sm font-medium">{file.name}</p>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Clique para selecionar um arquivo JSON
+                Clique para selecionar um arquivo {fileTypeLabel}
               </p>
             )}
           </div>

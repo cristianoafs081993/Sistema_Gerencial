@@ -6,7 +6,7 @@ export const descentralizacoesService = {
         const { data, error } = await supabase
             .from('descentralizacoes')
             .select('*')
-            .order('created_at', { ascending: false });
+            .order('data_emissao', { ascending: false, nullsFirst: false });
 
         if (error) throw error;
 
@@ -16,7 +16,12 @@ export const descentralizacoesService = {
             dimensaoId: item.dimensao_id || undefined,
             origemRecurso: item.origem_recurso,
             origemRecursoId: item.origem_recurso_id || undefined,
+            naturezaDespesa: item.natureza_despesa || undefined,
+            naturezaDespesaId: item.natureza_despesa_id || undefined,
             planoInterno: item.plano_interno || undefined,
+            planoInternoId: item.plano_interno_id || undefined,
+            dataEmissao: item.data_emissao ? new Date(item.data_emissao) : undefined,
+            descricao: item.descricao || undefined,
             valor: Number(item.valor),
             createdAt: new Date(item.created_at),
             updatedAt: new Date(item.updated_at),
@@ -31,7 +36,12 @@ export const descentralizacoesService = {
                 dimensao_id: descentralizacao.dimensaoId || null,
                 origem_recurso: descentralizacao.origemRecurso,
                 origem_recurso_id: descentralizacao.origemRecursoId || null,
+                natureza_despesa: descentralizacao.naturezaDespesa || '',
+                natureza_despesa_id: descentralizacao.naturezaDespesaId || null,
                 plano_interno: descentralizacao.planoInterno,
+                plano_interno_id: descentralizacao.planoInternoId || null,
+                data_emissao: descentralizacao.dataEmissao ? descentralizacao.dataEmissao.toISOString().split('T')[0] : null,
+                descricao: descentralizacao.descricao || '',
                 valor: descentralizacao.valor,
             })
             .select()
@@ -45,7 +55,12 @@ export const descentralizacoesService = {
             dimensaoId: data.dimensao_id || undefined,
             origemRecurso: data.origem_recurso,
             origemRecursoId: data.origem_recurso_id || undefined,
+            naturezaDespesa: data.natureza_despesa || undefined,
+            naturezaDespesaId: data.natureza_despesa_id || undefined,
             planoInterno: data.plano_interno || undefined,
+            planoInternoId: data.plano_interno_id || undefined,
+            dataEmissao: data.data_emissao ? new Date(data.data_emissao) : undefined,
+            descricao: data.descricao || undefined,
             valor: Number(data.valor),
             createdAt: new Date(data.created_at),
             updatedAt: new Date(data.updated_at),
@@ -61,7 +76,12 @@ export const descentralizacoesService = {
         if (descentralizacao.dimensaoId !== undefined) updates.dimensao_id = descentralizacao.dimensaoId || null;
         if (descentralizacao.origemRecurso !== undefined) updates.origem_recurso = descentralizacao.origemRecurso;
         if (descentralizacao.origemRecursoId !== undefined) updates.origem_recurso_id = descentralizacao.origemRecursoId || null;
+        if (descentralizacao.naturezaDespesa !== undefined) updates.natureza_despesa = descentralizacao.naturezaDespesa;
+        if (descentralizacao.naturezaDespesaId !== undefined) updates.natureza_despesa_id = descentralizacao.naturezaDespesaId || null;
         if (descentralizacao.planoInterno !== undefined) updates.plano_interno = descentralizacao.planoInterno;
+        if (descentralizacao.planoInternoId !== undefined) updates.plano_interno_id = descentralizacao.planoInternoId || null;
+        if (descentralizacao.dataEmissao !== undefined) updates.data_emissao = descentralizacao.dataEmissao ? descentralizacao.dataEmissao.toISOString().split('T')[0] : null;
+        if (descentralizacao.descricao !== undefined) updates.descricao = descentralizacao.descricao;
         if (descentralizacao.valor !== undefined) updates.valor = descentralizacao.valor;
 
         const { error } = await supabase

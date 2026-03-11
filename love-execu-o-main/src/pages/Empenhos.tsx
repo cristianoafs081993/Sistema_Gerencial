@@ -198,7 +198,14 @@ export default function Empenhos() {
 
 
   const handleJsonImport = (data: Record<string, string>[]) => {
+    // Build deduplication set from existing empenhos (in memory)
+    const existingNumeros = new Set(
+      empenhos.map(e => e.numero.trim().toUpperCase())
+    );
+
     let importCount = 0;
+    let skipCount = 0;
+
     data.forEach((row) => {
       const parseDate = (dateStr: string): Date => {
         if (!dateStr) return new Date();
@@ -212,9 +219,16 @@ export default function Empenhos() {
         return new Date(dateStr);
       };
 
+      const numero = (row['numero'] || '').trim().toUpperCase();
+
+      // Check for duplicate by numero
+      if (numero && existingNumeros.has(numero)) {
+        skipCount++;
+        return;
+      }
 
       const empenho = {
-        numero: row['numero'] || '',
+        numero,
         descricao: row['descricao'] || '',
         valor: parseCurrency(row['valor'] || '0'),
         dimensao: row['dimensao'] || '',
@@ -231,10 +245,18 @@ export default function Empenhos() {
       };
       if (empenho.numero && empenho.dimensao) {
         addEmpenho(empenho);
+        existingNumeros.add(numero); // prevent duplicates within same import
         importCount++;
       }
     });
-    toast.success(`${importCount} empenho(s) importado(s) com sucesso!`);
+
+    if (importCount > 0 && skipCount > 0) {
+      toast.success(`${importCount} novo(s) importado(s), ${skipCount} já existente(s) ignorado(s).`);
+    } else if (importCount > 0) {
+      toast.success(`${importCount} empenho(s) importado(s) com sucesso!`);
+    } else {
+      toast.info(`Nenhum registro novo encontrado. ${skipCount} já existente(s) ignorado(s).`);
+    }
   };
 
   const empenhosJsonFields = [
