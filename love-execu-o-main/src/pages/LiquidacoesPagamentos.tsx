@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { transparenciaService } from '@/services/transparencia';
 import { DocumentoDespesa } from '@/types';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatarDocumento, formatDocumentoId } from '@/lib/utils';
 import { format, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,22 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RefreshCw, Search, Loader2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUpDown, Filter as FilterIcon, X, Eye } from 'lucide-react';
+import { 
+    RefreshCw, 
+    Search, 
+    Loader2, 
+    ChevronLeft as ChevronLeftIcon, 
+    ChevronRight as ChevronRightIcon, 
+    ChevronsLeft as ChevronsLeftIcon, 
+    ChevronsRight as ChevronsRightIcon, 
+    ArrowUpDown, 
+    Filter as FilterIcon, 
+    X, 
+    Eye, 
+    FileText, 
+    FileWarning as FileBadge,
+    Calendar as CalendarIcon 
+} from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import {
@@ -37,6 +52,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { DocumentoDetalhesDialog } from '@/components/DocumentoDetalhesDialog';
 import { HeaderSubtitle, HeaderActions } from '@/components/HeaderParts';
+import { Header, HeaderPortal } from '@/components/Header';
 
 export default function LiquidacoesPagamentos() {
     const queryClient = useQueryClient();
@@ -46,7 +62,6 @@ export default function LiquidacoesPagamentos() {
 
     // Filtros
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterFase, setFilterFase] = useState('all');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
 
@@ -62,11 +77,10 @@ export default function LiquidacoesPagamentos() {
 
     // Query do Supabase
     const { data: queryData, isLoading } = useQuery({
-        queryKey: ['transparencia', startDate, endDate, filterFase, searchTerm, page, perPage, sortColumn, sortDirection],
+        queryKey: ['transparencia', startDate, endDate, searchTerm, page, perPage, sortColumn, sortDirection],
         queryFn: () => transparenciaService.getDocumentos({
             startDate: startDate ? new Date(startDate) : undefined,
             endDate: endDate ? new Date(endDate) : undefined,
-            fase: filterFase,
             search: searchTerm,
             page,
             perPage,
@@ -136,7 +150,6 @@ export default function LiquidacoesPagamentos() {
 
     const clearFilters = () => {
         setSearchTerm('');
-        setFilterFase('all');
         setStartDate('');
         setEndDate('');
         setPage(1);
@@ -147,249 +160,267 @@ export default function LiquidacoesPagamentos() {
         setDetailsOpen(true);
     };
 
-    // Calcular valor total da página atual (ou total geral se a API retornasse aggregated sum, mas aqui fazemos client-side da pagina)
-    // Para KPI "Valor Total (Filtro)" idealmente precisariamos de uma rota de agregação no backend/Supabase.
-    // Por enquanto, vamos omitir ou mostrar "Valor na Página" para ser preciso, ou remover o card se for confuso.
-    // Vamos mostrar "Valor nesta página"
-
-    const pageTotalValue = documentos.reduce((acc, doc) => acc + doc.valor, 0);
-
     return (
-        <div className="space-y-6 animate-fade-in pb-10">
-            <DocumentoDetalhesDialog
-                open={detailsOpen}
-                onOpenChange={setDetailsOpen}
-                documento={selectedDocumento}
-            />
+        <div className="min-h-screen bg-slate-50/30 dark:bg-slate-950/30">
+            <div className="p-4 md:p-8 space-y-8 max-w-[1600px] mx-auto animate-in fade-in duration-500">
+                <DocumentoDetalhesDialog
+                    open={detailsOpen}
+                    onOpenChange={setDetailsOpen}
+                    documento={selectedDocumento}
+                />
 
-            <HeaderSubtitle>
-                Portal da Transparência {lastUpdateDate ? `(Atualizado até: ${format(lastUpdateDate, 'dd/MM/yyyy')})` : ''}
-            </HeaderSubtitle>
+                <Header 
+                    title="Documentos Hábeis" 
+                    icon={FileText}
+                    onRefresh={handleSync}
+                    isRefreshing={isSyncing}
+                />
 
-            {/* Filtros em Grid */}
-            <Card className="">
-                <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                    <CardTitle className="text-base font-semibold flex items-center gap-2">
-                        <FilterIcon className="h-4 w-4" /> Filtros
-                    </CardTitle>
-                    {(searchTerm || filterFase !== 'all' || startDate || endDate) && (
-                        <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 px-2 text-muted-foreground hover:text-foreground">
-                            <X className="h-3 w-3 mr-1" /> Limpar
-                        </Button>
-                    )}
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Buscar..."
-                                value={searchTerm}
-                                onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
-                                className="pl-9"
-                            />
-                        </div>
-                        <div>
-                            <Select value={filterFase} onValueChange={(val) => { setFilterFase(val); setPage(1); }}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Fase" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Todas as Fases</SelectItem>
-                                    <SelectItem value="Liquidação">Liquidação</SelectItem>
-                                    <SelectItem value="Pagamento">Pagamento</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div>
-                            <Input
-                                type="date"
-                                placeholder="Data Início"
-                                value={startDate}
-                                onChange={e => { setStartDate(e.target.value); setPage(1); }}
-                                className="w-full" // Ensure input takes full width of grid cell
-                            />
-                        </div>
-                        <div>
-                            <Input
-                                type="date"
-                                placeholder="Data Fim"
-                                value={endDate}
-                                onChange={e => { setEndDate(e.target.value); setPage(1); }}
-                                className="w-full"
-                            />
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+                <HeaderPortal targetId="header-subtitle">
+                    Documentos Hábeis {lastUpdateDate ? `(Atualizado até: ${format(lastUpdateDate, 'dd/MM/yyyy')})` : ''}
+                </HeaderPortal>
 
-            {/* Tabela */}
-            <Card className="">
-                <CardContent className="p-0">
-                    <div className="rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('data_emissao')}>
-                                        <div className="flex items-center gap-1">
-                                            Data {sortColumn === 'data_emissao' && <ArrowUpDown className="h-3 w-3" />}
-                                        </div>
-                                    </TableHead>
-                                    <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('documento')}>
-                                        <div className="flex items-center gap-1">
-                                            Documento {sortColumn === 'documento' && <ArrowUpDown className="h-3 w-3" />}
-                                        </div>
-                                    </TableHead>
-                                    <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('fase')}>
-                                        <div className="flex items-center gap-1">
-                                            Fase {sortColumn === 'fase' && <ArrowUpDown className="h-3 w-3" />}
-                                        </div>
-                                    </TableHead>
-                                    <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('favorecido_nome')}>
-                                        <div className="flex items-center gap-1">
-                                            Favorecido {sortColumn === 'favorecido_nome' && <ArrowUpDown className="h-3 w-3" />}
-                                        </div>
-                                    </TableHead>
-                                    <TableHead>Observação</TableHead>
-                                    <TableHead className="text-right cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('valor')}>
-                                        <div className="flex items-center justify-end gap-1">
-                                            Valor {sortColumn === 'valor' && <ArrowUpDown className="h-3 w-3" />}
-                                        </div>
-                                    </TableHead>
-                                    <TableHead className="w-[50px]"></TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {isLoading ? (
-                                    Array.from({ length: 5 }).map((_, i) => (
-                                        <TableRow key={i}>
-                                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                                            <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                                            <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-                                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                                            <TableCell><Skeleton className="h-4 w-full max-w-[200px]" /></TableCell>
-                                            <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
-                                            <TableCell><Skeleton className="h-8 w-8 mx-auto" /></TableCell>
-                                        </TableRow>
-                                    ))
-                                ) : documentos.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
-                                            Nenhum registro encontrado com os filtros atuais.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    documentos.map((doc) => (
-                                        <TableRow key={doc.id} className="group hover:bg-muted/50">
-                                            <TableCell className="whitespace-nowrap font-medium text-xs">
-                                                {format(doc.dataEmissao, 'dd/MM/yyyy')}
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col">
-                                                    <span className="font-mono text-xs font-medium">{doc.documentoResumido}</span>
-                                                    {doc.empenhoDocumento && (
-                                                        <span className="text-[10px] text-muted-foreground" title="Empenho Associado">
-                                                            Ref: {doc.empenhoDocumento}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant={doc.fase === 'Pagamento' ? 'default' : 'secondary'} className="text-[10px] h-5">
-                                                    {doc.fase}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col max-w-[180px]">
-                                                    <span className="truncate text-xs font-medium" title={doc.favorecidoNome}>{doc.favorecidoNome}</span>
-                                                    <span className="text-[10px] text-muted-foreground truncate">{doc.favorecidoDocumento}</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <span className="text-xs text-muted-foreground line-clamp-1 max-w-[250px]" title={doc.observacao}>{doc.observacao}</span>
-                                            </TableCell>
-                                            <TableCell className="text-right font-medium text-xs">
-                                                {(() => {
-                                                    const valor = doc.valorLiquidado || doc.valorRestoPago || doc.valor;
-                                                    return valor === 0 ? '-' : formatCurrency(valor);
-                                                })()}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors" onClick={() => handleViewDetails(doc)}>
-                                                    <Eye className="h-4 w-4" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </div>
-
-                    {/* Footer Paginação */}
-                    <div className="flex items-center justify-between px-2 py-4 border-t">
-                        <div className="text-xs text-muted-foreground">
-                            Mostrando <strong>{((page - 1) * perPage) + 1}</strong> a <strong>{Math.min(page * perPage, totalRecords)}</strong> de <strong>{totalRecords}</strong> registros
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <Select value={String(perPage)} onValueChange={(val) => { setPerPage(Number(val)); setPage(1); }}>
-                                <SelectTrigger className="h-8 w-[70px]">
-                                    <SelectValue placeholder={String(perPage)} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="10">10</SelectItem>
-                                    <SelectItem value="20">20</SelectItem>
-                                    <SelectItem value="50">50</SelectItem>
-                                    <SelectItem value="100">100</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <div className="flex w-[100px] items-center justify-center text-sm font-medium">
-                                Página {page} de {totalPages || 1}
+                {isSyncing && (
+                    <div className="fixed bottom-8 right-8 z-50 w-80 bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-2xl border animate-in slide-in-from-bottom-5">
+                        <div className="flex items-center gap-3 mb-3">
+                            <div className="bg-primary/10 p-2 rounded-lg">
+                                <Loader2 className="w-4 h-4 text-primary animate-spin" />
                             </div>
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => setPage(1)}
-                                disabled={page <= 1 || isLoading}
-                                title="Primeira página"
-                            >
-                                <ChevronsLeft className="h-4 w-4" />
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => setPage(page - 1)}
-                                disabled={page <= 1 || isLoading}
-                                title="Página anterior"
-                            >
-                                <ChevronLeft className="h-4 w-4" />
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => setPage(page + 1)}
-                                disabled={page >= totalPages || isLoading}
-                                title="Próxima página"
-                            >
-                                <ChevronRight className="h-4 w-4" />
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => setPage(totalPages)}
-                                disabled={page >= totalPages || isLoading}
-                                title="Última página"
-                            >
-                                <ChevronsRight className="h-4 w-4" />
-                            </Button>
+                            <div className="flex-1">
+                                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Sincronizando Banco</p>
+                                <p className="text-[10px] text-muted-foreground truncate">{syncStatus}</p>
+                            </div>
                         </div>
+                        <Progress value={syncProgress} className="h-1.5" />
                     </div>
-                </CardContent>
-            </Card>
+                )}
+                
+                <div className="space-y-6">
+                    {/* Filtros em Grid */}
+                    <Card className="shadow-sm border-slate-200/60 dark:border-slate-800/60 bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm">
+                        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                            <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                                <FilterIcon className="h-3 w-3" /> Parâmetros de Busca
+                            </CardTitle>
+                            {(searchTerm || startDate || endDate) && (
+                                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 px-2 text-[10px] font-bold uppercase tracking-tighter text-muted-foreground hover:text-destructive transition-colors">
+                                    <X className="h-3 w-3 mr-1" /> Limpar Filtros
+                                </Button>
+                            )}
+                        </CardHeader>
+                        <CardContent className="pb-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 ml-1">Documento ou Favorecido</label>
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                        <Input
+                                            placeholder="Ex: 2026NP0000..."
+                                            value={searchTerm}
+                                            onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+                                            className="pl-9 h-10 text-sm bg-white dark:bg-slate-900 focus-visible:ring-primary/20 transition-all shadow-sm"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 ml-1">Data Início</label>
+                                    <Input
+                                        type="date"
+                                        value={startDate}
+                                        onChange={e => { setStartDate(e.target.value); setPage(1); }}
+                                        className="h-10 text-sm bg-white dark:bg-slate-900 focus-visible:ring-primary/20 transition-all shadow-sm"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 ml-1">Data Fim</label>
+                                    <Input
+                                        type="date"
+                                        value={endDate}
+                                        onChange={e => { setEndDate(e.target.value); setPage(1); }}
+                                        className="h-10 text-sm bg-white dark:bg-slate-900 focus-visible:ring-primary/20 transition-all shadow-sm"
+                                    />
+                                </div>
+                                <div className="flex items-end">
+                                    <div className="w-full p-2.5 bg-slate-100/50 dark:bg-slate-800/50 rounded-lg flex items-center justify-center gap-3 border border-dashed text-muted-foreground">
+                                        <div className="flex flex-col items-center">
+                                            <span className="text-[9px] font-bold uppercase">Total Registros</span>
+                                            <span className="text-xs font-black text-foreground">{totalRecords}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Tabela de Documentos */}
+                    <Card className="shadow-xl border-slate-200/60 dark:border-slate-800/60 overflow-hidden bg-white/90 dark:bg-slate-900/90 backdrop-blur-md">
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
+                                    <TableRow className="hover:bg-transparent border-b">
+                                        <TableHead className="w-[120px] font-bold text-[10px] uppercase tracking-widest text-muted-foreground py-4 px-6">Emissão</TableHead>
+                                        <TableHead className="font-bold text-[10px] uppercase tracking-widest text-muted-foreground py-4">Documento Origem</TableHead>
+                                        <TableHead className="font-bold text-[10px] uppercase tracking-widest text-muted-foreground py-4">Favorecido</TableHead>
+                                        <TableHead className="text-right font-bold text-[10px] uppercase tracking-widest text-muted-foreground py-4">Liquidado (NS)</TableHead>
+                                        <TableHead className="text-right font-bold text-[10px] uppercase tracking-widest text-muted-foreground py-4">Pago (OB)</TableHead>
+                                        <TableHead className="w-[80px] py-4 pr-6"></TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {isLoading ? (
+                                        Array.from({ length: 8 }).map((_, i) => (
+                                            <TableRow key={i}>
+                                                <TableCell className="px-6"><Skeleton className="h-4 w-16" /></TableCell>
+                                                <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                                                <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                                                <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                                                <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                                                <TableCell className="pr-6 text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                                            </TableRow>
+                                        ))
+                                    ) : documentos.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={6} className="h-40 text-center text-muted-foreground italic">
+                                                Nenhum registro encontrado com os parâmetros selecionados.
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        documentos.map((doc) => (
+                                            <TableRow 
+                                                key={doc.id} 
+                                                className="group hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer transition-all duration-200 border-b last:border-0"
+                                                onClick={() => handleViewDetails(doc)}
+                                            >
+                                                <TableCell className="whitespace-nowrap font-medium text-xs py-5 px-6">
+                                                    {format(doc.dataEmissao, 'dd/MM/yyyy')}
+                                                </TableCell>
+                                                <TableCell className="py-5">
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="font-mono text-xs font-bold text-primary group-hover:underline underline-offset-4 decoration-primary/30">
+                                                            {formatDocumentoId(doc.documento)}
+                                                        </span>
+                                                        {doc.empenhoDocumento && (
+                                                            <div className="flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                                                                <FileBadge className="w-2.5 h-2.5 text-slate-500" />
+                                                                <span className="text-[10px] font-medium tracking-tight whitespace-nowrap">Ref: {doc.empenhoDocumento}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="py-5">
+                                                    <div className="flex flex-col max-w-[340px] gap-0.5">
+                                                        <span className="truncate text-xs font-bold leading-tight group-hover:text-primary transition-colors" title={doc.favorecidoNome}>
+                                                            {doc.favorecidoNome}
+                                                        </span>
+                                                        <span className="text-[10px] font-mono text-muted-foreground/80 font-medium">
+                                                            {formatarDocumento(doc.favorecidoDocumento)}
+                                                        </span>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-right font-black text-[11px] text-blue-600 dark:text-blue-400 py-5">
+                                                    {doc.valorLiquidado > 0 ? formatCurrency(doc.valorLiquidado) : '-'}
+                                                </TableCell>
+                                                <TableCell className="text-right font-black text-[11px] text-emerald-600 dark:text-emerald-400 py-5">
+                                                    {doc.valorRestoPago > 0 ? formatCurrency(doc.valorRestoPago) : '-'}
+                                                </TableCell>
+                                                <TableCell className="pr-6 text-right py-5">
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        className="h-8 w-8 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-all rounded-full"
+                                                    >
+                                                        <Eye className="h-4 w-4" />
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
+
+                        {/* Paginação Premium */}
+                        <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 bg-slate-50/70 dark:bg-slate-900/40 border-t gap-4">
+                            <div className="flex items-center gap-6">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Exibir</span>
+                                    <Select value={String(perPage)} onValueChange={(val) => { setPerPage(Number(val)); setPage(1); }}>
+                                        <SelectTrigger className="h-8 w-[70px] bg-white dark:bg-slate-950 border-slate-200/60">
+                                            <SelectValue placeholder={String(perPage)} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="10">10</SelectItem>
+                                            <SelectItem value="20">20</SelectItem>
+                                            <SelectItem value="50">50</SelectItem>
+                                            <SelectItem value="100">100</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-800 hidden sm:block"></div>
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                    Página <span className="text-foreground">{page}</span> de {totalPages || 1}
+                                </span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-9 w-9 border-slate-200/60 shadow-sm"
+                                    onClick={() => setPage(1)}
+                                    disabled={page <= 1 || isLoading}
+                                >
+                                    <ChevronsLeftIcon className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-9 w-9 border-slate-200/60 shadow-sm"
+                                    onClick={() => setPage(page - 1)}
+                                    disabled={page <= 1 || isLoading}
+                                >
+                                    <ChevronLeftIcon className="h-4 w-4" />
+                                </Button>
+                                <div className="flex items-center gap-1 mx-2">
+                                    {Array.from({ length: Math.min(3, totalPages) }).map((_, i) => {
+                                        const p = i + 1;
+                                        return (
+                                            <Button
+                                                key={p}
+                                                variant={page === p ? "default" : "ghost"}
+                                                size="sm"
+                                                className={`h-8 w-8 text-xs font-bold transition-all ${page === p ? 'shadow-md' : ''}`}
+                                                onClick={() => setPage(p)}
+                                            >
+                                                {p}
+                                            </Button>
+                                        );
+                                    })}
+                                    {totalPages > 3 && <span className="text-muted-foreground text-xs mx-1">...</span>}
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-9 w-9 border-slate-200/60 shadow-sm"
+                                    onClick={() => setPage(page + 1)}
+                                    disabled={page >= totalPages || isLoading}
+                                >
+                                    <ChevronRightIcon className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-9 w-9 border-slate-200/60 shadow-sm"
+                                    onClick={() => setPage(totalPages)}
+                                    disabled={page >= totalPages || isLoading}
+                                >
+                                    <ChevronsRightIcon className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+            </div>
         </div>
     );
 }

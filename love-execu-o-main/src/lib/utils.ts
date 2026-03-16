@@ -38,6 +38,17 @@ export const parseCurrency = (value: string | number): number => {
   return parseFloat(cleaned) || 0;
 };
 
+// Função para formatar o ID do documento, removendo o prefixo técnico se presente
+export const formatDocumentoId = (id: string): string => {
+  if (!id) return id;
+  // Remove o prefixo 15836626435 (UG + Gestão) se ele existir no início do ID
+  const prefixo = "15836626435";
+  if (id.startsWith(prefixo)) {
+    return id.substring(prefixo.length);
+  }
+  return id;
+};
+
 export const formatarDocumento = (doc: string): string => {
   if (!doc) return doc;
   const cleanDoc = doc.replace(/\D/g, '');
@@ -68,3 +79,4 @@ export const formatarDocumento = (doc: string): string => {
   // Outros formatos (como UG de 6 dígitos) não são modificados
   return cleanDoc;
 };
+
