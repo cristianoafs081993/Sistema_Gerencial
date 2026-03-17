@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { transparenciaService } from '@/services/transparencia';
 import { DocumentoDespesa } from '@/types';
-import { formatCurrency, formatarDocumento, formatDocumentoId } from '@/lib/utils';
-import { format, addDays } from 'date-fns';
+import { formatCurrency, formatarDocumento, formatDocumentoId, parseCurrency } from '@/lib/utils';
+import { format, addDays, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { JsonImportDialog } from '@/components/JsonImportDialog';
+import { retencoesService } from '@/services/retencoes';
 import {
     Table,
     TableBody,
@@ -38,6 +40,8 @@ import {
     X, 
     Eye, 
     FileText, 
+    FileSpreadsheet,
+    Upload,
     FileWarning as FileBadge,
     Calendar as CalendarIcon 
 } from 'lucide-react';
@@ -56,9 +60,7 @@ import { Header, HeaderPortal } from '@/components/Header';
 
 export default function LiquidacoesPagamentos() {
     const queryClient = useQueryClient();
-    const [isSyncing, setIsSyncing] = useState(false);
-    const [syncProgress, setSyncProgress] = useState(0);
-    const [syncStatus, setSyncStatus] = useState('');
+    const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
     // Filtros
     const [searchTerm, setSearchTerm] = useState('');
@@ -90,54 +92,11 @@ export default function LiquidacoesPagamentos() {
         placeholderData: (previousData) => previousData, // Keep previous data while fetching new
     });
 
-    const { data: lastUpdateDate } = useQuery({
-        queryKey: ['transparencia-last-update'],
-        queryFn: () => transparenciaService.getLastDocumentoDate(),
-    });
 
     const documentos = queryData?.data || [];
     const totalRecords = queryData?.total || 0;
     const totalPages = Math.ceil(totalRecords / perPage);
 
-    const handleSync = async () => {
-        try {
-            setIsSyncing(true);
-            setSyncProgress(0);
-            setSyncStatus('Identificando ponto de partida...');
-
-            // Buscamos a última data apenas para o cálculo da porcentagem na UI
-            const lastDateFound = await transparenciaService.getLastDocumentoDate();
-            const dataInicioBase = lastDateFound ? addDays(lastDateFound, 1) : new Date(2026, 0, 1);
-
-            await transparenciaService.syncDados(undefined, (currentDate, total, fase) => {
-                setSyncStatus(`Sincronizando ${format(currentDate, 'dd/MM/yyyy')} - ${fase}... (${total} processados)`);
-
-                // Cálculo de progresso baseado na data de início identificada
-                const totalDias = Math.max(1, (new Date().getTime() - dataInicioBase.getTime()) / (1000 * 3600 * 24));
-                const diasProcessados = (currentDate.getTime() - dataInicioBase.getTime()) / (1000 * 3600 * 24);
-                const porcentagem = Math.min(100, Math.max(0, (diasProcessados / totalDias) * 100));
-                setSyncProgress(porcentagem);
-            });
-
-            setSyncStatus('Sincronização concluída!');
-            setSyncProgress(100);
-            toast.success('Dados sincronizados com sucesso!');
-
-            // Invalidar query para atualizar a tabela
-            queryClient.invalidateQueries({ queryKey: ['transparencia'] });
-
-        } catch (error) {
-            console.error(error);
-            toast.error('Erro ao sincronizar dados. Verifique o console.');
-            setSyncStatus('Erro na sincronização.');
-        } finally {
-            setIsSyncing(false);
-            setTimeout(() => {
-                setSyncProgress(0);
-                setSyncStatus('');
-            }, 5000);
-        }
-    };
 
     const handleSort = (column: string) => {
         if (sortColumn === column) {
@@ -160,6 +119,58 @@ export default function LiquidacoesPagamentos() {
         setDetailsOpen(true);
     };
 
+    const handleRetencoesImport = async (data: Record<string, string>[]) => {
+        const toastId = toast.loading('Processando importação de retenções...');
+        
+        try {
+            const parseDateBR = (str: string) => {
+                if (!str) return undefined;
+                try {
+                    return parse(str, 'dd/MM/yyyy', new Date());
+                } catch (e) {
+                    return undefined;
+                }
+            };
+
+            const mappedData = data.map(row => ({
+                documento_habil: row['documentohabil'],
+                dh_ug_pagadora: row['dhugpagadora'],
+                dh_item_ug_pagadora: row['dhitemugpagadora'],
+                dh_dia_emissao: parseDateBR(row['dhdiaemissao']),
+                dh_data_emissao_doc_origem: parseDateBR(row['dhdataemissaodocorigem']),
+                dh_item_dia_pagamento: parseDateBR(row['dhitemdiapagamento']),
+                dh_item_dia_vencimento: parseDateBR(row['dhitemdiavencimento']),
+                dh_dia_transacao: parseDateBR(row['dhdiatransacao']),
+                dh_dia_pagamento: parseDateBR(row['dhdiapagamento']),
+                dh_credor_numero: row['dhcredornumero'],
+                dh_credor_nome: row['dhcredornome'],
+                dh_processo: row['dhprocesso'],
+                dh_situacao: row['dhsituacao'],
+                dh_valor_doc_origem: parseCurrency(row['dhvalordocorigem']),
+                metrica: row['metrica'],
+                realizavel: row['realizavel']
+            }));
+
+            await retencoesService.upsertBatch(mappedData);
+            toast.success(`${mappedData.length} retenções processadas com sucesso!`, { id: toastId });
+            setIsImportDialogOpen(false);
+            queryClient.invalidateQueries({ queryKey: ['retencoes'] });
+        } catch (error) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const err = error as any;
+            console.error('Erro ao importar retenções:', err);
+            toast.error(`Erro na importação: ${err.message}`, { id: toastId });
+        }
+    };
+
+    const retencoesFields = [
+        'DH - UG Pagadora', 'DH Item - UG Pagadora', 'DH - Dia Emissão', 
+        'DH - Data Emissão Doc.Origem', 'DH Item - Dia Pagamento', 'DH Item - Dia Vencimento', 
+        'DH - Dia Transação', 'DH - Dia Pagamento', 'Documento Hábil', 'DH - Credor Número', 
+        'DH - Credor Nome', 'DH - Processo', 'DH - Situação', 'DH - Valor Doc.Origem', 
+        'Métrica', 'Realizável'
+    ];
+
     return (
         <div className="min-h-screen bg-slate-50/30 dark:bg-slate-950/30">
             <div className="p-4 md:p-8 space-y-8 max-w-[1600px] mx-auto animate-in fade-in duration-500">
@@ -172,28 +183,35 @@ export default function LiquidacoesPagamentos() {
                 <Header 
                     title="Documentos Hábeis" 
                     icon={FileText}
-                    onRefresh={handleSync}
-                    isRefreshing={isSyncing}
+                />
+
+                <HeaderActions>
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="gap-2 font-bold shadow-sm"
+                        onClick={() => setIsImportDialogOpen(true)}
+                    >
+                        <FileSpreadsheet className="h-4 w-4 text-green-600" />
+                        Importar Retenções
+                    </Button>
+                </HeaderActions>
+
+                <JsonImportDialog
+                    open={isImportDialogOpen}
+                    onOpenChange={setIsImportDialogOpen}
+                    onImport={handleRetencoesImport}
+                    title="Importar Retenções por NP"
+                    description="Selecione o arquivo CSV de retenções para importar para o sistema (formato separado por vírgula)."
+                    expectedFields={retencoesFields}
+                    acceptCsv={true}
+                    csvSeparator=","
                 />
 
                 <HeaderPortal targetId="header-subtitle">
-                    Documentos Hábeis {lastUpdateDate ? `(Atualizado até: ${format(lastUpdateDate, 'dd/MM/yyyy')})` : ''}
+                    Documentos Hábeis
                 </HeaderPortal>
 
-                {isSyncing && (
-                    <div className="fixed bottom-8 right-8 z-50 w-80 bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-2xl border animate-in slide-in-from-bottom-5">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="bg-primary/10 p-2 rounded-lg">
-                                <Loader2 className="w-4 h-4 text-primary animate-spin" />
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Sincronizando Banco</p>
-                                <p className="text-[10px] text-muted-foreground truncate">{syncStatus}</p>
-                            </div>
-                        </div>
-                        <Progress value={syncProgress} className="h-1.5" />
-                    </div>
-                )}
                 
                 <div className="space-y-6">
                     {/* Filtros em Grid */}

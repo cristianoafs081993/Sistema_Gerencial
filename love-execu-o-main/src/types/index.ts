@@ -247,6 +247,17 @@ export interface DocumentoDespesaAPI {
   modalidade: string;
 }
 
+export interface DocumentoItem {
+  id: string;
+  documento_habil_id: string;
+  doc_tipo: string;
+  data_emissao?: Date;
+  valor: number;
+  observacao?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface DocumentoDespesa {
   id: string;
   documento: string;
@@ -264,6 +275,30 @@ export interface DocumentoDespesa {
   empenhoDocumento?: string;
   valorLiquidado?: number;
   valorRestoPago?: number;
+  itens?: DocumentoItem[];
+  retencoes?: Retencao[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Retencao {
+  id: string;
+  documento_habil?: string;
+  dh_ug_pagadora?: string;
+  dh_item_ug_pagadora?: string;
+  dh_dia_emissao?: Date;
+  dh_data_emissao_doc_origem?: Date;
+  dh_item_dia_pagamento?: Date;
+  dh_item_dia_vencimento?: Date;
+  dh_dia_transacao?: Date;
+  dh_dia_pagamento?: Date;
+  dh_credor_numero?: string;
+  dh_credor_nome?: string;
+  dh_processo?: string;
+  dh_situacao?: string;
+  dh_valor_doc_origem: number;
+  metrica?: string;
+  realizavel?: string;
   createdAt: Date;
   updatedAt: Date;
 }
