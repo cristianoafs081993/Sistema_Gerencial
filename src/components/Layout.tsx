@@ -197,8 +197,8 @@ export function Layout({ children }: LayoutProps) {
               Conceito 5 — glass morphism sutil para integrar ao background */}
           <header className={cn(
             "sticky top-0 z-30 flex h-16 items-center gap-4 shrink-0",
-            "border-b border-border/60 bg-card/95 backdrop-blur-sm",
-            "px-4 lg:px-8 shadow-xs",
+            "border-b border-white/10 glass",
+            "px-4 lg:px-8",
             "transition-shadow duration-200",
           )}>
             {/* Mobile menu */}
@@ -229,7 +229,7 @@ export function Layout({ children }: LayoutProps) {
 
           {/* ── Page content ──
               Conceito 3 — Espaçamento consistente 8pt grid: p-4 (16px) → lg:p-8 (32px) */}
-          <main className="flex-1 p-4 lg:p-8 overflow-y-auto scrollbar-thin">
+          <main className="flex-1 p-4 lg:p-8 overflow-y-auto scrollbar-thin dot-pattern">
             <div className="max-w-[1600px] mx-auto animate-fade-in">
               {children}
             </div>

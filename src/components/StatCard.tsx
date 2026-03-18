@@ -30,56 +30,103 @@ export function StatCard({
 }: StatCardProps) {
 
   if (stitchColor) {
-    // New Stitch Premium Layout
-    const bgColorMap = {
-      'vibrant-blue': 'bg-vibrant-blue',
-      'purple': 'bg-purple',
-      'amber': 'bg-amber',
-      'emerald-green': 'bg-emerald-green',
-      'red-500': 'bg-red-500',
+    /* ── "Stitch Color" layout — Aura Style ──
+       - Border-glow: borda luminosa sutil
+       - Barra lateral colorida como accent
+       - Valor com text-gradient baseado na cor
+       - Ícone com fundo glassmorphism leve
+       - Micro-interação: hover sobe 1px */
+
+    const accentBarMap = {
+      'vibrant-blue':  'bg-[#3b82f6]',
+      'purple':        'bg-[#a855f7]',
+      'amber':         'bg-[#f59e0b]',
+      'emerald-green': 'bg-[#10b981]',
+      'red-500':       'bg-[#ef4444]',
     };
 
-    const textColorMap = {
-      'vibrant-blue': 'text-vibrant-blue',
-      'purple': 'text-purple',
-      'amber': 'text-amber',
-      'emerald-green': 'text-emerald-green',
-      'red-500': 'text-red-500',
+    const iconBgMap = {
+      'vibrant-blue':  'bg-[#3b82f6]/10 text-[#3b82f6]',
+      'purple':        'bg-[#a855f7]/10 text-[#a855f7]',
+      'amber':         'bg-[#f59e0b]/10 text-[#a16207]',
+      'emerald-green': 'bg-[#10b981]/10 text-[#10b981]',
+      'red-500':       'bg-[#ef4444]/10 text-[#ef4444]',
     };
 
-    const bgLightMap = {
-      'vibrant-blue': 'bg-vibrant-blue/10',
-      'purple': 'bg-purple/10',
-      'amber': 'bg-amber/10',
-      'emerald-green': 'bg-emerald-green/10',
-      'red-500': 'bg-red-500/10',
+    const valueGradientMap = {
+      'vibrant-blue':  'from-[#1a5ce6] to-[#3b82f6]',
+      'purple':        'from-[#7c3aed] to-[#a855f7]',
+      'amber':         'from-[#b45309] to-[#f59e0b]',
+      'emerald-green': 'from-[#047857] to-[#10b981]',
+      'red-500':       'from-[#dc2626] to-[#ef4444]',
+    };
+
+    const progressBgMap = {
+      'vibrant-blue':  'bg-[#3b82f6]',
+      'purple':        'bg-[#a855f7]',
+      'amber':         'bg-[#f59e0b]',
+      'emerald-green': 'bg-[#10b981]',
+      'red-500':       'bg-[#ef4444]',
     };
 
     return (
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden animate-fade-in">
-        <div className={cn("absolute left-0 top-0 bottom-0 w-1", bgColorMap[stitchColor])}></div>
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-sm font-medium text-slate-500">{title}</p>
-          <div className={cn("p-1.5 rounded-md", bgLightMap[stitchColor], textColorMap[stitchColor])}>
-            <Icon className="w-5 h-5" />
+      <div className={cn(
+        "relative overflow-hidden rounded-2xl",
+        "bg-card border border-border/70",
+        "shadow-soft hover:shadow-card hover:-translate-y-[1px]",
+        "transition-all duration-200",
+        "p-5 animate-fade-in",
+      )}>
+        {/* Barra lateral colorida — Aura Style accent indicator */}
+        <div className={cn("absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl", accentBarMap[stitchColor])} />
+
+        {/* Brilho de fundo sutil no canto superior direito */}
+        <div className={cn(
+          "absolute -top-10 -right-10 w-28 h-28 rounded-full opacity-5 blur-2xl",
+          accentBarMap[stitchColor]
+        )} />
+
+        <div className="flex items-start justify-between mb-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {title}
+          </p>
+          {/* Ícone com glassmorphism leve */}
+          <div className={cn("p-2 rounded-xl", iconBgMap[stitchColor])}>
+            <Icon className="w-4 h-4" />
           </div>
         </div>
+
         {isLoading ? (
-          <Skeleton className="h-8 w-1/2 mt-1 mb-1" />
+          <Skeleton className="h-8 w-3/5 mt-1 mb-1" />
         ) : (
-          <h3 className="text-2xl font-bold text-slate-900">{value}</h3>
+          /* Valor com text-gradient — Aura Style */
+          <h3 className={cn(
+            "text-2xl font-black tracking-tight",
+            "bg-gradient-to-br bg-clip-text text-transparent",
+            valueGradientMap[stitchColor]
+          )}>
+            {value}
+          </h3>
         )}
+
         {isLoading && subtitle ? (
-          <Skeleton className="h-4 w-3/4 mt-2" />
+          <Skeleton className="h-3.5 w-3/4 mt-2" />
         ) : (
-          subtitle && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>
+          subtitle && (
+            <p className="text-xs text-muted-foreground mt-1.5 leading-tight">{subtitle}</p>
+          )
         )}
+
+        {/* Progress bar refinada */}
         {progress !== undefined && (
-          <div className="mt-3 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+          <div className="mt-4 w-full bg-muted rounded-full h-1 overflow-hidden">
             {isLoading ? (
-              <Skeleton className="h-full w-full" />
+              <div className="h-full w-full animate-shimmer rounded-full" />
             ) : (
-              <div className={cn("h-full rounded-full", bgColorMap[stitchColor])} style={{ width: `${progress}%` }}></div>
+              <div
+                className={cn("h-full rounded-full transition-all duration-700 ease-spring", progressBgMap[stitchColor])}
+                style={{ width: `${Math.min(progress, 100)}%` }}
+              />
             )}
           </div>
         )}
@@ -87,7 +134,7 @@ export function StatCard({
     );
   }
 
-  // Legacy Layout
+  // ── Legacy Layout (mantido para compatibilidade) ──
   const variantStyles = {
     default: 'stat-card',
     primary: 'stat-card-primary',
@@ -122,7 +169,7 @@ export function StatCard({
         ) : (
           <p className={cn(
             "text-3xl font-bold mt-2 tracking-tight",
-            variant === 'default' ? 'text-foreground' : 'text-white'
+            variant === 'default' ? 'text-gradient-dark' : 'text-white'
           )}>
             {value}
           </p>
