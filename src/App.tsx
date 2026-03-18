@@ -13,6 +13,8 @@ import NotFound from "./pages/NotFound";
 
 import Contratos from "./pages/Contratos";
 import LiquidacoesPagamentos from "./pages/LiquidacoesPagamentos";
+import RastreabilidadePFs from "./pages/RastreabilidadePFs";
+import ConciliacaoPfs from "./pages/ConciliacaoPfs";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +33,8 @@ const App = () => (
               <Route path="/empenhos" element={<Empenhos />} />
               <Route path="/contratos" element={<Contratos />} />
               <Route path="/liquidacoes-pagamentos" element={<LiquidacoesPagamentos />} />
+              <Route path="/rastreabilidade-pfs" element={<RastreabilidadePFs />} />
+              <Route path="/conciliacao-pfs" element={<ConciliacaoPfs />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Layout>

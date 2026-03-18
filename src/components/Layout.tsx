@@ -10,7 +10,9 @@ import {
   Banknote,
   ArrowDownRight,
   ChevronLeft,
-  FileStack
+  FileStack,
+  ClipboardList,
+  ScanSearch
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -32,6 +34,8 @@ const navigation = [
   { name: 'Empenhos', href: '/empenhos', icon: Receipt },
   { name: 'Contratos', href: '/contratos', icon: FileStack },
   { name: 'Liquidações', href: '/liquidacoes-pagamentos', icon: Banknote },
+  { name: 'Rastreabilidade de PFs', href: '/rastreabilidade-pfs', icon: ClipboardList },
+  { name: 'Conciliação de PFs', href: '/conciliacao-pfs', icon: ScanSearch },
 ];
 
 export function Layout({ children }: LayoutProps) {
