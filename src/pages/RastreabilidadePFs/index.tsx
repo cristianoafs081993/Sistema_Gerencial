@@ -25,6 +25,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Upload, Search, Filter, ArrowUpDown, ChevronRight, Eye } from 'lucide-react';
 import { PFImportDialog } from './PFImportDialog';
 import { PFDetailsDialog } from './PFDetailsDialog';
+import { HeaderSubtitle, HeaderActions } from '@/components/HeaderParts';
 
 export default function RastreabilidadePFs() {
   const [data, setData] = useState<RastreabilidadePF[]>([]);
@@ -155,15 +156,13 @@ export default function RastreabilidadePFs() {
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">Rastreabilidade de PFs</h2>
-        <div className="flex items-center space-x-2">
-          <Button onClick={() => setImportOpen(true)}>
-            <Upload className="mr-2 h-4 w-4" />
-            Importar arquivos
-          </Button>
-        </div>
-      </div>
+      <HeaderSubtitle>Rastreabilidade e controle de PFs por fonte</HeaderSubtitle>
+      <HeaderActions>
+        <Button onClick={() => setImportOpen(true)} size="sm" className="gap-2">
+          <Upload className="h-4 w-4" />
+          Importar arquivos
+        </Button>
+      </HeaderActions>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>

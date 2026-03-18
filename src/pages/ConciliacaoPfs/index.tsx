@@ -25,6 +25,7 @@ import {
 import { formatCurrency, formatDocumentoId } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { HeaderSubtitle, HeaderActions } from '@/components/HeaderParts';
 
 interface NecessidadeFonte {
   fonte: string;
@@ -72,21 +73,14 @@ export default function ConciliacaoPfs() {
 
   return (
     <div className="flex-1 space-y-8 p-8 pt-6 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-3">
-             Necessidade de Recursos (PF) 
-             {totalNecessidade > 0 && <Badge variant="destructive" className="animate-pulse">Crítico</Badge>}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Análise de liquidações em aberto vs. saldo disponível de solicitações de recurso.
-          </p>
-        </div>
+      <HeaderSubtitle>Análise de liquidações em aberto vs. saldo disponível de PFs</HeaderSubtitle>
+      <HeaderActions>
+        {totalNecessidade > 0 && <Badge variant="destructive" className="animate-pulse">Crítico</Badge>}
         <Button onClick={fetchData} variant="outline" size="sm" className="gap-2 shadow-sm" disabled={loading}>
           <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
           Atualizar Análise
         </Button>
-      </div>
+      </HeaderActions>
 
       {/* Overview Cards */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

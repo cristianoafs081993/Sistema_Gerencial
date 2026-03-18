@@ -28,19 +28,19 @@ interface LayoutProps {
 }
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Atividades', href: '/atividades', icon: FileText },
-  { name: 'Descentralizações', href: '/descentralizacoes', icon: ArrowDownRight },
-  { name: 'Empenhos', href: '/empenhos', icon: Receipt },
-  { name: 'Contratos', href: '/contratos', icon: FileStack },
-  { name: 'Liquidações', href: '/liquidacoes-pagamentos', icon: Banknote },
+  { name: 'Dashboard',            href: '/',                      icon: LayoutDashboard },
+  { name: 'Atividades',           href: '/atividades',            icon: FileText },
+  { name: 'Descentralizações',    href: '/descentralizacoes',     icon: ArrowDownRight },
+  { name: 'Empenhos',             href: '/empenhos',              icon: Receipt },
+  { name: 'Contratos',            href: '/contratos',             icon: FileStack },
+  { name: 'Liquidações',          href: '/liquidacoes-pagamentos',icon: Banknote },
   { name: 'Rastreabilidade de PFs', href: '/rastreabilidade-pfs', icon: ClipboardList },
-  { name: 'Conciliação de PFs', href: '/conciliacao-pfs', icon: ScanSearch },
+  { name: 'Conciliação de PFs',   href: '/conciliacao-pfs',       icon: ScanSearch },
 ];
 
 export function Layout({ children }: LayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(() => {
+  const [sidebarOpen, setSidebarOpen]     = useState(false);
+  const [isCollapsed, setIsCollapsed]     = useState(() => {
     const saved = localStorage.getItem('sidebar-collapsed');
     return saved === 'true';
   });
@@ -52,101 +52,129 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <TooltipProvider delayDuration={0}>
-      <div className="min-h-screen bg-background-light flex">
-        {/* Mobile sidebar backdrop */}
+      <div className="min-h-screen bg-background flex">
+
+        {/* ── Mobile backdrop — Overlay correto com blur (Conceito 11) ── */}
         {sidebarOpen && (
           <div
-            className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden animate-fade-in"
             onClick={() => setSidebarOpen(false)}
           />
         )}
 
-        {/* Sidebar */}
+        {/* ══════════════════════════════════════════
+            SIDEBAR
+            Conceito 3 — Espaçamento 8pt grid
+            Conceito 10 — Micro-interações suaves
+        ══════════════════════════════════════════ */}
         <aside
           className={cn(
-            "fixed inset-y-0 left-0 z-50 bg-sidebar text-sidebar-foreground border-r border-sidebar-border shadow-xl transform transition-all duration-300 ease-in-out lg:relative lg:translate-x-0 group",
+            "fixed inset-y-0 left-0 z-50",
+            "bg-sidebar text-sidebar-foreground border-r border-sidebar-border",
+            "shadow-lifted transform transition-all duration-300 ease-spring",
+            "lg:relative lg:translate-x-0 group",
             sidebarOpen ? "translate-x-0" : "-translate-x-full",
-            isCollapsed ? "lg:w-20" : "lg:w-64",
+            isCollapsed ? "lg:w-[72px]" : "lg:w-64",
             !isCollapsed && "w-64"
           )}
         >
-          {/* Floating Toggle Button (Desktop) - Displays on Hover */}
+          {/* Toggle flutuante — Affordance clara (Conceito 1) */}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className={cn(
-              "absolute -right-3 top-20 z-50 hidden h-6 w-6 lg:flex items-center justify-center rounded-full border border-sidebar-border bg-background shadow-sm hover:bg-sidebar-accent transition-all duration-300 opacity-0 group-hover:opacity-100",
-              isCollapsed && "rotate-0",
-              !isCollapsed && "rotate-0"
+              "absolute -right-3 top-[72px] z-50 hidden h-6 w-6",
+              "lg:flex items-center justify-center rounded-full",
+              "border border-border bg-card shadow-soft",
+              "hover:bg-muted hover:shadow-card",
+              "transition-all duration-200 opacity-0 group-hover:opacity-100",
             )}
             title={isCollapsed ? "Expandir menu" : "Recolher menu"}
           >
             {isCollapsed ? (
-              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform" />
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
             ) : (
-              <ChevronLeft className="h-3.5 w-3.5 text-muted-foreground transition-transform" />
+              <ChevronLeft className="h-3.5 w-3.5 text-muted-foreground" />
             )}
           </button>
 
+          {/* ── Logo header ── */}
           <div className={cn(
-            "flex h-16 items-center border-b border-sidebar-border/50 transition-all duration-300 px-4",
-            isCollapsed ? "justify-center" : "justify-between px-6"
+            "flex h-16 items-center border-b border-sidebar-border/60 transition-all duration-300",
+            isCollapsed ? "justify-center px-4" : "justify-between px-5"
           )}>
             {!isCollapsed && (
-              <span className="text-xl font-bold tracking-tight text-sidebar-foreground truncate animate-fade-in">
-                Sistema Gerencial
-              </span>
+              <div className="flex flex-col gap-0 animate-fade-in overflow-hidden">
+                {/* Hierarquia visual — nome principal + tagline (Conceito 2) */}
+                <span className="text-[15px] font-bold tracking-tight text-sidebar-foreground truncate">
+                  Sistema Gerencial
+                </span>
+                <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-widest">
+                  Controle Orçamentário
+                </span>
+              </div>
             )}
-
             <Button
               variant="ghost"
-              size="icon"
+              size="icon-sm"
               className="lg:hidden text-sidebar-foreground hover:bg-sidebar-accent"
               onClick={() => setSidebarOpen(false)}
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4" />
             </Button>
           </div>
 
-          <nav className="flex flex-col gap-1.5 p-3 mt-4">
+          {/* ── Navigation ── */}
+          <nav className="flex flex-col gap-0.5 p-3 mt-2">
             {navigation.map((item) => {
               const isActive = location.pathname === item.href;
+
               const content = (
                 <Link
                   to={item.href}
                   onClick={() => setSidebarOpen(false)}
                   className={cn(
-                    "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all group relative overflow-hidden",
+                    // Affordance: parece clicável, responde ao toque (Conceito 1 e 10)
+                    "flex items-center gap-3 rounded-xl py-2.5 text-sm font-medium",
+                    "transition-all duration-150 select-none relative overflow-hidden",
                     isActive
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md shadow-primary/10"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground active:scale-95",
-                    isCollapsed && "justify-center px-0 h-11 w-11 mx-auto"
+                      ? "bg-primary text-primary-foreground font-semibold shadow-primary"
+                      : "text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground active:scale-[0.98]",
+                    isCollapsed
+                      ? "justify-center px-0 h-11 w-11 mx-auto"
+                      : "px-3"
                   )}
                 >
+                  {/* Indicador lateral do item ativo — Hierarquia Visual (Conceito 2) */}
+                  {isActive && !isCollapsed && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-white/50 rounded-r-full" />
+                  )}
+
                   <item.icon className={cn(
-                    "h-5 w-5 shrink-0 transition-all duration-300",
-                    isActive ? "scale-110" : "group-hover:scale-110 group-hover:rotate-3"
+                    "h-[18px] w-[18px] shrink-0 transition-all duration-200",
+                    isActive ? "opacity-100" : "opacity-55 group-hover:opacity-100"
                   )} />
 
                   {!isCollapsed && (
-                    <span className={cn(
-                      "truncate transition-all duration-300 flex-1",
-                      isActive ? "translate-x-1" : "group-hover:translate-x-1"
-                    )}>
+                    <span className="truncate flex-1 transition-all duration-200">
                       {item.name}
                     </span>
                   )}
 
-                  {isActive && !isCollapsed && <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-60" />}
+                  {isActive && !isCollapsed && (
+                    <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-50 shrink-0" />
+                  )}
                 </Link>
               );
 
               if (isCollapsed) {
                 return (
                   <Tooltip key={item.name}>
-                    <TooltipTrigger asChild>
-                      {content}
-                    </TooltipTrigger>
-                    <TooltipContent side="right" sideOffset={15} className="bg-sidebar-primary text-sidebar-primary-foreground border-none font-medium">
+                    <TooltipTrigger asChild>{content}</TooltipTrigger>
+                    <TooltipContent
+                      side="right"
+                      sideOffset={12}
+                      className="bg-primary text-primary-foreground border-none font-semibold text-xs shadow-primary animate-scale-in"
+                    >
                       {item.name}
                     </TooltipContent>
                   </Tooltip>
@@ -156,38 +184,58 @@ export function Layout({ children }: LayoutProps) {
               return <div key={item.name}>{content}</div>;
             })}
           </nav>
-
-          {/* User profile section at bottom could go here */}
         </aside>
 
-        {/* Main content area */}
+        {/* ══════════════════════════════════════════
+            MAIN CONTENT
+        ══════════════════════════════════════════ */}
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Top bar */}
-          <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-card px-4 lg:px-8 shadow-sm">
+
+          {/* ── TOP BAR ──
+              Conceito 2 — Hierarquia visual: título h1 + subtítulo descritivo
+              Conceito 7 — Sombra suave (não borda dura)
+              Conceito 5 — glass morphism sutil para integrar ao background */}
+          <header className={cn(
+            "sticky top-0 z-30 flex h-16 items-center gap-4 shrink-0",
+            "border-b border-border/60 bg-card/95 backdrop-blur-sm",
+            "px-4 lg:px-8 shadow-xs",
+            "transition-shadow duration-200",
+          )}>
+            {/* Mobile menu */}
             <Button
               variant="ghost"
-              size="icon"
-              className="lg:hidden"
+              size="icon-sm"
+              className="lg:hidden text-muted-foreground"
               onClick={() => setSidebarOpen(true)}
             >
               <Menu className="h-5 w-5" />
             </Button>
-            <div className="flex-1 flex flex-col justify-center">
-              <h1 className="text-lg font-bold text-foreground leading-tight tracking-tight">
+
+            {/* Título da página + subtítulo (Visual Hierarchy — Conceito 2) */}
+            <div className="flex-1 flex flex-col justify-center min-w-0">
+              <h1 className="text-[15px] font-bold text-foreground leading-none tracking-tight truncate">
                 {navigation.find((n) => n.href === location.pathname)?.name || 'Sistema'}
               </h1>
-              <div id="header-subtitle" className="text-xs text-muted-foreground/80 font-medium"></div>
+              {/* Portal de subtítulo injetado pelas páginas */}
+              <div
+                id="header-subtitle"
+                className="text-[11px] text-muted-foreground font-medium leading-tight mt-[3px] truncate empty:hidden"
+              />
             </div>
-            <div id="header-actions" className="flex items-center gap-3"></div>
+
+            {/* Portal de ações injetadas pelas páginas */}
+            <div id="header-actions" className="flex items-center gap-2 shrink-0" />
           </header>
 
-          {/* Page content */}
-          <main className="p-4 lg:p-8 overflow-y-auto">
-            <div className="max-w-[1600px] mx-auto">
+          {/* ── Page content ──
+              Conceito 3 — Espaçamento consistente 8pt grid: p-4 (16px) → lg:p-8 (32px) */}
+          <main className="flex-1 p-4 lg:p-8 overflow-y-auto scrollbar-thin">
+            <div className="max-w-[1600px] mx-auto animate-fade-in">
               {children}
             </div>
           </main>
         </div>
+
       </div>
     </TooltipProvider>
   );

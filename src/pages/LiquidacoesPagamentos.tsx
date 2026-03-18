@@ -39,7 +39,6 @@ import {
     Filter as FilterIcon, 
     X, 
     Eye, 
-    FileText, 
     FileSpreadsheet,
     Upload,
     FileWarning as FileBadge,
@@ -56,7 +55,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { DocumentoDetalhesDialog } from '@/components/DocumentoDetalhesDialog';
 import { HeaderSubtitle, HeaderActions } from '@/components/HeaderParts';
-import { Header, HeaderPortal } from '@/components/Header';
 
 export default function LiquidacoesPagamentos() {
     const queryClient = useQueryClient();
@@ -180,10 +178,7 @@ export default function LiquidacoesPagamentos() {
                     documento={selectedDocumento}
                 />
 
-                <Header 
-                    title="Documentos Hábeis" 
-                    icon={FileText}
-                />
+                <HeaderSubtitle>Documentos Hábeis</HeaderSubtitle>
 
                 <HeaderActions>
                     <Button 
@@ -207,10 +202,6 @@ export default function LiquidacoesPagamentos() {
                     acceptCsv={true}
                     csvSeparator=","
                 />
-
-                <HeaderPortal targetId="header-subtitle">
-                    Documentos Hábeis
-                </HeaderPortal>
 
                 
                 <div className="space-y-6">

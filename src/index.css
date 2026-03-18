@@ -1,173 +1,416 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+/* ============================================================
+   SISTEMA GERENCIAL — Design System v2.0
+   Baseado nos 11 conceitos UI/UX (Every UI/UX Concept Explained)
+   ============================================================ */
+
+/* 1. TYPOGRAPHY — Importing Inter with full weight range */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   2. COLOR SYSTEM — Regra 60-30-10
+   60% → Neutros (background, card, borders)
+   30% → Cor secundária / superfícies
+   10% → Accent / Primary (ações, destaques)
+   ============================================================ */
+
 @layer base {
   :root {
-    /* Stitch Base Palette */
-    --background: 210 20% 98%;
-    /* #f8fafc */
-    --foreground: 222 47% 11%;
+    /* === NEUTROS (60%) === */
+    /* Nunca usar branco puro — levemente azulado para conforto visual */
+    --background: 220 20% 97%;      /* #f4f6fa */
+    --foreground: 222 39% 11%;      /* #161d2f */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card: 0 0% 100%;              /* #ffffff — cards sobre o fundo */
+    --card-foreground: 222 39% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 222 39% 11%;
 
-    /* Stitch Primary: #195de6 (HSL ~ 220, 80%, 50%) */
-    --primary: 220 80% 50%;
+    --border: 220 20% 88%;          /* #dde2ec */
+    --input: 220 20% 91%;
+    --ring: 220 80% 55%;
+
+    --muted: 220 20% 94%;           /* superfície suave */
+    --muted-foreground: 220 13% 46%; /* texto secundário */
+
+    /* === SECUNDÁRIO (30%) === */
+    --secondary: 220 30% 92%;
+    --secondary-foreground: 222 39% 20%;
+
+    /* === ACCENT / PRIMARY (10%) === */
+    /* Azul vibrante — não genérico */
+    --primary: 220 80% 52%;         /* #1a5ce6 — azul rico */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-
-    --accent: 152 69% 31%;
+    /* Verde — sucesso / confirmações */
+    --accent: 152 65% 33%;          /* #1a9b5f */
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 60%;
+    /* Estados semânticos */
+    --destructive: 4 86% 58%;       /* #f03a2e */
     --destructive-foreground: 0 0% 100%;
-
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 217 91% 40%;
-
-    --radius: 0.5rem;
-
-    /* Custom tokens mapped for shadcn components that rely on HSL */
-    /* Emerald Green #10b981 */
-    --success: 160 84% 39%;
+    --success: 152 65% 33%;
     --success-foreground: 0 0% 100%;
-    /* Amber #f59e0b */
-    --warning: 45 93% 47%;
+    --warning: 38 90% 50%;          /* #f59e0b */
     --warning-foreground: 0 0% 100%;
-    /* Vibrant Blue #3b82f6 */
-    --info: 217 91% 60%;
+    --info: 212 90% 58%;
     --info-foreground: 0 0% 100%;
 
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 215 16% 47%;
-    --sidebar-primary: 220 80% 50%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 40% 96%;
-    --sidebar-accent-foreground: 220 80% 50%;
-    --sidebar-border: 214 32% 91%;
-    --sidebar-ring: 220 80% 50%;
+    /* Raio padrão — 8pt grid */
+    --radius: 0.5rem;               /* 8px */
 
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(217, 91%, 40%) 0%, hsl(217, 91%, 30%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(152, 69%, 31%) 0%, hsl(152, 69%, 25%) 100%);
-    --gradient-warning: linear-gradient(135deg, hsl(38, 92%, 50%) 0%, hsl(38, 92%, 40%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0, 0%, 100%) 0%, hsl(210, 40%, 98%) 100%);
+    /* === SIDEBAR === */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 13% 46%;
+    --sidebar-primary: 220 80% 52%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 20% 94%;
+    --sidebar-accent-foreground: 220 80% 52%;
+    --sidebar-border: 220 20% 91%;
+    --sidebar-ring: 220 80% 52%;
+
+    /* === SOMBRAS MULTICAMADAS (conceito 7 do vídeo) ===
+       Nunca usar uma sombra dura única — sempre camadas suaves */
+    --shadow-xs:  0 1px 2px 0 rgba(0,0,0,.04);
+    --shadow-sm:  0 1px 3px 0 rgba(0,0,0,.06),  0 1px 2px -1px rgba(0,0,0,.04);
+    --shadow-md:  0 4px 6px -1px rgba(0,0,0,.07), 0 2px 4px -2px rgba(0,0,0,.05);
+    --shadow-lg:  0 10px 15px -3px rgba(0,0,0,.08), 0 4px 6px -4px rgba(0,0,0,.05);
+    --shadow-xl:  0 20px 25px -5px rgba(0,0,0,.08), 0 8px 10px -6px rgba(0,0,0,.04);
+    --shadow-primary: 0 4px 14px 0 rgba(26,92,230,.25);
+
+    /* === GRADIENTES === */
+    --gradient-primary: linear-gradient(135deg, hsl(220,80%,52%) 0%, hsl(220,80%,40%) 100%);
+    --gradient-accent:  linear-gradient(135deg, hsl(152,65%,33%) 0%, hsl(152,65%,26%) 100%);
+    --gradient-warning: linear-gradient(135deg, hsl(38,90%,50%)  0%, hsl(38,90%,40%)  100%);
+    --gradient-card:    linear-gradient(180deg, hsl(0,0%,100%)   0%, hsl(220,20%,98%) 100%);
   }
 
+  /* ============================================================
+     DARK MODE — Nunca usar preto puro (#000)
+     Usar cinzas escuros com elevação (camadas mais claras = mais perto)
+     ============================================================ */
   .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
+    /* Fundo base — tom de cinza azulado escuro (não preto puro) */
+    --background: 222 28% 10%;      /* #111827 — base */
+    --foreground: 210 35% 93%;      /* #dce6f4 */
 
-    --card: 222 47% 15%;
-    --card-foreground: 210 40% 98%;
+    /* Elevação 1 — cards elevados sobre o fundo */
+    --card: 222 28% 13%;            /* #171f2e */
+    --card-foreground: 210 35% 93%;
 
-    --popover: 222 47% 15%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 222 28% 15%;
+    --popover-foreground: 210 35% 93%;
 
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 11%;
+    /* Elevação 2 — inputs, superfícies secundárias */
+    --secondary: 222 28% 18%;
+    --secondary-foreground: 210 35% 80%;
 
-    --secondary: 217 32% 20%;
-    --secondary-foreground: 210 40% 98%;
+    --muted: 222 28% 16%;
+    --muted-foreground: 215 18% 55%;
 
-    --muted: 217 32% 20%;
-    --muted-foreground: 215 20% 65%;
+    --border: 222 28% 20%;
+    --input: 222 28% 18%;
+    --ring: 220 80% 60%;
 
-    --accent: 152 69% 40%;
+    /* Primary mais vibrante no dark */
+    --primary: 220 80% 62%;
+    --primary-foreground: 222 28% 10%;
+
+    --accent: 152 60% 42%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 4 72% 52%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 217 32% 20%;
-    --input: 217 32% 20%;
-    --ring: 212 27% 84%;
-
-    --sidebar-background: 222 47% 11%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217 91% 60%;
+    --sidebar-background: 222 28% 10%;
+    --sidebar-foreground: 210 35% 70%;
+    --sidebar-primary: 220 80% 62%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 32% 20%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217 32% 20%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-accent: 222 28% 16%;
+    --sidebar-accent-foreground: 210 35% 93%;
+    --sidebar-border: 222 28% 16%;
+
+    /* Sombras mais suaves no dark */
+    --shadow-sm:  0 1px 3px 0 rgba(0,0,0,.25), 0 1px 2px -1px rgba(0,0,0,.15);
+    --shadow-md:  0 4px 6px -1px rgba(0,0,0,.30), 0 2px 4px -2px rgba(0,0,0,.20);
+    --shadow-lg:  0 10px 15px -3px rgba(0,0,0,.35), 0 4px 6px -4px rgba(0,0,0,.20);
+    --shadow-primary: 0 4px 14px 0 rgba(88,148,255,.20);
   }
 }
+
+/* ============================================================
+   3. BASE STYLES — Affordances, tipografia e espaçamento
+   ============================================================ */
 
 @layer base {
   * {
     @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    /* Suaviza scroll */
+    scroll-behavior: smooth;
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', sans-serif;
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    /* Line-height 1.5 para legibilidade (conceito 4) */
+    line-height: 1.5;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    text-rendering: optimizeLegibility;
+  }
+
+  /* === HIERARQUIA TIPOGRÁFICA (conceito 4) ===
+     Nunca usar tamanhos aleatórios — escala modular clara */
+  h1 { @apply text-2xl font-bold tracking-tight leading-tight; }
+  h2 { @apply text-xl font-bold tracking-tight leading-snug; }
+  h3 { @apply text-lg font-semibold leading-snug; }
+  h4 { @apply text-base font-semibold; }
+  h5 { @apply text-sm font-semibold; }
+  h6 { @apply text-xs font-semibold uppercase tracking-wider; }
+
+  p  { line-height: 1.6; }
+
+  /* Seleção de texto com cor primária */
+  ::selection {
+    background-color: hsl(var(--primary) / 0.15);
+    color: hsl(var(--foreground));
+  }
+
+  /* Foco visível para acessibilidade (conceito 9 — states) */
+  :focus-visible {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: 2px;
+    border-radius: var(--radius);
   }
 }
 
+/* ============================================================
+   4. COMPONENT LAYER — Reutilizáveis com design system
+   ============================================================ */
+
 @layer components {
+
+  /* === CARDS — Multi-shadow layers (conceito 7) === */
+  .card-elevated {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: calc(var(--radius) + 4px);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.2s ease, transform 0.15s ease;
+  }
+  .card-elevated:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+  }
+
+  /* === STAT CARDS (conceito 2 — Hierarquia Visual) === */
   .stat-card {
-    @apply bg-card rounded-xl p-6 shadow-sm border border-border transition-all duration-200 hover:shadow-md relative overflow-hidden;
+    @apply bg-card rounded-2xl p-6 border border-border transition-all duration-200 relative overflow-hidden;
+    box-shadow: var(--shadow-sm);
+  }
+  .stat-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
   }
 
   .stat-card-primary {
     background: var(--gradient-primary);
-    @apply text-primary-foreground rounded-xl p-6 shadow-lg relative overflow-hidden;
+    @apply text-primary-foreground rounded-2xl p-6 relative overflow-hidden;
+    box-shadow: var(--shadow-primary);
   }
-
   .stat-card-accent {
     background: var(--gradient-accent);
-    @apply text-accent-foreground rounded-xl p-6 shadow-lg relative overflow-hidden;
+    @apply text-accent-foreground rounded-2xl p-6 relative overflow-hidden;
+    box-shadow: var(--shadow-lg);
   }
-
   .stat-card-warning {
     background: var(--gradient-warning);
-    @apply text-white rounded-xl p-6 shadow-lg relative overflow-hidden;
+    @apply text-white rounded-2xl p-6 relative overflow-hidden;
+    box-shadow: var(--shadow-lg);
   }
 
+  /* === DATA TABLE === */
   .data-table {
-    @apply w-full bg-card rounded-xl shadow-sm border border-border overflow-hidden;
+    @apply w-full bg-card rounded-2xl border border-border overflow-hidden;
+    box-shadow: var(--shadow-sm);
   }
 
+  /* === PAGE HEADER (conceito 3 — Grid e Espaçamento) ===
+     Segue o grid de 8pt: mb-8 = 32px = 4 × 8pt */
   .page-header {
     @apply mb-8;
   }
-
   .page-title {
-    @apply text-3xl font-bold text-foreground tracking-tight;
+    @apply text-2xl font-bold text-foreground tracking-tight;
+  }
+  .page-subtitle {
+    @apply text-sm text-muted-foreground mt-1;
+    line-height: 1.5;
   }
 
-  .page-subtitle {
-    @apply text-muted-foreground mt-1;
+  /* === BADGES SEMÂNTICOS === */
+  .badge-success {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold;
+    background-color: hsl(var(--success) / 0.12);
+    color: hsl(var(--success));
+    border: 1px solid hsl(var(--success) / 0.25);
+  }
+  .badge-warning {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold;
+    background-color: hsl(var(--warning) / 0.12);
+    color: hsl(38 90% 42%);
+    border: 1px solid hsl(var(--warning) / 0.25);
+  }
+  .badge-danger {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold;
+    background-color: hsl(var(--destructive) / 0.10);
+    color: hsl(var(--destructive));
+    border: 1px solid hsl(var(--destructive) / 0.20);
+  }
+  .badge-info {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold;
+    background-color: hsl(var(--primary) / 0.10);
+    color: hsl(var(--primary));
+    border: 1px solid hsl(var(--primary) / 0.20);
+  }
+
+  /* === LINKS — Affordance clara (conceito 1) === */
+  .link-primary {
+    @apply text-primary font-medium underline-offset-4 transition-all duration-150;
+  }
+  .link-primary:hover {
+    @apply underline opacity-80;
+  }
+
+  /* === DIVIDERS === */
+  .divider {
+    @apply border-t border-border my-6;
+  }
+
+  /* === INPUT GROUP === */
+  .input-group {
+    @apply space-y-1.5;
+  }
+  .input-label {
+    @apply text-xs font-semibold uppercase tracking-wide text-muted-foreground;
   }
 }
 
+/* ============================================================
+   5. UTILITY LAYER — Animações e micro-interações (conceito 10)
+   ============================================================ */
+
 @layer utilities {
+
+  /* === FADE IN — entrada suave de página === */
   .animate-fade-in {
-    animation: fadeIn 0.3s ease-out;
+    animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
+  /* === SLIDE IN === */
+  .animate-slide-up {
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
 
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+  /* === SCALE IN === */
+  .animate-scale-in {
+    animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  /* === PULSE SUAVE (para badges críticos) === */
+  .animate-pulse-soft {
+    animation: pulseSoft 2.5s ease-in-out infinite;
+  }
+  @keyframes pulseSoft {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.7; }
+  }
+
+  /* === SHIMMER (skeleton loading) === */
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 25%,
+      hsl(var(--secondary)) 50%,
+      hsl(var(--muted)) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+  @keyframes shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* === MICRO-INTERAÇÕES em elementos interativos (conceito 10) === */
+  /* Affordance: qualquer elemento clicável responde ao toque */
+  .interactive {
+    @apply transition-all duration-150 cursor-pointer select-none;
+  }
+  .interactive:hover  { transform: translateY(-1px); }
+  .interactive:active { transform: translateY(0) scale(0.98); }
+
+  /* === ESTADOS DE TABELA (conceito 9 — Feedback & States) === */
+  .row-hover {
+    @apply transition-colors duration-100;
+  }
+  .row-hover:hover {
+    background-color: hsl(var(--primary) / 0.04);
+  }
+
+  /* === SOMBRAS UTILITÁRIAS === */
+  .shadow-soft    { box-shadow: var(--shadow-sm); }
+  .shadow-card    { box-shadow: var(--shadow-md); }
+  .shadow-lifted  { box-shadow: var(--shadow-lg); }
+  .shadow-primary { box-shadow: var(--shadow-primary); }
+
+  /* === GLASS MORPHISM (sobreposições elegantes — conceito 11) === */
+  .glass {
+    background: hsl(var(--card) / 0.85);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    border: 1px solid hsl(var(--border) / 0.6);
+  }
+
+  /* === GRADIENTE DE TEXTO (destaque em headers) === */
+  .text-gradient-primary {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* === SCROLLBAR CUSTOMIZADA === */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar       { width: 6px; height: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 3px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.5);
   }
 }
