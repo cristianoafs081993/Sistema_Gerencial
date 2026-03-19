@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
+import { slideInRight } from '@/lib/animations';
 import {
   LayoutDashboard,
   FileText,
@@ -227,12 +229,20 @@ export function Layout({ children }: LayoutProps) {
             <div id="header-actions" className="flex items-center gap-2 shrink-0" />
           </header>
 
-          {/* ── Page content ──
-              Conceito 3 — Espaçamento consistente 8pt grid: p-4 (16px) → lg:p-8 (32px) */}
+          {/* ── Page content —— AnimatePresence com page transition (Framer Motion) */}
           <main className="flex-1 p-4 lg:p-8 overflow-y-auto scrollbar-thin dot-pattern">
-            <div className="max-w-[1600px] mx-auto animate-fade-in">
-              {children}
-            </div>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={location.key}
+                className="max-w-[1600px] mx-auto"
+                variants={slideInRight}
+                initial="hidden"
+                animate="show"
+                exit="exit"
+              >
+                {children}
+              </motion.div>
+            </AnimatePresence>
           </main>
         </div>
 

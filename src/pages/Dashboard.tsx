@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
+import { staggerContainer, staggerItem, scaleIn } from '@/lib/animations';
 import {
   Wallet,
   Receipt,
@@ -458,15 +460,18 @@ export default function Dashboard() {
 
         <TabsContent value="corrente" className="space-y-6 border-none p-0">
 
-          {/* ══════════════════════════════════════════════════════════════
-              BENTO GRID — Assimétrico (Aura Style / Linear-inspired)
-              grid-cols-3 com row-span para hierarquia visual clara
-              Conceito 2: o card HERO tem muito mais peso visual
-          ══════════════════════════════════════════════════════════════ */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 auto-rows-[minmax(130px,auto)]">
+          {/* Bento Grid com Framer Motion stagger */}
+          <motion.div
+            className="grid grid-cols-1 md:grid-cols-3 gap-4 auto-rows-[minmax(130px,auto)]"
+            variants={staggerContainer}
+            initial="hidden"
+            animate="show"
+          >
 
-            {/* ── HERO CARD — Total Planejado (row-span-2, destaque máximo) ── */}
-            <div className={`
+            {/* ── HERO CARD — Total Planejado (row-span-2) ── */}
+            <motion.div
+              variants={scaleIn}
+              className={`
               md:row-span-2 relative overflow-hidden rounded-2xl
               border border-primary/20
               bg-gradient-to-br from-primary/8 via-primary/4 to-transparent
@@ -525,10 +530,11 @@ export default function Dashboard() {
                   </p>
                 </div>
               </div>
-            </div>
+            </motion.div>
 
             {/* ── Descentralizado ── */}
-            <StatCard
+            <motion.div variants={staggerItem}>
+              <StatCard
               title="Descentralizado"
               value={formatCurrency(totalDescentralizado)}
               subtitle={`${filteredData.descentralizacoes.length} descentralizações`}
@@ -537,9 +543,11 @@ export default function Dashboard() {
               progress={totalPlanejado > 0 ? (totalDescentralizado / totalPlanejado) * 100 : 0}
               isLoading={isLoading}
             />
+            </motion.div>
 
             {/* ── Total Empenhado ── */}
-            <StatCard
+            <motion.div variants={staggerItem}>
+              <StatCard
               title="Total Empenhado"
               value={formatCurrency(totalEmpenhado)}
               subtitle={`${filteredData.empenhosCorrente.length} empenhos filtrados`}
@@ -548,9 +556,11 @@ export default function Dashboard() {
               progress={totalPlanejado > 0 ? (totalEmpenhado / totalPlanejado) * 100 : 0}
               isLoading={isLoading}
             />
+            </motion.div>
 
             {/* ── A Descentralizar ── */}
-            <StatCard
+            <motion.div variants={staggerItem}>
+              <StatCard
               title="A Descentralizar"
               value={formatCurrency(aDescentralizar)}
               subtitle={aDescentralizar >= 0 ? "Dentro do orçamento" : "Acima do orçamento"}
@@ -559,9 +569,10 @@ export default function Dashboard() {
               progress={totalPlanejado > 0 ? (Math.max(0, aDescentralizar) / totalPlanejado) * 100 : 0}
               isLoading={isLoading}
             />
+            </motion.div>
 
-            {/* ── Mini card: Liquidado / Pago (complementa o row-span-2) ── */}
-            <div className={`
+            {/* ── Mini card: Liquidado / Pago ── */}
+            <motion.div variants={staggerItem} className={`
               relative overflow-hidden rounded-2xl
               border border-border/70 bg-card
               shadow-soft hover:shadow-card hover:-translate-y-[1px]
@@ -623,9 +634,9 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
 
-          </div>
+          </motion.div>
           {/* Fim do Bento Grid */}
 
           {/* Gráficos Linha 1 */}
