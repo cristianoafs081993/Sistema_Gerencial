@@ -59,7 +59,7 @@ export function Layout({ children }: LayoutProps) {
         {/* ── Mobile backdrop — Overlay correto com blur (Conceito 11) ── */}
         {sidebarOpen && (
           <div
-            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden animate-fade-in"
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden"
             onClick={() => setSidebarOpen(false)}
           />
         )}
@@ -84,18 +84,18 @@ export function Layout({ children }: LayoutProps) {
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className={cn(
-              "absolute -right-3 top-[72px] z-50 hidden h-6 w-6",
-              "lg:flex items-center justify-center rounded-full",
-              "border border-border bg-card shadow-soft",
-              "hover:bg-muted hover:shadow-card",
+              "absolute -right-space-3 top-space-20 z-50 hidden h-space-6 w-space-6",
+              "lg:flex items-center justify-center rounded-radius-full",
+              "border border-border-default bg-surface-card shadow-shadow-sm",
+              "hover:bg-surface-subtle hover:shadow-shadow-md",
               "transition-all duration-200 opacity-0 group-hover:opacity-100",
             )}
             title={isCollapsed ? "Expandir menu" : "Recolher menu"}
           >
             {isCollapsed ? (
-              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+              <ChevronRight className="h-space-3 w-space-3 text-text-muted" />
             ) : (
-              <ChevronLeft className="h-3.5 w-3.5 text-muted-foreground" />
+              <ChevronLeft className="h-space-3 w-space-3 text-text-muted" />
             )}
           </button>
 
@@ -105,7 +105,7 @@ export function Layout({ children }: LayoutProps) {
             isCollapsed ? "justify-center px-4" : "justify-between px-5"
           )}>
             {!isCollapsed && (
-              <div className="flex flex-col gap-0 animate-fade-in overflow-hidden">
+              <div className="flex flex-col gap-0 overflow-hidden">
                 {/* Hierarquia visual — nome principal + tagline (Conceito 2) */}
                 <span className="text-[15px] font-bold tracking-tight text-sidebar-foreground truncate">
                   Sistema Gerencial
@@ -175,7 +175,7 @@ export function Layout({ children }: LayoutProps) {
                     <TooltipContent
                       side="right"
                       sideOffset={12}
-                      className="bg-primary text-primary-foreground border-none font-semibold text-xs shadow-primary animate-scale-in"
+                      className="bg-primary text-primary-foreground border-none font-semibold text-xs shadow-primary"
                     >
                       {item.name}
                     </TooltipContent>
@@ -206,43 +206,34 @@ export function Layout({ children }: LayoutProps) {
             {/* Mobile menu */}
             <Button
               variant="ghost"
-              size="icon-sm"
-              className="lg:hidden text-muted-foreground"
+              size="icon"
+              className="lg:hidden text-text-secondary h-space-9 w-space-9"
               onClick={() => setSidebarOpen(true)}
             >
-              <Menu className="h-5 w-5" />
+              <Menu className="h-space-5 w-space-5" />
             </Button>
 
             {/* Título da página + subtítulo (Visual Hierarchy — Conceito 2) */}
             <div className="flex-1 flex flex-col justify-center min-w-0">
-              <h1 className="text-[15px] font-bold text-foreground leading-none tracking-tight truncate">
+              <h1 className="text-text-sm font-font-bold text-text-primary leading-none tracking-tight truncate">
                 {navigation.find((n) => n.href === location.pathname)?.name || 'Sistema'}
               </h1>
               {/* Portal de subtítulo injetado pelas páginas */}
               <div
                 id="header-subtitle"
-                className="text-[11px] text-muted-foreground font-medium leading-tight mt-[3px] truncate empty:hidden"
+                className="text-text-xs text-text-muted font-font-medium leading-tight mt-space-1 truncate empty:hidden"
               />
             </div>
 
             {/* Portal de ações injetadas pelas páginas */}
-            <div id="header-actions" className="flex items-center gap-2 shrink-0" />
+            <div id="header-actions" className="flex items-center gap-space-2 shrink-0" />
           </header>
 
           {/* ── Page content —— AnimatePresence com page transition (Framer Motion) */}
-          <main className="flex-1 p-4 lg:p-8 overflow-y-auto scrollbar-thin dot-pattern">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={location.key}
-                className="max-w-[1600px] mx-auto"
-                variants={slideInRight}
-                initial="hidden"
-                animate="show"
-                exit="exit"
-              >
-                {children}
-              </motion.div>
-            </AnimatePresence>
+          <main className="flex-1 p-space-4 lg:p-space-8 overflow-y-auto scrollbar-thin dot-pattern bg-surface-page">
+            <div className="max-w-[1600px] mx-auto">
+              {children}
+            </div>
           </main>
         </div>
 

@@ -179,16 +179,15 @@
     text-rendering: optimizeLegibility;
   }
 
-  /* === HIERARQUIA TIPOGRÁFICA (conceito 4) ===
-     Nunca usar tamanhos aleatórios — escala modular clara */
-  h1 { @apply text-2xl font-bold tracking-tight leading-tight; }
-  h2 { @apply text-xl font-bold tracking-tight leading-snug; }
-  h3 { @apply text-lg font-semibold leading-snug; }
-  h4 { @apply text-base font-semibold; }
-  h5 { @apply text-sm font-semibold; }
-  h6 { @apply text-xs font-semibold uppercase tracking-wider; }
+  /* === HIERARQUIA TIPOGRÁFICA (tokens semânticos) === */
+  h1 { @apply text-text-3xl font-font-bold tracking-tight leading-tight text-text-primary; }
+  h2 { @apply text-text-2xl font-font-bold tracking-tight leading-snug text-text-primary; }
+  h3 { @apply text-text-xl font-font-semibold leading-snug text-text-primary; }
+  h4 { @apply text-text-lg font-font-semibold text-text-primary; }
+  h5 { @apply text-text-base font-font-semibold text-text-primary; }
+  h6 { @apply text-text-xs font-font-semibold uppercase tracking-wider text-text-secondary; }
 
-  p  { line-height: 1.6; }
+  p  { @apply text-text-base text-text-secondary; line-height: 1.6; }
 
   /* Seleção de texto com cor primária */
   ::selection {
@@ -196,11 +195,9 @@
     color: hsl(var(--foreground));
   }
 
-  /* Foco visível para acessibilidade (conceito 9 — states) */
+  /* Foco visível para acessibilidade */
   :focus-visible {
-    outline: 2px solid hsl(var(--primary));
-    outline-offset: 2px;
-    border-radius: var(--radius);
+    @apply outline-2 outline-border-focus outline-offset-2 rounded-radius-md;
   }
 }
 
@@ -210,22 +207,36 @@
 
 @layer components {
 
-  /* === CARDS — Multi-shadow layers (conceito 7) === */
-  .card-elevated {
-    background: hsl(var(--card));
-    border: 1px solid hsl(var(--border));
-    border-radius: calc(var(--radius) + 4px);
-    box-shadow: var(--shadow-sm);
-    transition: box-shadow 0.2s ease, transform 0.15s ease;
-  }
-  .card-elevated:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
+  /* === BUTTONS (Semantic Tokens) === */
+  .btn-primary {
+    @apply bg-action-primary text-text-on-brand rounded-radius-md shadow-shadow-button-primary
+           hover:bg-action-primary-hover active:bg-action-primary-active
+           transition-all duration-200 px-space-4 py-space-2 font-font-semibold text-text-sm
+           disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
-  /* === STAT CARDS (conceito 2 — Hierarquia Visual) === */
+  .btn-secondary {
+    @apply bg-surface-card text-text-primary border border-border-default rounded-radius-md
+           hover:bg-surface-subtle transition-all duration-200 px-space-4 py-space-2
+           font-font-medium text-text-sm;
+  }
+
+  .btn-strong {
+    @apply bg-action-strong text-text-on-dark rounded-radius-md shadow-shadow-lg
+           hover:bg-action-strong-hover transition-all duration-200 px-space-6 py-space-3
+           font-font-bold text-text-base;
+  }
+
+  /* === CARDS (Semantic Tokens) === */
+  .card-system {
+    @apply bg-surface-card rounded-radius-xl p-space-6 shadow-shadow-card
+           hover:shadow-shadow-card-hover hover:-translate-y-0.5
+           transition-all duration-300 border border-border-subtle;
+  }
+
+  /* === STAT CARDS === */
   .stat-card {
-    @apply bg-card rounded-2xl p-6 border border-border transition-all duration-200 relative overflow-hidden;
+    @apply bg-surface-card rounded-radius-2xl p-space-6 border border-border-default transition-all duration-200 relative overflow-hidden;
     box-shadow: var(--shadow-sm);
   }
   .stat-card:hover {
@@ -250,39 +261,38 @@
   }
 
   /* === DATA TABLE === */
-  .data-table {
-    @apply w-full bg-card rounded-2xl border border-border overflow-hidden;
+  .data-table-container {
+    @apply w-full bg-surface-card rounded-radius-2xl border border-border-default overflow-hidden;
     box-shadow: var(--shadow-sm);
   }
 
-  /* === PAGE HEADER (conceito 3 — Grid e Espaçamento) ===
-     Segue o grid de 8pt: mb-8 = 32px = 4 × 8pt */
+  /* === PAGE HEADER === */
   .page-header {
-    @apply mb-8;
+    @apply mb-space-8;
   }
   .page-title {
-    @apply text-2xl font-bold text-foreground tracking-tight;
+    @apply text-text-3xl font-font-bold text-text-primary tracking-tight;
   }
   .page-subtitle {
-    @apply text-sm text-muted-foreground mt-1;
+    @apply text-text-sm text-text-secondary mt-space-1;
     line-height: 1.5;
   }
 
   /* === BADGES SEMÂNTICOS === */
   .badge-success {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold;
+    @apply inline-flex items-center gap-space-1 px-space-2 py-0.5 rounded-radius-full text-text-xs font-font-semibold;
     background-color: hsl(var(--success) / 0.12);
     color: hsl(var(--success));
     border: 1px solid hsl(var(--success) / 0.25);
   }
   .badge-warning {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold;
+    @apply inline-flex items-center gap-space-1 px-space-2 py-0.5 rounded-radius-full text-text-xs font-font-semibold;
     background-color: hsl(var(--warning) / 0.12);
     color: hsl(38 90% 42%);
     border: 1px solid hsl(var(--warning) / 0.25);
   }
-  .badge-danger {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold;
+  .badge-error {
+    @apply inline-flex items-center gap-space-1 px-space-2 py-0.5 rounded-radius-full text-text-xs font-font-semibold;
     background-color: hsl(var(--destructive) / 0.10);
     color: hsl(var(--destructive));
     border: 1px solid hsl(var(--destructive) / 0.20);
@@ -309,10 +319,10 @@
 
   /* === INPUT GROUP === */
   .input-group {
-    @apply space-y-1.5;
+    @apply space-y-space-2;
   }
   .input-label {
-    @apply text-xs font-semibold uppercase tracking-wide text-muted-foreground;
+    @apply text-text-xs font-font-semibold uppercase tracking-wide text-text-secondary;
   }
 }
 

@@ -14,6 +14,35 @@ export default {
     },
     extend: {
       colors: {
+        // --- TOKENS SEMÂNTICOS (SISTEMA GERENCIAL) ---
+        "text-primary":   "hsl(var(--foreground))",
+        "text-secondary": "hsl(var(--muted-foreground))",
+        "text-muted":     "hsl(var(--muted-foreground) / 0.6)",
+        "text-on-dark":   "#ffffff",
+        "text-on-brand":  "hsl(var(--primary-foreground))",
+        
+        "surface-page":     "hsl(var(--background))",
+        "surface-section":  "hsl(var(--background) / 0.95)",
+        "surface-card":     "hsl(var(--card))",
+        "surface-subtle":   "hsl(var(--muted))",
+        "surface-elevated": "hsl(var(--card))",
+        
+        "action-primary":         "hsl(var(--primary))",
+        "action-primary-hover":   "hsl(var(--primary) / 0.9)",
+        "action-primary-active":  "hsl(var(--primary) / 0.8)",
+        "action-secondary":       "hsl(var(--secondary))",
+        "action-strong":          "hsl(var(--foreground))",
+        "action-strong-hover":    "hsl(var(--foreground) / 0.9)",
+        
+        "border-default": "hsl(var(--border))",
+        "border-subtle":  "hsl(var(--border) / 0.5)",
+        "border-focus":   "hsl(var(--ring))",
+        
+        "status-success": "hsl(var(--success))",
+        "status-warning": "hsl(var(--warning))",
+        "status-error":   "hsl(var(--destructive))",
+
+        // Legado / Utilitários
         "background-light": "#f4f6fa",
         "background-dark":  "#0d1117",
         "vibrant-blue":     "#3b82f6",
@@ -64,7 +93,42 @@ export default {
           ring:                 "hsl(var(--sidebar-ring))",
         },
       },
+      spacing: {
+        "space-1":  "4px",
+        "space-2":  "8px",
+        "space-3":  "12px",
+        "space-4":  "16px",
+        "space-6":  "24px",
+        "space-8":  "32px",
+        "space-12": "48px",
+        "space-16": "64px",
+        "space-20": "80px",
+      },
+      fontSize: {
+        "text-xs":   ["12px", { lineHeight: "1.5" }],
+        "text-sm":   ["14px", { lineHeight: "1.5" }],
+        "text-base": ["16px", { lineHeight: "1.6" }],
+        "text-lg":   ["18px", { lineHeight: "1.6" }],
+        "text-xl":   ["20px", { lineHeight: "1.4" }],
+        "text-2xl":  ["24px", { lineHeight: "1.3" }],
+        "text-3xl":  ["30px", { lineHeight: "1.2" }],
+        "text-4xl":  ["36px", { lineHeight: "1.2" }],
+        "text-5xl":  ["48px", { lineHeight: "1.1" }],
+      },
+      fontWeight: {
+        "font-normal":   "400",
+        "font-medium":   "500",
+        "font-semibold": "600",
+        "font-bold":     "700",
+      },
       borderRadius: {
+        "radius-sm":   "6px",
+        "radius-md":   "8px",
+        "radius-lg":   "12px",
+        "radius-xl":   "16px",
+        "radius-2xl":  "24px",
+        "radius-full": "9999px",
+        
         "3xl": "24px",
         "2xl": "16px",
         xl:    "12px",
@@ -73,6 +137,13 @@ export default {
         sm:    "calc(var(--radius) - 4px)",
       },
       boxShadow: {
+        "shadow-sm":             "var(--shadow-sm)",
+        "shadow-md":             "var(--shadow-md)",
+        "shadow-lg":             "var(--shadow-lg)",
+        "shadow-card":           "var(--shadow-md)",
+        "shadow-card-hover":     "var(--shadow-lg)",
+        "shadow-button-primary": "var(--shadow-primary)",
+
         "xs":      "0 1px 2px 0 rgba(0,0,0,.04)",
         "soft":    "0 1px 3px 0 rgba(0,0,0,.06), 0 1px 2px -1px rgba(0,0,0,.04)",
         "card":    "0 4px 6px -1px rgba(0,0,0,.07), 0 2px 4px -2px rgba(0,0,0,.05)",

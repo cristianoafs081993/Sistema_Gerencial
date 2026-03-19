@@ -54,7 +54,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { DocumentoDetalhesDialog } from '@/components/DocumentoDetalhesDialog';
-import { HeaderSubtitle, HeaderActions } from '@/components/HeaderParts';
+import { HeaderActions } from '@/components/HeaderParts';
 
 export default function LiquidacoesPagamentos() {
     const queryClient = useQueryClient();
@@ -170,24 +170,24 @@ export default function LiquidacoesPagamentos() {
     ];
 
     return (
-        <div className="min-h-screen bg-slate-50/30 dark:bg-slate-950/30">
-            <div className="p-4 md:p-8 space-y-8 max-w-[1600px] mx-auto animate-in fade-in duration-500">
+        <div className="min-h-screen bg-surface-subtle/30">
+            <div className="p-space-4 md:p-space-8 space-y-space-8 max-w-[1600px] mx-auto">
                 <DocumentoDetalhesDialog
                     open={detailsOpen}
                     onOpenChange={setDetailsOpen}
                     documento={selectedDocumento}
                 />
 
-                <HeaderSubtitle>Documentos Hábeis</HeaderSubtitle>
+
 
                 <HeaderActions>
                     <Button 
                         variant="outline" 
                         size="sm" 
-                        className="gap-2 font-bold shadow-sm"
+                        className="gap-space-2 font-font-bold shadow-shadow-sm bg-surface-card border-border-default transition-all"
                         onClick={() => setIsImportDialogOpen(true)}
                     >
-                        <FileSpreadsheet className="h-4 w-4 text-green-600" />
+                        <FileSpreadsheet className="h-4 w-4 text-status-success" />
                         Importar Retenções
                     </Button>
                 </HeaderActions>
@@ -204,11 +204,11 @@ export default function LiquidacoesPagamentos() {
                 />
 
                 
-                <div className="space-y-6">
+                <div className="space-y-space-6">
                     {/* Filtros em Grid */}
-                    <Card className="shadow-sm border-slate-200/60 dark:border-slate-800/60 bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm">
-                        <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                            <CardTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                    <Card className="card-system">
+                        <CardHeader className="pb-space-3 flex flex-row items-center justify-between">
+                            <CardTitle className="text-text-xs font-font-bold uppercase tracking-widest text-text-muted flex items-center gap-space-2">
                                 <FilterIcon className="h-3 w-3" /> Parâmetros de Busca
                             </CardTitle>
                             {(searchTerm || startDate || endDate) && (
@@ -217,43 +217,43 @@ export default function LiquidacoesPagamentos() {
                                 </Button>
                             )}
                         </CardHeader>
-                        <CardContent className="pb-6">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 ml-1">Documento ou Favorecido</label>
+                        <CardContent className="pb-space-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-4">
+                                <div className="space-y-space-1.5">
+                                    <label className="text-text-xs font-font-bold uppercase tracking-wider text-text-secondary ml-space-1">Documento ou Favorecido</label>
                                     <div className="relative">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                        <Search className="absolute left-space-3 top-1/2 -translate-y-1/2 h-space-3.5 w-space-3.5 text-text-muted" />
                                         <Input
                                             placeholder="Ex: 2026NP0000..."
                                             value={searchTerm}
                                             onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
-                                            className="pl-9 h-10 text-sm bg-white dark:bg-slate-900 focus-visible:ring-primary/20 transition-all shadow-sm"
+                                            className="pl-space-9 h-space-10 text-text-sm input-system"
                                         />
                                     </div>
                                 </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 ml-1">Data Início</label>
+                                <div className="space-y-space-1.5">
+                                    <label className="text-text-xs font-font-bold uppercase tracking-wider text-text-secondary ml-space-1">Data Início</label>
                                     <Input
                                         type="date"
                                         value={startDate}
                                         onChange={e => { setStartDate(e.target.value); setPage(1); }}
-                                        className="h-10 text-sm bg-white dark:bg-slate-900 focus-visible:ring-primary/20 transition-all shadow-sm"
+                                        className="h-space-10 text-text-sm input-system"
                                     />
                                 </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 ml-1">Data Fim</label>
+                                <div className="space-y-space-1.5">
+                                    <label className="text-text-xs font-font-bold uppercase tracking-wider text-text-secondary ml-space-1">Data Fim</label>
                                     <Input
                                         type="date"
                                         value={endDate}
                                         onChange={e => { setEndDate(e.target.value); setPage(1); }}
-                                        className="h-10 text-sm bg-white dark:bg-slate-900 focus-visible:ring-primary/20 transition-all shadow-sm"
+                                        className="h-space-10 text-text-sm input-system"
                                     />
                                 </div>
                                 <div className="flex items-end">
-                                    <div className="w-full p-2.5 bg-slate-100/50 dark:bg-slate-800/50 rounded-lg flex items-center justify-center gap-3 border border-dashed text-muted-foreground">
+                                    <div className="w-full p-space-2.5 bg-surface-subtle/50 rounded-radius-lg flex items-center justify-center gap-space-3 border border-dashed border-border-default/50 text-text-muted">
                                         <div className="flex flex-col items-center">
-                                            <span className="text-[9px] font-bold uppercase">Total Registros</span>
-                                            <span className="text-xs font-black text-foreground">{totalRecords}</span>
+                                            <span className="text-[9px] font-font-bold uppercase leading-none">Total Registros</span>
+                                            <span className="text-text-sm font-font-extrabold text-text-primary mt-space-1">{totalRecords}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -262,17 +262,17 @@ export default function LiquidacoesPagamentos() {
                     </Card>
 
                     {/* Tabela de Documentos */}
-                    <Card className="shadow-xl border-slate-200/60 dark:border-slate-800/60 overflow-hidden bg-white/90 dark:bg-slate-900/90 backdrop-blur-md">
+                    <Card className="shadow-shadow-xl card-system overflow-hidden">
                         <div className="overflow-x-auto">
                             <Table>
-                                <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
-                                    <TableRow className="hover:bg-transparent border-b">
-                                        <TableHead className="w-[120px] font-bold text-[10px] uppercase tracking-widest text-muted-foreground py-4 px-6">Emissão</TableHead>
-                                        <TableHead className="font-bold text-[10px] uppercase tracking-widest text-muted-foreground py-4">Documento Origem</TableHead>
-                                        <TableHead className="font-bold text-[10px] uppercase tracking-widest text-muted-foreground py-4">Favorecido</TableHead>
-                                        <TableHead className="text-right font-bold text-[10px] uppercase tracking-widest text-muted-foreground py-4">Liquidado (NS)</TableHead>
-                                        <TableHead className="text-right font-bold text-[10px] uppercase tracking-widest text-muted-foreground py-4">Pago (OB)</TableHead>
-                                        <TableHead className="w-[80px] py-4 pr-6"></TableHead>
+                                <TableHeader className="bg-surface-subtle/50">
+                                    <TableRow className="hover:bg-transparent border-b border-border-default/50">
+                                        <TableHead className="w-[120px] font-font-bold text-[10px] uppercase tracking-widest text-text-muted py-space-4 px-space-6">Emissão</TableHead>
+                                        <TableHead className="font-font-bold text-[10px] uppercase tracking-widest text-text-muted py-space-4">Documento Origem</TableHead>
+                                        <TableHead className="font-font-bold text-[10px] uppercase tracking-widest text-text-muted py-space-4">Favorecido</TableHead>
+                                        <TableHead className="text-right font-font-bold text-[10px] uppercase tracking-widest text-text-muted py-space-4">Liquidado (NS)</TableHead>
+                                        <TableHead className="text-right font-font-bold text-[10px] uppercase tracking-widest text-text-muted py-space-4">Pago (OB)</TableHead>
+                                        <TableHead className="w-[80px] py-space-4 pr-space-6"></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -326,17 +326,17 @@ export default function LiquidacoesPagamentos() {
                                                         </span>
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="text-right font-black text-[11px] text-blue-600 dark:text-blue-400 py-5">
+                                                <TableCell className="text-right font-font-extrabold text-[11px] text-action-primary py-space-5">
                                                     {doc.valorLiquidado > 0 ? formatCurrency(doc.valorLiquidado) : '-'}
                                                 </TableCell>
-                                                <TableCell className="text-right font-black text-[11px] text-emerald-600 dark:text-emerald-400 py-5">
+                                                <TableCell className="text-right font-font-extrabold text-[11px] text-status-success py-space-5">
                                                     {doc.valorRestoPago > 0 ? formatCurrency(doc.valorRestoPago) : '-'}
                                                 </TableCell>
-                                                <TableCell className="pr-6 text-right py-5">
+                                                <TableCell className="pr-space-6 text-right py-space-5">
                                                     <Button 
                                                         variant="ghost" 
                                                         size="icon" 
-                                                        className="h-8 w-8 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-all rounded-full"
+                                                        className="h-space-8 w-space-8 text-text-muted hover:bg-action-primary/10 hover:text-action-primary transition-all rounded-radius-full"
                                                     >
                                                         <Eye className="h-4 w-4" />
                                                     </Button>

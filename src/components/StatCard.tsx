@@ -38,35 +38,35 @@ export function StatCard({
        - Micro-interação: hover sobe 1px */
 
     const accentBarMap = {
-      'vibrant-blue':  'bg-[#3b82f6]',
-      'purple':        'bg-[#a855f7]',
-      'amber':         'bg-[#f59e0b]',
+      'vibrant-blue': 'bg-[#3b82f6]',
+      'purple': 'bg-[#a855f7]',
+      'amber': 'bg-[#f59e0b]',
       'emerald-green': 'bg-[#10b981]',
-      'red-500':       'bg-[#ef4444]',
+      'red-500': 'bg-[#ef4444]',
     };
 
     const iconBgMap = {
-      'vibrant-blue':  'bg-[#3b82f6]/10 text-[#3b82f6]',
-      'purple':        'bg-[#a855f7]/10 text-[#a855f7]',
-      'amber':         'bg-[#f59e0b]/10 text-[#a16207]',
+      'vibrant-blue': 'bg-[#3b82f6]/10 text-[#3b82f6]',
+      'purple': 'bg-[#a855f7]/10 text-[#a855f7]',
+      'amber': 'bg-[#f59e0b]/10 text-[#a16207]',
       'emerald-green': 'bg-[#10b981]/10 text-[#10b981]',
-      'red-500':       'bg-[#ef4444]/10 text-[#ef4444]',
+      'red-500': 'bg-[#ef4444]/10 text-[#ef4444]',
     };
 
     const valueGradientMap = {
-      'vibrant-blue':  'from-[#1a5ce6] to-[#3b82f6]',
-      'purple':        'from-[#7c3aed] to-[#a855f7]',
-      'amber':         'from-[#b45309] to-[#f59e0b]',
+      'vibrant-blue': 'from-[#1a5ce6] to-[#3b82f6]',
+      'purple': 'from-[#7c3aed] to-[#a855f7]',
+      'amber': 'from-[#b45309] to-[#f59e0b]',
       'emerald-green': 'from-[#047857] to-[#10b981]',
-      'red-500':       'from-[#dc2626] to-[#ef4444]',
+      'red-500': 'from-[#dc2626] to-[#ef4444]',
     };
 
     const progressBgMap = {
-      'vibrant-blue':  'bg-[#3b82f6]',
-      'purple':        'bg-[#a855f7]',
-      'amber':         'bg-[#f59e0b]',
+      'vibrant-blue': 'bg-[#3b82f6]',
+      'purple': 'bg-[#a855f7]',
+      'amber': 'bg-[#f59e0b]',
       'emerald-green': 'bg-[#10b981]',
-      'red-500':       'bg-[#ef4444]',
+      'red-500': 'bg-[#ef4444]',
     };
 
     return (
@@ -75,7 +75,7 @@ export function StatCard({
         "bg-card border border-border/70",
         "shadow-soft hover:shadow-card hover:-translate-y-[1px]",
         "transition-all duration-200",
-        "p-5 animate-fade-in",
+        "p-5",
       )}>
         {/* Barra lateral colorida — Aura Style accent indicator */}
         <div className={cn("absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl", accentBarMap[stitchColor])} />
@@ -150,7 +150,7 @@ export function StatCard({
   };
 
   return (
-    <div className={cn(variantStyles[variant], 'animate-fade-in relative')}>
+    <div className={cn(variantStyles[variant], 'relative')}>
       <div className={cn(
         "absolute top-4 right-4 rounded-lg p-2",
         iconBgStyles[variant]

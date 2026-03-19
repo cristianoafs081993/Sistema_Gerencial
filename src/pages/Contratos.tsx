@@ -4,7 +4,7 @@ import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { HeaderSubtitle } from '@/components/HeaderParts';
+
 import { formatCurrency, cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -99,31 +99,27 @@ export default function Contratos() {
       </div>
     );
   }
-
   return (
-    <div className="space-y-6 animate-fade-in">
-      <HeaderSubtitle>
-        Visualização de contratos e empenhos vinculados
-      </HeaderSubtitle>
+    <div className="space-y-space-6 pb-space-10">
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle>Contratos Ativos</CardTitle>
-          <div className="relative mt-2">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <Card className="card-system shadow-shadow-sm">
+        <CardHeader className="pb-space-3">
+          <CardTitle className="text-text-lg font-font-bold">Contratos Ativos</CardTitle>
+          <div className="relative mt-space-2">
+            <Search className="absolute left-space-3 top-1/2 -translate-y-1/2 h-space-4 w-space-4 text-text-muted" />
             <Input
               placeholder="Buscar por número ou contratada..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-space-10 input-system"
             />
           </div>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border border-border/50 overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="rounded-radius-md border border-border-default/50 overflow-hidden">
+            <table className="w-full text-text-sm">
               <thead>
-                <tr className="bg-muted/50 border-b border-border/50">
+                <tr className="bg-surface-subtle/50 border-b border-border-default/50">
                   <th 
                     className="text-left py-3 px-4 font-medium cursor-pointer hover:bg-muted/80 transition-colors"
                     onClick={() => handleSort('numero')}
@@ -167,43 +163,43 @@ export default function Contratos() {
                     }, 0);
 
                     return (
-                      <tr key={c.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                        <td className="py-3 px-4">
+                      <tr key={c.id} className="border-b border-border-default/50 hover:bg-surface-subtle transition-colors">
+                        <td className="py-space-3 px-space-4">
                           <div className="flex flex-col">
-                            <span className="font-mono font-medium">{c.numero}</span>
+                            <span className="font-mono font-font-medium text-text-sm">{c.numero}</span>
                           </div>
                         </td>
-                        <td className="py-3 px-4">
-                          <span className="font-medium">{c.contratada}</span>
+                        <td className="py-space-3 px-space-4">
+                          <span className="font-font-medium text-text-sm">{c.contratada}</span>
                         </td>
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex flex-col text-xs space-y-0.5">
-                            <span className="text-muted-foreground">Início: {safeFormatDate(c.data_inicio)}</span>
-                            <span className="font-medium">Fim: {safeFormatDate(c.data_termino)}</span>
+                        <td className="py-space-3 px-space-4 text-right">
+                          <div className="flex flex-col text-text-xs space-y-space-0.5">
+                            <span className="text-text-muted">Início: {safeFormatDate(c.data_inicio)}</span>
+                            <span className="font-font-medium text-text-secondary">Fim: {safeFormatDate(c.data_termino)}</span>
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-right">
+                        <td className="py-space-3 px-space-4 text-right">
                           <div className="flex flex-col">
-                            <span className="font-bold text-primary">{formatCurrency(c.valor || 0)}</span>
+                            <span className="font-font-bold text-action-primary text-text-sm">{formatCurrency(c.valor || 0)}</span>
                             {totalEmpenhado > 0 && (
-                              <span className="text-[10px] text-muted-foreground">
+                              <span className="text-[10px] text-text-muted">
                                 Empenhado: {formatCurrency(totalEmpenhado)}
                               </span>
                             )}
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-right">
+                        <td className="py-space-3 px-space-4 text-right">
                           <div className="flex flex-col">
                             <span className={cn(
-                              "font-semibold",
-                              totalALiquidar > 0 ? "text-orange-600" : "text-green-600"
+                              "font-font-semibold text-text-sm",
+                              totalALiquidar > 0 ? "text-status-warning" : "text-status-success"
                             )}>
                               {formatCurrency(totalALiquidar)}
                             </span>
-                            <span className="text-[10px] text-muted-foreground uppercase">A Liquidar</span>
+                            <span className="text-[10px] text-text-muted uppercase">A Liquidar</span>
                           </div>
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-space-3 px-space-4">
                           <div className="flex flex-wrap gap-1">
                             {empenhosVinculados.length > 0 ? (
                               empenhosVinculados.map((e) => {
@@ -270,47 +266,47 @@ export default function Contratos() {
         </CardContent>
       </Card>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-primary/5 border-primary/10">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center text-center space-y-2">
-              <FileText className="h-8 w-8 text-primary opacity-70" />
-              <div className="text-2xl font-bold">{contratos.length}</div>
-              <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Contratos Ativos</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-space-4">
+        <Card className="bg-action-primary/5 border-action-primary/10 shadow-shadow-sm">
+          <CardContent className="pt-space-6">
+            <div className="flex flex-col items-center text-center space-y-space-2">
+              <FileText className="h-space-8 w-space-8 text-action-primary opacity-70" />
+              <div className="text-text-2xl font-font-bold">{contratos.length}</div>
+              <div className="text-text-xs text-text-muted uppercase tracking-wider font-font-semibold">Contratos Ativos</div>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-accent/5 border-accent/10">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center text-center space-y-2">
-              <DollarSign className="h-8 w-8 text-accent opacity-70" />
-              <div className="text-2xl font-bold">
+        <Card className="bg-action-secondary/5 border-action-secondary/10 shadow-shadow-sm">
+          <CardContent className="pt-space-6">
+            <div className="flex flex-col items-center text-center space-y-space-2">
+              <DollarSign className="h-space-8 w-space-8 text-action-secondary opacity-70" />
+              <div className="text-text-2xl font-font-bold">
                 {formatCurrency(contratos.reduce((sum, c) => sum + (c.valor || 0), 0))}
               </div>
-              <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Valor Global Sob Contrato</div>
+              <div className="text-text-xs text-text-muted uppercase tracking-wider font-font-semibold">Valor Global Sob Contrato</div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-orange-500/5 border-orange-500/10">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center text-center space-y-2">
-              <Calendar className="h-8 w-8 text-orange-500 opacity-70" />
-              <div className="text-2xl font-bold">
+        <Card className="bg-status-warning/5 border-status-warning/10 shadow-shadow-sm">
+          <CardContent className="pt-space-6">
+            <div className="flex flex-col items-center text-center space-y-space-2">
+              <Calendar className="h-space-8 w-space-8 text-status-warning opacity-70" />
+              <div className="text-text-2xl font-font-bold">
                 {formatCurrency(totalALiquidarGlobal)}
               </div>
-              <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Saldo Total a Liquidar</div>
+              <div className="text-text-xs text-text-muted uppercase tracking-wider font-font-semibold">Saldo Total a Liquidar</div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-blue-500/5 border-blue-500/10">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center text-center space-y-2">
-              <ExternalLink className="h-8 w-8 text-blue-500 opacity-70" />
-              <div className="text-2xl font-bold">{contratosEmpenhos.length}</div>
-              <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Vínculos Gerenciados</div>
+        <Card className="bg-action-info/5 border-action-info/10 shadow-shadow-sm">
+          <CardContent className="pt-space-6">
+            <div className="flex flex-col items-center text-center space-y-space-2">
+              <ExternalLink className="h-space-8 w-space-8 text-action-info opacity-70" />
+              <div className="text-text-2xl font-font-bold">{contratosEmpenhos.length}</div>
+              <div className="text-text-xs text-text-muted uppercase tracking-wider font-font-semibold">Vínculos Gerenciados</div>
             </div>
           </CardContent>
         </Card>

@@ -28,7 +28,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
-import { HeaderSubtitle, HeaderActions } from '@/components/HeaderParts';
+import { HeaderActions } from '@/components/HeaderParts';
 import { toast } from 'sonner';
 import { formatCurrency, parseCurrency, formatarDocumento } from '@/lib/utils';
 import { parseSiafiCsv, syncSiafiDataToDb } from '@/lib/siafi-parser';
@@ -36,10 +36,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 
 
 const statusColors: Record<string, string> = {
-  pendente: 'bg-warning/20 text-warning border-warning/30',
-  liquidado: 'bg-info/20 text-info border-info/30',
-  pago: 'bg-accent/20 text-accent border-accent/30',
-  cancelado: 'bg-destructive/20 text-destructive border-destructive/30',
+  pendente: 'bg-status-warning/20 text-status-warning border-status-warning/30',
+  liquidado: 'bg-action-primary/20 text-action-primary border-action-primary/30',
+  pago: 'bg-status-success/20 text-status-success border-status-success/30',
+  cancelado: 'bg-status-error/20 text-status-error border-status-error/30',
 };
 
 const statusLabels: Record<string, string> = {
@@ -337,21 +337,10 @@ export default function Empenhos() {
     return date > max ? date : max;
   }, new Date(0));
   const hasLastUpdate = lastUpdate.getTime() > 0;
-
   return (
-    <div className="space-y-6 animate-fade-in">
-      <HeaderSubtitle>
-        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-          <span>Gerencie a execução orçamentária</span>
-          {hasLastUpdate && (
-            <Badge variant="outline" className="text-[10px] sm:text-xs font-normal py-0 sm:py-0.5">
-              Última importação CSV: {format(lastUpdate, "dd/MM/yyyy 'às' HH:mm")}
-            </Badge>
-          )}
-        </div>
-      </HeaderSubtitle>
+    <div className="space-y-space-6 pb-space-10">
       <HeaderActions>
-        <div className="flex gap-2">
+        <div className="flex gap-space-2">
           <input
             type="file"
             ref={saldosInputRef}
@@ -365,17 +354,17 @@ export default function Empenhos() {
                 <Button
                   variant="outline"
                   onClick={() => saldosInputRef.current?.click()}
-                  className="gap-2 h-8 text-xs sm:h-9 sm:text-sm bg-white"
+                  className="gap-space-2 h-space-8 text-text-xs sm:h-space-9 sm:text-text-sm bg-surface-card border-border-default shadow-shadow-sm transition-all"
                   disabled={isUpdatingSaldos}
                 >
                   {isUpdatingSaldos ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader2 className="h-space-4 w-space-4 animate-spin" />
                       Lendo SIAFI...
                     </>
                   ) : (
                     <>
-                      <FileSpreadsheet className="h-4 w-4 text-green-600" />
+                      <FileSpreadsheet className="h-space-4 w-space-4 text-status-success" />
                       Importar CSV
                     </>
                   )}
@@ -390,25 +379,25 @@ export default function Empenhos() {
       </HeaderActions>
 
       {/* Filters */}
-      <Card className="">
-        <CardHeader className="pb-3">
-          <CardTitle>Filtros</CardTitle>
+      <Card className="card-system">
+        <CardHeader className="pb-space-3">
+          <CardTitle className="text-text-lg font-font-bold">Filtros</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-space-4">
           {/* Linha 1: Busca e Filtros Básicos */}
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-space-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-space-3 top-1/2 -translate-y-1/2 h-space-4 w-space-4 text-text-muted" />
               <Input
                 placeholder="Buscar empenhos..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-space-10 input-system"
               />
             </div>
             <div className="w-full sm:w-[180px]">
               <Select value={filterDimensao} onValueChange={setFilterDimensao}>
-                <SelectTrigger>
+                <SelectTrigger className="input-system">
                   <SelectValue placeholder="Dimensão" />
                 </SelectTrigger>
                 <SelectContent>
@@ -423,7 +412,7 @@ export default function Empenhos() {
             </div>
             <div className="w-full sm:w-[150px]">
               <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger>
+                <SelectTrigger className="input-system">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -438,19 +427,20 @@ export default function Empenhos() {
             <Button
               variant={showAdvancedFilters ? "secondary" : "outline"}
               onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className="gap-space-2"
             >
-              <Filter className="w-4 h-4 mr-2" />
+              <Filter className="w-4 h-4" />
               Filtros
             </Button>
           </div>
 
           {/* Linha 2: Filtros Avançados (Colapsável) */}
           {showAdvancedFilters && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg border border-border/50 animate-in slide-in-from-top-2">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Componente Funcional</label>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-space-4 p-space-4 bg-surface-subtle/30 rounded-radius-lg border border-border-default/50">
+              <div className="space-y-space-2">
+                <label className="text-text-sm font-font-medium">Componente Funcional</label>
                 <Select value={filterComponente} onValueChange={setFilterComponente}>
-                  <SelectTrigger>
+                  <SelectTrigger className="input-system">
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -462,10 +452,10 @@ export default function Empenhos() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Origem de Recurso</label>
+              <div className="space-y-space-2">
+                <label className="text-text-sm font-font-medium">Origem de Recurso</label>
                 <Select value={filterOrigem} onValueChange={setFilterOrigem}>
-                  <SelectTrigger>
+                  <SelectTrigger className="input-system">
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -477,10 +467,10 @@ export default function Empenhos() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Plano Interno</label>
+              <div className="space-y-space-2">
+                <label className="text-text-sm font-font-medium">Plano Interno</label>
                 <Select value={filterPlanoInterno} onValueChange={setFilterPlanoInterno}>
-                  <SelectTrigger>
+                  <SelectTrigger className="input-system">
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -492,22 +482,24 @@ export default function Empenhos() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Período (Início)</label>
+              <div className="space-y-space-2">
+                <label className="text-text-sm font-font-medium">Período (Início)</label>
                 <Input
                   type="date"
                   value={dataInicio}
                   onChange={(e) => setDataInicio(e.target.value)}
+                  className="input-system"
                 />
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Período (Fim)</label>
-                <div className="flex gap-2">
+              <div className="space-y-space-2">
+                <label className="text-text-sm font-font-medium">Período (Fim)</label>
+                <div className="flex gap-space-2">
                   <Input
                     type="date"
                     value={dataFim}
                     onChange={(e) => setDataFim(e.target.value)}
+                    className="input-system"
                   />
                   <Button
                     variant="ghost"
@@ -523,8 +515,9 @@ export default function Empenhos() {
                       setDataFim('');
                       setSearchTerm('');
                     }}
+                    className="hover:bg-status-error/10 hover:text-status-error transition-colors"
                   >
-                    <Filter className="w-4 h-4 text-muted-foreground" />
+                    <Filter className="w-4 h-4" />
                     <span className="sr-only">Limpar</span>
                   </Button>
                 </div>
@@ -536,10 +529,10 @@ export default function Empenhos() {
 
 
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
-          <TabsTrigger value="execucao">Execução {new Date().getFullYear()}</TabsTrigger>
-          <TabsTrigger value="restos">Restos a Pagar</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-space-6">
+        <TabsList className="bg-surface-subtle p-px rounded-radius-lg h-auto">
+          <TabsTrigger value="execucao" className="px-space-6 py-space-2 data-[state=active]:bg-surface-card data-[state=active]:shadow-shadow-sm rounded-radius-md text-text-sm font-font-semibold">Execução {new Date().getFullYear()}</TabsTrigger>
+          <TabsTrigger value="restos" className="px-space-6 py-space-2 data-[state=active]:bg-surface-card data-[state=active]:shadow-shadow-sm rounded-radius-md text-text-sm font-font-semibold">Restos a Pagar</TabsTrigger>
         </TabsList>
 
         <TabsContent value="execucao">
@@ -772,17 +765,17 @@ function EmpenhoRow({
   isChild?: boolean;
 }) {
   return (
-    <tr className={`border-b border-border/50 hover:bg-muted/50 transition-colors ${isChild ? 'bg-white' : 'even:bg-muted/20'}`}>
-      <td className={`py-2 px-2 align-top ${isChild ? 'pl-8' : ''}`}>
-        <div className="flex flex-col gap-1">
-          <span className="font-mono text-sm font-medium whitespace-nowrap">{empenho.numero}</span>
+    <tr className={`border-b border-border-default/50 hover:bg-surface-subtle transition-colors transition-all duration-200 ${isChild ? 'bg-surface-card' : 'even:bg-surface-subtle/20'}`}>
+      <td className={`py-space-2 px-space-2 align-top ${isChild ? 'pl-space-8' : ''}`}>
+        <div className="flex flex-col gap-space-1">
+          <span className="font-mono text-text-sm font-font-medium whitespace-nowrap">{empenho.numero}</span>
           {empenho.processo && (
-            <span className="text-xs text-muted-foreground whitespace-nowrap" title="Processo">
+            <span className="text-text-xs text-text-muted whitespace-nowrap" title="Processo">
               Proc: {empenho.processo}
             </span>
           )}
           {empenho.historicoOperacoes && empenho.historicoOperacoes.length > 1 && (
-            <span className="text-[10px] text-blue-500 flex items-center gap-0.5" title="Empenho com histórico de alterações">
+            <span className="text-[10px] text-action-primary flex items-center gap-space-0.5" title="Empenho com histórico de alterações">
               <History className="h-3 w-3" />
               {empenho.historicoOperacoes.length} ops
             </span>
@@ -988,29 +981,29 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
 
   const SortHeader = ({ label, colKey, align = 'left' }: { label: string; colKey: string; align?: 'left' | 'right' | 'center' }) => (
     <th
-      className={`text-${align} py-2 px-2 text-sm font-medium text-muted-foreground whitespace-nowrap cursor-pointer hover:text-foreground select-none transition-colors`}
+      className={`text-${align} py-space-2 px-space-2 text-text-sm font-font-medium text-text-muted whitespace-nowrap cursor-pointer hover:text-text-primary select-none transition-colors border-b border-border-default/50`}
       onClick={() => handleSort(colKey)}
     >
-      <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
+      <span className={`inline-flex items-center gap-space-1 ${align === 'right' ? 'justify-end' : ''}`}>
         {label}
         {sortKey === colKey && (
-          <span className="text-primary text-xs">{sortDir === 'asc' ? '▲' : '▼'}</span>
+          <span className="text-action-primary text-text-xs transition-transform duration-200">{sortDir === 'asc' ? '▲' : '▼'}</span>
         )}
       </span>
     </th>
   );
 
   return (
-    <Card className="">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-lg">
+    <Card className="card-system">
+      <CardHeader className="flex flex-row items-center justify-between pb-space-2">
+        <CardTitle className="text-text-lg font-font-bold">
           {empenhos.length} empenho{empenhos.length !== 1 ? 's' : ''} encontrado{empenhos.length !== 1 ? 's' : ''}
         </CardTitle>
         <Button
           variant={groupBy === 'favorecido' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setGroupBy(g => g === 'none' ? 'favorecido' : 'none')}
-          className="h-8 gap-2"
+          className="h-space-8 gap-space-2 btn-secondary"
         >
           <Layers className="h-4 w-4" />
           {groupBy === 'favorecido' ? 'Desagrupar' : 'Agrupar por Favorecido'}
@@ -1134,13 +1127,13 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
         </div>
 
         {/* Footer Paginação */}
-        <div className="flex items-center justify-between px-2 py-4 border-t mt-4">
-          <div className="text-xs text-muted-foreground">
+        <div className="flex flex-col sm:flex-row items-center justify-between px-space-2 py-space-4 border-t border-border-default/50 mt-space-4 gap-space-4">
+          <div className="text-text-xs text-text-muted">
             Mostrando <strong>{totalRecords === 0 ? 0 : ((page - 1) * perPage) + 1}</strong> a <strong>{Math.min(page * perPage, totalRecords)}</strong> de <strong>{totalRecords}</strong> registros
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-space-2">
             <Select value={String(perPage)} onValueChange={(val) => { setPerPage(Number(val)); setPage(1); }}>
-              <SelectTrigger className="h-8 w-[70px]">
+              <SelectTrigger className="h-space-8 w-space-[70px] input-system">
                 <SelectValue placeholder={String(perPage)} />
               </SelectTrigger>
               <SelectContent>
@@ -1150,48 +1143,48 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
                 <SelectItem value="100">100</SelectItem>
               </SelectContent>
             </Select>
-            <div className="flex w-[100px] items-center justify-center text-sm font-medium">
+            <div className="flex w-space-24 items-center justify-center text-text-sm font-font-medium text-text-secondary">
               Página {page} de {totalPages || 1}
             </div>
             <Button
               variant="outline"
               size="icon"
-              className="h-8 w-8"
+              className="h-space-8 w-space-8 border-border-default hover:bg-surface-subtle"
               onClick={() => setPage(1)}
               disabled={page <= 1}
               title="Primeira página"
             >
-              <ChevronsLeft className="h-4 w-4" />
+              <ChevronsLeft className="h-space-4 w-space-4" />
             </Button>
             <Button
               variant="outline"
               size="icon"
-              className="h-8 w-8"
+              className="h-space-8 w-space-8 border-border-default hover:bg-surface-subtle"
               onClick={() => setPage(page - 1)}
               disabled={page <= 1}
               title="Página anterior"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-space-4 w-space-4" />
             </Button>
             <Button
               variant="outline"
               size="icon"
-              className="h-8 w-8"
+              className="h-space-8 w-space-8 border-border-default hover:bg-surface-subtle"
               onClick={() => setPage(page + 1)}
               disabled={page >= totalPages}
               title="Próxima página"
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-space-4 w-space-4" />
             </Button>
             <Button
               variant="outline"
               size="icon"
-              className="h-8 w-8"
+              className="h-space-8 w-space-8 border-border-default hover:bg-surface-subtle"
               onClick={() => setPage(totalPages)}
               disabled={page >= totalPages}
               title="Última página"
             >
-              <ChevronsRight className="h-4 w-4" />
+              <ChevronsRight className="h-space-4 w-space-4" />
             </Button>
           </div>
         </div>

@@ -25,7 +25,7 @@ import {
 import { formatCurrency, formatDocumentoId } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
-import { HeaderSubtitle, HeaderActions } from '@/components/HeaderParts';
+import { HeaderActions } from '@/components/HeaderParts';
 
 interface NecessidadeFonte {
   fonte: string;
@@ -72,54 +72,53 @@ export default function ConciliacaoPfs() {
     : docsPendentes;
 
   return (
-    <div className="flex-1 space-y-8 p-8 pt-6 animate-in fade-in duration-500">
-      <HeaderSubtitle>Análise de liquidações em aberto vs. saldo disponível de PFs</HeaderSubtitle>
+    <div className="flex-1 space-y-space-8 p-space-4 md:p-space-8 pt-space-6 pb-space-10">
       <HeaderActions>
-        {totalNecessidade > 0 && <Badge variant="destructive" className="animate-pulse">Crítico</Badge>}
-        <Button onClick={fetchData} variant="outline" size="sm" className="gap-2 shadow-sm" disabled={loading}>
-          <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+        {totalNecessidade > 0 && <Badge variant="destructive" className="animate-pulse bg-status-error">Crítico</Badge>}
+        <Button onClick={fetchData} variant="outline" size="sm" className="gap-space-2 shadow-shadow-sm h-space-9" disabled={loading}>
+          <RefreshCw className={loading ? "h-space-4 w-space-4 animate-spin" : "h-space-4 w-space-4"} />
           Atualizar Análise
         </Button>
       </HeaderActions>
 
       {/* Overview Cards */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="border-red-200 bg-red-50/20 dark:bg-red-900/10 shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-bold uppercase tracking-wider text-red-700 dark:text-red-400">Falta Solicitar (PF)</CardTitle>
-            <TrendingDown className="h-5 w-5 text-red-600" />
+      <div className="grid gap-space-6 md:grid-cols-2 lg:grid-cols-3">
+        <Card className="border-status-error/20 bg-status-error/5 shadow-shadow-md card-system">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-space-2">
+            <CardTitle className="text-text-xs font-font-bold uppercase tracking-wider text-status-error">Falta Solicitar (PF)</CardTitle>
+            <TrendingDown className="h-space-5 w-space-5 text-status-error" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-black text-red-700 dark:text-red-400">{formatCurrency(totalNecessidade)}</div>
-            <p className="text-xs text-red-600/80 mt-1 font-medium">
+            <div className="text-text-3xl font-font-black text-status-error">{formatCurrency(totalNecessidade)}</div>
+            <p className="text-text-xs text-status-error/80 mt-space-1 font-font-medium">
               Déficit total de cobertura para as liquidações atuais
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-blue-200 bg-blue-50/20 dark:bg-blue-900/10 shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400">Liquidações a Pagar</CardTitle>
-            <FileWarning className="h-5 w-5 text-blue-600" />
+        <Card className="border-action-primary/20 bg-action-primary/5 shadow-shadow-md card-system">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-space-2">
+            <CardTitle className="text-text-xs font-font-bold uppercase tracking-wider text-action-primary">Liquidações a Pagar</CardTitle>
+            <FileWarning className="h-space-5 w-space-5 text-action-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-black text-blue-700 dark:text-blue-400">{formatCurrency(totalAPagar)}</div>
-            <p className="text-xs text-blue-600/80 mt-1 font-medium">
+            <div className="text-text-3xl font-font-black text-action-primary">{formatCurrency(totalAPagar)}</div>
+            <p className="text-text-xs text-action-primary/80 mt-space-1 font-font-medium">
               {docsPendentes.length} documentos aguardando pagamento
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-emerald-200 bg-emerald-50/20 dark:bg-emerald-900/10 shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Fontes Críticas</CardTitle>
-            <AlertCircle className="h-5 w-5 text-emerald-600" />
+        <Card className="border-status-success/20 bg-status-success/5 shadow-shadow-md card-system">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-space-2">
+            <CardTitle className="text-text-xs font-font-bold uppercase tracking-wider text-status-success">Fontes Críticas</CardTitle>
+            <AlertCircle className="h-space-5 w-space-5 text-status-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-black text-emerald-700 dark:text-emerald-400">
+            <div className="text-text-3xl font-font-black text-status-success">
               {fontes.filter(f => f.status_analise === 'NECESSITA_PF').length}
             </div>
-            <p className="text-xs text-emerald-600/80 mt-1 font-medium">
+            <p className="text-text-xs text-status-success/80 mt-space-1 font-font-medium">
               Fontes onde o saldo de PF é insuficiente
             </p>
           </CardContent>
@@ -127,9 +126,9 @@ export default function ConciliacaoPfs() {
       </div>
 
       {/* Fontes Analysis */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-bold flex items-center gap-2 px-1">
-          <Wallet className="h-5 w-5 text-primary" /> Análise por Fonte de Recursos
+      <div className="space-y-space-4">
+        <h3 className="text-text-lg font-font-bold flex items-center gap-space-2 px-space-1">
+          <Wallet className="h-space-5 w-space-5 text-action-primary" /> Análise por Fonte de Recursos
         </h3>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {loading ? (
@@ -144,40 +143,40 @@ export default function ConciliacaoPfs() {
               } ${selectedFonte === f.fonte ? 'ring-2 ring-primary ring-offset-2' : ''}`}
               onClick={() => setSelectedFonte(selectedFonte === f.fonte ? null : f.fonte)}
             >
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-space-3">
                 <div className="flex items-center justify-between">
-                  <Badge variant="outline" className="font-mono text-sm px-3 py-1 bg-white dark:bg-slate-900">Fonte {f.fonte}</Badge>
+                  <Badge variant="outline" className="font-mono text-text-sm px-space-3 py-space-1 bg-surface-card border-border-default">Fonte {f.fonte}</Badge>
                   {f.status_analise === 'NECESSITA_PF' ? (
-                    <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-red-200 gap-1.5 shadow-none">
-                      <TrendingDown className="h-3 w-3" /> Necessita PF
+                    <Badge className="bg-status-error/10 text-status-error hover:bg-status-error/20 border-status-error/20 gap-space-1.5 shadow-none">
+                      <TrendingDown className="h-space-3 w-space-3" /> Necessita PF
                     </Badge>
                   ) : f.status_analise === 'SUFICIENTE' ? (
-                    <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200 gap-1.5 shadow-none">
-                      <CheckCircle2 className="h-3 w-3" /> Suficiente
+                    <Badge className="bg-status-success/10 text-status-success hover:bg-status-success/20 border-status-success/20 gap-space-1.5 shadow-none">
+                      <CheckCircle2 className="h-space-3 w-space-3" /> Suficiente
                     </Badge>
                   ) : (
-                    <Badge variant="secondary" className="gap-1.5">Regular</Badge>
+                    <Badge variant="secondary" className="gap-space-1.5">Regular</Badge>
                   )}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between items-end border-b pb-2 border-slate-100 dark:border-slate-800">
+              <CardContent className="space-y-space-3">
+                <div className="flex justify-between items-end border-b pb-space-2 border-border-default/50">
                    <div className="flex flex-col">
-                     <span className="text-[10px] font-bold uppercase text-muted-foreground">Saldo PF Disponível</span>
-                     <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{formatCurrency(f.saldo_pf_disponivel)}</span>
+                     <span className="text-[10px] font-font-bold uppercase text-text-muted">Saldo PF Disponível</span>
+                     <span className="text-text-sm font-font-bold text-text-secondary">{formatCurrency(f.saldo_pf_disponivel)}</span>
                    </div>
                    <div className="flex flex-col text-right">
-                     <span className="text-[10px] font-bold uppercase text-muted-foreground">Fila de Pagamento</span>
-                     <span className="text-sm font-black text-blue-600">{formatCurrency(f.total_a_pagar)}</span>
+                     <span className="text-[10px] font-font-bold uppercase text-text-muted">Fila de Pagamento</span>
+                     <span className="text-text-sm font-font-black text-action-primary">{formatCurrency(f.total_a_pagar)}</span>
                    </div>
                 </div>
                 {f.necessidade_pf > 0 && (
-                  <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg flex items-center justify-between group-hover:bg-red-100/50 transition-colors">
-                    <span className="text-xs font-bold text-red-700 dark:text-red-400 uppercase">Déficit de Recurso:</span>
-                    <span className="text-lg font-black text-red-600">{formatCurrency(f.necessidade_pf)}</span>
-                  </div>
+                   <div className="bg-status-error/10 p-space-3 rounded-radius-lg flex items-center justify-between group-hover:bg-status-error/20 transition-colors">
+                     <span className="text-text-xs font-font-bold text-status-error uppercase">Déficit de Recurso:</span>
+                     <span className="text-text-lg font-font-black text-status-error">{formatCurrency(f.necessidade_pf)}</span>
+                   </div>
                 )}
-                <p className="text-[10px] text-center text-muted-foreground font-medium italic pt-1">
+                <p className="text-[10px] text-center text-text-muted font-font-medium italic pt-space-1">
                   Clique para ver os {f.qtd_docs_pendentes} documentos desta fonte
                 </p>
               </CardContent>
@@ -200,17 +199,17 @@ export default function ConciliacaoPfs() {
           )}
         </div>
         
-        <Card className="shadow-xl border-slate-200/60 dark:border-slate-800/60 overflow-hidden bg-white/90 dark:bg-slate-900/90 backdrop-blur-md">
+        <Card className="shadow-shadow-xl border-border-default/60 card-system overflow-hidden">
           <Table>
-            <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
-              <TableRow className="border-b">
-                <TableHead className="w-[120px] font-bold text-[10px] uppercase tracking-widest text-muted-foreground">Data</TableHead>
-                <TableHead className="font-bold text-[10px] uppercase tracking-widest text-muted-foreground">Documento</TableHead>
-                <TableHead className="font-bold text-[10px] uppercase tracking-widest text-muted-foreground">Favorecido</TableHead>
-                <TableHead className="text-center font-bold text-[10px] uppercase tracking-widest text-muted-foreground">Fonte</TableHead>
-                <TableHead className="text-right font-bold text-[10px] uppercase tracking-widest text-muted-foreground">Liquidado</TableHead>
-                <TableHead className="text-right font-bold text-[10px] uppercase tracking-widest text-muted-foreground">Pago</TableHead>
-                <TableHead className="text-right font-bold text-[10px] uppercase tracking-widest text-muted-foreground">Pendente</TableHead>
+            <TableHeader className="bg-surface-subtle/50">
+              <TableRow className="border-b border-border-default">
+                <TableHead className="w-[120px] font-font-bold text-[10px] uppercase tracking-widest text-text-muted">Data</TableHead>
+                <TableHead className="font-font-bold text-[10px] uppercase tracking-widest text-text-muted">Documento</TableHead>
+                <TableHead className="font-font-bold text-[10px] uppercase tracking-widest text-text-muted">Favorecido</TableHead>
+                <TableHead className="text-center font-font-bold text-[10px] uppercase tracking-widest text-text-muted">Fonte</TableHead>
+                <TableHead className="text-right font-font-bold text-[10px] uppercase tracking-widest text-text-muted">Liquidado</TableHead>
+                <TableHead className="text-right font-font-bold text-[10px] uppercase tracking-widest text-text-muted">Pago</TableHead>
+                <TableHead className="text-right font-font-bold text-[10px] uppercase tracking-widest text-text-muted">Pendente</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

@@ -27,7 +27,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
-import { HeaderSubtitle, HeaderActions } from '@/components/HeaderParts';
+import { HeaderActions } from '@/components/HeaderParts';
 import { toast } from 'sonner';
 import { formatCurrency, parseCurrency } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -249,42 +249,44 @@ export default function Descentralizacoes() {
         'NC Célula - Plano Interno',
         'NC Célula - Valor',
     ];
-
     return (
-        <div className="space-y-6 animate-fade-in">
-            <HeaderSubtitle>Gerencie os recursos descentralizados pela reitoria</HeaderSubtitle>
+        <div className="space-y-space-6 pb-space-10">
             <HeaderActions>
                 {selectedIds.size > 0 && (
-                    <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)} className="gap-2 h-8 text-xs sm:h-9 sm:text-sm">
+                    <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)} className="gap-space-2 h-space-8 text-text-xs sm:h-space-9 sm:text-text-sm shadow-shadow-sm transition-all">
                         <Trash2 className="h-4 w-4" />
                         Excluir ({selectedIds.size})
                     </Button>
                 )}
-                <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} className="gap-2 h-8 text-xs sm:h-9 sm:text-sm">
-                    <Upload className="h-4 w-4" />
+                <Button 
+                    variant="outline" 
+                    onClick={() => setIsImportDialogOpen(true)} 
+                    className="gap-space-2 h-space-8 text-text-xs sm:h-space-9 sm:text-text-sm bg-surface-card border-border-default shadow-shadow-sm transition-all"
+                >
+                    <Upload className="h-4 w-4 text-action-primary" />
                     Importar CSV
                 </Button>
             </HeaderActions>
 
             {/* Filters */}
-            <Card className="">
-                <CardHeader className="pb-3">
-                    <CardTitle>Filtros</CardTitle>
+            <Card className="card-system">
+                <CardHeader className="pb-space-3">
+                    <CardTitle className="text-text-lg font-font-bold">Filtros</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex flex-col sm:flex-row gap-4">
+                <CardContent className="space-y-space-4">
+                    <div className="flex flex-col sm:flex-row gap-space-4">
                         <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Search className="absolute left-space-3 top-1/2 -translate-y-1/2 h-space-4 w-space-4 text-text-muted" />
                             <Input
                                 placeholder="Buscar por dimensão, origem, plano ou descrição..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-10"
+                                className="pl-space-10 input-system"
                             />
                         </div>
                         <div className="w-full sm:w-[200px]">
                             <Select value={filterDimensao} onValueChange={setFilterDimensao}>
-                                <SelectTrigger>
+                                <SelectTrigger className="input-system">
                                     <SelectValue placeholder="Dimensão" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -300,18 +302,19 @@ export default function Descentralizacoes() {
                         <Button
                             variant={showAdvancedFilters ? "secondary" : "outline"}
                             onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                            className="gap-space-2"
                         >
-                            <Filter className="w-4 h-4 mr-2" />
+                            <Filter className="w-4 h-4" />
                             Filtros Avançados
                         </Button>
                     </div>
 
                     {showAdvancedFilters && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg border border-border/50 animate-in slide-in-from-top-2">
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Origem de Recurso</label>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-space-4 p-space-4 bg-surface-subtle/30 rounded-radius-lg border border-border-default/50">
+                            <div className="space-y-space-2">
+                                <label className="text-text-sm font-font-medium">Origem de Recurso</label>
                                 <Select value={filterOrigem} onValueChange={setFilterOrigem}>
-                                    <SelectTrigger>
+                                    <SelectTrigger className="input-system">
                                         <SelectValue placeholder="Selecione..." />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -342,13 +345,13 @@ export default function Descentralizacoes() {
             </Card>
 
             {/* Table */}
-            <Card className="">
-                <CardHeader>
-                    <CardTitle className="text-lg flex items-center justify-between">
+            <Card className="card-system">
+                <CardHeader className="pb-space-2">
+                    <CardTitle className="text-text-lg font-font-bold flex items-center justify-between">
                         <span>
                             {sortedDescentralizacoes.length} {sortedDescentralizacoes.length !== 1 ? 'descentralizações' : 'descentralização'} encontrada{sortedDescentralizacoes.length !== 1 ? 's' : ''}
                         </span>
-                        <Badge variant="secondary" className="text-base px-3 py-1">
+                        <Badge variant="secondary" className="text-text-sm px-space-3 py-space-1 bg-surface-subtle border-border-default">
                             Total: {formatCurrency(totalFiltrado)}
                         </Badge>
                     </CardTitle>

@@ -80,13 +80,13 @@ export default function Atividades() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Buscar naturezas de despesa do banco
-  const { data: naturezasDespesa = [] } = useQuery({
+  const { data: naturezasDespesa = [], isLoading: isLoadingNaturezas } = useQuery({
     queryKey: ['naturezas_despesa'],
     queryFn: dominioService.getNaturezasDespesa,
   });
 
   // Buscar dimensões do banco
-  const { data: dimensoesDB = [] } = useQuery({
+  const { data: dimensoesDB = [], isLoading: isLoadingDimensoes } = useQuery({
     queryKey: ['dimensoes'],
     queryFn: dominioService.getDimensoes,
   });
@@ -99,48 +99,60 @@ export default function Atividades() {
   }, [formData.dimensao, dimensoesDB]);
 
   // Buscar componentes funcionais do banco baseados na dimensão selecionada
-  const { data: componentesDB = [] } = useQuery({
+  const { data: componentesDB = [], isLoading: isLoadingComponentes } = useQuery({
     queryKey: ['componentes_funcionais', selectedDimId],
     queryFn: () => dominioService.getComponentesFuncionais(selectedDimId),
     enabled: !!selectedDimId,
   });
 
+  const isPageLoading = isLoading || isLoadingNaturezas || isLoadingDimensoes;
+
   // Extrair opções únicas para os filtros
-  const componentesUnicos = Array.from(new Set(atividades.map(a => a.componenteFuncional?.trim()).filter(Boolean))).sort();
-  const origensUnicas = Array.from(new Set(atividades.map(a => a.origemRecurso?.trim()).filter(Boolean))).sort();
+  const componentesUnicos = useMemo(() => 
+    Array.from(new Set(atividades.map(a => a.componenteFuncional?.trim()).filter(Boolean))).sort()
+  , [atividades]);
 
-  const filteredAtividades = atividades.filter((a) => {
-    const matchesSearch =
-      (a.atividade || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (a.descricao || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (a.origemRecurso || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (a.componenteFuncional || '').toLowerCase().includes(searchTerm.toLowerCase());
+  const origensUnicas = useMemo(() => 
+    Array.from(new Set(atividades.map(a => a.origemRecurso?.trim()).filter(Boolean))).sort()
+  , [atividades]);
 
-    const matchesDimensao = filterDimensao === 'all' || (a.dimensao || '').includes(filterDimensao);
-    const matchesComponente = filterComponente === 'all' || a.componenteFuncional?.trim() === filterComponente;
-    const matchesOrigem = filterOrigem === 'all' || a.origemRecurso?.trim() === filterOrigem;
+  const filteredAtividades = useMemo(() => {
+    return atividades.filter((a) => {
+      const matchesSearch =
+        (a.atividade || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (a.descricao || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (a.origemRecurso || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (a.componenteFuncional || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-    return matchesSearch && matchesDimensao && matchesComponente && matchesOrigem;
-  });
+      const matchesDimensao = filterDimensao === 'all' || (a.dimensao || '').includes(filterDimensao);
+      const matchesComponente = filterComponente === 'all' || a.componenteFuncional?.trim() === filterComponente;
+      const matchesOrigem = filterOrigem === 'all' || a.origemRecurso?.trim() === filterOrigem;
 
-  const sortedAtividades = [...filteredAtividades].sort((a, b) => {
-    if (!sortConfig) return 0;
+      return matchesSearch && matchesDimensao && matchesComponente && matchesOrigem;
+    });
+  }, [atividades, searchTerm, filterDimensao, filterComponente, filterOrigem]);
+
+  const sortedAtividades = useMemo(() => {
+    const list = [...filteredAtividades];
+    if (!sortConfig) return list;
 
     const { key, direction } = sortConfig;
-    let aValue = a[key] ?? '';
-    let bValue = b[key] ?? '';
+    return list.sort((a, b) => {
+      let aValue = a[key] ?? '';
+      let bValue = b[key] ?? '';
 
-    if (typeof aValue === 'string') aValue = aValue.toLowerCase();
-    if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+      if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+      if (typeof bValue === 'string') bValue = bValue.toLowerCase();
 
-    if (aValue < bValue) {
-      return direction === 'asc' ? -1 : 1;
-    }
-    if (aValue > bValue) {
-      return direction === 'asc' ? 1 : -1;
-    }
-    return 0;
-  });
+      if (aValue < bValue) {
+        return direction === 'asc' ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return direction === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+  }, [filteredAtividades, sortConfig]);
 
   const requestSort = (key: keyof Atividade) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -353,234 +365,236 @@ export default function Atividades() {
   ];
 
   return (
-    <div className="space-y-6">
-      <HeaderSubtitle>Gerencie o planejamento orçamentário</HeaderSubtitle>
+    <div className="space-y-space-6 pb-space-10">
       <HeaderActions>
-        {selectedIds.size > 0 && (
-          <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)} className="gap-2 h-8 text-xs sm:h-9 sm:text-sm animate-scale-in">
-            <Trash2 className="h-4 w-4" />
-            Excluir ({selectedIds.size})
-          </Button>
+        {isPageLoading ? (
+          <Skeleton className="h-9 w-space-32" />
+        ) : (
+          <div className="flex gap-space-2">
+            {selectedIds.size > 0 && (
+              <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)} className="gap-space-2 h-space-9 text-text-sm">
+                <Trash2 className="h-4 w-4" />
+                Excluir ({selectedIds.size})
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} className="gap-space-2 h-space-9 text-text-sm">
+              <Upload className="h-4 w-4" />
+              Importar JSON
+            </Button>
+            <Button onClick={() => handleOpenDialog()} className="btn-primary">
+              <Plus className="h-4 w-4" />
+              Nova Atividade
+            </Button>
+          </div>
         )}
-        <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} className="gap-2 h-8 text-xs sm:h-9 sm:text-sm">
-          <Upload className="h-4 w-4" />
-          Importar JSON
-        </Button>
-        <Button onClick={() => handleOpenDialog()} className="gap-2 h-8 text-xs sm:h-9 sm:text-sm">
-          <Plus className="h-4 w-4" />
-          Nova Atividade
-        </Button>
       </HeaderActions>
 
-      <motion.div
-        variants={staggerContainer}
-        initial="hidden"
-        animate="show"
-        className="space-y-6"
-      >
+      <div className="space-y-space-6">
         {/* Filters */}
-        <motion.div variants={scaleIn}>
-          <Card className="border-glow">
-            <CardHeader className="pb-3">
-              <CardTitle>Filtros</CardTitle>
+        <div>
+          <Card className="card-system shadow-shadow-sm">
+            <CardHeader className="pb-space-3 px-0 pt-0">
+              <CardTitle className="text-text-xl font-font-bold">Filtros</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar por atividade, processo ou dimensão..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
+            <CardContent className="space-y-space-4 p-0">
+              {isPageLoading ? (
+                <div className="flex flex-col sm:flex-row gap-space-4">
+                  <Skeleton className="h-10 flex-1" />
+                  <Skeleton className="h-10 w-[200px]" />
+                  <Skeleton className="h-10 w-[150px]" />
                 </div>
-                <div className="w-full sm:w-[200px]">
-                  <Select value={filterDimensao} onValueChange={setFilterDimensao}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Dimensão" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas as dimensões</SelectItem>
-                      {DIMENSOES.map((d) => (
-                        <SelectItem key={d.codigo} value={d.codigo}>
-                          {d.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  variant={showAdvancedFilters ? "secondary" : "outline"}
-                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                >
-                  <Filter className="w-4 h-4 mr-2" />
-                  Filtros Avançados
-                </Button>
-              </div>
-
-              {showAdvancedFilters && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg border border-border/50 animate-in slide-in-from-top-2">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Componente Funcional</label>
-                    <Select value={filterComponente} onValueChange={setFilterComponente}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        {componentesUnicos.map(comp => (
-                          <SelectItem key={comp} value={comp}>{comp}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Origem de Recurso</label>
-                    <Select value={filterOrigem} onValueChange={setFilterOrigem}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todas</SelectItem>
-                        {origensUnicas.map(origem => (
-                          <SelectItem key={origem} value={origem}>{origem}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-end">
+              ) : (
+                <>
+                  <div className="flex flex-col sm:flex-row gap-space-4">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-space-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+                      <Input
+                        placeholder="Buscar por atividade, processo ou dimensão..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-space-10"
+                      />
+                    </div>
+                    <div className="w-full sm:w-[200px]">
+                      <Select value={filterDimensao} onValueChange={setFilterDimensao}>
+                        <SelectTrigger className="input-system">
+                          <SelectValue placeholder="Dimensão" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-radius-sm">
+                          <SelectItem value="all">Todas as dimensões</SelectItem>
+                          {DIMENSOES.map((d) => (
+                            <SelectItem key={d.codigo} value={d.codigo}>
+                              {d.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <Button
-                      variant="ghost"
-                      className="w-full text-muted-foreground hover:text-foreground"
-                      onClick={() => {
-                        setFilterDimensao('all');
-                        setFilterComponente('all');
-                        setFilterOrigem('all');
-                        setSearchTerm('');
-                      }}
+                      variant={showAdvancedFilters ? "secondary" : "outline"}
+                      onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                      className="gap-space-2"
                     >
-                      Limpar Filtros
+                      <Filter className="w-4 h-4 mr-space-2" />
+                      Filtros Avançados
                     </Button>
                   </div>
-                </div>
+
+                  {showAdvancedFilters && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-space-4 p-space-4 bg-surface-subtle/30 rounded-radius-lg border border-border-default/50">
+                      <div className="space-y-space-2">
+                        <label className="text-text-sm font-font-medium text-text-secondary">Componente Funcional</label>
+                        <Select value={filterComponente} onValueChange={setFilterComponente}>
+                          <SelectTrigger className="input-system">
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-radius-sm">
+                            <SelectItem value="all">Todos</SelectItem>
+                            {componentesUnicos.map(comp => (
+                              <SelectItem key={comp} value={comp}>{comp}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-space-2">
+                        <label className="text-text-sm font-font-medium text-text-secondary">Origem de Recurso</label>
+                        <Select value={filterOrigem} onValueChange={setFilterOrigem}>
+                          <SelectTrigger className="input-system">
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-radius-sm">
+                            <SelectItem value="all">Todas</SelectItem>
+                            {origensUnicas.map(origem => (
+                              <SelectItem key={origem} value={origem}>{origem}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex items-end">
+                        <Button
+                          variant="ghost"
+                          className="w-full text-text-muted hover:text-text-primary transition-all"
+                          onClick={() => {
+                            setFilterDimensao('all');
+                            setFilterComponente('all');
+                            setFilterOrigem('all');
+                            setSearchTerm('');
+                          }}
+                        >
+                          Limpar Filtros
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
-        </motion.div>
+        </div>
 
-        {/* Table */}
-        <motion.div variants={scaleIn}>
-          <Card className="border-glow overflow-hidden">
-            <CardHeader className="pb-0">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">
-                  {filteredAtividades.length} atividade{filteredAtividades.length !== 1 ? 's' : ''} encontrada{filteredAtividades.length !== 1 ? 's' : ''}
-                </CardTitle>
-              </div>
+        {/* Tabela */}
+        <div>
+          <Card className="card-system shadow-shadow-sm overflow-hidden p-0">
+            <CardHeader className="pb-space-2 pt-space-4 px-space-6 flex flex-row items-center justify-between">
+              <CardTitle className="text-text-xl font-font-bold">Planejamento</CardTitle>
+              <Badge variant="outline" className="text-text-xs font-font-medium border-border-default">
+                {sortedAtividades.length} atividades
+              </Badge>
             </CardHeader>
-            <CardContent className="p-0 sm:p-6">
-              <div className="overflow-x-auto">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto min-h-[400px]">
                 <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="py-3 px-4 w-[40px]">
+                  <thead className="bg-surface-subtle/50">
+                    <tr className="border-b border-border-default">
+                      <th className="py-space-3 px-space-4 text-left w-space-10">
                         <Checkbox
-                          checked={
-                            sortedAtividades.length > 0 &&
-                            sortedAtividades.every((a) => selectedIds.has(a.id))
-                          }
-                          onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                          checked={selectedIds.size === sortedAtividades.length && sortedAtividades.length > 0}
+                          onCheckedChange={handleSelectAll}
                         />
                       </th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                        <Button variant="ghost" className="hover:bg-transparent px-0 font-medium" onClick={() => requestSort('atividade')}>
+                      <th className="text-left py-space-3 px-space-4 text-text-sm font-font-medium text-text-secondary">
+                        <Button variant="ghost" className="hover:bg-transparent px-0 font-font-medium" onClick={() => requestSort('atividade')}>
                           Atividade {getSortIcon('atividade')}
                         </Button>
                       </th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                        <Button variant="ghost" className="hover:bg-transparent px-0 font-medium" onClick={() => requestSort('dimensao')}>
+                      <th className="text-left py-space-3 px-space-4 text-text-sm font-font-medium text-text-secondary">
+                        <Button variant="ghost" className="hover:bg-transparent px-0 font-font-medium" onClick={() => requestSort('dimensao')}>
                           Dimensão {getSortIcon('dimensao')}
                         </Button>
                       </th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                        <Button variant="ghost" className="hover:bg-transparent px-0 font-medium" onClick={() => requestSort('componenteFuncional')}>
+                      <th className="text-left py-space-3 px-space-4 text-text-sm font-font-medium text-text-secondary">
+                        <Button variant="ghost" className="hover:bg-transparent px-0 font-font-medium" onClick={() => requestSort('componenteFuncional')}>
                           Componente Funcional {getSortIcon('componenteFuncional')}
                         </Button>
                       </th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                        <Button variant="ghost" className="hover:bg-transparent px-0 font-medium" onClick={() => requestSort('origemRecurso')}>
+                      <th className="text-left py-space-3 px-space-4 text-text-sm font-font-medium text-text-secondary">
+                        <Button variant="ghost" className="hover:bg-transparent px-0 font-font-medium" onClick={() => requestSort('origemRecurso')}>
                           Origem de Recurso {getSortIcon('origemRecurso')}
                         </Button>
                       </th>
-                      <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">
-                        <Button variant="ghost" className="hover:bg-transparent px-0 font-medium justify-end w-full" onClick={() => requestSort('valorTotal')}>
+                      <th className="text-right py-space-3 px-space-4 text-text-sm font-font-medium text-text-secondary">
+                        <Button variant="ghost" className="hover:bg-transparent px-0 font-font-medium justify-end w-full" onClick={() => requestSort('valorTotal')}>
                           Valor {getSortIcon('valorTotal')}
                         </Button>
                       </th>
-                      <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Ações</th>
+                      <th className="text-center py-space-3 px-space-4 text-text-sm font-font-medium text-text-secondary">Ações</th>
                     </tr>
                   </thead>
-                  <motion.tbody
-                    variants={staggerContainer}
-                    initial="hidden"
-                    animate="show"
-                  >
-                    {isLoading ? (
+                  <tbody className="divide-y divide-border-default/50">
+                    {isPageLoading ? (
                       Array.from({ length: 5 }).map((_, i) => (
-                        <tr key={i} className="border-b border-border/50">
-                          <td className="py-4 px-4"><Skeleton className="h-4 w-4 rounded" /></td>
-                          <td className="py-4 px-4"><Skeleton className="h-4 w-3/4" /></td>
-                          <td className="py-4 px-4"><Skeleton className="h-5 w-16" /></td>
-                          <td className="py-4 px-4"><Skeleton className="h-4 w-1/2" /></td>
-                          <td className="py-4 px-4"><Skeleton className="h-4 w-1/3" /></td>
-                          <td className="py-4 px-4"><Skeleton className="h-4 w-20 ml-auto" /></td>
-                          <td className="py-4 px-4"><Skeleton className="h-8 w-16 mx-auto" /></td>
+                        <tr key={i} className="bg-surface-card animate-pulse">
+                          <td className="py-space-4 px-space-4"><Skeleton className="h-4 w-4 rounded" /></td>
+                          <td className="py-space-4 px-space-4"><Skeleton className="h-4 w-3/4" /></td>
+                          <td className="py-space-4 px-space-4"><Skeleton className="h-5 w-16" /></td>
+                          <td className="py-space-4 px-space-4"><Skeleton className="h-4 w-1/2" /></td>
+                          <td className="py-space-4 px-space-4"><Skeleton className="h-4 w-1/3" /></td>
+                          <td className="py-space-4 px-space-4"><Skeleton className="h-4 w-20 ml-auto" /></td>
+                          <td className="py-space-4 px-space-4"><Skeleton className="h-8 w-16 mx-auto" /></td>
                         </tr>
                       ))
                     ) : sortedAtividades.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="text-center py-10 text-muted-foreground italic">Nenhuma atividade encontrada.</td>
+                        <td colSpan={7} className="text-center py-space-12 text-text-muted italic">Nenhuma atividade encontrada.</td>
                       </tr>
                     ) : (
                       sortedAtividades.map((atividade) => (
-                        <motion.tr
+                        <tr
                           key={atividade.id}
-                          variants={staggerItem}
-                          className="border-b border-border/50 hover:bg-muted/30 transition-colors group"
+                          className="hover:bg-surface-subtle transition-colors group border-b border-border-default/30 last:border-0"
                         >
-                          <td className="py-4 px-4">
+                          <td className="py-space-4 px-space-4">
                             <Checkbox
                               checked={selectedIds.has(atividade.id)}
                               onCheckedChange={(checked) => handleSelectOne(atividade.id, checked as boolean)}
                             />
                           </td>
-                          <td className="py-4 px-4">
-                            <p className="font-semibold text-sm group-hover:text-primary transition-colors">{atividade.atividade}</p>
+                          <td className="py-space-4 px-space-4">
+                            <p className="font-font-semibold text-text-base group-hover:text-action-primary transition-colors">{atividade.atividade}</p>
                           </td>
-                          <td className="py-4 px-4">
-                            <Badge variant="secondary" className="whitespace-nowrap font-medium">
+                          <td className="py-space-4 px-space-4">
+                            <Badge variant="secondary" className="whitespace-nowrap font-font-medium bg-surface-subtle text-text-primary">
                               {(atividade.dimensao || 'N/D').split(' - ')[0]}
                             </Badge>
                           </td>
-                          <td className="py-4 px-4">
-                            <span className="text-sm">{atividade.componenteFuncional}</span>
+                          <td className="py-space-4 px-space-4">
+                            <span className="text-text-sm text-text-secondary">{atividade.componenteFuncional}</span>
                           </td>
-                          <td className="py-4 px-4">
-                            <span className="text-sm text-muted-foreground font-mono">{atividade.origemRecurso}</span>
+                          <td className="py-space-4 px-space-4">
+                            <span className="text-text-sm text-text-muted font-mono">{atividade.origemRecurso}</span>
                           </td>
-                          <td className="py-4 px-4 text-right">
-                            <span className="font-bold text-gradient-primary">{formatCurrency(atividade.valorTotal)}</span>
+                          <td className="py-space-4 px-space-4 text-right">
+                            <span className="font-font-bold text-text-base text-action-primary">{formatCurrency(atividade.valorTotal)}</span>
                           </td>
-                          <td className="py-4 px-4">
-                            <div className="flex items-center justify-center gap-1 opacity-10 sm:group-hover:opacity-100 transition-opacity">
+                          <td className="py-space-4 px-space-4">
+                            <div className="flex items-center justify-center gap-space-2 opacity-20 sm:group-hover:opacity-100 transition-opacity">
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleOpenDialog(atividade)}
-                                className="h-8 w-8"
+                                className="h-space-8 w-space-8 hover:bg-surface-subtle text-text-secondary"
                               >
                                 <Pencil className="h-4 w-4" />
                               </Button>
@@ -588,22 +602,22 @@ export default function Atividades() {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => openDeleteDialog(atividade)}
-                                className="h-8 w-8"
+                                className="h-space-8 w-space-8 hover:bg-status-error/10 text-status-error"
                               >
-                                <Trash2 className="h-4 w-4 text-destructive" />
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           </td>
-                        </motion.tr>
+                        </tr>
                       ))
                     )}
-                  </motion.tbody>
+                  </tbody>
                 </table>
               </div>
             </CardContent>
           </Card>
-        </motion.div>
-      </motion.div>
+        </div>
+      </div>
 
       {/* Form Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -664,22 +678,24 @@ export default function Atividades() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="atividade">Atividade</Label>
+            <div className="grid gap-space-2">
+              <Label htmlFor="atividade" className="text-text-sm font-font-semibold">Atividade</Label>
               <Input
                 id="atividade"
                 value={formData.atividade}
                 onChange={(e) => setFormData({ ...formData, atividade: e.target.value })}
                 placeholder="Nome da atividade"
+                className="input-system"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="descricao">Descrição</Label>
+            <div className="grid gap-space-2">
+              <Label htmlFor="descricao" className="text-text-sm font-font-semibold">Descrição</Label>
               <Textarea
                 id="descricao"
                 value={formData.descricao}
                 onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
                 placeholder="Descrição detalhada da atividade"
+                className="input-system min-h-[100px]"
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

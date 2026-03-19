@@ -460,17 +460,11 @@ export default function Dashboard() {
 
         <TabsContent value="corrente" className="space-y-6 border-none p-0">
 
-          {/* Bento Grid com Framer Motion stagger */}
-          <motion.div
-            className="grid grid-cols-1 md:grid-cols-3 gap-4 auto-rows-[minmax(130px,auto)]"
-            variants={staggerContainer}
-            initial="hidden"
-            animate="show"
-          >
+          {/* Bento Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 auto-rows-[minmax(130px,auto)]">
 
             {/* ── HERO CARD — Total Planejado (row-span-2) ── */}
-            <motion.div
-              variants={scaleIn}
+            <div
               className={`
               md:row-span-2 relative overflow-hidden rounded-2xl
               border border-primary/20
@@ -478,7 +472,7 @@ export default function Dashboard() {
               p-6 flex flex-col justify-between
               shadow-[0_8px_30px_rgba(26,92,230,0.12)]
               hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(26,92,230,0.18)]
-              transition-all duration-300 animate-fade-in
+              transition-all duration-300
             `}>
               {/* Glow decorativo — Aura Style */}
               <div className="absolute -bottom-12 -right-12 w-40 h-40 bg-primary/15 rounded-full blur-3xl pointer-events-none" />
@@ -530,54 +524,53 @@ export default function Dashboard() {
                   </p>
                 </div>
               </div>
-            </motion.div>
+            </div>
 
             {/* ── Descentralizado ── */}
-            <motion.div variants={staggerItem}>
+            <div>
               <StatCard
-              title="Descentralizado"
-              value={formatCurrency(totalDescentralizado)}
-              subtitle={`${filteredData.descentralizacoes.length} descentralizações`}
-              icon={Receipt}
-              stitchColor="emerald-green"
-              progress={totalPlanejado > 0 ? (totalDescentralizado / totalPlanejado) * 100 : 0}
-              isLoading={isLoading}
-            />
-            </motion.div>
+                title="Descentralizado"
+                value={formatCurrency(totalDescentralizado)}
+                subtitle={`${filteredData.descentralizacoes.length} descentralizações`}
+                icon={Receipt}
+                stitchColor="emerald-green"
+                progress={totalPlanejado > 0 ? (totalDescentralizado / totalPlanejado) * 100 : 0}
+                isLoading={isLoading}
+              />
+            </div>
 
             {/* ── Total Empenhado ── */}
-            <motion.div variants={staggerItem}>
+            <div>
               <StatCard
-              title="Total Empenhado"
-              value={formatCurrency(totalEmpenhado)}
-              subtitle={`${filteredData.empenhosCorrente.length} empenhos filtrados`}
-              icon={TrendingUp}
-              stitchColor="purple"
-              progress={totalPlanejado > 0 ? (totalEmpenhado / totalPlanejado) * 100 : 0}
-              isLoading={isLoading}
-            />
-            </motion.div>
+                title="Total Empenhado"
+                value={formatCurrency(totalEmpenhado)}
+                subtitle={`${filteredData.empenhosCorrente.length} empenhos filtrados`}
+                icon={TrendingUp}
+                stitchColor="purple"
+                progress={totalPlanejado > 0 ? (totalEmpenhado / totalPlanejado) * 100 : 0}
+                isLoading={isLoading}
+              />
+            </div>
 
             {/* ── A Descentralizar ── */}
-            <motion.div variants={staggerItem}>
+            <div>
               <StatCard
-              title="A Descentralizar"
-              value={formatCurrency(aDescentralizar)}
-              subtitle={aDescentralizar >= 0 ? "Dentro do orçamento" : "Acima do orçamento"}
-              icon={PiggyBank}
-              stitchColor="amber"
-              progress={totalPlanejado > 0 ? (Math.max(0, aDescentralizar) / totalPlanejado) * 100 : 0}
-              isLoading={isLoading}
-            />
-            </motion.div>
+                title="A Descentralizar"
+                value={formatCurrency(aDescentralizar)}
+                subtitle={aDescentralizar >= 0 ? "Dentro do orçamento" : "Acima do orçamento"}
+                icon={PiggyBank}
+                stitchColor="amber"
+                progress={totalPlanejado > 0 ? (Math.max(0, aDescentralizar) / totalPlanejado) * 100 : 0}
+                isLoading={isLoading}
+              />
+            </div>
 
             {/* ── Mini card: Liquidado / Pago ── */}
-            <motion.div variants={staggerItem} className={`
+            <div className={`
               relative overflow-hidden rounded-2xl
               border border-border/70 bg-card
               shadow-soft hover:shadow-card hover:-translate-y-[1px]
               transition-all duration-200 p-5 flex flex-col justify-between
-              animate-fade-in
             `}>
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                 Liquidado · Pago
@@ -634,9 +627,8 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-            </motion.div>
-
-          </motion.div>
+            </div>
+          </div>
           {/* Fim do Bento Grid */}
 
           {/* Gráficos Linha 1 */}

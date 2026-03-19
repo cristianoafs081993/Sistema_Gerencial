@@ -25,7 +25,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Upload, Search, Filter, ArrowUpDown, ChevronRight, Eye } from 'lucide-react';
 import { PFImportDialog } from './PFImportDialog';
 import { PFDetailsDialog } from './PFDetailsDialog';
-import { HeaderSubtitle, HeaderActions } from '@/components/HeaderParts';
+import { HeaderActions } from '@/components/HeaderParts';
 
 export default function RastreabilidadePFs() {
   const [data, setData] = useState<RastreabilidadePF[]>([]);
@@ -96,9 +96,9 @@ export default function RastreabilidadePFs() {
   };
 
   const statusColorMap: Record<string, string> = {
-    'APROVADA E LIBERADA': 'bg-green-500 hover:bg-green-600 border-transparent text-white',
-    'CANCELADA': 'bg-red-500 hover:bg-red-600 border-transparent text-white',
-    'PENDENTE': 'bg-yellow-500 hover:bg-yellow-600 border-transparent text-white',
+    'APROVADA E LIBERADA': 'bg-status-success hover:bg-status-success/90 border-transparent text-white',
+    'CANCELADA': 'bg-status-error hover:bg-status-error/90 border-transparent text-white',
+    'PENDENTE': 'bg-status-warning hover:bg-status-warning/90 border-transparent text-white',
   };
 
   // Filtered and Sorted data
@@ -155,81 +155,81 @@ export default function RastreabilidadePFs() {
   const totalPendente = pendentes.reduce((acc, curr) => acc + (curr.valor || 0), 0);
 
   return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
-      <HeaderSubtitle>Rastreabilidade e controle de PFs por fonte</HeaderSubtitle>
+    <div className="flex-1 space-y-space-6 p-space-4 md:p-space-8 pt-space-6 pb-space-10">
+
       <HeaderActions>
-        <Button onClick={() => setImportOpen(true)} size="sm" className="gap-2">
+        <Button onClick={() => setImportOpen(true)} size="sm" className="gap-space-2 h-space-9 shadow-shadow-sm">
           <Upload className="h-4 w-4" />
           Importar arquivos
         </Button>
       </HeaderActions>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Solicitado</CardTitle>
+      <div className="grid gap-space-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card className="card-system shadow-shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-space-2">
+            <CardTitle className="text-text-xs font-font-bold uppercase tracking-wider text-text-muted">Total Solicitado</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalSolicitado)}</div>
-            <p className="text-xs text-muted-foreground">{processedData.length} PFs no total</p>
+            <div className="text-text-2xl font-font-bold text-action-primary">{formatCurrency(totalSolicitado)}</div>
+            <p className="text-text-xs text-text-muted mt-space-1">{processedData.length} PFs no total</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Liberado</CardTitle>
+        <Card className="card-system shadow-shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-space-2">
+            <CardTitle className="text-text-xs font-font-bold uppercase tracking-wider text-text-muted">Total Liberado</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{formatCurrency(totalLiberado)}</div>
+            <div className="text-text-2xl font-font-bold text-status-success">{formatCurrency(totalLiberado)}</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
+        <Card className="card-system shadow-shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-space-2">
+            <CardTitle className="text-text-xs font-font-bold uppercase tracking-wider text-text-muted">Pendentes</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{formatCurrency(totalPendente)}</div>
-            <p className="text-xs text-muted-foreground">{pendentes.length} PFs pendentes</p>
+            <div className="text-text-2xl font-font-bold text-status-warning">{formatCurrency(totalPendente)}</div>
+            <p className="text-text-xs text-text-muted mt-space-1">{pendentes.length} PFs pendentes</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="flex flex-1 items-center space-x-2">
+      <div className="flex flex-col gap-space-4 sm:flex-row sm:items-center">
+        <div className="flex flex-1 items-center space-x-space-2">
           <Select value={mesFilter} onValueChange={setMesFilter}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="w-[150px] input-system">
               <SelectValue placeholder="Mês" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="rounded-radius-md">
               <SelectItem value="all">Todos os Meses</SelectItem>
               {meses.map(m => <SelectItem key={m as string} value={m as string}>{m}</SelectItem>)}
             </SelectContent>
           </Select>
 
           <Select value={fonteFilter} onValueChange={setFonteFilter}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="w-[150px] input-system">
               <SelectValue placeholder="Fonte" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="rounded-radius-md">
               <SelectItem value="all">Todas as Fontes</SelectItem>
               {fontes.map(f => <SelectItem key={f as string} value={f as string}>{f}</SelectItem>)}
             </SelectContent>
           </Select>
 
           <Select value={tipoFilter} onValueChange={setTipoFilter}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="w-[150px] input-system">
               <SelectValue placeholder="Tipo" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="rounded-radius-md">
               <SelectItem value="all">Todos os Tipos</SelectItem>
               {tipos.map(t => <SelectItem key={t as string} value={t as string}>{t}</SelectItem>)}
             </SelectContent>
           </Select>
 
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="w-[150px] input-system">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="rounded-radius-md">
               <SelectItem value="all">Todos os Status</SelectItem>
               {statusList.map(s => <SelectItem key={s as string} value={s as string}>{s}</SelectItem>)}
             </SelectContent>
@@ -237,54 +237,54 @@ export default function RastreabilidadePFs() {
         </div>
       </div>
 
-      <div className="rounded-md border bg-white shadow-sm">
+      <div className="rounded-radius-md border border-border-default bg-surface-card shadow-shadow-sm overflow-hidden">
         <div className="max-w-full overflow-x-auto">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[140px] cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('ppf_campus')}>
+            <TableHeader className="bg-surface-subtle/50">
+              <TableRow className="border-b border-border-default">
+                <TableHead className="w-[140px] cursor-pointer hover:bg-surface-subtle transition-colors text-text-xs font-font-bold uppercase tracking-wider" onClick={() => handleSort('ppf_campus')}>
                   <div className="flex items-center">
                     PPF Campus
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                    <ArrowUpDown className="ml-space-2 h-space-4 w-space-4" />
                   </div>
                 </TableHead>
-                <TableHead className="w-[140px] cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('data_solicitacao')}>
+                <TableHead className="w-[140px] cursor-pointer hover:bg-surface-subtle transition-colors text-text-xs font-font-bold uppercase tracking-wider" onClick={() => handleSort('data_solicitacao')}>
                   <div className="flex items-center">
                     Data Solicitação
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                    <ArrowUpDown className="ml-space-2 h-space-4 w-space-4" />
                   </div>
                 </TableHead>
-                <TableHead className="w-[100px] cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('tipo')}>
+                <TableHead className="w-[100px] cursor-pointer hover:bg-surface-subtle transition-colors text-text-xs font-font-bold uppercase tracking-wider" onClick={() => handleSort('tipo')}>
                   <div className="flex items-center">
                     Tipo
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                    <ArrowUpDown className="ml-space-2 h-space-4 w-space-4" />
                   </div>
                 </TableHead>
-                <TableHead className="w-[120px] cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('mes_referencia')}>
+                <TableHead className="w-[120px] cursor-pointer hover:bg-surface-subtle transition-colors text-text-xs font-font-bold uppercase tracking-wider" onClick={() => handleSort('mes_referencia')}>
                   <div className="flex items-center">
                     Mês
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                    <ArrowUpDown className="ml-space-2 h-space-4 w-space-4" />
                   </div>
                 </TableHead>
-                <TableHead className="w-[120px] cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('fonte_recurso')}>
+                <TableHead className="w-[120px] cursor-pointer hover:bg-surface-subtle transition-colors text-text-xs font-font-bold uppercase tracking-wider" onClick={() => handleSort('fonte_recurso')}>
                   <div className="flex items-center">
                     Fonte
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                    <ArrowUpDown className="ml-space-2 h-space-4 w-space-4" />
                   </div>
                 </TableHead>
-                <TableHead className="text-right w-[140px] cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('valor')}>
+                <TableHead className="text-right w-[140px] cursor-pointer hover:bg-surface-subtle transition-colors text-text-xs font-font-bold uppercase tracking-wider" onClick={() => handleSort('valor')}>
                   <div className="flex items-center justify-end">
                     Valor
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                    <ArrowUpDown className="ml-space-2 h-space-4 w-space-4" />
                   </div>
                 </TableHead>
-                <TableHead className="w-[140px] text-center cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('status')}>
+                <TableHead className="w-[140px] text-center cursor-pointer hover:bg-surface-subtle transition-colors text-text-xs font-font-bold uppercase tracking-wider" onClick={() => handleSort('status')}>
                   <div className="flex items-center justify-center">
                     Status
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                    <ArrowUpDown className="ml-space-2 h-space-4 w-space-4" />
                   </div>
                 </TableHead>
-                <TableHead className="w-[80px] text-right">Ações</TableHead>
+                <TableHead className="w-[80px] text-right text-text-xs font-font-bold uppercase tracking-wider">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -302,26 +302,26 @@ export default function RastreabilidadePFs() {
                 </TableRow>
               ) : (
                 processedData.map((row, i) => (
-                  <TableRow key={i} className="hover:bg-muted/40 transition-colors cursor-pointer group" onClick={() => openDetails(row)}>
-                    <TableCell className="font-mono text-xs font-semibold text-primary">
+                  <TableRow key={i} className="hover:bg-surface-subtle transition-colors cursor-pointer group border-b border-border-default/30 last:border-0" onClick={() => openDetails(row)}>
+                    <TableCell className="font-mono text-text-xs font-font-semibold text-action-primary">
                       {row.ppf_campus}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{formatDate(row.data_solicitacao)}</TableCell>
+                    <TableCell className="text-text-muted text-text-sm">{formatDate(row.data_solicitacao)}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="text-[10px] h-5">{row.tipo}</Badge>
+                      <Badge variant="outline" className="text-[10px] h-space-5 bg-surface-card border-border-default">{row.tipo}</Badge>
                     </TableCell>
-                    <TableCell>{row.mes_referencia}</TableCell>
+                    <TableCell className="text-text-sm text-text-secondary">{row.mes_referencia}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="font-mono text-[10px]">{row.fonte_recurso}</Badge>
+                      <Badge variant="secondary" className="font-mono text-[10px] bg-surface-subtle text-text-primary">{row.fonte_recurso}</Badge>
                     </TableCell>
-                    <TableCell className="text-right font-bold text-base">{formatCurrency(row.valor)}</TableCell>
+                    <TableCell className="text-right font-font-bold text-text-base text-text-primary">{formatCurrency(row.valor)}</TableCell>
                     <TableCell className="text-center">
-                      <Badge className={`${statusColorMap[row.status?.toUpperCase() || ''] || getStatusBadgeVariant(row.status)} text-white border-none shadow-sm`}>
+                      <Badge className={`${statusColorMap[row.status?.toUpperCase() || ''] || getStatusBadgeVariant(row.status)} text-white border-none shadow-shadow-sm text-[10px]`}>
                         {row.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button variant="ghost" size="icon" className="h-space-8 w-space-8 opacity-0 group-hover:opacity-100 transition-opacity text-text-muted hover:text-action-primary">
                         <ChevronRight className="h-4 w-4" />
                       </Button>
                     </TableCell>
