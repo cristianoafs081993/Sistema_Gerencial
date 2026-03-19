@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
+import { staggerContainer, staggerItem, scaleIn, fadeIn } from '@/lib/animations';
 import { Plus, Pencil, Trash2, Search, Filter, Upload, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useData } from '@/contexts/DataContext';
@@ -351,11 +353,11 @@ export default function Atividades() {
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       <HeaderSubtitle>Gerencie o planejamento orçamentário</HeaderSubtitle>
       <HeaderActions>
         {selectedIds.size > 0 && (
-          <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)} className="gap-2 h-8 text-xs sm:h-9 sm:text-sm">
+          <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)} className="gap-2 h-8 text-xs sm:h-9 sm:text-sm animate-scale-in">
             <Trash2 className="h-4 w-4" />
             Excluir ({selectedIds.size})
           </Button>
@@ -370,215 +372,238 @@ export default function Atividades() {
         </Button>
       </HeaderActions>
 
-      {/* Filters */}
-      <Card className="">
-        <CardHeader className="pb-3">
-          <CardTitle>Filtros</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por atividade, processo ou dimensão..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <div className="w-full sm:w-[200px]">
-              <Select value={filterDimensao} onValueChange={setFilterDimensao}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Dimensão" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as dimensões</SelectItem>
-                  {DIMENSOES.map((d) => (
-                    <SelectItem key={d.codigo} value={d.codigo}>
-                      {d.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button
-              variant={showAdvancedFilters ? "secondary" : "outline"}
-              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            >
-              <Filter className="w-4 h-4 mr-2" />
-              Filtros Avançados
-            </Button>
-          </div>
-
-          {showAdvancedFilters && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg border border-border/50 animate-in slide-in-from-top-2">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Componente Funcional</label>
-                <Select value={filterComponente} onValueChange={setFilterComponente}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {componentesUnicos.map(comp => (
-                      <SelectItem key={comp} value={comp}>{comp}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Origem de Recurso</label>
-                <Select value={filterOrigem} onValueChange={setFilterOrigem}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    {origensUnicas.map(origem => (
-                      <SelectItem key={origem} value={origem}>{origem}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-end">
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="show"
+        className="space-y-6"
+      >
+        {/* Filters */}
+        <motion.div variants={scaleIn}>
+          <Card className="border-glow">
+            <CardHeader className="pb-3">
+              <CardTitle>Filtros</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por atividade, processo ou dimensão..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="w-full sm:w-[200px]">
+                  <Select value={filterDimensao} onValueChange={setFilterDimensao}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Dimensão" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as dimensões</SelectItem>
+                      {DIMENSOES.map((d) => (
+                        <SelectItem key={d.codigo} value={d.codigo}>
+                          {d.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Button
-                  variant="ghost"
-                  className="w-full text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    setFilterDimensao('all');
-                    setFilterComponente('all');
-                    setFilterOrigem('all');
-                    setSearchTerm('');
-                  }}
+                  variant={showAdvancedFilters ? "secondary" : "outline"}
+                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
                 >
-                  Limpar Filtros
+                  <Filter className="w-4 h-4 mr-2" />
+                  Filtros Avançados
                 </Button>
               </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Table */}
-      <Card className="">
-        <CardHeader>
-          <CardTitle className="text-lg">
-            {filteredAtividades.length} atividade{filteredAtividades.length !== 1 ? 's' : ''} encontrada{filteredAtividades.length !== 1 ? 's' : ''}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="py-3 px-4 w-[40px]">
-                    <Checkbox
-                      checked={
-                        sortedAtividades.length > 0 &&
-                        sortedAtividades.every((a) => selectedIds.has(a.id))
-                      }
-                      onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
-                    />
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                    <Button variant="ghost" className="hover:bg-transparent px-0 font-medium" onClick={() => requestSort('atividade')}>
-                      Atividade {getSortIcon('atividade')}
+              {showAdvancedFilters && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg border border-border/50 animate-in slide-in-from-top-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Componente Funcional</label>
+                    <Select value={filterComponente} onValueChange={setFilterComponente}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {componentesUnicos.map(comp => (
+                          <SelectItem key={comp} value={comp}>{comp}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Origem de Recurso</label>
+                    <Select value={filterOrigem} onValueChange={setFilterOrigem}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        {origensUnicas.map(origem => (
+                          <SelectItem key={origem} value={origem}>{origem}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-end">
+                    <Button
+                      variant="ghost"
+                      className="w-full text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        setFilterDimensao('all');
+                        setFilterComponente('all');
+                        setFilterOrigem('all');
+                        setSearchTerm('');
+                      }}
+                    >
+                      Limpar Filtros
                     </Button>
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                    <Button variant="ghost" className="hover:bg-transparent px-0 font-medium" onClick={() => requestSort('dimensao')}>
-                      Dimensão {getSortIcon('dimensao')}
-                    </Button>
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                    <Button variant="ghost" className="hover:bg-transparent px-0 font-medium" onClick={() => requestSort('componenteFuncional')}>
-                      Componente Funcional {getSortIcon('componenteFuncional')}
-                    </Button>
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                    <Button variant="ghost" className="hover:bg-transparent px-0 font-medium" onClick={() => requestSort('origemRecurso')}>
-                      Origem de Recurso {getSortIcon('origemRecurso')}
-                    </Button>
-                  </th>
-                  <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">
-                    <Button variant="ghost" className="hover:bg-transparent px-0 font-medium justify-end w-full" onClick={() => requestSort('valorTotal')}>
-                      Valor {getSortIcon('valorTotal')}
-                    </Button>
-                  </th>
-                  <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <tr key={i} className="border-b border-border/50">
-                      <td className="py-4 px-4"><Skeleton className="h-4 w-4 rounded" /></td>
-                      <td className="py-4 px-4"><Skeleton className="h-4 w-3/4" /></td>
-                      <td className="py-4 px-4"><Skeleton className="h-5 w-16" /></td>
-                      <td className="py-4 px-4"><Skeleton className="h-4 w-1/2" /></td>
-                      <td className="py-4 px-4"><Skeleton className="h-4 w-1/3" /></td>
-                      <td className="py-4 px-4"><Skeleton className="h-4 w-20 ml-auto" /></td>
-                      <td className="py-4 px-4"><Skeleton className="h-8 w-16 mx-auto" /></td>
-                    </tr>
-                  ))
-                ) : sortedAtividades.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="text-center py-6 text-muted-foreground italic">Nenhuma atividade encontrada.</td>
-                  </tr>
-                ) : (
-                  sortedAtividades.map((atividade) => (
-                    <tr key={atividade.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
-                      <td className="py-4 px-4">
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Table */}
+        <motion.div variants={scaleIn}>
+          <Card className="border-glow overflow-hidden">
+            <CardHeader className="pb-0">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">
+                  {filteredAtividades.length} atividade{filteredAtividades.length !== 1 ? 's' : ''} encontrada{filteredAtividades.length !== 1 ? 's' : ''}
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0 sm:p-6">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="py-3 px-4 w-[40px]">
                         <Checkbox
-                          checked={selectedIds.has(atividade.id)}
-                          onCheckedChange={(checked) => handleSelectOne(atividade.id, checked as boolean)}
+                          checked={
+                            sortedAtividades.length > 0 &&
+                            sortedAtividades.every((a) => selectedIds.has(a.id))
+                          }
+                          onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
                         />
-                      </td>
-                      <td className="py-4 px-4">
-                        <p className="font-medium text-sm">{atividade.atividade}</p>
-                      </td>
-                      <td className="py-4 px-4">
-                        <Badge variant="secondary" className="whitespace-nowrap">
-                          {(atividade.dimensao || 'N/D').split(' - ')[0]}
-                        </Badge>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className="text-sm">{atividade.componenteFuncional}</span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className="text-sm text-muted-foreground">{atividade.origemRecurso}</span>
-                      </td>
-                      <td className="py-4 px-4 text-right">
-                        <span className="font-medium">{formatCurrency(atividade.valorTotal)}</span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center justify-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenDialog(atividade)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openDeleteDialog(atividade)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </td>
+                      </th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
+                        <Button variant="ghost" className="hover:bg-transparent px-0 font-medium" onClick={() => requestSort('atividade')}>
+                          Atividade {getSortIcon('atividade')}
+                        </Button>
+                      </th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
+                        <Button variant="ghost" className="hover:bg-transparent px-0 font-medium" onClick={() => requestSort('dimensao')}>
+                          Dimensão {getSortIcon('dimensao')}
+                        </Button>
+                      </th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
+                        <Button variant="ghost" className="hover:bg-transparent px-0 font-medium" onClick={() => requestSort('componenteFuncional')}>
+                          Componente Funcional {getSortIcon('componenteFuncional')}
+                        </Button>
+                      </th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
+                        <Button variant="ghost" className="hover:bg-transparent px-0 font-medium" onClick={() => requestSort('origemRecurso')}>
+                          Origem de Recurso {getSortIcon('origemRecurso')}
+                        </Button>
+                      </th>
+                      <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">
+                        <Button variant="ghost" className="hover:bg-transparent px-0 font-medium justify-end w-full" onClick={() => requestSort('valorTotal')}>
+                          Valor {getSortIcon('valorTotal')}
+                        </Button>
+                      </th>
+                      <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Ações</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                  </thead>
+                  <motion.tbody
+                    variants={staggerContainer}
+                    initial="hidden"
+                    animate="show"
+                  >
+                    {isLoading ? (
+                      Array.from({ length: 5 }).map((_, i) => (
+                        <tr key={i} className="border-b border-border/50">
+                          <td className="py-4 px-4"><Skeleton className="h-4 w-4 rounded" /></td>
+                          <td className="py-4 px-4"><Skeleton className="h-4 w-3/4" /></td>
+                          <td className="py-4 px-4"><Skeleton className="h-5 w-16" /></td>
+                          <td className="py-4 px-4"><Skeleton className="h-4 w-1/2" /></td>
+                          <td className="py-4 px-4"><Skeleton className="h-4 w-1/3" /></td>
+                          <td className="py-4 px-4"><Skeleton className="h-4 w-20 ml-auto" /></td>
+                          <td className="py-4 px-4"><Skeleton className="h-8 w-16 mx-auto" /></td>
+                        </tr>
+                      ))
+                    ) : sortedAtividades.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="text-center py-10 text-muted-foreground italic">Nenhuma atividade encontrada.</td>
+                      </tr>
+                    ) : (
+                      sortedAtividades.map((atividade) => (
+                        <motion.tr
+                          key={atividade.id}
+                          variants={staggerItem}
+                          className="border-b border-border/50 hover:bg-muted/30 transition-colors group"
+                        >
+                          <td className="py-4 px-4">
+                            <Checkbox
+                              checked={selectedIds.has(atividade.id)}
+                              onCheckedChange={(checked) => handleSelectOne(atividade.id, checked as boolean)}
+                            />
+                          </td>
+                          <td className="py-4 px-4">
+                            <p className="font-semibold text-sm group-hover:text-primary transition-colors">{atividade.atividade}</p>
+                          </td>
+                          <td className="py-4 px-4">
+                            <Badge variant="secondary" className="whitespace-nowrap font-medium">
+                              {(atividade.dimensao || 'N/D').split(' - ')[0]}
+                            </Badge>
+                          </td>
+                          <td className="py-4 px-4">
+                            <span className="text-sm">{atividade.componenteFuncional}</span>
+                          </td>
+                          <td className="py-4 px-4">
+                            <span className="text-sm text-muted-foreground font-mono">{atividade.origemRecurso}</span>
+                          </td>
+                          <td className="py-4 px-4 text-right">
+                            <span className="font-bold text-gradient-primary">{formatCurrency(atividade.valorTotal)}</span>
+                          </td>
+                          <td className="py-4 px-4">
+                            <div className="flex items-center justify-center gap-1 opacity-10 sm:group-hover:opacity-100 transition-opacity">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleOpenDialog(atividade)}
+                                className="h-8 w-8"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openDeleteDialog(atividade)}
+                                className="h-8 w-8"
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </td>
+                        </motion.tr>
+                      ))
+                    )}
+                  </motion.tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </motion.div>
 
       {/* Form Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -739,10 +764,7 @@ export default function Atividades() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => {
-              if (!selectedAtividade) setSelectedIds(new Set()); // Clear selection if cancelling bulk delete? Maybe not.
-              // Actually, user might just want to back out of deletion but keep selection.
-              // Logic check: if I have selection but clicked specific trash icon -> selectedAtividade is set.
-              // If I clicked bulk delete -> selectedAtividade is NULL.
+              if (!selectedAtividade) setSelectedIds(new Set());
             }}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={selectedAtividade ? handleDelete : handleBulkDelete}
@@ -762,6 +784,6 @@ export default function Atividades() {
         title="Importar Atividades"
         expectedFields={atividadesJsonFields}
       />
-    </div >
+    </div>
   );
 }
