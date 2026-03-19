@@ -457,16 +457,77 @@ export default function Dashboard() {
         </div>
 
         <TabsContent value="corrente" className="space-y-6 border-none p-0">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <StatCard
-              title="Total Planejado"
-              value={formatCurrency(totalPlanejado)}
-              subtitle={`${filteredData.atividades.length} atividades filtradas`}
-              icon={Wallet}
-              stitchColor="vibrant-blue"
-              progress={100}
-              isLoading={isLoading}
-            />
+
+          {/* ══════════════════════════════════════════════════════════════
+              BENTO GRID — Assimétrico (Aura Style / Linear-inspired)
+              grid-cols-3 com row-span para hierarquia visual clara
+              Conceito 2: o card HERO tem muito mais peso visual
+          ══════════════════════════════════════════════════════════════ */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 auto-rows-[minmax(130px,auto)]">
+
+            {/* ── HERO CARD — Total Planejado (row-span-2, destaque máximo) ── */}
+            <div className={`
+              md:row-span-2 relative overflow-hidden rounded-2xl
+              border border-primary/20
+              bg-gradient-to-br from-primary/8 via-primary/4 to-transparent
+              p-6 flex flex-col justify-between
+              shadow-[0_8px_30px_rgba(26,92,230,0.12)]
+              hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(26,92,230,0.18)]
+              transition-all duration-300 animate-fade-in
+            `}>
+              {/* Glow decorativo — Aura Style */}
+              <div className="absolute -bottom-12 -right-12 w-40 h-40 bg-primary/15 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+
+              {/* Ícone */}
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-primary/60">
+                    Total Planejado
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {filteredData.atividades.length} atividades filtradas
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-primary/10 text-primary shrink-0">
+                  <Wallet className="w-5 h-5" />
+                </div>
+              </div>
+
+              {/* Valor principal — text-gradient-primary, fonte grande */}
+              <div>
+                {isLoading ? (
+                  <div className="h-10 w-4/5 bg-primary/10 rounded-lg animate-pulse mt-2" />
+                ) : (
+                  <p className={`
+                    text-3xl lg:text-4xl font-black tracking-tighter leading-none mt-2 mb-4
+                    bg-gradient-to-br from-[#1a5ce6] to-[#3b82f6]
+                    bg-clip-text text-transparent
+                  `}>
+                    {formatCurrency(totalPlanejado)}
+                  </p>
+                )}
+
+                {/* Progress integrado no hero */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Execução orçamentária</span>
+                    <span className="font-bold text-primary">{percentualExecutado.toFixed(1)}%</span>
+                  </div>
+                  <div className="h-2 w-full bg-primary/10 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-primary/70 to-primary rounded-full transition-all duration-700 ease-spring"
+                      style={{ width: `${Math.min(percentualExecutado, 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {formatCurrency(totalEmpenhado)} empenhados
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Descentralizado ── */}
             <StatCard
               title="Descentralizado"
               value={formatCurrency(totalDescentralizado)}
@@ -476,6 +537,8 @@ export default function Dashboard() {
               progress={totalPlanejado > 0 ? (totalDescentralizado / totalPlanejado) * 100 : 0}
               isLoading={isLoading}
             />
+
+            {/* ── Total Empenhado ── */}
             <StatCard
               title="Total Empenhado"
               value={formatCurrency(totalEmpenhado)}
@@ -485,8 +548,10 @@ export default function Dashboard() {
               progress={totalPlanejado > 0 ? (totalEmpenhado / totalPlanejado) * 100 : 0}
               isLoading={isLoading}
             />
+
+            {/* ── A Descentralizar ── */}
             <StatCard
-              title="A descentralizar"
+              title="A Descentralizar"
               value={formatCurrency(aDescentralizar)}
               subtitle={aDescentralizar >= 0 ? "Dentro do orçamento" : "Acima do orçamento"}
               icon={PiggyBank}
@@ -494,26 +559,74 @@ export default function Dashboard() {
               progress={totalPlanejado > 0 ? (Math.max(0, aDescentralizar) / totalPlanejado) * 100 : 0}
               isLoading={isLoading}
             />
-          </div>
 
-          {/* Progresso Geral */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-semibold">Progresso da Execução</CardTitle>
-              <CardDescription>Visão geral do consumo do orçamento selecionado</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    {formatCurrency(totalEmpenhado)} de {formatCurrency(totalPlanejado)}
-                  </span>
-                  <span className="font-medium text-primary">{percentualExecutado.toFixed(1)}%</span>
+            {/* ── Mini card: Liquidado / Pago (complementa o row-span-2) ── */}
+            <div className={`
+              relative overflow-hidden rounded-2xl
+              border border-border/70 bg-card
+              shadow-soft hover:shadow-card hover:-translate-y-[1px]
+              transition-all duration-200 p-5 flex flex-col justify-between
+              animate-fade-in
+            `}>
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                Liquidado · Pago
+              </p>
+
+              <div className="space-y-3 mt-2">
+                {/* Liquidado */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-muted-foreground">Liquidado</span>
+                    {isLoading ? (
+                      <div className="h-4 w-24 bg-muted rounded animate-pulse" />
+                    ) : (
+                      <span className={`
+                        text-sm font-black tracking-tight
+                        bg-gradient-to-r from-[#b45309] to-[#f59e0b]
+                        bg-clip-text text-transparent
+                      `}>
+                        {formatCurrency(totalLiquidado)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="h-1 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-[#f59e0b]/70 to-[#f59e0b] rounded-full transition-all duration-700 ease-spring"
+                      style={{ width: totalEmpenhado > 0 ? `${Math.min((totalLiquidado / totalEmpenhado) * 100, 100)}%` : '0%' }}
+                    />
+                  </div>
                 </div>
-                <Progress value={Math.min(percentualExecutado, 100)} className="h-4" />
+
+                <div className="h-px bg-border/60" />
+
+                {/* Pago */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-muted-foreground">Pago</span>
+                    {isLoading ? (
+                      <div className="h-4 w-24 bg-muted rounded animate-pulse" />
+                    ) : (
+                      <span className={`
+                        text-sm font-black tracking-tight
+                        bg-gradient-to-r from-[#047857] to-[#10b981]
+                        bg-clip-text text-transparent
+                      `}>
+                        {formatCurrency(totalPago)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="h-1 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-[#10b981]/70 to-[#10b981] rounded-full transition-all duration-700 ease-spring"
+                      style={{ width: totalLiquidado > 0 ? `${Math.min((totalPago / totalLiquidado) * 100, 100)}%` : '0%' }}
+                    />
+                  </div>
+                </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+
+          </div>
+          {/* Fim do Bento Grid */}
 
           {/* Gráficos Linha 1 */}
           <div className="grid gap-6 md:grid-cols-3">
