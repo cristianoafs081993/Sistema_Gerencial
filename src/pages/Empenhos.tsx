@@ -233,7 +233,7 @@ export default function Empenhos() {
         valor: parseCurrency(row['valor'] || '0'),
         dimensao: row['dimensao'] || '',
         componenteFuncional: row['componentefuncional'] || row['componente'] || '',
-        origemRecurso: row['origemrecurso'] || row['origem'] || '',
+        origemRecurso: row['origemrecurso'] || row['origem'] || row['ptres'] || '',
         naturezaDespesa: row['naturezadespesa'] || row['natureza'] || '',
         planoInterno: row['planointerno'] || row['plano'] || '',
         favorecidoNome: row['favorecido'] || row['nomefavorecido'] || row['razaosocial'] || '',
@@ -260,7 +260,7 @@ export default function Empenhos() {
   };
 
   const empenhosJsonFields = [
-    'numero', 'descricao', 'valor', 'dimensao', 'componentefuncional', 'origemrecurso', 'naturezadespesa', 'dataempenho', 'planointerno', 'favorecido', 'cpfcnpj'
+    'numero', 'descricao', 'valor', 'dimensao', 'componentefuncional', 'origemrecurso', 'naturezadespesa', 'dataempenho', 'planointerno', 'favorecido', 'cpfcnpj', 'ptres'
   ];
 
   const handleImportSaldos = async (event: React.ChangeEvent<HTMLInputElement>) => {

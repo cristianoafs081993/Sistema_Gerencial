@@ -10,6 +10,7 @@ export interface SiafiEmpenhoData {
     descricao: string;
     naturezaDespesa: string;
     planoInterno: string;
+    ptres: string;
     isRap: boolean;
     // Exercício corrente
     valorLiquidadoOficial: number;
@@ -107,8 +108,9 @@ export async function parseSiafiCsv(file: File): Promise<SiafiEmpenhoData[]> {
                         : findCol('Historico');
                 const colNatureza = findCol('Natureza Despesa');
                 const colPI = findCol('PI Codigo') !== -1 ? findCol('PI Codigo') : findCol('Plano Interno');
+                const colPTRES = findCol('PTRES');
 
-                console.log('[SIAFI Parser] Column indices:', { colNE, colProcesso, colFavorecidoNome, colFavorecidoNum, colDescricao, colNatureza, colPI });
+                console.log('[SIAFI Parser] Column indices:', { colNE, colProcesso, colFavorecidoNome, colFavorecidoNum, colDescricao, colNatureza, colPI, colPTRES });
 
                 // Exercício Atual
                 const colEmpenhadas = findCol('DESPESAS EMPENHADAS (CONTROLE EMPENHO)');
@@ -168,6 +170,7 @@ export async function parseSiafiCsv(file: File): Promise<SiafiEmpenhoData[]> {
                     const descricao = safeCol(colDescricao);
                     const naturezaDespesa = safeCol(colNatureza);
                     const planoInterno = safeCol(colPI);
+                    const ptres = colPTRES !== -1 ? safeCol(colPTRES) : '';
 
                     // Valores
                     const valorEmpenhado = parseCurrency(safeCol(colEmpenhadas));
@@ -194,6 +197,7 @@ export async function parseSiafiCsv(file: File): Promise<SiafiEmpenhoData[]> {
                         descricao,
                         naturezaDespesa,
                         planoInterno,
+                        ptres,
                         isRap,
                         valorLiquidadoOficial,
                         valorPagoOficial,
@@ -270,6 +274,7 @@ export async function syncSiafiDataToDb(
                     if (item.favorecidoDocumento) updatePayload.favorecido_documento = item.favorecidoDocumento;
                     if (item.naturezaDespesa) updatePayload.natureza_despesa = item.naturezaDespesa;
                     if (item.planoInterno) updatePayload.plano_interno = item.planoInterno;
+                    if (item.ptres) updatePayload.origem_recurso = item.ptres;
                 } else {
                     // Exercício corrente — CSV é a fonte única de saldos
                     updatePayload.valor = item.valorEmpenhado;
@@ -290,6 +295,7 @@ export async function syncSiafiDataToDb(
                     if (item.favorecidoDocumento) updatePayload.favorecido_documento = item.favorecidoDocumento;
                     if (item.naturezaDespesa) updatePayload.natureza_despesa = item.naturezaDespesa;
                     if (item.planoInterno) updatePayload.plano_interno = item.planoInterno;
+                    if (item.ptres) updatePayload.origem_recurso = item.ptres;
                 }
 
                 const { error } = await supabase
@@ -313,7 +319,7 @@ export async function syncSiafiDataToDb(
                         valor: item.rapInscrito,    // Valor inscrito é o "valor" do empenho RAP
                         dimensao: '',               // Será preenchido manualmente depois
                         componente_funcional: '',
-                        origem_recurso: '',
+                        origem_recurso: item.ptres || '',
                         natureza_despesa: item.naturezaDespesa || '',
                         plano_interno: item.planoInterno || null,
                         favorecido_nome: item.favorecidoNome || null,
@@ -355,7 +361,7 @@ export async function syncSiafiDataToDb(
                         valor: item.valorEmpenhado,
                         dimensao: '',               // Será preenchido manualmente depois
                         componente_funcional: '',
-                        origem_recurso: '',
+                        origem_recurso: item.ptres || '',
                         natureza_despesa: item.naturezaDespesa || '',
                         plano_interno: item.planoInterno || null,
                         favorecido_nome: item.favorecidoNome || null,

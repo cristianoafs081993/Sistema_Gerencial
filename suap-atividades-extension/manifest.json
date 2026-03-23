@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "SUAP Atividades Scraper",
+  "version": "1.0",
+  "description": "Extrai atividades do Planejamento Estratégico do SUAP para o Supabase",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://suap.ifrn.edu.br/*",
+    "https://mnqhwyrzhgykjlyyqodd.supabase.co/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
