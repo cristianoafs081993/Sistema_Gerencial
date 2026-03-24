@@ -232,7 +232,7 @@ export function Layout({ children }: LayoutProps) {
           </header>
 
           {/* ── Page content —— AnimatePresence com page transition (Framer Motion) */}
-          <main className="flex-1 p-space-4 lg:p-space-8 overflow-y-auto scrollbar-thin dot-pattern bg-surface-page">
+          <main className="flex-1 p-4 lg:p-8 overflow-y-auto scrollbar-thin dot-pattern bg-surface-page">
             <div className="max-w-[1600px] mx-auto">
               {children}
             </div>

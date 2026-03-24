@@ -1,19 +1,42 @@
 import { supabase } from '@/lib/supabase';
-import { Retencao } from '@/types';
+import { DocumentoSituacao } from '@/types';
 
 export const retencoesService = {
-  async upsertBatch(data: Partial<Retencao>[]) {
-    // Map dates back to ISO strings if needed, though supabase-js often handles Date objects
-    const { error } = await supabase
-      .from('retencoes')
-      .upsert(data, { 
-        // We assume a natural key based on the document and item details
-        onConflict: 'documento_habil,dh_ug_pagadora,dh_item_ug_pagadora,dh_credor_numero,metrica' 
-      });
+    async getSituacoes(documentoHabilId?: string) {
+        let query = supabase
+            .from('documentos_habeis_situacoes')
+            .select('*')
+            .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error in retencoesService.upsertBatch:', error);
-      throw error;
+        if (documentoHabilId) {
+            query = query.eq('documento_habil_id', documentoHabilId);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        return data as DocumentoSituacao[];
+    },
+
+    async upsertSituacoesBatch(situacoes: Partial<DocumentoSituacao>[]) {
+        if (!situacoes.length) return;
+
+        // O upsert usará a restrição uq_documento_situacao_valor (id_documento, codigo, valor)
+        const { error } = await supabase
+            .from('documentos_habeis_situacoes')
+            .upsert(situacoes, {
+                onConflict: 'documento_habil_id, situacao_codigo, valor',
+                ignoreDuplicates: false
+            });
+
+        if (error) throw error;
+    },
+    
+    async deleteByDocumento(documentoHabilId: string) {
+        const { error } = await supabase
+            .from('documentos_habeis_situacoes')
+            .delete()
+            .eq('documento_habil_id', documentoHabilId);
+
+        if (error) throw error;
     }
-  }
 };

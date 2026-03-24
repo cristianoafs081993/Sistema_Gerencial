@@ -2,8 +2,17 @@ import { useState, useMemo, useCallback } from 'react';
 import { Search, FileText, Calendar, DollarSign, ExternalLink, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatCard } from '@/components/StatCard';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 import { formatCurrency, cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -100,57 +109,100 @@ export default function Contratos() {
     );
   }
   return (
-    <div className="space-y-space-6 pb-space-10">
+    <div className="space-y-6 pb-10">
 
-      <Card className="card-system shadow-shadow-sm">
-        <CardHeader className="pb-space-3">
-          <CardTitle className="text-text-lg font-font-bold">Contratos Ativos</CardTitle>
-          <div className="relative mt-space-2">
-            <Search className="absolute left-space-3 top-1/2 -translate-y-1/2 h-space-4 w-space-4 text-text-muted" />
-            <Input
-              placeholder="Buscar por número ou contratada..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-space-10 input-system"
-            />
-          </div>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
+        <StatCard
+          title="Contratos Ativos"
+          value={contratos.length}
+          icon={FileText}
+          stitchColor="vibrant-blue"
+        />
+        
+        <StatCard
+          title="Valor Global"
+          value={formatCurrency(contratos.reduce((sum, c) => sum + (c.valor || 0), 0))}
+          icon={DollarSign}
+          stitchColor="purple"
+        />
+
+        <StatCard
+          title="Saldo a Liquidar"
+          value={formatCurrency(totalALiquidarGlobal)}
+          icon={Calendar}
+          stitchColor="amber"
+          progress={45} // Placeholder progress or calculate if possible
+        />
+
+        <StatCard
+          title="Vínculos"
+          value={contratosEmpenhos.length}
+          icon={ExternalLink}
+          stitchColor="emerald-green"
+        />
+      </div>
+
+      {/* Standard Filter Card */}
+      <Card className="card-system shadow-sm">
+        <CardHeader className="pb-3 px-0 pt-0">
+          <CardTitle className="text-xl font-bold">Filtros</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="rounded-radius-md border border-border-default/50 overflow-hidden">
-            <table className="w-full text-text-sm">
-              <thead>
-                <tr className="bg-surface-subtle/50 border-b border-border-default/50">
-                  <th 
-                    className="text-left py-3 px-4 font-medium cursor-pointer hover:bg-muted/80 transition-colors"
+        <CardContent className="p-0">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por número ou contratada..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 h-10 text-sm input-system"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="card-system shadow-sm overflow-hidden border-none shadow-none mt-6">
+        <CardHeader className="px-6 py-4 border-b border-border-default/50">
+          <CardTitle className="text-base font-semibold">Contratos Ativos</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-slate-50/50">
+                <TableRow className="hover:bg-transparent border-b border-border-default/50">
+                  <TableHead
+                    className="h-11 px-6 text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-slate-100/80 transition-colors"
                     onClick={() => handleSort('numero')}
                   >
                     <div className="flex items-center">
                       Contrato
                       <SortIcon columnKey="numero" />
                     </div>
-                  </th>
-                  <th className="text-left py-3 px-4 font-medium">Contratada</th>
-                  <th 
-                    className="text-right py-3 px-4 font-medium cursor-pointer hover:bg-muted/80 transition-colors"
+                  </TableHead>
+                  <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">Contratada</TableHead>
+                  <TableHead
+                    className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-slate-100/80 transition-colors"
                     onClick={() => handleSort('data_termino')}
                   >
                     <div className="flex items-center justify-end">
                       Vigência
                       <SortIcon columnKey="data_termino" />
                     </div>
-                  </th>
-                  <th className="text-right py-3 px-4 font-medium">Valor Total</th>
-                  <th className="text-right py-3 px-4 font-medium">Saldo a Liquidar</th>
-                  <th className="text-left py-3 px-4 font-medium">Empenhos Vinculados</th>
-                </tr>
-              </thead>
-              <tbody>
+                  </TableHead>
+                  <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Valor Total</TableHead>
+                  <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Saldo a Liquidar</TableHead>
+                  <TableHead className="h-11 px-6 text-xs font-semibold uppercase tracking-wider">Empenhos Vinculados</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {filteredContratos.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">
                       Nenhum contrato encontrado.
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ) : (
                   filteredContratos.map((c) => {
                     const empenhosVinculados = getEmpenhosDoContrato(c.id);
@@ -163,43 +215,41 @@ export default function Contratos() {
                     }, 0);
 
                     return (
-                      <tr key={c.id} className="border-b border-border-default/50 hover:bg-surface-subtle transition-colors">
-                        <td className="py-space-3 px-space-4">
-                          <div className="flex flex-col">
-                            <span className="font-mono font-font-medium text-text-sm">{c.numero}</span>
+                      <TableRow key={c.id} className="hover:bg-slate-50/80 transition-colors border-b last:border-0">
+                        <TableCell className="py-4 px-6">
+                          <span className="font-mono font-medium text-sm">{c.numero}</span>
+                        </TableCell>
+                        <TableCell className="py-4 px-4">
+                          <span className="font-medium text-sm">{c.contratada}</span>
+                        </TableCell>
+                        <TableCell className="py-4 px-4 text-right">
+                          <div className="flex flex-col text-xs space-y-0.5">
+                            <span className="text-muted-foreground">Início: {safeFormatDate(c.data_inicio)}</span>
+                            <span className="font-medium text-muted-foreground">Fim: {safeFormatDate(c.data_termino)}</span>
                           </div>
-                        </td>
-                        <td className="py-space-3 px-space-4">
-                          <span className="font-font-medium text-text-sm">{c.contratada}</span>
-                        </td>
-                        <td className="py-space-3 px-space-4 text-right">
-                          <div className="flex flex-col text-text-xs space-y-space-0.5">
-                            <span className="text-text-muted">Início: {safeFormatDate(c.data_inicio)}</span>
-                            <span className="font-font-medium text-text-secondary">Fim: {safeFormatDate(c.data_termino)}</span>
-                          </div>
-                        </td>
-                        <td className="py-space-3 px-space-4 text-right">
+                        </TableCell>
+                        <TableCell className="py-4 px-4 text-right">
                           <div className="flex flex-col">
-                            <span className="font-font-bold text-action-primary text-text-sm">{formatCurrency(c.valor || 0)}</span>
+                            <span className="font-bold text-action-primary text-sm">{formatCurrency(c.valor || 0)}</span>
                             {totalEmpenhado > 0 && (
-                              <span className="text-[10px] text-text-muted">
+                              <span className="text-[10px] text-muted-foreground">
                                 Empenhado: {formatCurrency(totalEmpenhado)}
                               </span>
                             )}
                           </div>
-                        </td>
-                        <td className="py-space-3 px-space-4 text-right">
+                        </TableCell>
+                        <TableCell className="py-4 px-4 text-right">
                           <div className="flex flex-col">
                             <span className={cn(
-                              "font-font-semibold text-text-sm",
+                              "font-semibold text-sm",
                               totalALiquidar > 0 ? "text-status-warning" : "text-status-success"
                             )}>
                               {formatCurrency(totalALiquidar)}
                             </span>
-                            <span className="text-[10px] text-text-muted uppercase">A Liquidar</span>
+                            <span className="text-[10px] text-muted-foreground uppercase">A Liquidar</span>
                           </div>
-                        </td>
-                        <td className="py-space-3 px-space-4">
+                        </TableCell>
+                        <TableCell className="py-4 px-6">
                           <div className="flex flex-wrap gap-1">
                             {empenhosVinculados.length > 0 ? (
                               empenhosVinculados.map((e) => {
@@ -255,62 +305,17 @@ export default function Contratos() {
                               <span className="text-xs text-muted-foreground italic">Sem empenhos</span>
                             )}
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     );
                   })
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </CardContent>
       </Card>
-      
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-space-4">
-        <Card className="bg-action-primary/5 border-action-primary/10 shadow-shadow-sm">
-          <CardContent className="pt-space-6">
-            <div className="flex flex-col items-center text-center space-y-space-2">
-              <FileText className="h-space-8 w-space-8 text-action-primary opacity-70" />
-              <div className="text-text-2xl font-font-bold">{contratos.length}</div>
-              <div className="text-text-xs text-text-muted uppercase tracking-wider font-font-semibold">Contratos Ativos</div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-action-secondary/5 border-action-secondary/10 shadow-shadow-sm">
-          <CardContent className="pt-space-6">
-            <div className="flex flex-col items-center text-center space-y-space-2">
-              <DollarSign className="h-space-8 w-space-8 text-action-secondary opacity-70" />
-              <div className="text-text-2xl font-font-bold">
-                {formatCurrency(contratos.reduce((sum, c) => sum + (c.valor || 0), 0))}
-              </div>
-              <div className="text-text-xs text-text-muted uppercase tracking-wider font-font-semibold">Valor Global Sob Contrato</div>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card className="bg-status-warning/5 border-status-warning/10 shadow-shadow-sm">
-          <CardContent className="pt-space-6">
-            <div className="flex flex-col items-center text-center space-y-space-2">
-              <Calendar className="h-space-8 w-space-8 text-status-warning opacity-70" />
-              <div className="text-text-2xl font-font-bold">
-                {formatCurrency(totalALiquidarGlobal)}
-              </div>
-              <div className="text-text-xs text-text-muted uppercase tracking-wider font-font-semibold">Saldo Total a Liquidar</div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-action-info/5 border-action-info/10 shadow-shadow-sm">
-          <CardContent className="pt-space-6">
-            <div className="flex flex-col items-center text-center space-y-space-2">
-              <ExternalLink className="h-space-8 w-space-8 text-action-info opacity-70" />
-              <div className="text-text-2xl font-font-bold">{contratosEmpenhos.length}</div>
-              <div className="text-text-xs text-text-muted uppercase tracking-wider font-font-semibold">Vínculos Gerenciados</div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }

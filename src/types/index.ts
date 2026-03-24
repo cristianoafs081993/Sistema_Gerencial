@@ -251,56 +251,42 @@ export interface DocumentoItem {
   id: string;
   documento_habil_id: string;
   doc_tipo: string;
-  data_emissao?: Date;
+  data_emissao?: string;
   valor: number;
   observacao?: string;
-  createdAt: Date;
-  updatedAt: Date;
+}
+
+export interface DocumentoSituacao {
+  id?: string;
+  documento_habil_id: string;
+  situacao_codigo: string;
+  valor: number;
+  is_retencao: boolean;
+  created_at?: string;
 }
 
 export interface DocumentoDespesa {
   id: string;
-  documento: string;
-  dataEmissao: Date;
-  fase: string;
-  documentoResumido: string;
-  observacao: string;
-  favorecidoNome: string;
-  favorecidoDocumento: string;
-  valor: number;
-  elementoDespesa: string;
-  naturezaDespesa: string;
-  fonteRecurso?: string;
+  valor_original: number;
+  valor_pago: number;
+  estado: string;
+  processo: string;
+  favorecido_nome: string;
+  favorecido_documento: string;
+  data_emissao: string;
+  fonte_sof?: string;
   empenho_id?: string;
-  empenhoDocumento?: string;
-  valorLiquidado?: number;
-  valorRestoPago?: number;
   itens?: DocumentoItem[];
-  retencoes?: Retencao[];
-  createdAt: Date;
-  updatedAt: Date;
+  situacoes?: DocumentoSituacao[];
 }
 
+// Nota: A interface Retencao antiga foi descontinuada em favor de DocumentoSituacao
 export interface Retencao {
   id: string;
-  documento_habil?: string;
-  dh_ug_pagadora?: string;
-  dh_item_ug_pagadora?: string;
-  dh_dia_emissao?: Date;
-  dh_data_emissao_doc_origem?: Date;
-  dh_item_dia_pagamento?: Date;
-  dh_item_dia_vencimento?: Date;
-  dh_dia_transacao?: Date;
-  dh_dia_pagamento?: Date;
-  dh_credor_numero?: string;
-  dh_credor_nome?: string;
-  dh_processo?: string;
-  dh_situacao?: string;
-  dh_valor_doc_origem: number;
-  metrica?: string;
-  realizavel?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  documento_habil_id: string;
+  situacao_codigo: string;
+  valor: number;
+  is_retencao: boolean;
 }
 
 export interface Contrato {

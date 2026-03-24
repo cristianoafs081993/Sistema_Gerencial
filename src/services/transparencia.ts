@@ -13,6 +13,14 @@ const API_KEY = '931d4d57337bef94e775337c318342e9';
 // Delay para evitar Rate Limit (se necessário)
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+const normalizeDocId = (id: string | undefined): string => {
+    if (!id) return '';
+    const trimmed = id.trim();
+    // Os IDs curtos têm 12 caracteres (ex: 2026NP000001). 
+    // Os logos têm ~23. Tomamos sempre os últimos 12 para garantir o vínculo.
+    return trimmed.length > 12 ? trimmed.slice(-12) : trimmed;
+};
+
 export const transparenciaService = {
     // Buscar documentos do Supabase com filtros
     async getDocumentos(filters?: {
@@ -31,7 +39,7 @@ export const transparenciaService = {
 
         let query = supabase
             .from('documentos_habeis')
-            .select('*', { count: 'exact' });
+            .select('*, itens:documentos_habeis_itens(*), situacoes:documentos_habeis_situacoes(*)', { count: 'exact' });
 
         // Ordenação
         if (filters?.orderBy) {
@@ -62,24 +70,32 @@ export const transparenciaService = {
 
         if (error) throw error;
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const mappedData = (data as any[]).map((item) => ({
-            id: item.id,
-            documento: item.id,
-            dataEmissao: new Date(`${item.data_emissao}T12:00:00`),
-            fase: item.doc_tipo || 'N/D',
-            documentoResumido: item.id,
-            observacao: item.observacao,
-            favorecidoNome: item.favorecido_nome,
-            favorecidoDocumento: item.favorecido_documento,
-            valor: Number(item.valor_liquidado || item.valor_pago || 0),
-            empenhoDocumento: item.empenho_numero,
-            valorLiquidado: Number(item.valor_liquidado || 0),
-            valorRestoPago: Number(item.valor_pago || 0),
-            elementoDespesa: '',
-            naturezaDespesa: '',
-            createdAt: new Date(item.created_at),
-            updatedAt: new Date(item.updated_at),
+        const mappedData: DocumentoDespesa[] = (data as any[]).map((doc) => ({
+            id: doc.id,
+            valor_original: Number(doc.valor_original || 0),
+            valor_pago: Number(doc.valor_pago || 0),
+            estado: doc.estado || 'PENDENTE DE REALIZAÇÃO',
+            processo: doc.processo || '',
+            favorecido_nome: doc.favorecido_nome || '',
+            favorecido_documento: doc.favorecido_documento || '',
+            data_emissao: doc.data_emissao,
+            fonte_sof: doc.fonte_sof,
+            empenho_id: doc.empenho_id,
+            itens: (doc.itens || []).map((item: any) => ({
+                id: item.id,
+                documento_habil_id: item.documento_habil_id,
+                doc_tipo: item.doc_tipo,
+                data_emissao: item.data_emissao,
+                valor: Number(item.valor || 0),
+                observacao: item.observacao
+            })),
+            situacoes: (doc.situacoes || []).map((sit: any) => ({
+                id: sit.id,
+                documento_habil_id: sit.documento_habil_id,
+                situacao_codigo: sit.situacao_codigo,
+                valor: Number(sit.valor || 0),
+                is_retencao: sit.is_retencao
+            }))
         }));
 
         return { data: mappedData, total: count || 0 };
@@ -135,56 +151,42 @@ export const transparenciaService = {
 
         if (itensError) throw itensError;
 
-        // 3. Buscar retenções relacionadas
-        const { data: retencoes, error: retencoesError } = await supabase
-            .from('retencoes')
+        // 3. Buscar situações relacionadas (Despesas e Retenções)
+        const { data: situacoes, error: sitError } = await supabase
+            .from('documentos_habeis_situacoes')
             .select('*')
-            .eq('documento_habil', id);
+            .eq('documento_habil_id', id);
 
-        if (retencoesError) throw retencoesError;
+        if (sitError) throw sitError;
 
         // Mapear documento principal
         const mappedDoc: DocumentoDespesa = {
             id: doc.id,
-            documento: doc.id,
-            dataEmissao: new Date(`${doc.data_emissao}T12:00:00`),
-            fase: doc.doc_tipo || 'N/D',
-            documentoResumido: doc.id,
-            observacao: doc.observacao,
-            favorecidoNome: doc.favorecido_nome,
-            favorecidoDocumento: doc.favorecido_documento,
-            valor: Number(doc.valor_liquidado || doc.valor_pago || 0),
-            empenhoDocumento: doc.empenho_numero,
-            valorLiquidado: Number(doc.valor_liquidado || 0),
-            valorRestoPago: Number(doc.valor_pago || 0),
-            fonteRecurso: doc.fonte_sof,
-            createdAt: new Date(doc.created_at),
-            updatedAt: new Date(doc.updated_at),
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            valor_original: Number(doc.valor_original || 0),
+            valor_pago: Number(doc.valor_pago || 0),
+            estado: doc.estado || 'PENDENTE DE REALIZAÇÃO',
+            processo: doc.processo || '',
+            favorecido_nome: doc.favorecido_nome || '',
+            favorecido_documento: doc.favorecido_documento || '',
+            data_emissao: doc.data_emissao,
+            fonte_sof: doc.fonte_sof,
+            empenho_id: doc.empenho_id,
             itens: (itens as any[]).map((item) => ({
                 id: item.id,
                 documento_habil_id: item.documento_habil_id,
                 doc_tipo: item.doc_tipo,
-                data_emissao: item.data_emissao ? new Date(`${item.data_emissao}T12:00:00`) : undefined,
+                data_emissao: item.data_emissao,
                 valor: Number(item.valor || 0),
-                observacao: item.observacao,
-                createdAt: new Date(item.created_at),
-                updatedAt: new Date(item.updated_at),
+                observacao: item.observacao
             })),
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            retencoes: (retencoes as any[]).map((item) => ({
-                ...item,
-                dh_dia_emissao: item.dh_dia_emissao ? new Date(`${item.dh_dia_emissao}T12:00:00`) : undefined,
-                dh_data_emissao_doc_origem: item.dh_data_emissao_doc_origem ? new Date(`${item.dh_data_emissao_doc_origem}T12:00:00`) : undefined,
-                dh_item_dia_pagamento: item.dh_item_dia_pagamento ? new Date(`${item.dh_item_dia_pagamento}T12:00:00`) : undefined,
-                dh_item_dia_vencimento: item.dh_item_dia_vencimento ? new Date(`${item.dh_item_dia_vencimento}T12:00:00`) : undefined,
-                dh_dia_transacao: item.dh_dia_transacao ? new Date(`${item.dh_dia_transacao}T12:00:00`) : undefined,
-                dh_dia_pagamento: item.dh_dia_pagamento ? new Date(`${item.dh_dia_pagamento}T12:00:00`) : undefined,
-                createdAt: new Date(item.created_at),
-                updatedAt: new Date(item.updated_at),
-            })),
-            elementoDespesa: '', // Manter por compatibilidade de tipo
-            naturezaDespesa: '', // Manter por compatibilidade de tipo
+            situacoes: (situacoes as any[]).map((sit) => ({
+                id: sit.id,
+                documento_habil_id: sit.documento_habil_id,
+                situacao_codigo: sit.situacao_codigo,
+                valor: Number(sit.valor || 0),
+                is_retencao: sit.is_retencao,
+                created_at: sit.created_at
+            }))
         };
 
         return mappedDoc;
@@ -200,5 +202,178 @@ export const transparenciaService = {
 
         if (error) return null;
         return data ? new Date(`${data.data_emissao}T12:00:00`) : null;
+    },
+
+    // Importação em Lote via UI
+    async importDocumentosHabeis(data: Record<string, string>[]): Promise<void> {
+        const docsMap = new Map<string, any>();
+        
+        for (const row of data) {
+            // Mapeamento flexível de chaves normalizadas
+            const rawId = row['documentohabil'] || row['dhdocumentohabil'] || '';
+            const id = normalizeDocId(rawId);
+            if (!id) continue;
+
+            if (!docsMap.has(id)) {
+                const dataEmissao = row['dhdataemissaodocorigem'] || row['dataemissao'] || '';
+                let formattedDate = new Date().toISOString().split('T')[0];
+                if (dataEmissao.includes('/')) {
+                    const [d, m, y] = dataEmissao.split('/');
+                    formattedDate = `${y}-${m}-${d}`;
+                }
+
+                docsMap.set(id, {
+                    doc: {
+                        id,
+                        valor_original: Number((row['dhvalordocorigem'] || row['valor'] || '0').replace(/[^\d.,]/g, '').replace(',', '.')),
+                        processo: row['dhprocesso'] || '',
+                        estado: row['dhestado'] || 'PENDENTE',
+                        favorecido_documento: row['dhcredor'] || '',
+                        favorecido_nome: row['favorecidonome'] || '',
+                        data_emissao: formattedDate,
+                        updated_at: new Date().toISOString()
+                    },
+                    situacoes: new Map<string, any>(),
+                    itens: new Map<string, any>()
+                });
+            }
+
+            const docData = docsMap.get(id);
+
+            // 1. Identificar Situações (Despesas/Retenções)
+            const situacaoCodigo = row['dhsituacao'] || '';
+            const valueSituacao = Number((row['metricavalor'] || row['dhvalordocorigem'] || row['valor'] || '0').replace(/[^\d.,]/g, '').replace(',', '.'));
+            
+            if (situacaoCodigo && !['OB', 'NS', 'NC', 'DR', 'GR'].includes(situacaoCodigo)) {
+                const sitKey = `${situacaoCodigo}-${valueSituacao}`;
+                docData.situacoes.set(sitKey, {
+                    documento_habil_id: id,
+                    situacao_codigo: situacaoCodigo,
+                    valor: valueSituacao,
+                    is_retencao: situacaoCodigo.startsWith('DDF') || 
+                                situacaoCodigo.startsWith('DDU') || 
+                                situacaoCodigo === 'DOB001' || 
+                                situacaoCodigo === 'DOB035'
+                });
+            }
+
+            // 2. Identificar Itens (Documentos Gerados como OB, NS)
+            const itemTipo = row['dhitem'] || situacaoCodigo;
+            const itemIdRaw = row['dhdocorigem'] || '';
+            const itemId = normalizeDocId(itemIdRaw);
+
+            if (['OB', 'NS', 'NC', 'DR', 'GR'].includes(itemTipo)) {
+                const itemValor = Number((row['dhvalordocorigem'] || row['valor'] || '0').replace(/[^\d.,]/g, '').replace(',', '.'));
+                // ID Determinístico: Se não tem itemId, gera um baseado no tipo e valor para evitar duplicatas em re-import
+                const finalItemId = itemId || `${id}-${itemTipo}-${itemValor}`;
+                
+                docData.itens.set(finalItemId, {
+                    id: finalItemId,
+                    documento_habil_id: id,
+                    doc_tipo: itemTipo,
+                    valor: itemValor,
+                    data_emissao: docData.doc.data_emissao, 
+                    observacao: row['observacao'] || row['docobservacao'] || ''
+                });
+            }
+        }
+
+        const allDocs = Array.from(docsMap.values()).map(d => d.doc);
+        const { error: docError } = await supabase.from('documentos_habeis').upsert(allDocs, { onConflict: 'id' });
+        if (docError) throw docError;
+
+        const docIds = allDocs.map(d => d.id);
+
+        // Limpar e Inserir Situações (Limpamos para evitar resíduos se campos mudarem)
+        await supabase.from('documentos_habeis_situacoes').delete().in('documento_habil_id', docIds);
+        const allSituacoes = Array.from(docsMap.values()).flatMap(d => Array.from(d.situacoes.values()));
+        if (allSituacoes.length > 0) {
+            const { error: sitError } = await supabase.from('documentos_habeis_situacoes').insert(allSituacoes);
+            if (sitError) throw sitError;
+        }
+
+        // Limpar e Inserir Itens
+        await supabase.from('documentos_habeis_itens').delete().in('documento_habil_id', docIds);
+        const allItens = Array.from(docsMap.values()).flatMap(d => Array.from(d.itens.values()));
+        if (allItens.length > 0) {
+            const { error: itemError } = await supabase.from('documentos_habeis_itens').insert(allItens);
+            if (itemError) throw itemError;
+        }
+    },
+
+    async importLiquidacoes(data: Record<string, string>[]): Promise<void> {
+        for (const row of data) {
+            const rawId = row['documentoorigem'] || '';
+            const id = normalizeDocId(rawId);
+            const fonte = row['fontesof'] || '';
+            
+            // Segurança: Ignorar se a fonte for o código da UG ou vazio
+            if (id && fonte && fonte !== '158366') {
+                await supabase
+                    .from('documentos_habeis')
+                    .update({ fonte_sof: fonte })
+                    .eq('id', id);
+            }
+        }
+    },
+
+    async importOrdensBancarias(data: Record<string, string>[]): Promise<void> {
+        const itemsMap = new Map<string, any>();
+
+        for (const row of data) {
+            const rawId = row['documento'] || '';
+            const rawDhId = row['documentoorigem'] || '';
+            
+            const id = normalizeDocId(rawId);
+            const dhId = normalizeDocId(rawDhId);
+            
+            if (!id || !dhId) continue;
+
+            const valorStr = row['despesaspagas'] || row['restosapagarpagosprocenproc'] || row['valor'] || '0';
+            const valor = Number(valorStr.replace(/[^\d.,]/g, '').replace(',', '.'));
+            
+            const dataLancamento = row['dialancamento'] || '';
+            let formattedDate = new Date().toISOString().split('T')[0];
+            if (dataLancamento.includes('/')) {
+                const [d, m, y] = dataLancamento.split('/');
+                formattedDate = `${y}-${m}-${d}`;
+            }
+
+            if (itemsMap.has(id)) {
+                itemsMap.get(id).valor += valor;
+            } else {
+                itemsMap.set(id, {
+                    id,
+                    documento_habil_id: dhId,
+                    doc_tipo: row['doctipo'] || 'OB',
+                    valor,
+                    data_emissao: formattedDate,
+                    observacao: row['docobservacao'] || ''
+                });
+            }
+        }
+
+        const items = Array.from(itemsMap.values());
+        if (items.length > 0) {
+            // Validação de Chave Estrangeira: Pegar quais IDs de DH realmente existem
+            const uniqueDhIds = Array.from(new Set(items.map(i => i.documento_habil_id)));
+            const { data: validIds } = await supabase
+                .from('documentos_habeis')
+                .select('id')
+                .in('id', uniqueDhIds);
+            
+            const existingIds = new Set(validIds?.map(v => v.id) || []);
+            const filteredItems = items.filter(i => existingIds.has(i.documento_habil_id));
+
+            if (filteredItems.length > 0) {
+                const { error } = await supabase.from('documentos_habeis_itens').upsert(filteredItems, { onConflict: 'id' });
+                if (error) throw error;
+            }
+
+            if (filteredItems.length < items.length) {
+                const skipped = items.length - filteredItems.length;
+                console.warn(`${skipped} OBs foram ignoradas pois seus Documentos Hábeis (NP/RP) correspondentes não foram encontrados. Certifique-se de importar o arquivo principal primeiro.`);
+            }
+        }
     }
 };

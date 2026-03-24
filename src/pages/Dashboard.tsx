@@ -18,6 +18,14 @@ import { useData } from '@/contexts/DataContext';
 import { StatCard } from '@/components/StatCard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -670,7 +678,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="">
+            <Card className="overflow-visible">
               <CardHeader>
                 <CardTitle>Funil de Execução</CardTitle>
                 <CardDescription>Eficiência da despesa</CardDescription>
@@ -681,46 +689,81 @@ export default function Dashboard() {
                   <div className="absolute left-1/2 top-0 bottom-0 w-px bg-slate-100 -translate-x-1/2 z-0 hidden md:block"></div>
 
                   {/* Funnel Steps */}
-                  <div className="relative z-10 flex flex-col items-center">
-                    <div className="bg-vibrant-blue text-white px-4 py-2 rounded-lg w-full text-center shadow-sm max-w-[240px]">
-                      <p className="text-[10px] font-medium text-blue-100 uppercase tracking-wider mb-0.5">Planejado</p>
-                      <p className="font-bold text-sm">{formatCurrency(totalPlanejado)}</p>
+                  <div className="relative z-10 flex flex-col items-center gap-1 pr-12">
+                    {/* Planejado */}
+                    <div className="bg-gradient-to-br from-[#1d4ed8] to-[#3b82f6] text-white px-2 py-3 rounded-xl w-full max-w-[280px] shadow-md border border-white/10 relative group">
+                      <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
+                      <div className="grid grid-cols-[40px_1fr_40px] items-center">
+                        <div /> {/* Left spacer */}
+                        <div className="text-center">
+                          <p className="text-[11px] font-bold text-white/80 uppercase tracking-widest mb-1">Planejado</p>
+                          <p className="font-black text-lg text-white drop-shadow-sm">{formatCurrency(totalPlanejado)}</p>
+                        </div>
+                        <div /> {/* Right spacer */}
+                      </div>
                     </div>
 
                     <div className="h-4 flex items-center justify-center">
-                      <ArrowDown className="text-slate-300 w-4 h-4" />
+                      <ArrowDown className="text-slate-300 w-4 h-4 animate-bounce" />
                     </div>
 
-                    <div className="bg-purple text-white px-4 py-2 rounded-lg w-11/12 text-center shadow-sm max-w-[220px] relative">
-                      <div className="absolute -right-2 top-1/2 -translate-y-1/2 bg-white text-purple text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-slate-100 hidden md:block">
-                        {totalPlanejado ? ((totalEmpenhado / totalPlanejado) * 100).toFixed(1) : '0'}%
+                    {/* Empenhado */}
+                    <div className="bg-gradient-to-br from-[#7e22ce] to-[#a855f7] text-white px-2 py-3 rounded-xl w-11/12 max-w-[260px] shadow-md border border-white/10 relative group">
+                      <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
+                      <div className="grid grid-cols-[40px_1fr_40px] items-center">
+                        <div /> {/* Left spacer */}
+                        <div className="text-center">
+                          <p className="text-[11px] font-bold text-white/80 uppercase tracking-widest mb-1">Empenhado</p>
+                          <p className="font-black text-lg text-white drop-shadow-sm">{formatCurrency(totalEmpenhado)}</p>
+                        </div>
+                        <div className="flex justify-start relative">
+                          <div className="absolute -left-1 top-1/2 -translate-y-1/2 bg-white/10 backdrop-blur-md text-white text-[10px] font-black px-2 py-1 rounded-lg shadow-xl border border-white/20 hidden md:block z-20">
+                            {totalPlanejado ? ((totalEmpenhado / totalPlanejado) * 100).toFixed(1) : '0'}%
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-[10px] font-medium text-purple-100 uppercase tracking-wider mb-0.5">Empenhado</p>
-                      <p className="font-bold text-sm">{formatCurrency(totalEmpenhado)}</p>
                     </div>
 
                     <div className="h-4 flex items-center justify-center">
-                      <ArrowDown className="text-slate-300 w-4 h-4" />
+                      <ArrowDown className="text-slate-300 w-4 h-4 animate-bounce" style={{ animationDelay: '200ms' }} />
                     </div>
 
-                    <div className="bg-amber text-white px-4 py-2 rounded-lg w-5/6 text-center shadow-sm max-w-[200px] relative">
-                      <div className="absolute -right-2 top-1/2 -translate-y-1/2 bg-white text-amber text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-slate-100 hidden md:block">
-                        {totalEmpenhado ? ((totalLiquidado / totalEmpenhado) * 100).toFixed(1) : '0'}%
+                    {/* Liquidado */}
+                    <div className="bg-gradient-to-br from-[#d97706] to-[#f59e0b] text-white px-2 py-3 rounded-xl w-5/6 max-w-[240px] shadow-md border border-white/10 relative group">
+                      <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
+                      <div className="grid grid-cols-[40px_1fr_40px] items-center">
+                        <div /> {/* Left spacer */}
+                        <div className="text-center">
+                          <p className="text-[11px] font-bold text-white/80 uppercase tracking-widest mb-1">Liquidado</p>
+                          <p className="font-black text-lg text-white drop-shadow-sm">{formatCurrency(totalLiquidado)}</p>
+                        </div>
+                        <div className="flex justify-start relative">
+                          <div className="absolute -left-1 top-1/2 -translate-y-1/2 bg-white/10 backdrop-blur-md text-white text-[10px] font-black px-2 py-1 rounded-lg shadow-xl border border-white/20 hidden md:block z-20">
+                            {totalEmpenhado ? ((totalLiquidado / totalEmpenhado) * 100).toFixed(1) : '0'}%
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-[10px] font-medium text-amber-100 uppercase tracking-wider mb-0.5">Liquidado</p>
-                      <p className="font-bold text-sm">{formatCurrency(totalLiquidado)}</p>
                     </div>
 
                     <div className="h-4 flex items-center justify-center">
-                      <ArrowDown className="text-slate-300 w-4 h-4" />
+                      <ArrowDown className="text-slate-300 w-4 h-4 animate-bounce" style={{ animationDelay: '400ms' }} />
                     </div>
 
-                    <div className="bg-emerald-green text-white px-4 py-2 rounded-lg w-4/5 text-center shadow-sm max-w-[180px] relative">
-                      <div className="absolute -right-2 top-1/2 -translate-y-1/2 bg-white text-emerald-green text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-slate-100 hidden md:block">
-                        {totalLiquidado ? ((totalPago / totalLiquidado) * 100).toFixed(1) : '0'}%
+                    {/* Pago */}
+                    <div className="bg-gradient-to-br from-[#059669] to-[#10b981] text-white px-2 py-3 rounded-xl w-3/4 max-w-[220px] shadow-md border border-white/10 relative group">
+                      <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
+                      <div className="grid grid-cols-[40px_1fr_40px] items-center">
+                        <div /> {/* Left spacer */}
+                        <div className="text-center">
+                          <p className="text-[11px] font-bold text-white/80 uppercase tracking-widest mb-1">Pago</p>
+                          <p className="font-black text-lg text-white drop-shadow-sm">{formatCurrency(totalPago)}</p>
+                        </div>
+                        <div className="flex justify-start relative">
+                          <div className="absolute -left-1 top-1/2 -translate-y-1/2 bg-white/10 backdrop-blur-md text-white text-[10px] font-black px-2 py-1 rounded-lg shadow-xl border border-white/20 hidden md:block z-20">
+                            {totalLiquidado ? ((totalPago / totalLiquidado) * 100).toFixed(1) : '0'}%
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-[10px] font-medium text-green-100 uppercase tracking-wider mb-0.5">Pago</p>
-                      <p className="font-bold text-sm">{formatCurrency(totalPago)}</p>
                     </div>
                   </div>
                 </div>
@@ -802,44 +845,44 @@ export default function Dashboard() {
           </div>
 
           {/* Tabela de Resumo */}
-          <Card className="">
-            <CardHeader>
-              <CardTitle>Detalhamento por Origem</CardTitle>
+          <Card className="card-system overflow-hidden">
+            <CardHeader className="px-6 py-4 border-b border-border-default/50">
+              <CardTitle className="text-base font-semibold">Detalhamento por Origem</CardTitle>
               <CardDescription>Execução financeira por fonte de recurso</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Origem de Recurso</th>
-                      <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Planejado</th>
-                      <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Empenhado</th>
-                      <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Saldo</th>
-                      <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Execução</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table>
+                  <TableHeader className="bg-slate-50/50">
+                    <TableRow className="hover:bg-transparent border-b border-border-default/50">
+                      <TableHead className="h-11 px-6 text-xs font-semibold uppercase tracking-wider">Origem de Recurso</TableHead>
+                      <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Planejado</TableHead>
+                      <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Empenhado</TableHead>
+                      <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Saldo</TableHead>
+                      <TableHead className="h-11 px-6 text-right text-xs font-semibold uppercase tracking-wider">Execução</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {dadosPorOrigem.map((item, index) => (
-                      <tr key={index} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
-                        <td className="py-3 px-4 text-sm font-medium">{item.origem}</td>
-                        <td className="py-3 px-4 text-sm text-right">{formatCurrency(item.planejado)}</td>
-                        <td className="py-3 px-4 text-sm text-right">{formatCurrency(item.empenhado)}</td>
-                        <td className={`py-3 px-4 text-sm text-right font-medium ${item.saldo >= 0 ? 'text-accent' : 'text-destructive'}`}>
+                      <TableRow key={index} className="hover:bg-slate-50/80 transition-colors border-b last:border-0">
+                        <TableCell className="py-4 px-6 text-sm font-medium">{item.origem}</TableCell>
+                        <TableCell className="py-4 px-4 text-sm text-right">{formatCurrency(item.planejado)}</TableCell>
+                        <TableCell className="py-4 px-4 text-sm text-right">{formatCurrency(item.empenhado)}</TableCell>
+                        <TableCell className={`py-4 px-4 text-sm text-right font-medium ${item.saldo >= 0 ? 'text-status-success' : 'text-status-error'}`}>
                           {formatCurrency(item.saldo)}
-                        </td>
-                        <td className="py-3 px-4 text-right">
+                        </TableCell>
+                        <TableCell className="py-4 px-6 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <Progress value={Math.min(item.percentual, 100)} className="w-16 h-2" />
                             <span className="text-sm text-muted-foreground w-12 text-right">
                               {item.percentual.toFixed(0)}%
                             </span>
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             </CardContent>
           </Card>
@@ -882,50 +925,50 @@ export default function Dashboard() {
             />
           </div>
 
-          <Card className="">
-            <CardHeader>
-              <CardTitle>Resumo de RAPs por Origem</CardTitle>
+          <Card className="card-system overflow-hidden">
+            <CardHeader className="px-6 py-4 border-b border-border-default/50">
+              <CardTitle className="text-base font-semibold">Resumo de RAPs por Origem</CardTitle>
               <CardDescription>Acompanhamento de inscritos vs pagamentos efetivados</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Origem de Recurso</th>
-                      <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Inscrito Original</th>
-                      <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Pago</th>
-                      <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Saldo Restante</th>
-                      <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Taxa de Pgto</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table>
+                  <TableHeader className="bg-slate-50/50">
+                    <TableRow className="hover:bg-transparent border-b border-border-default/50">
+                      <TableHead className="h-11 px-6 text-xs font-semibold uppercase tracking-wider">Origem de Recurso</TableHead>
+                      <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Inscrito Original</TableHead>
+                      <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Pago</TableHead>
+                      <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Saldo Restante</TableHead>
+                      <TableHead className="h-11 px-6 text-right text-xs font-semibold uppercase tracking-wider">Taxa de Pgto</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {dadosRapPorOrigem.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="text-center py-6 text-muted-foreground italic">Nenhum RAP correspondente aos filtros foi encontrado.</td>
-                      </tr>
+                      <TableRow>
+                        <TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic">Nenhum RAP correspondente aos filtros foi encontrado.</TableCell>
+                      </TableRow>
                     ) : (
                       dadosRapPorOrigem.map((item, index) => (
-                        <tr key={index} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
-                          <td className="py-3 px-4 text-sm font-medium">{item.origem}</td>
-                          <td className="py-3 px-4 text-sm text-right">{formatCurrency(item.inscrito)}</td>
-                          <td className="py-3 px-4 text-sm text-right">{formatCurrency(item.pago)}</td>
-                          <td className="py-3 px-4 text-sm text-right font-medium text-red-600 dark:text-red-500">
+                        <TableRow key={index} className="hover:bg-slate-50/80 transition-colors border-b last:border-0">
+                          <TableCell className="py-4 px-6 text-sm font-medium">{item.origem}</TableCell>
+                          <TableCell className="py-4 px-4 text-sm text-right">{formatCurrency(item.inscrito)}</TableCell>
+                          <TableCell className="py-4 px-4 text-sm text-right">{formatCurrency(item.pago)}</TableCell>
+                          <TableCell className="py-4 px-4 text-sm text-right font-medium text-status-error">
                             {formatCurrency(item.saldo)}
-                          </td>
-                          <td className="py-3 px-4 text-right">
+                          </TableCell>
+                          <TableCell className="py-4 px-6 text-right">
                             <div className="flex items-center justify-end gap-2">
                               <Progress value={Math.min(item.percentual, 100)} className="w-16 h-2" />
                               <span className="text-sm text-muted-foreground w-12 text-right">
                                 {item.percentual.toFixed(0)}%
                               </span>
                             </div>
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       ))
                     )}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             </CardContent>
           </Card>

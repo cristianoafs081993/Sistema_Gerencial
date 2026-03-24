@@ -4,6 +4,7 @@ import { RastreabilidadePF } from '@/types/pfs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatCard } from '@/components/StatCard';
 import {
   Table,
   TableBody,
@@ -23,8 +24,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Upload, Search, Filter, ArrowUpDown, ChevronRight, Eye } from 'lucide-react';
-import { PFImportDialog } from './PFImportDialog';
-import { PFDetailsDialog } from './PFDetailsDialog';
+import { PFImportDialog } from '@/components/modals/PFImportDialog';
+import { PFDetailsDialog } from '@/components/modals/PFDetailsDialog';
 import { HeaderActions } from '@/components/HeaderParts';
 
 export default function RastreabilidadePFs() {
@@ -155,7 +156,7 @@ export default function RastreabilidadePFs() {
   const totalPendente = pendentes.reduce((acc, curr) => acc + (curr.valor || 0), 0);
 
   return (
-    <div className="flex-1 space-y-space-6 p-space-4 md:p-space-8 pt-space-6 pb-space-10">
+    <div className="space-y-6 pb-10">
 
       <HeaderActions>
         <Button onClick={() => setImportOpen(true)} size="sm" className="gap-space-2 h-space-9 shadow-shadow-sm">
@@ -164,181 +165,208 @@ export default function RastreabilidadePFs() {
         </Button>
       </HeaderActions>
 
-      <div className="grid gap-space-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="card-system shadow-shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-space-2">
-            <CardTitle className="text-text-xs font-font-bold uppercase tracking-wider text-text-muted">Total Solicitado</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-text-2xl font-font-bold text-action-primary">{formatCurrency(totalSolicitado)}</div>
-            <p className="text-text-xs text-text-muted mt-space-1">{processedData.length} PFs no total</p>
-          </CardContent>
-        </Card>
-        <Card className="card-system shadow-shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-space-2">
-            <CardTitle className="text-text-xs font-font-bold uppercase tracking-wider text-text-muted">Total Liberado</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-text-2xl font-font-bold text-status-success">{formatCurrency(totalLiberado)}</div>
-          </CardContent>
-        </Card>
-        <Card className="card-system shadow-shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-space-2">
-            <CardTitle className="text-text-xs font-font-bold uppercase tracking-wider text-text-muted">Pendentes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-text-2xl font-font-bold text-status-warning">{formatCurrency(totalPendente)}</div>
-            <p className="text-text-xs text-text-muted mt-space-1">{pendentes.length} PFs pendentes</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatCard
+          title="Total Solicitado"
+          value={formatCurrency(totalSolicitado)}
+          subtitle={`${processedData.length} PFs no total`}
+          icon={Search}
+          stitchColor="vibrant-blue"
+        />
+        <StatCard
+          title="Total Liberado"
+          value={formatCurrency(totalLiberado)}
+          icon={Search}
+          stitchColor="emerald-green"
+        />
+        <StatCard
+          title="Pendentes"
+          value={formatCurrency(totalPendente)}
+          subtitle={`${pendentes.length} PFs pendentes`}
+          icon={Filter}
+          stitchColor="amber"
+          progress={(totalPendente / (totalSolicitado || 1)) * 100}
+        />
       </div>
+      {/* Standard Filter Card */}
+      <Card className="card-system shadow-sm">
+        <CardHeader className="pb-3 px-0 pt-0">
+          <CardTitle className="text-xl font-bold">Filtros</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 flex flex-wrap items-center gap-2">
+              <div className="w-full sm:w-[140px]">
+                <Select value={mesFilter} onValueChange={setMesFilter}>
+                  <SelectTrigger className="input-system h-10 w-full">
+                    <SelectValue placeholder="Mês" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-sm">
+                    <SelectItem value="all">Todos os Meses</SelectItem>
+                    {meses.map(m => <SelectItem key={m as string} value={m as string}>{m}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
 
-      <div className="flex flex-col gap-space-4 sm:flex-row sm:items-center">
-        <div className="flex flex-1 items-center space-x-space-2">
-          <Select value={mesFilter} onValueChange={setMesFilter}>
-            <SelectTrigger className="w-[150px] input-system">
-              <SelectValue placeholder="Mês" />
-            </SelectTrigger>
-            <SelectContent className="rounded-radius-md">
-              <SelectItem value="all">Todos os Meses</SelectItem>
-              {meses.map(m => <SelectItem key={m as string} value={m as string}>{m}</SelectItem>)}
-            </SelectContent>
-          </Select>
+              <div className="w-full sm:w-[140px]">
+                <Select value={fonteFilter} onValueChange={setFonteFilter}>
+                  <SelectTrigger className="input-system h-10 w-full">
+                    <SelectValue placeholder="Fonte" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-sm">
+                    <SelectItem value="all">Todas as Fontes</SelectItem>
+                    {fontes.map(f => <SelectItem key={f as string} value={f as string}>{f}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <Select value={fonteFilter} onValueChange={setFonteFilter}>
-            <SelectTrigger className="w-[150px] input-system">
-              <SelectValue placeholder="Fonte" />
-            </SelectTrigger>
-            <SelectContent className="rounded-radius-md">
-              <SelectItem value="all">Todas as Fontes</SelectItem>
-              {fontes.map(f => <SelectItem key={f as string} value={f as string}>{f}</SelectItem>)}
-            </SelectContent>
-          </Select>
+              <div className="w-full sm:w-[140px]">
+                <Select value={tipoFilter} onValueChange={setTipoFilter}>
+                  <SelectTrigger className="input-system h-10 w-full">
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-sm">
+                    <SelectItem value="all">Todos os Tipos</SelectItem>
+                    {tipos.map(t => <SelectItem key={t as string} value={t as string}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <Select value={tipoFilter} onValueChange={setTipoFilter}>
-            <SelectTrigger className="w-[150px] input-system">
-              <SelectValue placeholder="Tipo" />
-            </SelectTrigger>
-            <SelectContent className="rounded-radius-md">
-              <SelectItem value="all">Todos os Tipos</SelectItem>
-              {tipos.map(t => <SelectItem key={t as string} value={t as string}>{t}</SelectItem>)}
-            </SelectContent>
-          </Select>
+              <div className="w-full sm:w-[140px]">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="input-system h-10 w-full">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-sm">
+                    <SelectItem value="all">Todos os Status</SelectItem>
+                    {statusList.map(s => <SelectItem key={s as string} value={s as string}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[150px] input-system">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent className="rounded-radius-md">
-              <SelectItem value="all">Todos os Status</SelectItem>
-              {statusList.map(s => <SelectItem key={s as string} value={s as string}>{s}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="rounded-radius-md border border-border-default bg-surface-card shadow-shadow-sm overflow-hidden">
-        <div className="max-w-full overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-surface-subtle/50">
-              <TableRow className="border-b border-border-default">
-                <TableHead className="w-[140px] cursor-pointer hover:bg-surface-subtle transition-colors text-text-xs font-font-bold uppercase tracking-wider" onClick={() => handleSort('ppf_campus')}>
-                  <div className="flex items-center">
-                    PPF Campus
-                    <ArrowUpDown className="ml-space-2 h-space-4 w-space-4" />
-                  </div>
-                </TableHead>
-                <TableHead className="w-[140px] cursor-pointer hover:bg-surface-subtle transition-colors text-text-xs font-font-bold uppercase tracking-wider" onClick={() => handleSort('data_solicitacao')}>
-                  <div className="flex items-center">
-                    Data Solicitação
-                    <ArrowUpDown className="ml-space-2 h-space-4 w-space-4" />
-                  </div>
-                </TableHead>
-                <TableHead className="w-[100px] cursor-pointer hover:bg-surface-subtle transition-colors text-text-xs font-font-bold uppercase tracking-wider" onClick={() => handleSort('tipo')}>
-                  <div className="flex items-center">
-                    Tipo
-                    <ArrowUpDown className="ml-space-2 h-space-4 w-space-4" />
-                  </div>
-                </TableHead>
-                <TableHead className="w-[120px] cursor-pointer hover:bg-surface-subtle transition-colors text-text-xs font-font-bold uppercase tracking-wider" onClick={() => handleSort('mes_referencia')}>
-                  <div className="flex items-center">
-                    Mês
-                    <ArrowUpDown className="ml-space-2 h-space-4 w-space-4" />
-                  </div>
-                </TableHead>
-                <TableHead className="w-[120px] cursor-pointer hover:bg-surface-subtle transition-colors text-text-xs font-font-bold uppercase tracking-wider" onClick={() => handleSort('fonte_recurso')}>
-                  <div className="flex items-center">
-                    Fonte
-                    <ArrowUpDown className="ml-space-2 h-space-4 w-space-4" />
-                  </div>
-                </TableHead>
-                <TableHead className="text-right w-[140px] cursor-pointer hover:bg-surface-subtle transition-colors text-text-xs font-font-bold uppercase tracking-wider" onClick={() => handleSort('valor')}>
-                  <div className="flex items-center justify-end">
-                    Valor
-                    <ArrowUpDown className="ml-space-2 h-space-4 w-space-4" />
-                  </div>
-                </TableHead>
-                <TableHead className="w-[140px] text-center cursor-pointer hover:bg-surface-subtle transition-colors text-text-xs font-font-bold uppercase tracking-wider" onClick={() => handleSort('status')}>
-                  <div className="flex items-center justify-center">
-                    Status
-                    <ArrowUpDown className="ml-space-2 h-space-4 w-space-4" />
-                  </div>
-                </TableHead>
-                <TableHead className="w-[80px] text-right text-text-xs font-font-bold uppercase tracking-wider">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground italic">
-                    Carregando dados...
-                  </TableCell>
+      <Card className="shadow-sm card-system overflow-hidden">
+        <CardHeader className="px-6 py-4 border-b border-border-default/50 flex flex-row items-center justify-between bg-white">
+          <div className="flex items-center gap-3">
+            <CardTitle className="text-base font-semibold">Rastreabilidade de PFs</CardTitle>
+            <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-bold px-2 py-0 h-5">
+              {processedData.length}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-slate-50/50">
+                <TableRow className="hover:bg-transparent border-b border-border-default/50">
+                  <TableHead className="w-[140px] cursor-pointer hover:text-primary transition-colors text-xs font-semibold uppercase tracking-wider py-4 px-6" onClick={() => handleSort('ppf_campus')}>
+                    <div className="flex items-center gap-2">
+                      PPF Campus
+                      <ArrowUpDown className="h-3 w-3 opacity-50" />
+                    </div>
+                  </TableHead>
+                  <TableHead className="w-[140px] cursor-pointer hover:text-primary transition-colors text-xs font-semibold uppercase tracking-wider py-4" onClick={() => handleSort('data_solicitacao')}>
+                    <div className="flex items-center gap-2">
+                      Data Solicitação
+                      <ArrowUpDown className="h-3 w-3 opacity-50" />
+                    </div>
+                  </TableHead>
+                  <TableHead className="w-[100px] cursor-pointer hover:text-primary transition-colors text-xs font-semibold uppercase tracking-wider py-4" onClick={() => handleSort('tipo')}>
+                    <div className="flex items-center gap-2">
+                      Tipo
+                      <ArrowUpDown className="h-3 w-3 opacity-50" />
+                    </div>
+                  </TableHead>
+                  <TableHead className="w-[100px] cursor-pointer hover:text-primary transition-colors text-xs font-semibold uppercase tracking-wider py-4" onClick={() => handleSort('mes_referencia')}>
+                    <div className="flex items-center gap-2">
+                      Mês
+                      <ArrowUpDown className="h-3 w-3 opacity-50" />
+                    </div>
+                  </TableHead>
+                  <TableHead className="w-[100px] cursor-pointer hover:text-primary transition-colors text-xs font-semibold uppercase tracking-wider py-4" onClick={() => handleSort('fonte_recurso')}>
+                    <div className="flex items-center gap-2">
+                      Fonte
+                      <ArrowUpDown className="h-3 w-3 opacity-50" />
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-right w-[140px] cursor-pointer hover:text-primary transition-colors text-xs font-semibold uppercase tracking-wider py-4" onClick={() => handleSort('valor')}>
+                    <div className="flex items-center justify-end gap-2">
+                      Valor
+                      <ArrowUpDown className="h-3 w-3 opacity-50" />
+                    </div>
+                  </TableHead>
+                  <TableHead className="w-[160px] text-center cursor-pointer hover:text-primary transition-colors text-xs font-semibold uppercase tracking-wider py-4" onClick={() => handleSort('status')}>
+                    <div className="flex items-center justify-center gap-2">
+                      Status
+                      <ArrowUpDown className="h-3 w-3 opacity-50" />
+                    </div>
+                  </TableHead>
+                  <TableHead className="w-[80px] text-right text-xs font-semibold uppercase tracking-wider py-4 pr-6">Ações</TableHead>
                 </TableRow>
-              ) : processedData.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground italic">
-                    Nenhum registro encontrado.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                processedData.map((row, i) => (
-                  <TableRow key={i} className="hover:bg-surface-subtle transition-colors cursor-pointer group border-b border-border-default/30 last:border-0" onClick={() => openDetails(row)}>
-                    <TableCell className="font-mono text-text-xs font-font-semibold text-action-primary">
-                      {row.ppf_campus}
-                    </TableCell>
-                    <TableCell className="text-text-muted text-text-sm">{formatDate(row.data_solicitacao)}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-[10px] h-space-5 bg-surface-card border-border-default">{row.tipo}</Badge>
-                    </TableCell>
-                    <TableCell className="text-text-sm text-text-secondary">{row.mes_referencia}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="font-mono text-[10px] bg-surface-subtle text-text-primary">{row.fonte_recurso}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-font-bold text-text-base text-text-primary">{formatCurrency(row.valor)}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge className={`${statusColorMap[row.status?.toUpperCase() || ''] || getStatusBadgeVariant(row.status)} text-white border-none shadow-shadow-sm text-[10px]`}>
-                        {row.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" className="h-space-8 w-space-8 opacity-0 group-hover:opacity-100 transition-opacity text-text-muted hover:text-action-primary">
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="px-6 py-4"><div className="h-4 w-20 bg-slate-100 animate-pulse rounded" /></TableCell>
+                      <TableCell className="py-4"><div className="h-4 w-24 bg-slate-100 animate-pulse rounded" /></TableCell>
+                      <TableCell className="py-4"><div className="h-4 w-16 bg-slate-100 animate-pulse rounded" /></TableCell>
+                      <TableCell className="py-4"><div className="h-4 w-12 bg-slate-100 animate-pulse rounded" /></TableCell>
+                      <TableCell className="py-4"><div className="h-4 w-12 bg-slate-100 animate-pulse rounded" /></TableCell>
+                      <TableCell className="py-4"><div className="h-4 w-24 bg-slate-100 animate-pulse rounded ml-auto" /></TableCell>
+                      <TableCell className="py-4"><div className="h-6 w-32 bg-slate-100 animate-pulse rounded-full mx-auto" /></TableCell>
+                      <TableCell className="pr-6 py-4"><div className="h-8 w-8 bg-slate-100 animate-pulse rounded-full ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : processedData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="h-32 text-center text-muted-foreground italic">
+                      Nenhum registro encontrado.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-            <TableFooter>
-              <TableRow>
-                <TableCell colSpan={5} className="font-bold">Total Geral (Exibido):</TableCell>
-                <TableCell className="text-right font-bold">{formatCurrency(totalSolicitado)}</TableCell>
-                <TableCell colSpan={6}></TableCell>
-              </TableRow>
-            </TableFooter>
-          </Table>
-        </div>
-      </div>
+                ) : (
+                  processedData.map((row, i) => (
+                    <TableRow key={i} className="hover:bg-slate-50 transition-colors cursor-pointer group border-b border-border-default/30 last:border-0" onClick={() => openDetails(row)}>
+                      <TableCell className="font-mono text-xs font-bold text-primary py-4 px-6">
+                        {row.ppf_campus}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs py-4">{formatDate(row.data_solicitacao)}</TableCell>
+                      <TableCell className="py-4">
+                        <Badge variant="outline" className="text-[10px] uppercase font-bold text-muted-foreground border-slate-200">{row.tipo}</Badge>
+                      </TableCell>
+                      <TableCell className="text-xs font-medium text-slate-600 py-4">{row.mes_referencia}</TableCell>
+                      <TableCell className="py-4">
+                        <Badge variant="secondary" className="font-mono text-[10px] bg-slate-100 text-slate-600">{row.fonte_recurso}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-bold text-sm text-slate-900 py-4">{formatCurrency(row.valor)}</TableCell>
+                      <TableCell className="text-center py-4">
+                        <Badge className={`${statusColorMap[row.status?.toUpperCase() || ''] || getStatusBadgeVariant(row.status)} border-none shadow-sm text-[10px] font-bold uppercase tracking-wider px-2 py-0.5`}>
+                          {row.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right py-4 pr-6">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-action-primary/10 hover:text-action-primary rounded-full transition-all">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+              <TableFooter className="bg-slate-50/80">
+                <TableRow>
+                  <TableCell colSpan={5} className="font-bold text-xs uppercase tracking-wider px-6 py-4">Total Geral (Exibido):</TableCell>
+                  <TableCell className="text-right font-bold text-sm text-slate-900 py-4">{formatCurrency(totalSolicitado)}</TableCell>
+                  <TableCell colSpan={2} className="pr-6 py-4"></TableCell>
+                </TableRow>
+              </TableFooter>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
       <PFImportDialog
         open={importOpen}

@@ -5,6 +5,15 @@ import { Descentralizacao, DIMENSOES } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatCard } from '@/components/StatCard';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 import {
     Select,
@@ -14,16 +23,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { ConfirmDialog } from '@/components/modals/ConfirmDialog';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
@@ -250,10 +250,10 @@ export default function Descentralizacoes() {
         'NC Célula - Valor',
     ];
     return (
-        <div className="space-y-space-6 pb-space-10">
+        <div className="space-y-6 pb-10">
             <HeaderActions>
                 {selectedIds.size > 0 && (
-                    <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)} className="gap-space-2 h-space-8 text-text-xs sm:h-space-9 sm:text-text-sm shadow-shadow-sm transition-all">
+                    <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)} className="gap-2 h-8 text-xs sm:h-9 sm:text-sm shadow-sm transition-all">
                         <Trash2 className="h-4 w-4" />
                         Excluir ({selectedIds.size})
                     </Button>
@@ -261,35 +261,62 @@ export default function Descentralizacoes() {
                 <Button 
                     variant="outline" 
                     onClick={() => setIsImportDialogOpen(true)} 
-                    className="gap-space-2 h-space-8 text-text-xs sm:h-space-9 sm:text-text-sm bg-surface-card border-border-default shadow-shadow-sm transition-all"
+                    className="gap-2 h-8 text-xs sm:h-9 sm:text-sm bg-surface-card border-border-default shadow-sm transition-all"
                 >
                     <Upload className="h-4 w-4 text-action-primary" />
                     Importar CSV
                 </Button>
             </HeaderActions>
 
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <StatCard
+                    title="Total Descentralizado"
+                    value={formatCurrency(totalFiltrado)}
+                    icon={Upload}
+                    stitchColor="vibrant-blue"
+                />
+                <StatCard
+                    title="Quantidade de NCs"
+                    value={sortedDescentralizacoes.length}
+                    icon={Filter}
+                    stitchColor="purple"
+                />
+                <StatCard
+                    title="Maior Valor"
+                    value={formatCurrency(Math.max(0, ...sortedDescentralizacoes.map(d => d.valor)))}
+                    icon={Search}
+                    stitchColor="amber"
+                />
+                <StatCard
+                    title="Origens Únicas"
+                    value={origensUnicas.length}
+                    icon={Filter}
+                    stitchColor="emerald-green"
+                />
+            </div>
+
             {/* Filters */}
             <Card className="card-system">
-                <CardHeader className="pb-space-3">
-                    <CardTitle className="text-text-lg font-font-bold">Filtros</CardTitle>
+                <CardHeader className="pb-3 px-0 pt-0">
+                    <CardTitle className="text-xl font-bold">Filtros</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-space-4">
-                    <div className="flex flex-col sm:flex-row gap-space-4">
+                <CardContent className="p-0">
+                    <div className="flex flex-col sm:flex-row gap-4">
                         <div className="relative flex-1">
-                            <Search className="absolute left-space-3 top-1/2 -translate-y-1/2 h-space-4 w-space-4 text-text-muted" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder="Buscar por dimensão, origem, plano ou descrição..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-space-10 input-system"
+                                className="pl-9 h-10 text-sm input-system"
                             />
                         </div>
-                        <div className="w-full sm:w-[200px]">
+                        <div className="w-full sm:w-[150px]">
                             <Select value={filterDimensao} onValueChange={setFilterDimensao}>
-                                <SelectTrigger className="input-system">
+                                <SelectTrigger className="input-system h-10">
                                     <SelectValue placeholder="Dimensão" />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="rounded-sm">
                                     <SelectItem value="all">Todas as dimensões</SelectItem>
                                     {DIMENSOES.map((d) => (
                                         <SelectItem key={d.codigo} value={d.codigo}>
@@ -302,17 +329,17 @@ export default function Descentralizacoes() {
                         <Button
                             variant={showAdvancedFilters ? "secondary" : "outline"}
                             onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                            className="gap-space-2"
+                            className="gap-2 h-10 font-bold"
                         >
                             <Filter className="w-4 h-4" />
-                            Filtros Avançados
+                            Opções
                         </Button>
                     </div>
 
                     {showAdvancedFilters && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-space-4 p-space-4 bg-surface-subtle/30 rounded-radius-lg border border-border-default/50">
-                            <div className="space-y-space-2">
-                                <label className="text-text-sm font-font-medium">Origem de Recurso</label>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-slate-50/50 rounded-lg border border-border-default/50">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-slate-600">Origem de Recurso</label>
                                 <Select value={filterOrigem} onValueChange={setFilterOrigem}>
                                     <SelectTrigger className="input-system">
                                         <SelectValue placeholder="Selecione..." />
@@ -345,23 +372,21 @@ export default function Descentralizacoes() {
             </Card>
 
             {/* Table */}
-            <Card className="card-system">
-                <CardHeader className="pb-space-2">
-                    <CardTitle className="text-text-lg font-font-bold flex items-center justify-between">
-                        <span>
-                            {sortedDescentralizacoes.length} {sortedDescentralizacoes.length !== 1 ? 'descentralizações' : 'descentralização'} encontrada{sortedDescentralizacoes.length !== 1 ? 's' : ''}
-                        </span>
-                        <Badge variant="secondary" className="text-text-sm px-space-3 py-space-1 bg-surface-subtle border-border-default">
-                            Total: {formatCurrency(totalFiltrado)}
-                        </Badge>
+            <Card className="card-system overflow-hidden border-none shadow-none mt-6">
+                <CardHeader className="px-6 py-4 border-b border-border-default/50 flex flex-row items-center justify-between">
+                    <CardTitle className="text-base font-semibold">
+                        <span>{sortedDescentralizacoes.length} {sortedDescentralizacoes.length !== 1 ? 'descentralizações' : 'descentralização'} encontrada{sortedDescentralizacoes.length !== 1 ? 's' : ''}</span>
                     </CardTitle>
+                    <Badge variant="secondary" className="text-sm px-3 py-1 bg-slate-100 text-slate-700 border-none">
+                        Total: {formatCurrency(totalFiltrado)}
+                    </Badge>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-0">
                     <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead>
-                                <tr className="border-b border-border">
-                                    <th className="py-3 px-4 w-[40px]">
+                        <Table>
+                            <TableHeader className="bg-slate-50/50">
+                                <TableRow className="hover:bg-transparent border-b border-border-default/50">
+                                    <TableHead className="h-11 px-6 w-10">
                                         <Checkbox
                                             checked={
                                                 sortedDescentralizacoes.length > 0 &&
@@ -369,126 +394,112 @@ export default function Descentralizacoes() {
                                             }
                                             onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
                                         />
-                                    </th>
-                                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                                        <Button variant="ghost" className="hover:bg-transparent px-0 font-medium" onClick={() => requestSort('dataEmissao')}>
+                                    </TableHead>
+                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">
+                                        <Button variant="ghost" className="hover:bg-transparent px-0 font-semibold text-xs uppercase tracking-wider" onClick={() => requestSort('dataEmissao')}>
                                             Data {getSortIcon('dataEmissao')}
                                         </Button>
-                                    </th>
-                                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                                        <Button variant="ghost" className="hover:bg-transparent px-0 font-medium" onClick={() => requestSort('dimensao')}>
+                                    </TableHead>
+                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">
+                                        <Button variant="ghost" className="hover:bg-transparent px-0 font-semibold text-xs uppercase tracking-wider" onClick={() => requestSort('dimensao')}>
                                             Dimensão {getSortIcon('dimensao')}
                                         </Button>
-                                    </th>
-                                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                                        <Button variant="ghost" className="hover:bg-transparent px-0 font-medium" onClick={() => requestSort('origemRecurso')}>
+                                    </TableHead>
+                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">
+                                        <Button variant="ghost" className="hover:bg-transparent px-0 font-semibold text-xs uppercase tracking-wider" onClick={() => requestSort('origemRecurso')}>
                                             PTRES {getSortIcon('origemRecurso')}
                                         </Button>
-                                    </th>
-                                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                                        <Button variant="ghost" className="hover:bg-transparent px-0 font-medium" onClick={() => requestSort('naturezaDespesa')}>
+                                    </TableHead>
+                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">
+                                        <Button variant="ghost" className="hover:bg-transparent px-0 font-semibold text-xs uppercase tracking-wider" onClick={() => requestSort('naturezaDespesa')}>
                                             ND {getSortIcon('naturezaDespesa')}
                                         </Button>
-                                    </th>
-                                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
-                                        <Button variant="ghost" className="hover:bg-transparent px-0 font-medium" onClick={() => requestSort('planoInterno')}>
+                                    </TableHead>
+                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">
+                                        <Button variant="ghost" className="hover:bg-transparent px-0 font-semibold text-xs uppercase tracking-wider" onClick={() => requestSort('planoInterno')}>
                                             PI {getSortIcon('planoInterno')}
                                         </Button>
-                                    </th>
-                                    <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground max-w-[200px]">
+                                    </TableHead>
+                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider max-w-[200px]">
                                         Descrição
-                                    </th>
-                                    <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">
-                                        <Button variant="ghost" className="hover:bg-transparent px-0 font-medium justify-end w-full" onClick={() => requestSort('valor')}>
+                                    </TableHead>
+                                    <TableHead className="h-11 px-6 text-right text-xs font-semibold uppercase tracking-wider">
+                                        <Button variant="ghost" className="hover:bg-transparent px-0 font-semibold text-xs uppercase tracking-wider justify-end w-full" onClick={() => requestSort('valor')}>
                                             Valor {getSortIcon('valor')}
                                         </Button>
-                                    </th>
-
-                                </tr>
-                            </thead>
-                            <tbody>
+                                    </TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
                                 {isLoading ? (
                                     Array.from({ length: 5 }).map((_, i) => (
-                                        <tr key={i} className="border-b border-border/50">
-                                            <td className="py-4 px-4"><Skeleton className="h-4 w-4 rounded" /></td>
-                                            <td className="py-4 px-4"><Skeleton className="h-4 w-20" /></td>
-                                            <td className="py-4 px-4"><Skeleton className="h-5 w-16" /></td>
-                                            <td className="py-4 px-4"><Skeleton className="h-4 w-20" /></td>
-                                            <td className="py-4 px-4"><Skeleton className="h-4 w-16" /></td>
-                                            <td className="py-4 px-4"><Skeleton className="h-4 w-28" /></td>
-                                            <td className="py-4 px-2"><Skeleton className="h-4 w-32" /></td>
-                                            <td className="py-4 px-4"><Skeleton className="h-4 w-24 ml-auto" /></td>
-                                        </tr>
+                                        <TableRow key={i}>
+                                            <TableCell className="px-6"><Skeleton className="h-4 w-4 rounded" /></TableCell>
+                                            <TableCell className="px-4"><Skeleton className="h-4 w-20" /></TableCell>
+                                            <TableCell className="px-4"><Skeleton className="h-5 w-16" /></TableCell>
+                                            <TableCell className="px-4"><Skeleton className="h-4 w-20" /></TableCell>
+                                            <TableCell className="px-4"><Skeleton className="h-4 w-16" /></TableCell>
+                                            <TableCell className="px-4"><Skeleton className="h-4 w-28" /></TableCell>
+                                            <TableCell className="px-4"><Skeleton className="h-4 w-32" /></TableCell>
+                                            <TableCell className="px-6"><Skeleton className="h-4 w-24 ml-auto" /></TableCell>
+                                        </TableRow>
                                     ))
                                 ) : sortedDescentralizacoes.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={8} className="text-center py-6 text-muted-foreground italic">Nenhuma descentralização encontrada.</td>
-                                    </tr>
+                                    <TableRow>
+                                        <TableCell colSpan={8} className="h-32 text-center text-muted-foreground italic">Nenhuma descentralização encontrada.</TableCell>
+                                    </TableRow>
                                 ) : (
                                     sortedDescentralizacoes.map((descentralizacao) => (
-                                        <tr key={descentralizacao.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
-                                            <td className="py-4 px-4">
+                                        <TableRow key={descentralizacao.id} className="hover:bg-slate-50/80 transition-colors border-b last:border-0">
+                                            <TableCell className="py-4 px-6">
                                                 <Checkbox
                                                     checked={selectedIds.has(descentralizacao.id)}
                                                     onCheckedChange={(checked) => handleSelectOne(descentralizacao.id, checked as boolean)}
                                                 />
-                                            </td>
-                                            <td className="py-4 px-4">
+                                            </TableCell>
+                                            <TableCell className="py-4 px-4">
                                                 <span className="text-sm text-muted-foreground whitespace-nowrap">{formatDateBR(descentralizacao.dataEmissao)}</span>
-                                            </td>
-                                            <td className="py-4 px-4">
-                                                <Badge variant="secondary" className="whitespace-nowrap">
+                                            </TableCell>
+                                            <TableCell className="py-4 px-4">
+                                                <Badge variant="secondary" className="whitespace-nowrap font-medium bg-slate-100 text-slate-700">
                                                     {descentralizacao.dimensao.split(' - ')[0]}
                                                 </Badge>
-                                            </td>
-                                            <td className="py-4 px-4">
+                                            </TableCell>
+                                            <TableCell className="py-4 px-4">
                                                 <span className="text-sm font-medium">{descentralizacao.origemRecurso}</span>
-                                            </td>
-                                            <td className="py-4 px-4">
+                                            </TableCell>
+                                            <TableCell className="py-4 px-4">
                                                 <span className="text-sm text-muted-foreground">{descentralizacao.naturezaDespesa || '-'}</span>
-                                            </td>
-                                            <td className="py-4 px-4">
+                                            </TableCell>
+                                            <TableCell className="py-4 px-4">
                                                 <span className="text-sm text-muted-foreground">{descentralizacao.planoInterno || '-'}</span>
-                                            </td>
-                                            <td className="py-4 px-2 max-w-[200px]">
+                                            </TableCell>
+                                            <TableCell className="py-4 px-4 max-w-[200px]">
                                                 <span className="text-xs text-muted-foreground line-clamp-2" title={descentralizacao.descricao || ''}>
                                                     {descentralizacao.descricao || '-'}
                                                 </span>
-                                            </td>
-                                            <td className="py-4 px-4 text-right">
-                                                <span className="font-medium">{formatCurrency(descentralizacao.valor)}</span>
-                                            </td>
-
-                                        </tr>
+                                            </TableCell>
+                                            <TableCell className="py-4 px-6 text-right">
+                                                <span className="font-bold text-sm text-action-primary">{formatCurrency(descentralizacao.valor)}</span>
+                                            </TableCell>
+                                        </TableRow>
                                     ))
                                 )}
-                            </tbody>
-                        </table>
+                            </TableBody>
+                        </Table>
                     </div>
                 </CardContent>
             </Card>
 
 
-            {/* Delete Confirmation */}
-            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            {`Tem certeza que deseja excluir as ${selectedIds.size} descentralizações selecionadas? Esta ação não pode ser desfeita.`}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={handleBulkDelete}
-                            className="bg-destructive hover:bg-destructive/90"
-                        >
-                            Excluir
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            <ConfirmDialog
+                open={isDeleteDialogOpen}
+                onOpenChange={setIsDeleteDialogOpen}
+                onConfirm={handleBulkDelete}
+                title="Confirmar exclusão"
+                description={`Tem certeza que deseja excluir as ${selectedIds.size} descentralizações selecionadas? Esta ação não pode ser desfeita.`}
+                confirmText="Excluir"
+            />
 
             {/* CSV/JSON Import Dialog */}
             <JsonImportDialog

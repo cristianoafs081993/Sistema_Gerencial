@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getNecessidadePFs, getDocumentosPendentes } from '@/services/pfImportService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { StatCard } from '@/components/StatCard';
 import {
   Table,
   TableBody,
@@ -72,7 +73,7 @@ export default function ConciliacaoPfs() {
     : docsPendentes;
 
   return (
-    <div className="flex-1 space-y-space-8 p-space-4 md:p-space-8 pt-space-6 pb-space-10">
+    <div className="space-y-6 pb-10">
       <HeaderActions>
         {totalNecessidade > 0 && <Badge variant="destructive" className="animate-pulse bg-status-error">Crítico</Badge>}
         <Button onClick={fetchData} variant="outline" size="sm" className="gap-space-2 shadow-shadow-sm h-space-9" disabled={loading}>
@@ -82,47 +83,33 @@ export default function ConciliacaoPfs() {
       </HeaderActions>
 
       {/* Overview Cards */}
-      <div className="grid gap-space-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="border-status-error/20 bg-status-error/5 shadow-shadow-md card-system">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-space-2">
-            <CardTitle className="text-text-xs font-font-bold uppercase tracking-wider text-status-error">Falta Solicitar (PF)</CardTitle>
-            <TrendingDown className="h-space-5 w-space-5 text-status-error" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-text-3xl font-font-black text-status-error">{formatCurrency(totalNecessidade)}</div>
-            <p className="text-text-xs text-status-error/80 mt-space-1 font-font-medium">
-              Déficit total de cobertura para as liquidações atuais
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <StatCard
+          title="Falta Solicitar (PF)"
+          value={formatCurrency(totalNecessidade)}
+          subtitle="Déficit total de cobertura para as liquidações atuais"
+          icon={TrendingDown}
+          stitchColor="red-500"
+          isLoading={loading}
+        />
 
-        <Card className="border-action-primary/20 bg-action-primary/5 shadow-shadow-md card-system">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-space-2">
-            <CardTitle className="text-text-xs font-font-bold uppercase tracking-wider text-action-primary">Liquidações a Pagar</CardTitle>
-            <FileWarning className="h-space-5 w-space-5 text-action-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-text-3xl font-font-black text-action-primary">{formatCurrency(totalAPagar)}</div>
-            <p className="text-text-xs text-action-primary/80 mt-space-1 font-font-medium">
-              {docsPendentes.length} documentos aguardando pagamento
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Liquidações a Pagar"
+          value={formatCurrency(totalAPagar)}
+          subtitle={`${docsPendentes.length} documentos aguardando pagamento`}
+          icon={FileWarning}
+          stitchColor="vibrant-blue"
+          isLoading={loading}
+        />
 
-        <Card className="border-status-success/20 bg-status-success/5 shadow-shadow-md card-system">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-space-2">
-            <CardTitle className="text-text-xs font-font-bold uppercase tracking-wider text-status-success">Fontes Críticas</CardTitle>
-            <AlertCircle className="h-space-5 w-space-5 text-status-success" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-text-3xl font-font-black text-status-success">
-              {fontes.filter(f => f.status_analise === 'NECESSITA_PF').length}
-            </div>
-            <p className="text-text-xs text-status-success/80 mt-space-1 font-font-medium">
-              Fontes onde o saldo de PF é insuficiente
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Fontes Críticas"
+          value={fontes.filter(f => f.status_analise === 'NECESSITA_PF').length}
+          subtitle="Fontes onde o saldo de PF é insuficiente"
+          icon={AlertCircle}
+          stitchColor="amber"
+          isLoading={loading}
+        />
       </div>
 
       {/* Fontes Analysis */}
@@ -187,63 +174,86 @@ export default function ConciliacaoPfs() {
 
       {/* Pending Documents Table */}
       <div className="space-y-4 pt-4">
-        <div className="flex items-center justify-between gap-2 px-1">
-          <h3 className="text-lg font-bold flex items-center gap-2">
-            <ArrowRightCircle className="h-5 w-5 text-blue-500" /> 
-            {selectedFonte ? `Liquidações Pendentes - Fonte ${selectedFonte}` : "Todas as Liquidações Pendentes"}
-          </h3>
-          {selectedFonte && (
-            <Button variant="ghost" size="sm" onClick={() => setSelectedFonte(null)} className="h-8 text-[11px] font-bold uppercase tracking-tighter">
-              Ver Todos
-            </Button>
-          )}
-        </div>
-        
-        <Card className="shadow-shadow-xl border-border-default/60 card-system overflow-hidden">
-          <Table>
-            <TableHeader className="bg-surface-subtle/50">
-              <TableRow className="border-b border-border-default">
-                <TableHead className="w-[120px] font-font-bold text-[10px] uppercase tracking-widest text-text-muted">Data</TableHead>
-                <TableHead className="font-font-bold text-[10px] uppercase tracking-widest text-text-muted">Documento</TableHead>
-                <TableHead className="font-font-bold text-[10px] uppercase tracking-widest text-text-muted">Favorecido</TableHead>
-                <TableHead className="text-center font-font-bold text-[10px] uppercase tracking-widest text-text-muted">Fonte</TableHead>
-                <TableHead className="text-right font-font-bold text-[10px] uppercase tracking-widest text-text-muted">Liquidado</TableHead>
-                <TableHead className="text-right font-font-bold text-[10px] uppercase tracking-widest text-text-muted">Pago</TableHead>
-                <TableHead className="text-right font-font-bold text-[10px] uppercase tracking-widest text-text-muted">Pendente</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell colSpan={7}><Skeleton className="h-10 w-full" /></TableCell>
-                  </TableRow>
-                ))
-              ) : filteredDocs.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="h-40 text-center text-muted-foreground italic">
-                    {selectedFonte ? "Nenhuma liquidação pendente nesta fonte." : "Nenhuma liquidação pendente no sistema. Parabéns!"}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredDocs.map((doc) => (
-                  <TableRow key={doc.id} className="group hover:bg-slate-50/80 transition-all border-b last:border-0">
-                    <TableCell className="text-xs font-medium">{format(new Date(`${doc.data_emissao}T12:00:00`), 'dd/MM/yyyy')}</TableCell>
-                    <TableCell className="font-mono text-[11px] font-bold text-primary">{formatDocumentoId(doc.id)}</TableCell>
-                    <TableCell className="max-w-[300px] truncate text-xs font-bold" title={doc.favorecido_nome}>{doc.favorecido_nome}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant="secondary" className="font-mono text-[9px] px-1">{doc.fonte_sof}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right text-xs font-medium">{formatCurrency(doc.valor_liquidado)}</TableCell>
-                    <TableCell className="text-right text-xs font-medium text-muted-foreground">{formatCurrency(doc.valor_pago)}</TableCell>
-                    <TableCell className="text-right font-black text-sm text-red-600">
-                      {formatCurrency(doc.valor_pendente)}
-                    </TableCell>
-                  </TableRow>
-                ))
+        <Card className="shadow-sm card-system overflow-hidden">
+          <CardHeader className="px-6 py-4 border-b border-border-default/50 flex flex-row items-center justify-between bg-white">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-50 rounded-lg">
+                <ArrowRightCircle className="h-5 w-5 text-blue-500" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-semibold">
+                  {selectedFonte ? `Liquidações Pendentes - Fonte ${selectedFonte}` : "Todas as Liquidações Pendentes"}
+                </CardTitle>
+                <CardDescription className="text-[10px] font-medium uppercase tracking-wider mt-0.5">
+                  Documentos aguardando liberação de recurso
+                </CardDescription>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-bold px-2 py-0 h-5">
+                {filteredDocs.length} Registros
+              </Badge>
+              {selectedFonte && (
+                <Button variant="ghost" size="sm" onClick={() => setSelectedFonte(null)} className="h-7 px-2 text-[10px] font-bold uppercase tracking-tighter text-muted-foreground hover:text-primary transition-colors">
+                  Ver Todos
+                </Button>
               )}
-            </TableBody>
-          </Table>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow className="hover:bg-transparent border-b border-border-default/50">
+                    <TableHead className="w-[120px] font-semibold text-xs uppercase tracking-wider py-4 px-6 text-muted-foreground">Data</TableHead>
+                    <TableHead className="font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground">Documento</TableHead>
+                    <TableHead className="font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground">Favorecido</TableHead>
+                    <TableHead className="text-center font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap">Fonte</TableHead>
+                    <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap">Liquidado</TableHead>
+                    <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap">Pago</TableHead>
+                    <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-4 pr-6 text-muted-foreground whitespace-nowrap">Pendente</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="px-6 py-4"><Skeleton className="h-4 w-16" /></TableCell>
+                        <TableCell className="py-4"><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell className="py-4"><Skeleton className="h-4 w-48" /></TableCell>
+                        <TableCell className="py-4"><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
+                        <TableCell className="py-4"><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                        <TableCell className="py-4"><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                        <TableCell className="py-4 pr-6"><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : filteredDocs.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-40 text-center text-muted-foreground italic">
+                        {selectedFonte ? "Nenhuma liquidação pendente nesta fonte." : "Nenhuma liquidação pendente no sistema. Parabéns!"}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredDocs.map((doc) => (
+                      <TableRow key={doc.id} className="group hover:bg-slate-50/80 transition-all border-b last:border-0 cursor-pointer">
+                        <TableCell className="text-xs font-medium py-4 px-6">{format(new Date(`${doc.data_emissao}T12:00:00`), 'dd/MM/yyyy')}</TableCell>
+                        <TableCell className="font-mono text-[11px] font-bold text-primary py-4 group-hover:underline underline-offset-4 decoration-primary/30">{formatDocumentoId(doc.id)}</TableCell>
+                        <TableCell className="max-w-[300px] truncate text-xs font-bold py-4 text-slate-700" title={doc.favorecido_nome}>{doc.favorecido_nome}</TableCell>
+                        <TableCell className="text-center py-4">
+                          <Badge variant="secondary" className="font-mono text-[9px] px-1.5 py-0 bg-slate-100 text-slate-600">{doc.fonte_sof}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-xs font-medium py-4">{formatCurrency(doc.valor_liquidado)}</TableCell>
+                        <TableCell className="text-right text-xs font-medium text-muted-foreground py-4">{formatCurrency(doc.valor_pago)}</TableCell>
+                        <TableCell className="text-right font-extrabold text-sm text-status-error py-4 pr-6">
+                          {formatCurrency(doc.valor_pendente)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
         </Card>
       </div>
     </div>

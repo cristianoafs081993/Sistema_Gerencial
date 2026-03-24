@@ -1,5 +1,5 @@
 import { Fragment, useState, useMemo, useRef } from 'react';
-import { Plus, Pencil, Search, Filter, Calendar, Upload, FileSpreadsheet, Loader2, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, Layers } from 'lucide-react';
+import { Plus, Pencil, Search, Filter, Calendar, Upload, FileSpreadsheet, Loader2, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, Layers, X } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Empenho, DIMENSOES, COMPONENTES_POR_DIMENSAO } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -8,13 +8,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatCard } from '@/components/StatCard';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   Select,
   SelectContent,
@@ -23,11 +25,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
+import { EmpenhoDialog } from '@/components/modals/EmpenhoDialog';
 import { HeaderActions } from '@/components/HeaderParts';
 import { toast } from 'sonner';
 import { formatCurrency, parseCurrency, formatarDocumento } from '@/lib/utils';
@@ -49,41 +51,7 @@ const statusLabels: Record<string, string> = {
   cancelado: 'Cancelado',
 };
 
-const initialFormState: {
-  numero: string;
-  descricao: string;
-  valor: number;
-  dimensao: string;
-  componenteFuncional: string;
-  origemRecurso: string;
-  naturezaDespesa: string;
-  dataEmpenho: Date;
-  status: 'pendente' | 'liquidado' | 'pago' | 'cancelado';
-  atividadeId: string;
-  planoInterno: string;
-  favorecidoNome: string;
-  favorecidoDocumento: string;
-  processo: string;
-  tipo: 'exercicio' | 'rap';
-  valorLiquidadoAPagar?: number;
-  valorPagoOficial?: number;
-} = {
-  numero: '',
-  descricao: '',
-  valor: 0,
-  dimensao: '',
-  componenteFuncional: '',
-  origemRecurso: '',
-  naturezaDespesa: '',
-  dataEmpenho: new Date(),
-  status: 'pendente',
-  atividadeId: '',
-  planoInterno: '',
-  favorecidoNome: '',
-  favorecidoDocumento: '',
-  processo: '',
-  tipo: 'exercicio',
-};
+
 
 export default function Empenhos() {
   const { empenhos, atividades, isLoading, addEmpenho, updateEmpenho, deleteEmpenho, refreshData } = useData();
@@ -106,7 +74,6 @@ export default function Empenhos() {
 
   const saldosInputRef = useRef<HTMLInputElement>(null);
   const [selectedEmpenho, setSelectedEmpenho] = useState<Empenho | null>(null);
-  const [formData, setFormData] = useState(initialFormState);
 
   // Extrair opções únicas para filtros
   const componentesUnicos = Array.from(new Set(empenhos.map(e => e.componenteFuncional?.trim()).filter(Boolean))).sort();
@@ -157,42 +124,13 @@ export default function Empenhos() {
   });
 
   const handleOpenDialog = (empenho?: Empenho) => {
-    if (empenho) {
-      setSelectedEmpenho(empenho);
-      setFormData({
-        numero: empenho.numero,
-        descricao: empenho.descricao,
-        valor: empenho.valor,
-        dimensao: empenho.dimensao,
-        componenteFuncional: empenho.componenteFuncional,
-        origemRecurso: empenho.origemRecurso,
-        naturezaDespesa: empenho.naturezaDespesa,
-        planoInterno: empenho.planoInterno || '',
-        favorecidoNome: empenho.favorecidoNome || '',
-        favorecidoDocumento: empenho.favorecidoDocumento || '',
-        dataEmpenho: empenho.dataEmpenho,
-        status: empenho.status,
-        atividadeId: empenho.atividadeId || '',
-        processo: empenho.processo || '',
-        tipo: empenho.tipo,
-        valorLiquidadoAPagar: empenho.valorLiquidadoAPagar,
-        valorPagoOficial: empenho.valorPagoOficial,
-      });
-    } else {
-      setSelectedEmpenho(null);
-      setFormData(initialFormState);
-    }
+    setSelectedEmpenho(empenho || null);
     setIsDialogOpen(true);
   };
 
-  const handleSubmit = () => {
-    if (selectedEmpenho) {
-      updateEmpenho(selectedEmpenho.id, formData);
-    } else {
-      addEmpenho(formData);
-    }
+  const handleSaveEmpenho = (id: string, data: any) => {
+    updateEmpenho(id, data);
     setIsDialogOpen(false);
-    setFormData(initialFormState);
   };
 
 
@@ -317,19 +255,7 @@ export default function Empenhos() {
 
 
 
-  const dimensoesDisponiveis = useMemo(() => {
-    // Agora usando apenas as dimensões estáticas definidas
-    return DIMENSOES.map(d => d.nome);
-  }, []);
 
-  const origensDisponiveis = useMemo(() => {
-    return [...new Set(
-      atividades
-        .filter(a => !formData.dimensao || a.dimensao === formData.dimensao)
-        .map(a => a.origemRecurso)
-        .filter(Boolean)
-    )];
-  }, [atividades, formData.dimensao]);
 
   const lastUpdate = empenhos.reduce((max, e) => {
     if (!e.ultimaAtualizacaoSiafi) return max;
@@ -378,29 +304,58 @@ export default function Empenhos() {
         </div>
       </HeaderActions>
 
-      {/* Filters */}
-      <Card className="card-system">
-        <CardHeader className="pb-space-3">
-          <CardTitle className="text-text-lg font-font-bold">Filtros</CardTitle>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <StatCard
+          title="Total Empenhado"
+          value={formatCurrency(empenhos.reduce((sum, e) => sum + (e.valor || 0), 0))}
+          icon={Layers}
+          stitchColor="vibrant-blue"
+          isLoading={isLoading}
+        />
+        <StatCard
+          title="Total Liquidado"
+          value={formatCurrency(empenhos.reduce((sum, e) => sum + (e.valorLiquidadoAPagar || 0) + (e.valorPagoOficial || 0), 0))}
+          icon={Plus}
+          stitchColor="purple"
+          isLoading={isLoading}
+        />
+        <StatCard
+          title="Total Pago"
+          value={formatCurrency(empenhos.reduce((sum, e) => sum + (e.valorPagoOficial || 0), 0))}
+          icon={Plus}
+          stitchColor="emerald-green"
+          isLoading={isLoading}
+        />
+        <StatCard
+          title="Saldo a Pagar"
+          value={formatCurrency(empenhos.reduce((sum, e) => sum + Math.max(0, e.valor - ((e.valorLiquidadoAPagar || 0) + (e.valorPagoOficial || 0))), 0))}
+          icon={X}
+          stitchColor="amber"
+          isLoading={isLoading}
+        />
+      </div>
+      <Card className="card-system shadow-sm">
+        <CardHeader className="pb-3 px-0 pt-0">
+          <CardTitle className="text-xl font-bold">Filtros</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-space-4">
+        <CardContent className="p-0">
           {/* Linha 1: Busca e Filtros Básicos */}
-          <div className="flex flex-col sm:flex-row gap-space-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-space-3 top-1/2 -translate-y-1/2 h-space-4 w-space-4 text-text-muted" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar empenhos..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-space-10 input-system"
+                className="pl-9 h-10 text-sm input-system"
               />
             </div>
-            <div className="w-full sm:w-[180px]">
+            <div className="w-full sm:w-[150px]">
               <Select value={filterDimensao} onValueChange={setFilterDimensao}>
-                <SelectTrigger className="input-system">
+                <SelectTrigger className="input-system h-10">
                   <SelectValue placeholder="Dimensão" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-sm">
                   <SelectItem value="all">Todas dimensões</SelectItem>
                   {DIMENSOES.map((d) => (
                     <SelectItem key={d.codigo} value={d.codigo}>
@@ -412,10 +367,10 @@ export default function Empenhos() {
             </div>
             <div className="w-full sm:w-[150px]">
               <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="input-system">
+                <SelectTrigger className="input-system h-10">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-sm">
                   <SelectItem value="all">Todos status</SelectItem>
                   <SelectItem value="pendente">Pendente</SelectItem>
                   {activeTab !== 'restos' && <SelectItem value="liquidado">Liquidado</SelectItem>}
@@ -427,18 +382,18 @@ export default function Empenhos() {
             <Button
               variant={showAdvancedFilters ? "secondary" : "outline"}
               onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              className="gap-space-2"
+              className="gap-2 h-10 font-bold"
             >
               <Filter className="w-4 h-4" />
-              Filtros
+              Opções
             </Button>
           </div>
 
           {/* Linha 2: Filtros Avançados (Colapsável) */}
           {showAdvancedFilters && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-space-4 p-space-4 bg-surface-subtle/30 rounded-radius-lg border border-border-default/50">
-              <div className="space-y-space-2">
-                <label className="text-text-sm font-font-medium">Componente Funcional</label>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 mt-4 bg-slate-50/50 rounded-lg border border-border-default/50">
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Componente Funcional</label>
                 <Select value={filterComponente} onValueChange={setFilterComponente}>
                   <SelectTrigger className="input-system">
                     <SelectValue placeholder="Selecione..." />
@@ -452,8 +407,8 @@ export default function Empenhos() {
                 </Select>
               </div>
 
-              <div className="space-y-space-2">
-                <label className="text-text-sm font-font-medium">Origem de Recurso</label>
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Origem de Recurso</label>
                 <Select value={filterOrigem} onValueChange={setFilterOrigem}>
                   <SelectTrigger className="input-system">
                     <SelectValue placeholder="Selecione..." />
@@ -467,8 +422,8 @@ export default function Empenhos() {
                 </Select>
               </div>
 
-              <div className="space-y-space-2">
-                <label className="text-text-sm font-font-medium">Plano Interno</label>
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Plano Interno</label>
                 <Select value={filterPlanoInterno} onValueChange={setFilterPlanoInterno}>
                   <SelectTrigger className="input-system">
                     <SelectValue placeholder="Selecione..." />
@@ -481,25 +436,24 @@ export default function Empenhos() {
                   </SelectContent>
                 </Select>
               </div>
-
-              <div className="space-y-space-2">
-                <label className="text-text-sm font-font-medium">Período (Início)</label>
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Período (Início)</label>
                 <Input
                   type="date"
                   value={dataInicio}
                   onChange={(e) => setDataInicio(e.target.value)}
-                  className="input-system"
+                  className="input-system h-10"
                 />
               </div>
 
-              <div className="space-y-space-2">
-                <label className="text-text-sm font-font-medium">Período (Fim)</label>
-                <div className="flex gap-space-2">
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Período (Fim)</label>
+                <div className="flex gap-2">
                   <Input
                     type="date"
                     value={dataFim}
                     onChange={(e) => setDataFim(e.target.value)}
-                    className="input-system"
+                    className="input-system h-10"
                   />
                   <Button
                     variant="ghost"
@@ -515,9 +469,9 @@ export default function Empenhos() {
                       setDataFim('');
                       setSearchTerm('');
                     }}
-                    className="hover:bg-status-error/10 hover:text-status-error transition-colors"
+                    className="h-10 w-10 hover:bg-red-50 hover:text-red-500 transition-colors"
                   >
-                    <Filter className="w-4 h-4" />
+                    <X className="w-4 h-4" />
                     <span className="sr-only">Limpar</span>
                   </Button>
                 </div>
@@ -526,13 +480,10 @@ export default function Empenhos() {
           )}
         </CardContent>
       </Card>
-
-
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-space-6">
-        <TabsList className="bg-surface-subtle p-px rounded-radius-lg h-auto">
-          <TabsTrigger value="execucao" className="px-space-6 py-space-2 data-[state=active]:bg-surface-card data-[state=active]:shadow-shadow-sm rounded-radius-md text-text-sm font-font-semibold">Execução {new Date().getFullYear()}</TabsTrigger>
-          <TabsTrigger value="restos" className="px-space-6 py-space-2 data-[state=active]:bg-surface-card data-[state=active]:shadow-shadow-sm rounded-radius-md text-text-sm font-font-semibold">Restos a Pagar</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6 mt-6">
+        <TabsList className="bg-slate-100 p-1 rounded-lg h-auto">
+          <TabsTrigger value="execucao" className="px-6 py-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md text-sm font-semibold">Execução {new Date().getFullYear()}</TabsTrigger>
+          <TabsTrigger value="restos" className="px-6 py-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md text-sm font-semibold">Restos a Pagar</TabsTrigger>
         </TabsList>
 
         <TabsContent value="execucao">
@@ -554,201 +505,13 @@ export default function Empenhos() {
         </TabsContent>
       </Tabs>
 
-      {/* Form Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedEmpenho ? `Editar Empenho ${selectedEmpenho.numero}` : 'Detalhes do Empenho'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            {/* Informações Read-Only */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted/30 p-3 rounded-md">
-              <div className="grid gap-1">
-                <span className="text-sm font-medium text-muted-foreground">Número</span>
-                <span>{formData.numero}</span>
-              </div>
-              <div className="grid gap-1">
-                <span className="text-sm font-medium text-muted-foreground">Data</span>
-                <span>{format(new Date(formData.dataEmpenho), 'dd/MM/yyyy')}</span>
-              </div>
-              <div className="grid gap-1 sm:col-span-2">
-                <span className="text-sm font-medium text-muted-foreground">Descrição</span>
-                <p className="text-sm">{formData.descricao}</p>
-              </div>
-              <div className="grid gap-1">
-                <span className="text-sm font-medium text-muted-foreground">Processo</span>
-                <span>{formData.processo || '-'}</span>
-              </div>
-              <div className="grid gap-1">
-                <span className="text-sm font-medium text-muted-foreground">Favorecido</span>
-                <span>{formData.favorecidoNome}</span>
-              </div>
-              <div className="grid gap-1">
-                <span className="text-sm font-medium text-muted-foreground">Valor</span>
-                <span>{formatCurrency(formData.valor)}</span>
-              </div>
-              {formData.tipo === 'exercicio' && (
-                <>
-                  <div className="grid gap-1">
-                    <span className="text-sm font-medium text-muted-foreground">A Pagar (Liquidado)</span>
-                    <span>{formatCurrency(formData.valorLiquidadoAPagar || 0)}</span>
-                  </div>
-                  <div className="grid gap-1">
-                    <span className="text-sm font-medium text-muted-foreground">Pago Oficial</span>
-                    <span>{formatCurrency(formData.valorPagoOficial || 0)}</span>
-                  </div>
-                </>
-              )}
-              <div className="grid gap-1 sm:col-span-2">
-                <span className="text-sm font-medium text-muted-foreground">Natureza de Despesa</span>
-                <span>{formData.naturezaDespesa}</span>
-              </div>
-            </div>
-
-            {/* Histórico de Operações */}
-            {selectedEmpenho?.historicoOperacoes && selectedEmpenho.historicoOperacoes.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <History className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-semibold">Histórico de Operações ({selectedEmpenho.historicoOperacoes.length})</span>
-                </div>
-                <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-muted/50">
-                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Data</th>
-                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Operação</th>
-                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">Valor</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...selectedEmpenho.historicoOperacoes]
-                        .sort((a, b) => {
-                          // Sort by date ascending
-                          const parseDate = (d: string) => {
-                            const parts = d.split('/');
-                            return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-                          };
-                          return parseDate(a.data).getTime() - parseDate(b.data).getTime();
-                        })
-                        .map((op, idx) => (
-                          <tr key={idx} className="border-t border-border/50">
-                            <td className="py-2 px-3 text-muted-foreground">{op.data}</td>
-                            <td className="py-2 px-3">
-                              <Badge
-                                variant={
-                                  op.operacao === 'INCLUSAO' ? 'info' :
-                                    op.operacao === 'REFORCO' ? 'success' :
-                                      op.operacao === 'ANULACAO' ? 'danger' : 'default'
-                                }
-                                className="text-xs"
-                              >
-                                {op.operacao === 'INCLUSAO' ? 'Inclusão' :
-                                  op.operacao === 'REFORCO' ? 'Reforço' :
-                                    op.operacao === 'ANULACAO' ? 'Anulação' :
-                                      op.operacao}
-                              </Badge>
-                            </td>
-                            <td className={`py-2 px-3 text-right font-medium ${op.operacao === 'ANULACAO' ? 'text-red-600' : 'text-green-600'
-                              }`}>
-                              {op.operacao === 'ANULACAO' ? '-' : '+'}{formatCurrency(op.valorTotal)}
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="border-t-2 border-border bg-muted/30">
-                        <td colSpan={2} className="py-2 px-3 font-semibold">Valor Consolidado</td>
-                        <td className="py-2 px-3 text-right font-bold">{formatCurrency(formData.valor)}</td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* Campos Editáveis */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="dimensao">Dimensão</Label>
-                <Select
-                  value={formData.dimensao}
-                  onValueChange={(v) => setFormData({ ...formData, dimensao: v, origemRecurso: '' })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a dimensão" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {dimensoesDisponiveis.map((dimensao) => (
-                      <SelectItem key={dimensao} value={dimensao}>
-                        {dimensao}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="componenteFuncional">Componente Funcional</Label>
-                <Select
-                  value={formData.componenteFuncional}
-                  onValueChange={(v) => setFormData({ ...formData, componenteFuncional: v })}
-                  disabled={!formData.dimensao}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={formData.dimensao ? "Selecione o componente" : "Selecione a dimensão primeiro"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {formData.dimensao && (() => {
-                      // Extrair código da dimensão (ex: "AD - Administração" -> "AD")
-                      const dimCodigo = formData.dimensao.split(' - ')[0];
-                      const componentes = COMPONENTES_POR_DIMENSAO[dimCodigo] || [];
-                      return componentes.map((comp) => (
-                        <SelectItem key={comp} value={comp}>
-                          {comp}
-                        </SelectItem>
-                      ));
-                    })()}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="origemRecurso">Origem de Recurso</Label>
-                <Input
-                  id="origemRecurso"
-                  value={formData.origemRecurso}
-                  onChange={(e) => setFormData({ ...formData, origemRecurso: e.target.value })}
-                  placeholder="Ex: Fonte 100/111"
-                  list="origens-list"
-                />
-                <datalist id="origens-list">
-                  {origensDisponiveis.map((origem) => (
-                    <option key={origem} value={origem} />
-                  ))}
-                </datalist>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="planoInterno">Plano Interno</Label>
-                <Input
-                  id="planoInterno"
-                  value={formData.planoInterno || ''}
-                  onChange={(e) => setFormData({ ...formData, planoInterno: e.target.value })}
-                  placeholder="Ex: L20RLP01ADN"
-                />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSubmit}>
-              Salvar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <EmpenhoDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        empenho={selectedEmpenho}
+        atividades={atividades}
+        onSave={handleSaveEmpenho}
+      />
     </div>
   );
 }
@@ -765,118 +528,119 @@ function EmpenhoRow({
   isChild?: boolean;
 }) {
   return (
-    <tr className={`border-b border-border-default/50 hover:bg-surface-subtle transition-colors transition-all duration-200 ${isChild ? 'bg-surface-card' : 'even:bg-surface-subtle/20'}`}>
-      <td className={`py-space-2 px-space-2 align-top ${isChild ? 'pl-space-8' : ''}`}>
-        <div className="flex flex-col gap-space-1">
-          <span className="font-mono text-text-sm font-font-medium whitespace-nowrap">{empenho.numero}</span>
+    <TableRow className={`hover:bg-slate-50/80 transition-colors border-b border-border-default/50 ${isChild ? 'bg-slate-50/30' : ''}`}>
+      <TableCell className={`py-4 px-6 align-top ${isChild ? 'pl-10' : ''}`}>
+        <div className="flex flex-col gap-1">
+          <span className="font-mono text-sm font-semibold whitespace-nowrap">{empenho.numero}</span>
           {empenho.processo && (
-            <span className="text-text-xs text-text-muted whitespace-nowrap" title="Processo">
+            <span className="text-xs text-muted-foreground whitespace-nowrap" title="Processo">
               Proc: {empenho.processo}
             </span>
           )}
           {empenho.historicoOperacoes && empenho.historicoOperacoes.length > 1 && (
-            <span className="text-[10px] text-action-primary flex items-center gap-space-0.5" title="Empenho com histórico de alterações">
+            <span className="text-[10px] text-action-primary flex items-center gap-0.5" title="Empenho com histórico de alterações">
               <History className="h-3 w-3" />
               {empenho.historicoOperacoes.length} ops
             </span>
           )}
         </div>
-      </td>
-      <td className="py-2 px-2 align-top">
+      </TableCell>
+      <TableCell className="py-4 px-4 align-top">
         <div className="flex flex-col">
           <span className="text-sm font-medium truncate max-w-[150px]" title={empenho.favorecidoNome}>{empenho.favorecidoNome || '-'}</span>
           <span className="text-xs text-muted-foreground">
             {formatarDocumento(empenho.favorecidoDocumento || '')}
           </span>
         </div>
-      </td>
+      </TableCell>
       {type === 'execucao' ? (
-        <td className="py-2 px-2 align-top">
+        <TableCell className="py-4 px-4 align-top">
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium whitespace-nowrap">{empenho.origemRecurso || '-'}</p>
             {empenho.planoInterno && (
               <span className="text-xs text-muted-foreground whitespace-nowrap">{empenho.planoInterno}</span>
             )}
           </div>
-        </td>
+        </TableCell>
       ) : (
-        <td className="py-2 px-2 align-top">
+        <TableCell className="py-4 px-4 align-top">
           <span className="text-sm line-clamp-2" title={empenho.descricao}>{empenho.descricao || '-'}</span>
-        </td>
+        </TableCell>
       )}
-      <td className="py-2 px-2 text-right align-top whitespace-nowrap">
+      <TableCell className="py-4 px-4 text-right align-top whitespace-nowrap">
         <div className="flex flex-col gap-1 items-end">
           {type === 'restos' && empenho.rapInscrito != null ? (
             <>
-              <span className="font-medium" title="Inscrito (original)">
+              <span className="font-semibold text-sm" title="Inscrito (original)">
                 {formatCurrency(empenho.rapInscrito || 0)}
               </span>
-              <span className={`text-xs ${(empenho.rapALiquidar || 0) > 0 ? 'text-orange-500' : 'text-muted-foreground'}`} title="A Liquidar">
+              <span className={`text-xs ${(empenho.rapALiquidar || 0) > 0 ? 'text-status-warning' : 'text-muted-foreground'}`} title="A Liquidar">
                 A Liq: {formatCurrency(empenho.rapALiquidar || 0)}
               </span>
-              <span className={`text-xs ${(empenho.rapLiquidado || 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`} title="Liquidado">
+              <span className={`text-xs ${(empenho.rapLiquidado || 0) > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado">
                 Liq: {formatCurrency(empenho.rapLiquidado || 0)}
               </span>
-              <span className={`text-xs ${(empenho.rapPago || 0) > 0 ? 'text-green-600' : 'text-muted-foreground'}`} title="Pago">
+              <span className={`text-xs ${(empenho.rapPago || 0) > 0 ? 'text-status-success' : 'text-muted-foreground'}`} title="Pago">
                 Pg: {formatCurrency(empenho.rapPago || 0)}
               </span>
             </>
           ) : (
             <>
-              <span className="font-medium" title={type === 'execucao' ? 'Empenhado' : 'Inscrito'}>
+              <span className="font-semibold text-sm" title={type === 'execucao' ? 'Empenhado' : 'Inscrito'}>
                 {formatCurrency(empenho.valor)}
               </span>
               {type === 'execucao' ? (
                 <>
-                  <span className={`text-xs ${(empenho.valorLiquidado || 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`} title="Liquidado">
+                  <span className={`text-xs ${(empenho.valorLiquidado || 0) > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado">
                     Liq: {formatCurrency(empenho.valorLiquidado || 0)}
                   </span>
                   {(empenho.valorPago || 0) > 0 && (
-                    <span className="text-[10px] text-green-600" title="Pago">
+                    <span className="text-[10px] text-status-success" title="Pago">
                       Pg: {formatCurrency(empenho.valorPago || 0)}
                     </span>
                   )}
                 </>
               ) : (
-                <span className={`text-xs ${(empenho.valorPago || 0) > 0 ? 'text-green-600' : 'text-muted-foreground'}`} title="Pago">
+                <span className={`text-xs ${(empenho.valorPago || 0) > 0 ? 'text-status-success' : 'text-muted-foreground'}`} title="Pago">
                   Pg: {formatCurrency(empenho.valorPago || 0)}
                 </span>
               )}
             </>
           )}
         </div>
-      </td>
-      <td className="py-2 px-2 text-right align-top whitespace-nowrap">
+      </TableCell>
+      <TableCell className="py-4 px-4 text-right align-top whitespace-nowrap">
         {(() => {
           if (type === 'restos') {
             const aLiquidar = empenho.rapALiquidar || 0;
             return (
-              <span className={`font-medium ${aLiquidar > 0 ? 'text-orange-500' : 'text-muted-foreground'}`}>
+              <span className={`font-semibold text-sm ${aLiquidar > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}>
                 {formatCurrency(aLiquidar)}
               </span>
             );
           }
           const saldo = empenho.valor - (empenho.valorLiquidado || 0);
           return (
-            <span className={`font-medium ${saldo > 0 ? 'text-green-600' : saldo < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+            <span className={`font-semibold text-sm ${saldo > 0 ? 'text-status-success' : saldo < 0 ? 'text-status-error' : 'text-muted-foreground'}`}>
               {formatCurrency(saldo)}
             </span>
           );
         })()}
-      </td>
+      </TableCell>
 
-      <td className="py-2 px-2 align-top whitespace-nowrap">
+      <TableCell className="py-4 px-6 align-top whitespace-nowrap">
         <div className="flex items-center justify-center gap-2">
           <Button
             variant="ghost"
             size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-action-primary hover:bg-action-primary/10"
             onClick={() => handleOpenDialog(empenho)}
           >
             <Pencil className="h-4 w-4" />
           </Button>
         </div>
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -945,9 +709,9 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
           case 'pago': valA = a.pagoTotal; valB = b.pagoTotal; break;
           default: valA = a.name; valB = b.name; break;
         }
-      } else if (!a.isGroup && !b.isGroup) {
-        const itemA = a.item!;
-        const itemB = b.item!;
+      } else {
+        const itemA = (a as { isGroup: false; item: Empenho }).item;
+        const itemB = (b as { isGroup: false; item: Empenho }).item;
         switch (sortKey) {
           case 'numero': valA = itemA.numero; valB = itemB.numero; break;
           case 'favorecido': valA = itemA.favorecidoNome || ''; valB = itemB.favorecidoNome || ''; break;
@@ -980,160 +744,158 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
   const paginatedData = sortedData.slice((page - 1) * perPage, page * perPage);
 
   const SortHeader = ({ label, colKey, align = 'left' }: { label: string; colKey: string; align?: 'left' | 'right' | 'center' }) => (
-    <th
-      className={`text-${align} py-space-2 px-space-2 text-text-sm font-font-medium text-text-muted whitespace-nowrap cursor-pointer hover:text-text-primary select-none transition-colors border-b border-border-default/50`}
+    <TableHead
+      className={`h-11 px-4 text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-slate-100/80 transition-colors select-none ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : ''}`}
       onClick={() => handleSort(colKey)}
     >
-      <span className={`inline-flex items-center gap-space-1 ${align === 'right' ? 'justify-end' : ''}`}>
+      <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
         {label}
         {sortKey === colKey && (
-          <span className="text-action-primary text-text-xs transition-transform duration-200">{sortDir === 'asc' ? '▲' : '▼'}</span>
+          <span className="text-action-primary text-xs transition-transform duration-200">{sortDir === 'asc' ? '▲' : '▼'}</span>
         )}
       </span>
-    </th>
+    </TableHead>
   );
 
   return (
-    <Card className="card-system">
-      <CardHeader className="flex flex-row items-center justify-between pb-space-2">
-        <CardTitle className="text-text-lg font-font-bold">
+    <Card className="card-system overflow-hidden">
+      <CardHeader className="px-6 py-4 border-b border-border-default/50 flex flex-row items-center justify-between">
+        <CardTitle className="text-base font-semibold">
           {empenhos.length} empenho{empenhos.length !== 1 ? 's' : ''} encontrado{empenhos.length !== 1 ? 's' : ''}
         </CardTitle>
         <Button
           variant={groupBy === 'favorecido' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setGroupBy(g => g === 'none' ? 'favorecido' : 'none')}
-          className="h-space-8 gap-space-2 btn-secondary"
+          className="h-8 gap-2 btn-secondary"
         >
           <Layers className="h-4 w-4" />
           {groupBy === 'favorecido' ? 'Desagrupar' : 'Agrupar por Favorecido'}
         </Button>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border">
+          <Table>
+            <TableHeader className="bg-slate-50/50">
+              <TableRow className="hover:bg-transparent border-b border-border-default/50">
                 {groupBy === 'none' && <SortHeader label="Número" colKey="numero" />}
                 <SortHeader label="Favorecido" colKey="favorecido" />
                 {type === 'execucao' ? (
-                  <th className="text-left py-2 px-2 text-sm font-medium text-muted-foreground whitespace-nowrap">Origem / Plano</th>
+                  <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">Origem / Plano</TableHead>
                 ) : (
-                  <th className="text-left py-2 px-2 text-sm font-medium text-muted-foreground">Descrição</th>
+                  <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">Descrição</TableHead>
                 )}
                 <SortHeader label={type === 'execucao' ? 'Empenhado / Liquidado' : 'Inscrito / A Liq / Liq / Pago'} colKey="valor" align="right" />
                 <SortHeader label={type === 'execucao' ? 'Saldo' : 'A Liquidar'} colKey="saldo" align="right" />
-
-                <th className="text-center py-2 px-2 text-sm font-medium text-muted-foreground whitespace-nowrap">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
+                <TableHead className="h-11 px-6 text-center text-xs font-semibold uppercase tracking-wider">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="border-b border-border/50">
-                    <td className="py-2 px-2"><Skeleton className="h-8 w-24" /></td>
-                    <td className="py-2 px-2"><Skeleton className="h-8 w-32" /></td>
-                    <td className="py-2 px-2"><Skeleton className="h-8 w-24" /></td>
-                    <td className="py-2 px-2"><Skeleton className="h-8 w-24 ml-auto" /></td>
-                    <td className="py-2 px-2"><Skeleton className="h-8 w-16 ml-auto" /></td>
-                    <td className="py-2 px-2"><Skeleton className="h-8 w-16 mx-auto" /></td>
-                  </tr>
+                  <TableRow key={i}>
+                    <TableCell className="px-4"><Skeleton className="h-8 w-24" /></TableCell>
+                    <TableCell className="px-4"><Skeleton className="h-8 w-32" /></TableCell>
+                    <TableCell className="px-4"><Skeleton className="h-8 w-24" /></TableCell>
+                    <TableCell className="px-4"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                    <TableCell className="px-4"><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
+                    <TableCell className="px-6"><Skeleton className="h-8 w-16 mx-auto" /></TableCell>
+                  </TableRow>
                 ))
               ) : paginatedData.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-center py-6 text-muted-foreground italic">Nenhum empenho encontrado.</td>
-                </tr>
+                <TableRow>
+                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">Nenhum empenho encontrado.</TableCell>
+                </TableRow>
               ) : (
                 paginatedData.map((row, idx) => {
                   if (row.isGroup) {
                     const isExpanded = expandedGroups[row.name];
                     return (
                       <Fragment key={`group-${idx}`}>
-                        <tr
-                          className="border-b border-border/50 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
+                        <TableRow
+                          className="bg-slate-50/50 hover:bg-slate-100/80 transition-colors cursor-pointer border-b border-border-default/50"
                           onClick={() => toggleGroup(row.name)}
                         >
-                          <td className="py-3 px-2 align-middle font-medium" colSpan={2}>
+                          <TableCell className="py-4 px-6 font-medium" colSpan={2}>
                             <div className="flex items-center gap-2">
                               <ChevronRight className={`h-4 w-4 text-slate-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                               <span>{row.name}</span>
-                              <Badge variant="secondary" className="ml-2 bg-white">{row.items.length}</Badge>
+                              <Badge variant="secondary" className="ml-2 bg-white text-xs">{row.items.length}</Badge>
                             </div>
-                          </td>
-                          {type === 'execucao' ? (
-                            <td className="py-3 px-2 align-middle text-sm text-muted-foreground">-</td>
-                          ) : (
-                            <td className="py-3 px-2 align-middle text-sm text-muted-foreground">-</td>
-                          )}
-                          <td className="py-3 px-2 text-right align-middle">
+                          </TableCell>
+                          <TableCell className="py-4 px-4 text-sm text-muted-foreground">
+                            -
+                          </TableCell>
+                          <TableCell className="py-4 px-4 text-right">
                             <div className="flex flex-col gap-1 items-end">
-                              <span className="font-bold">{formatCurrency(row.valorTotal)}</span>
+                              <span className="font-bold text-sm">{formatCurrency(row.valorTotal)}</span>
                               {type === 'execucao' ? (
                                 <>
-                                  <span className={`text-xs ${(row.liquidadoTotal || 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`} title="Liquidado">
+                                  <span className={`text-[11px] ${(row.liquidadoTotal || 0) > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado">
                                     Liq: {formatCurrency(row.liquidadoTotal)}
                                   </span>
                                   {(row.pagoTotal || 0) > 0 && (
-                                    <span className="text-[10px] text-green-600" title="Pago">
+                                    <span className="text-[11px] text-status-success" title="Pago">
                                       Pg: {formatCurrency(row.pagoTotal)}
                                     </span>
                                   )}
                                 </>
                               ) : (
                                 <>
-                                  <span className={`text-xs ${(row.saldoTotal || 0) > 0 ? 'text-orange-500' : 'text-muted-foreground'}`} title="A Liquidar">
+                                  <span className={`text-[11px] ${(row.saldoTotal || 0) > 0 ? 'text-status-warning' : 'text-muted-foreground'}`} title="A Liquidar">
                                     A Liq: {formatCurrency(row.saldoTotal)}
                                   </span>
-                                  <span className={`text-xs ${(row.liquidadoTotal || 0) > 0 ? 'text-blue-600' : 'text-muted-foreground'}`} title="Liquidado">
+                                  <span className={`text-[11px] ${(row.liquidadoTotal || 0) > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado">
                                     Liq: {formatCurrency(row.liquidadoTotal)}
                                   </span>
-                                  <span className={`text-xs ${(row.pagoTotal || 0) > 0 ? 'text-green-600' : 'text-muted-foreground'}`} title="Pago">
+                                  <span className={`text-[11px] ${(row.pagoTotal || 0) > 0 ? 'text-status-success' : 'text-muted-foreground'}`} title="Pago">
                                     Pg: {formatCurrency(row.pagoTotal)}
                                   </span>
                                 </>
                               )}
                             </div>
-                          </td>
-                          <td className="py-3 px-2 text-right align-middle font-bold">
+                          </TableCell>
+                          <TableCell className="py-4 px-4 text-right">
                             {(() => {
                               if (type === 'restos') {
                                 return (
-                                  <span className={`font-medium ${row.saldoTotal > 0 ? 'text-orange-500' : 'text-muted-foreground'}`}>
+                                  <span className={`font-bold text-sm ${row.saldoTotal > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}>
                                     {formatCurrency(row.saldoTotal)}
                                   </span>
                                 );
                               }
                               return (
-                                <span className={`font-medium ${row.saldoTotal > 0 ? 'text-green-600' : row.saldoTotal < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                                <span className={`font-bold text-sm ${row.saldoTotal > 0 ? 'text-status-success' : row.saldoTotal < 0 ? 'text-status-error' : 'text-muted-foreground'}`}>
                                   {formatCurrency(row.saldoTotal)}
                                 </span>
                               );
                             })()}
-                          </td>
-                          <td className="py-3 px-2 align-middle text-center"></td>
-                        </tr>
+                          </TableCell>
+                          <TableCell className="py-4 px-6 text-center"></TableCell>
+                        </TableRow>
                         {isExpanded && row.items.map(empenho => (
                           <EmpenhoRow key={empenho.id} empenho={empenho} type={type} handleOpenDialog={handleOpenDialog} isChild />
                         ))}
                       </Fragment>
                     );
                   } else {
-                    return <EmpenhoRow key={row.item.id} empenho={row.item} type={type} handleOpenDialog={handleOpenDialog} />;
+                    const singleRow = row as { isGroup: false; item: Empenho };
+                    return <EmpenhoRow key={singleRow.item.id} empenho={singleRow.item} type={type} handleOpenDialog={handleOpenDialog} />;
                   }
                 })
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
 
         {/* Footer Paginação */}
-        <div className="flex flex-col sm:flex-row items-center justify-between px-space-2 py-space-4 border-t border-border-default/50 mt-space-4 gap-space-4">
-          <div className="text-text-xs text-text-muted">
+        <div className="flex flex-col sm:flex-row items-center justify-between px-2 py-4 border-t border-border-default/50 mt-4 gap-4">
+          <div className="text-xs text-muted-foreground">
             Mostrando <strong>{totalRecords === 0 ? 0 : ((page - 1) * perPage) + 1}</strong> a <strong>{Math.min(page * perPage, totalRecords)}</strong> de <strong>{totalRecords}</strong> registros
           </div>
-          <div className="flex items-center space-x-space-2">
+          <div className="flex items-center space-x-2">
             <Select value={String(perPage)} onValueChange={(val) => { setPerPage(Number(val)); setPage(1); }}>
-              <SelectTrigger className="h-space-8 w-space-[70px] input-system">
+              <SelectTrigger className="h-8 w-[70px] input-system">
                 <SelectValue placeholder={String(perPage)} />
               </SelectTrigger>
               <SelectContent>
@@ -1143,49 +905,49 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
                 <SelectItem value="100">100</SelectItem>
               </SelectContent>
             </Select>
-            <div className="flex w-space-24 items-center justify-center text-text-sm font-font-medium text-text-secondary">
-              Página {page} de {totalPages || 1}
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 border-slate-200"
+                onClick={() => setPage(1)}
+                disabled={page <= 1 || isLoading}
+              >
+                <ChevronsLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 border-slate-200"
+                onClick={() => setPage(page - 1)}
+                disabled={page <= 1 || isLoading}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="flex items-center gap-1 px-2">
+                <span className="text-xs font-bold text-slate-600">
+                  {page} <span className="text-muted-foreground font-normal">/ {totalPages || 1}</span>
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 border-slate-200"
+                onClick={() => setPage(page + 1)}
+                disabled={page >= totalPages || isLoading}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 border-slate-200"
+                onClick={() => setPage(totalPages)}
+                disabled={page >= totalPages || isLoading}
+              >
+                <ChevronsRight className="h-4 w-4" />
+              </Button>
             </div>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-space-8 w-space-8 border-border-default hover:bg-surface-subtle"
-              onClick={() => setPage(1)}
-              disabled={page <= 1}
-              title="Primeira página"
-            >
-              <ChevronsLeft className="h-space-4 w-space-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-space-8 w-space-8 border-border-default hover:bg-surface-subtle"
-              onClick={() => setPage(page - 1)}
-              disabled={page <= 1}
-              title="Página anterior"
-            >
-              <ChevronLeft className="h-space-4 w-space-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-space-8 w-space-8 border-border-default hover:bg-surface-subtle"
-              onClick={() => setPage(page + 1)}
-              disabled={page >= totalPages}
-              title="Próxima página"
-            >
-              <ChevronRight className="h-space-4 w-space-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-space-8 w-space-8 border-border-default hover:bg-surface-subtle"
-              onClick={() => setPage(totalPages)}
-              disabled={page >= totalPages}
-              title="Última página"
-            >
-              <ChevronsRight className="h-space-4 w-space-4" />
-            </Button>
           </div>
         </div>
       </CardContent>

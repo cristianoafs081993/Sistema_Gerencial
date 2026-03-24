@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
-import { Upload, FileJson, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Upload, FileJson, AlertCircle, CheckCircle2, Info } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -45,11 +46,12 @@ export function JsonImportDialog({
 
   const normalizeKey = (key: string): string => {
     return key
+      .replace(/"/g, '')
       .trim()
       .toLowerCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
-      .replace(/\s+/g, '');
+      .replace(/[^a-z0-9]/g, '');
   };
 
   const parseCsvText = (text: string): Record<string, string>[] => {
@@ -58,14 +60,51 @@ export function JsonImportDialog({
       throw new Error('O CSV deve ter pelo menos um cabeçalho e uma linha de dados.');
     }
 
-    const headers = lines[0].split(csvSeparator).map(h => normalizeKey(h));
-    const data: Record<string, string>[] = [];
+    const normalizedExpected = expectedFields.map(normalizeKey);
+    let headerIndex = -1;
+    let headers: string[] = [];
+    let detectedSeparator = '';
 
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(csvSeparator);
+    // Heurística: Tentar encontrar a linha que melhor combina com os campos esperados
+    // Testando diferentes separadores e as primeiras 15 linhas
+    const potentialSeparators = [';', '\t', ',', '|'];
+    
+    let bestMatch = { count: 0, index: -1, sep: '', headers: [] as string[] };
+
+    for (let i = 0; i < Math.min(lines.length, 15); i++) {
+        for (const sep of potentialSeparators) {
+            const parts = lines[i].split(sep);
+            if (parts.length < 2) continue;
+
+            const normalized = parts.map(h => normalizeKey(h));
+            const matchCount = normalizedExpected.filter(f => normalized.includes(f)).length;
+
+            if (matchCount > bestMatch.count) {
+                bestMatch = { count: matchCount, index: i, sep, headers: normalized };
+            }
+        }
+    }
+
+    if (bestMatch.count > 0) {
+        headerIndex = bestMatch.index;
+        detectedSeparator = bestMatch.sep;
+        // Precisamos dos nomes originais das colunas (sem normalização agressiva) para o mapeamento
+        headers = lines[headerIndex].split(detectedSeparator).map(h => h.replace(/"/g, '').trim());
+    } else {
+        // Fallback: Tenta descobrir se está usando o separador padrão na primeira linha
+        detectedSeparator = csvSeparator || ';';
+        headerIndex = 0;
+        headers = lines[0].split(detectedSeparator).map(h => h.replace(/"/g, '').trim());
+    }
+
+    const data: Record<string, string>[] = [];
+    const normalizedHeaders = headers.map(normalizeKey);
+
+    for (let i = headerIndex + 1; i < lines.length; i++) {
+      const values = lines[i].split(detectedSeparator);
       const row: Record<string, string> = {};
-      headers.forEach((header, idx) => {
-        row[header] = (values[idx] || '').trim();
+      normalizedHeaders.forEach((header, idx) => {
+        row[header] = (values[idx] || '').replace(/"/g, '').trim();
       });
       data.push(row);
     }
@@ -115,14 +154,25 @@ export function JsonImportDialog({
     // Check for expected fields (using normalized versions)
     const normalizedExpected = expectedFields.map(normalizeKey);
     const sampleItem = normalizedData[0];
+    const foundKeys = Object.keys(sampleItem);
 
     const hasSomeValidField = normalizedExpected.some(
-      (field) => field in sampleItem
+      (field) => foundKeys.includes(field)
     );
 
     if (!hasSomeValidField) {
-      const foundKeys = Object.keys(sampleItem).join(', ');
-      setError(`Campos não identificados. Encontrado: ${foundKeys}. Esperado: ${expectedFields.join(', ')}`)
+      // Diagnóstico inteligente: verificar se parece com o outro arquivo conhecido
+      const docsHabeisSample = ['documentohabil', 'dhcredor', 'dhsituacao'];
+      const looksLikeDocsHabeis = docsHabeisSample.some(f => foundKeys.includes(f));
+      
+      const foundKeysStr = foundKeys.join(', ');
+      let errorMsg = `Campos não identificados. Encontrado: ${foundKeysStr}. Esperado: ${expectedFields.join(', ')}`;
+      
+      if (looksLikeDocsHabeis && !normalizedExpected.includes('documentohabil')) {
+          errorMsg = "Parece que você está tentando carregar um arquivo de 'Documentos Hábeis' neste campo de 'Liquidações'. Por favor, use a opção correta no menu Importar.";
+      }
+
+      setError(errorMsg);
       return;
     }
 
@@ -198,72 +248,117 @@ export function JsonImportDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileJson className="h-5 w-5" />
-            {title}
-          </DialogTitle>
-          <DialogDescription>
-            Importe dados de um arquivo {fileTypeLabel}
+      <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border-none shadow-2xl bg-white text-slate-900">
+        <DialogHeader className="p-6 bg-slate-50/80 border-b border-slate-100 space-y-1 relative">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
+              <Upload className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-600/70">Importação de Dados</span>
+              <DialogTitle className="text-xl font-black tracking-tight text-slate-900">
+                {title}
+              </DialogTitle>
+            </div>
+          </div>
+          <div className="absolute top-0 left-0 w-full h-1 bg-blue-500" />
+          <DialogDescription className="text-xs text-slate-500 font-medium pt-1">
+            Selecione um arquivo {fileTypeLabel} para importar novos registros.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="p-6 space-y-6">
           {/* Expected fields info */}
-          <div className="rounded-lg bg-muted p-3 text-sm">
-            <p className="font-medium mb-1">Campos esperados:</p>
-            <p className="text-muted-foreground text-xs">
-              {expectedFields.join(', ')}
+          <div className="rounded-xl bg-slate-50 p-4 border border-slate-100 text-[11px]">
+            <p className="font-black uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-2">
+              <Info className="w-3 h-3" />
+              Campos esperados no arquivo:
             </p>
+            <div className="flex flex-wrap gap-1.5">
+              {expectedFields.map(field => (
+                <Badge key={field} variant="outline" className="bg-white border-slate-200 text-slate-600 text-[9px] font-bold py-0.5 px-2">
+                  {field}
+                </Badge>
+              ))}
+            </div>
           </div>
 
           {/* File input */}
-          <div
-            className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={acceptAttr}
-              onChange={handleFileChange}
-              className="hidden"
-            />
-            <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-            {file ? (
-              <p className="text-sm font-medium">{file.name}</p>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Clique para selecionar um arquivo {fileTypeLabel}
-              </p>
-            )}
-          </div>
+          {!file ? (
+            <div
+              className="group border-2 border-dashed border-slate-200 rounded-2xl p-10 flex flex-col items-center justify-center gap-4 hover:border-blue-400 hover:bg-blue-50/50 transition-all cursor-pointer"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={acceptAttr}
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <div className="p-4 bg-slate-50 rounded-full group-hover:scale-110 transition-transform">
+                <Upload className="h-8 w-8 text-slate-400 group-hover:text-blue-500" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-bold text-slate-700">Clique para selecionar</p>
+                <p className="text-xs text-slate-400 font-medium mt-1">ou arraste e solte o arquivo aqui</p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                <div className="p-2 bg-white rounded-lg shadow-sm">
+                  <FileJson className="w-6 h-6 text-blue-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-900 truncate">{file.name}</p>
+                  <p className="text-[10px] text-slate-500 font-medium">{(file.size / 1024).toFixed(1)} KB</p>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={resetState}
+                  className="text-red-500 hover:text-red-600 hover:bg-red-50 text-[10px] font-bold"
+                >
+                  REMOVER
+                </Button>
+              </div>
 
-          {/* Error message */}
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+              {/* Error message */}
+              {error && (
+                <Alert variant="destructive" className="bg-red-50 border-red-100 text-red-700 rounded-xl py-3 animate-in slide-in-from-top-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-xs font-bold ml-2">{error}</AlertDescription>
+                </Alert>
+              )}
 
-          {/* Success message */}
-          {success && parsedData.length > 0 && (
-            <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-700 dark:text-green-300">
-                {parsedData.length} registro(s) encontrado(s) e pronto(s) para importação.
-              </AlertDescription>
-            </Alert>
+              {/* Success message */}
+              {success && parsedData.length > 0 && (
+                <div className="flex items-center gap-3 p-4 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100 animate-in slide-in-from-top-2">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-wider">Arquivo Validado</p>
+                    <p className="text-xs font-medium">{parsedData.length} registro(s) encontrado(s) para importação.</p>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
+        <DialogFooter className="p-4 bg-slate-50/80 border-t border-slate-100 flex items-center justify-end gap-3">
+          <Button 
+            variant="secondary" 
+            onClick={handleClose}
+            className="bg-white border-slate-200 text-slate-600 hover:bg-slate-100 font-bold uppercase text-[10px] tracking-widest px-6 shadow-sm shadow-slate-200/50"
+          >
             Cancelar
           </Button>
-          <Button onClick={handleImport} disabled={!success || parsedData.length === 0}>
+          <Button 
+            onClick={handleImport} 
+            disabled={!success || parsedData.length === 0}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase text-[10px] tracking-widest px-8 shadow-md shadow-blue-500/20 transition-all active:scale-95 disabled:opacity-50 disabled:shadow-none"
+          >
             Importar {parsedData.length > 0 && `(${parsedData.length})`}
           </Button>
         </DialogFooter>
