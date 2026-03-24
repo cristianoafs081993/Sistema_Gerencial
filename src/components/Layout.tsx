@@ -14,7 +14,8 @@ import {
   ChevronLeft,
   FileStack,
   ClipboardList,
-  ScanSearch
+  ScanSearch,
+  Wand2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,7 @@ const navigation = [
   { name: 'Liquidações',          href: '/liquidacoes-pagamentos',icon: Banknote },
   { name: 'Rastreabilidade de PFs', href: '/rastreabilidade-pfs', icon: ClipboardList },
   { name: 'Conciliação de PFs',   href: '/conciliacao-pfs',       icon: ScanSearch },
+  { name: 'Gerador de Documentos', href: '/gerador-documentos',   icon: Wand2 },
 ];
 
 export function Layout({ children }: LayoutProps) {
