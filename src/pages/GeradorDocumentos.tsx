@@ -257,43 +257,6 @@ export default function GeradorDocumentos() {
         </button>
       </div>
 
-      {/* Horizontal Pipeline (Classic) */}
-      <div className="flex items-start justify-between w-full mt-4 mb-2 relative px-8">
-        <div className="absolute top-5 left-[15%] right-[15%] h-[3px] bg-muted-foreground/20 z-0" />
-        <div 
-          className="absolute top-5 left-[15%] h-[3px] z-0 transition-all duration-500 bg-primary" 
-          style={{ width: step === 1 ? '0%' : step === 2 ? '50%' : '70%' }} 
-        />
-
-        {[
-          { label: '1. Preencher\nDados', id: 1 },
-          { label: '2. Gerar\nDocumento', id: 2 },
-          { label: '3. Copiar e\nFinalizar', id: 3 },
-        ].map((item) => {
-          const isActive = step === item.id;
-          const isCompleted = step > item.id;
-          return (
-            <div key={item.id} className={cn("flex flex-col items-center flex-1 relative z-10 transition-opacity duration-300", step >= item.id ? "opacity-100" : "opacity-40")}>
-              <div className={cn(
-                "w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg mb-2 shadow-sm transition-colors",
-                isActive ? "bg-primary text-primary-foreground ring-4 ring-primary/20" : 
-                isCompleted ? "bg-emerald-600 text-white ring-2 ring-emerald-600 border-none" : 
-                "bg-muted text-muted-foreground border-2 border-background"
-              )}>
-                {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : item.id}
-              </div>
-              <span className={cn(
-                "text-sm font-bold text-center whitespace-pre-line leading-tight", 
-                isActive ? "text-primary" : 
-                isCompleted ? "text-emerald-700" : 
-                "text-muted-foreground"
-              )}>
-                {item.label}
-              </span>
-            </div>
-          );
-        })}
-      </div>
 
       {/* Form Area */}
       <Card className={cn(
@@ -551,16 +514,23 @@ export default function GeradorDocumentos() {
 
           <div className="flex flex-col gap-4 pt-4 border-t">
             <div className="flex gap-4">
-              <Button 
-                className={cn(
-                  "flex-1 h-12 text-lg font-bold shadow-lg transition-all active:scale-[0.98] text-white",
-                  activeTab === 'despacho' ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20" : "bg-purple-600 hover:bg-purple-700 shadow-purple-500/20"
-                )} 
-                onClick={handleGenerate}
-              >
-                <RefreshCw className={cn("w-5 h-5 mr-2", hasGenerated && "animate-spin")} />
-                {hasGenerated ? `REGERAR ${activeTab.toUpperCase()}` : `GERAR ${activeTab.toUpperCase()}`}
-              </Button>
+              {activeTab === 'despacho' ? (
+                <Button 
+                  className="flex-1 h-12 text-lg font-bold shadow-lg transition-all active:scale-[0.98] text-white bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20"
+                  onClick={handleGenerate}
+                >
+                  <RefreshCw className={cn("w-5 h-5 mr-2", hasGenerated && "animate-spin")} />
+                  {hasGenerated ? 'REGERAR DESPACHO' : 'GERAR DESPACHO'}
+                </Button>
+              ) : (
+                <Button 
+                  className="flex-1 h-12 text-lg font-bold shadow-lg transition-all active:scale-[0.98] text-white bg-purple hover:bg-purple/80 shadow-purple/20"
+                  onClick={handleGenerate}
+                >
+                  <RefreshCw className={cn("w-5 h-5 mr-2", hasGenerated && "animate-spin")} />
+                  {hasGenerated ? 'REGERAR CDO' : 'GERAR CDO'}
+                </Button>
+              )}
               <Button variant="outline" className="h-12 w-32 border-2 hover:bg-destructive hover:text-white" onClick={handleReset}>
                 LIMPAR
               </Button>
@@ -582,17 +552,21 @@ export default function GeradorDocumentos() {
                   >
                     <ExternalLink className="w-5 h-5 mr-2" /> CLONAR NO SUAP
                   </Button>
-                  <Button 
-                    className={cn(
-                      "h-14 font-black transition-all border-none active:scale-[0.98] text-white",
-                      activeTab === 'despacho' 
-                        ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/30" 
-                        : "bg-purple-600 hover:bg-purple-700 shadow-purple-500/30"
-                    )}
-                    onClick={handleCopy}
-                  >
-                    <Copy className="w-5 h-5 mr-2" /> COPIAR {activeTab.toUpperCase()}
-                  </Button>
+                  {activeTab === 'despacho' ? (
+                    <Button 
+                      className="h-14 font-black transition-all border-none active:scale-[0.98] text-white bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/30"
+                      onClick={handleCopy}
+                    >
+                      <Copy className="w-5 h-5 mr-2" /> COPIAR DESPACHO
+                    </Button>
+                  ) : (
+                    <Button 
+                      className="h-14 font-black transition-all border-none active:scale-[0.98] text-white bg-purple hover:bg-purple/80 shadow-purple/30"
+                      onClick={handleCopy}
+                    >
+                      <Copy className="w-5 h-5 mr-2" /> COPIAR CDO
+                    </Button>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -618,11 +592,59 @@ export default function GeradorDocumentos() {
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="relative bg-background w-full max-w-[23cm] max-h-[90vh] rounded-xl shadow-2xl flex flex-col overflow-hidden"
             >
-              <div className="flex items-center justify-between px-6 py-4 border-b shrink-0 bg-muted/20">
-                <h3 className="text-xl font-bold text-foreground">Documento Gerado</h3>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => setShowModal(false)}>
-                  <X className="w-5 h-5" />
-                </Button>
+              <div className="flex flex-col border-b shrink-0 bg-muted/20">
+                <div className="flex items-center justify-between px-6 py-4">
+                  <h3 className="text-xl font-bold text-foreground">Documento Gerado</h3>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => setShowModal(false)}>
+                    <X className="w-5 h-5" />
+                  </Button>
+                </div>
+
+                {/* Horizontal Pipeline in Modal */}
+                <div className="flex items-start justify-between w-full pb-6 pt-2 relative px-12">
+                  <div className="absolute top-[28px] left-[20%] right-[20%] h-[3px] bg-muted-foreground/20 z-0">
+                    <div 
+                      className={cn(
+                        "h-full z-0 transition-all duration-500",
+                        activeTab === 'despacho' ? "bg-emerald-600" : "bg-purple"
+                      )}
+                      style={{ width: step === 2 ? '50%' : '100%' }} 
+                    />
+                  </div>
+
+                  {[
+                    { label: '1. Preencher\nDados', id: 1 },
+                    { label: '2. Gerar\nDocumento', id: 2 },
+                    { label: '3. Copiar e\nFinalizar', id: 3 },
+                  ].map((item) => {
+                    const isActive = step === item.id;
+                    const isCompleted = step > item.id;
+                    const colorClass = activeTab === 'despacho' ? "bg-emerald-600" : "bg-purple";
+                    const textClass = activeTab === 'despacho' ? "text-emerald-700" : "text-purple";
+                    const ringClass = activeTab === 'despacho' ? "ring-emerald-600/20" : "ring-purple/20";
+
+                    return (
+                      <div key={item.id} className={cn("flex flex-col items-center flex-1 relative z-10 transition-opacity duration-300", step >= item.id ? "opacity-100" : "opacity-40")}>
+                        <div className={cn(
+                          "w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg mb-2 shadow-sm transition-colors",
+                          isActive ? `${colorClass} text-white ring-4 ${ringClass}` : 
+                          isCompleted ? `${colorClass} text-white ring-2 ${colorClass} border-none` : 
+                          "bg-muted text-muted-foreground border-2 border-background"
+                        )}>
+                          {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : item.id}
+                        </div>
+                        <span className={cn(
+                          "text-sm font-bold text-center whitespace-pre-line leading-tight", 
+                          isActive ? textClass : 
+                          isCompleted ? textClass : 
+                          "text-muted-foreground"
+                        )}>
+                          {item.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-8 bg-zinc-200/50">
@@ -644,15 +666,21 @@ export default function GeradorDocumentos() {
                 
                 <div className="flex-1" />
 
-                <Button 
-                  className={cn(
-                    "font-bold h-12 px-8 shadow-sm text-white",
-                    activeTab === 'despacho' ? "bg-emerald-600 hover:bg-emerald-700" : "bg-purple-600 hover:bg-purple-700"
-                  )} 
-                  onClick={handleCopy}
-                >
-                  <Copy className="w-4 h-4 mr-2" /> COPIAR {activeTab.toUpperCase()}
-                </Button>
+                {activeTab === 'despacho' ? (
+                  <Button 
+                    className="font-bold h-12 px-8 shadow-sm text-white bg-emerald-600 hover:bg-emerald-700" 
+                    onClick={handleCopy}
+                  >
+                    <Copy className="w-4 h-4 mr-2" /> COPIAR DESPACHO
+                  </Button>
+                ) : (
+                  <Button 
+                    className="font-bold h-12 px-8 shadow-sm text-white bg-purple hover:bg-purple/80" 
+                    onClick={handleCopy}
+                  >
+                    <Copy className="w-4 h-4 mr-2" /> COPIAR CDO
+                  </Button>
+                )}
               </div>
             </motion.div>
           </div>
