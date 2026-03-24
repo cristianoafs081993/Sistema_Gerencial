@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { 
   FileText, 
   Trash2, 
@@ -6,9 +6,8 @@ import {
   Copy, 
   RefreshCw, 
   ExternalLink,
-  ChevronRight,
   CheckCircle2,
-  AlertCircle
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -42,7 +41,7 @@ const macroprocessoData: Record<string, string[]> = {
   "IE - Infraestrutura": ["14 - Gestão de Manutenção", "15 - Logística e Sustentabilidade"],
   "IN - Internacionalização": ["5 - Relações Internacionais"],
   "PI - Pesquisa, Pós e Inovação": ["2 - Inovação Tecnológica"],
-  "TI - Technology da Informação": ["1 - Política TIC", "2 - Governança", "4 - Infraestrutura"]
+  "TI - Tecnologia da Informação": ["1 - Política TIC", "2 - Governança", "4 - Infraestrutura"]
 };
 
 export default function GeradorDocumentos() {
@@ -168,7 +167,7 @@ export default function GeradorDocumentos() {
         <div style="margin-bottom: 25px;"><b>Processo:</b> ${cdoProcTopo}</div>
         
         <p style="text-align: justify; line-height: 1.6; margin-bottom: 25px;">
-            Visando subsidiar a execução de atividades concernentes ao Macroprocesso <b>${cdoMacro}</b> Processo <b>${cdoProcDesc}</b> gerido por <b>${cdoSetor}</b> programada no plano de atividades do Instituto para ${cdoAno}, certificamos a disponibilidade orçamentária abaixo detalhada with o reforço de empenho para o objetivo de atender à despesa com a finalidade de <b>${cdoFinalidade}</b>, no valor total de <b>R$ ${totalStr}</b>.
+            Visando subsidiar a execução de atividades concernentes ao Macroprocesso <b>${cdoMacro}</b> Processo <b>${cdoProcDesc}</b> gerido por <b>${cdoSetor}</b> programada no plano de atividades do Instituto para ${cdoAno}, certificamos a disponibilidade orçamentária abaixo detalhada com o reforço de empenho para o objetivo de atender à despesa com a finalidade de <b>${cdoFinalidade}</b>, no valor total de <b>R$ ${totalStr}</b>.
         </p>
 
         <div style="font-weight: bold; margin-bottom: 10px;">Detalhes Orçamentários:</div>
@@ -208,17 +207,17 @@ export default function GeradorDocumentos() {
     try {
       const data = [new ClipboardItem({ "text/html": blob })];
       await navigator.clipboard.write(data);
-      toast.success("Documento copiado!");
-      setStep(4);
+      toast.success("Documento copiado com sucesso!");
+      setStep(3);
     } catch (err) {
-      toast.error("Erro ao copiar");
+      toast.error("Erro ao copiar o documento");
     }
   };
 
   const handleClone = () => {
     const id = activeTab === 'despacho' ? '1026154' : '1016427';
     window.open(`https://suap.ifrn.edu.br/documento_eletronico/clonar_documento/${id}/`, '_blank');
-    setStep(4);
+    setStep(3);
   };
 
   const handleReset = () => {
@@ -234,7 +233,7 @@ export default function GeradorDocumentos() {
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-5xl mx-auto">
+    <div className="flex flex-col gap-6 max-w-4xl mx-auto pb-12">
       
       {/* Tabs Navigation */}
       <div className="flex bg-muted/50 p-1.5 rounded-xl self-start">
@@ -258,359 +257,349 @@ export default function GeradorDocumentos() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Form Column */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card className={cn(
-            "border-t-4 shadow-lg overflow-hidden transition-all duration-300",
-            activeTab === 'despacho' ? "border-t-emerald-500" : "border-t-purple-500"
-          )}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className={cn("w-5 h-5", activeTab === 'despacho' ? "text-emerald-500" : "text-purple-500")} />
-                {activeTab === 'despacho' ? 'Configurar Despacho de Liquidação' : 'Certificado de Dotação Orçamentária'}
-              </CardTitle>
-              <CardDescription>
-                Preencha os campos abaixo para gerar o documento oficial.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              
-              {activeTab === 'despacho' ? (
-                // --- DESPACHO FORM ---
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Finalidade</Label>
-                      <Select value={finalidade} onValueChange={v => { setFinalidade(v); setStep(1); setHasGenerated(false); }}>
+      {/* Horizontal Pipeline (Classic) */}
+      <div className="flex items-start justify-between w-full mt-4 mb-2 relative px-8">
+        <div className="absolute top-5 left-[15%] right-[15%] h-[3px] bg-muted-foreground/20 z-0" />
+        <div 
+          className="absolute top-5 left-[15%] h-[3px] z-0 transition-all duration-500 bg-primary" 
+          style={{ width: step === 1 ? '0%' : step === 2 ? '50%' : '70%' }} 
+        />
+
+        {[
+          { label: '1. Preencher\nDados', id: 1 },
+          { label: '2. Gerar\nDocumento', id: 2 },
+          { label: '3. Copiar e\nFinalizar', id: 3 },
+        ].map((item) => {
+          const isActive = step === item.id;
+          const isCompleted = step > item.id;
+          return (
+            <div key={item.id} className={cn("flex flex-col items-center flex-1 relative z-10 transition-opacity duration-300", step >= item.id ? "opacity-100" : "opacity-40")}>
+              <div className={cn(
+                "w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg mb-2 shadow-sm transition-colors",
+                isActive ? "bg-primary text-primary-foreground ring-4 ring-primary/20" : 
+                isCompleted ? "bg-emerald-600 text-white ring-2 ring-emerald-600 border-none" : 
+                "bg-muted text-muted-foreground border-2 border-background"
+              )}>
+                {isCompleted ? <CheckCircle2 className="w-5 h-5" /> : item.id}
+              </div>
+              <span className={cn(
+                "text-sm font-bold text-center whitespace-pre-line leading-tight", 
+                isActive ? "text-primary" : 
+                isCompleted ? "text-emerald-700" : 
+                "text-muted-foreground"
+              )}>
+                {item.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Form Area */}
+      <Card className={cn(
+        "border-t-4 shadow-lg overflow-hidden transition-all duration-300",
+        activeTab === 'despacho' ? "border-t-emerald-500" : "border-t-purple-500"
+      )}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className={cn("w-5 h-5", activeTab === 'despacho' ? "text-emerald-500" : "text-purple-500")} />
+            {activeTab === 'despacho' ? 'Configurar Despacho de Liquidação' : 'Certificado de Dotação Orçamentária'}
+          </CardTitle>
+          <CardDescription>
+            Preencha os campos abaixo para gerar o documento oficial.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          
+          {activeTab === 'despacho' ? (
+            // --- DESPACHO FORM ---
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Finalidade</Label>
+                  <Select value={finalidade} onValueChange={v => { setFinalidade(v); setStep(1); setHasGenerated(false); }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="contrato">Contrato ou Aquisição Comum</SelectItem>
+                      <SelectItem value="projeto">Projeto de Pesquisa / Extensão (Alunos)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <AnimatePresence mode="wait">
+                  {finalidade === 'projeto' ? (
+                    <motion.div 
+                      key="proj-fields"
+                      initial={{ opacity: 0, x: 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -10 }}
+                      className="grid grid-cols-2 gap-2"
+                    >
+                      <div className="space-y-2">
+                        <Label>Ano</Label>
+                        <Input value={anoProjeto} onChange={e => { setAnoProjeto(e.target.value); setStep(1); setHasGenerated(false); }} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Identificação do Edital</Label>
+                        <Input value={editalProjeto} onChange={e => { setEditalProjeto(e.target.value); setStep(1); setHasGenerated(false); }} />
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div 
+                      key="cont-field"
+                      initial={{ opacity: 0, x: 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -10 }}
+                      className="space-y-2"
+                    >
+                      <Label>Tipo</Label>
+                      <Select value={tipo} onValueChange={v => { setTipo(v); setStep(1); setHasGenerated(false); }}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="contrato">Contrato ou Aquisição Comum</SelectItem>
-                          <SelectItem value="projeto">Projeto de Pesquisa / Extensão</SelectItem>
+                          <SelectItem value="dos serviços de">Serviço</SelectItem>
+                          <SelectItem value="da aquisição de">Aquisição</SelectItem>
                         </SelectContent>
                       </Select>
-                    </div>
-
-                    <AnimatePresence mode="wait">
-                      {finalidade === 'projeto' ? (
-                        <motion.div 
-                          key="proj-fields"
-                          initial={{ opacity: 0, x: 10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -10 }}
-                          className="grid grid-cols-2 gap-2"
-                        >
-                          <div className="space-y-2">
-                            <Label>Ano</Label>
-                            <Input value={anoProjeto} onChange={e => { setAnoProjeto(e.target.value); setStep(1); setHasGenerated(false); }} />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Edital</Label>
-                            <Input value={editalProjeto} onChange={e => { setEditalProjeto(e.target.value); setStep(1); setHasGenerated(false); }} />
-                          </div>
-                        </motion.div>
-                      ) : (
-                        <motion.div 
-                          key="cont-field"
-                          initial={{ opacity: 0, x: 10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -10 }}
-                          className="space-y-2"
-                        >
-                          <Label>Tipo</Label>
-                          <Select value={tipo} onValueChange={v => { setTipo(v); setStep(1); setHasGenerated(false); }}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="dos serviços de">Serviço</SelectItem>
-                              <SelectItem value="da aquisição de">Aquisição</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-
-                  {finalidade === 'projeto' ? (
-                    <div className="space-y-2">
-                      <Label>Nome do Projeto</Label>
-                      <Textarea 
-                        rows={2} 
-                        value={nomeProjeto} 
-                        onChange={e => { setNomeProjeto(e.target.value); setStep(1); setHasGenerated(false); }} 
-                        placeholder="Nome completo do projeto conforme edital..."
-                      />
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <Label>Descrição Detalhada</Label>
-                      <Textarea 
-                        rows={2} 
-                        value={descricao} 
-                        onChange={e => { setDescricao(e.target.value); setStep(1); setHasGenerated(false); }} 
-                        placeholder="Ex: SERVIÇOS DE MANUTENÇÃO PREVENTIVA..."
-                      />
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label>{finalidade === 'projeto' ? 'Alunos Beneficiários' : 'Favorecido (Empresa)'}</Label>
-                    <Input value={favorecido} onChange={e => { setFavorecido(e.target.value); setStep(1); setHasGenerated(false); }} className="uppercase" />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Número do Processo</Label>
-                      <Input value={processo} onChange={e => { setProcesso(e.target.value); setStep(1); setHasGenerated(false); }} placeholder="23035.XXXXXX/202X-XX" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Valor da Liquidação (R$)</Label>
-                      <Input value={valor} onChange={e => { setValor(e.target.value); setStep(1); setHasGenerated(false); }} placeholder="0.000,00" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Número do Empenho</Label>
-                    <Input value={empenho} onChange={e => { setEmpenho(e.target.value); setStep(1); setHasGenerated(false); }} placeholder="202XNE000XXX" className="uppercase" />
-                  </div>
-                </>
-              ) : (
-                // --- CDO FORM ---
-                <div className="space-y-5">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Unidade Administrativa</Label>
-                      <Input value={cdoUnidade} onChange={e => { setCdoUnidade(e.target.value); setStep(1); setHasGenerated(false); }} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Processo nº</Label>
-                      <Input value={cdoProcTopo} onChange={e => { setCdoProcTopo(e.target.value); setStep(1); setHasGenerated(false); }} placeholder="23035.XXXXXX/2026-XX" />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Macroprocesso</Label>
-                      <Select value={cdoMacro} onValueChange={v => { setCdoMacro(v); setCdoProcDesc(''); setStep(1); setHasGenerated(false); }}>
-                        <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                        <SelectContent>
-                          {Object.keys(macroprocessoData).sort().map(m => (
-                            <SelectItem key={m} value={m}>{m}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Processo (Descrição)</Label>
-                      <Select value={cdoProcDesc} onValueChange={v => { setCdoProcDesc(v); setStep(1); setHasGenerated(false); }}>
-                        <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                        <SelectContent>
-                          {(macroprocessoData[cdoMacro] || []).map(p => (
-                            <SelectItem key={p} value={p}>{p}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="col-span-2 space-y-2">
-                      <Label>Gerido por</Label>
-                      <Input value={cdoSetor} onChange={e => { setCdoSetor(e.target.value); setStep(1); setHasGenerated(false); }} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Ano</Label>
-                      <Input value={cdoAno} onChange={e => { setCdoAno(e.target.value); setStep(1); setHasGenerated(false); }} />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Finalidade da Despesa</Label>
-                    <Input value={cdoFinalidade} onChange={e => { setCdoFinalidade(e.target.value); setStep(1); setHasGenerated(false); }} placeholder="Ex: Custeio de manutenção..." />
-                  </div>
-
-                  <div className="bg-muted/40 p-4 rounded-xl space-y-4 border border-border/60">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>UG / UGR</Label>
-                        <Input value={cdoUg} onChange={e => { setCdoUg(e.target.value); setStep(1); setHasGenerated(false); }} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Origem Recurso SUAP</Label>
-                        <Input value={cdoOrigem} onChange={e => { setCdoOrigem(e.target.value); setStep(1); setHasGenerated(false); }} />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>PTRES</Label>
-                        <Input value={cdoPtres} onChange={e => { setCdoPtres(e.target.value); setStep(1); setHasGenerated(false); }} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>PI</Label>
-                        <Input value={cdoPi} onChange={e => { setCdoPi(e.target.value); setStep(1); setHasGenerated(false); }} />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>GND</Label>
-                        <Input value={cdoGnd} onChange={e => { setCdoGnd(e.target.value); setStep(1); setHasGenerated(false); }} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Fonte</Label>
-                        <Input value={cdoFonte} onChange={e => { setCdoFonte(e.target.value); setStep(1); setHasGenerated(false); }} />
-                      </div>
-                    </div>
-                  </div>
-
-                  <Card className="bg-transparent border-dashed">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base">Naturezas de Despesa</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-3 gap-3">
-                        <div className="col-span-2 space-y-1.5">
-                          <Label className="text-[10px] uppercase text-muted-foreground">Descrição</Label>
-                          <Input value={cdoNatDesc} onChange={e => { setCdoNatDesc(e.target.value); setStep(1); setHasGenerated(false); }} />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-[10px] uppercase text-muted-foreground">Valor (R$)</Label>
-                          <Input value={cdoNatValor} onChange={e => { setCdoNatValor(e.target.value); setStep(1); setHasGenerated(false); }} />
-                        </div>
-                      </div>
-
-                      <AnimatePresence>
-                        {naturezasExtras.map((n, idx) => (
-                          <motion.div 
-                            key={`extra-${idx}`}
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="flex items-center justify-between bg-surface-card p-3 rounded-lg border shadow-sm"
-                          >
-                            <div className="flex-1 min-w-0 pr-4">
-                              <p className="text-sm font-medium truncate">{n.descricao}</p>
-                              <p className="text-xs text-primary font-bold">R$ {formatCurrency(n.valor)}</p>
-                            </div>
-                            <Button variant="ghost" size="icon-sm" onClick={() => handleRemoveNatureza(idx)} className="text-destructive">
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </motion.div>
-                        ))}
-                      </AnimatePresence>
-
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="w-full border-dashed" 
-                        onClick={handleAddNatureza}
-                      >
-                        <Plus className="w-4 h-4 mr-2" /> Adicionar Natureza Extra
-                      </Button>
-
-                      <div className="flex justify-between items-center pt-2 border-t">
-                        <span className="text-sm font-semibold">TOTAL PREVISTO:</span>
-                        <span className="text-lg font-black text-primary font-mono tabular-nums">R$ {formatCurrency(totalCDO())}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-
-              <div className="flex flex-col gap-4 pt-4">
-                <div className="flex gap-4">
-                  <Button 
-                    className={cn(
-                      "flex-1 h-12 text-lg font-bold shadow-lg transition-all active:scale-[0.98]",
-                      activeTab === 'despacho' ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald/20" : "bg-purple-600 hover:bg-purple-700 shadow-purple/20"
-                    )} 
-                    onClick={handleGenerate}
-                  >
-                    <RefreshCw className={cn("w-5 h-5 mr-2", hasGenerated && "animate-spin")} />
-                    {hasGenerated ? "REGERAR DOCUMENTO" : "GERAR DOCUMENTO"}
-                  </Button>
-                  <Button variant="outline" className="h-12 w-12 border-2" onClick={handleReset}>
-                    <Trash2 className="w-5 h-5 text-muted-foreground" />
-                  </Button>
-                </div>
-
-                {/* --- SHORTCUT BUTTONS (VISIBLE AFTER GENERATE) --- */}
-                <AnimatePresence>
-                  {hasGenerated && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="grid grid-cols-2 gap-4 pb-2"
-                    >
-                      <Button 
-                        className={cn(
-                          "h-14 font-black transition-all border-b-4",
-                          activeTab === 'despacho' 
-                            ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-700 active:border-b-0" 
-                            : "bg-purple-700 hover:bg-purple-800 text-white border-purple-900 active:border-b-0"
-                        )}
-                        onClick={handleCopy}
-                      >
-                        <Copy className="w-5 h-5 mr-2" /> COPIAR {activeTab.toUpperCase()}
-                      </Button>
-                      <Button 
-                        className="h-14 bg-indigo-600 hover:bg-indigo-700 text-white font-black transition-all border-b-4 border-indigo-800 active:border-b-0"
-                        onClick={handleClone}
-                      >
-                        <ExternalLink className="w-5 h-5 mr-2" /> CLONAR NO SUAP
-                      </Button>
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
 
-            </CardContent>
-          </Card>
-        </div>
+              {finalidade === 'projeto' ? (
+                <div className="space-y-2">
+                  <Label>Nome do Projeto</Label>
+                  <Textarea 
+                    rows={2} 
+                    value={nomeProjeto} 
+                    onChange={e => { setNomeProjeto(e.target.value); setStep(1); setHasGenerated(false); }} 
+                  />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Descrição Detalhada</Label>
+                  <Textarea 
+                    rows={2} 
+                    value={descricao} 
+                    onChange={e => { setDescricao(e.target.value); setStep(1); setHasGenerated(false); }} 
+                    placeholder="Ex: SERVIÇOS DE MANUTENÇÃO PREVENTIVA..."
+                  />
+                </div>
+              )}
 
-        {/* Info Column */}
-        <div className="space-y-6">
-          <Card className={cn(
-            "border-l-4 sticky top-24 transition-colors duration-500",
-            activeTab === 'despacho' ? "bg-emerald-500/5 border-l-emerald-500" : "bg-purple-500/5 border-l-purple-500"
-          )}>
-            <CardHeader>
-              <CardTitle className="text-lg">Etapas do Processo</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-8 relative">
-                {/* Visual Line */}
-                <div className="absolute left-[19px] top-2 bottom-2 w-0.5 bg-muted-foreground/20" />
-                
-                {[
-                  { label: 'Informar Dados', desc: 'Preencha o formulário lateral com as informações do processo.', status: step >= 1 ? 'active' : 'idle' },
-                  { label: 'Gerar Documento', desc: 'O documento será gerado e os botões de ação ficarão disponíveis.', status: step >= 2 ? 'active' : 'idle' },
-                  { label: 'Ações Disponíveis', desc: 'Use os botões para copiar o texto ou clonar diretamente no SUAP.', status: step >= 3 ? 'active' : 'idle' },
-                  { label: 'Finalizado', desc: 'O documento foi utilizado com sucesso.', status: step >= 4 ? 'active' : 'idle' },
-                ].map((s, idx) => (
-                  <div key={idx} className="flex gap-4 relative z-10">
-                    <div className={cn(
-                      "w-10 h-10 rounded-full flex items-center justify-center border-4 border-background shrink-0 transition-all duration-300",
-                      s.status === 'active' ? (activeTab === 'despacho' ? "bg-emerald-500 text-white shadow-emerald/30 scale-110" : "bg-purple-500 text-white shadow-purple/30 scale-110") : "bg-muted text-muted-foreground"
-                    )}>
-                      {step > idx + 1 || (step === 4 && idx === 3) ? <CheckCircle2 className="w-5 h-5" /> : idx + 1}
+              <div className="space-y-2">
+                <Label>{finalidade === 'projeto' ? 'Favorecido (Alunos)' : 'Favorecido (Empresa)'}</Label>
+                <Input value={favorecido} onChange={e => { setFavorecido(e.target.value); setStep(1); setHasGenerated(false); }} className="uppercase" />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Processo nº</Label>
+                  <Input value={processo} onChange={e => { setProcesso(e.target.value); setStep(1); setHasGenerated(false); }} placeholder="23035.XXXXXX/202X-XX" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Valor (R$)</Label>
+                  <Input value={valor} onChange={e => { setValor(e.target.value); setStep(1); setHasGenerated(false); }} placeholder="0.000,00" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Número do Empenho</Label>
+                <Input value={empenho} onChange={e => { setEmpenho(e.target.value); setStep(1); setHasGenerated(false); }} placeholder="202XNE000XXX" className="uppercase" />
+              </div>
+            </>
+          ) : (
+            // --- CDO FORM ---
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Unidade Administrativa</Label>
+                  <Input value={cdoUnidade} onChange={e => { setCdoUnidade(e.target.value); setStep(1); setHasGenerated(false); }} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Processo nº</Label>
+                  <Input value={cdoProcTopo} onChange={e => { setCdoProcTopo(e.target.value); setStep(1); setHasGenerated(false); }} placeholder="23035.XXXXXX/2026-XX" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Macroprocesso</Label>
+                  <Select value={cdoMacro} onValueChange={v => { setCdoMacro(v); setCdoProcDesc(''); setStep(1); setHasGenerated(false); }}>
+                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      {Object.keys(macroprocessoData).sort().map(m => (
+                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Processo (Descrição)</Label>
+                  <Select value={cdoProcDesc} onValueChange={v => { setCdoProcDesc(v); setStep(1); setHasGenerated(false); }}>
+                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      {(macroprocessoData[cdoMacro] || []).map(p => (
+                        <SelectItem key={p} value={p}>{p}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2 space-y-2">
+                  <Label>Gerido por</Label>
+                  <Input value={cdoSetor} onChange={e => { setCdoSetor(e.target.value); setStep(1); setHasGenerated(false); }} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Ano Atividades</Label>
+                  <Input value={cdoAno} onChange={e => { setCdoAno(e.target.value); setStep(1); setHasGenerated(false); }} />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Finalidade (Ex: Custeio Mercatto)</Label>
+                <Input value={cdoFinalidade} onChange={e => { setCdoFinalidade(e.target.value); setStep(1); setHasGenerated(false); }} />
+              </div>
+
+              <div className="bg-muted/40 p-4 rounded-xl space-y-4 border border-border/60">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>UG / UGR</Label>
+                    <Input value={cdoUg} onChange={e => { setCdoUg(e.target.value); setStep(1); setHasGenerated(false); }} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Origem Recurso SUAP</Label>
+                    <Input value={cdoOrigem} onChange={e => { setCdoOrigem(e.target.value); setStep(1); setHasGenerated(false); }} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>PTRES</Label>
+                    <Input value={cdoPtres} onChange={e => { setCdoPtres(e.target.value); setStep(1); setHasGenerated(false); }} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>PI</Label>
+                    <Input value={cdoPi} onChange={e => { setCdoPi(e.target.value); setStep(1); setHasGenerated(false); }} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>GND</Label>
+                    <Input value={cdoGnd} onChange={e => { setCdoGnd(e.target.value); setStep(1); setHasGenerated(false); }} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Fonte</Label>
+                    <Input value={cdoFonte} onChange={e => { setCdoFonte(e.target.value); setStep(1); setHasGenerated(false); }} />
+                  </div>
+                </div>
+              </div>
+
+              <Card className="bg-transparent border-dashed">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Naturezas de Despesa</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="col-span-2 space-y-1.5">
+                      <Label className="text-[10px] uppercase text-muted-foreground">Natureza de Despesa (Ex: 339034 - DIARIAS)</Label>
+                      <Input value={cdoNatDesc} onChange={e => { setCdoNatDesc(e.target.value); setStep(1); setHasGenerated(false); }} />
                     </div>
-                    <div className="pt-1">
-                      <p className={cn("font-bold text-sm", s.status === 'active' ? (activeTab === 'despacho' ? "text-emerald-700" : "text-purple-700") : "text-muted-foreground")}>{s.label}</p>
-                      <p className="text-xs text-muted-foreground leading-relaxed mt-1">{s.desc}</p>
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] uppercase text-muted-foreground">Valor (R$)</Label>
+                      <Input value={cdoNatValor} onChange={e => { setCdoNatValor(e.target.value); setStep(1); setHasGenerated(false); }} />
                     </div>
                   </div>
-                ))}
-              </div>
 
-              <div className="mt-8 p-4 bg-background/50 rounded-xl border flex gap-3 text-xs leading-relaxed">
-                <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
-                <p>O documento gerado segue os padrões IFRN e pode ser clonado diretamente no SUAP para agilizar seu trabalho.</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+                  <AnimatePresence>
+                    {naturezasExtras.map((n, idx) => (
+                      <motion.div 
+                        key={`extra-${idx}`}
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="flex items-center justify-between bg-surface-card p-3 rounded-lg border shadow-sm"
+                      >
+                        <div className="flex-1 min-w-0 pr-4">
+                          <p className="text-sm font-medium truncate">{n.descricao}</p>
+                          <p className="text-xs text-primary font-bold">R$ {formatCurrency(n.valor)}</p>
+                        </div>
+                        <Button variant="ghost" size="icon-sm" onClick={() => handleRemoveNatureza(idx)} className="text-destructive hover:bg-destructive/10">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full border-dashed bg-cyan-50/50 hover:bg-cyan-100 text-cyan-700 border-cyan-200" 
+                    onClick={handleAddNatureza}
+                  >
+                    <Plus className="w-4 h-4 mr-2" /> ADICIONAR NATUREZA DE DESPESA
+                  </Button>
+
+                  <div className="flex justify-between items-center px-4 py-3 bg-blue-50/50 border-2 border-blue-200 rounded-lg text-blue-800">
+                    <span className="text-sm font-semibold">TOTAL PREVISTO:</span>
+                    <span className="text-lg font-black font-mono tabular-nums">R$ {formatCurrency(totalCDO())}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-4 pt-4 border-t">
+            <div className="flex gap-4">
+              <Button 
+                className={cn(
+                  "flex-1 h-12 text-lg font-bold shadow-lg transition-all active:scale-[0.98] text-white",
+                  activeTab === 'despacho' ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20" : "bg-purple-600 hover:bg-purple-700 shadow-purple-500/20"
+                )} 
+                onClick={handleGenerate}
+              >
+                <RefreshCw className={cn("w-5 h-5 mr-2", hasGenerated && "animate-spin")} />
+                {hasGenerated ? `REGERAR ${activeTab.toUpperCase()}` : `GERAR ${activeTab.toUpperCase()}`}
+              </Button>
+              <Button variant="outline" className="h-12 w-32 border-2 hover:bg-destructive hover:text-white" onClick={handleReset}>
+                LIMPAR
+              </Button>
+            </div>
+
+            {/* --- SHORTCUT BUTTONS (VISIBLE AFTER GENERATE) --- */}
+            <AnimatePresence>
+              {hasGenerated && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="grid grid-cols-2 gap-4 pb-2"
+                >
+                  <Button 
+                    variant="outline"
+                    className="h-14 bg-blue-600 hover:bg-blue-700 text-white font-black transition-all border-none active:scale-[0.98]"
+                    onClick={handleClone}
+                  >
+                    <ExternalLink className="w-5 h-5 mr-2" /> CLONAR NO SUAP
+                  </Button>
+                  <Button 
+                    className={cn(
+                      "h-14 font-black transition-all border-none active:scale-[0.98] text-white",
+                      activeTab === 'despacho' 
+                        ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/30" 
+                        : "bg-purple-600 hover:bg-purple-700 shadow-purple-500/30"
+                    )}
+                    onClick={handleCopy}
+                  >
+                    <Copy className="w-5 h-5 mr-2" /> COPIAR {activeTab.toUpperCase()}
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+        </CardContent>
+      </Card>
 
       {/* Preview Modal */}
       <AnimatePresence>
@@ -627,30 +616,27 @@ export default function GeradorDocumentos() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-background w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+              className="relative bg-background w-full max-w-[23cm] max-h-[90vh] rounded-xl shadow-2xl flex flex-col overflow-hidden"
             >
-              <div className="flex items-center justify-between p-6 border-b shrink-0 bg-muted/20">
-                <div>
-                  <h3 className="text-xl font-bold">Prévia do Documento</h3>
-                  <p className="text-sm text-muted-foreground">O conteúdo abaixo pode ser editado diretamente antes de copiar.</p>
-                </div>
-                <Button variant="ghost" size="icon" onClick={() => setShowModal(false)}>
-                  <Plus className="w-6 h-6 rotate-45" />
+              <div className="flex items-center justify-between px-6 py-4 border-b shrink-0 bg-muted/20">
+                <h3 className="text-xl font-bold text-foreground">Documento Gerado</h3>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => setShowModal(false)}>
+                  <X className="w-5 h-5" />
                 </Button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-8 bg-zinc-200/50">
                 <div 
-                  className="bg-white text-black p-[2.5cm] min-h-[29.7cm] shadow-2xl mx-auto w-full max-w-[21cm] focus:outline-none focus:ring-2 focus:ring-primary/20 rounded-sm"
+                  className="bg-white text-black p-[2.5cm] min-h-[29.7cm] shadow-xl mx-auto w-[21cm] focus:outline-none"
                   contentEditable
                   suppressContentEditableWarning
                   dangerouslySetInnerHTML={{ __html: activeTab === 'despacho' ? generateDespachoHTML() : generateCDOHTML() }}
                 />
               </div>
 
-              <div className="p-6 border-t flex flex-wrap gap-4 bg-muted/20 shrink-0">
+              <div className="px-6 py-4 border-t flex gap-4 bg-muted/20 shrink-0">
                 <Button 
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-6 h-12 shadow-lg"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 shadow-sm px-6"
                   onClick={handleClone}
                 >
                   <ExternalLink className="w-4 h-4 mr-2" /> CLONAR NO SUAP
@@ -658,13 +644,10 @@ export default function GeradorDocumentos() {
                 
                 <div className="flex-1" />
 
-                <Button variant="outline" className="h-12 px-6" onClick={() => setShowModal(false)}>
-                  FECHAR
-                </Button>
                 <Button 
                   className={cn(
-                    "font-black px-8 h-12 shadow-lg",
-                    activeTab === 'despacho' ? "bg-amber-500 hover:bg-amber-600 text-white" : "bg-purple-700 hover:bg-purple-800 text-white"
+                    "font-bold h-12 px-8 shadow-sm text-white",
+                    activeTab === 'despacho' ? "bg-emerald-600 hover:bg-emerald-700" : "bg-purple-600 hover:bg-purple-700"
                   )} 
                   onClick={handleCopy}
                 >
