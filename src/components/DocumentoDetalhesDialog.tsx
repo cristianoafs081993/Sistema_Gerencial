@@ -1,5 +1,5 @@
 import { DocumentoDespesa } from "@/types";
-import { formatCurrency, formatarDocumento, formatDocumentoId } from "@/lib/utils";
+import { formatCurrency, formatarDocumento, formatDocumentoId, calculateDocumentoValorPago } from "@/lib/utils";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { transparenciaService } from "@/services/transparencia";
@@ -48,26 +48,17 @@ export function DocumentoDetalhesDialog({
 
     if (!displayDoc) return null;
 
-    // Lógica de Negócio:
-    // O Valor Pago é calculado no momento da exibição baseando-se no estado.
-    // Se REALIZADO, pago = original.
-    // Se PENDENTE, pago = original - retenções (se houver OB).
+    // Lógica de Negócio centralizada em utils.ts
     const situational = displayDoc.situacoes || [];
-    const items = displayDoc.itens || [];
-    const temOB = items.some(i => i.doc_tipo === 'OB');
     const totalRetencoes = situational.filter(s => 
         s.is_retencao || 
         s.situacao_codigo === 'DOB001' || 
         s.situacao_codigo === 'DOB035'
     ).reduce((acc, s) => acc + (s.valor || 0), 0) || 0;
+    const items = displayDoc.itens || [];
+    const temOB = items.some(i => i.doc_tipo === 'OB');
     
-    let valorPagoCalculado = 0;
-    if (displayDoc.estado === 'REALIZADO') {
-        valorPagoCalculado = displayDoc.valor_original || 0;
-    } else if (temOB) {
-        valorPagoCalculado = Math.max(0, (displayDoc.valor_original || 0) - totalRetencoes);
-    }
-
+    const valorPagoCalculado = calculateDocumentoValorPago(displayDoc);
     const valorLiquido = Math.max(0, (displayDoc.valor_original || 0) - totalRetencoes);
 
     return (

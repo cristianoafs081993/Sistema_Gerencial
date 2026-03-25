@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { transparenciaService } from '@/services/transparencia';
 import { DocumentoDespesa, DocumentoSituacao } from '@/types';
-import { formatCurrency, formatarDocumento, formatDocumentoId, parseCurrency } from '@/lib/utils';
+import { calculateDocumentoValorPago, formatCurrency, formatarDocumento, formatDocumentoId, parseCurrency } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -274,15 +274,7 @@ export default function LiquidacoesPagamentos() {
                 />
                 <StatCard
                     title="Total Pago (Filtrado)"
-                    value={formatCurrency(documentos.reduce((sum, d) => {
-                        const situational = d.situacoes || [];
-                        const totalRetencoes = situational.filter(s => s.is_retencao).reduce((acc, s) => acc + (s.valor || 0), 0) || 0;
-                        const temOB = (d.itens || []).some(i => i.doc_tipo === 'OB');
-                        let vPago = 0;
-                        if (d.estado === 'REALIZADO') vPago = d.valor_original || 0;
-                        else if (temOB) vPago = Math.max(0, (d.valor_original || 0) - totalRetencoes);
-                        return sum + vPago;
-                    }, 0))}
+                    value={formatCurrency(documentos.reduce((sum, d) => sum + calculateDocumentoValorPago(d), 0))}
                     icon={Eye}
                     stitchColor="emerald-green"
                     isLoading={isLoading}
@@ -470,22 +462,11 @@ export default function LiquidacoesPagamentos() {
                                                 {doc.valor_original ? formatCurrency(doc.valor_original) : '-'}
                                             </TableCell>
                                             <TableCell className="text-right font-black text-[11px] text-emerald-600 dark:text-emerald-400 py-5">
-                                                {(() => {
-                                                    const situational = doc.situacoes || [];
-                                                    const totalRetencoes = situational.filter(s => 
-                                                        s.is_retencao || 
-                                                        s.situacao_codigo === 'DOB001' || 
-                                                        s.situacao_codigo === 'DOB035'
-                                                    ).reduce((acc, s) => acc + (s.valor || 0), 0) || 0;
-                                                    
-                                                    const temOB = (doc.itens || []).some(i => i.doc_tipo === 'OB');
-                                                    let vPago = 0;
-                                                    if (doc.estado === 'REALIZADO') vPago = doc.valor_original || 0;
-                                                    else if (temOB) vPago = Math.max(0, (doc.valor_original || 0) - totalRetencoes);
-                                                    
-                                                    return vPago > 0 ? formatCurrency(vPago) : '-';
-                                                })()}
-                                            </TableCell>
+                                                 {(() => {
+                                                     const vPago = calculateDocumentoValorPago(doc);
+                                                     return vPago > 0 ? formatCurrency(vPago) : '-';
+                                                 })()}
+                                             </TableCell>
                                             <TableCell className="pr-6 text-right py-5">
                                                 <Button 
                                                     variant="ghost" 

@@ -1,8 +1,61 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { DocumentoDespesa } from "@/types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+/**
+ * Calcula o valor pago de um documento com base em seu estado e itens (OBs/NSs)
+ */
+export function calculateDocumentoValorPago(doc: DocumentoDespesa): number {
+    const situacoes = doc.situacoes || [];
+    const items = doc.itens || [];
+    const temOB = items.some(i => i.doc_tipo === 'OB');
+    const estado = doc.estado?.toUpperCase() || '';
+    
+    if (estado === 'REALIZADO') {
+        return doc.valor_original || 0;
+    }
+    
+    if (estado === 'CANCELADO') {
+        return 0;
+    }
+    
+    // Regra específica: Pendente de Realização
+    // Se temos OBs com valores válidos, usamos a soma delas como o valor pago primário
+    // Se não houver OBs ou os valores forem zero (ainda não importados), calculamos com base nas retenções
+    if (estado === 'PENDENTE DE REALIZACAO') {
+        const obs = items.filter(i => i.doc_tipo === 'OB');
+        const somaOBs = obs.reduce((acc, i) => acc + (i.valor || 0), 0);
+        
+        if (obs.length > 0 && somaOBs > 0) {
+            return somaOBs;
+        }
+
+        const retencoesPendentes = situacoes
+            .filter(s => {
+                const code = s.situacao_codigo?.toUpperCase() || '';
+                return code === 'DSP021' || code === 'DSP025' || code === 'DDF021' || code === 'DDF025';
+            })
+            .reduce((acc, s) => acc + (s.valor || 0), 0);
+        
+        return Math.max(0, (doc.valor_original || 0) - retencoesPendentes);
+    }
+    
+    // Regra geral para outros estados (ex: EM LIQUIDACAO) que possuem OB
+    if (temOB) {
+         const totalRetencoes = situacoes.filter(s => 
+            s.is_retencao || 
+            s.situacao_codigo === 'DOB001' || 
+            s.situacao_codigo === 'DOB035'
+        ).reduce((acc, s) => acc + (s.valor || 0), 0) || 0;
+        
+        return Math.max(0, (doc.valor_original || 0) - totalRetencoes);
+    }
+
+    return 0;
 }
 
 export const formatCurrency = (value: number) => {

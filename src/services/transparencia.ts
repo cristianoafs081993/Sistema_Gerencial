@@ -368,6 +368,7 @@ export const transparenciaService = {
     },
 
     async importOrdensBancarias(data: Record<string, string>[]): Promise<void> {
+        const itemsMap: Map<string, any> = new Map();
         const parentUpdates: Map<string, { empenho_numero?: string, fonte_sof?: string }> = new Map();
         const empenhoNumbers = new Set<string>();
 
@@ -387,7 +388,19 @@ export const transparenciaService = {
             }
 
             const valorStr = row['despesaspagas'] || row['restosapagarpagosprocenproc'] || row['valor'] || '0';
-            const valor = Number(valorStr.replace(/[^\d.,]/g, '').replace(',', '.'));
+            // Robust parsing: Handling 28.727,79 format
+            let valor = 0;
+            if (valorStr) {
+                const cleaned = valorStr.replace(/\s/g, '');
+                if (cleaned.includes(',') && cleaned.includes('.')) {
+                    // Brazil format: 1.234,56
+                    valor = Number(cleaned.replace(/\./g, '').replace(',', '.'));
+                } else if (cleaned.includes(',')) {
+                    valor = Number(cleaned.replace(',', '.'));
+                } else {
+                    valor = Number(cleaned);
+                }
+            }
             
             const dataLancamento = row['dialancamento'] || '';
             let formattedDate = new Date().toISOString().split('T')[0];
