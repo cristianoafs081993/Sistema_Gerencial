@@ -209,27 +209,37 @@ export const transparenciaService = {
         const docsMap = new Map<string, any>();
         
         for (const row of data) {
-            // Mapeamento flexível de chaves normalizadas
-            const rawId = row['documentohabil'] || row['dhdocumentohabil'] || '';
+            const rawId = row['documentohabil'] || row['dhdocumentohabil'] || row['documento_habil'] || '';
             const id = normalizeDocId(rawId);
             if (!id) continue;
 
             if (!docsMap.has(id)) {
-                const dataEmissao = row['dhdataemissaodocorigem'] || row['dataemissao'] || '';
+                const dataEmissao = row['dhdataemissaodocorigem'] || row['data_emissao_doc_origem'] || row['dataemissao'] || '';
                 let formattedDate = new Date().toISOString().split('T')[0];
                 if (dataEmissao.includes('/')) {
                     const [d, m, y] = dataEmissao.split('/');
                     formattedDate = `${y}-${m}-${d}`;
                 }
 
+                // Identificar o nome do favorecido (pode estar em 'favorecidonome' ou logo após o 'dhcredor' se o header for vazio)
+                let favorecidoNome = row['favorecidonome'] || '';
+                if (!favorecidoNome) {
+                    // Heurística para colunas sem nome (comum em CSVs do governo onde o nome vem após o CPF/CNPJ)
+                    const keys = Object.keys(row);
+                    const credorIdx = keys.findIndex(k => k === 'dhcredor' || k === 'credor');
+                    if (credorIdx !== -1 && keys[credorIdx + 1] && keys[credorIdx + 1].startsWith('empty_')) {
+                        favorecidoNome = row[keys[credorIdx + 1]];
+                    }
+                }
+
                 docsMap.set(id, {
                     doc: {
                         id,
                         valor_original: Number((row['dhvalordocorigem'] || row['valor'] || '0').replace(/[^\d.,]/g, '').replace(',', '.')),
-                        processo: row['dhprocesso'] || '',
-                        estado: row['dhestado'] || 'PENDENTE',
-                        favorecido_documento: row['dhcredor'] || '',
-                        favorecido_nome: row['favorecidonome'] || '',
+                        processo: row['dhprocesso'] || row['processo'] || '',
+                        estado: row['dhestado'] || row['estado'] || 'PENDENTE',
+                        favorecido_documento: row['dhcredor'] || row['credor'] || '',
+                        favorecido_nome: favorecidoNome,
                         data_emissao: formattedDate,
                         updated_at: new Date().toISOString()
                     },
@@ -302,32 +312,79 @@ export const transparenciaService = {
     },
 
     async importLiquidacoes(data: Record<string, string>[]): Promise<void> {
+        const dhUpdates: Map<string, { empenho_numero?: string, fonte_sof?: string }> = new Map();
+        const empenhoNumbers = new Set<string>();
+
         for (const row of data) {
-            const rawId = row['documentoorigem'] || '';
+            // Suporte a múltiplos nomes de coluna para o ID do documento
+            const rawId = row['documentoorigem'] || row['documento origem'] || row['ne ccor'] || row['neccor'] || row['documento'] || '';
             const id = normalizeDocId(rawId);
-            const fonte = row['fontesof'] || '';
+            if (!id) continue;
+
+            const neccor = row['ne ccor'] || row['neccor'] || row['empenho'] || '';
+            const fonte = row['fontesof'] || row['fonte'] || row['fontedo_recurso'] || '';
             
-            // Segurança: Ignorar se a fonte for o código da UG ou vazio
-            if (id && fonte && fonte !== '158366') {
-                await supabase
-                    .from('documentos_habeis')
-                    .update({ fonte_sof: fonte })
-                    .eq('id', id);
+            const updateData: any = {};
+            if (neccor) {
+                updateData.empenho_numero = neccor;
+                empenhoNumbers.add(neccor);
             }
+            
+            if (fonte && !['158366', '26435'].includes(fonte)) {
+                updateData.fonte_sof = fonte;
+            }
+
+            if (Object.keys(updateData).length > 0) {
+                dhUpdates.set(id, { ...dhUpdates.get(id), ...updateData });
+            }
+        }
+
+        // Lookup missing fontes from empenhos table if we have empenhos to check
+        if (empenhoNumbers.size > 0) {
+            const { data: empenhos } = await supabase
+                .from('empenhos')
+                .select('numero, origem_recurso')
+                .in('numero', Array.from(empenhoNumbers));
+            
+            const empenhoFonteMap = new Map(empenhos?.map(e => [e.numero, e.origem_recurso]) || []);
+
+            for (const [id, update] of dhUpdates.entries()) {
+                if (!update.fonte_sof && update.empenho_numero) {
+                    const fetchedFonte = empenhoFonteMap.get(update.empenho_numero);
+                    if (fetchedFonte) {
+                        update.fonte_sof = fetchedFonte;
+                    }
+                }
+            }
+        }
+
+        // Perform updates in the database
+        for (const [id, update] of dhUpdates.entries()) {
+            await supabase
+                .from('documentos_habeis')
+                .update(update)
+                .eq('id', id);
         }
     },
 
     async importOrdensBancarias(data: Record<string, string>[]): Promise<void> {
-        const itemsMap = new Map<string, any>();
+        const parentUpdates: Map<string, { empenho_numero?: string, fonte_sof?: string }> = new Map();
+        const empenhoNumbers = new Set<string>();
 
         for (const row of data) {
             const rawId = row['documento'] || '';
-            const rawDhId = row['documentoorigem'] || '';
+            const rawDhId = row['documentoorigem'] || row['documento origem'] || '';
             
             const id = normalizeDocId(rawId);
             const dhId = normalizeDocId(rawDhId);
             
             if (!id || !dhId) continue;
+
+            const neccor = row['ne ccor'] || row['neccor'] || row['empenho'] || '';
+            if (neccor) {
+                parentUpdates.set(dhId, { ...parentUpdates.get(dhId), empenho_numero: neccor });
+                empenhoNumbers.add(neccor);
+            }
 
             const valorStr = row['despesaspagas'] || row['restosapagarpagosprocenproc'] || row['valor'] || '0';
             const valor = Number(valorStr.replace(/[^\d.,]/g, '').replace(',', '.'));
@@ -373,6 +430,31 @@ export const transparenciaService = {
             if (filteredItems.length < items.length) {
                 const skipped = items.length - filteredItems.length;
                 console.warn(`${skipped} OBs foram ignoradas pois seus Documentos Hábeis (NP/RP) correspondentes não foram encontrados. Certifique-se de importar o arquivo principal primeiro.`);
+            }
+        }
+
+        // Parent linkage and Fonte lookup
+        if (empenhoNumbers.size > 0) {
+            const { data: empenhos } = await supabase
+                .from('empenhos')
+                .select('numero, origem_recurso')
+                .in('numero', Array.from(empenhoNumbers));
+            
+            const empenhoFonteMap = new Map(empenhos?.map(e => [e.numero, e.origem_recurso]) || []);
+
+            for (const [dhId, update] of parentUpdates.entries()) {
+                if (update.empenho_numero) {
+                    const fetchedFonte = empenhoFonteMap.get(update.empenho_numero);
+                    if (fetchedFonte) {
+                        update.fonte_sof = fetchedFonte;
+                    }
+                    
+                    // Update parent DH
+                    await supabase
+                        .from('documentos_habeis')
+                        .update(update)
+                        .eq('id', dhId);
+                }
             }
         }
     }

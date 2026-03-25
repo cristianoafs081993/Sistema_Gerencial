@@ -38,7 +38,10 @@ import {
     FileSpreadsheet,
     FileSpreadsheet as FileSpreadsheetIcon,
     FileWarning as FileBadge,
-    RefreshCcw as RefreshCcwIcon
+    RefreshCcw as RefreshCcwIcon,
+    ArrowUpDown,
+    ArrowUp,
+    ArrowDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DocumentoDetalhesDialog } from '@/components/DocumentoDetalhesDialog';
@@ -97,6 +100,21 @@ export default function LiquidacoesPagamentos() {
         setStartDate('');
         setEndDate('');
         setPage(1);
+    };
+
+    const handleSort = (column: string) => {
+        if (sortColumn === column) {
+            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortColumn(column);
+            setSortDirection('asc');
+        }
+        setPage(1);
+    };
+
+    const getSortIcon = (column: string) => {
+        if (sortColumn !== column) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />;
+        return sortDirection === 'asc' ? <ArrowUp className="ml-1 h-3 w-3 text-primary" /> : <ArrowDown className="ml-1 h-3 w-3 text-primary" />;
     };
 
     const handleViewDetails = (doc: DocumentoDespesa) => {
@@ -338,14 +356,38 @@ export default function LiquidacoesPagamentos() {
                         <Table>
                             <TableHeader className="bg-slate-50/50">
                                 <TableRow className="hover:bg-transparent border-b border-border-default/50">
-                                    <TableHead className="w-[120px] font-semibold text-xs uppercase tracking-wider py-4 px-6 text-muted-foreground whitespace-nowrap">Emissão</TableHead>
-                                    <TableHead className="font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-4">Documento / Processo</TableHead>
-                                    <TableHead className="font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-4">Favorecido</TableHead>
-                                    <TableHead className="text-center font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-4">Fonte</TableHead>
-                                    <TableHead className="text-center font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-4">Estado</TableHead>
-                                    <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-4">Bruto</TableHead>
-                                    <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap">Valor Pago</TableHead>
-                                    <TableHead className="w-[80px] py-4 pr-6 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ações</TableHead>
+                                    <TableHead className="w-[120px] font-semibold text-xs uppercase tracking-wider py-4 px-6 text-muted-foreground whitespace-nowrap">
+                                        <Button variant="ghost" className="h-auto p-0 hover:bg-transparent font-semibold text-xs uppercase tracking-wider" onClick={() => handleSort('data_emissao')}>
+                                            Emissão {getSortIcon('data_emissao')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-4">
+                                        <Button variant="ghost" className="h-auto p-0 hover:bg-transparent font-semibold text-xs uppercase tracking-wider" onClick={() => handleSort('id')}>
+                                            Documento / Processo {getSortIcon('id')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-4">
+                                        <Button variant="ghost" className="h-auto p-0 hover:bg-transparent font-semibold text-xs uppercase tracking-wider" onClick={() => handleSort('favorecido_nome')}>
+                                            Favorecido {getSortIcon('favorecido_nome')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-4 text-center">
+                                        <Button variant="ghost" className="h-auto p-0 hover:bg-transparent font-semibold text-xs uppercase tracking-wider mx-auto" onClick={() => handleSort('fonte_sof')}>
+                                            Fonte {getSortIcon('fonte_sof')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-4 text-center">
+                                        <Button variant="ghost" className="h-auto p-0 hover:bg-transparent font-semibold text-xs uppercase tracking-wider mx-auto" onClick={() => handleSort('estado')}>
+                                            Estado {getSortIcon('estado')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-4 text-right">
+                                        <Button variant="ghost" className="h-auto p-0 hover:bg-transparent font-semibold text-xs uppercase tracking-wider ml-auto" onClick={() => handleSort('valor_original')}>
+                                            Bruto {getSortIcon('valor_original')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap px-4 border-l border-slate-100/50">Valor Pago</TableHead>
+                                    <TableHead className="w-[80px] py-4 pr-6 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground border-l border-slate-100/50">Ações</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -547,7 +589,7 @@ export default function LiquidacoesPagamentos() {
                 onOpenChange={setIsImportDocsOpen} 
                 onImport={handleImportDocs}
                 title="Importar Documentos Hábeis"
-                expectedFields={['Documento Hábil', 'DH - Valor Doc.Origem', 'DH - Estado', 'DH - Credor']}
+                expectedFields={['Documento Hábil', 'DH - Valor Doc.Origem', 'DH - Processo', 'DH - Estado', 'DH - Credor']}
                 acceptCsv
                 csvSeparator="\t"
             />
@@ -557,7 +599,7 @@ export default function LiquidacoesPagamentos() {
                 onOpenChange={setIsImportFonteOpen} 
                 onImport={handleImportFonte}
                 title="Importar Fonte SOF (Liquidações)"
-                expectedFields={['Documento Origem', 'Fonte SOF']}
+                expectedFields={['NE CCor', 'Documento Origem', 'Fonte SOF', 'Fonte']}
                 acceptCsv
                 csvSeparator="\t"
             />
@@ -572,7 +614,7 @@ export default function LiquidacoesPagamentos() {
                 onOpenChange={setIsImportOBOpen} 
                 onImport={handleImportOB}
                 title="Importar Ordens Bancárias"
-                expectedFields={['Documento', 'Documento Origem', 'DESPESAS PAGAS']}
+                expectedFields={['Documento', 'Documento Origem', 'DESPESAS PAGAS', 'RESTOS A PAGAR PAGOS', 'Dia Lançamento']}
                 acceptCsv={true}
                 csvSeparator="\t"
             />

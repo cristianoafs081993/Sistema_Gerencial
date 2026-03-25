@@ -11,6 +11,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { splitCsvLine } from '@/utils/csvParser';
 
 interface JsonImportDialogProps {
   open: boolean;
@@ -66,14 +67,12 @@ export function JsonImportDialog({
     let detectedSeparator = '';
 
     // Heurística: Tentar encontrar a linha que melhor combina com os campos esperados
-    // Testando diferentes separadores e as primeiras 15 linhas
     const potentialSeparators = [';', '\t', ',', '|'];
-    
     let bestMatch = { count: 0, index: -1, sep: '', headers: [] as string[] };
 
     for (let i = 0; i < Math.min(lines.length, 15); i++) {
         for (const sep of potentialSeparators) {
-            const parts = lines[i].split(sep);
+            const parts = splitCsvLine(lines[i], sep);
             if (parts.length < 2) continue;
 
             const normalized = parts.map(h => normalizeKey(h));
@@ -88,23 +87,24 @@ export function JsonImportDialog({
     if (bestMatch.count > 0) {
         headerIndex = bestMatch.index;
         detectedSeparator = bestMatch.sep;
-        // Precisamos dos nomes originais das colunas (sem normalização agressiva) para o mapeamento
-        headers = lines[headerIndex].split(detectedSeparator).map(h => h.replace(/"/g, '').trim());
+        headers = splitCsvLine(lines[headerIndex], detectedSeparator);
     } else {
-        // Fallback: Tenta descobrir se está usando o separador padrão na primeira linha
         detectedSeparator = csvSeparator || ';';
         headerIndex = 0;
-        headers = lines[0].split(detectedSeparator).map(h => h.replace(/"/g, '').trim());
+        headers = splitCsvLine(lines[0], detectedSeparator);
     }
 
     const data: Record<string, string>[] = [];
-    const normalizedHeaders = headers.map(normalizeKey);
+    const normalizedHeaders = headers.map((h, i) => {
+        const normalized = normalizeKey(h);
+        return normalized || `empty_${i}`;
+    });
 
     for (let i = headerIndex + 1; i < lines.length; i++) {
-      const values = lines[i].split(detectedSeparator);
+      const values = splitCsvLine(lines[i], detectedSeparator);
       const row: Record<string, string> = {};
       normalizedHeaders.forEach((header, idx) => {
-        row[header] = (values[idx] || '').replace(/"/g, '').trim();
+        row[header] = values[idx] || '';
       });
       data.push(row);
     }
@@ -201,24 +201,34 @@ export function JsonImportDialog({
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
-        const text = event.target?.result as string;
+        const result = event.target?.result;
+        if (!result) return;
 
-        // Check if UTF-8 produced replacement characters (U+FFFD)
-        // This means the file is likely encoded in Windows-1252/Latin-1
-        if (text.includes('\uFFFD')) {
-          // Re-read with Windows-1252 encoding
-          const fallbackReader = new FileReader();
-          fallbackReader.onload = (fallbackEvent) => {
-            try {
-              const fallbackText = fallbackEvent.target?.result as string;
-              processFileText(fallbackText, isCsv);
-            } catch (err) {
-              const msg = err instanceof Error ? err.message : 'Erro desconhecido';
-              setError(`Erro ao processar arquivo: ${msg}`);
-            }
-          };
-          fallbackReader.readAsText(selectedFile, 'windows-1252');
-          return;
+        // Convert ArrayBuffer to string with encoding detection
+        const buffer = new Uint8Array(result as ArrayBuffer);
+        
+        let text = '';
+        let detectedEncoding = 'UTF-8';
+
+        // Detect UTF-16LE BOM (FF FE)
+        if (buffer[0] === 0xFF && buffer[1] === 0xFE) {
+          text = new TextDecoder('utf-16le').decode(buffer.slice(2));
+          detectedEncoding = 'UTF-16LE';
+        } 
+        // Detect UTF-16BE BOM (FE FF)
+        else if (buffer[0] === 0xFE && buffer[1] === 0xFF) {
+          text = new TextDecoder('utf-16be').decode(buffer.slice(2));
+          detectedEncoding = 'UTF-16BE';
+        }
+        else {
+          // Normal UTF-8 attempt
+          text = new TextDecoder('utf-8').decode(buffer);
+          
+          // Check for Mojibake or common failures
+          if (text.includes('\uFFFD')) {
+            text = new TextDecoder('windows-1252').decode(buffer);
+            detectedEncoding = 'Windows-1252';
+          }
         }
 
         processFileText(text, isCsv);
@@ -227,7 +237,7 @@ export function JsonImportDialog({
         setError(`Erro ao processar arquivo: ${msg}`);
       }
     };
-    reader.readAsText(selectedFile, 'UTF-8');
+    reader.readAsArrayBuffer(selectedFile);
   };
 
   const handleImport = () => {
