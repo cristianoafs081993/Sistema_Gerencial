@@ -15,6 +15,7 @@ interface DataContextType {
   descentralizacoes: Descentralizacao[];
   contratos: Contrato[];
   contratosEmpenhos: ContratoEmpenho[];
+  creditosDisponiveis: any[];
   isLoading: boolean;
   addAtividade: (atividade: Omit<Atividade, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateAtividade: (id: string, atividade: Partial<Atividade>) => void;
@@ -69,7 +70,18 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     },
   });
 
-  const isLoading = isLoadingAtividades || isLoadingEmpenhos || isLoadingDescentralizacoes || isLoadingContratos || isLoadingContratosEmpenhos;
+  const { data: creditosDisponiveis = [], isLoading: isLoadingCreditos } = useQuery({
+    queryKey: ['creditos_disponiveis'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('creditos_disponiveis').select('*').order('ptres', { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const isLoading = isLoadingAtividades || isLoadingEmpenhos || isLoadingDescentralizacoes || isLoadingContratos || isLoadingContratosEmpenhos || isLoadingCreditos;
+
+  // ... (previous mutations omitted for brevity, keeping them)
 
   // --- Mutations: Atividades ---
   const createAtividadeMutation = useMutation({
@@ -328,6 +340,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     await queryClient.invalidateQueries({ queryKey: ['descentralizacoes'] });
     await queryClient.invalidateQueries({ queryKey: ['contratos'] });
     await queryClient.invalidateQueries({ queryKey: ['contratos_empenhos'] });
+    await queryClient.invalidateQueries({ queryKey: ['creditos_disponiveis'] });
   }, [queryClient]);
 
   const value = useMemo(
@@ -337,6 +350,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       descentralizacoes,
       contratos,
       contratosEmpenhos,
+      creditosDisponiveis,
       isLoading,
       addAtividade,
       updateAtividade,
@@ -361,6 +375,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       descentralizacoes,
       contratos,
       contratosEmpenhos,
+      creditosDisponiveis,
       isLoading,
       addAtividade,
       updateAtividade,

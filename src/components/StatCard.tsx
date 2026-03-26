@@ -3,7 +3,7 @@ import { LucideIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface StatCardProps {
-  title: string;
+  title: React.ReactNode;
   value: string | number;
   subtitle?: string;
   icon: LucideIcon;

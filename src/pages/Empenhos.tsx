@@ -34,7 +34,9 @@ import { HeaderActions } from '@/components/HeaderParts';
 import { toast } from 'sonner';
 import { formatCurrency, parseCurrency, formatarDocumento } from '@/lib/utils';
 import { parseSiafiCsv, syncSiafiDataToDb } from '@/lib/siafi-parser';
+import { transparenciaService } from '@/services/transparencia';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { splitCsvLine } from '@/utils/csvParser';
 
 
 const statusColors: Record<string, string> = {
@@ -54,7 +56,7 @@ const statusLabels: Record<string, string> = {
 
 
 export default function Empenhos() {
-  const { empenhos, atividades, isLoading, addEmpenho, updateEmpenho, deleteEmpenho, refreshData } = useData();
+  const { empenhos, atividades, creditosDisponiveis, isLoading, addEmpenho, updateEmpenho, deleteEmpenho, refreshData } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('pendente');
   const [filterDimensao, setFilterDimensao] = useState('all');
@@ -73,6 +75,7 @@ export default function Empenhos() {
   const [isUpdatingSaldos, setIsUpdatingSaldos] = useState(false);
 
   const saldosInputRef = useRef<HTMLInputElement>(null);
+  const creditosInputRef = useRef<HTMLInputElement>(null);
   const [selectedEmpenho, setSelectedEmpenho] = useState<Empenho | null>(null);
 
   // Extrair opções únicas para filtros
@@ -253,6 +256,53 @@ export default function Empenhos() {
     }
   };
 
+  const handleImportCreditos = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUpdatingSaldos(true);
+    const toastId = toast.loading('Processando arquivo de Crédito Disponível...');
+
+    try {
+      // FileReader para ler como UTF-16LE
+      const reader = new FileReader();
+      
+      const fileContent = await new Promise<string>((resolve, reject) => {
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.onerror = (e) => reject(e);
+        // Tentar UTF-16LE primeiro, se falhar ou parecer estranho, UTF-8
+        reader.readAsText(file, 'UTF-16LE');
+      });
+
+      const lines = fileContent.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) throw new Error('Arquivo vazio ou inválido');
+
+      // Detect separator
+      const headerLine = lines[0];
+      const sep = headerLine.includes('\t') ? '\t' : (headerLine.includes(';') ? ';' : ',');
+      
+      const data: Record<string, string>[] = lines.slice(1).map(line => {
+        const cols = splitCsvLine(line, sep);
+        if (cols.length < 2) return null;
+        return {
+          ptres: (cols[0] || '').trim(),
+          metrica: (cols[1] || '').trim(),
+          valor: (cols[2] || '').trim()
+        } as Record<string, string>;
+      }).filter((item): item is Record<string, string> => item !== null);
+
+      await transparenciaService.importCreditosDisponiveis(data);
+      await refreshData();
+      toast.success('Créditos disponíveis atualizados com sucesso!', { id: toastId });
+    } catch (error: any) {
+      console.error('Erro ao importar créditos:', error);
+      toast.error('Erro ao importar créditos: ' + error.message, { id: toastId });
+    } finally {
+      setIsUpdatingSaldos(false);
+      if (creditosInputRef.current) creditosInputRef.current.value = '';
+    }
+  };
+
 
 
 
@@ -274,6 +324,14 @@ export default function Empenhos() {
             accept=".csv"
             className="hidden"
           />
+          <input
+            type="file"
+            ref={creditosInputRef}
+            onChange={handleImportCreditos}
+            accept=".csv"
+            className="hidden"
+          />
+          
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -286,7 +344,7 @@ export default function Empenhos() {
                   {isUpdatingSaldos ? (
                     <>
                       <Loader2 className="h-space-4 w-space-4 animate-spin" />
-                      Lendo SIAFI...
+                      Processando...
                     </>
                   ) : (
                     <>
@@ -301,38 +359,57 @@ export default function Empenhos() {
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  onClick={() => creditosInputRef.current?.click()}
+                  className="gap-space-2 h-space-8 text-text-xs sm:h-space-9 sm:text-text-sm bg-surface-card border-border-default shadow-shadow-sm transition-all"
+                  disabled={isUpdatingSaldos}
+                >
+                  <Upload className="h-space-4 w-space-4 text-action-primary" />
+                  Importar Crédito
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Importar CSV de Crédito Disponível (UTF-16LE)</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </HeaderActions>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard
-          title="Total Empenhado"
-          value={formatCurrency(empenhos.reduce((sum, e) => sum + (e.valor || 0), 0))}
-          icon={Layers}
-          stitchColor="vibrant-blue"
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Total Liquidado"
-          value={formatCurrency(empenhos.reduce((sum, e) => sum + (e.valorLiquidadoAPagar || 0) + (e.valorPagoOficial || 0), 0))}
-          icon={Plus}
-          stitchColor="purple"
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Total Pago"
-          value={formatCurrency(empenhos.reduce((sum, e) => sum + (e.valorPagoOficial || 0), 0))}
-          icon={Plus}
-          stitchColor="emerald-green"
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Saldo a Pagar"
-          value={formatCurrency(empenhos.reduce((sum, e) => sum + Math.max(0, e.valor - ((e.valorLiquidadoAPagar || 0) + (e.valorPagoOficial || 0))), 0))}
-          icon={X}
-          stitchColor="amber"
-          isLoading={isLoading}
-        />
+        {creditosDisponiveis.length > 0 ? (
+          creditosDisponiveis.slice(0, 4).map((credito, idx) => (
+            <StatCard
+              key={credito.id}
+              title={
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground/60 font-bold tracking-widest uppercase">PTRES</span>
+                  <span className="text-sm font-black text-foreground bg-slate-100 rounded leading-none px-1.5 py-1 border border-border/50 shadow-sm">
+                    {credito.ptres}
+                  </span>
+                </div>
+              }
+              value={formatCurrency(credito.valor)}
+              subtitle="Crédito Disponível"
+              icon={Layers}
+              stitchColor={idx === 0 ? "vibrant-blue" : idx === 1 ? "purple" : idx === 2 ? "emerald-green" : "amber"}
+              isLoading={isLoading}
+            />
+          ))
+        ) : (
+          <StatCard
+            title="Crédito Disponível"
+            value="Importe os dados"
+            icon={Layers}
+            stitchColor="vibrant-blue"
+            isLoading={isLoading}
+          />
+        )}
       </div>
       <Card className="card-system shadow-sm">
         <CardHeader className="pb-3 px-0 pt-0">

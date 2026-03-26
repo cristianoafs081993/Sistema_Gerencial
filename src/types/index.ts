@@ -306,3 +306,11 @@ export interface ContratoEmpenho {
   empenho_id: string;
   created_at: Date;
 }
+
+export interface CreditoDisponivel {
+  id: string;
+  ptres: string;
+  metrica?: string;
+  valor: number;
+  updated_at: string;
+}
