@@ -15,7 +15,9 @@ import {
   FileStack,
   ClipboardList,
   ScanSearch,
-  Wand2
+  Wand2,
+  Bot,
+  MessageSquare
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -40,6 +42,8 @@ const navigation = [
   { name: 'Rastreabilidade de PFs', href: '/rastreabilidade-pfs', icon: ClipboardList },
   { name: 'Conciliação de PFs',   href: '/conciliacao-pfs',       icon: ScanSearch },
   { name: 'Gerador de Documentos', href: '/gerador-documentos',   icon: Wand2 },
+  { name: 'Editor de Documentos (IA)', href: '/editor-documentos', icon: Bot },
+  { name: 'Consultor Jurídico IA', href: '/consultor', icon: MessageSquare },
 ];
 
 export function Layout({ children }: LayoutProps) {
@@ -49,6 +53,7 @@ export function Layout({ children }: LayoutProps) {
     return saved === 'true';
   });
   const location = useLocation();
+  const isConsultor = location.pathname === '/consultor';
 
   useEffect(() => {
     localStorage.setItem('sidebar-collapsed', isCollapsed.toString());
@@ -232,8 +237,11 @@ export function Layout({ children }: LayoutProps) {
           </header>
 
           {/* ── Page content —— AnimatePresence com page transition (Framer Motion) */}
-          <main className="flex-1 p-4 lg:p-8 overflow-y-auto scrollbar-thin dot-pattern bg-surface-page">
-            <div className="max-w-[1600px] mx-auto">
+          <main className={cn(
+            "flex-1 overflow-y-auto scrollbar-thin dot-pattern bg-surface-page",
+            isConsultor ? "p-0" : "p-4 lg:p-8"
+          )}>
+            <div className={isConsultor ? "h-full w-full" : "max-w-[1600px] mx-auto"}>
               {children}
             </div>
           </main>

@@ -16,6 +16,8 @@ import LiquidacoesPagamentos from "./pages/LiquidacoesPagamentos";
 import RastreabilidadePFs from "./pages/RastreabilidadePFs";
 import ConciliacaoPfs from "./pages/ConciliacaoPfs";
 import GeradorDocumentos from "./pages/GeradorDocumentos";
+import EditorDocumentos from "./pages/EditorDocumentos";
+import Consultor from "./pages/Consultor";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +39,8 @@ const App = () => (
               <Route path="/rastreabilidade-pfs" element={<RastreabilidadePFs />} />
               <Route path="/conciliacao-pfs" element={<ConciliacaoPfs />} />
               <Route path="/gerador-documentos" element={<GeradorDocumentos />} />
+              <Route path="/editor-documentos" element={<EditorDocumentos />} />
+              <Route path="/consultor" element={<Consultor />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Layout>
