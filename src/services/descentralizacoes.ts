@@ -100,4 +100,35 @@ export const descentralizacoesService = {
 
         if (error) throw error;
     },
+
+    async processDevolucao(devolucao) {
+        const { ptres, planoInterno, valor } = devolucao;
+
+        // Buscar descentralização correspondente
+        const { data, error } = await supabase
+            .from('descentralizacoes')
+            .select('*')
+            .eq('plano_interno', planoInterno)
+            .eq('ptres', ptres)
+            .single();
+
+        if (error) {
+            console.error('Erro ao buscar descentralização:', error);
+            return;
+        }
+
+        // Atualizar saldo
+        const novoValor = data.valor - valor;
+
+        const { error: updateError } = await supabase
+            .from('descentralizacoes')
+            .update({ valor: novoValor })
+            .eq('id', data.id);
+
+        if (updateError) {
+            console.error('Erro ao atualizar saldo:', updateError);
+        } else {
+            console.log(`Saldo atualizado para o plano interno ${planoInterno}: ${novoValor}`);
+        }
+    },
 };

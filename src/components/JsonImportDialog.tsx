@@ -16,7 +16,7 @@ import { splitCsvLine } from '@/utils/csvParser';
 interface JsonImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onImport: (data: Record<string, string>[]) => void;
+  onImport: (data: Record<string, string>[]) => void | Promise<void>;
   title: string;
   expectedFields: string[];
   acceptCsv?: boolean;
@@ -241,11 +241,18 @@ export function JsonImportDialog({
   };
 
   const handleImport = () => {
-    if (parsedData.length > 0) {
-      onImport(parsedData);
-      onOpenChange(false);
-      resetState();
-    }
+    if (parsedData.length === 0) return;
+
+    // Permite que onImport seja async e evita "Uncaught (in promise)".
+    Promise.resolve(onImport(parsedData))
+      .then(() => {
+        onOpenChange(false);
+        resetState();
+      })
+      .catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        setError(msg);
+      });
   };
 
   const handleClose = () => {

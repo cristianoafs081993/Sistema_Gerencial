@@ -42,5 +42,30 @@ export const contratosService = {
       .match({ contrato_id: contratoId, empenho_id: empenhoId });
 
     if (error) throw error;
-  }
+  },
+
+  async deleteByNumeros(numeros: string[]) {
+    if (numeros.length === 0) return;
+    const { error } = await supabase
+      .from('contratos')
+      .delete()
+      .in('numero', numeros);
+    if (error) throw error;
+  },
+
+  async upsertLinks(links: { contrato_id: string; empenho_id: string }[]) {
+    if (links.length === 0) return;
+    const { error } = await supabase
+      .from('contratos_empenhos')
+      .upsert(links, { onConflict: 'contrato_id,empenho_id' });
+    if (error) throw error;
+  },
+
+  async getEmpenhos() {
+    const { data, error } = await supabase
+      .from('empenhos')
+      .select('id, numero');
+    if (error) throw error;
+    return data as { id: string; numero: string }[];
+  },
 };

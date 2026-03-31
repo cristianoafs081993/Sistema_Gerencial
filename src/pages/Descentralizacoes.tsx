@@ -31,6 +31,7 @@ import { HeaderActions } from '@/components/HeaderParts';
 import { toast } from 'sonner';
 import { formatCurrency, parseCurrency } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
+import { descentralizacoesService } from '@/services/descentralizacoes';
 
 // Mapeamento de sufixo de PI para código de dimensão
 const PI_DIMENSAO_MAP: Record<string, string> = {
@@ -85,8 +86,10 @@ function parseValorBR(valorStr: string): number {
     return parseFloat(cleaned) || 0;
 }
 
+const normalizeKey = (key) => key.normalize('NFD').replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+
 export default function Descentralizacoes() {
-    const { descentralizacoes, isLoading, addDescentralizacao, deleteDescentralizacao } = useData();
+    const { descentralizacoes, isLoading, addDescentralizacao, deleteDescentralizacao, refreshData } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [filterDimensao, setFilterDimensao] = useState('all');
     const [filterOrigem, setFilterOrigem] = useState('all');
@@ -98,6 +101,8 @@ export default function Descentralizacoes() {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+    const [isDevolucoesDialogOpen, setIsDevolucoesDialogOpen] = useState(false);
 
     // Extrair opções únicas para os filtros
     const origensUnicas = Array.from(new Set(descentralizacoes.map(d => d.origemRecurso?.trim()).filter(Boolean))).sort();
@@ -150,7 +155,6 @@ export default function Descentralizacoes() {
     const totalFiltrado = sortedDescentralizacoes.reduce((sum, d) => sum + d.valor, 0);
 
 
-
     const handleSelectAll = (checked: boolean) => {
         if (checked) {
             setSelectedIds(new Set(sortedDescentralizacoes.map((d) => d.id)));
@@ -188,18 +192,41 @@ export default function Descentralizacoes() {
         let importCount = 0;
         let skipCount = 0;
 
+        const findValue = (row: Record<string, string>, patterns: RegExp[], fallbacks: string[] = []) => {
+            for (const key of fallbacks) {
+                if (row[key] != null && String(row[key]).trim() !== '') return row[key];
+            }
+            const keys = Object.keys(row);
+            for (const k of keys) {
+                if (patterns.some(p => p.test(k))) {
+                    const v = row[k];
+                    if (v != null && String(v).trim() !== '') return v;
+                }
+            }
+            return '';
+        };
+
         data.forEach((row) => {
-            const planoInterno = row['nccelula-planointerno'] || row['planointerno'] || row['plano_interno'] || '';
-            const origemRecurso = row['nccelula-ptres'] || row['origemrecurso'] || row['origem_recurso'] || '';
-            const naturezaDespesa = row['nccelula-naturezadespesa'] || row['naturezadespesa'] || row['natureza_despesa'] || '';
-            const valorStr = row['nccelula-valor'] || row['valor'] || '0';
-            const dataEmissaoStr = row['nc-diaemissao'] || row['dataemissao'] || row['data_emissao'] || '';
-            const descricao = row['nc-descricao'] || row['descricao'] || '';
+            // O JsonImportDialog normaliza headers removendo acentos e tudo que não é [a-z0-9].
+            // Para os seus arquivos, as chaves mais comuns ficam como: ncdiaemissao, ncdescricao,
+            // nccelulaptres, nccelulanaturezadespesa, nccelulaplanointerno, nccelulavalor.
+            const planoInterno = findValue(row, [/planointern/i, /plano/i], ['nccelulaplanointerno', 'planointerno', 'plano_interno', 'plano']);
+            const origemRecurso = findValue(row, [/ptres/i, /origemrecurso/i, /origem/i], ['nccelulaptres', 'origemrecurso', 'origem_recurso', 'ptres']);
+            const naturezaDespesa = findValue(row, [/naturezadesp/i, /natureza/i], ['nccelulanaturezadespesa', 'naturezadespesa', 'natureza_despesa', 'natureza']);
+            const valorStr = findValue(row, [/valor/i], ['nccelulavalor', 'valor']);
+            const dataEmissaoStr = findValue(row, [/diaemiss/i, /dataemiss/i, /data/i], ['ncdiaemissao', 'dataemissao', 'data_emissao']);
+            const descricao = findValue(row, [/descr/i], ['ncdescricao', 'descricao', 'ncdrescricao']);
 
             const piNorm = planoInterno.trim().toUpperCase();
             const orNorm = origemRecurso.trim();
             const ndNorm = naturezaDespesa.trim();
-            const valor = parseValorBR(valorStr);
+            let valor = parseValorBR(valorStr || '0');
+
+            // Se for devolução, o valor deve ser negativo
+            const isDevolucao = descricao.toUpperCase().includes('DEVOLUCAO');
+            if (isDevolucao) {
+                valor = -Math.abs(valor);
+            }
 
             // Check for duplicate (date + PI + PTRES + ND + valor)
             const dataEmissao = parseDateBR(dataEmissaoStr);
@@ -225,7 +252,7 @@ export default function Descentralizacoes() {
                 descentralizacao.dataEmissao = dataEmissao;
             }
 
-            if (valor > 0) {
+            if (valor !== 0) {
                 addDescentralizacao(descentralizacao);
                 existingKeys.add(key); // prevent duplicates within the same CSV
                 importCount++;
@@ -239,6 +266,100 @@ export default function Descentralizacoes() {
         } else {
             toast.info(`Nenhum registro novo encontrado. ${skipCount} já existente(s) ignorada(s).`);
         }
+    };
+
+    const handleDevolucoesImport = async (data: Record<string, string>[]) => {
+        let importCount = 0;
+        let skipCount = 0;
+
+        const existingKeys = new Set(
+            descentralizacoes.map(d => {
+                const dateStr = d.dataEmissao ? d.dataEmissao.toISOString().split('T')[0] : '';
+                return `${dateStr}|${(d.origemRecurso || '').trim()}|${(d.naturezaDespesa || '').trim()}|${(d.planoInterno || '').trim().toUpperCase()}|${d.valor}`;
+            })
+        );
+
+        const findValue = (row: Record<string, string>, patterns: RegExp[], fallbacks: string[] = []) => {
+            for (const key of fallbacks) {
+                if (row[key] != null && String(row[key]).trim() !== '') return row[key];
+            }
+            const keys = Object.keys(row);
+            for (const k of keys) {
+                if (patterns.some(p => p.test(k))) {
+                    const v = row[k];
+                    if (v != null && String(v).trim() !== '') return v;
+                }
+            }
+            return '';
+        };
+
+        for (const row of data) {
+            // Obs: o JsonImportDialog já normaliza as chaves (lowercase + remove acentos + remove não-alfanuméricos),
+            // mas quando o CSV vem com encoding ruim, algumas letras podem "sumir". Por isso, buscamos por padrões.
+            const diaEmissaoStr = findValue(row, [/diaemiss/i, /ncdiaemiss/i], ['ncdiaemissao', 'ncdiaemisso', 'dataemissao', 'data']);
+            const descricao = findValue(row, [/descr/i, /ncdescr/i], ['ncdescricao', 'descricao']);
+            const ptres = findValue(row, [/ptres/i], ['nccelulaptres', 'ptres', 'origemrecurso']);
+            const naturezaDespesa = findValue(row, [/naturezadesp/i, /natureza/i], ['nccelulanaturezadespesa', 'naturezadespesa', 'natureza']);
+            const planoInterno = findValue(row, [/planointern/i, /plano/i], ['nccelulaplanointerno', 'planointerno', 'plano']);
+            const valorStr = findValue(row, [/valor/i], ['nccelulavalor', 'valor']);
+
+            if (!diaEmissaoStr || !ptres || !naturezaDespesa || !planoInterno || valorStr === undefined || valorStr === null) {
+                skipCount++;
+                continue;
+            }
+
+            const dataEmissao = parseDateBR(diaEmissaoStr);
+            if (!dataEmissao) {
+                skipCount++;
+                continue;
+            }
+
+            const parsedValor = parseValorBR(String(valorStr));
+            if (!parsedValor || isNaN(parsedValor)) {
+                skipCount++;
+                continue;
+            }
+
+            const piNorm = String(planoInterno).trim().toUpperCase();
+            const ptresNorm = String(ptres).trim();
+            const ndNorm = String(naturezaDespesa).trim();
+            const descricaoNorm = String(descricao || '').trim() || 'DEVOLUCAO';
+            const dateKey = dataEmissao.toISOString().split('T')[0];
+            const valorNeg = -Math.abs(parsedValor);
+
+            const key = `${dateKey}|${ptresNorm}|${ndNorm}|${piNorm}|${valorNeg}`;
+            if (existingKeys.has(key)) {
+                skipCount++;
+                continue;
+            }
+
+            const dimensao = deriveDimensaoFromPI(piNorm);
+
+            const result = await descentralizacoesService.processDevolucao({
+                dataEmissao: dateKey,
+                descricao: descricaoNorm,
+                ptres: ptresNorm,
+                naturezaDespesa: ndNorm,
+                planoInterno: piNorm,
+                valor: parsedValor,
+                dimensao,
+            });
+
+            if (result) {
+                importCount++;
+                existingKeys.add(key);
+            } else {
+                skipCount++;
+            }
+        }
+
+        await refreshData();
+        toast.success(`${importCount} devolução(ões) processada(s), ${skipCount} linha(s) ignorada(s).`);
+    };
+
+    const processDevolucao = (devolucao) => {
+        // Implementar lógica para ajustar os saldos com base nas devoluções
+        console.log("Processando devolução:", devolucao);
     };
 
     const descentralizacoesCsvFields = [
@@ -265,6 +386,14 @@ export default function Descentralizacoes() {
                 >
                     <Upload className="h-4 w-4 text-action-primary" />
                     Importar CSV
+                </Button>
+                <Button 
+                    variant="outline" 
+                    onClick={() => setIsDevolucoesDialogOpen(true)} 
+                    className="gap-2 h-8 text-xs sm:h-9 sm:text-sm bg-surface-card border-border-default shadow-sm transition-all"
+                >
+                    <Upload className="h-4 w-4 text-action-primary" />
+                    Importar Devoluções
                 </Button>
             </HeaderActions>
 
@@ -480,7 +609,9 @@ export default function Descentralizacoes() {
                                                 </span>
                                             </TableCell>
                                             <TableCell className="py-4 px-6 text-right">
-                                                <span className="font-bold text-sm text-action-primary">{formatCurrency(descentralizacao.valor)}</span>
+                                                <span className={`font-bold text-sm ${descentralizacao.valor < 0 ? 'text-red-600' : 'text-action-primary'}`}>
+                                                    {formatCurrency(descentralizacao.valor)}
+                                                </span>
                                             </TableCell>
                                         </TableRow>
                                     ))
@@ -509,7 +640,16 @@ export default function Descentralizacoes() {
                 title="Importar Descentralizações"
                 expectedFields={descentralizacoesCsvFields}
                 acceptCsv={true}
-                csvSeparator=";"
+                csvSeparator="\t"
+            />
+            <JsonImportDialog
+                open={isDevolucoesDialogOpen}
+                onOpenChange={setIsDevolucoesDialogOpen}
+                onImport={handleDevolucoesImport}
+                title="Importar Devoluções"
+                expectedFields={["NC - Dia Emissão", "NC - Descrição", "NC Célula - PTRES", "NC Célula - Natureza Despesa", "NC Célula - Plano Interno", "NC Célula - Valor"]}
+                acceptCsv={true}
+                csvSeparator="\t"
             />
         </div>
     );

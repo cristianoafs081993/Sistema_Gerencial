@@ -1,10 +1,11 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Search, FileText, Calendar, DollarSign, ExternalLink, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import { Search, FileText, Calendar, DollarSign, ExternalLink, ArrowUpDown, ChevronUp, ChevronDown, RefreshCw } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatCard } from '@/components/StatCard';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -18,11 +19,14 @@ import { formatCurrency, cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { HeaderActions } from '@/components/HeaderParts';
+import { ContratosSyncDialog } from '@/components/modals/ContratosSyncDialog';
 
 export default function Contratos() {
-  const { contratos, empenhos, contratosEmpenhos, isLoading } = useData();
+  const { contratos, empenhos, contratosEmpenhos, isLoading, refreshData } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
 
   const normalizeString = useCallback((str: string) =>
     str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "", []);
@@ -73,8 +77,38 @@ export default function Contratos() {
     const linkIds = contratosEmpenhos
       .filter((l) => l.contrato_id === contratoId)
       .map((l) => l.empenho_id);
-    
-    return empenhos.filter((e) => linkIds.includes(e.id));
+
+    // Compatibilidade: dependendo do histórico/imports, `contratos_empenhos.empenho_id`
+    // pode estar armazenando o UUID do empenho OU o número do empenho.
+    // Para não "sumir" vínculos na UI, resolvemos por ambos.
+    const normalizeRef = (s: string) => (s || '')
+      .toString()
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '');
+
+    const byId = new Map(empenhos.map(e => [e.id, e] as const));
+    const byNumero = new Map(empenhos.map(e => [e.numero, e] as const));
+    const byNumeroNorm = new Map(empenhos.map(e => [normalizeRef(e.numero), e] as const));
+    // Alguns vínculos antigos guardam só o final do número
+    const byNumeroSuffix12 = new Map(empenhos.map(e => [normalizeRef(e.numero).slice(-12), e] as const));
+
+    const resolved: typeof empenhos = [];
+    const seen = new Set<string>();
+    for (const ref of linkIds) {
+      const refStr = (ref || '').toString().trim();
+      const refNorm = normalizeRef(refStr);
+      const emp =
+        byId.get(refStr) ||
+        byNumero.get(refStr) ||
+        byNumeroNorm.get(refNorm) ||
+        (refNorm.length >= 12 ? byNumeroSuffix12.get(refNorm.slice(-12)) : undefined);
+      if (!emp) continue;
+      if (seen.has(emp.id)) continue;
+      seen.add(emp.id);
+      resolved.push(emp);
+    }
+    return resolved;
   }, [empenhos, contratosEmpenhos]);
 
   const totalALiquidarGlobal = useMemo(() => {
@@ -111,6 +145,17 @@ export default function Contratos() {
   return (
     <div className="space-y-6 pb-10">
 
+      <HeaderActions>
+        <Button
+          variant="outline"
+          className="gap-2 h-8 text-xs sm:h-9 sm:text-sm bg-surface-card border-border-default shadow-sm transition-all"
+          onClick={() => setIsSyncDialogOpen(true)}
+        >
+          <RefreshCw className="h-4 w-4 text-action-primary" />
+          Sincronizar Contratos
+        </Button>
+      </HeaderActions>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
         <StatCard
@@ -119,7 +164,7 @@ export default function Contratos() {
           icon={FileText}
           stitchColor="vibrant-blue"
         />
-        
+
         <StatCard
           title="Valor Global"
           value={formatCurrency(contratos.reduce((sum, c) => sum + (c.valor || 0), 0))}
@@ -136,8 +181,11 @@ export default function Contratos() {
         />
 
         <StatCard
-          title="Vínculos"
-          value={contratosEmpenhos.length}
+          title="Valor Empenhado"
+          value={formatCurrency(contratos.reduce((sum, c) => {
+            const emps = getEmpenhosDoContrato(c.id);
+            return sum + emps.reduce((s, e) => s + (e.valor || 0), 0);
+          }, 0))}
           icon={ExternalLink}
           stitchColor="emerald-green"
         />
@@ -207,7 +255,7 @@ export default function Contratos() {
                   filteredContratos.map((c) => {
                     const empenhosVinculados = getEmpenhosDoContrato(c.id);
                     const totalEmpenhado = empenhosVinculados.reduce((sum, e) => sum + e.valor, 0);
-                    
+
                     const totalALiquidar = empenhosVinculados.reduce((sum, e) => {
                       if (e.tipo === 'rap') return sum + (e.rapALiquidar || 0);
                       const liquidado = (e.valorLiquidadoAPagar || 0) + (e.valorPagoOficial || 0);
@@ -253,15 +301,15 @@ export default function Contratos() {
                           <div className="flex flex-wrap gap-1">
                             {empenhosVinculados.length > 0 ? (
                               empenhosVinculados.map((e) => {
-                                const balance = e.tipo === 'rap' 
-                                  ? (e.rapALiquidar || 0) 
+                                const balance = e.tipo === 'rap'
+                                  ? (e.rapALiquidar || 0)
                                   : Math.max(0, e.valor - ((e.valorLiquidadoAPagar || 0) + (e.valorPagoOficial || 0)));
-                                
+
                                 return (
                                   <Popover key={e.id}>
                                     <PopoverTrigger asChild>
-                                      <Badge 
-                                        variant="secondary" 
+                                      <Badge
+                                        variant="secondary"
                                         className="text-[10px] font-mono py-0 h-5 cursor-pointer hover:bg-muted-foreground/20 transition-colors"
                                       >
                                         {e.numero}
@@ -316,6 +364,11 @@ export default function Contratos() {
         </CardContent>
       </Card>
 
+      <ContratosSyncDialog
+        open={isSyncDialogOpen}
+        onOpenChange={setIsSyncDialogOpen}
+        onSyncComplete={refreshData}
+      />
     </div>
   );
 }
