@@ -11,7 +11,7 @@ export const atividadesService = {
 
         if (error) throw error;
 
-        return data.map((item: any) => ({
+        return data.map((item) => ({
             id: item.id,
             dimensao: item.dimensao,
             dimensaoId: item.dimensao_id || undefined,
@@ -32,7 +32,7 @@ export const atividadesService = {
     },
 
     async create(atividade: Omit<Atividade, 'id' | 'createdAt' | 'updatedAt'>): Promise<Atividade> {
-        const payload: any = {
+        const payload: Record<string, unknown> = {
             dimensao: atividade.dimensao,
             dimensao_id: atividade.dimensaoId || null,
             componente_funcional: atividade.componenteFuncional,
@@ -77,7 +77,7 @@ export const atividadesService = {
     },
 
     async update(id: string, atividade: Partial<Atividade>): Promise<void> {
-        const updates: any = {
+        const updates: Record<string, unknown> = {
             updated_at: new Date().toISOString(),
         };
 

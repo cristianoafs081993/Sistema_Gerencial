@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Atividade, Empenho, Descentralizacao, ResumoOrcamentario, Contrato, ContratoEmpenho } from '@/types';
+import { Atividade, Empenho, Descentralizacao, ResumoOrcamentario, Contrato, ContratoEmpenho, CreditoDisponivel } from '@/types';
 import { atividadesService } from '@/services/atividades';
 import { empenhosService } from '@/services/empenhos';
 import { descentralizacoesService } from '@/services/descentralizacoes';
@@ -15,7 +15,7 @@ interface DataContextType {
   descentralizacoes: Descentralizacao[];
   contratos: Contrato[];
   contratosEmpenhos: ContratoEmpenho[];
-  creditosDisponiveis: any[];
+  creditosDisponiveis: CreditoDisponivel[];
   isLoading: boolean;
   addAtividade: (atividade: Omit<Atividade, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateAtividade: (id: string, atividade: Partial<Atividade>) => void;

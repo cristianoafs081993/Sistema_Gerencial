@@ -6,7 +6,7 @@ import { transparenciaService } from "@/services/transparencia";
 import { Loader2, Info, Receipt, Landmark, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-function isValid(date: any) {
+function isValid(date: unknown) {
     return date instanceof Date && !isNaN(date.getTime());
 }
 import {

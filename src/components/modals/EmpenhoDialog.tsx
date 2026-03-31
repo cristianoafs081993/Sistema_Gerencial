@@ -29,11 +29,11 @@ interface EmpenhoDialogProps {
   onOpenChange: (open: boolean) => void;
   empenho: Empenho | null;
   atividades: Atividade[];
-  onSave: (id: string, data: any) => void;
+  onSave: (id: string, data: Partial<Empenho>) => void;
 }
 
 export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave }: EmpenhoDialogProps) {
-  const [formData, setFormData] = useState<any>({});
+  const [formData, setFormData] = useState<Partial<Empenho>>({});
 
   useEffect(() => {
     if (open && empenho) {

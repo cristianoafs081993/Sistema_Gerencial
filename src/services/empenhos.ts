@@ -11,7 +11,7 @@ export const empenhosService = {
 
         if (error) throw error;
 
-        return data.map((item: any) => ({
+        return data.map((item) => ({
             id: item.id,
             numero: item.numero,
             descricao: item.descricao,
@@ -118,7 +118,7 @@ export const empenhosService = {
     },
 
     async update(id: string, empenho: Partial<Empenho>): Promise<void> {
-        const updates: any = {
+        const updates: Record<string, unknown> = {
             updated_at: new Date().toISOString(),
         };
 

@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatCard } from '@/components/StatCard';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { retencoesService } from '@/services/retencoes';
-import {
+import { 
     Table,
     TableBody,
     TableCell,
@@ -52,6 +52,8 @@ import {
     DropdownMenuItem, 
     DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
+
+type CsvRow = Record<string, string>;
 
 export default function LiquidacoesPagamentos() {
     const queryClient = useQueryClient();
@@ -139,16 +141,17 @@ export default function LiquidacoesPagamentos() {
         }
     };
 
-    const handleImportOB = async (data: any[]) => {
+    const handleImportOB = async (data: CsvRow[]) => {
         const toastId = toast.loading('Processando Ordens Bancárias...');
         try {
             await transparenciaService.importOrdensBancarias(data);
             toast.success(`${data.length} ordens bancárias importadas com sucesso!`, { id: toastId });
             setIsImportOBOpen(false);
             handleRefresh();
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Erro import OB:', error);
-            toast.error(`Falha na importação: ${error.message}`, { id: toastId });
+            const message = error instanceof Error ? error.message : 'Erro desconhecido';
+            toast.error(`Falha na importação: ${message}`, { id: toastId });
         }
     };
 
@@ -165,7 +168,7 @@ export default function LiquidacoesPagamentos() {
         }
     };
 
-    const handleRetencoesImport = async (data: any[]) => {
+    const handleRetencoesImport = async (data: CsvRow[]) => {
         const toastId = toast.loading('Processando importação de situações...');
         
         try {
@@ -190,10 +193,10 @@ export default function LiquidacoesPagamentos() {
             
             // Invalida transparência para atualizar os documentos
             queryClient.invalidateQueries({ queryKey: ['transparencia'] });
-        } catch (error) {
-            const err = error as any;
-            console.error('Erro ao importar situações:', err);
-            toast.error(`Erro na importação: ${err.message}`, { id: toastId });
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Erro desconhecido';
+            console.error('Erro ao importar situações:', error);
+            toast.error(`Erro na importação: ${message}`, { id: toastId });
         }
     };
 

@@ -32,6 +32,21 @@ interface AtividadeDialogProps {
 export function AtividadeDialog({ open, onOpenChange, atividade, onSuccess }: AtividadeDialogProps) {
   const [formData, setFormData] = useState<Partial<Atividade>>({});
   const [loading, setLoading] = useState(false);
+  const basePayload = (): Omit<Atividade, 'id' | 'createdAt' | 'updatedAt'> => ({
+    dimensao: formData.dimensao || '',
+    dimensaoId: formData.dimensaoId,
+    componenteFuncional: formData.componenteFuncional || '',
+    componenteFuncionalId: formData.componenteFuncionalId,
+    processo: formData.processo || '',
+    atividade: formData.atividade || '',
+    descricao: formData.descricao || '',
+    valorTotal: formData.valorTotal || 0,
+    origemRecurso: formData.origemRecurso || '',
+    origemRecursoId: formData.origemRecursoId,
+    naturezaDespesa: formData.naturezaDespesa || '',
+    naturezaDespesaId: formData.naturezaDespesaId,
+    planoInterno: formData.planoInterno || '',
+  });
 
   useEffect(() => {
     if (open) {
@@ -58,7 +73,7 @@ export function AtividadeDialog({ open, onOpenChange, atividade, onSuccess }: At
         await atividadesService.update(atividade.id, formData);
         toast.success('Atividade atualizada!', { id: toastId });
       } else {
-        await atividadesService.create(formData as any);
+        await atividadesService.create(basePayload());
         toast.success('Atividade criada!', { id: toastId });
       }
       onSuccess();

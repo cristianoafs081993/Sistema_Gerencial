@@ -42,8 +42,8 @@ export default function Contratos() {
 
     if (sortConfig) {
       result = [...result].sort((a, b) => {
-        let aValue: any;
-        let bValue: any;
+        let aValue: string | number = '';
+        let bValue: string | number = '';
 
         if (sortConfig.key === 'numero') {
           aValue = a.numero;
@@ -62,7 +62,7 @@ export default function Contratos() {
     return result;
   }, [contratos, searchTerm, normalizeString, sortConfig]);
 
-  const safeFormatDate = (dateVal: any) => {
+  const safeFormatDate = (dateVal: Date | string | null | undefined) => {
     if (!dateVal) return '-';
     try {
       const d = new Date(dateVal);

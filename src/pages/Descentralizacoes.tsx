@@ -239,7 +239,7 @@ export default function Descentralizacoes() {
 
             const dimensao = deriveDimensaoFromPI(planoInterno);
 
-            const descentralizacao: any = {
+            const descentralizacao: Omit<Descentralizacao, 'id' | 'createdAt' | 'updatedAt'> = {
                 dimensao,
                 origemRecurso: orNorm,
                 naturezaDespesa: ndNorm,
@@ -357,7 +357,7 @@ export default function Descentralizacoes() {
         toast.success(`${importCount} devolução(ões) processada(s), ${skipCount} linha(s) ignorada(s).`);
     };
 
-    const processDevolucao = (devolucao) => {
+    const processDevolucao = (devolucao: Record<string, unknown>) => {
         // Implementar lógica para ajustar os saldos com base nas devoluções
         console.log("Processando devolução:", devolucao);
     };

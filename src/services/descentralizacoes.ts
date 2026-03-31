@@ -10,7 +10,7 @@ export const descentralizacoesService = {
 
         if (error) throw error;
 
-        return data.map((item: any) => ({
+        return data.map((item) => ({
             id: item.id,
             dimensao: item.dimensao,
             dimensaoId: item.dimensao_id || undefined,
@@ -68,7 +68,7 @@ export const descentralizacoesService = {
     },
 
     async update(id: string, descentralizacao: Partial<Descentralizacao>): Promise<void> {
-        const updates: any = {
+        const updates: Record<string, unknown> = {
             updated_at: new Date().toISOString(),
         };
 

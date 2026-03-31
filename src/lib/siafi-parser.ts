@@ -252,7 +252,7 @@ export async function syncSiafiDataToDb(
 
             if (empenhos && empenhos.length > 0) {
                 // Empenho já existe — atualizar campos oficiais
-                const updatePayload: Record<string, any> = {
+                const updatePayload: Record<string, unknown> = {
                     valor_liquidado_oficial: item.valorLiquidadoOficial,
                     valor_pago_oficial: item.valorPagoOficial,
                     valor_liquidado_a_pagar: item.valorLiquidadoAPagar,

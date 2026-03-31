@@ -54,6 +54,16 @@ interface DocumentTemplate {
   sections: DocumentSection[];
 }
 
+type FonteUsada = {
+  titulo: string;
+  referencia: string;
+};
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  return 'Erro desconhecido';
+};
+
 // ── Conformidade Layers ──
 const CONFORMIDADE_LAYERS = [
   {
@@ -193,7 +203,7 @@ export default function EditorDocumentos() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [verifyDone, setVerifyDone] = useState(false);
-  const [aiResult, setAiResult] = useState<{ analise: string, fontes_usadas: any[] } | null>(null);
+  const [aiResult, setAiResult] = useState<{ analise: string, fontes_usadas: FonteUsada[] } | null>(null);
 
   const handleStartDocument = (tpl: DocumentTemplate) => {
     const firstWriting = tpl.sections.find(s => s.status === 'writing') ?? tpl.sections[0];
@@ -243,9 +253,9 @@ export default function EditorDocumentos() {
       if (error) throw error;
       setAiResult(data);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      toast.error('Erro na verificação pela IA');
+      toast.error(`Erro na verificação pela IA: ${getErrorMessage(err)}`);
     } finally {
       setIsVerifying(false);
       setVerifyDone(true);
@@ -474,7 +484,7 @@ export default function EditorDocumentos() {
                             </p>
                             {/* Grouping sources by document title to avoid duplicate cards */}
                             {Object.entries(
-                              aiResult.fontes_usadas.reduce((acc: Record<string, any[]>, f: any) => {
+                              aiResult.fontes_usadas.reduce((acc: Record<string, FonteUsada[]>, f: FonteUsada) => {
                                 if (!acc[f.titulo]) acc[f.titulo] = [];
                                 // Evita duplicar a mesma referência no mesmo documento
                                 if (!acc[f.titulo].find((item) => item.referencia === f.referencia)) {
@@ -482,7 +492,7 @@ export default function EditorDocumentos() {
                                 }
                                 return acc;
                               }, {})
-                            ).map(([titulo, refs]: [string, any[]], i) => (
+                            ).map(([titulo, refs]: [string, FonteUsada[]], i) => (
                               <div key={i} className="p-3 bg-muted/20 hover:bg-muted/40 transition-colors rounded-xl border border-border/80 shadow-sm relative overflow-hidden group">
                                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/20 group-hover:bg-primary/40 transition-colors" />
                                 <p className="text-xs font-semibold text-foreground leading-snug">{titulo}</p>

@@ -31,7 +31,17 @@ type Message = {
   role: 'user' | 'assistant';
   content: string;
   attachedFile?: { name: string; text: string; base64?: string };
-  sources?: any[];
+  sources?: SourceRef[];
+};
+
+type SourceRef = {
+  titulo: string;
+  referencia: string;
+};
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  return 'Erro desconhecido';
 };
 
 export default function Consultor() {
@@ -100,7 +110,7 @@ export default function Consultor() {
       setLoadingTextIndex(prev => (prev + 1) % loadingTexts.length);
     }, 2200); // Troca a cada 2.2s
     return () => clearInterval(interval);
-  }, [isLoading]);
+  }, [isLoading, loadingTexts.length]);
 
   // Auto-scroll para a última mensagem e salva no localStorage
   useEffect(() => {
@@ -142,7 +152,7 @@ export default function Consultor() {
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
-        const pageText = textContent.items.map((item: any) => item.str).join(' ');
+        const pageText = textContent.items.map((item) => ('str' in item ? String(item.str) : '')).join(' ');
         fullText += pageText + '\n\n';
         
         // Optimisation: Stop parsing if we have enough context for the LLM
@@ -239,8 +249,8 @@ export default function Consultor() {
       const decoder = new TextDecoder();
       
       let assistantText = '';
-      let fontesDisponiveis: any[] = [];
-      let aiMsgId = (Date.now() + 1).toString();
+      let fontesDisponiveis: SourceRef[] = [];
+      const aiMsgId = (Date.now() + 1).toString();
       
       setMessages(prev => [...prev, { id: aiMsgId, role: 'assistant', content: '', sources: [] }]);
       setIsLoading(false); // Retira o loading spinner, pois as letras já vão começar a aparecer
@@ -315,9 +325,9 @@ export default function Consultor() {
         if (done) break;
       }
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      toast.error('Erro de conexão com o Consultor IA.');
+      toast.error(`Erro de conexão com o Consultor IA: ${getErrorMessage(err)}`);
       const errMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -421,14 +431,14 @@ export default function Consultor() {
                     <div className="flex flex-wrap gap-2">
                        {/* Grouping just like EditorDocumentos */}
                        {Object.entries(
-                          msg.sources.reduce((acc: Record<string, any[]>, f: any) => {
+                          msg.sources.reduce((acc: Record<string, SourceRef[]>, f: SourceRef) => {
                             if (!acc[f.titulo]) acc[f.titulo] = [];
                             if (!acc[f.titulo].find((item) => item.referencia === f.referencia)) {
                               acc[f.titulo].push(f);
                             }
                             return acc;
                           }, {})
-                        ).map(([titulo, refs]: [string, any[]], i) => (
+                        ).map(([titulo, refs]: [string, SourceRef[]], i) => (
                           <div key={i} className="p-2.5 bg-slate-50 border rounded-lg max-w-sm">
                             <p className="text-[11px] font-bold text-slate-700">{titulo}</p>
                             <div className="mt-1 space-y-1">
@@ -539,3 +549,4 @@ export default function Consultor() {
     </div>
   );
 }
+

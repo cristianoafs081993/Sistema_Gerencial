@@ -288,7 +288,7 @@ export default function Dashboard() {
   // 5.1 Stack de Dimensão x Componente Funcional
   const { dadosStack, uniqueComponents } = useMemo(() => {
     // Dimensão -> { name: Dimensao, Componente A: valor, Componente B: valor, ... }
-    const dimMap = new Map<string, Record<string, any>>();
+    const dimMap = new Map<string, Record<string, string | number>>();
     const compSet = new Set<string>();
 
     filteredData.atividades.forEach(a => {
@@ -317,7 +317,7 @@ export default function Dashboard() {
 
   // 5.2 Descentralizações por Dimensão e Origem
   const { dadosDescentralizacao, uniqueOrigens } = useMemo(() => {
-    const dimMap = new Map<string, Record<string, any>>();
+    const dimMap = new Map<string, Record<string, string | number>>();
     const origemSet = new Set<string>();
 
     filteredData.descentralizacoes.forEach(d => {

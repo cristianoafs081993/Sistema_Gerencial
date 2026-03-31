@@ -13,7 +13,7 @@ export const dominioService = {
             .order('codigo');
 
         if (error) throw error;
-        return (data || []).map((item: any) => ({
+        return (data || []).map((item) => ({
             id: item.id,
             codigo: item.codigo,
             nome: item.nome || '',
@@ -27,7 +27,7 @@ export const dominioService = {
             .order('codigo');
 
         if (error) throw error;
-        return (data || []).map((item: any) => ({
+        return (data || []).map((item) => ({
             id: item.id,
             codigo: item.codigo,
             nome: item.nome,
@@ -41,7 +41,7 @@ export const dominioService = {
             .order('codigo');
 
         if (error) throw error;
-        return (data || []).map((item: any) => ({
+        return (data || []).map((item) => ({
             id: item.id,
             codigo: item.codigo,
             descricao: item.descricao || '',
@@ -60,7 +60,7 @@ export const dominioService = {
 
         const { data, error } = await query;
         if (error) throw error;
-        return (data || []).map((item: any) => ({
+        return (data || []).map((item) => ({
             id: item.id,
             dimensaoId: item.dimensao_id,
             nome: item.nome,

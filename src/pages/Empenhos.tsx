@@ -131,7 +131,7 @@ export default function Empenhos() {
     setIsDialogOpen(true);
   };
 
-  const handleSaveEmpenho = (id: string, data: any) => {
+  const handleSaveEmpenho = (id: string, data: Partial<Empenho>) => {
     updateEmpenho(id, data);
     setIsDialogOpen(false);
   };
@@ -150,7 +150,7 @@ export default function Empenhos() {
     data.forEach((row) => {
       const parseDate = (dateStr: string): Date => {
         if (!dateStr) return new Date();
-        const parts = dateStr.split(/[\/\-]/);
+        const parts = dateStr.split(/[/-]/);
         if (parts.length === 3) {
           if (parts[0].length === 4) {
             return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
@@ -245,9 +245,10 @@ export default function Empenhos() {
         toast.error(`Houve erro ao salvar ${result.erros} registros.`, { duration: 5000 });
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao processar SIAFI CSV:', error);
-      toast.error(error.message || 'Erro ao ler a planilha. Verifique o formato do arquivo.', { id: toastId });
+      const message = error instanceof Error ? error.message : 'Erro ao ler a planilha. Verifique o formato do arquivo.';
+      toast.error(message, { id: toastId });
     } finally {
       setIsUpdatingSaldos(false);
       if (saldosInputRef.current) {
@@ -294,9 +295,10 @@ export default function Empenhos() {
       await transparenciaService.importCreditosDisponiveis(data);
       await refreshData();
       toast.success('Créditos disponíveis atualizados com sucesso!', { id: toastId });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao importar créditos:', error);
-      toast.error('Erro ao importar créditos: ' + error.message, { id: toastId });
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
+      toast.error('Erro ao importar créditos: ' + message, { id: toastId });
     } finally {
       setIsUpdatingSaldos(false);
       if (creditosInputRef.current) creditosInputRef.current.value = '';
