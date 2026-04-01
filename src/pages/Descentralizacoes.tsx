@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Trash2, Search, Filter, Upload, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, Filter, Upload, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Descentralizacao, DIMENSOES } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -23,14 +23,12 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 
-import { ConfirmDialog } from '@/components/modals/ConfirmDialog';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { HeaderActions } from '@/components/HeaderParts';
 import { toast } from 'sonner';
 import { formatCurrency, parseCurrency } from '@/lib/utils';
-import { Checkbox } from '@/components/ui/checkbox';
 import { descentralizacoesService } from '@/services/descentralizacoes';
 
 // Mapeamento de sufixo de PI para código de dimensão
@@ -89,7 +87,7 @@ function parseValorBR(valorStr: string): number {
 const normalizeKey = (key) => key.normalize('NFD').replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
 
 export default function Descentralizacoes() {
-    const { descentralizacoes, isLoading, addDescentralizacao, deleteDescentralizacao, refreshData } = useData();
+    const { descentralizacoes, isLoading, addDescentralizacao, refreshData } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [filterDimensao, setFilterDimensao] = useState('all');
     const [filterOrigem, setFilterOrigem] = useState('all');
@@ -98,9 +96,7 @@ export default function Descentralizacoes() {
     // Sorting
     const [sortConfig, setSortConfig] = useState<{ key: keyof Descentralizacao; direction: 'asc' | 'desc' } | null>(null);
 
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
-    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
     const [isDevolucoesDialogOpen, setIsDevolucoesDialogOpen] = useState(false);
 
@@ -154,31 +150,6 @@ export default function Descentralizacoes() {
     // Total descentralizado filtrado
     const totalFiltrado = sortedDescentralizacoes.reduce((sum, d) => sum + d.valor, 0);
 
-
-    const handleSelectAll = (checked: boolean) => {
-        if (checked) {
-            setSelectedIds(new Set(sortedDescentralizacoes.map((d) => d.id)));
-        } else {
-            setSelectedIds(new Set());
-        }
-    };
-
-    const handleSelectOne = (id: string, checked: boolean) => {
-        const newSelected = new Set(selectedIds);
-        if (checked) {
-            newSelected.add(id);
-        } else {
-            newSelected.delete(id);
-        }
-        setSelectedIds(newSelected);
-    };
-
-    const handleBulkDelete = () => {
-        selectedIds.forEach((id) => deleteDescentralizacao(id));
-        setSelectedIds(new Set());
-        setIsDeleteDialogOpen(false);
-        toast.success(`${selectedIds.size} descentralizações excluídas com sucesso!`);
-    };
 
     const handleCsvImport = (data: Record<string, string>[]) => {
         // Build deduplication set from existing records (in memory)
@@ -373,12 +344,6 @@ export default function Descentralizacoes() {
     return (
         <div className="space-y-6 pb-10">
             <HeaderActions>
-                {selectedIds.size > 0 && (
-                    <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)} className="gap-2 h-8 text-xs sm:h-9 sm:text-sm shadow-sm transition-all">
-                        <Trash2 className="h-4 w-4" />
-                        Excluir ({selectedIds.size})
-                    </Button>
-                )}
                 <Button 
                     variant="outline" 
                     onClick={() => setIsImportDialogOpen(true)} 
@@ -511,40 +476,31 @@ export default function Descentralizacoes() {
                     </Badge>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <Table>
+                    <div className="overflow-hidden">
+                        <Table className="table-fixed w-full">
                             <TableHeader className="bg-slate-50/50">
                                 <TableRow className="hover:bg-transparent border-b border-border-default/50">
-                                    <TableHead className="h-11 px-6 w-10">
-                                        <Checkbox
-                                            checked={
-                                                sortedDescentralizacoes.length > 0 &&
-                                                sortedDescentralizacoes.every((d) => selectedIds.has(d.id))
-                                            }
-                                            onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
-                                        />
-                                    </TableHead>
-                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">
+                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider w-[108px]">
                                         <Button variant="ghost" className="hover:bg-transparent px-0 font-semibold text-xs uppercase tracking-wider" onClick={() => requestSort('dataEmissao')}>
                                             Data {getSortIcon('dataEmissao')}
                                         </Button>
                                     </TableHead>
-                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">
+                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider w-[112px]">
                                         <Button variant="ghost" className="hover:bg-transparent px-0 font-semibold text-xs uppercase tracking-wider" onClick={() => requestSort('dimensao')}>
                                             Dimensão {getSortIcon('dimensao')}
                                         </Button>
                                     </TableHead>
-                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">
+                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider w-[112px]">
                                         <Button variant="ghost" className="hover:bg-transparent px-0 font-semibold text-xs uppercase tracking-wider" onClick={() => requestSort('origemRecurso')}>
                                             PTRES {getSortIcon('origemRecurso')}
                                         </Button>
                                     </TableHead>
-                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">
+                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider hidden xl:table-cell w-[110px]">
                                         <Button variant="ghost" className="hover:bg-transparent px-0 font-semibold text-xs uppercase tracking-wider" onClick={() => requestSort('naturezaDespesa')}>
                                             ND {getSortIcon('naturezaDespesa')}
                                         </Button>
                                     </TableHead>
-                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">
+                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider hidden xl:table-cell w-[140px]">
                                         <Button variant="ghost" className="hover:bg-transparent px-0 font-semibold text-xs uppercase tracking-wider" onClick={() => requestSort('planoInterno')}>
                                             PI {getSortIcon('planoInterno')}
                                         </Button>
@@ -563,29 +519,22 @@ export default function Descentralizacoes() {
                                 {isLoading ? (
                                     Array.from({ length: 5 }).map((_, i) => (
                                         <TableRow key={i}>
-                                            <TableCell className="px-6"><Skeleton className="h-4 w-4 rounded" /></TableCell>
                                             <TableCell className="px-4"><Skeleton className="h-4 w-20" /></TableCell>
                                             <TableCell className="px-4"><Skeleton className="h-5 w-16" /></TableCell>
                                             <TableCell className="px-4"><Skeleton className="h-4 w-20" /></TableCell>
-                                            <TableCell className="px-4"><Skeleton className="h-4 w-16" /></TableCell>
-                                            <TableCell className="px-4"><Skeleton className="h-4 w-28" /></TableCell>
+                                            <TableCell className="px-4 hidden xl:table-cell"><Skeleton className="h-4 w-16" /></TableCell>
+                                            <TableCell className="px-4 hidden xl:table-cell"><Skeleton className="h-4 w-28" /></TableCell>
                                             <TableCell className="px-4"><Skeleton className="h-4 w-32" /></TableCell>
                                             <TableCell className="px-6"><Skeleton className="h-4 w-24 ml-auto" /></TableCell>
                                         </TableRow>
                                     ))
                                 ) : sortedDescentralizacoes.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={8} className="h-32 text-center text-muted-foreground italic">Nenhuma descentralização encontrada.</TableCell>
+                                        <TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic">Nenhuma descentralização encontrada.</TableCell>
                                     </TableRow>
                                 ) : (
                                     sortedDescentralizacoes.map((descentralizacao) => (
                                         <TableRow key={descentralizacao.id} className="hover:bg-slate-50/80 transition-colors border-b last:border-0">
-                                            <TableCell className="py-4 px-6">
-                                                <Checkbox
-                                                    checked={selectedIds.has(descentralizacao.id)}
-                                                    onCheckedChange={(checked) => handleSelectOne(descentralizacao.id, checked as boolean)}
-                                                />
-                                            </TableCell>
                                             <TableCell className="py-4 px-4">
                                                 <span className="text-sm text-muted-foreground whitespace-nowrap">{formatDateBR(descentralizacao.dataEmissao)}</span>
                                             </TableCell>
@@ -597,14 +546,14 @@ export default function Descentralizacoes() {
                                             <TableCell className="py-4 px-4">
                                                 <span className="text-sm font-medium">{descentralizacao.origemRecurso}</span>
                                             </TableCell>
-                                            <TableCell className="py-4 px-4">
+                                            <TableCell className="py-4 px-4 hidden xl:table-cell">
                                                 <span className="text-sm text-muted-foreground">{descentralizacao.naturezaDespesa || '-'}</span>
                                             </TableCell>
-                                            <TableCell className="py-4 px-4">
+                                            <TableCell className="py-4 px-4 hidden xl:table-cell">
                                                 <span className="text-sm text-muted-foreground">{descentralizacao.planoInterno || '-'}</span>
                                             </TableCell>
-                                            <TableCell className="py-4 px-4 max-w-[200px]">
-                                                <span className="text-xs text-muted-foreground line-clamp-2" title={descentralizacao.descricao || ''}>
+                                            <TableCell className="py-4 px-4 min-w-0">
+                                                <span className="text-xs text-muted-foreground block truncate" title={descentralizacao.descricao || ''}>
                                                     {descentralizacao.descricao || '-'}
                                                 </span>
                                             </TableCell>
@@ -621,17 +570,6 @@ export default function Descentralizacoes() {
                     </div>
                 </CardContent>
             </Card>
-
-
-            <ConfirmDialog
-                open={isDeleteDialogOpen}
-                onOpenChange={setIsDeleteDialogOpen}
-                onConfirm={handleBulkDelete}
-                title="Confirmar exclusão"
-                description={`Tem certeza que deseja excluir as ${selectedIds.size} descentralizações selecionadas? Esta ação não pode ser desfeita.`}
-                confirmText="Excluir"
-            />
-
             {/* CSV/JSON Import Dialog */}
             <JsonImportDialog
                 open={isImportDialogOpen}

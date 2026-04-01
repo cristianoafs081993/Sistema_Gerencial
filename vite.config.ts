@@ -14,6 +14,11 @@ export default defineConfig(({ mode }) => ({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api-transparencia/, ''),
       },
+      '/api-contratos': {
+        target: 'https://contratos.comprasnet.gov.br',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api-contratos/, ''),
+      },
     },
     hmr: {
       overlay: false,

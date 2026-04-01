@@ -120,7 +120,12 @@ export async function parseSiafiCsv(file: File): Promise<SiafiEmpenhoData[]> {
 
                 // Restos a Pagar (RAP) - 4 estágios
                 const colRapInscritos = findCol('RESTOS A PAGAR INSCRITOS');
-                const colRapALiquidar = findCol('RESTOS A PAGAR NAO PROCESSADOS A LIQUIDAR');
+                // Alguns relatórios trazem "NAO PROCESSADOS REINSCRITOS" no lugar de "A LIQUIDAR".
+                // Usamos fallback para manter compatibilidade entre layouts do TG/SIAFI.
+                const colRapALiquidar =
+                    findCol('RESTOS A PAGAR NAO PROCESSADOS A LIQUIDAR') !== -1
+                        ? findCol('RESTOS A PAGAR NAO PROCESSADOS A LIQUIDAR')
+                        : findCol('RESTOS A PAGAR NAO PROCESSADOS REINSCRITOS');
                 const colRapPagos = findCol('RESTOS A PAGAR PAGOS');
                 const colRapAPagar = findCol('RESTOS A PAGAR A PAGAR');
 
@@ -186,7 +191,7 @@ export async function parseSiafiCsv(file: File): Promise<SiafiEmpenhoData[]> {
                     const rapALiquidar = parseCurrency(safeCol(colRapALiquidar));
                     const rapPago = parseCurrency(safeCol(colRapPagos));
                     const rapAPagar = parseCurrency(safeCol(colRapAPagar));
-                    const rapLiquidado = rapInscrito - rapALiquidar;
+                    const rapLiquidado = Math.max(0, rapInscrito - rapALiquidar);
 
                     data.push({
                         numeroCompleto,

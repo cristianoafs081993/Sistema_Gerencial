@@ -13,11 +13,14 @@ import NotFound from "./pages/NotFound";
 
 import Contratos from "./pages/Contratos";
 import LiquidacoesPagamentos from "./pages/LiquidacoesPagamentos";
+import Financeiro from "./pages/Financeiro";
+import LCPage from "./pages/LC";
 import RastreabilidadePFs from "./pages/RastreabilidadePFs";
 import ConciliacaoPfs from "./pages/ConciliacaoPfs";
 import GeradorDocumentos from "./pages/GeradorDocumentos";
 import EditorDocumentos from "./pages/EditorDocumentos";
 import Consultor from "./pages/Consultor";
+import DesignSystemPreview from "./pages/DesignSystemPreview";
 
 const queryClient = new QueryClient();
 
@@ -36,11 +39,14 @@ const App = () => (
               <Route path="/empenhos" element={<Empenhos />} />
               <Route path="/contratos" element={<Contratos />} />
               <Route path="/liquidacoes-pagamentos" element={<LiquidacoesPagamentos />} />
+              <Route path="/financeiro" element={<Financeiro />} />
+              <Route path="/lc" element={<LCPage />} />
               <Route path="/rastreabilidade-pfs" element={<RastreabilidadePFs />} />
               <Route path="/conciliacao-pfs" element={<ConciliacaoPfs />} />
               <Route path="/gerador-documentos" element={<GeradorDocumentos />} />
               <Route path="/editor-documentos" element={<EditorDocumentos />} />
               <Route path="/consultor" element={<Consultor />} />
+              <Route path="/design-system-preview" element={<DesignSystemPreview />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Layout>

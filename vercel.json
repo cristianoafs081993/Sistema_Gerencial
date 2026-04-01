@@ -10,6 +10,10 @@
             "destination": "https://api.portaldatransparencia.gov.br/:path*"
         },
         {
+            "source": "/api-contratos/:path*",
+            "destination": "https://contratos.comprasnet.gov.br/:path*"
+        },
+        {
             "source": "/(.*)",
             "destination": "/index.html"
         }

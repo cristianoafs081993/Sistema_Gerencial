@@ -18,6 +18,35 @@ type PFLink = {
   l: PFRow | null;
 };
 
+function decodeCsvBuffer(arrayBuffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(arrayBuffer);
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+    return new TextDecoder('utf-16le').decode(bytes);
+  }
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+    return new TextDecoder('utf-16be').decode(bytes);
+  }
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+async function readWorkbook(file: File): Promise<XLSX.WorkBook> {
+  const arrayBuffer = await file.arrayBuffer();
+  const isCsv = file.name.toLowerCase().endsWith('.csv') || file.type.includes('csv');
+
+  if (isCsv) {
+    const text = decodeCsvBuffer(arrayBuffer).replace(/^\uFEFF/, '');
+    const delimiter = text.includes(';') ? ';' : ',';
+    return XLSX.read(text, {
+      type: 'string',
+      raw: false,
+      FS: delimiter,
+      cellDates: true,
+    });
+  }
+
+  return XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+}
+
 export function parseNumeroPF(numero: string | number): string {
   const numStr = String(numero).trim();
   const pfRegex = /^\\d{6}\\d{9}\\d{4}PF\\d{6}$/;
@@ -61,8 +90,7 @@ export function safeFormatDate(val: unknown): string {
 }
 
 export async function parseSolicitacoes(file: File): Promise<PFRow[]> {
-  const arrayBuffer = await file.arrayBuffer();
-  const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+  const workbook = await readWorkbook(file);
   const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
   
@@ -97,8 +125,7 @@ export async function parseSolicitacoes(file: File): Promise<PFRow[]> {
 }
 
 export async function parseAprovacoesLiberacoes(file: File): Promise<PFRow[]> {
-  const arrayBuffer = await file.arrayBuffer();
-  const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+  const workbook = await readWorkbook(file);
   // python says: sheet_name='PFs'
   let worksheet = workbook.Sheets['PFs'];
   if (!worksheet) {

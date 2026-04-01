@@ -53,6 +53,17 @@ const statusLabels: Record<string, string> = {
   cancelado: 'Cancelado',
 };
 
+const getRapSaldo = (e: Empenho): number => {
+  const aLiquidar = e.rapALiquidar || 0;
+  if (aLiquidar > 0) return aLiquidar;
+  return e.saldoRapOficial || 0;
+};
+
+const getRapLiquidado = (e: Empenho): number => {
+  const inscrito = e.rapInscrito || 0;
+  return Math.max(0, inscrito - getRapSaldo(e));
+};
+
 
 
 export default function Empenhos() {
@@ -99,10 +110,10 @@ export default function Empenhos() {
     const matchesStatus = filterStatus === 'all' || (() => {
       // Regra específica para Restos a Pagar
       if (e.tipo === 'rap') {
-        const isCompletamentePago = (e.rapALiquidar || 0) <= 0 && (e.saldoRapOficial || 0) <= 0 && (e.rapPago || 0) > 0;
+        const isCompletamentePago = getRapSaldo(e) <= 0 && (e.rapPago || 0) > 0;
 
         if (filterStatus === 'pago') return isCompletamentePago;
-        if (filterStatus === 'liquidado') return (e.rapLiquidado || 0) > 0 && !isCompletamentePago;
+        if (filterStatus === 'liquidado') return getRapLiquidado(e) > 0 && !isCompletamentePago;
         if (filterStatus === 'pendente') return !isCompletamentePago;
       }
 
@@ -653,11 +664,11 @@ function EmpenhoRow({
               <span className="font-semibold text-sm" title="Inscrito (original)">
                 {formatCurrency(empenho.rapInscrito || 0)}
               </span>
-              <span className={`text-xs ${(empenho.rapALiquidar || 0) > 0 ? 'text-status-warning' : 'text-muted-foreground'}`} title="A Liquidar">
-                A Liq: {formatCurrency(empenho.rapALiquidar || 0)}
+              <span className={`text-xs ${getRapSaldo(empenho) > 0 ? 'text-status-warning' : 'text-muted-foreground'}`} title="A Liquidar">
+                A Liq: {formatCurrency(getRapSaldo(empenho))}
               </span>
-              <span className={`text-xs ${(empenho.rapLiquidado || 0) > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado">
-                Liq: {formatCurrency(empenho.rapLiquidado || 0)}
+              <span className={`text-xs ${getRapLiquidado(empenho) > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado">
+                Liq: {formatCurrency(getRapLiquidado(empenho))}
               </span>
               <span className={`text-xs ${(empenho.rapPago || 0) > 0 ? 'text-status-success' : 'text-muted-foreground'}`} title="Pago">
                 Pg: {formatCurrency(empenho.rapPago || 0)}
@@ -691,7 +702,7 @@ function EmpenhoRow({
       <TableCell className="py-4 px-4 text-right align-top whitespace-nowrap">
         {(() => {
           if (type === 'restos') {
-            const aLiquidar = empenho.rapALiquidar || 0;
+            const aLiquidar = getRapSaldo(empenho);
             return (
               <span className={`font-semibold text-sm ${aLiquidar > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}>
                 {formatCurrency(aLiquidar)}
@@ -769,9 +780,9 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
       name,
       items,
       valorTotal: items.reduce((acc, e) => acc + (type === 'restos' ? (e.rapInscrito || e.valor) : e.valor), 0),
-      saldoTotal: items.reduce((acc, e) => acc + (type === 'restos' ? (e.rapALiquidar || 0) : (e.valor - (e.valorLiquidado || 0))), 0),
+      saldoTotal: items.reduce((acc, e) => acc + (type === 'restos' ? getRapSaldo(e) : (e.valor - (e.valorLiquidado || 0))), 0),
       pagoTotal: items.reduce((acc, e) => acc + (type === 'restos' ? (e.rapPago || 0) : (e.valorPago || 0)), 0),
-      liquidadoTotal: items.reduce((acc, e) => acc + (type === 'restos' ? (e.rapLiquidado || 0) : (e.valorLiquidado || 0)), 0),
+      liquidadoTotal: items.reduce((acc, e) => acc + (type === 'restos' ? getRapLiquidado(e) : (e.valorLiquidado || 0)), 0),
     }));
   }, [empenhos, groupBy, type]);
 
@@ -799,8 +810,8 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
             valB = type === 'restos' ? (itemB.rapInscrito || itemB.valor) : itemB.valor;
             break;
           case 'saldo':
-            valA = type === 'restos' ? (itemA.rapALiquidar || 0) : (itemA.valor - (itemA.valorLiquidado || 0));
-            valB = type === 'restos' ? (itemB.rapALiquidar || 0) : (itemB.valor - (itemB.valorLiquidado || 0));
+            valA = type === 'restos' ? getRapSaldo(itemA) : (itemA.valor - (itemA.valorLiquidado || 0));
+            valB = type === 'restos' ? getRapSaldo(itemB) : (itemB.valor - (itemB.valorLiquidado || 0));
             break;
           case 'pago':
             valA = type === 'restos' ? (itemA.rapPago || 0) : (itemA.valorPago || 0);

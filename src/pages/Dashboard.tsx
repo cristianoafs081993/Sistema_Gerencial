@@ -72,6 +72,12 @@ import { ptBR } from 'date-fns/locale';
 import { DIMENSOES } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 
+const getRapSaldo = (rapALiquidar?: number, saldoRapOficial?: number) => {
+  const aLiq = rapALiquidar || 0;
+  if (aLiq > 0) return aLiq;
+  return saldoRapOficial || 0;
+};
+
 
 export default function Dashboard() {
   const { atividades, empenhos, descentralizacoes, getTotalDescentralizado, getADescentralizar, isLoading } = useData();
@@ -164,7 +170,7 @@ export default function Dashboard() {
 
   // --- KPI Calculations (RAP) ---
   const rapTotalInscrito = filteredData.empenhosRap.reduce((acc, e) => acc + (e.rapInscrito || 0), 0);
-  const rapTotalALiquidar = filteredData.empenhosRap.reduce((acc, e) => acc + (e.rapALiquidar || 0), 0);
+  const rapTotalALiquidar = filteredData.empenhosRap.reduce((acc, e) => acc + getRapSaldo(e.rapALiquidar, e.saldoRapOficial), 0);
   const rapTotalLiquidado = filteredData.empenhosRap.reduce((acc, e) => acc + (e.rapLiquidado || 0), 0);
   const rapTotalPago = filteredData.empenhosRap.reduce((acc, e) => acc + (e.rapPago || 0), 0);
   const rapSaldoPagar = filteredData.empenhosRap.reduce((acc, e) => acc + (e.saldoRapOficial || 0), 0);

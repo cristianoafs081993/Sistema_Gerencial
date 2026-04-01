@@ -73,6 +73,12 @@ export default function Contratos() {
     }
   };
 
+  const getRapSaldo = (rapALiquidar?: number, saldoRapOficial?: number) => {
+    const aLiq = rapALiquidar || 0;
+    if (aLiq > 0) return aLiq;
+    return saldoRapOficial || 0;
+  };
+
   const getEmpenhosDoContrato = useCallback((contratoId: string) => {
     const linkIds = contratosEmpenhos
       .filter((l) => l.contrato_id === contratoId)
@@ -115,7 +121,7 @@ export default function Contratos() {
     return contratos.reduce((sumContrato, c) => {
       const emps = getEmpenhosDoContrato(c.id);
       return sumContrato + emps.reduce((sumEmp, e) => {
-        if (e.tipo === 'rap') return sumEmp + (e.rapALiquidar || 0);
+        if (e.tipo === 'rap') return sumEmp + getRapSaldo(e.rapALiquidar, e.saldoRapOficial);
         const liquidado = (e.valorLiquidadoAPagar || 0) + (e.valorPagoOficial || 0);
         return sumEmp + Math.max(0, e.valor - liquidado);
       }, 0);
@@ -240,8 +246,8 @@ export default function Contratos() {
                     </div>
                   </TableHead>
                   <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Valor Total</TableHead>
+                  <TableHead className="h-11 px-6 text-xs font-semibold uppercase tracking-wider">EMPENHADO</TableHead>
                   <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Saldo a Liquidar</TableHead>
-                  <TableHead className="h-11 px-6 text-xs font-semibold uppercase tracking-wider">Empenhos Vinculados</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -255,9 +261,12 @@ export default function Contratos() {
                   filteredContratos.map((c) => {
                     const empenhosVinculados = getEmpenhosDoContrato(c.id);
                     const totalEmpenhado = empenhosVinculados.reduce((sum, e) => sum + e.valor, 0);
+                    const percentualEmpenhado = c.valor && c.valor > 0
+                      ? Math.min(100, (totalEmpenhado / c.valor) * 100)
+                      : 0;
 
                     const totalALiquidar = empenhosVinculados.reduce((sum, e) => {
-                      if (e.tipo === 'rap') return sum + (e.rapALiquidar || 0);
+                      if (e.tipo === 'rap') return sum + getRapSaldo(e.rapALiquidar, e.saldoRapOficial);
                       const liquidado = (e.valorLiquidadoAPagar || 0) + (e.valorPagoOficial || 0);
                       return sum + Math.max(0, e.valor - liquidado);
                     }, 0);
@@ -272,37 +281,37 @@ export default function Contratos() {
                         </TableCell>
                         <TableCell className="py-4 px-4 text-right">
                           <div className="flex flex-col text-xs space-y-0.5">
-                            <span className="text-muted-foreground">Início: {safeFormatDate(c.data_inicio)}</span>
-                            <span className="font-medium text-muted-foreground">Fim: {safeFormatDate(c.data_termino)}</span>
+                            <span className="text-muted-foreground">+ {safeFormatDate(c.data_inicio)}</span>
+                            <span className="font-medium text-muted-foreground">- {safeFormatDate(c.data_termino)}</span>
                           </div>
                         </TableCell>
                         <TableCell className="py-4 px-4 text-right">
-                          <div className="flex flex-col">
+                          <div className="flex flex-col items-end gap-1.5">
                             <span className="font-bold text-action-primary text-sm">{formatCurrency(c.valor || 0)}</span>
-                            {totalEmpenhado > 0 && (
-                              <span className="text-[10px] text-muted-foreground">
-                                Empenhado: {formatCurrency(totalEmpenhado)}
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-4 px-4 text-right">
-                          <div className="flex flex-col">
-                            <span className={cn(
-                              "font-semibold text-sm",
-                              totalALiquidar > 0 ? "text-status-warning" : "text-status-success"
-                            )}>
-                              {formatCurrency(totalALiquidar)}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground uppercase">A Liquidar</span>
                           </div>
                         </TableCell>
                         <TableCell className="py-4 px-6">
-                          <div className="flex flex-wrap gap-1">
+                          <div className="space-y-2">
+                            {totalEmpenhado > 0 && (
+                              <div className="rounded-md border border-slate-200 bg-slate-50 p-2">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="font-bold text-slate-700">{formatCurrency(totalEmpenhado)}</span>
+                                  <span className="font-medium text-slate-500">{percentualEmpenhado.toFixed(1)}%</span>
+                                </div>
+                                <div className="mt-1 h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-slate-500 rounded-full transition-all"
+                                    style={{ width: `${percentualEmpenhado}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="flex flex-wrap gap-1">
                             {empenhosVinculados.length > 0 ? (
                               empenhosVinculados.map((e) => {
                                 const balance = e.tipo === 'rap'
-                                  ? (e.rapALiquidar || 0)
+                                  ? getRapSaldo(e.rapALiquidar, e.saldoRapOficial)
                                   : Math.max(0, e.valor - ((e.valorLiquidadoAPagar || 0) + (e.valorPagoOficial || 0)));
 
                                 return (
@@ -352,6 +361,17 @@ export default function Contratos() {
                             ) : (
                               <span className="text-xs text-muted-foreground italic">Sem empenhos</span>
                             )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-4 text-right">
+                          <div className="flex flex-col">
+                            <span className={cn(
+                              "font-semibold text-sm",
+                              totalALiquidar > 0 ? "text-status-warning" : "text-status-success"
+                            )}>
+                              {formatCurrency(totalALiquidar)}
+                            </span>
                           </div>
                         </TableCell>
                       </TableRow>

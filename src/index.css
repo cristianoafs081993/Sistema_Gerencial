@@ -3,8 +3,8 @@
    Baseado nos 11 conceitos UI/UX (Every UI/UX Concept Explained)
    ============================================================ */
 
-/* 1. TYPOGRAPHY — Importing Inter with full weight range */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+/* 1. TYPOGRAPHY - Interface + Data Pairing */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -501,3 +501,4 @@
     background-color: hsl(var(--muted-foreground) / 0.5);
   }
 }
+
