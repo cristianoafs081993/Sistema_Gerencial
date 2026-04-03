@@ -72,6 +72,7 @@ import { ptBR } from 'date-fns/locale';
 import { DIMENSOES } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { HeaderActions } from '@/components/HeaderParts';
+import { extractDimensionCode, getDimensionLabel, matchesDimensionFilter } from '@/utils/dimensionFilters';
 
 const getRapSaldo = (rapALiquidar?: number, saldoRapOficial?: number) => {
   const aLiq = rapALiquidar || 0;
@@ -127,95 +128,6 @@ const truncateTreemapLabel = (label: string, width: number, depth: number) => {
   const maxChars = Math.max(8, Math.floor((width - 18) / charWidth));
 
   return label.length > maxChars ? `${label.slice(0, maxChars - 1)}...` : label;
-};
-
-const normalizeDimensionText = (value: string) =>
-  value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
-
-const extractDimensionCode = (value?: string | null) => {
-  if (!value) return null;
-
-  const directMatch = value.match(/\b([A-Z]{2})\b/);
-  if (directMatch && DIMENSOES.some((dimension) => dimension.codigo === directMatch[1])) {
-    return directMatch[1];
-  }
-
-  const normalizedValue = normalizeDimensionText(value);
-  const matchedDimension = DIMENSOES.find((dimension) => {
-    const normalizedCode = normalizeDimensionText(dimension.codigo);
-    const normalizedName = normalizeDimensionText(dimension.nome);
-
-    return (
-      normalizedValue === normalizedCode ||
-      normalizedValue.includes(normalizedName) ||
-      normalizedName.includes(normalizedValue)
-    );
-  });
-
-  return matchedDimension?.codigo || null;
-};
-
-const extractDimensionCodeFromPlanInternal = (value?: string | null) => {
-  if (!value) return null;
-
-  const normalizedValue = value.trim().toUpperCase();
-  const endMatch = normalizedValue.match(/([A-Z]{2})[A-Z]?$/);
-  if (!endMatch) return null;
-
-  return DIMENSOES.some((dimension) => dimension.codigo === endMatch[1]) ? endMatch[1] : null;
-};
-
-const resolveRecordDimensionCode = ({
-  dimensionValue,
-  planInternal,
-  description,
-}: {
-  dimensionValue?: string | null;
-  planInternal?: string | null;
-  description?: string | null;
-}) => {
-  return (
-    extractDimensionCode(dimensionValue) ||
-    extractDimensionCodeFromPlanInternal(planInternal) ||
-    extractDimensionCode(description) ||
-    null
-  );
-};
-
-const getDimensionLabel = (dimensionCode?: string | null) => {
-  if (!dimensionCode || dimensionCode === 'all') return null;
-
-  return DIMENSOES.find((dimension) => dimension.codigo === dimensionCode)?.nome || dimensionCode;
-};
-
-const matchesDimensionFilter = ({
-  dimensionValue,
-  planInternal,
-  description,
-  filterValue,
-}: {
-  dimensionValue?: string | null;
-  planInternal?: string | null;
-  description?: string | null;
-  filterValue: string;
-}) => {
-  if (filterValue === 'all') return true;
-
-  const recordCode = resolveRecordDimensionCode({ dimensionValue, planInternal, description });
-  if (recordCode) return recordCode === filterValue;
-
-  if (!dimensionValue?.trim()) return false;
-
-  const normalizedValue = normalizeDimensionText(dimensionValue || '');
-  const normalizedFilter = normalizeDimensionText(filterValue);
-
-  return normalizedValue.length > 0 && (
-    normalizedValue.includes(normalizedFilter) || normalizedFilter.includes(normalizedValue)
-  );
 };
 
 function ExecutionTooltip({
@@ -369,6 +281,7 @@ function BudgetTreemapContent(props: {
 export default function Dashboard() {
   const { atividades, empenhos, descentralizacoes, isLoading } = useData();
   const [hoveredBudgetDimension, setHoveredBudgetDimension] = useState<string | null>(null);
+  const [selectedBudgetDimensionCode, setSelectedBudgetDimensionCode] = useState<string | null>(null);
 
   // --- Filtros ---
   const [filterDimensao, setFilterDimensao] = useState('all');
@@ -664,7 +577,7 @@ export default function Dashboard() {
       .sort((a, b) => (b.value || 0) - (a.value || 0));
   }, [filteredData]);
 
-  const selectedBudgetDimension = useMemo(() => {
+  const filteredBudgetDimension = useMemo(() => {
     if (effectiveFilterDimensao === 'all') return null;
 
     return (
@@ -674,34 +587,26 @@ export default function Dashboard() {
     );
   }, [budgetTreemapData, effectiveFilterDimensao]);
 
-  const highlightedBudgetDimension = hoveredBudgetDimension || selectedBudgetDimension;
+  const selectedBudgetDimension = useMemo(() => {
+    if (!selectedBudgetDimensionCode) return null;
+
+    return (
+      budgetTreemapData.find((item) => item.dimensionCode === selectedBudgetDimensionCode)?.name ||
+      getDimensionLabel(selectedBudgetDimensionCode) ||
+      null
+    );
+  }, [budgetTreemapData, selectedBudgetDimensionCode]);
+
+  const activeBudgetDimension = selectedBudgetDimension || filteredBudgetDimension;
+  const highlightedBudgetDimension = hoveredBudgetDimension || activeBudgetDimension;
 
   const handleBudgetDimensionSelect = (dimensionLabel?: string | null) => {
     const nextValue = resolveDimensionFilterValue(dimensionLabel);
     if (nextValue === 'all') return;
 
-    if (effectiveFilterDimensao === nextValue) {
-      setFilterDimensao('all');
-      setHoveredBudgetDimension(null);
-      return;
-    }
-
-    const hasActivitiesForDimension = atividades.some((atividade) =>
-      matchesDimensionFilter({
-        dimensionValue: atividade.dimensao,
-        filterValue: nextValue,
-      }),
-    );
-
-    if (!hasActivitiesForDimension) {
-      setHoveredBudgetDimension(null);
-      return;
-    }
-
-    setFilterOrigem('all');
-    setDateStart('');
-    setDateEnd('');
-    setFilterDimensao(nextValue);
+    setSelectedBudgetDimensionCode((currentValue) => (
+      currentValue === nextValue ? null : nextValue
+    ));
     setHoveredBudgetDimension(null);
   };
 
@@ -765,6 +670,7 @@ export default function Dashboard() {
     setDateStart('');
     setDateEnd('');
     setHoveredBudgetDimension(null);
+    setSelectedBudgetDimensionCode(null);
   };
 
   const hasActiveFilters = filterDimensao !== 'all' || filterOrigem !== 'all' || dateStart !== '' || dateEnd !== '';
@@ -1313,7 +1219,7 @@ export default function Dashboard() {
                         type="button"
                         key={item.name}
                         className={`inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5 shadow-[0_6px_18px_rgba(15,23,42,0.06)] transition-all ${
-                          selectedBudgetDimension === item.name
+                          activeBudgetDimension === item.name
                             ? 'border-slate-400 bg-white text-text-primary shadow-[0_12px_28px_rgba(15,23,42,0.14)] ring-2 ring-slate-200/80'
                             : hoveredBudgetDimension === item.name
                             ? 'border-slate-300 bg-white text-text-primary shadow-[0_10px_24px_rgba(15,23,42,0.12)]'

@@ -31,6 +31,7 @@ import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { toast } from 'sonner';
 import { formatCurrency, parseCurrency } from '@/lib/utils';
 import { descentralizacoesService } from '@/services/descentralizacoes';
+import { matchesDimensionFilter } from '@/utils/dimensionFilters';
 
 // Mapeamento de sufixo de PI para código de dimensão
 const PI_DIMENSAO_MAP: Record<string, string> = {
@@ -111,7 +112,12 @@ export default function Descentralizacoes() {
             (d.planoInterno || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
             (d.descricao || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-        const matchesDimensao = filterDimensao === 'all' || d.dimensao.includes(filterDimensao);
+        const matchesDimensao = matchesDimensionFilter({
+            dimensionValue: d.dimensao,
+            planInternal: d.planoInterno,
+            description: d.descricao,
+            filterValue: filterDimensao,
+        });
         const matchesOrigem = filterOrigem === 'all' || d.origemRecurso?.trim() === filterOrigem;
 
         return matchesSearch && matchesDimensao && matchesOrigem;

@@ -38,6 +38,7 @@ import { parseSiafiCsv, syncSiafiDataToDb } from '@/lib/siafi-parser';
 import { transparenciaService } from '@/services/transparencia';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { splitCsvLine } from '@/utils/csvParser';
+import { matchesDimensionFilter } from '@/utils/dimensionFilters';
 
 
 const statusColors: Record<string, string> = {
@@ -120,7 +121,12 @@ export default function Empenhos() {
 
       return e.status === filterStatus;
     })();
-    const matchesDimensao = filterDimensao === 'all' || e.dimensao.includes(filterDimensao);
+    const matchesDimensao = matchesDimensionFilter({
+      dimensionValue: e.dimensao,
+      planInternal: e.planoInterno,
+      description: e.descricao,
+      filterValue: filterDimensao,
+    });
     const matchesComponente = filterComponente === 'all' || e.componenteFuncional?.trim() === filterComponente;
     const matchesOrigem = filterOrigem === 'all' || e.origemRecurso?.trim() === filterOrigem;
     const matchesPlano = filterPlanoInterno === 'all' || e.planoInterno?.trim() === filterPlanoInterno;

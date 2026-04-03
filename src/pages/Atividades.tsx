@@ -43,6 +43,7 @@ import { toast } from 'sonner';
 import { formatCurrency, parseCurrency } from '@/lib/utils';
 import { HeaderActions } from '@/components/HeaderParts';
 import { atividadesService } from '@/services/atividades';
+import { matchesDimensionFilter } from '@/utils/dimensionFilters';
 
 export default function Atividades() {
   const [atividades, setAtividades] = useState<Atividade[]>([]);
@@ -139,7 +140,12 @@ export default function Atividades() {
         a.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
         a.planoInterno?.toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchesDimensao = filterDimensao === 'all' || a.dimensao === filterDimensao;
+      const matchesDimensao = matchesDimensionFilter({
+        dimensionValue: a.dimensao,
+        planInternal: a.planoInterno,
+        description: a.descricao,
+        filterValue: filterDimensao,
+      });
       const matchesComponente = filterComponente === 'all' || a.componenteFuncional === filterComponente;
       const matchesOrigem = filterOrigem === 'all' || a.origemRecurso === filterOrigem;
 

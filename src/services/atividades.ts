@@ -1,34 +1,72 @@
 
 import { supabase } from '@/lib/supabase';
+import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { Atividade } from '@/types';
+
+const ATIVIDADES_SELECT = 'id,dimensao,dimensao_id,componente_funcional,componente_funcional_id,processo,atividade,descricao,valor_total,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,created_at,updated_at';
+
+type AtividadeRow = {
+    id: string;
+    dimensao: string;
+    dimensao_id?: string | null;
+    componente_funcional: string;
+    componente_funcional_id?: string | null;
+    processo?: string | null;
+    atividade: string;
+    descricao: string;
+    valor_total: number | string;
+    origem_recurso: string;
+    origem_recurso_id?: string | null;
+    natureza_despesa: string;
+    natureza_despesa_id?: string | null;
+    plano_interno: string;
+    created_at: string;
+    updated_at: string;
+};
+
+const mapAtividadeRow = (item: AtividadeRow): Atividade => ({
+    id: item.id,
+    dimensao: item.dimensao,
+    dimensaoId: item.dimensao_id || undefined,
+    componenteFuncional: item.componente_funcional,
+    componenteFuncionalId: item.componente_funcional_id || undefined,
+    processo: item.processo || '',
+    atividade: item.atividade,
+    descricao: item.descricao,
+    valorTotal: Number(item.valor_total),
+    origemRecurso: item.origem_recurso,
+    origemRecursoId: item.origem_recurso_id || undefined,
+    naturezaDespesa: item.natureza_despesa,
+    naturezaDespesaId: item.natureza_despesa_id || undefined,
+    planoInterno: item.plano_interno,
+    createdAt: new Date(item.created_at),
+    updatedAt: new Date(item.updated_at),
+});
 
 export const atividadesService = {
     async getAll(): Promise<Atividade[]> {
         const { data, error } = await supabase
             .from('atividades')
-            .select('*')
+            .select(ATIVIDADES_SELECT)
             .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+            console.warn('atividadesService.getAll: fallback para Supabase REST', error);
+            const fallbackData = await fetchSupabaseRestRows<AtividadeRow>('atividades', ATIVIDADES_SELECT, {
+                orderBy: 'created_at',
+            });
+            return fallbackData.map(mapAtividadeRow);
+        }
 
-        return data.map((item) => ({
-            id: item.id,
-            dimensao: item.dimensao,
-            dimensaoId: item.dimensao_id || undefined,
-            componenteFuncional: item.componente_funcional,
-            componenteFuncionalId: item.componente_funcional_id || undefined,
-            processo: item.processo,
-            atividade: item.atividade,
-            descricao: item.descricao,
-            valorTotal: Number(item.valor_total),
-            origemRecurso: item.origem_recurso,
-            origemRecursoId: item.origem_recurso_id || undefined,
-            naturezaDespesa: item.natureza_despesa,
-            naturezaDespesaId: item.natureza_despesa_id || undefined,
-            planoInterno: item.plano_interno,
-            createdAt: new Date(item.created_at),
-            updatedAt: new Date(item.updated_at),
-        }));
+        if (!data || data.length === 0) {
+            console.warn('atividadesService.getAll: resultado vazio via supabase-js, consultando REST');
+            const fallbackData = await fetchSupabaseRestRows<AtividadeRow>('atividades', ATIVIDADES_SELECT, {
+                orderBy: 'created_at',
+            });
+            return fallbackData.map(mapAtividadeRow);
+        }
+
+        return (data as AtividadeRow[]).map(mapAtividadeRow);
     },
 
     async create(atividade: Omit<Atividade, 'id' | 'createdAt' | 'updatedAt'>): Promise<Atividade> {
