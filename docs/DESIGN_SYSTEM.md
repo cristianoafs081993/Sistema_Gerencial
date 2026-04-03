@@ -3,6 +3,12 @@
 Este documento define o padrão visual e de componentes do sistema.
 Toda nova interface, ajuste visual e componente deve seguir estas diretrizes.
 
+## Regra para novas paginas
+
+- Toda nova pagina deve nascer no design system do sistema.
+- Antes de abrir uma nova rota, reutilize o shell oficial de pagina, `SectionPanel`, `FilterPanel`, `DataTablePanel`, `StatCard` e os tokens semanticos existentes.
+- Nao aprovamos paginas novas com padrao visual paralelo ou componentes ad hoc se ja existir equivalente no design system.
+
 ## 1) Princípios
 
 - Clareza operacional: foco em leitura rápida para rotinas de execução financeira.

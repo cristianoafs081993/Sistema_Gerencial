@@ -29,6 +29,7 @@ You are working with Synkra AIOS, an AI-Orchestrated System for Full Stack Devel
 
 ### Design System Governance (Mandatory)
 - **All new UI work must follow** `docs/DESIGN_SYSTEM.md`
+- **Every new page or route must start from the design system shell** and reuse existing page blocks before proposing new patterns
 - **Do not introduce new visual patterns ad hoc**; reuse existing tokens/components first
 - If a required pattern does not exist, define it in the Design System first and only then apply it in pages
 - Keep design tokens and shadow scale aligned with `src/index.css` and `tailwind.config.ts`

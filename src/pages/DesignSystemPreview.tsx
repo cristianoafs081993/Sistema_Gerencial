@@ -291,6 +291,7 @@ const coverageRows: CoverageRow[] = [
   { route: '/liquidacoes-pagamentos', modulo: 'Liquidacoes', filtros: true, dados: true, overlays: true, upload: true, visualizacao: false, ia: false, status: 'Coberto' },
   { route: '/financeiro', modulo: 'Financeiro', filtros: true, dados: true, overlays: true, upload: true, visualizacao: true, ia: false, status: 'Coberto' },
   { route: '/lc', modulo: 'LC', filtros: true, dados: true, overlays: true, upload: true, visualizacao: false, ia: false, status: 'Coberto' },
+  { route: '/retencoes-efd-reinf', modulo: 'Retencoes EFD-Reinf', filtros: true, dados: true, overlays: false, upload: true, visualizacao: true, ia: false, status: 'Coberto' },
   { route: '/rastreabilidade-pfs', modulo: 'Rastreabilidade PFs', filtros: true, dados: true, overlays: true, upload: true, visualizacao: false, ia: false, status: 'Coberto' },
   { route: '/conciliacao-pfs', modulo: 'Conciliacao PFs', filtros: true, dados: true, overlays: true, upload: true, visualizacao: true, ia: false, status: 'Coberto' },
   { route: '/gerador-documentos', modulo: 'Gerador de Documentos', filtros: true, dados: true, overlays: true, upload: true, visualizacao: true, ia: false, status: 'Coberto' },

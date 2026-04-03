@@ -176,7 +176,7 @@ function BudgetHierarchyTooltip({
   return (
     <div className="min-w-[220px] rounded-2xl border border-border-default/70 bg-white/95 px-4 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.12)] backdrop-blur-sm">
       <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">
-        {item.nodeType === 'componente' ? 'Componente funcional' : 'Dimensão'}
+        {item.nodeType === 'componente' ? 'Componente funcional' : 'Dimensao'}
       </p>
       <p className="mt-1 font-ui text-sm font-semibold text-text-primary">{item.name}</p>
       {item.parentName ? (
@@ -304,8 +304,7 @@ export default function Dashboard() {
       setFilterDimensao('all');
     }
   }, [filterDimensao, effectiveFilterDimensao]);
-
-  // Extrair Origens ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡nicas para o Filtro
+  // Extrair origens unicas para o filtro
   const origensDisponiveis = useMemo(() => {
     const origens = new Set<string>();
     atividades.forEach(a => { if (a.origemRecurso) origens.add(a.origemRecurso); });
@@ -370,9 +369,7 @@ export default function Dashboard() {
 
       return matchDimensao && matchOrigem && matchDate && e.status !== 'cancelado';
     });
-
-
-    // Filtrar DescentralizaÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes
+    // Filtrar descentralizacoes
     const filteredDescentralizacoes = descentralizacoes.filter(d => {
       const matchDimensao = matchesDimensionFilter({
         dimensionValue: d.dimensao,
@@ -389,8 +386,7 @@ export default function Dashboard() {
       descentralizacoes: filteredDescentralizacoes
     };
   }, [atividades, empenhos, descentralizacoes, effectiveFilterDimensao, filterOrigem, dateStart, dateEnd]);
-
-  // --- KPI Calculations (ExercÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â­cio Corrente) ---
+  // --- KPI Calculations (Exercicio Corrente) ---
   const totalPlanejado = filteredData.atividades.reduce((acc, a) => acc + a.valorTotal, 0);
   const totalEmpenhado = filteredData.empenhosCorrente.reduce((acc, e) => acc + e.valor, 0);
   const totalDescentralizado = filteredData.descentralizacoes.reduce((acc, d) => acc + d.valor, 0);
@@ -408,7 +404,7 @@ export default function Dashboard() {
   const rapTotalPago = filteredData.empenhosRap.reduce((acc, e) => acc + (e.rapPago || 0), 0);
   const rapSaldoPagar = filteredData.empenhosRap.reduce((acc, e) => acc + (e.saldoRapOficial || 0), 0);
 
-  // --- GrÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ficos & Tabelas ---
+  // --- Graficos e Tabelas ---
 
   // 1. Resumo por Origem
   const dadosPorOrigem = useMemo(() => {
@@ -441,7 +437,7 @@ export default function Dashboard() {
   // 2. Top 5 Componentes
   const dadosPorComponente = useMemo(() => {
     const map = new Map<string, { planejado: number; empenhado: number }>();
-    const normalize = (s: string) => s?.trim() || 'Não Informado';
+    const normalize = (s: string) => s?.trim() || 'Nao Informado';
 
     filteredData.atividades.forEach((a) => {
       const key = normalize(a.componenteFuncional);
@@ -480,7 +476,7 @@ export default function Dashboard() {
       .slice(0, 7);
   }, [filteredData]);
 
-  // 4. EvoluÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o Mensal
+  // 4. Evolucao Mensal
   const dadosMensais = useMemo(() => {
     const mapEmpenhado = new Map<string, number>();
     const mapPago = new Map<string, number>();
@@ -515,8 +511,7 @@ export default function Dashboard() {
       };
     });
   }, [filteredData, totalPlanejado]);
-
-  // 5. Funil (ExercÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â­cio Corrente)
+  // 5. Funil (Exercicio Corrente)
   const dadosFunil = [
     { name: 'Planejado', value: totalPlanejado, fill: '#3b82f6' }, // vibrant-blue
     { name: 'Empenhado', value: totalEmpenhado, fill: '#a855f7' }, // purple
@@ -524,13 +519,13 @@ export default function Dashboard() {
     { name: 'Pago', value: totalPago, fill: '#10b981' }, // emerald-green
   ];
 
-  // 5.1 Hierarquia de DimensÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o x Componente Funcional
+  // 5.1 Hierarquia de Dimensao x Componente Funcional
   const budgetTreemapData = useMemo(() => {
     const dimensionPalette = ['#2563eb', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', '#14b8a6', '#6366f1', '#f43f5e'];
     const dimMap = new Map<string, Record<string, string | number>>();
 
     filteredData.atividades.forEach((atividade) => {
-      const dim = atividade.dimensao || 'Sem Dimensão';
+      const dim = atividade.dimensao || 'Sem Dimensao';
       const comp = atividade.componenteFuncional?.trim();
 
       if (!comp || comp.toLowerCase() === 'sem componente') return;
@@ -615,7 +610,7 @@ export default function Dashboard() {
     const origemSet = new Set<string>();
 
     filteredData.descentralizacoes.forEach((descentralizacao) => {
-      const dim = descentralizacao.dimensao || 'Sem Dimensão';
+      const dim = descentralizacao.dimensao || 'Sem Dimensao';
       const origem = descentralizacao.origemRecurso || 'Sem Origem';
 
       origemSet.add(origem);
@@ -694,12 +689,12 @@ export default function Dashboard() {
         <SheetHeader>
           <SheetTitle>Filtrar Dashboard</SheetTitle>
           <SheetDescription>
-            Selecione os critérios para visualizar os dados.
+            Selecione os criterios para visualizar os dados.
           </SheetDescription>
         </SheetHeader>
         <div className="grid gap-4 py-4">
           <div className="space-y-2">
-            <Label>Dimensão</Label>
+            <Label>Dimensao</Label>
             <Select value={filterDimensao} onValueChange={setFilterDimensao}>
               <SelectTrigger>
                 <SelectValue placeholder="Todas" />
@@ -729,7 +724,7 @@ export default function Dashboard() {
           </div>
 
           <div className="space-y-2">
-            <Label>Período de Início</Label>
+            <Label>Periodo de Inicio</Label>
             <Input
               type="date"
               value={dateStart}
@@ -738,7 +733,7 @@ export default function Dashboard() {
           </div>
 
           <div className="space-y-2">
-            <Label>Período Final</Label>
+            <Label>Periodo Final</Label>
             <Input
               type="date"
               value={dateEnd}
@@ -771,7 +766,7 @@ export default function Dashboard() {
                 value="corrente"
                 className="h-7 sm:h-8 px-3 sm:px-4 data-[state=active]:bg-slate-900 data-[state=active]:text-white text-slate-600 rounded-md text-[11px] sm:text-xs font-semibold transition-all"
               >
-                Exercício Atual
+                Exercicio Atual
               </TabsTrigger>
               <TabsTrigger
                 value="rap"
@@ -786,7 +781,7 @@ export default function Dashboard() {
 
         <div className="md:hidden flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
           <TabsList className="bg-slate-100 p-1 rounded-lg h-auto">
-            <TabsTrigger value="corrente" className="px-6 py-2 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm text-slate-500 hover:text-slate-900 rounded-md text-sm font-semibold transition-all">Exercício Atual</TabsTrigger>
+            <TabsTrigger value="corrente" className="px-6 py-2 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm text-slate-500 hover:text-slate-900 rounded-md text-sm font-semibold transition-all">Exercicio Atual</TabsTrigger>
             <TabsTrigger value="rap" className="px-6 py-2 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm text-slate-500 hover:text-slate-900 rounded-md text-sm font-semibold transition-all">Restos a Pagar (RAP)</TabsTrigger>
           </TabsList>
 
@@ -806,12 +801,12 @@ export default function Dashboard() {
               <SheetHeader>
                 <SheetTitle>Filtrar Dashboard</SheetTitle>
                 <SheetDescription>
-                  Selecione os critérios para visualizar os dados.
+                  Selecione os criterios para visualizar os dados.
                 </SheetDescription>
               </SheetHeader>
               <div className="grid gap-4 py-4">
                 <div className="space-y-2">
-                  <Label>Dimensão</Label>
+                  <Label>Dimensao</Label>
                   <Select value={filterDimensao} onValueChange={setFilterDimensao}>
                     <SelectTrigger>
                       <SelectValue placeholder="Todas" />
@@ -841,7 +836,7 @@ export default function Dashboard() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Período de Início</Label>
+                  <Label>Periodo de Inicio</Label>
                   <Input
                     type="date"
                     value={dateStart}
@@ -850,7 +845,7 @@ export default function Dashboard() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Período Final</Label>
+                  <Label>Periodo Final</Label>
                   <Input
                     type="date"
                     value={dateEnd}
@@ -879,7 +874,7 @@ export default function Dashboard() {
               variant="secondary"
               className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 font-ui text-xs font-semibold text-primary"
             >
-              Dimensão ativa: {activeDimensionLabel}
+              Dimensao ativa: {activeDimensionLabel}
             </Badge>
             <Button
               type="button"
@@ -888,7 +883,7 @@ export default function Dashboard() {
               className="h-8 px-2 text-xs text-text-muted hover:text-text-primary"
               onClick={() => setFilterDimensao('all')}
             >
-              Limpar seleção
+              Limpar selecao
             </Button>
           </div>
         ) : null}
@@ -898,7 +893,7 @@ export default function Dashboard() {
           {/* Bento Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 auto-rows-[minmax(130px,auto)]">
 
-            {/* ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ HERO CARD ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â Total Planejado (row-span-2) ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ */}
+            {/* Hero card: Total Planejado */}
             <div
               className={`
               md:row-span-2 relative overflow-hidden rounded-2xl
@@ -909,11 +904,11 @@ export default function Dashboard() {
               hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(26,92,230,0.18)]
               transition-all duration-300
             `}>
-              {/* Glow decorativo ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â Aura Style */}
+              {/* Glow decorativo */}
               <div className="absolute -bottom-12 -right-12 w-40 h-40 bg-primary/15 rounded-full blur-3xl pointer-events-none" />
               <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
 
-              {/* ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âcone */}
+              {/* Icone */}
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-widest text-primary/60">
@@ -927,8 +922,7 @@ export default function Dashboard() {
                   <Wallet className="w-5 h-5" />
                 </div>
               </div>
-
-              {/* Valor principal ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â text-gradient-primary, fonte grande */}
+              {/* Valor principal */}
               <div>
                 {isLoading ? (
                   <div className="h-10 w-4/5 bg-primary/10 rounded-lg animate-pulse mt-2" />
@@ -945,7 +939,7 @@ export default function Dashboard() {
                 {/* Progress integrado no hero */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Execução orçamentária</span>
+                    <span className="text-muted-foreground">Execucao orcamentaria</span>
                     <span className="font-bold text-primary">{percentualExecutado.toFixed(1)}%</span>
                   </div>
                   <div className="h-2 w-full bg-primary/10 rounded-full overflow-hidden">
@@ -960,21 +954,19 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-
-            {/* ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ Descentralizado ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ */}
+            {/* Descentralizado */}
             <div>
               <StatCard
                 title="Descentralizado"
                 value={formatCurrency(totalDescentralizado)}
-                subtitle={`${filteredData.descentralizacoes.length} descentralizações`}
+                subtitle={`${filteredData.descentralizacoes.length} descentralizacoes`}
                 icon={Receipt}
                 stitchColor="emerald-green"
                 progress={totalPlanejado > 0 ? (totalDescentralizado / totalPlanejado) * 100 : 0}
                 isLoading={isLoading}
               />
             </div>
-
-            {/* ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ Total Empenhado ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ */}
+            {/* Total Empenhado */}
             <div>
               <StatCard
                 title="Total Empenhado"
@@ -986,21 +978,19 @@ export default function Dashboard() {
                 isLoading={isLoading}
               />
             </div>
-
-            {/* ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ A Descentralizar ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ */}
+            {/* A Descentralizar */}
             <div>
               <StatCard
                 title="A Descentralizar"
                 value={formatCurrency(aDescentralizar)}
-                subtitle={aDescentralizar >= 0 ? "Dentro do orçamento" : "Acima do orçamento"}
+                subtitle={aDescentralizar >= 0 ? "Dentro do orcamento" : "Acima do orcamento"}
                 icon={PiggyBank}
                 stitchColor="amber"
                 progress={totalPlanejado > 0 ? (Math.max(0, aDescentralizar) / totalPlanejado) * 100 : 0}
                 isLoading={isLoading}
               />
             </div>
-
-            {/* ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ Mini card: Liquidado / Pago ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚ÂÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ */}
+            {/* Mini card: Liquidado / Pago */}
             <div className={`
               relative overflow-hidden rounded-2xl
               border border-border/70 bg-card
@@ -1008,7 +998,7 @@ export default function Dashboard() {
               transition-all duration-200 p-5 flex flex-col justify-between
             `}>
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                Liquidado · Pago
+                Liquidado / Pago
               </p>
 
               <div className="space-y-3 mt-2">
@@ -1066,12 +1056,12 @@ export default function Dashboard() {
           </div>
           {/* Fim do Bento Grid */}
 
-          {/* GrÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ficos Linha 1 */}
+          {/* Graficos Linha 1 */}
           <div className="grid gap-6 md:grid-cols-3">
             <ChartPanel
               className="md:col-span-2"
-              title="Evolução da Execução"
-              description="Acumulado de empenhos no período"
+              title="Evolucao da Execucao"
+              description="Acumulado de empenhos no periodo"
               loading={isLoading}
             >
                 <div className="mb-4 flex flex-wrap gap-2">
@@ -1150,8 +1140,8 @@ export default function Dashboard() {
 
             <Card className="overflow-visible">
               <CardHeader>
-                <CardTitle>Funil de Execução</CardTitle>
-                <CardDescription>Eficiência da despesa</CardDescription>
+                <CardTitle>Funil de Execucao</CardTitle>
+                <CardDescription>Eficiencia da despesa</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex-1 flex flex-col justify-center gap-4 relative py-4 min-h-[300px]">
@@ -1204,11 +1194,11 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          {/* GrÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ficos Linha 2: DistribuiÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o Stacked */}
+          {/* Graficos Linha 2: Distribuicao Stacked */}
           <div className="grid gap-6 md:grid-cols-1">
             <ChartPanel
-              title="Distribuição do Orçamento (Dimensão x Componentes Funcionais)"
-              description="Composição do Planejado por área de atuação e programas"
+              title="Distribuicao do Orcamento (Dimensao x Componentes Funcionais)"
+              description="Composicao do Planejado por area de atuacao e programas"
               loading={isLoading}
               heightClassName="h-[468px]"
             >
@@ -1227,7 +1217,7 @@ export default function Dashboard() {
                               ? 'border-border-default/40 bg-white/55 text-text-muted opacity-60'
                               : 'border-border-default/60 bg-white/85 text-text-secondary'
                         }`}
-                        title={`${item.name} · ${formatCurrency(item.value || 0)}`}
+                        title={`${item.name} | ${formatCurrency(item.value || 0)}`}
                         onClick={() => handleBudgetDimensionSelect(item.dimensionCode)}
                         onMouseEnter={() => setHoveredBudgetDimension(item.name)}
                         onMouseLeave={() => setHoveredBudgetDimension(null)}
@@ -1263,11 +1253,11 @@ export default function Dashboard() {
             </ChartPanel>
           </div>
 
-          {/* GrÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ficos Linha 3: Radar & Naturezas */}
+          {/* Graficos Linha 3: Radar e Naturezas */}
           <div className="grid gap-6 md:grid-cols-2">
             <ChartPanel
-              title="Descentralizações"
-              description="Volume distribuído por Dimensão"
+              title="Descentralizacoes"
+              description="Volume distribuido por Dimensao"
               loading={isLoading}
               heightClassName="h-[350px]"
             >
@@ -1312,7 +1302,7 @@ export default function Dashboard() {
           <Card className="card-system overflow-hidden">
             <CardHeader className="px-6 py-4 border-b border-border-default/50">
               <CardTitle className="table-title">Detalhamento por Origem</CardTitle>
-              <CardDescription>Execução financeira por fonte de recurso</CardDescription>
+                <CardDescription>Execucao financeira por fonte de recurso</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -1323,7 +1313,7 @@ export default function Dashboard() {
                       <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Planejado</TableHead>
                       <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Empenhado</TableHead>
                       <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Saldo</TableHead>
-                      <TableHead className="h-11 px-6 text-right text-xs font-semibold uppercase tracking-wider">Execução</TableHead>
+                  <TableHead className="h-11 px-6 text-right text-xs font-semibold uppercase tracking-wider">Execucao</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

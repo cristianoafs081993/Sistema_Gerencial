@@ -66,8 +66,8 @@ function extractFromText(text: string, sourceFile: string): BolsistaPdfRecord[] 
 
     const nome = extractNameNear(text, prevCpfIndex, idx);
     const banco = extractFieldAfterLabel(segment, /Banco\s+(.+?)(?:\s+Dados\b|\s+Ag[êe]ncia\b|\s+Conta\b|$)/i);
-    const agencia = extractFieldAfterLabel(segment, /Ag[êe]ncia\s+([0-9A-Za-z\-]+)/i);
-    const conta = extractFieldAfterLabel(segment, /Conta\s+([0-9A-Za-z\-]+)/i);
+    const agencia = extractFieldAfterLabel(segment, /Ag[êe]ncia\s+([0-9A-Za-z-]+)/i);
+    const conta = extractFieldAfterLabel(segment, /Conta\s+([0-9A-Za-z-]+)/i);
 
     found.push({ cpf, nome, banco, agencia, conta, sourceFile });
   }

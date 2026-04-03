@@ -15,7 +15,7 @@ import Contratos from "./pages/Contratos";
 import LiquidacoesPagamentos from "./pages/LiquidacoesPagamentos";
 import Financeiro from "./pages/Financeiro";
 import LCPage from "./pages/LC";
-import RetencoesEfdReinfPage from "./pages/RetencoesEfdReinf";
+import RetencoesEfdReinfPage from "./pages/RetencoesFdReinfDesign";
 import RastreabilidadePFs from "./pages/RastreabilidadePFs";
 import ConciliacaoPfs from "./pages/ConciliacaoPfs";
 import GeradorDocumentos from "./pages/GeradorDocumentos";
