@@ -46,6 +46,7 @@ import {
 import { toast } from 'sonner';
 import { DocumentoDetalhesDialog } from '@/components/DocumentoDetalhesDialog';
 import { HeaderActions } from '@/components/HeaderParts';
+import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { 
     DropdownMenu, 
     DropdownMenuContent, 
@@ -295,10 +296,7 @@ export default function LiquidacoesPagamentos() {
             />
 
             {/* Standard Filter Card */}
-            <Card className="card-system shadow-sm">
-                <CardHeader className="pb-3 px-0 pt-0">
-                    <CardTitle className="text-xl font-bold">Filtros</CardTitle>
-                </CardHeader>
+            <FilterPanel className="shadow-sm">
                 <CardContent className="p-0">
                     <div className="flex flex-col sm:flex-row gap-4">
                         <div className="relative flex-1">
@@ -334,13 +332,13 @@ export default function LiquidacoesPagamentos() {
                         )}
                     </div>
                 </CardContent>
-            </Card>
+            </FilterPanel>
 
             {/* Main Table Card */}
             <Card className="card-system shadow-sm border-none shadow-none mt-6">
                 <CardHeader className="px-6 py-4 border-b border-border-default/50 flex flex-row items-center justify-between bg-white">
                     <div className="flex items-center gap-3">
-                        <CardTitle className="text-base font-semibold">Documentos Hábeis</CardTitle>
+                        <CardTitle className="table-title">Documentos Hábeis</CardTitle>
                         <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-bold px-2 py-0 h-5">
                             {totalRecords}
                         </Badge>
@@ -581,4 +579,5 @@ export default function LiquidacoesPagamentos() {
         </div>
     );
 }
+
 

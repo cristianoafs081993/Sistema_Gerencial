@@ -1,0 +1,15 @@
+<HAScript name="Teste2" description="" timeout="60000" pausetime="300" promptall="true" blockinput="false" author="crist" creationdate="01/04/2026 12:19:42" supressclearevents="false" usevars="false" ignorepauseforenhancedtn="true" delayifnotenhancedtn="0" ignorepausetimeforenhancedtn="true">
+
+    <screen name="Tela1" entryscreen="true" exitscreen="true" transient="false">
+        <description >
+            <oia status="NOTINHIBITED" optional="false" invertmatch="false" />
+        </description>
+        <actions>
+            <mouseclick row="8" col="12" />
+            <input value="12302654260[tab]0010223000000000022020000002200[tab]22220000" row="0" col="0" movecursor="true" xlatehostkeys="true" encrypted="false" />
+        </actions>
+        <nextscreens timeout="0" >
+        </nextscreens>
+    </screen>
+
+</HAScript>

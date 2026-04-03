@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { HeaderActions } from '@/components/HeaderParts';
 import { StatCard } from '@/components/StatCard';
+import { FilterPanel } from '@/components/design-system/FilterPanel';
 import {
   Table,
   TableBody,
@@ -324,10 +325,7 @@ export default function ContratosAcompanhamento() {
         </Alert>
       )}
 
-      <Card className="card-system shadow-sm">
-        <CardHeader className="pb-3 px-0 pt-0">
-          <CardTitle className="text-xl font-bold">Acompanhamento de Contratos via API</CardTitle>
-        </CardHeader>
+      <FilterPanel className="shadow-sm" title="Acompanhamento de Contratos via API">
         <CardContent className="p-0 space-y-4">
           <div className="text-sm text-muted-foreground">
             Última sincronização:{' '}
@@ -354,7 +352,7 @@ export default function ContratosAcompanhamento() {
               />
             </div>
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
-              <SelectTrigger className="h-10">
+              <SelectTrigger className="h-10 input-system">
                 <SelectValue placeholder="Filtrar status" />
               </SelectTrigger>
               <SelectContent>
@@ -367,11 +365,11 @@ export default function ContratosAcompanhamento() {
             </Select>
           </div>
         </CardContent>
-      </Card>
+      </FilterPanel>
 
       <Card className="card-system shadow-sm overflow-hidden border-none shadow-none">
         <CardHeader className="px-6 py-4 border-b border-border-default/50">
-          <CardTitle className="text-base font-semibold">Resultados da Auditoria</CardTitle>
+          <CardTitle className="table-title">Resultados da Auditoria</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -579,3 +577,4 @@ export default function ContratosAcompanhamento() {
     </div>
   );
 }
+

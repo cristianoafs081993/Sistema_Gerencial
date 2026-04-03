@@ -191,7 +191,7 @@ export default function ConciliacaoPfs() {
                 <ArrowRightCircle className="h-5 w-5 text-blue-500" />
               </div>
               <div>
-                <CardTitle className="text-base font-semibold">
+                <CardTitle className="table-title">
                   {selectedFonte ? `Liquidações Pendentes - Fonte ${selectedFonte}` : "Todas as Liquidações Pendentes"}
                 </CardTitle>
                 <CardDescription className="text-[10px] font-medium uppercase tracking-wider mt-0.5">
@@ -269,3 +269,4 @@ export default function ConciliacaoPfs() {
     </div>
   );
 }
+

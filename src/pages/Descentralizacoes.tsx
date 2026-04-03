@@ -27,6 +27,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { HeaderActions } from '@/components/HeaderParts';
+import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { toast } from 'sonner';
 import { formatCurrency, parseCurrency } from '@/lib/utils';
 import { descentralizacoesService } from '@/services/descentralizacoes';
@@ -390,10 +391,7 @@ export default function Descentralizacoes() {
             </div>
 
             {/* Filters */}
-            <Card className="card-system">
-                <CardHeader className="pb-3 px-0 pt-0">
-                    <CardTitle className="text-xl font-bold">Filtros</CardTitle>
-                </CardHeader>
+            <FilterPanel className="shadow-sm">
                 <CardContent className="p-0">
                     <div className="flex flex-col sm:flex-row gap-4">
                         <div className="relative flex-1">
@@ -405,7 +403,7 @@ export default function Descentralizacoes() {
                                 className="pl-9 h-10 text-sm input-system"
                             />
                         </div>
-                        <div className="w-full sm:w-[150px]">
+                        <div className="w-full sm:w-[190px]">
                             <Select value={filterDimensao} onValueChange={setFilterDimensao}>
                                 <SelectTrigger className="input-system h-10">
                                     <SelectValue placeholder="Dimensão" />
@@ -463,12 +461,12 @@ export default function Descentralizacoes() {
                         </div>
                     )}
                 </CardContent>
-            </Card>
+            </FilterPanel>
 
             {/* Table */}
             <Card className="card-system overflow-hidden border-none shadow-none mt-6">
                 <CardHeader className="px-6 py-4 border-b border-border-default/50 flex flex-row items-center justify-between">
-                    <CardTitle className="text-base font-semibold">
+                    <CardTitle className="table-title">
                         <span>{sortedDescentralizacoes.length} {sortedDescentralizacoes.length !== 1 ? 'descentralizações' : 'descentralização'} encontrada{sortedDescentralizacoes.length !== 1 ? 's' : ''}</span>
                     </CardTitle>
                     <Badge variant="secondary" className="text-sm px-3 py-1 bg-slate-100 text-slate-700 border-none">
@@ -592,3 +590,4 @@ export default function Descentralizacoes() {
         </div>
     );
 }
+

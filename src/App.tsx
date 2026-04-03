@@ -15,12 +15,14 @@ import Contratos from "./pages/Contratos";
 import LiquidacoesPagamentos from "./pages/LiquidacoesPagamentos";
 import Financeiro from "./pages/Financeiro";
 import LCPage from "./pages/LC";
+import RetencoesEfdReinfPage from "./pages/RetencoesEfdReinf";
 import RastreabilidadePFs from "./pages/RastreabilidadePFs";
 import ConciliacaoPfs from "./pages/ConciliacaoPfs";
 import GeradorDocumentos from "./pages/GeradorDocumentos";
 import EditorDocumentos from "./pages/EditorDocumentos";
 import Consultor from "./pages/Consultor";
 import DesignSystemPreview from "./pages/DesignSystemPreview";
+import Suap from "./pages/Suap";
 
 const queryClient = new QueryClient();
 
@@ -41,11 +43,13 @@ const App = () => (
               <Route path="/liquidacoes-pagamentos" element={<LiquidacoesPagamentos />} />
               <Route path="/financeiro" element={<Financeiro />} />
               <Route path="/lc" element={<LCPage />} />
+              <Route path="/retencoes-efd-reinf" element={<RetencoesEfdReinfPage />} />
               <Route path="/rastreabilidade-pfs" element={<RastreabilidadePFs />} />
               <Route path="/conciliacao-pfs" element={<ConciliacaoPfs />} />
               <Route path="/gerador-documentos" element={<GeradorDocumentos />} />
               <Route path="/editor-documentos" element={<EditorDocumentos />} />
               <Route path="/consultor" element={<Consultor />} />
+              <Route path="/suap" element={<Suap />} />
               <Route path="/design-system-preview" element={<DesignSystemPreview />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

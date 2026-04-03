@@ -31,6 +31,7 @@ import { ptBR } from 'date-fns/locale';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { EmpenhoDialog } from '@/components/modals/EmpenhoDialog';
 import { HeaderActions } from '@/components/HeaderParts';
+import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { toast } from 'sonner';
 import { formatCurrency, parseCurrency, formatarDocumento } from '@/lib/utils';
 import { parseSiafiCsv, syncSiafiDataToDb } from '@/lib/siafi-parser';
@@ -424,10 +425,7 @@ export default function Empenhos() {
           />
         )}
       </div>
-      <Card className="card-system shadow-sm">
-        <CardHeader className="pb-3 px-0 pt-0">
-          <CardTitle className="text-xl font-bold">Filtros</CardTitle>
-        </CardHeader>
+      <FilterPanel className="shadow-sm">
         <CardContent className="p-0">
           {/* Linha 1: Busca e Filtros Básicos */}
           <div className="flex flex-col sm:flex-row gap-4">
@@ -569,7 +567,7 @@ export default function Empenhos() {
             </div>
           )}
         </CardContent>
-      </Card>
+      </FilterPanel>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6 mt-6">
         <TabsList className="bg-slate-100 p-1 rounded-lg h-auto">
           <TabsTrigger value="execucao" className="px-6 py-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md text-sm font-semibold">Execução {new Date().getFullYear()}</TabsTrigger>
@@ -850,7 +848,7 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
   return (
     <Card className="card-system overflow-hidden">
       <CardHeader className="px-6 py-4 border-b border-border-default/50 flex flex-row items-center justify-between">
-        <CardTitle className="text-base font-semibold">
+        <CardTitle className="table-title">
           {empenhos.length} empenho{empenhos.length !== 1 ? 's' : ''} encontrado{empenhos.length !== 1 ? 's' : ''}
         </CardTitle>
         <Button
@@ -1044,5 +1042,6 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
     </Card>
   );
 }
+
 
 

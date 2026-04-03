@@ -60,6 +60,12 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## Design System
+
+- Documentação oficial: `docs/DESIGN_SYSTEM.md`
+- Preview visual: `src/pages/DesignSystemPreview.tsx` (`/design-system-preview`)
+- Regras de adoção: `.antigravity/rules.md`
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.

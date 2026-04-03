@@ -280,6 +280,55 @@ export interface DocumentoDespesa {
   situacoes?: DocumentoSituacao[];
 }
 
+export interface SuapNotaFiscal {
+  numero?: string;
+  data_emissao?: string;
+}
+
+export interface SuapDadosBancarios {
+  banco?: string;
+  agencia?: string;
+  conta?: string;
+}
+
+export interface SuapRetencoesTributarias {
+  optante_simples_nacional?: boolean;
+  iss?: string;
+  inss?: string;
+  ir?: string;
+  csll?: string;
+  cofins?: string;
+  pis_pasep?: string;
+}
+
+export interface SuapDadosCompletos {
+  val_nf?: string;
+  contrato_numero?: string;
+  ns_numero?: string;
+  status_processo?: string;
+  empenhos?: string[];
+  notas_fiscais?: SuapNotaFiscal[];
+  dados_bancarios?: SuapDadosBancarios;
+  retencoes_tributarias?: SuapRetencoesTributarias;
+}
+
+export interface SuapProcesso {
+  id: string;
+  tenantId?: string;
+  suapId: string;
+  url: string;
+  status: string;
+  numProcesso?: string;
+  beneficiario?: string;
+  cpfCnpj?: string;
+  assunto?: string;
+  contrato?: string;
+  pdfUrl?: string;
+  dadosCompletos?: SuapDadosCompletos;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 // Nota: A interface Retencao antiga foi descontinuada em favor de DocumentoSituacao
 export interface Retencao {
   id: string;

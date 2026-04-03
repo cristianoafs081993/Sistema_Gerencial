@@ -38,6 +38,7 @@ import {
 import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { AtividadeDialog } from '@/components/modals/AtividadeDialog';
 import { ConfirmDialog } from '@/components/modals/ConfirmDialog';
+import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { toast } from 'sonner';
 import { formatCurrency, parseCurrency } from '@/lib/utils';
 import { HeaderActions } from '@/components/HeaderParts';
@@ -238,10 +239,7 @@ export default function Atividades() {
       </div>
 
       {/* Standard Filter Card */}
-      <Card className="card-system shadow-sm">
-        <CardHeader className="pb-3 px-0 pt-0">
-          <CardTitle className="text-xl font-bold">Filtros</CardTitle>
-        </CardHeader>
+      <FilterPanel className="shadow-sm">
         <CardContent className="p-0">
           {isPageLoading ? (
             <div className="flex flex-col sm:flex-row gap-4">
@@ -337,13 +335,13 @@ export default function Atividades() {
             </div>
           )}
         </CardContent>
-      </Card>
+      </FilterPanel>
 
       {/* Main Table Card */}
       <Card className="card-system shadow-sm border-none shadow-none mt-6">
         <CardHeader className="px-6 py-4 border-b border-border-default/50 flex flex-row items-center justify-between bg-white">
           <div className="flex items-center gap-3">
-            <CardTitle className="text-base font-semibold">Atividades Planejadas</CardTitle>
+            <CardTitle className="table-title">Atividades Planejadas</CardTitle>
             <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-bold px-2 py-0 h-5">
               {filteredAtividades.length}
             </Badge>
@@ -520,5 +518,6 @@ export default function Atividades() {
     </div>
   );
 }
+
 
 

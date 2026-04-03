@@ -15,6 +15,11 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["Public Sans", "Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
+        ui: ["Public Sans", "Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
+        data: ["IBM Plex Mono", "ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"],
+      },
       colors: {
         // --- TOKENS SEMÂNTICOS (SISTEMA GERENCIAL) ---
         "text-primary":   "hsl(var(--foreground))",

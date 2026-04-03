@@ -1,9 +1,8 @@
-﻿import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Upload, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -13,6 +12,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { DataTablePanel } from '@/components/design-system/DataTablePanel';
+import { SectionPanel } from '@/components/design-system/SectionPanel';
+import { TableSkeletonRows } from '@/components/design-system/TableSkeletonRows';
 import { HeaderActions } from '@/components/HeaderParts';
 import { ConfirmDialog } from '@/components/modals/ConfirmDialog';
 import { LCRegistro, loadLatestLCRowsFromDb, parseLCCsv, saveLCRows } from '@/services/lcImportService';
@@ -289,48 +291,42 @@ export default function LCPage() {
         </div>
       </HeaderActions>
 
-      <Card className="card-system shadow-sm">
-        <CardHeader className="pb-3 px-0 pt-0">
-          <CardTitle className="text-xl font-bold">Lista de Credores (LC)</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Arquivo: <span className="font-semibold text-foreground">{fileName || 'nenhum arquivo enviado'}</span>
-          </p>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="flex flex-wrap items-center gap-2 mb-3">
-            <Button
-              size="sm"
-              variant={showConsolidado ? 'default' : 'outline'}
-              onClick={() => setShowConsolidado(true)}
-            >
-              Consolidado (CPF)
-            </Button>
-            <Button
-              size="sm"
-              variant={!showConsolidado ? 'default' : 'outline'}
-              onClick={() => setShowConsolidado(false)}
-            >
-              Todos
-            </Button>
-            <span className="text-xs text-muted-foreground ml-1">
-              Exibindo {rowsForDisplay.length} de {rows.length} registro(s)
-            </span>
-          </div>
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={queryLC}
-              onChange={(e) => setQueryLC(e.target.value)}
-              placeholder="Buscar por lista, documento, favorecido ou banco..."
-              className="pl-9 h-10 input-system"
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <SectionPanel
+        title="Lista de Credores (LC)"
+        description={`Arquivo: ${fileName || 'nenhum arquivo enviado'}`}
+      >
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <Button
+            size="sm"
+            variant={showConsolidado ? 'default' : 'outline'}
+            onClick={() => setShowConsolidado(true)}
+          >
+            Consolidado (CPF)
+          </Button>
+          <Button
+            size="sm"
+            variant={!showConsolidado ? 'default' : 'outline'}
+            onClick={() => setShowConsolidado(false)}
+          >
+            Todos
+          </Button>
+          <span className="text-xs text-muted-foreground ml-1">
+            Exibindo {rowsForDisplay.length} de {rows.length} registro(s)
+          </span>
+        </div>
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={queryLC}
+            onChange={(e) => setQueryLC(e.target.value)}
+            placeholder="Buscar por lista, documento, favorecido ou banco..."
+            className="pl-9 h-10 input-system"
+          />
+        </div>
+      </SectionPanel>
 
-      <Card className="card-system shadow-sm overflow-hidden">
-        <CardHeader className="pb-3 px-0 pt-0">
-          <CardTitle className="text-xl font-bold">Pendencias de Bolsistas x LC</CardTitle>
+      <SectionPanel title="Pendencias de Bolsistas x LC" className="overflow-hidden">
+        <div className="space-y-1 pb-3">
           <p className="text-xs text-muted-foreground">
             PDFs: <span className="font-semibold text-foreground">{pdfFileNames.length ? pdfFileNames.join(', ') : 'nenhum arquivo enviado'}</span>
           </p>
@@ -346,169 +342,145 @@ export default function LCPage() {
               className="pl-9 h-10 input-system"
             />
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-slate-50/50">
-                <TableRow className="hover:bg-transparent border-b border-border-default/50">
-                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">CPF</TableHead>
-                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Nome (PDF)</TableHead>
-                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Conta PDF</TableHead>
-                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Nome/Conta LC</TableHead>
-                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Status</TableHead>
-                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Arquivo</TableHead>
+        </div>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-slate-50/50">
+              <TableRow className="hover:bg-transparent border-b border-border-default/50">
+                <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">CPF</TableHead>
+                <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Nome (PDF)</TableHead>
+                <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Conta PDF</TableHead>
+                <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Nome/Conta LC</TableHead>
+                <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Status</TableHead>
+                <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Arquivo</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isComparingPdf ? (
+                <TableSkeletonRows rows={6} columns={6} widths={['w-24', 'w-64', 'w-28', 'w-48', 'w-24', 'w-24']} />
+              ) : pendenciasFiltradas.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground italic">
+                    Nenhuma pendencia encontrada.
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isComparingPdf ? (
-                  Array.from({ length: 6 }).map((_, i) => (
-                    <TableRow key={`sk-p-${i}`}>
-                      <TableCell className="px-4 py-3"><div className="h-4 w-24 bg-slate-100 animate-pulse rounded" /></TableCell>
-                      <TableCell className="px-4 py-3"><div className="h-4 w-64 bg-slate-100 animate-pulse rounded" /></TableCell>
-                      <TableCell className="px-4 py-3"><div className="h-4 w-28 bg-slate-100 animate-pulse rounded" /></TableCell>
-                      <TableCell className="px-4 py-3"><div className="h-4 w-48 bg-slate-100 animate-pulse rounded" /></TableCell>
-                      <TableCell className="px-4 py-3"><div className="h-4 w-24 bg-slate-100 animate-pulse rounded" /></TableCell>
-                      <TableCell className="px-4 py-3"><div className="h-4 w-24 bg-slate-100 animate-pulse rounded" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : pendenciasFiltradas.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground italic">
-                      Nenhuma pendencia encontrada.
+              ) : (
+                pendenciasPage.map((row, idx) => (
+                  <TableRow key={`${row.cpf}-${row.status}-${idx}`} className="border-b border-border-default/30 last:border-0">
+                    <TableCell className="px-4 py-3 text-xs font-mono font-semibold">{row.cpf}</TableCell>
+                    <TableCell className="px-4 py-3 text-xs">{row.nome || '-'}</TableCell>
+                    <TableCell className="px-4 py-3 text-xs font-mono">{row.contaPdf || '-'}</TableCell>
+                    <TableCell className="px-4 py-3 text-xs">
+                      <div>{row.nomeLc || '-'}</div>
+                      <div className="font-mono text-muted-foreground">{row.contaLc || '-'}</div>
                     </TableCell>
+                    <TableCell className="px-4 py-3 text-xs font-semibold text-status-warning">{statusLabel[row.status]}</TableCell>
+                    <TableCell className="px-4 py-3 text-xs">{row.arquivoPdf}</TableCell>
                   </TableRow>
-                ) : (
-                  pendenciasPage.map((row, idx) => (
-                    <TableRow key={`${row.cpf}-${row.status}-${idx}`} className="border-b border-border-default/30 last:border-0">
-                      <TableCell className="px-4 py-3 text-xs font-mono font-semibold">{row.cpf}</TableCell>
-                      <TableCell className="px-4 py-3 text-xs">{row.nome || '-'}</TableCell>
-                      <TableCell className="px-4 py-3 text-xs font-mono">{row.contaPdf || '-'}</TableCell>
-                      <TableCell className="px-4 py-3 text-xs">
-                        <div>{row.nomeLc || '-'}</div>
-                        <div className="font-mono text-muted-foreground">{row.contaLc || '-'}</div>
-                      </TableCell>
-                      <TableCell className="px-4 py-3 text-xs font-semibold text-status-warning">{statusLabel[row.status]}</TableCell>
-                      <TableCell className="px-4 py-3 text-xs">{row.arquivoPdf}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-          <div className="flex items-center justify-between px-4 py-3 border-t border-border-default/50">
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <div className="flex items-center justify-between px-4 py-3 border-t border-border-default/50">
+          <span className="text-xs text-muted-foreground">
+            {pendenciasFiltradas.length} resultado(s)
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setPagePendencias((p) => Math.max(1, p - 1))}
+              disabled={pagePendencias <= 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
             <span className="text-xs text-muted-foreground">
-              {pendenciasFiltradas.length} resultado(s)
+              Pag. {pagePendencias} de {totalPagesPendencias}
             </span>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setPagePendencias((p) => Math.max(1, p - 1))}
-                disabled={pagePendencias <= 1}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                Pag. {pagePendencias} de {totalPagesPendencias}
-              </span>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setPagePendencias((p) => Math.min(totalPagesPendencias, p + 1))}
-                disabled={pagePendencias >= totalPagesPendencias}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setPagePendencias((p) => Math.min(totalPagesPendencias, p + 1))}
+              disabled={pagePendencias >= totalPagesPendencias}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </SectionPanel>
 
-      <Card className="card-system shadow-sm overflow-hidden">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-slate-50/50">
-                <TableRow className="hover:bg-transparent border-b border-border-default/50">
-                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">OB Lista Credores</TableHead>
-                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Seq</TableHead>
-                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Favorecido</TableHead>
-                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Banco</TableHead>
-                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Agencia</TableHead>
-                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Conta</TableHead>
+      <DataTablePanel>
+        <Table>
+          <TableHeader className="bg-slate-50/50">
+            <TableRow className="hover:bg-transparent border-b border-border-default/50">
+              <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">OB Lista Credores</TableHead>
+              <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Seq</TableHead>
+              <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Favorecido</TableHead>
+              <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Banco</TableHead>
+              <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Agencia</TableHead>
+              <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Conta</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoadingInitial || isUploading ? (
+              <TableSkeletonRows rows={8} columns={6} widths={['w-56', 'w-10', 'w-64', 'w-40', 'w-24', 'w-32']} />
+            ) : filteredRows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground italic">
+                  Nenhum registro encontrado.
+                </TableCell>
+              </TableRow>
+            ) : (
+              rowsPage.map((row) => (
+                <TableRow key={`${row.obListaCredores}-${row.sequencial}`} className="border-b border-border-default/30 last:border-0">
+                  <TableCell className="px-4 py-3 font-mono text-xs font-semibold">{row.obListaCredores}</TableCell>
+                  <TableCell className="px-4 py-3 text-xs">{row.sequencial}</TableCell>
+                  <TableCell className="px-4 py-3">
+                    <div className="text-xs font-semibold">{row.favorecidoDocumento}</div>
+                    <div className="text-xs text-muted-foreground">{row.favorecidoNome || '-'}</div>
+                  </TableCell>
+                  <TableCell className="px-4 py-3">
+                    <div className="text-xs font-semibold">{row.bancoCodigo || '-'}</div>
+                    <div className="text-xs text-muted-foreground">{row.bancoNome || '-'}</div>
+                  </TableCell>
+                  <TableCell className="px-4 py-3">
+                    <div className="text-xs font-semibold">{row.agenciaCodigo || '-'}</div>
+                    <div className="text-xs text-muted-foreground">{row.agenciaNome || '-'}</div>
+                  </TableCell>
+                  <TableCell className="px-4 py-3 text-xs font-mono">{row.contaBancaria || '-'}</TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoadingInitial || isUploading ? (
-                  Array.from({ length: 8 }).map((_, i) => (
-                    <TableRow key={`sk-lc-${i}`}>
-                      <TableCell className="px-4 py-3"><div className="h-4 w-56 bg-slate-100 animate-pulse rounded" /></TableCell>
-                      <TableCell className="px-4 py-3"><div className="h-4 w-10 bg-slate-100 animate-pulse rounded" /></TableCell>
-                      <TableCell className="px-4 py-3"><div className="h-4 w-64 bg-slate-100 animate-pulse rounded" /></TableCell>
-                      <TableCell className="px-4 py-3"><div className="h-4 w-40 bg-slate-100 animate-pulse rounded" /></TableCell>
-                      <TableCell className="px-4 py-3"><div className="h-4 w-24 bg-slate-100 animate-pulse rounded" /></TableCell>
-                      <TableCell className="px-4 py-3"><div className="h-4 w-32 bg-slate-100 animate-pulse rounded" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : filteredRows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground italic">
-                      Nenhum registro encontrado.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  rowsPage.map((row) => (
-                    <TableRow key={`${row.obListaCredores}-${row.sequencial}`} className="border-b border-border-default/30 last:border-0">
-                      <TableCell className="px-4 py-3 font-mono text-xs font-semibold">{row.obListaCredores}</TableCell>
-                      <TableCell className="px-4 py-3 text-xs">{row.sequencial}</TableCell>
-                      <TableCell className="px-4 py-3">
-                        <div className="text-xs font-semibold">{row.favorecidoDocumento}</div>
-                        <div className="text-xs text-muted-foreground">{row.favorecidoNome || '-'}</div>
-                      </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <div className="text-xs font-semibold">{row.bancoCodigo || '-'}</div>
-                        <div className="text-xs text-muted-foreground">{row.bancoNome || '-'}</div>
-                      </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <div className="text-xs font-semibold">{row.agenciaCodigo || '-'}</div>
-                        <div className="text-xs text-muted-foreground">{row.agenciaNome || '-'}</div>
-                      </TableCell>
-                      <TableCell className="px-4 py-3 text-xs font-mono">{row.contaBancaria || '-'}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-          <div className="flex items-center justify-between px-4 py-3 border-t border-border-default/50">
+              ))
+            )}
+          </TableBody>
+        </Table>
+        <div className="flex items-center justify-between px-4 py-3 border-t border-border-default/50">
+          <span className="text-xs text-muted-foreground">
+            {filteredRows.length} resultado(s)
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setPageLC((p) => Math.max(1, p - 1))}
+              disabled={pageLC <= 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
             <span className="text-xs text-muted-foreground">
-              {filteredRows.length} resultado(s)
+              Pag. {pageLC} de {totalPagesLC}
             </span>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setPageLC((p) => Math.max(1, p - 1))}
-                disabled={pageLC <= 1}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                Pag. {pageLC} de {totalPagesLC}
-              </span>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setPageLC((p) => Math.min(totalPagesLC, p + 1))}
-                disabled={pageLC >= totalPagesLC}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setPageLC((p) => Math.min(totalPagesLC, p + 1))}
+              disabled={pageLC >= totalPagesLC}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </DataTablePanel>
 
       <ConfirmDialog
         open={macroDialogOpen}

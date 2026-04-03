@@ -1,0 +1,417 @@
+{
+  "generated_at": "2026-03-31T16:31:16.293Z",
+  "source_api": "https://contratos.comprasnet.gov.br",
+  "filters": {
+    "ug_origem": "158366"
+  },
+  "summary": {
+    "total_contratos_local": 29,
+    "api_nao_encontrado": 6,
+    "divergencia_empenhos": 14,
+    "divergencia_saldo_gt_1_real": 23
+  },
+  "rows": [
+    {
+      "numero": "00261/2024",
+      "api_encontrado": true,
+      "api_id": 327076,
+      "api_empenhos_qtd": 4,
+      "local_empenhos_qtd": 2,
+      "faltando_local": [
+        "2024NE000119",
+        "2025NE000330"
+      ],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 66104.75,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -66104.75
+    },
+    {
+      "numero": "00169/2024",
+      "api_encontrado": true,
+      "api_id": 307876,
+      "api_empenhos_qtd": 3,
+      "local_empenhos_qtd": 2,
+      "faltando_local": [
+        "2024NE000129"
+      ],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 17221.04,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -17221.04
+    },
+    {
+      "numero": "00164/2025",
+      "api_encontrado": true,
+      "api_id": 570763,
+      "api_empenhos_qtd": 1,
+      "local_empenhos_qtd": 1,
+      "faltando_local": [],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 268.5,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -268.5
+    },
+    {
+      "numero": "00329/2025",
+      "api_encontrado": true,
+      "api_id": 734623,
+      "api_empenhos_qtd": 1,
+      "local_empenhos_qtd": 1,
+      "faltando_local": [],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 17973.35,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -17973.35
+    },
+    {
+      "numero": "00181/2025",
+      "api_encontrado": true,
+      "api_id": 582913,
+      "api_empenhos_qtd": 2,
+      "local_empenhos_qtd": 2,
+      "faltando_local": [],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 15251.1,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -15251.1
+    },
+    {
+      "numero": "00073/2022",
+      "api_encontrado": false,
+      "api_id": null,
+      "api_empenhos_qtd": 0,
+      "local_empenhos_qtd": 1,
+      "faltando_local": [],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": null,
+      "local_saldo_a_liquidar": null,
+      "diff_saldo": null
+    },
+    {
+      "numero": "00129/2024",
+      "api_encontrado": true,
+      "api_id": 286709,
+      "api_empenhos_qtd": 2,
+      "local_empenhos_qtd": 2,
+      "faltando_local": [
+        "2024NE000042"
+      ],
+      "sobrando_local": [
+        "2025NE000154"
+      ],
+      "api_saldo_a_liquidar": 311459.57,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -311459.57
+    },
+    {
+      "numero": "00449/2025",
+      "api_encontrado": true,
+      "api_id": 770875,
+      "api_empenhos_qtd": 1,
+      "local_empenhos_qtd": 1,
+      "faltando_local": [],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 200000,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -200000
+    },
+    {
+      "numero": "00221/2024",
+      "api_encontrado": true,
+      "api_id": 318492,
+      "api_empenhos_qtd": 2,
+      "local_empenhos_qtd": 2,
+      "faltando_local": [],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 25920,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -25920
+    },
+    {
+      "numero": "00374/2024",
+      "api_encontrado": true,
+      "api_id": 370149,
+      "api_empenhos_qtd": 2,
+      "local_empenhos_qtd": 1,
+      "faltando_local": [
+        "2024NE000319"
+      ],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 6568.52,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -6568.52
+    },
+    {
+      "numero": "00089/2016",
+      "api_encontrado": true,
+      "api_id": 71578,
+      "api_empenhos_qtd": 7,
+      "local_empenhos_qtd": 0,
+      "faltando_local": [
+        "2023NE000165",
+        "2024NE000038",
+        "2016NE800104",
+        "2019NE800146",
+        "2020NE800101",
+        "2021NE000071",
+        "2022NE000015"
+      ],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 1884.92,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -1884.92
+    },
+    {
+      "numero": "00232/2025",
+      "api_encontrado": true,
+      "api_id": 627230,
+      "api_empenhos_qtd": 1,
+      "local_empenhos_qtd": 1,
+      "faltando_local": [],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 31928.01,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -31928.01
+    },
+    {
+      "numero": "00111/2025",
+      "api_encontrado": true,
+      "api_id": 498066,
+      "api_empenhos_qtd": 4,
+      "local_empenhos_qtd": 3,
+      "faltando_local": [
+        "2026NE000017"
+      ],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 138107.37,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -138107.37
+    },
+    {
+      "numero": "00082/2021",
+      "api_encontrado": true,
+      "api_id": 109051,
+      "api_empenhos_qtd": 10,
+      "local_empenhos_qtd": 2,
+      "faltando_local": [
+        "2021NE000376",
+        "2022NE000097",
+        "2023NE000010",
+        "2023NE000057",
+        "2023NE000093",
+        "2024NE000025",
+        "2024NE000045",
+        "2024NE000048"
+      ],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 410943.49,
+      "local_saldo_a_liquidar": 37038.75,
+      "diff_saldo": -373904.74
+    },
+    {
+      "numero": "00114/2024",
+      "api_encontrado": true,
+      "api_id": 281260,
+      "api_empenhos_qtd": 10,
+      "local_empenhos_qtd": 4,
+      "faltando_local": [
+        "2024NE000090",
+        "2024NE000124",
+        "2024NE000047",
+        "2023NE000199",
+        "2025NE000080",
+        "2026NE000015"
+      ],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 12174.44,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -12174.44
+    },
+    {
+      "numero": "00257/2025",
+      "api_encontrado": true,
+      "api_id": 793573,
+      "api_empenhos_qtd": 1,
+      "local_empenhos_qtd": 1,
+      "faltando_local": [],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 1123.5,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -1123.5
+    },
+    {
+      "numero": "00337/2025",
+      "api_encontrado": true,
+      "api_id": 722290,
+      "api_empenhos_qtd": 1,
+      "local_empenhos_qtd": 1,
+      "faltando_local": [],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 13690.5,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -13690.5
+    },
+    {
+      "numero": "00213/2022",
+      "api_encontrado": true,
+      "api_id": 166414,
+      "api_empenhos_qtd": 3,
+      "local_empenhos_qtd": 1,
+      "faltando_local": [
+        "2023NE000164",
+        "2024NE000113"
+      ],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 4427.08,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -4427.08
+    },
+    {
+      "numero": "00233/2025",
+      "api_encontrado": true,
+      "api_id": 628681,
+      "api_empenhos_qtd": 2,
+      "local_empenhos_qtd": 1,
+      "faltando_local": [
+        "2026NE000016"
+      ],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 54308.6,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -54308.6
+    },
+    {
+      "numero": "00034/2026",
+      "api_encontrado": false,
+      "api_id": null,
+      "api_empenhos_qtd": 0,
+      "local_empenhos_qtd": 0,
+      "faltando_local": [],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": null,
+      "local_saldo_a_liquidar": null,
+      "diff_saldo": null
+    },
+    {
+      "numero": "00028/2023",
+      "api_encontrado": true,
+      "api_id": 181991,
+      "api_empenhos_qtd": 3,
+      "local_empenhos_qtd": 1,
+      "faltando_local": [
+        "2024NE000034",
+        "2024NE000035"
+      ],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 14121.48,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -14121.48
+    },
+    {
+      "numero": "00280/2024",
+      "api_encontrado": true,
+      "api_id": 331090,
+      "api_empenhos_qtd": 4,
+      "local_empenhos_qtd": 3,
+      "faltando_local": [
+        "2024NE000127"
+      ],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 58287.69,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -58287.69
+    },
+    {
+      "numero": "00158/2021",
+      "api_encontrado": false,
+      "api_id": null,
+      "api_empenhos_qtd": 0,
+      "local_empenhos_qtd": 1,
+      "faltando_local": [],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": null,
+      "local_saldo_a_liquidar": null,
+      "diff_saldo": null
+    },
+    {
+      "numero": "00436/2025",
+      "api_encontrado": false,
+      "api_id": null,
+      "api_empenhos_qtd": 0,
+      "local_empenhos_qtd": 0,
+      "faltando_local": [],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": null,
+      "local_saldo_a_liquidar": null,
+      "diff_saldo": null
+    },
+    {
+      "numero": "00422/2025",
+      "api_encontrado": false,
+      "api_id": null,
+      "api_empenhos_qtd": 0,
+      "local_empenhos_qtd": 0,
+      "faltando_local": [],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": null,
+      "local_saldo_a_liquidar": null,
+      "diff_saldo": null
+    },
+    {
+      "numero": "00153/2024",
+      "api_encontrado": true,
+      "api_id": 305980,
+      "api_empenhos_qtd": 7,
+      "local_empenhos_qtd": 4,
+      "faltando_local": [
+        "2024NE000100",
+        "2024NE000316",
+        "2024NE000322"
+      ],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 956002.43,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -956002.43
+    },
+    {
+      "numero": "00285/2025",
+      "api_encontrado": false,
+      "api_id": null,
+      "api_empenhos_qtd": 0,
+      "local_empenhos_qtd": 0,
+      "faltando_local": [],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": null,
+      "local_saldo_a_liquidar": null,
+      "diff_saldo": null
+    },
+    {
+      "numero": "00185/2024",
+      "api_encontrado": true,
+      "api_id": 308040,
+      "api_empenhos_qtd": 2,
+      "local_empenhos_qtd": 2,
+      "faltando_local": [],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 9440.61,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -9440.61
+    },
+    {
+      "numero": "00184/2024",
+      "api_encontrado": true,
+      "api_id": 307917,
+      "api_empenhos_qtd": 3,
+      "local_empenhos_qtd": 1,
+      "faltando_local": [
+        "2024NE000103",
+        "2025NE000091"
+      ],
+      "sobrando_local": [],
+      "api_saldo_a_liquidar": 25887,
+      "local_saldo_a_liquidar": 0,
+      "diff_saldo": -25887
+    }
+  ]
+}

@@ -27,6 +27,7 @@ import { Upload, Search, Filter, ArrowUpDown, ChevronRight, Eye } from 'lucide-r
 import { PFImportDialog } from '@/components/modals/PFImportDialog';
 import { PFDetailsDialog } from '@/components/modals/PFDetailsDialog';
 import { HeaderActions } from '@/components/HeaderParts';
+import { FilterPanel } from '@/components/design-system/FilterPanel';
 
 export default function RastreabilidadePFs() {
   const [data, setData] = useState<RastreabilidadePF[]>([]);
@@ -189,10 +190,7 @@ export default function RastreabilidadePFs() {
         />
       </div>
       {/* Standard Filter Card */}
-      <Card className="card-system shadow-sm">
-        <CardHeader className="pb-3 px-0 pt-0">
-          <CardTitle className="text-xl font-bold">Filtros</CardTitle>
-        </CardHeader>
+      <FilterPanel className="shadow-sm">
         <CardContent className="p-0">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1 flex flex-wrap items-center gap-2">
@@ -246,12 +244,12 @@ export default function RastreabilidadePFs() {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </FilterPanel>
 
       <Card className="shadow-sm card-system overflow-hidden">
         <CardHeader className="px-6 py-4 border-b border-border-default/50 flex flex-row items-center justify-between bg-white">
           <div className="flex items-center gap-3">
-            <CardTitle className="text-base font-semibold">Rastreabilidade de PFs</CardTitle>
+            <CardTitle className="table-title">Rastreabilidade de PFs</CardTitle>
             <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-bold px-2 py-0 h-5">
               {processedData.length}
             </Badge>

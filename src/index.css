@@ -172,7 +172,7 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Public Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     /* Line-height 1.5 para legibilidade (conceito 4) */
     line-height: 1.5;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
@@ -188,6 +188,17 @@
   h6 { @apply text-text-xs font-font-semibold uppercase tracking-wider text-text-secondary; }
 
   p  { @apply text-text-base text-text-secondary; line-height: 1.6; }
+
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  .font-mono {
+    font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
 
   /* Seleção de texto com cor primária */
   ::selection {
@@ -324,6 +335,58 @@
   .input-label {
     @apply text-text-xs font-font-semibold uppercase tracking-wide text-text-secondary;
   }
+
+  /* === TYPOGRAPHY HELPERS === */
+  .font-ui {
+    font-family: 'Public Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  .font-data {
+    font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    letter-spacing: 0.01em;
+  }
+
+  .label-eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted;
+    font-family: 'Public Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  .panel-title {
+    @apply font-ui text-lg font-semibold leading-tight tracking-tight text-text-primary;
+  }
+
+  .panel-description {
+    @apply font-ui text-sm text-text-muted leading-relaxed;
+  }
+
+  .table-title {
+    @apply panel-title;
+  }
+
+  .table-description {
+    @apply panel-description;
+  }
+
+  /* === FILTER PANEL === */
+  .filter-panel {
+    @apply rounded-radius-xl border border-border-default/60 bg-surface-card shadow-shadow-sm;
+  }
+
+  .filter-panel-header {
+    @apply px-space-4 pt-space-4 pb-space-2;
+  }
+
+  .filter-title {
+    @apply inline-flex items-center gap-space-2 text-text-sm font-font-semibold uppercase tracking-[0.12em] text-text-secondary;
+  }
+
+  .filter-title-custom {
+    @apply normal-case tracking-normal text-text-base font-font-semibold text-text-primary;
+  }
+
+  .filter-content {
+    @apply px-space-4 pt-space-3 pb-space-4;
+  }
 }
 
 /* ============================================================
@@ -436,6 +499,21 @@
   /* Dot-pattern dark */
   .dark .dot-pattern {
     --dot-pattern: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='2' cy='2' r='1' fill='%234f46e5' fill-opacity='0.15'/%3E%3C/svg%3E");
+  }
+
+  /* === APP BACKGROUND (SUAVE CLEAN) === */
+  .app-bg-soft {
+    background-color: #f6f8fc;
+    background-image:
+      radial-gradient(1100px 520px at 10% -20%, rgba(56, 112, 226, 0.08), rgba(56, 112, 226, 0) 58%),
+      linear-gradient(180deg, #f8fafd 0%, #f4f7fb 100%);
+  }
+
+  .dark .app-bg-soft {
+    background-color: hsl(222 28% 10%);
+    background-image:
+      radial-gradient(1100px 560px at 12% -22%, rgba(86, 144, 255, 0.14), rgba(86, 144, 255, 0) 62%),
+      linear-gradient(180deg, hsl(222 28% 11%) 0%, hsl(222 28% 9%) 100%);
   }
 
   /* === BORDERS LUMINOSAS (Aura Style) === */

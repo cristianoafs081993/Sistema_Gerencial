@@ -21,6 +21,7 @@ import { ptBR } from 'date-fns/locale';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { HeaderActions } from '@/components/HeaderParts';
 import { ContratosSyncDialog } from '@/components/modals/ContratosSyncDialog';
+import { FilterPanel } from '@/components/design-system/FilterPanel';
 
 export default function Contratos() {
   const { contratos, empenhos, contratosEmpenhos, isLoading, refreshData } = useData();
@@ -198,10 +199,7 @@ export default function Contratos() {
       </div>
 
       {/* Standard Filter Card */}
-      <Card className="card-system shadow-sm">
-        <CardHeader className="pb-3 px-0 pt-0">
-          <CardTitle className="text-xl font-bold">Filtros</CardTitle>
-        </CardHeader>
+      <FilterPanel className="shadow-sm">
         <CardContent className="p-0">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
@@ -215,11 +213,11 @@ export default function Contratos() {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </FilterPanel>
 
       <Card className="card-system shadow-sm overflow-hidden border-none shadow-none mt-6">
         <CardHeader className="px-6 py-4 border-b border-border-default/50">
-          <CardTitle className="text-base font-semibold">Contratos Ativos</CardTitle>
+          <CardTitle className="table-title">Contratos Ativos</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -392,3 +390,4 @@ export default function Contratos() {
     </div>
   );
 }
+
