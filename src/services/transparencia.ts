@@ -3,12 +3,16 @@ import { DocumentoDespesa, DocumentoDespesaAPI, OperacaoEmpenho, DocumentoItem, 
 import { parseCurrency } from '@/lib/utils';
 import { addDays, format, isAfter, isBefore, parse } from 'date-fns';
 import { dominioService } from './dominio';
+import { creditosDisponiveisService } from './creditosDisponiveis';
 
 const API_BASE = '/api-transparencia/api-de-dados/despesas/documentos';
 const API_HISTORICO = '/api-transparencia/api-de-dados/despesas/itens-de-empenho/historico';
 const UNIDADE_GESTORA = '158366';
 const GESTAO = '26435';
 const API_KEY = '931d4d57337bef94e775337c318342e9';
+const DOCUMENTOS_HABEIS_SELECT = 'id,valor_original,valor_pago,estado,processo,favorecido_nome,favorecido_documento,data_emissao,fonte_sof,empenho_id';
+const DOCUMENTOS_HABEIS_ITENS_SELECT = 'id,documento_habil_id,doc_tipo,data_emissao,valor,observacao';
+const DOCUMENTOS_HABEIS_SITUACOES_SELECT = 'id,documento_habil_id,situacao_codigo,valor,is_retencao,created_at';
 
 // Delay para evitar Rate Limit (se necessário)
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -153,7 +157,7 @@ export const transparenciaService = {
     async getDocumentoCompleto(id: string): Promise<DocumentoDespesa> {
         const { data: doc, error: docError } = await supabase
             .from('documentos_habeis')
-            .select('*')
+            .select(DOCUMENTOS_HABEIS_SELECT)
             .eq('id', id)
             .single();
 
@@ -161,7 +165,7 @@ export const transparenciaService = {
 
         const { data: itens, error: itensError } = await supabase
             .from('documentos_habeis_itens')
-            .select('*')
+            .select(DOCUMENTOS_HABEIS_ITENS_SELECT)
             .eq('documento_habil_id', id)
             .order('data_emissao', { ascending: false });
 
@@ -169,7 +173,7 @@ export const transparenciaService = {
 
         const { data: situacoes, error: sitError } = await supabase
             .from('documentos_habeis_situacoes')
-            .select('*')
+            .select(DOCUMENTOS_HABEIS_SITUACOES_SELECT)
             .eq('documento_habil_id', id);
 
         if (sitError) throw sitError;
@@ -442,12 +446,7 @@ export const transparenciaService = {
     },
 
     async getCreditosDisponiveis(): Promise<CreditoDisponivel[]> {
-        const { data, error } = await supabase
-            .from('creditos_disponiveis')
-            .select('*')
-            .order('ptres', { ascending: true });
-        if (error) throw error;
-        return data || [];
+        return creditosDisponiveisService.getAll();
     },
 
     async importCreditosDisponiveis(data: Record<string, string>[]): Promise<void> {

@@ -9,7 +9,7 @@ export const dominioService = {
     async getNaturezasDespesa(): Promise<NaturezaDespesaDB[]> {
         const { data, error } = await supabase
             .from('naturezas_despesa')
-            .select('*')
+            .select('id,codigo,nome')
             .order('codigo');
 
         if (error) throw error;
@@ -23,7 +23,7 @@ export const dominioService = {
     async getDimensoes(): Promise<DimensaoDB[]> {
         const { data, error } = await supabase
             .from('dimensoes')
-            .select('*')
+            .select('id,codigo,nome')
             .order('codigo');
 
         if (error) throw error;
@@ -37,7 +37,7 @@ export const dominioService = {
     async getOrigensRecurso(): Promise<OrigemRecursoDB[]> {
         const { data, error } = await supabase
             .from('origens_recurso')
-            .select('*')
+            .select('id,codigo,descricao')
             .order('codigo');
 
         if (error) throw error;
@@ -51,7 +51,7 @@ export const dominioService = {
     async getComponentesFuncionais(dimensaoId?: string): Promise<ComponenteFuncionalDB[]> {
         let query = supabase
             .from('componentes_funcionais')
-            .select('*')
+            .select('id,dimensao_id,nome')
             .order('nome');
 
         if (dimensaoId) {

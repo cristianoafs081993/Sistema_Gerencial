@@ -38,7 +38,7 @@ import { parseSiafiCsv, syncSiafiDataToDb } from '@/lib/siafi-parser';
 import { transparenciaService } from '@/services/transparencia';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { splitCsvLine } from '@/utils/csvParser';
-import { matchesDimensionFilter } from '@/utils/dimensionFilters';
+import { filterEmpenhos, getRapLiquidado, getRapSaldo } from './empenhosFilters';
 
 
 const statusColors: Record<string, string> = {
@@ -54,19 +54,6 @@ const statusLabels: Record<string, string> = {
   pago: 'Pago',
   cancelado: 'Cancelado',
 };
-
-const getRapSaldo = (e: Empenho): number => {
-  const aLiquidar = e.rapALiquidar || 0;
-  if (aLiquidar > 0) return aLiquidar;
-  return e.saldoRapOficial || 0;
-};
-
-const getRapLiquidado = (e: Empenho): number => {
-  const inscrito = e.rapInscrito || 0;
-  return Math.max(0, inscrito - getRapSaldo(e));
-};
-
-
 
 export default function Empenhos() {
   const { empenhos, atividades, creditosDisponiveis, isLoading, addEmpenho, updateEmpenho, deleteEmpenho, refreshData } = useData();
@@ -95,54 +82,30 @@ export default function Empenhos() {
   const componentesUnicos = Array.from(new Set(empenhos.map(e => e.componenteFuncional?.trim()).filter(Boolean))).sort();
   const origensUnicas = Array.from(new Set(empenhos.map(e => e.origemRecurso?.trim()).filter(Boolean))).sort();
   const planosUnicos = Array.from(new Set(empenhos.map(e => e.planoInterno?.trim()).filter(Boolean))).sort();
-  const normalizeString = (str: string) =>
-    str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-
-  const filteredEmpenhos = empenhos.filter((e) => {
-    const searchNormalized = normalizeString(searchTerm);
-    const searchDigits = searchTerm.replace(/\D/g, '');
-
-    const matchesSearch =
-      normalizeString(e.numero).includes(searchNormalized) ||
-      normalizeString(e.descricao).includes(searchNormalized) ||
-      normalizeString(e.componenteFuncional || '').includes(searchNormalized) ||
-      normalizeString(e.favorecidoNome || '').includes(searchNormalized) ||
-      (searchDigits !== '' && (e.favorecidoDocumento || '').replace(/\D/g, '').includes(searchDigits));
-
-    const matchesStatus = filterStatus === 'all' || (() => {
-      // Regra específica para Restos a Pagar
-      if (e.tipo === 'rap') {
-        const isCompletamentePago = getRapSaldo(e) <= 0 && (e.rapPago || 0) > 0;
-
-        if (filterStatus === 'pago') return isCompletamentePago;
-        if (filterStatus === 'liquidado') return getRapLiquidado(e) > 0 && !isCompletamentePago;
-        if (filterStatus === 'pendente') return !isCompletamentePago;
-      }
-
-      return e.status === filterStatus;
-    })();
-    const matchesDimensao = matchesDimensionFilter({
-      dimensionValue: e.dimensao,
-      planInternal: e.planoInterno,
-      description: e.descricao,
-      filterValue: filterDimensao,
-    });
-    const matchesComponente = filterComponente === 'all' || e.componenteFuncional?.trim() === filterComponente;
-    const matchesOrigem = filterOrigem === 'all' || e.origemRecurso?.trim() === filterOrigem;
-    const matchesPlano = filterPlanoInterno === 'all' || e.planoInterno?.trim() === filterPlanoInterno;
-
-    // Filtro de Data
-    let matchesData = true;
-    if (dataInicio && dataFim) {
-      const data = new Date(e.dataEmpenho);
-      const inicio = new Date(dataInicio);
-      const fim = new Date(dataFim);
-      fim.setHours(23, 59, 59, 999);
-      matchesData = data >= inicio && data <= fim;
-    }
-
-    return matchesSearch && matchesStatus && matchesDimensao && matchesComponente && matchesOrigem && matchesPlano && matchesData;
-  });
+  const filteredEmpenhos = useMemo(
+    () =>
+      filterEmpenhos(empenhos, {
+        searchTerm,
+        filterStatus,
+        filterDimensao,
+        filterComponente,
+        filterOrigem,
+        filterPlanoInterno,
+        dataInicio,
+        dataFim,
+      }),
+    [
+      empenhos,
+      searchTerm,
+      filterStatus,
+      filterDimensao,
+      filterComponente,
+      filterOrigem,
+      filterPlanoInterno,
+      dataInicio,
+      dataFim,
+    ],
+  );
 
   const handleOpenDialog = (empenho?: Empenho) => {
     setSelectedEmpenho(empenho || null);

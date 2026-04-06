@@ -1,6 +1,7 @@
 import type { BolsistaPdfRecord } from '@/services/bolsistasPdfService';
 import type { LCRegistro } from '@/services/lcImportService';
 import type { ComparacaoBolsista } from '@/services/lcComparisonService';
+import { env } from '@/lib/env';
 
 export interface SiafiMacroInputRow {
   cpf: string;
@@ -29,8 +30,8 @@ interface MacroRowsOptions {
 const DEFAULT_SCRIPT_NAME = 'Lista de Credores';
 const DEFAULT_AUTHOR = 'sistema-gerencial';
 const DEFAULT_CHUNK_SIZE = 7;
-const DEFAULT_CONTA_PAGADORA = (import.meta.env.VITE_SIAFI_CONTA_PAGADORA as string | undefined) || '408034';
-const DEFAULT_CODIGO_FINAL_CAMPO2 = (import.meta.env.VITE_SIAFI_MACRO_CODIGO_FINAL as string | undefined) || '2200';
+const DEFAULT_CONTA_PAGADORA = env.siafiContaPagadora;
+const DEFAULT_CODIGO_FINAL_CAMPO2 = env.siafiMacroCodigoFinal;
 
 function onlyDigits(value: string): string {
   return (value || '').replace(/\D/g, '');

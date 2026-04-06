@@ -16,7 +16,7 @@ import {
   Redo 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 interface RichTextEditorProps {
   content: string;
@@ -47,6 +47,7 @@ function ToolbarBtn({ active, onClick, children }: { active?: boolean; onClick: 
 const Sep = () => <div className="w-px h-4 bg-border mx-0.5" />;
 
 export default function RichTextEditor({ content, onChange, placeholder, toolbarLeft, toolbarRight }: RichTextEditorProps) {
+  const isSyncingExternally = useRef(false);
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -55,8 +56,23 @@ export default function RichTextEditor({ content, onChange, placeholder, toolbar
       Placeholder.configure({ placeholder: placeholder || 'Comece a digitar...' }),
     ],
     content,
-    onUpdate: ({ editor }) => onChange(editor.getHTML()),
+    onUpdate: ({ editor }) => {
+      if (isSyncingExternally.current) {
+        isSyncingExternally.current = false;
+        return;
+      }
+      onChange(editor.getHTML());
+    },
   });
+
+  useEffect(() => {
+    if (!editor) return;
+    const current = editor.getHTML();
+    if (content !== current) {
+      isSyncingExternally.current = true;
+      editor.commands.setContent(content || '<p></p>', false);
+    }
+  }, [content, editor]);
 
   if (!editor) return null;
 

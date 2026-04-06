@@ -20,6 +20,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
+import { getSupabaseEnv, getSupabaseFunctionUrl } from '@/lib/env';
 // PDF.js import (using dynamic import to avoid SSR issues if any, but since it's vite, standard import works)
 import * as pdfjsLib from 'pdfjs-dist';
 
@@ -217,7 +218,8 @@ export default function Consultor() {
     setIsLoading(true);
 
     try {
-      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/consultor`;
+      const functionUrl = getSupabaseFunctionUrl('consultor');
+      const { anonKey } = getSupabaseEnv();
       
       const allMsgs = messages.concat(userMsg);
       // Sempre buscar o último PDF anexado na conversa para manter o contexto
@@ -231,7 +233,7 @@ export default function Consultor() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          'Authorization': `Bearer ${anonKey}`
         },
         body: JSON.stringify({ 
           messages: allMsgs.slice(-10).map(m => ({ role: m.role, content: m.content })),

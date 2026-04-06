@@ -1,5 +1,4 @@
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+import { getSupabaseEnv } from './env';
 
 type RestQueryOptions = {
   orderBy?: string;
@@ -11,9 +10,7 @@ export async function fetchSupabaseRestRows<T>(
   select: string,
   options: RestQueryOptions = {},
 ): Promise<T[]> {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Missing Supabase environment variables');
-  }
+  const { url: supabaseUrl, anonKey: supabaseAnonKey } = getSupabaseEnv();
 
   const url = new URL(`/rest/v1/${table}`, supabaseUrl);
   url.searchParams.set('select', select);

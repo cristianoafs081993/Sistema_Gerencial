@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 
 const CONTRATOS_API_BASE = '/api-contratos/api';
 const DEFAULT_UASG = '158366';
+const CONTRATOS_API_SYNC_RUNS_SELECT = 'id,unidade_codigo,started_at,finished_at,status,contratos_ativos,contratos_inativos,contratos_upserted,empenhos_upserted,faturas_upserted,error_message,details';
 const MIGRATION_REQUIRED_MESSAGE =
   'MIGRATION_REQUIRED: tabelas do módulo de contratos API ainda não existem no banco. Aplique as migrations do Supabase.';
 
@@ -266,7 +267,7 @@ export const contratosApiService = {
   async getLastSyncRun(unidadeCodigo = DEFAULT_UASG): Promise<ContratoApiSyncRun | null> {
     const { data, error } = await supabase
       .from('contratos_api_sync_runs')
-      .select('*')
+      .select(CONTRATOS_API_SYNC_RUNS_SELECT)
       .eq('unidade_codigo', unidadeCodigo)
       .order('started_at', { ascending: false })
       .limit(1)

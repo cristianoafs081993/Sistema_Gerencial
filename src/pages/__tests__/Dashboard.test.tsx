@@ -1,0 +1,244 @@
+import type { ReactNode } from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import Dashboard from '@/pages/Dashboard';
+import { useData } from '@/contexts/DataContext';
+
+vi.mock('@/contexts/DataContext', () => ({
+  useData: vi.fn(),
+}));
+
+vi.mock('@/components/HeaderParts', () => ({
+  HeaderActions: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}));
+
+vi.mock('@/components/dashboard/DashboardFiltersSheet', () => ({
+  DashboardFiltersSheet: ({
+    onFilterDimensaoChange,
+    onClearFilters,
+  }: {
+    onFilterDimensaoChange: (value: string) => void;
+    onClearFilters: () => void;
+  }) => (
+    <div>
+      <button type="button" onClick={() => onFilterDimensaoChange('EN')}>
+        filter-en
+      </button>
+      <button type="button" onClick={onClearFilters}>
+        clear-filters
+      </button>
+    </div>
+  ),
+}));
+
+vi.mock('@/components/dashboard/DashboardCurrentTab', () => ({
+  DashboardCurrentTab: ({
+    filteredData,
+    totalPlanejado,
+    activeBudgetDimension,
+    onSelectBudgetDimension,
+  }: {
+    filteredData: { empenhosCorrente: unknown[]; empenhosRap: unknown[] };
+    totalPlanejado: number;
+    activeBudgetDimension: string | null;
+    onSelectBudgetDimension: (value?: string | null) => void;
+  }) => (
+    <div data-testid="current-tab">
+      <span data-testid="current-planejado">{totalPlanejado}</span>
+      <span data-testid="current-empenhos-corrente">{filteredData.empenhosCorrente.length}</span>
+      <span data-testid="current-empenhos-rap">{filteredData.empenhosRap.length}</span>
+      <span data-testid="active-budget-dimension">{activeBudgetDimension ?? 'none'}</span>
+      <button type="button" onClick={() => onSelectBudgetDimension('EN')}>
+        select-budget-en
+      </button>
+    </div>
+  ),
+}));
+
+vi.mock('@/components/dashboard/DashboardRapTab', () => ({
+  DashboardRapTab: ({
+    filteredRapCount,
+    rapTotalInscrito,
+  }: {
+    filteredRapCount: number;
+    rapTotalInscrito: number;
+  }) => (
+    <div data-testid="rap-tab">
+      <span data-testid="rap-count">{filteredRapCount}</span>
+      <span data-testid="rap-total-inscrito">{rapTotalInscrito}</span>
+    </div>
+  ),
+}));
+
+const mockedUseData = vi.mocked(useData);
+
+const makeAtividade = (overrides: Partial<ReturnType<typeof baseAtividade>> = {}) => ({
+  ...baseAtividade(),
+  ...overrides,
+});
+
+const makeEmpenho = (overrides: Partial<ReturnType<typeof baseEmpenho>> = {}) => ({
+  ...baseEmpenho(),
+  ...overrides,
+});
+
+const makeDescentralizacao = (overrides: Partial<ReturnType<typeof baseDescentralizacao>> = {}) => ({
+  ...baseDescentralizacao(),
+  ...overrides,
+});
+
+function baseAtividade() {
+  return {
+    id: 'atividade-1',
+    dimensao: 'EN - Ensino',
+    componenteFuncional: 'Ensino Base',
+    atividade: 'Atividade teste',
+    descricao: 'Descricao teste',
+    valorTotal: 100,
+    origemRecurso: 'Tesouro',
+    naturezaDespesa: '339039 - Outros Servicos',
+    planoInterno: 'PI-EN',
+    createdAt: new Date('2026-01-01'),
+    updatedAt: new Date('2026-01-01'),
+  };
+}
+
+function baseEmpenho() {
+  return {
+    id: 'empenho-1',
+    numero: '2026NE0001',
+    descricao: 'Empenho teste',
+    valor: 50,
+    dimensao: 'EN - Ensino',
+    componenteFuncional: 'Ensino Base',
+    origemRecurso: 'Tesouro',
+    naturezaDespesa: '339039 - Outros Servicos',
+    planoInterno: 'PIEN',
+    favorecidoNome: 'Fornecedor Teste',
+    favorecidoDocumento: '00000000000100',
+    tipo: 'exercicio' as const,
+    dataEmpenho: new Date('2026-02-10'),
+    status: 'pendente' as const,
+    createdAt: new Date('2026-02-10'),
+    updatedAt: new Date('2026-02-10'),
+  };
+}
+
+function baseDescentralizacao() {
+  return {
+    id: 'desc-1',
+    dimensao: 'EN - Ensino',
+    origemRecurso: 'Tesouro',
+    valor: 40,
+    createdAt: new Date('2026-01-10'),
+    updatedAt: new Date('2026-01-10'),
+  };
+}
+
+describe('Dashboard', () => {
+  beforeEach(() => {
+    mockedUseData.mockReturnValue({
+      atividades: [
+        makeAtividade({ id: 'atividade-en', dimensao: 'EN - Ensino', valorTotal: 200 }),
+        makeAtividade({ id: 'atividade-ad', dimensao: 'AD - Administracao', valorTotal: 100, componenteFuncional: 'Gestao', planoInterno: 'PI-AD' }),
+      ],
+      empenhos: [
+        makeEmpenho({
+          id: 'empenho-en',
+          dimensao: '',
+          planoInterno: 'PI-EN',
+          descricao: 'Empenho vinculado ao ensino',
+          valor: 50,
+          tipo: 'exercicio',
+        }),
+        makeEmpenho({
+          id: 'empenho-ad',
+          numero: '2026NE0002',
+          dimensao: 'AD - Administracao',
+          componenteFuncional: 'Gestao',
+          planoInterno: 'PI-AD',
+          valor: 30,
+          tipo: 'exercicio',
+        }),
+        makeEmpenho({
+          id: 'rap-en',
+          numero: '2025NE0001',
+          dimensao: '',
+          planoInterno: 'RAP-EN',
+          descricao: 'RAP do ensino',
+          valor: 80,
+          tipo: 'rap',
+          rapInscrito: 80,
+          rapALiquidar: 20,
+          rapLiquidado: 60,
+          rapPago: 10,
+        }),
+      ],
+      descentralizacoes: [
+        makeDescentralizacao({ id: 'desc-en', dimensao: 'EN - Ensino', valor: 70 }),
+        makeDescentralizacao({ id: 'desc-ad', dimensao: 'AD - Administracao', valor: 20 }),
+      ],
+      contratos: [],
+      contratosEmpenhos: [],
+      creditosDisponiveis: [],
+      isLoading: false,
+      addAtividade: vi.fn(),
+      updateAtividade: vi.fn(),
+      deleteAtividade: vi.fn(),
+      addEmpenho: vi.fn(),
+      updateEmpenho: vi.fn(),
+      deleteEmpenho: vi.fn(),
+      addDescentralizacao: vi.fn(),
+      updateDescentralizacao: vi.fn(),
+      deleteDescentralizacao: vi.fn(),
+      getResumoOrcamentario: vi.fn(),
+      getTotalPlanejado: vi.fn(),
+      getTotalEmpenhado: vi.fn(),
+      getTotalDescentralizado: vi.fn(),
+      getADescentralizar: vi.fn(),
+      getSaldoTotal: vi.fn(),
+      refreshData: vi.fn(),
+    });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('aplica filtro de dimensao usando inferencia por plano interno em exercicio e RAP', async () => {
+    render(<Dashboard />);
+
+    expect(screen.getByTestId('current-planejado')).toHaveTextContent('300');
+    expect(screen.getByTestId('current-empenhos-corrente')).toHaveTextContent('2');
+    expect(screen.getByTestId('current-empenhos-rap')).toHaveTextContent('1');
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'filter-en' })[0]);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('current-planejado')).toHaveTextContent('200');
+    });
+
+    expect(screen.getByTestId('current-empenhos-corrente')).toHaveTextContent('1');
+    expect(screen.getByTestId('current-empenhos-rap')).toHaveTextContent('1');
+
+    expect(screen.getByTestId('current-empenhos-rap')).toHaveTextContent('1');
+  });
+
+  it('mantem os totais principais ao selecionar uma dimensao no treemap', async () => {
+    render(<Dashboard />);
+
+    expect(screen.getByTestId('current-planejado')).toHaveTextContent('300');
+    expect(screen.getByTestId('current-empenhos-corrente')).toHaveTextContent('2');
+    expect(screen.getByTestId('active-budget-dimension')).toHaveTextContent('none');
+    expect(screen.queryByText(/Dimensao ativa:/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'select-budget-en' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-budget-dimension')).toHaveTextContent('EN - Ensino');
+    });
+
+    expect(screen.getByTestId('current-planejado')).toHaveTextContent('300');
+    expect(screen.getByTestId('current-empenhos-corrente')).toHaveTextContent('2');
+    expect(screen.queryByText(/Dimensao ativa:/)).not.toBeInTheDocument();
+  });
+});

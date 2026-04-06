@@ -301,6 +301,35 @@ export interface SuapRetencoesTributarias {
   pis_pasep?: string;
 }
 
+export interface SuapLiquidacaoAnaliseItem {
+  campo: string;
+  status: 'ok' | 'warning' | 'error';
+  esperado?: string;
+  encontrado?: string;
+  observacao: string;
+}
+
+export interface SuapLiquidacaoAnalise {
+  statusGeral: 'ok' | 'warning' | 'error';
+  resumo: string;
+  recomendacao?: string;
+  itens: SuapLiquidacaoAnaliseItem[];
+  analisadoEm?: string;
+  modelo?: string;
+  quantidadePrints?: number;
+}
+
+export interface SuapWorkflowConclusao {
+  concluido?: boolean;
+  concluidoEm?: string;
+  concluidoPor?: string;
+  nsNumero?: string;
+  solicitarAnaliseLiquidacao?: boolean;
+  arquivosSiafi?: string[];
+  analiseLiquidacao?: SuapLiquidacaoAnalise;
+  reabertoEm?: string;
+}
+
 export interface SuapDadosCompletos {
   val_nf?: string;
   contrato_numero?: string;
@@ -310,6 +339,7 @@ export interface SuapDadosCompletos {
   notas_fiscais?: SuapNotaFiscal[];
   dados_bancarios?: SuapDadosBancarios;
   retencoes_tributarias?: SuapRetencoesTributarias;
+  workflow?: SuapWorkflowConclusao;
 }
 
 export interface SuapProcesso {

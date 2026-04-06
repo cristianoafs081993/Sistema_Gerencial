@@ -288,7 +288,7 @@ export async function importPFs(file_solicitacoes: File, file_aprovacoes: File) 
 export async function getNecessidadePFs() {
   const { data, error } = await supabase
     .from('vw_controle_pfs_pendentes')
-    .select('*')
+    .select('fonte,total_solicitado,total_pago,total_a_pagar,saldo_pf_disponivel,qtd_docs_pendentes,necessidade_pf,status_analise')
     .order('fonte', { ascending: true });
 
   if (error) throw error;
@@ -298,7 +298,7 @@ export async function getNecessidadePFs() {
 export async function getDocumentosPendentes(fonte?: string) {
   let query = supabase
     .from('vw_documentos_pendentes_pagamento')
-    .select('*')
+    .select('id,fonte_sof,data_emissao,favorecido_nome,valor_liquidado,valor_pago,valor_pendente')
     .order('data_emissao', { ascending: true });
 
   if (fonte) {

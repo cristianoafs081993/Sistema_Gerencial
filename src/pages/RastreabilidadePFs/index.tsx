@@ -1,5 +1,4 @@
 ﻿import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
 import { RastreabilidadePF } from '@/types/pfs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +27,7 @@ import { PFImportDialog } from '@/components/modals/PFImportDialog';
 import { PFDetailsDialog } from '@/components/modals/PFDetailsDialog';
 import { HeaderActions } from '@/components/HeaderParts';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
+import { rastreabilidadePFsService } from '@/services/rastreabilidadePFs';
 
 export default function RastreabilidadePFs() {
   const [data, setData] = useState<RastreabilidadePF[]>([]);
@@ -52,13 +52,8 @@ export default function RastreabilidadePFs() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const { data: pfs, error } = await supabase
-        .from('vw_rastreabilidade_pf')
-        .select('*')
-        .order('data_solicitacao', { ascending: false });
-
-      if (error) throw error;
-      setData(pfs || []);
+      const pfs = await rastreabilidadePFsService.getAll();
+      setData(pfs);
     } catch (error) {
       console.error('Erro ao buscar dados:', error);
     } finally {
