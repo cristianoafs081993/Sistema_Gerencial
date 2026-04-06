@@ -1248,6 +1248,36 @@ export async function resolveDocumentIntent(
   };
 }
 
+export async function buildResolvedContextFromSuapProcess(
+  processo: SuapProcesso,
+  resources: ResolverResources,
+): Promise<ResolvedDocumentContext> {
+  const processoLite = mapSuapProcessoLite({
+    id: processo.id,
+    suap_id: processo.suapId,
+    status: processo.status,
+    num_processo: processo.numProcesso,
+    beneficiario: processo.beneficiario,
+    cpf_cnpj: processo.cpfCnpj,
+    assunto: processo.assunto,
+    contrato: processo.contrato,
+    dados_completos: processo.dadosCompletos,
+  });
+
+  const intent: DocumentIntent = {
+    documentType: 'despacho-liquidacao',
+    lookupType: 'processo',
+    lookupValue: processo.numProcesso || processo.suapId,
+    rawPrompt: processo.numProcesso || processo.suapId,
+  };
+
+  const contratosApi = await fetchContratosApiByIntent(intent);
+  const contratosApiEmpenhos = await fetchContratoApiEmpenhos(contratosApi.map((item) => item.id));
+  const relatedMaps = buildRelatedMaps(resources, [processoLite], contratosApi, contratosApiEmpenhos);
+
+  return buildContextFromSuap(processoLite, relatedMaps.forSuap(processoLite));
+}
+
 export function buildDespachoLiquidacaoHtml(context: ResolvedDocumentContext) {
   const categoria = inferObjetoCategoria(context);
   const favorecidoHtml = htmlValue(context.favorecido, 'favorecido', { uppercase: true, bold: true });

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { NaturezaDespesaDB, DimensaoDB, OrigemRecursoDB, ComponenteFuncionalDB } from '@/types';
+import { normalizeFunctionalComponentName } from '@/utils/functionalComponentLabels';
 
 /**
  * Service para buscar dados das tabelas de domínio (lookup tables).
@@ -63,7 +64,7 @@ export const dominioService = {
         return (data || []).map((item) => ({
             id: item.id,
             dimensaoId: item.dimensao_id,
-            nome: item.nome,
+            nome: normalizeFunctionalComponentName(item.nome),
         }));
     },
 

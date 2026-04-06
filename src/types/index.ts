@@ -1,3 +1,5 @@
+import { normalizeFunctionalComponentName } from '@/utils/functionalComponentLabels';
+
 export interface Atividade {
   id: string;
   dimensao: string;
@@ -133,7 +135,7 @@ export const DIMENSOES: Dimensao[] = [
   { codigo: 'TI', nome: 'TI - Tecnologia da Informação e Comunicação' },
 ];
 
-export const COMPONENTES_POR_DIMENSAO: Record<string, string[]> = {
+const COMPONENTES_POR_DIMENSAO_BRUTOS: Record<string, string[]> = {
   'AD': [
     '8 - Orçamento',
     '9 - Contabilidade e Finanças',
@@ -230,6 +232,13 @@ export const COMPONENTES_POR_DIMENSAO: Record<string, string[]> = {
     '4 - Infraestrutura e Operações de TIC'
   ]
 };
+
+export const COMPONENTES_POR_DIMENSAO: Record<string, string[]> = Object.fromEntries(
+  Object.entries(COMPONENTES_POR_DIMENSAO_BRUTOS).map(([dimensao, componentes]) => [
+    dimensao,
+    componentes.map(normalizeFunctionalComponentName),
+  ]),
+) as Record<string, string[]>;
 
 export interface DocumentoDespesaAPI {
   data: string;

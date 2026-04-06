@@ -2,6 +2,7 @@
 import { supabase } from '@/lib/supabase';
 import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { Empenho } from '@/types';
+import { normalizeFunctionalComponentName } from '@/utils/functionalComponentLabels';
 
 const EMPENHOS_SELECT = 'id,numero,descricao,valor,dimensao,dimensao_id,componente_funcional,componente_funcional_id,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,favorecido_nome,favorecido_documento,valor_liquidado,data_empenho,status,atividade_id,created_at,updated_at,processo,historico_operacoes,valor_liquidado_oficial,valor_pago_oficial,saldo_rap_oficial,ultima_atualizacao_siafi,tipo,rap_inscrito,rap_a_liquidar,rap_liquidado,rap_pago,valor_liquidado_a_pagar';
 
@@ -48,7 +49,7 @@ const mapEmpenhoRow = (item: EmpenhoRow): Empenho => ({
     valor: Number(item.valor),
     dimensao: item.dimensao,
     dimensaoId: item.dimensao_id || undefined,
-    componenteFuncional: item.componente_funcional,
+    componenteFuncional: normalizeFunctionalComponentName(item.componente_funcional),
     componenteFuncionalId: item.componente_funcional_id || undefined,
     origemRecurso: item.origem_recurso,
     origemRecursoId: item.origem_recurso_id || undefined,
@@ -104,6 +105,7 @@ export const empenhosService = {
     },
 
     async create(empenho: Omit<Empenho, 'id' | 'createdAt' | 'updatedAt'>): Promise<Empenho> {
+        const componenteFuncional = normalizeFunctionalComponentName(empenho.componenteFuncional);
         const { data, error } = await supabase
             .from('empenhos')
             .insert({
@@ -112,7 +114,7 @@ export const empenhosService = {
                 valor: empenho.valor,
                 dimensao: empenho.dimensao,
                 dimensao_id: empenho.dimensaoId || null,
-                componente_funcional: empenho.componenteFuncional,
+                componente_funcional: componenteFuncional,
                 componente_funcional_id: empenho.componenteFuncionalId || null,
                 origem_recurso: empenho.origemRecurso,
                 origem_recurso_id: empenho.origemRecursoId || null,
@@ -139,37 +141,7 @@ export const empenhosService = {
 
         if (error) throw error;
 
-        return {
-            id: data.id,
-            numero: data.numero,
-            descricao: data.descricao,
-            valor: Number(data.valor),
-            dimensao: data.dimensao,
-            dimensaoId: data.dimensao_id || undefined,
-            componenteFuncional: data.componente_funcional,
-            componenteFuncionalId: data.componente_funcional_id || undefined,
-            origemRecurso: data.origem_recurso,
-            origemRecursoId: data.origem_recurso_id || undefined,
-            naturezaDespesa: data.natureza_despesa,
-            naturezaDespesaId: data.natureza_despesa_id || undefined,
-            planoInterno: data.plano_interno || undefined,
-            favorecidoNome: data.favorecido_nome || undefined,
-            favorecidoDocumento: data.favorecido_documento || undefined,
-            processo: data.processo || undefined,
-            valorLiquidado: data.valor_liquidado ? Number(data.valor_liquidado) : 0,
-            valorLiquidadoAPagar: data.valor_liquidado_a_pagar != null ? Number(data.valor_liquidado_a_pagar) : undefined,
-            tipo: data.tipo || 'exercicio',
-            rapInscrito: data.rap_inscrito != null ? Number(data.rap_inscrito) : undefined,
-            rapALiquidar: data.rap_a_liquidar != null ? Number(data.rap_a_liquidar) : undefined,
-            rapLiquidado: data.rap_liquidado != null ? Number(data.rap_liquidado) : undefined,
-            rapPago: data.rap_pago != null ? Number(data.rap_pago) : undefined,
-            dataEmpenho: new Date(data.data_empenho),
-            status: data.status,
-            atividadeId: data.atividade_id || undefined,
-            historicoOperacoes: data.historico_operacoes || [],
-            createdAt: new Date(data.created_at),
-            updatedAt: new Date(data.updated_at),
-        };
+        return mapEmpenhoRow(data as EmpenhoRow);
     },
 
     async update(id: string, empenho: Partial<Empenho>): Promise<void> {
@@ -182,7 +154,9 @@ export const empenhosService = {
         if (empenho.valor !== undefined) updates.valor = empenho.valor;
         if (empenho.dimensao) updates.dimensao = empenho.dimensao;
         if (empenho.dimensaoId !== undefined) updates.dimensao_id = empenho.dimensaoId || null;
-        if (empenho.componenteFuncional) updates.componente_funcional = empenho.componenteFuncional;
+        if (empenho.componenteFuncional) {
+            updates.componente_funcional = normalizeFunctionalComponentName(empenho.componenteFuncional);
+        }
         if (empenho.componenteFuncionalId !== undefined) updates.componente_funcional_id = empenho.componenteFuncionalId || null;
         if (empenho.origemRecurso) updates.origem_recurso = empenho.origemRecurso;
         if (empenho.origemRecursoId !== undefined) updates.origem_recurso_id = empenho.origemRecursoId || null;

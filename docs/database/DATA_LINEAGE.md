@@ -17,11 +17,13 @@ Mostrar a linhagem operacional dos dados de forma curta:
   - pagina: [Atividades.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Atividades.tsx)
   - service: [atividades.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/atividades.ts)
   - tabela: `atividades`
+  - observacao: normaliza `componente_funcional` sem prefixo numerico e limpa labels legados de atividades da dimensao `EN`
 
 - entrada manual de empenhos e imports auxiliares
   - pagina: [Empenhos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Empenhos.tsx)
   - service: [empenhos.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/empenhos.ts)
   - tabela: `empenhos`
+  - observacao: normaliza `componente_funcional` sem prefixo numerico antes de persistir
 
 ### Financeiro
 

@@ -9,6 +9,7 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "check": "npm run lint && npm test && npm run build",
+    "check:docs": "node scripts/check-docs-coverage.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

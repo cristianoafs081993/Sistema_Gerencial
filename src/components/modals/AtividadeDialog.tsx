@@ -128,7 +128,7 @@ export function AtividadeDialog({ open, onOpenChange, atividade, onSuccess }: At
                 <Input 
                   value={formData.componenteFuncional || ''} 
                   onChange={e => setFormData({ ...formData, componenteFuncional: e.target.value })}
-                  placeholder="Ex: 11 - Contratos"
+                  placeholder="Ex: Contratos"
                   className="h-10 border-slate-200 bg-slate-50/50 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                 />
               </div>

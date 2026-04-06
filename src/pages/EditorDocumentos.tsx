@@ -1,23 +1,50 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check, CheckCircle2, Copy, Loader2, Sparkles, Wand2 } from 'lucide-react';
+import {
+  Building2,
+  Check,
+  CheckCircle2,
+  Copy,
+  ExternalLink,
+  FileText,
+  Landmark,
+  Loader2,
+  PanelRightOpen,
+  Pencil,
+  ReceiptText,
+  ShieldCheck,
+  Sparkles,
+  Wallet,
+  Wand2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import RichTextEditor from '@/components/Editor/RichTextEditor';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useData } from '@/contexts/DataContext';
 import {
   buildDespachoLiquidacaoHtml,
+  buildResolvedContextFromSuapProcess,
   documentDefinitions,
   extractProcessNumbers,
   resolveDocumentIntent,
   type DocumentIntent,
   type ResolvedDocumentContext,
 } from '@/lib/documentGeneration';
+import { cn, formatarDocumento } from '@/lib/utils';
 import { suapProcessosService } from '@/services/suapProcessos';
+import type { SuapProcesso } from '@/types';
 
 type ScreenState = 'idle' | 'resolving' | 'ambiguous' | 'not_found';
 type FeedbackTone = 'neutral' | 'warning' | 'success';
@@ -26,6 +53,7 @@ type ExampleProcessCard = {
   id: string;
   processo: string;
   beneficiario?: string;
+  processoCompleto: SuapProcesso;
 };
 
 type GeneratedDispatch = {
@@ -58,6 +86,25 @@ const feedbackClasses: Record<FeedbackTone, string> = {
   neutral: 'border-border-default bg-surface-subtle/70 text-text-secondary',
   warning: 'border-warning/20 bg-warning/10 text-amber-900',
   success: 'border-status-success/20 bg-status-success/10 text-emerald-900',
+};
+
+const isCopyableValue = (value?: string | null) => {
+  if (!value) return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized !== '' && normalized !== '-' && normalized !== 'null' && normalized !== 'undefined';
+};
+
+const copyValue = async (value: string | undefined | null, message: string) => {
+  if (!isCopyableValue(value)) {
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(value!);
+    toast.success(message);
+  } catch {
+    toast.error('Nao foi possivel copiar este valor.');
+  }
 };
 
 function ModelSubmenu({
@@ -95,24 +142,138 @@ function ModelSubmenu({
   );
 }
 
-function ExampleCard({
-  processo,
-  beneficiario,
-  onClick,
+function CopyValueButton({
+  value,
+  message,
+  className,
 }: {
-  processo: string;
-  beneficiario?: string;
-  onClick: () => void;
+  value?: string | null;
+  message: string;
+  className?: string;
 }) {
+  const canCopy = isCopyableValue(value);
+
   return (
     <button
       type="button"
-      onClick={onClick}
-      className="flex w-full flex-col items-start rounded-radius-lg border border-border-default/70 bg-surface-card px-3 py-2.5 text-left shadow-xs transition-all duration-200 hover:-translate-y-[1px] hover:border-primary/20 hover:bg-surface-subtle/40 hover:shadow-soft"
+      disabled={!canCopy}
+      title={message}
+      className={cn(
+        'inline-flex h-8 w-8 items-center justify-center rounded-radius-md border border-border-default/70 bg-surface-card text-text-secondary shadow-xs transition',
+        'hover:border-border-default hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40',
+        className,
+      )}
+      onClick={() => {
+        void copyValue(value, message);
+      }}
     >
-      <span className="font-mono text-[12px] font-semibold text-text-primary">{processo}</span>
-      <span className="mt-1 line-clamp-2 font-ui text-[10px] leading-relaxed text-text-secondary">{beneficiario || 'Sincronizado no SUAP'}</span>
+      <Copy className="h-3.5 w-3.5" />
     </button>
+  );
+}
+
+function SidebarSection({
+  icon,
+  title,
+  children,
+  contentClassName,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+  contentClassName?: string;
+}) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
+      <div className="h-0.5 w-full bg-slate-200" />
+      <div className="p-3">
+        <div className="mb-2 flex items-center gap-2 font-ui text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+          {icon}
+        </span>
+        {title}
+      </div>
+        <div className={cn('space-y-2', contentClassName)}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function SidebarField({
+  label,
+  value,
+  copyValue: valueToCopy,
+  copyMessage,
+  mono = false,
+}: {
+  label: string;
+  value: string;
+  copyValue?: string | null;
+  copyMessage: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
+      <div className="min-w-0">
+        <p className="font-ui text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">{label}</p>
+        <p className={cn('mt-0.5 break-words font-ui text-[13px] text-slate-900', mono && 'font-mono text-[12px] font-semibold')}>
+          {value}
+        </p>
+      </div>
+      <CopyValueButton value={valueToCopy} message={copyMessage} className="h-7 w-7 shrink-0 border-slate-200 bg-white shadow-none" />
+    </div>
+  );
+}
+
+function ExampleProcessRow({
+  processo,
+  beneficiario,
+  onPreview,
+  onAppend,
+  isSelected,
+}: {
+  processo: string;
+  beneficiario?: string;
+  onPreview: () => void;
+  onAppend: () => void;
+  isSelected: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-2 rounded-radius-lg border bg-surface-card p-1.5 shadow-xs transition-all duration-200',
+        isSelected
+          ? 'border-primary/30 bg-primary/[0.05] shadow-soft'
+          : 'border-border-default/70 hover:-translate-y-[1px] hover:border-primary/20 hover:bg-surface-subtle/40 hover:shadow-soft',
+      )}
+    >
+      <button
+        type="button"
+        onClick={onPreview}
+        className="min-w-0 flex-1 rounded-radius-md px-2 py-1 text-left"
+      >
+        <span className="block truncate font-mono text-[11px] font-semibold text-text-primary">{processo}</span>
+        <span className="mt-0.5 line-clamp-1 block font-ui text-[10px] leading-snug text-text-secondary">
+          {beneficiario || 'Sincronizado no SUAP'}
+        </span>
+        <span className="mt-1 inline-flex items-center gap-1 font-ui text-[9px] font-semibold uppercase tracking-[0.12em] text-primary/80">
+          <PanelRightOpen className="h-3 w-3" />
+          Ver detalhes
+        </span>
+      </button>
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-9 w-9 shrink-0 rounded-radius-md border-border-default bg-surface-card p-0 text-text-primary"
+        onClick={onAppend}
+        aria-label="Gerar documento"
+        title="Gerar documento"
+      >
+        <Pencil className="h-3.5 w-3.5" />
+      </Button>
+    </div>
   );
 }
 
@@ -142,6 +303,7 @@ function CandidateCard({
 
 export default function EditorDocumentos() {
   const { empenhos, contratos, contratosEmpenhos } = useData();
+  const editorCardRef = useRef<HTMLDivElement | null>(null);
   const [processInput, setProcessInput] = useState('');
   const [screenState, setScreenState] = useState<ScreenState>('idle');
   const [feedback, setFeedback] = useState('');
@@ -152,6 +314,7 @@ export default function EditorDocumentos() {
   const [generatedDispatches, setGeneratedDispatches] = useState<GeneratedDispatch[]>([]);
   const [copiedDispatchIds, setCopiedDispatchIds] = useState<string[]>([]);
   const [clonedDispatchIds, setClonedDispatchIds] = useState<string[]>([]);
+  const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
 
   const resources = useMemo(
     () => ({ empenhos, contratos, contratosEmpenhos }),
@@ -176,13 +339,46 @@ export default function EditorDocumentos() {
           id: processo.id,
           processo: processo.numProcesso!.trim(),
           beneficiario: processo.beneficiario || processo.assunto,
+          processoCompleto: processo,
         })),
     [syncedProcesses],
   );
 
   const detectedProcesses = useMemo(() => extractProcessNumbers(processInput), [processInput]);
+  const selectedProcess = useMemo(
+    () => exampleProcesses.find((processo) => processo.id === selectedProcessId)?.processoCompleto || null,
+    [exampleProcesses, selectedProcessId],
+  );
+  const visibleRetencoes = useMemo(
+    () =>
+      selectedProcess
+        ? ([
+            ['ISS', selectedProcess.dadosCompletos?.retencoes_tributarias?.iss],
+            ['INSS', selectedProcess.dadosCompletos?.retencoes_tributarias?.inss],
+            ['IR', selectedProcess.dadosCompletos?.retencoes_tributarias?.ir],
+            ['CSLL', selectedProcess.dadosCompletos?.retencoes_tributarias?.csll],
+            ['COFINS', selectedProcess.dadosCompletos?.retencoes_tributarias?.cofins],
+            ['PIS/PASEP', selectedProcess.dadosCompletos?.retencoes_tributarias?.pis_pasep],
+          ] as Array<[string, string | undefined]>).filter(([, value]) => isCopyableValue(value))
+        : [],
+    [selectedProcess],
+  );
 
-  const openContext = (context: ResolvedDocumentContext) => {
+  const focusEditor = () => {
+    window.setTimeout(() => {
+      editorCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const editable = editorCardRef.current?.querySelector('[contenteditable="true"]') as HTMLElement | null;
+      editable?.focus();
+    }, 0);
+  };
+
+  const openContext = (
+    context: ResolvedDocumentContext,
+    options?: {
+      feedbackMessage?: string;
+      feedbackTone?: FeedbackTone;
+    },
+  ) => {
     const html = buildDespachoLiquidacaoHtml(context);
     setSelectedTitle(context.title || activeDocument.name);
     setEditorContent(html);
@@ -198,8 +394,10 @@ export default function EditorDocumentos() {
     setCopiedDispatchIds([]);
     setClonedDispatchIds([]);
     setPendingCandidates([]);
-    setFeedback('');
+    setFeedback(options?.feedbackMessage || '');
+    setFeedbackTone(options?.feedbackTone || 'neutral');
     setScreenState('idle');
+    focusEditor();
   };
 
   const handleAppendProcess = (processo: string) => {
@@ -242,7 +440,10 @@ export default function EditorDocumentos() {
         const result = results[0];
 
         if (result.status === 'resolved') {
-          openContext(result.context);
+          openContext(result.context, {
+            feedbackMessage: '1 minuta gerada.',
+            feedbackTone: 'success',
+          });
           return;
         }
 
@@ -313,6 +514,35 @@ export default function EditorDocumentos() {
 
       setFeedback(`${messageParts.join('. ')}.`);
       setFeedbackTone(ambiguousResults.length > 0 || notFoundProcesses.length > 0 ? 'neutral' : 'success');
+      focusEditor();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro inesperado ao gerar a minuta.';
+      setFeedback(message);
+      setFeedbackTone('warning');
+      setScreenState('not_found');
+      toast.error(message);
+    }
+  };
+
+  const handleGenerateProcess = async (processo: SuapProcesso) => {
+    const processValue = processo.numProcesso?.trim();
+
+    if (!processValue) {
+      return;
+    }
+
+    setProcessInput(processValue);
+    setPendingCandidates([]);
+    setFeedback('');
+    setScreenState('resolving');
+
+    try {
+      const context = await buildResolvedContextFromSuapProcess(processo, resources);
+      openContext(context, {
+        feedbackMessage: '1 minuta gerada.',
+        feedbackTone: 'success',
+      });
+      setSelectedProcessId(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro inesperado ao gerar a minuta.';
       setFeedback(message);
@@ -364,89 +594,104 @@ export default function EditorDocumentos() {
   return (
     <div className="-m-4 min-h-[calc(100vh-4rem)] w-[calc(100%+2rem)] bg-surface-page lg:-m-8 lg:w-[calc(100%+4rem)]">
       <div className="mx-auto flex max-w-[1560px] flex-col gap-5 px-4 py-5 lg:px-8 lg:py-6">
-        <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-          <Card className="overflow-hidden border-border-default/70 bg-surface-card shadow-soft">
-            <CardContent className="p-4">
-              <ModelSubmenu
-                title={activeDocument.name}
-                subtitle="Gera a minuta a partir do numero do processo"
-                onClick={() => setProcessInput('')}
-              />
-            </CardContent>
-          </Card>
+          <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+            <Card className="overflow-hidden border-border-default/70 bg-surface-card shadow-soft">
+              <CardContent className="p-4">
+                <ModelSubmenu
+                  title={activeDocument.name}
+                  subtitle="Gera a minuta a partir do numero do processo"
+                  onClick={() => setProcessInput('')}
+                />
+              </CardContent>
+            </Card>
 
-          <Card className="overflow-hidden border-border-default/70 bg-surface-card shadow-soft">
-            <CardContent className="p-4">
-              <div className="flex flex-col gap-4">
-                {exampleProcesses.length > 0 ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-text-secondary">
-                      <Sparkles className="h-4 w-4 text-primary" />
-                      <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">
-                        Processos sincronizados
-                      </p>
+            <Card className="overflow-hidden border-border-default/70 bg-surface-card shadow-soft">
+              <CardContent className="p-4">
+                <div className="flex flex-col gap-4">
+                  {exampleProcesses.length > 0 ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-text-secondary">
+                        <Sparkles className="h-4 w-4 text-primary" />
+                        <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">
+                          Processos sincronizados
+                        </p>
+                      </div>
+
+                      <div className="rounded-radius-xl border border-border-default/70 bg-surface-subtle/35 p-2">
+                        <div>
+                          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+                          {exampleProcesses.map((example) => (
+                            <ExampleProcessRow
+                              key={example.id}
+                              processo={example.processo}
+                              beneficiario={example.beneficiario}
+                              isSelected={selectedProcessId === example.id}
+                              onPreview={() => setSelectedProcessId(example.id)}
+                              onAppend={() => handleAppendProcess(example.processo)}
+                            />
+                          ))}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
-                      {exampleProcesses.map((example) => (
-                        <ExampleCard
-                          key={example.id}
-                          processo={example.processo}
-                          beneficiario={example.beneficiario}
-                          onClick={() => handleAppendProcess(example.processo)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
+                  ) : null}
 
-                <div className="space-y-3 rounded-radius-xl border border-border-default/70 bg-surface-subtle/40 p-3">
-                  <Textarea
-                    value={processInput}
-                    onChange={(event) => setProcessInput(event.target.value)}
-                    placeholder="Cole um ou mais numeros de processo, um por linha."
-                    className="min-h-[116px] resize-none rounded-radius-lg border-border-default bg-surface-card font-mono text-sm text-text-primary shadow-xs placeholder:font-ui placeholder:text-text-muted"
-                  />
-
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div className="flex items-center gap-2 font-ui text-xs text-text-secondary">
-                      <Badge variant="outline" className="border-border-default bg-surface-card text-text-secondary">
-                        {detectedProcesses.length} processo{detectedProcesses.length !== 1 ? 's' : ''}
-                      </Badge>
-                      <span></span>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button
-                        className="h-10 gap-2"
-                        onClick={() => void handleBatchResolve()}
-                        disabled={screenState === 'resolving'}
-                      >
-                        {screenState === 'resolving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                        Gerar minuta
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                {feedback ? (
-                  <div className={`rounded-radius-xl border px-4 py-3 font-ui text-sm ${feedbackClasses[feedbackTone]}`}>{feedback}</div>
-                ) : null}
-
-                {screenState === 'ambiguous' && pendingCandidates.length > 0 ? (
                   <div className="space-y-3 rounded-radius-xl border border-border-default/70 bg-surface-subtle/40 p-3">
-                    <div className="grid gap-3 lg:grid-cols-2">
-                      {pendingCandidates.map((candidate) => (
-                        <CandidateCard key={candidate.candidateId} candidate={candidate} onSelect={openContext} />
-                      ))}
+                    <Textarea
+                      value={processInput}
+                      onChange={(event) => setProcessInput(event.target.value)}
+                      placeholder="Cole um ou mais numeros de processo, um por linha."
+                      className="min-h-[116px] resize-none rounded-radius-lg border-border-default bg-surface-card font-mono text-sm text-text-primary shadow-xs placeholder:font-ui placeholder:text-text-muted"
+                    />
+
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div className="flex items-center gap-2 font-ui text-xs text-text-secondary">
+                        <Badge variant="outline" className="border-border-default bg-surface-card text-text-secondary">
+                          {detectedProcesses.length} processo{detectedProcesses.length !== 1 ? 's' : ''}
+                        </Badge>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button
+                          className="h-10 gap-2"
+                          onClick={() => void handleBatchResolve()}
+                          disabled={screenState === 'resolving'}
+                        >
+                          {screenState === 'resolving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                          Gerar minuta
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                ) : null}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
 
-        <Card className="overflow-hidden border-border-default/70 bg-surface-card shadow-soft">
+                  {feedback ? (
+                    <div className={`rounded-radius-xl border px-4 py-3 font-ui text-sm ${feedbackClasses[feedbackTone]}`}>{feedback}</div>
+                  ) : null}
+
+                  {screenState === 'ambiguous' && pendingCandidates.length > 0 ? (
+                    <div className="space-y-3 rounded-radius-xl border border-border-default/70 bg-surface-subtle/40 p-3">
+                      <div className="grid gap-3 lg:grid-cols-2">
+                        {pendingCandidates.map((candidate) => (
+                          <CandidateCard
+                            key={candidate.candidateId}
+                            candidate={candidate}
+                            onSelect={(selectedCandidate) =>
+                              openContext(selectedCandidate, {
+                                feedbackMessage: '1 minuta gerada.',
+                                feedbackTone: 'success',
+                              })
+                            }
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+        <Card ref={editorCardRef} className="overflow-hidden border-border-default/70 bg-surface-card shadow-soft">
           <CardContent className="p-0">
             <RichTextEditor
               content={editorContent}
@@ -471,14 +716,14 @@ export default function EditorDocumentos() {
           </CardContent>
         </Card>
 
-        {generatedDispatches.length > 1 ? (
+        {generatedDispatches.length > 0 ? (
           <Card className="overflow-hidden border-border-default/70 bg-surface-card shadow-soft">
             <CardContent className="bg-surface-subtle/40 px-4 py-3">
               <div className="mb-3 flex items-center gap-2 font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">
                 <Copy className="h-3.5 w-3.5" />
-                Copiar por despacho
+                {generatedDispatches.length > 1 ? 'Copiar por despacho' : 'Acoes da minuta'}
               </div>
-              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              <div className={cn('grid gap-2', generatedDispatches.length > 1 ? 'md:grid-cols-2 xl:grid-cols-3' : 'max-w-md')}>
                 {generatedDispatches.map((dispatch, index) => {
                   const isCopied = copiedDispatchIds.includes(dispatch.id);
                   const isCloned = clonedDispatchIds.includes(dispatch.id);
@@ -524,7 +769,7 @@ export default function EditorDocumentos() {
                           ].join(' ')}
                           onClick={() => handleCloneDispatch(dispatch)}
                         >
-                          {isCloned ? 'Clonado' : 'Clonar'}
+                          {isCloned ? 'Clonado' : 'Clonar no SUAP'}
                         </Button>
                       </div>
                     </div>
@@ -535,6 +780,253 @@ export default function EditorDocumentos() {
           </Card>
         ) : null}
       </div>
+
+      <Dialog open={Boolean(selectedProcess)} onOpenChange={(open) => !open && setSelectedProcessId(null)}>
+        <DialogContent className="w-[min(95vw,1140px)] max-w-none overflow-hidden border-none bg-white p-0 text-slate-900 shadow-2xl">
+          {selectedProcess ? (
+            <>
+              <DialogHeader className="relative space-y-1 border-b border-slate-100 bg-slate-50/80 p-4">
+                <div className="absolute left-0 top-0 h-1 w-full bg-cyan-500" />
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                    <div className="rounded-lg bg-cyan-100 p-1.5 text-cyan-600">
+                      <PanelRightOpen className="h-4.5 w-4.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <DialogTitle className="font-ui text-[24px] font-black tracking-tight text-slate-900">
+                          {selectedProcess.numProcesso || selectedProcess.suapId}
+                        </DialogTitle>
+                        <CopyValueButton
+                          value={selectedProcess.numProcesso || selectedProcess.suapId}
+                          message="Numero do processo copiado."
+                          className="h-7 w-7 border-slate-200 bg-white shadow-none"
+                        />
+                      </div>
+                      <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-600/70">
+                        Processo Sincronizado
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 text-right">
+                    <div className="flex items-center gap-2">
+                      <span className="font-ui text-[24px] font-black tracking-tight text-slate-900">
+                        {selectedProcess.suapId}
+                      </span>
+                      <CopyValueButton
+                        value={selectedProcess.suapId}
+                        message="SUAP ID copiado."
+                        className="h-7 w-7 border-slate-200 bg-white shadow-none"
+                      />
+                    </div>
+                    <p className="mt-0.5 text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                      SUAP ID
+                    </p>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <div className="bg-white p-4">
+                <div className="space-y-3">
+                <SidebarSection
+                  icon={<Building2 className="h-3.5 w-3.5" />}
+                  title="Beneficiario e assunto"
+                  contentClassName="space-y-3"
+                >
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <SidebarField label="Nome" value={selectedProcess.beneficiario || 'Nao extraido'} copyValue={selectedProcess.beneficiario} copyMessage="Beneficiario copiado." />
+                    <SidebarField
+                      label="Documento"
+                      value={selectedProcess.cpfCnpj ? formatarDocumento(selectedProcess.cpfCnpj) : 'Sem documento'}
+                      copyValue={selectedProcess.cpfCnpj}
+                      copyMessage="Documento copiado."
+                      mono
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <SidebarField
+                      label="Descricao"
+                      value={selectedProcess.assunto || 'Sem assunto extraido'}
+                      copyValue={selectedProcess.assunto}
+                      copyMessage="Assunto copiado."
+                    />
+                  </div>
+                </SidebarSection>
+
+                <SidebarSection
+                  icon={<Landmark className="h-3.5 w-3.5" />}
+                  title="Contrato, nota fiscal, bancos, retencoes e empenhos"
+                  contentClassName="space-y-3"
+                >
+                    <div className="space-y-2.5">
+                      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                        <SidebarField
+                          label="Contrato"
+                          value={selectedProcess.contrato || selectedProcess.dadosCompletos?.contrato_numero || '-'}
+                          copyValue={selectedProcess.contrato || selectedProcess.dadosCompletos?.contrato_numero}
+                          copyMessage="Contrato copiado."
+                        />
+                        <SidebarField
+                          label="Nota fiscal"
+                          value={selectedProcess.dadosCompletos?.notas_fiscais?.[0]?.numero || '-'}
+                          copyValue={selectedProcess.dadosCompletos?.notas_fiscais?.[0]?.numero}
+                          copyMessage="Numero da nota fiscal copiado."
+                          mono
+                        />
+                        <SidebarField
+                          label="Emissao"
+                          value={selectedProcess.dadosCompletos?.notas_fiscais?.[0]?.data_emissao || 'Sem data de emissao'}
+                          copyValue={selectedProcess.dadosCompletos?.notas_fiscais?.[0]?.data_emissao}
+                          copyMessage="Data de emissao copiada."
+                        />
+                        <SidebarField
+                          label="Valor"
+                          value={selectedProcess.dadosCompletos?.val_nf || '-'}
+                          copyValue={selectedProcess.dadosCompletos?.val_nf}
+                          copyMessage="Valor copiado."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2 xl:flex-row xl:items-start">
+                      <div className="min-w-0 flex-1 space-y-2.5">
+                        <p className="font-ui text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                          Dados bancarios
+                        </p>
+                        <div className="rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
+                          <div className="grid gap-2 md:grid-cols-3">
+                            <div className="flex items-start justify-between gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2">
+                              <div className="min-w-0">
+                                <p className="font-ui text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Banco</p>
+                                <p className="mt-0.5 break-words font-ui text-[13px] text-slate-900">
+                                  {selectedProcess.dadosCompletos?.dados_bancarios?.banco || 'Sem banco extraido'}
+                                </p>
+                              </div>
+                              <CopyValueButton
+                                value={selectedProcess.dadosCompletos?.dados_bancarios?.banco}
+                                message="Banco copiado."
+                                className="h-7 w-7 shrink-0 border-slate-200 bg-white shadow-none"
+                              />
+                            </div>
+
+                            <div className="flex items-start justify-between gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2">
+                              <div className="min-w-0">
+                                <p className="font-ui text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Agencia</p>
+                                <p className="mt-0.5 break-words font-mono text-[12px] font-semibold text-slate-900">
+                                  {selectedProcess.dadosCompletos?.dados_bancarios?.agencia || '-'}
+                                </p>
+                              </div>
+                              <CopyValueButton
+                                value={selectedProcess.dadosCompletos?.dados_bancarios?.agencia}
+                                message="Agencia copiada."
+                                className="h-7 w-7 shrink-0 border-slate-200 bg-white shadow-none"
+                              />
+                            </div>
+
+                            <div className="flex items-start justify-between gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2">
+                              <div className="min-w-0">
+                                <p className="font-ui text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Conta</p>
+                                <p className="mt-0.5 break-words font-mono text-[12px] font-semibold text-slate-900">
+                                  {selectedProcess.dadosCompletos?.dados_bancarios?.conta || '-'}
+                                </p>
+                              </div>
+                              <CopyValueButton
+                                value={selectedProcess.dadosCompletos?.dados_bancarios?.conta}
+                                message="Conta copiada."
+                                className="h-7 w-7 shrink-0 border-slate-200 bg-white shadow-none"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {(selectedProcess.dadosCompletos?.empenhos || []).length > 0 ? (
+                        <div className="min-w-0 xl:w-[38%] xl:max-w-[420px] space-y-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-ui text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                              Empenhos
+                            </p>
+                            <CopyValueButton value={(selectedProcess.dadosCompletos?.empenhos || []).join(', ')} message="Lista de empenhos copiada." className="h-7 w-7" />
+                          </div>
+                          <div className="flex flex-wrap gap-1.5 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
+                            {(selectedProcess.dadosCompletos?.empenhos || []).map((empenho) => (
+                              <div
+                                key={empenho}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1"
+                              >
+                                <span className="font-mono text-[12px] font-semibold text-text-primary">{empenho}</span>
+                                <CopyValueButton value={empenho} message="Empenho copiado." className="h-6 w-6 border-0 bg-transparent shadow-none" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {(selectedProcess.dadosCompletos?.retencoes_tributarias?.optante_simples_nacional ||
+                      visibleRetencoes.length > 0) ? (
+                      <>
+                        <div className="space-y-2.5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-ui text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                              Retencoes
+                            </p>
+                            {selectedProcess.dadosCompletos?.retencoes_tributarias?.optante_simples_nacional ? (
+                              <Badge variant="outline" className="border-warning/30 bg-warning/10 text-amber-900">
+                                Optante pelo Simples Nacional
+                              </Badge>
+                            ) : null}
+                          </div>
+
+                          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                            {visibleRetencoes.map(([label, value]) => (
+                              <SidebarField key={label} label={label} value={value || '-'} copyValue={value} copyMessage={`${label} copiado.`} />
+                            ))}
+                          </div>
+                        </div>
+
+                      </>
+                    ) : (
+                      <p className="font-ui text-sm text-slate-500">Nenhuma retencao extraida para este processo.</p>
+                    )}
+                  </SidebarSection>
+                </div>
+              </div>
+
+              <DialogFooter className="border-t border-slate-100 bg-slate-50/80 px-4 py-2.5 sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 gap-2 border-slate-200 bg-white px-3.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 shadow-sm shadow-slate-200/50 hover:bg-slate-100"
+                  onClick={() => window.open(selectedProcess.url, '_blank', 'noopener,noreferrer')}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Abrir no SUAP
+                </Button>
+                <Button
+                  type="button"
+                  className="h-9 gap-2 px-3.5 text-[10px] font-bold uppercase tracking-[0.16em]"
+                  onClick={() => void handleGenerateProcess(selectedProcess)}
+                  disabled={!selectedProcess.numProcesso}
+                >
+                  <FileText className="h-4 w-4" />
+                  Gerar Documento
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setSelectedProcessId(null)}
+                  className="border border-slate-200 bg-white px-6 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 shadow-sm shadow-slate-200/50 hover:bg-slate-100"
+                >
+                  Fechar
+                </Button>
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
