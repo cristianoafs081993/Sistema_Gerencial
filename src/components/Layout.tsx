@@ -193,18 +193,20 @@ export function Layout({ children }: LayoutProps) {
                         onClick={() => setSidebarOpen(false)}
                         className={cn(
                           'relative flex items-center rounded-xl transition-all duration-150',
-                          isCollapsed ? 'h-11 w-11 justify-center mx-auto' : 'px-3 py-[9px] gap-3',
+                          isCollapsed ? 'h-11 w-11 justify-center mx-auto' : 'px-3 py-[9px]',
                           active
                             ? 'bg-[#2f67d8] text-white shadow-[0_8px_16px_rgba(47,103,216,0.28)]'
                             : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700',
                         )}
                       >
-                        <item.icon
-                          className={cn(
-                            'h-[18px] w-[18px] shrink-0 transition-colors',
-                            active ? 'text-white' : 'text-slate-400',
-                          )}
-                        />
+                        {isCollapsed ? (
+                          <item.icon
+                            className={cn(
+                              'h-[18px] w-[18px] shrink-0 transition-colors',
+                              active ? 'text-white' : 'text-slate-400',
+                            )}
+                          />
+                        ) : null}
 
                         {!isCollapsed && (
                           <span className={cn('font-ui text-[13px] truncate flex-1', active ? 'font-semibold' : 'font-medium')}>{item.name}</span>

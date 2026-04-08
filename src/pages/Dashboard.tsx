@@ -8,7 +8,7 @@ import { HeaderActions } from '@/components/HeaderParts';
 import { DashboardCurrentTab } from '@/components/dashboard/DashboardCurrentTab';
 import { DashboardFiltersSheet } from '@/components/dashboard/DashboardFiltersSheet';
 import { DashboardRapTab } from '@/components/dashboard/DashboardRapTab';
-import { getRapSaldo, getReadableTextColor, mixHexColors } from '@/components/dashboard/utils';
+import { getRapALiquidar, getRapAPagar, getReadableTextColor, mixHexColors } from '@/components/dashboard/utils';
 import { useData } from '@/contexts/DataContext';
 import { extractDimensionCode, getDimensionLabel, matchesDimensionFilter } from '@/utils/dimensionFilters';
 
@@ -129,11 +129,11 @@ export default function Dashboard() {
   );
 
   const rapTotalInscrito = filteredData.empenhosRap.reduce((total, empenho) => total + (empenho.rapInscrito || 0), 0);
-  const rapTotalALiquidar = filteredData.empenhosRap.reduce(
-    (total, empenho) => total + getRapSaldo(empenho.rapALiquidar, empenho.saldoRapOficial),
+  const rapTotalALiquidar = filteredData.empenhosRap.reduce((total, empenho) => total + getRapALiquidar(empenho.rapALiquidar), 0);
+  const rapTotalLiquidado = filteredData.empenhosRap.reduce(
+    (total, empenho) => total + getRapAPagar(empenho.saldoRapOficial, empenho.rapInscrito, empenho.rapALiquidar, empenho.rapPago),
     0,
   );
-  const rapTotalLiquidado = filteredData.empenhosRap.reduce((total, empenho) => total + (empenho.rapLiquidado || 0), 0);
   const rapTotalPago = filteredData.empenhosRap.reduce((total, empenho) => total + (empenho.rapPago || 0), 0);
 
   const dadosPorOrigem = useMemo(() => {
@@ -326,8 +326,8 @@ export default function Dashboard() {
       const origem = empenho.origemRecurso || 'Sem origem';
       const item = map.get(origem) || { inscrito: 0, pago: 0 };
 
-      item.inscrito += empenho.valor || 0;
-      item.pago += empenho.valorPagoOficial || empenho.valorPago || 0;
+      item.inscrito += empenho.rapInscrito || 0;
+      item.pago += empenho.rapPago || 0;
 
       map.set(origem, item);
     });

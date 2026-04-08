@@ -53,7 +53,7 @@ export function DashboardRapTab({
           isLoading={isLoading}
         />
         <StatCard
-          title="Liquidado"
+          title="Liquidado / a pagar"
           value={formatCurrency(rapTotalLiquidado)}
           icon={Lock}
           stitchColor="purple"

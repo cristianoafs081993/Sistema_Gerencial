@@ -11,6 +11,13 @@ vi.mock('@/components/HeaderParts', () => ({
   HeaderActions: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
+vi.mock('@/components/ui/tabs', () => ({
+  Tabs: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  TabsList: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  TabsTrigger: ({ children }: { children: ReactNode }) => <button type="button">{children}</button>,
+  TabsContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}));
+
 vi.mock('@/components/dashboard/DashboardFiltersSheet', () => ({
   DashboardFiltersSheet: ({
     onFilterDimensaoChange,
@@ -58,13 +65,26 @@ vi.mock('@/components/dashboard/DashboardRapTab', () => ({
   DashboardRapTab: ({
     filteredRapCount,
     rapTotalInscrito,
+    rapTotalALiquidar,
+    rapTotalLiquidado,
+    rapTotalPago,
+    dadosRapPorOrigem,
   }: {
     filteredRapCount: number;
     rapTotalInscrito: number;
+    rapTotalALiquidar: number;
+    rapTotalLiquidado: number;
+    rapTotalPago: number;
+    dadosRapPorOrigem: Array<{ origem: string; inscrito: number; pago: number }>;
   }) => (
     <div data-testid="rap-tab">
       <span data-testid="rap-count">{filteredRapCount}</span>
       <span data-testid="rap-total-inscrito">{rapTotalInscrito}</span>
+      <span data-testid="rap-total-a-liquidar">{rapTotalALiquidar}</span>
+      <span data-testid="rap-total-liquidado">{rapTotalLiquidado}</span>
+      <span data-testid="rap-total-pago">{rapTotalPago}</span>
+      <span data-testid="rap-origem-inscrito">{dadosRapPorOrigem[0]?.inscrito ?? 0}</span>
+      <span data-testid="rap-origem-pago">{dadosRapPorOrigem[0]?.pago ?? 0}</span>
     </div>
   ),
 }));
@@ -240,5 +260,57 @@ describe('Dashboard', () => {
     expect(screen.getByTestId('current-planejado')).toHaveTextContent('300');
     expect(screen.getByTestId('current-empenhos-corrente')).toHaveTextContent('2');
     expect(screen.queryByText(/Dimensao ativa:/)).not.toBeInTheDocument();
+  });
+
+  it('usa os campos proprios de RAP no resumo por origem', async () => {
+    mockedUseData.mockReturnValue({
+      atividades: [],
+      empenhos: [
+        makeEmpenho({
+          id: 'rap-base',
+          numero: '2025NE0009',
+          tipo: 'rap',
+          origemRecurso: 'Tesouro',
+          valor: 999,
+          valorPagoOficial: 555,
+          rapInscrito: 120,
+          rapALiquidar: 30,
+          rapLiquidado: 90,
+          saldoRapOficial: 20,
+          rapPago: 70,
+        }),
+      ],
+      descentralizacoes: [],
+      contratos: [],
+      contratosEmpenhos: [],
+      creditosDisponiveis: [],
+      isLoading: false,
+      addAtividade: vi.fn(),
+      updateAtividade: vi.fn(),
+      deleteAtividade: vi.fn(),
+      addEmpenho: vi.fn(),
+      updateEmpenho: vi.fn(),
+      deleteEmpenho: vi.fn(),
+      addDescentralizacao: vi.fn(),
+      updateDescentralizacao: vi.fn(),
+      deleteDescentralizacao: vi.fn(),
+      getResumoOrcamentario: vi.fn(),
+      getTotalPlanejado: vi.fn(),
+      getTotalEmpenhado: vi.fn(),
+      getTotalDescentralizado: vi.fn(),
+      getADescentralizar: vi.fn(),
+      getSaldoTotal: vi.fn(),
+      refreshData: vi.fn(),
+    });
+
+    render(<Dashboard />);
+
+    expect(screen.getByTestId('rap-total-inscrito')).toHaveTextContent('120');
+    expect(screen.getByTestId('rap-total-a-liquidar')).toHaveTextContent('30');
+    expect(screen.getByTestId('rap-total-liquidado')).toHaveTextContent('20');
+    expect(screen.getByTestId('rap-total-pago')).toHaveTextContent('70');
+
+    expect(screen.getByTestId('rap-origem-inscrito')).toHaveTextContent('120');
+    expect(screen.getByTestId('rap-origem-pago')).toHaveTextContent('70');
   });
 });

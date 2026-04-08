@@ -80,6 +80,15 @@ Alguns services usam fallback para REST quando `supabase-js` falha ou retorna va
 
 `App.tsx` -> `Dashboard.tsx` -> `useData()` -> `DataContext` -> `useDataQueries` -> services -> Supabase
 
+Observacao para a aba RAP do dashboard:
+
+- os cards de topo devem usar os campos proprios de RAP do empenho
+- `inscrito`: `rapInscrito`
+- `a liquidar`: `rapALiquidar`
+- `liquidado / a pagar`: `saldoRapOficial` com fallback derivado quando ausente
+- `pago`: `rapPago`
+- nao reutilizar `valor` ou `valorPagoOficial` como substitutos desses totais na agregacao da aba RAP
+
 ### Financeiro
 
 `Financeiro.tsx` -> `parseFinanceiroCsv` / `saveFinanceiroRows` -> `financeiro_fonte_vinculacao`

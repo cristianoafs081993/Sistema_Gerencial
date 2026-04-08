@@ -13,7 +13,7 @@ export function ExecutionTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="min-w-[210px] rounded-2xl border border-border-default/70 bg-white/95 px-4 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.12)] backdrop-blur-sm">
+      <div className="min-w-[210px] rounded-2xl border border-border-default/65 bg-white/92 px-4 py-3 shadow-[0_12px_28px_rgba(15,23,42,0.08)] backdrop-blur-[2px]">
       <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">
         {label}
       </p>
@@ -45,7 +45,7 @@ export function BudgetHierarchyTooltip({
   if (!active || !item) return null;
 
   return (
-    <div className="min-w-[220px] rounded-2xl border border-border-default/70 bg-white/95 px-4 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.12)] backdrop-blur-sm">
+      <div className="min-w-[220px] rounded-2xl border border-border-default/65 bg-white/92 px-4 py-3 shadow-[0_12px_28px_rgba(15,23,42,0.08)] backdrop-blur-[2px]">
       <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">
         {item.nodeType === 'componente' ? 'Componente funcional' : 'Dimensao'}
       </p>
