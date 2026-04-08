@@ -38,6 +38,14 @@ Arquivos reais de operacao presentes em [docs](/C:/Users/crist/OneDrive/Desktop/
 - `Relatorio (3).xlsx`
 - `Relatorio (4).xlsx`
 
+## Observacoes importantes do dominio de descentralizacoes
+
+- o upload principal de `Descentralizacoes.tsx` agora pode receber as colunas `NC` e `NC - Operacao (Tipo)` alem das colunas historicas
+- quando a coluna `NC` vier completa, o parser consome a forma resumida no padrao `2026NC000001`
+- quando `NC - Operacao (Tipo)` indicar `ANULACAO DE DESCENTRALIZACAO DE CREDITO`, o valor de `NC Celula - Valor` deve entrar como negativo no upload principal
+- o botao `Importar Devolucoes` da mesma pagina continua sendo um fluxo separado e nao deve ser alterado em conjunto com o upload principal
+- esse segundo fluxo pode continuar recebendo valores negativos diretamente no CSV
+
 ## Regras gerais observadas no codigo
 
 - os parsers tentam lidar com UTF-8, UTF-16LE, UTF-16BE e em alguns casos Latin-1

@@ -6,6 +6,8 @@
 |---|---|---|---|---|---|
 | Financeiro | `Financeiro.tsx` | CSV/XLSX | `financeiroImportService.ts` | `financeiro_fonte_vinculacao` | Consolida saldo por fonte e vinculacao |
 | LC | `LC.tsx` | CSV/XLSX | `lcImportService.ts` | `lc_credores` | Tambem compara PDFs e gera macro SIAFI |
+| Descentralizacoes | `Descentralizacoes.tsx` | CSV | `handleCsvImport` em `Descentralizacoes.tsx` | `descentralizacoes` | Upload principal aceita `NC` e `NC - Operacao (Tipo)`; resume a NC para `2026NC000001`; quando a operacao for `ANULACAO DE DESCENTRALIZACAO DE CREDITO`, interpreta `NC Celula - Valor` como negativo |
+| Devolucoes de descentralizacoes | `Descentralizacoes.tsx` | CSV | `handleDevolucoesImport` + `descentralizacoesService.processDevolucao` | `descentralizacoes` | Fluxo separado do upload principal; nao reutiliza a logica de anulação do CSV principal e pode receber valores negativos diretamente |
 | PFs | `RastreabilidadePFs/index.tsx` | XLSX/XLS/CSV | `pfImportService.ts` | `pf_solicitacao`, `pf_aprovacao`, `pf_liberacao`, `pf_fonte_recurso` | Usa dois arquivos correlacionados |
 | Retencoes FD-Reinf | `RetencoesFdReinfDesign.tsx` | CSV | `retencoesEfdReinfImportService.ts` | `retencoes_efd_reinf` | UI aceita XLSX, parser atual nao |
 | Documentos habeis | `LiquidacoesPagamentos.tsx` | JSON/CSV tabulado | `transparencia.importDocumentosHabeis` | `documentos_habeis`, `documentos_habeis_itens`, `documentos_habeis_situacoes` | Usa `JsonImportDialog` |

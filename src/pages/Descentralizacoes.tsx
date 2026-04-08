@@ -29,9 +29,14 @@ import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { HeaderActions } from '@/components/HeaderParts';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { toast } from 'sonner';
-import { formatCurrency, parseCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 import { descentralizacoesService } from '@/services/descentralizacoes';
 import { matchesDimensionFilter } from '@/utils/dimensionFilters';
+import {
+    createDescentralizacaoImportIdentity,
+    shouldImportDescentralizacaoAsNegative,
+    summarizeNotaCredito,
+} from '@/utils/descentralizacoesImport';
 
 // Mapeamento de sufixo de PI para código de dimensão
 const PI_DIMENSAO_MAP: Record<string, string> = {
@@ -85,8 +90,6 @@ function parseValorBR(valorStr: string): number {
         .replace(',', '.');    // decimal separator
     return parseFloat(cleaned) || 0;
 }
-
-const normalizeKey = (key) => key.normalize('NFD').replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
 
 export default function Descentralizacoes() {
     const { descentralizacoes, isLoading, addDescentralizacao, refreshData } = useData();
@@ -159,13 +162,14 @@ export default function Descentralizacoes() {
 
 
     const handleCsvImport = (data: Record<string, string>[]) => {
-        // Build deduplication set from existing records (in memory)
-        const existingKeys = new Set(
+        // Build deduplication set from existing persisted records.
+        const existingBaseKeys = new Set(
             descentralizacoes.map(d => {
                 const dateStr = d.dataEmissao ? d.dataEmissao.toISOString().split('T')[0] : '';
                 return `${dateStr}|${(d.planoInterno || '').trim().toUpperCase()}|${(d.origemRecurso || '').trim()}|${(d.naturezaDespesa || '').trim()}|${d.valor}`;
             })
         );
+        const importedRowKeys = new Set<string>();
 
         let importCount = 0;
         let skipCount = 0;
@@ -185,9 +189,18 @@ export default function Descentralizacoes() {
         };
 
         data.forEach((row) => {
-            // O JsonImportDialog normaliza headers removendo acentos e tudo que não é [a-z0-9].
-            // Para os seus arquivos, as chaves mais comuns ficam como: ncdiaemissao, ncdescricao,
-            // nccelulaptres, nccelulanaturezadespesa, nccelulaplanointerno, nccelulavalor.
+            // O JsonImportDialog normaliza headers removendo acentos e tudo que nao e [a-z0-9].
+            // Para os arquivos novos, as chaves mais comuns ficam como: nc, ncoperacaotipo,
+            // ncdiaemissao, ncdescricao, nccelulaptres, nccelulanaturezadespesa,
+            // nccelulaplanointerno, nccelulavalor.
+            const notaCredito = summarizeNotaCredito(
+                findValue(row, [/^nc$/i, /notacredito/i, /notadecredito/i], ['nc', 'notacredito', 'notadecredito']),
+            );
+            const operacaoTipo = findValue(
+                row,
+                [/operacaotip/i, /tipooperacao/i, /operacao/i],
+                ['ncoperacaotipo', 'operacaotipo', 'tipooperacao'],
+            );
             const planoInterno = findValue(row, [/planointern/i, /plano/i], ['nccelulaplanointerno', 'planointerno', 'plano_interno', 'plano']);
             const origemRecurso = findValue(row, [/ptres/i, /origemrecurso/i, /origem/i], ['nccelulaptres', 'origemrecurso', 'origem_recurso', 'ptres']);
             const naturezaDespesa = findValue(row, [/naturezadesp/i, /natureza/i], ['nccelulanaturezadespesa', 'naturezadespesa', 'natureza_despesa', 'natureza']);
@@ -200,17 +213,21 @@ export default function Descentralizacoes() {
             const ndNorm = naturezaDespesa.trim();
             let valor = parseValorBR(valorStr || '0');
 
-            // Se for devolução, o valor deve ser negativo
-            const isDevolucao = descricao.toUpperCase().includes('DEVOLUCAO');
-            if (isDevolucao) {
+            if (shouldImportDescentralizacaoAsNegative({ operationType: operacaoTipo, description: descricao })) {
                 valor = -Math.abs(valor);
             }
 
-            // Check for duplicate (date + PI + PTRES + ND + valor)
             const dataEmissao = parseDateBR(dataEmissaoStr);
             const dateKey = dataEmissao ? dataEmissao.toISOString().split('T')[0] : '';
-            const key = `${dateKey}|${piNorm}|${orNorm}|${ndNorm}|${valor}`;
-            if (existingKeys.has(key)) {
+            const { baseKey, rowKey } = createDescentralizacaoImportIdentity({
+                dateKey,
+                planoInterno: piNorm,
+                origemRecurso: orNorm,
+                naturezaDespesa: ndNorm,
+                valor,
+                notaCredito,
+            });
+            if (existingBaseKeys.has(baseKey) || importedRowKeys.has(rowKey)) {
                 skipCount++;
                 return;
             }
@@ -232,7 +249,7 @@ export default function Descentralizacoes() {
 
             if (valor !== 0) {
                 addDescentralizacao(descentralizacao);
-                existingKeys.add(key); // prevent duplicates within the same CSV
+                importedRowKeys.add(rowKey);
                 importCount++;
             }
         });
@@ -335,12 +352,9 @@ export default function Descentralizacoes() {
         toast.success(`${importCount} devolução(ões) processada(s), ${skipCount} linha(s) ignorada(s).`);
     };
 
-    const processDevolucao = (devolucao: Record<string, unknown>) => {
-        // Implementar lógica para ajustar os saldos com base nas devoluções
-        console.log("Processando devolução:", devolucao);
-    };
-
     const descentralizacoesCsvFields = [
+        'NC',
+        'NC - Operacao (Tipo)',
         'NC - Dia Emissão',
         'NC - Descrição',
         'NC Célula - PTRES',
