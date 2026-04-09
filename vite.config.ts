@@ -59,7 +59,7 @@ function getManualChunk(id: string) {
     packageName.startsWith("d3-") ||
     packageName === "react-smooth"
   ) {
-    return "charts-vendor";
+    return "react-vendor";
   }
 
   if (packageName.startsWith("@supabase/") || packageName === "postgres") {
