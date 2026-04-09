@@ -76,10 +76,6 @@ const navigationSections: NavigationSection[] = [
 ];
 
 const navigation = navigationSections.flatMap((section) => section.items);
-const initialSectionState = navigationSections.reduce<Record<string, boolean>>((acc, section) => {
-  acc[section.title] = true;
-  return acc;
-}, {});
 
 function isPathActive(pathname: string, href: string) {
   if (href === '/') return pathname === '/';
@@ -90,7 +86,16 @@ export function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem('sidebar-collapsed') === 'true');
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(initialSectionState);
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => {
+    const activeSection = navigationSections.find((section) =>
+      section.items.some((item) => isPathActive(location.pathname, item.href)),
+    );
+
+    return navigationSections.reduce<Record<string, boolean>>((acc, section) => {
+      acc[section.title] = section.title === activeSection?.title;
+      return acc;
+    }, {});
+  });
 
   const isConsultor = location.pathname === '/consultor';
 
@@ -124,7 +129,7 @@ export function Layout({ children }: LayoutProps) {
 
         <aside
           className={cn(
-            'fixed inset-y-0 left-0 z-50 border-r border-slate-200 bg-white text-slate-600 shadow-lifted transition-all duration-300 ease-spring lg:relative lg:translate-x-0 group',
+            'fixed inset-y-0 left-0 z-50 flex flex-col overflow-hidden border-r border-slate-200 bg-white text-slate-600 shadow-lifted transition-all duration-300 ease-spring lg:relative lg:translate-x-0 group',
             sidebarOpen ? 'translate-x-0' : '-translate-x-full',
             isCollapsed ? 'w-56 lg:w-[84px]' : 'w-[248px]',
           )}
@@ -160,7 +165,7 @@ export function Layout({ children }: LayoutProps) {
             </Button>
           </div>
 
-          <nav className="h-[calc(100vh-4rem)] overflow-y-auto px-2.5 py-3 scrollbar-thin bg-white">
+          <nav className="min-h-0 flex-1 overflow-y-auto px-2.5 py-3 scrollbar-thin bg-white">
             {navigationSections.map((section, sectionIndex) => {
               const open = isCollapsed ? true : (expandedSections[section.title] ?? true);
 

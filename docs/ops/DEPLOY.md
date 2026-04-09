@@ -32,6 +32,20 @@ Definidos em [vercel.json](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Pr
 - `/api-contratos/:path*` -> `https://contratos.comprasnet.gov.br/:path*`
 - fallback SPA -> `/index.html`
 
+## Fallback estatico para rotas SPA
+
+O build tambem gera entradas estaticas por rota em `dist/<rota>/index.html` e um `dist/404.html` baseado no shell da SPA.
+
+Objetivo:
+
+- evitar 404 em acesso direto ou refresh de rotas como `/consultor`, `/editor-documentos` e similares
+- reduzir dependencia exclusiva do rewrite do host
+
+Implementacao:
+
+- script: [generate-spa-fallbacks.mjs](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/scripts/generate-spa-fallbacks.mjs)
+- acionado por `npm run build`
+
 ## Diferenca entre dev e producao
 
 ### Em dev
