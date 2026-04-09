@@ -196,3 +196,28 @@ Arquivos:
 - `lcImportService.ts`
 - `pfImportService.ts`
 - `retencoesEfdReinfImportService.ts`
+
+## 10. Gmail + Google Apps Script + Edge Function `ingest-email-csv`
+
+Uso:
+
+- leitura automatica de e-mails com anexo `.csv`
+- roteamento do arquivo para o parser correto
+- persistencia com idempotencia e trilha de execucao
+
+Documentacao detalhada:
+
+- [GMAIL_CSV_INGESTION.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/integrations/GMAIL_CSV_INGESTION.md)
+
+Arquivos:
+
+- [ingest-email-csv/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/ingest-email-csv/index.ts)
+- [emailCsvIngestion.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/lib/emailCsvIngestion.ts)
+- [gmailCsvIngress.gs](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/scripts/google-apps-script/gmailCsvIngress.gs)
+
+Credenciais/segredos:
+
+- `SUPABASE_ANON_KEY` no Apps Script para invocar a function
+- `EMAIL_CSV_INGEST_SECRET` no Apps Script e na Edge Function
+- `SUPABASE_SERVICE_ROLE_KEY` na Edge Function para gravacao no banco
+- opcional `EMAIL_CSV_ALLOWED_SENDERS` para restringir remetentes

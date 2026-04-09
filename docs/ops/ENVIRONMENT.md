@@ -33,6 +33,26 @@ Necessarias no ambiente do Supabase:
 - `OPENAI_API_KEY`
 - opcional: `OPENAI_VISION_MODEL`
 
+### `ingest-email-csv`
+
+Necessarias no ambiente do Supabase:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `EMAIL_CSV_INGEST_SECRET`
+- opcional: `EMAIL_CSV_ALLOWED_SENDERS`
+
+Necessarias no Apps Script que varre o Gmail:
+
+- `SUPABASE_FUNCTION_URL`
+- `SUPABASE_ANON_KEY`
+- `EMAIL_CSV_INGEST_SECRET`
+- opcionais:
+  - `GMAIL_CSV_QUERY`
+  - `GMAIL_CSV_SUCCESS_LABEL`
+  - `GMAIL_CSV_ERROR_LABEL`
+  - `GMAIL_CSV_BATCH_SIZE`
+  - `GMAIL_CSV_PIPELINE_HINT`
+
 ### Consultor
 
 O frontend chama a function `consultor`, mas a implementacao nao foi localizada neste repo nesta rodada.
@@ -61,3 +81,4 @@ Separar conceitualmente:
 - variaveis necessarias para rodar o frontend
 - variaveis necessarias para publicar Edge Functions
 - variaveis de ferramentas externas que nao sao essenciais ao sistema
+- propriedades do Apps Script usadas para integracoes Gmail

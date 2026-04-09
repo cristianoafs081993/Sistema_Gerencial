@@ -53,3 +53,10 @@ Arquivos reais de operacao presentes em [docs](/C:/Users/crist/OneDrive/Desktop/
 - alguns modulos procuram o cabecalho real pela presenca de palavras-chave
 - alguns modulos aceitam XLSX na UI, mas nao necessariamente no parser real
 - parte da importacao usa heuristicas de normalizacao de colunas
+
+## Automacao por e-mail
+
+- a automacao por Gmail foi centralizada na Edge Function `ingest-email-csv`
+- o roteamento do anexo depende do assunto, do nome do arquivo e do cabecalho real do CSV
+- hoje o fluxo automatizado cobre os pipelines CSV de arquivo unico
+- PFs continuam fora da automacao porque exigem correlacao entre dois arquivos

@@ -50,6 +50,7 @@ Para mudancas sensiveis, confirme sempre nas migrations em [supabase/migrations]
 - `financeiro_fonte_vinculacao`
 - `lc_credores`
 - `retencoes_efd_reinf`
+- `email_csv_ingestion_runs`
 
 ## Views identificadas nas migrations
 

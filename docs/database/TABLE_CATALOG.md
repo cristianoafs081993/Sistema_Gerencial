@@ -262,3 +262,9 @@ Consumido por:
 ### `retencoes_efd_reinf`
 
 - base dedicada de auditoria FD-Reinf
+
+### `email_csv_ingestion_runs`
+
+- trilha operacional da ingestao automatica de anexos CSV vindos do Gmail
+- guarda `message_id`, hash do anexo, pipeline detectado, status, volumetria e erro
+- usada para idempotencia e auditoria da automacao por e-mail

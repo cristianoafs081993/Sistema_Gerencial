@@ -15,6 +15,7 @@
 | Ordens bancarias | `LiquidacoesPagamentos.tsx` | JSON/CSV tabulado | `transparencia.importOrdensBancarias` | `documentos_habeis_itens` e `documentos_habeis` | Atualiza pagos |
 | Situacoes / Retencoes | `LiquidacoesPagamentos.tsx` | JSON/CSV tabulado | `retencoes.upsertSituacoesBatch` | `documentos_habeis_situacoes` | Regras de retencao derivadas da situacao |
 | Creditos disponiveis | `Empenhos.tsx` | JSON/CSV tabulado | `transparencia.importCreditosDisponiveis` | `creditos_disponiveis` | Usa parser generico |
+| Ingestao automatica por Gmail | `Gmail + Apps Script` | CSV | `ingest-email-csv` | `email_csv_ingestion_runs` + tabela final do pipeline | Roteia anexos CSV para os parsers server-side; exige `EMAIL_CSV_INGEST_SECRET`; suporta os pipelines CSV de arquivo unico |
 
 ## Dialogos e componentes reutilizados
 
