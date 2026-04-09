@@ -38,7 +38,7 @@ function getManualChunk(id: string) {
     packageName.startsWith("@tiptap/") ||
     packageName.startsWith("prosemirror-")
   ) {
-    return "editor-vendor";
+    return "react-vendor";
   }
 
   if (
