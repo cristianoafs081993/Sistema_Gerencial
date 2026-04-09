@@ -31,7 +31,7 @@ function getManualChunk(id: string) {
   }
 
   if (packageName.startsWith("@radix-ui/") || packageName === "vaul") {
-    return "radix-vendor";
+    return "react-vendor";
   }
 
   if (
@@ -51,7 +51,7 @@ function getManualChunk(id: string) {
     packageName.startsWith("remark-") ||
     packageName.startsWith("rehype-")
   ) {
-    return "markdown-vendor";
+    return "react-vendor";
   }
 
   if (
