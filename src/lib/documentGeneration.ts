@@ -1,4 +1,5 @@
 ﻿import { supabase } from '@/lib/supabase';
+import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { formatCurrency, formatDocumentoId, formatarDocumento, parseCurrency } from '@/lib/utils';
 import type {
   Contrato,
@@ -42,6 +43,18 @@ type SuapProcessoLite = Pick<
   SuapProcesso,
   'id' | 'suapId' | 'status' | 'numProcesso' | 'beneficiario' | 'cpfCnpj' | 'assunto' | 'contrato' | 'dadosCompletos'
 >;
+
+type SuapProcessoLiteRow = {
+  id: string;
+  suap_id: string;
+  status: string;
+  num_processo?: string | null;
+  beneficiario?: string | null;
+  cpf_cnpj?: string | null;
+  assunto?: string | null;
+  contrato?: string | null;
+  dados_completos?: SuapDadosCompletos | null;
+};
 
 type ContratoApiLite = {
   id: string;
@@ -349,17 +362,7 @@ const toSourceLabel = (tableName: string) => {
   }
 };
 
-const mapSuapProcessoLite = (row: {
-  id: string;
-  suap_id: string;
-  status: string;
-  num_processo?: string | null;
-  beneficiario?: string | null;
-  cpf_cnpj?: string | null;
-  assunto?: string | null;
-  contrato?: string | null;
-  dados_completos?: SuapDadosCompletos | null;
-}): SuapProcessoLite => ({
+const mapSuapProcessoLite = (row: SuapProcessoLiteRow): SuapProcessoLite => ({
   id: row.id,
   suapId: row.suap_id,
   status: row.status,
@@ -370,6 +373,33 @@ const mapSuapProcessoLite = (row: {
   contrato: row.contrato || undefined,
   dadosCompletos: row.dados_completos || undefined,
 });
+
+const fetchSuapProcessosBroad = async () => {
+  try {
+    const broad = await supabase
+      .from('processos')
+      .select(PROCESSOS_SELECT)
+      .limit(250);
+
+    if (broad.error) {
+      throw broad.error;
+    }
+
+    if (broad.data && broad.data.length > 0) {
+      return (broad.data || []).map((row) => mapSuapProcessoLite(row as SuapProcessoLiteRow));
+    }
+
+    console.warn('documentGeneration.fetchSuapProcessosBroad: resultado vazio via supabase-js, consultando REST');
+  } catch (error) {
+    console.warn('documentGeneration.fetchSuapProcessosBroad: fallback para Supabase REST', error);
+  }
+
+  const fallbackData = await fetchSupabaseRestRows<SuapProcessoLiteRow>('processos', PROCESSOS_SELECT, {
+    limit: 250,
+  });
+
+  return fallbackData.map(mapSuapProcessoLite);
+};
 
 const findEmpenhoLocally = (
   resources: ResolverResources,
@@ -952,15 +982,9 @@ const fetchDocumentosByIntent = async (intent: DocumentIntent) => {
 
 const fetchSuapProcessosByIntent = async (intent: DocumentIntent) => {
   if (intent.lookupType === 'processo') {
-    const broad = await supabase
-      .from('processos')
-      .select(PROCESSOS_SELECT)
-      .limit(250);
-
-    if (broad.error) throw broad.error;
-
+    const broad = await fetchSuapProcessosBroad();
     return filterByNormalizedProcess(
-      (broad.data || []).map((row) => mapSuapProcessoLite(row as never)),
+      broad,
       (item) => item.numProcesso,
       intent.lookupValue,
     ).slice(0, 12);
@@ -974,20 +998,14 @@ const fetchSuapProcessosByIntent = async (intent: DocumentIntent) => {
       .in('cpf_cnpj', lookupVariants)
       .limit(12);
 
-    if (!error) return (data || []).map((row) => mapSuapProcessoLite(row as never));
+    if (!error) return (data || []).map((row) => mapSuapProcessoLite(row as SuapProcessoLiteRow));
   } catch {
     // cai para a estrategia tolerante abaixo
   }
 
-  const broad = await supabase
-    .from('processos')
-    .select(PROCESSOS_SELECT)
-    .limit(250);
-
-  if (broad.error) throw broad.error;
-
+  const broad = await fetchSuapProcessosBroad();
   return filterByNormalizedDocumento(
-    (broad.data || []).map((row) => mapSuapProcessoLite(row as never)),
+    broad,
     (item) => item.cpfCnpj,
     intent.lookupValue,
   ).slice(0, 12);

@@ -231,12 +231,16 @@ function ExampleProcessRow({
   onPreview,
   onAppend,
   isSelected,
+  appendDisabled = false,
+  appendTitle = 'Adicionar ao lote',
 }: {
   processo: string;
   beneficiario?: string;
   onPreview: () => void;
   onAppend: () => void;
   isSelected: boolean;
+  appendDisabled?: boolean;
+  appendTitle?: string;
 }) {
   return (
     <div
@@ -266,10 +270,11 @@ function ExampleProcessRow({
         type="button"
         variant="outline"
         size="sm"
-        className="h-9 w-9 shrink-0 rounded-radius-md border-border-default bg-surface-card p-0 text-text-primary"
+        className="h-9 w-9 shrink-0 rounded-radius-md border-border-default bg-surface-card p-0 text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
         onClick={onAppend}
-        aria-label="Gerar documento"
-        title="Gerar documento"
+        aria-label={appendTitle}
+        title={appendTitle}
+        disabled={appendDisabled}
       >
         <Pencil className="h-3.5 w-3.5" />
       </Button>
@@ -323,7 +328,11 @@ export default function EditorDocumentos() {
 
   const activeDocument = documentDefinitions[0];
 
-  const { data: syncedProcesses = [] } = useQuery({
+  const {
+    data: syncedProcesses = [],
+    isLoading: isLoadingSyncedProcesses,
+    isError: isSyncedProcessesError,
+  } = useQuery({
     queryKey: ['suap-processos', 'editor-exemplos'],
     queryFn: suapProcessosService.getAll,
     staleTime: 30000,
@@ -333,11 +342,21 @@ export default function EditorDocumentos() {
 
   const exampleProcesses = useMemo<ExampleProcessCard[]>(
     () =>
-      syncedProcesses
-        .filter((processo) => processo.numProcesso)
+      [...syncedProcesses]
+        .filter((processo) => processo.numProcesso || processo.suapId)
+        .sort((left, right) => {
+          const leftHasProcessNumber = Boolean(left.numProcesso?.trim());
+          const rightHasProcessNumber = Boolean(right.numProcesso?.trim());
+
+          if (leftHasProcessNumber !== rightHasProcessNumber) {
+            return Number(rightHasProcessNumber) - Number(leftHasProcessNumber);
+          }
+
+          return (right.updatedAt?.getTime() || 0) - (left.updatedAt?.getTime() || 0);
+        })
         .map((processo) => ({
           id: processo.id,
-          processo: processo.numProcesso!.trim(),
+          processo: processo.numProcesso?.trim() || `SUAP ${processo.suapId}`,
           beneficiario: processo.beneficiario || processo.assunto,
           processoCompleto: processo,
         })),
@@ -400,10 +419,12 @@ export default function EditorDocumentos() {
     focusEditor();
   };
 
-  const handleAppendProcess = (processo: string) => {
-    const processValue = processo.trim();
+  const handleAppendProcess = (processo: SuapProcesso) => {
+    const processValue = processo.numProcesso?.trim();
 
     if (!processValue) {
+      setSelectedProcessId(processo.id);
+      toast.info('Este processo ainda nao possui numero sincronizado para entrar no lote. Gere a minuta individualmente pelos detalhes.');
       return;
     }
 
@@ -525,13 +546,15 @@ export default function EditorDocumentos() {
   };
 
   const handleGenerateProcess = async (processo: SuapProcesso) => {
-    const processValue = processo.numProcesso?.trim();
+    const processValue = processo.numProcesso?.trim() || processo.suapId.trim();
 
     if (!processValue) {
       return;
     }
 
-    setProcessInput(processValue);
+    if (processo.numProcesso?.trim()) {
+      setProcessInput(processo.numProcesso.trim());
+    }
     setPendingCandidates([]);
     setFeedback('');
     setScreenState('resolving');
@@ -627,12 +650,40 @@ export default function EditorDocumentos() {
                               beneficiario={example.beneficiario}
                               isSelected={selectedProcessId === example.id}
                               onPreview={() => setSelectedProcessId(example.id)}
-                              onAppend={() => handleAppendProcess(example.processo)}
+                              onAppend={() => handleAppendProcess(example.processoCompleto)}
+                              appendDisabled={!example.processoCompleto.numProcesso?.trim()}
+                              appendTitle={
+                                example.processoCompleto.numProcesso?.trim()
+                                  ? 'Adicionar ao lote'
+                                  : 'Numero de processo indisponivel para lote'
+                              }
                             />
                           ))}
                           </div>
                         </div>
                       </div>
+                    </div>
+                  ) : null}
+
+                  {isLoadingSyncedProcesses ? (
+                    <div className="rounded-radius-xl border border-border-default/70 bg-surface-subtle/35 px-4 py-3">
+                      <p className="font-ui text-sm text-text-secondary">Carregando processos sincronizados...</p>
+                    </div>
+                  ) : null}
+
+                  {!isLoadingSyncedProcesses && !isSyncedProcessesError && exampleProcesses.length === 0 ? (
+                    <div className="rounded-radius-xl border border-dashed border-border-default/70 bg-surface-subtle/35 px-4 py-3">
+                      <p className="font-ui text-sm text-text-secondary">
+                        Nenhum processo sincronizado disponivel para atalho no modo publico. Continue colando os numeros de processo manualmente.
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {isSyncedProcessesError ? (
+                    <div className="rounded-radius-xl border border-warning/20 bg-warning/10 px-4 py-3">
+                      <p className="font-ui text-sm text-amber-900">
+                        Nao foi possivel carregar a lista publica de processos sincronizados agora. A geracao manual continua disponivel.
+                      </p>
                     </div>
                   ) : null}
 
@@ -782,7 +833,7 @@ export default function EditorDocumentos() {
       </div>
 
       <Dialog open={Boolean(selectedProcess)} onOpenChange={(open) => !open && setSelectedProcessId(null)}>
-        <DialogContent className="w-[min(95vw,1140px)] max-w-none overflow-hidden border-none bg-white p-0 text-slate-900 shadow-2xl">
+        <DialogContent className="grid max-h-[calc(100dvh-2rem)] w-[min(95vw,1140px)] max-w-none grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden border-none bg-white p-0 text-slate-900 shadow-2xl">
           {selectedProcess ? (
             <>
               <DialogHeader className="relative space-y-1 border-b border-slate-100 bg-slate-50/80 p-4">
@@ -827,7 +878,7 @@ export default function EditorDocumentos() {
                 </div>
               </DialogHeader>
 
-              <div className="bg-white p-4">
+              <div className="min-h-0 overflow-y-auto bg-white p-4">
                 <div className="space-y-3">
                 <SidebarSection
                   icon={<Building2 className="h-3.5 w-3.5" />}
@@ -995,7 +1046,7 @@ export default function EditorDocumentos() {
                 </div>
               </div>
 
-              <DialogFooter className="border-t border-slate-100 bg-slate-50/80 px-4 py-2.5 sm:justify-end">
+              <DialogFooter className="shrink-0 border-t border-slate-100 bg-slate-50/80 px-4 py-2.5 sm:justify-end">
                 <Button
                   type="button"
                   variant="outline"

@@ -54,7 +54,7 @@ const navigationSections: NavigationSection[] = [
     items: [
       { name: 'Liquidacoes', href: '/liquidacoes-pagamentos', icon: Banknote },
       { name: 'Financeiro', href: '/financeiro', icon: ClipboardList },
-      { name: 'LC', href: '/lc', icon: ClipboardList },
+      { name: 'Lista de Credores', href: '/lc', icon: ClipboardList },
       { name: 'Retencoes EFD-Reinf', href: '/retencoes-efd-reinf', icon: ShieldAlert },
       { name: 'Rastreabilidade de PFs', href: '/rastreabilidade-pfs', icon: ClipboardList },
       { name: 'Conciliacao de PFs', href: '/conciliacao-pfs', icon: ScanSearch },
@@ -68,9 +68,8 @@ const navigationSections: NavigationSection[] = [
     title: 'Documentos',
     items: [
       { name: 'Gerador de Documentos', href: '/gerador-documentos', icon: Wand2 },
-      { name: 'Editor de Documentos (IA)', href: '/editor-documentos', icon: Bot },
-      { name: 'Consultor Juridico IA', href: '/consultor', icon: MessageSquare },
-      { name: 'Espelho SUAP', href: '/suap', icon: FileSearch },
+      { name: 'Editor de Documentos', href: '/editor-documentos', icon: Bot },
+      { name: 'Consultor Juridico', href: '/consultor', icon: MessageSquare },
     ],
   },
 ];

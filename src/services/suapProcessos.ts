@@ -4,6 +4,7 @@ import {
   SuapProcesso,
   SuapWorkflowConclusao,
 } from '@/types';
+import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { supabase } from '@/lib/supabase';
 
 type SuapProcessoRow = {
@@ -75,13 +76,28 @@ const upsertWorkflow = async (processoId: string, dadosCompletos: SuapDadosCompl
 
 export const suapProcessosService = {
   async getAll(): Promise<SuapProcesso[]> {
+    const fetchFallback = async () => {
+      const fallbackData = await fetchSupabaseRestRows<SuapProcessoRow>('processos', PROCESSOS_SELECT, {
+        orderBy: 'updated_at',
+        ascending: false,
+      });
+
+      return fallbackData.map(mapProcessoRow);
+    };
+
     const { data, error } = await supabase
       .from('processos')
       .select(PROCESSOS_SELECT)
       .order('updated_at', { ascending: false });
 
     if (error) {
-      throw error;
+      console.warn('suapProcessosService.getAll: fallback para Supabase REST', error);
+      return fetchFallback();
+    }
+
+    if (!data || data.length === 0) {
+      console.warn('suapProcessosService.getAll: resultado vazio via supabase-js, consultando REST');
+      return fetchFallback();
     }
 
     return ((data as SuapProcessoRow[] | null) || []).map(mapProcessoRow);

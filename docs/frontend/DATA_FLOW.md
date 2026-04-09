@@ -73,6 +73,7 @@ Alguns services usam fallback para REST quando `supabase-js` falha ou retorna va
 - [empenhos.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/empenhos.ts)
 - [descentralizacoes.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/descentralizacoes.ts)
 - [rastreabilidadePFs.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/rastreabilidadePFs.ts)
+- [suapProcessos.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/suapProcessos.ts)
 
 ## Exemplos de fluxo
 
@@ -107,6 +108,15 @@ Observacao para a aba RAP do dashboard:
 ### Documentos habeis
 
 `LiquidacoesPagamentos.tsx` -> `JsonImportDialog` -> `transparenciaService.import*` -> `documentos_habeis*`
+
+### Editor de Documentos
+
+`EditorDocumentos.tsx` -> `suapProcessosService.getAll` -> `processos`
+
+Observacoes:
+
+- a grade de processos sincronizados do editor tenta leitura publica via `supabase-js` e cai para REST anonimo quando necessario
+- a tela [Suap.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Suap.tsx) continua com sessao propria porque o modulo tambem executa acoes autenticadas de conclusao e reabertura
 
 ## Regras de cautela
 

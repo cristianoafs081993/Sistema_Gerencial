@@ -3,6 +3,7 @@ import { getSupabaseEnv } from './env';
 type RestQueryOptions = {
   orderBy?: string;
   ascending?: boolean;
+  limit?: number;
 };
 
 export async function fetchSupabaseRestRows<T>(
@@ -17,6 +18,10 @@ export async function fetchSupabaseRestRows<T>(
 
   if (options.orderBy) {
     url.searchParams.set('order', `${options.orderBy}.${options.ascending ? 'asc' : 'desc'}`);
+  }
+
+  if (typeof options.limit === 'number') {
+    url.searchParams.set('limit', String(options.limit));
   }
 
   const response = await fetch(url.toString(), {
