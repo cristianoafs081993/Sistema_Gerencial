@@ -35,8 +35,6 @@ const statusLabel: Record<PendenciaStatus, string> = {
 
 export default function LCPage() {
   const [rows, setRows] = useState<LCRegistro[]>([]);
-  const [showConsolidado, setShowConsolidado] = useState(true);
-  const [fileName, setFileName] = useState('');
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isComparingPdf, setIsComparingPdf] = useState(false);
@@ -59,13 +57,18 @@ export default function LCPage() {
   const pageSize = 100;
 
   const onlyDigits = (value: string) => (value || '').replace(/\D/g, '');
+  const normalizeSearchValue = (value: string) =>
+    (value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
 
   const loadLatest = async () => {
     try {
       setIsLoadingInitial(true);
       const latest = await loadLatestLCRowsFromDb();
       setRows(latest.rows);
-      setFileName(latest.sourceFile);
     } catch (error) {
       console.error('Erro ao carregar LC do banco:', error);
     } finally {
@@ -85,7 +88,6 @@ export default function LCPage() {
       const parsed = await parseLCCsv(file);
       await saveLCRows(parsed, file.name);
       setRows(parsed);
-      setFileName(file.name);
       setPageLC(1);
     } catch (error) {
       console.error('Erro ao importar LC:', error);
@@ -96,62 +98,71 @@ export default function LCPage() {
   };
 
   const consolidatedRows = useMemo(() => {
-    const byCpf = new Map<string, LCRegistro>();
+    const byCpf = new Map<string, LCRegistro[]>();
+
+    const pickPreferredRow = (current: LCRegistro, candidate: LCRegistro) => {
+      const shouldReplace =
+        (!current.contaBancaria && !!candidate.contaBancaria) ||
+        (!current.favorecidoNome && !!candidate.favorecidoNome) ||
+        (!current.bancoCodigo && !!candidate.bancoCodigo) ||
+        (!current.agenciaCodigo && !!candidate.agenciaCodigo);
+
+      return shouldReplace ? candidate : current;
+    };
 
     for (const row of rows) {
       const key = onlyDigits(row.favorecidoDocumento) || row.favorecidoDocumento.trim();
       if (!key) continue;
 
-      const existing = byCpf.get(key);
-      if (!existing) {
-        byCpf.set(key, row);
-        continue;
-      }
-
-      const shouldReplace =
-        (!existing.contaBancaria && !!row.contaBancaria) ||
-        (!existing.favorecidoNome && !!row.favorecidoNome) ||
-        (!existing.bancoCodigo && !!row.bancoCodigo) ||
-        (!existing.agenciaCodigo && !!row.agenciaCodigo);
-
-      if (shouldReplace) {
-        byCpf.set(key, row);
-      }
+      const group = byCpf.get(key) || [];
+      group.push(row);
+      byCpf.set(key, group);
     }
 
-    return Array.from(byCpf.values());
+    return Array.from(byCpf.values()).flatMap((group) => {
+      const byConta = new Map<string, LCRegistro>();
+
+      for (const row of group) {
+        const contaKey = onlyDigits(row.contaBancaria) || `sem-conta:${row.obListaCredores}-${row.sequencial}`;
+        const existing = byConta.get(contaKey);
+        byConta.set(contaKey, existing ? pickPreferredRow(existing, row) : row);
+      }
+
+      const rowsByConta = Array.from(byConta.values());
+      return rowsByConta.length > 1 ? rowsByConta : [rowsByConta[0]];
+    });
   }, [rows]);
 
-  const rowsForDisplay = useMemo(
-    () => (showConsolidado ? consolidatedRows : rows),
-    [showConsolidado, consolidatedRows, rows],
-  );
+  const rowsForDisplay = consolidatedRows;
 
   const filteredRows = useMemo(() => {
-    const q = queryLCDeferred.trim().toLowerCase();
+    const q = normalizeSearchValue(queryLCDeferred);
     if (!q) return rowsForDisplay;
     return rowsForDisplay.filter((row) =>
-      row.obListaCredores.toLowerCase().includes(q) ||
-      row.favorecidoDocumento.toLowerCase().includes(q) ||
-      row.favorecidoNome.toLowerCase().includes(q) ||
-      row.bancoCodigo.toLowerCase().includes(q) ||
-      row.bancoNome.toLowerCase().includes(q),
+      normalizeSearchValue(row.obListaCredores).includes(q) ||
+      normalizeSearchValue(row.favorecidoDocumento).includes(q) ||
+      normalizeSearchValue(row.favorecidoNome).includes(q) ||
+      normalizeSearchValue(row.bancoCodigo).includes(q) ||
+      normalizeSearchValue(row.bancoNome).includes(q) ||
+      normalizeSearchValue(row.contaBancaria).includes(q),
     );
   }, [rowsForDisplay, queryLCDeferred]);
 
   const pendenciasFiltradas = useMemo(() => {
-    const q = queryPendenciasDeferred.trim().toLowerCase();
+    const q = normalizeSearchValue(queryPendenciasDeferred);
     if (!q) return pendencias;
     return pendencias.filter((row) =>
-      row.cpf.toLowerCase().includes(q) ||
-      row.nome.toLowerCase().includes(q) ||
-      row.nomeLc.toLowerCase().includes(q),
+      normalizeSearchValue(row.cpf).includes(q) ||
+      normalizeSearchValue(row.nome).includes(q) ||
+      normalizeSearchValue(row.nomeLc).includes(q) ||
+      normalizeSearchValue(row.contaPdf).includes(q) ||
+      normalizeSearchValue(row.contaLc).includes(q),
     );
   }, [pendencias, queryPendenciasDeferred]);
 
   useEffect(() => {
     setPageLC(1);
-  }, [queryLCDeferred, rowsForDisplay.length, showConsolidado]);
+  }, [queryLCDeferred, rowsForDisplay.length]);
 
   useEffect(() => {
     setPagePendencias(1);
@@ -169,6 +180,7 @@ export default function LCPage() {
     const start = (pagePendencias - 1) * pageSize;
     return pendenciasFiltradas.slice(start, start + pageSize);
   }, [pendenciasFiltradas, pagePendencias]);
+  const shouldShowPendenciasSection = isComparingPdf || pendencias.length > 0;
 
   const buildMacroFileName = (sourcePdfNames: string[]) => {
     const pad = (value: number) => String(value).padStart(2, '0');
@@ -291,27 +303,10 @@ export default function LCPage() {
         </div>
       </HeaderActions>
 
-      <SectionPanel
-        title="Lista de Credores (LC)"
-        description={`Arquivo: ${fileName || 'nenhum arquivo enviado'}`}
-      >
-        <div className="flex flex-wrap items-center gap-2 mb-3">
-          <Button
-            size="sm"
-            variant={showConsolidado ? 'default' : 'outline'}
-            onClick={() => setShowConsolidado(true)}
-          >
-            Consolidado (CPF)
-          </Button>
-          <Button
-            size="sm"
-            variant={!showConsolidado ? 'default' : 'outline'}
-            onClick={() => setShowConsolidado(false)}
-          >
-            Todos
-          </Button>
-          <span className="text-xs text-muted-foreground ml-1">
-            Exibindo {rowsForDisplay.length} de {rows.length} registro(s)
+      <SectionPanel title="Lista de Credores (LC)">
+        <div className="mb-3">
+          <span className="text-xs text-muted-foreground">
+            {rowsForDisplay.length} registro(s) unico(s)
           </span>
         </div>
         <div className="relative max-w-md">
@@ -325,90 +320,86 @@ export default function LCPage() {
         </div>
       </SectionPanel>
 
-      <SectionPanel title="Pendencias de Bolsistas x LC" className="overflow-hidden">
-        <div className="space-y-1 pb-3">
-          <p className="text-xs text-muted-foreground">
-            PDFs: <span className="font-semibold text-foreground">{pdfFileNames.length ? pdfFileNames.join(', ') : 'nenhum arquivo enviado'}</span>
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Processados: <span className="font-semibold text-foreground">{totalBolsistasProcessados}</span> | Pendencias: <span className="font-semibold text-foreground">{pendencias.length}</span>
-          </p>
-          <div className="relative max-w-md mt-2">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={queryPendencias}
-              onChange={(e) => setQueryPendencias(e.target.value)}
-              placeholder="Buscar pendencias por CPF ou nome..."
-              className="pl-9 h-10 input-system"
-            />
+      {shouldShowPendenciasSection ? (
+        <SectionPanel title="Pendencias de Bolsistas x LC" className="overflow-hidden">
+          <div className="space-y-1 pb-3">
+            <p className="text-xs text-muted-foreground">
+              PDFs: <span className="font-semibold text-foreground">{pdfFileNames.length ? pdfFileNames.join(', ') : 'nenhum arquivo enviado'}</span>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Processados: <span className="font-semibold text-foreground">{totalBolsistasProcessados}</span> | Pendencias: <span className="font-semibold text-foreground">{pendencias.length}</span>
+            </p>
+            <div className="relative max-w-md mt-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={queryPendencias}
+                onChange={(e) => setQueryPendencias(e.target.value)}
+                placeholder="Buscar pendencias por CPF ou nome..."
+                className="pl-9 h-10 input-system"
+              />
+            </div>
           </div>
-        </div>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-slate-50/50">
-              <TableRow className="hover:bg-transparent border-b border-border-default/50">
-                <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">CPF</TableHead>
-                <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Nome (PDF)</TableHead>
-                <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Conta PDF</TableHead>
-                <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Nome/Conta LC</TableHead>
-                <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Status</TableHead>
-                <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Arquivo</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isComparingPdf ? (
-                <TableSkeletonRows rows={6} columns={6} widths={['w-24', 'w-64', 'w-28', 'w-48', 'w-24', 'w-24']} />
-              ) : pendenciasFiltradas.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground italic">
-                    Nenhuma pendencia encontrada.
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-slate-50/50">
+                <TableRow className="hover:bg-transparent border-b border-border-default/50">
+                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">CPF</TableHead>
+                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Nome (PDF)</TableHead>
+                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Conta PDF</TableHead>
+                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Nome/Conta LC</TableHead>
+                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Status</TableHead>
+                  <TableHead className="px-4 py-3 text-xs font-semibold uppercase tracking-wider">Arquivo</TableHead>
                 </TableRow>
-              ) : (
-                pendenciasPage.map((row, idx) => (
-                  <TableRow key={`${row.cpf}-${row.status}-${idx}`} className="border-b border-border-default/30 last:border-0">
-                    <TableCell className="px-4 py-3 text-xs font-mono font-semibold">{row.cpf}</TableCell>
-                    <TableCell className="px-4 py-3 text-xs">{row.nome || '-'}</TableCell>
-                    <TableCell className="px-4 py-3 text-xs font-mono">{row.contaPdf || '-'}</TableCell>
-                    <TableCell className="px-4 py-3 text-xs">
-                      <div>{row.nomeLc || '-'}</div>
-                      <div className="font-mono text-muted-foreground">{row.contaLc || '-'}</div>
-                    </TableCell>
-                    <TableCell className="px-4 py-3 text-xs font-semibold text-status-warning">{statusLabel[row.status]}</TableCell>
-                    <TableCell className="px-4 py-3 text-xs">{row.arquivoPdf}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-        <div className="flex items-center justify-between px-4 py-3 border-t border-border-default/50">
-          <span className="text-xs text-muted-foreground">
-            {pendenciasFiltradas.length} resultado(s)
-          </span>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setPagePendencias((p) => Math.max(1, p - 1))}
-              disabled={pagePendencias <= 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-xs text-muted-foreground">
-              Pag. {pagePendencias} de {totalPagesPendencias}
-            </span>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setPagePendencias((p) => Math.min(totalPagesPendencias, p + 1))}
-              disabled={pagePendencias >= totalPagesPendencias}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+              </TableHeader>
+              <TableBody>
+                {isComparingPdf ? (
+                  <TableSkeletonRows rows={6} columns={6} widths={['w-24', 'w-64', 'w-28', 'w-48', 'w-24', 'w-24']} />
+                ) : (
+                  pendenciasPage.map((row, idx) => (
+                    <TableRow key={`${row.cpf}-${row.status}-${idx}`} className="border-b border-border-default/30 last:border-0">
+                      <TableCell className="px-4 py-3 text-xs font-mono font-semibold">{row.cpf}</TableCell>
+                      <TableCell className="px-4 py-3 text-xs">{row.nome || '-'}</TableCell>
+                      <TableCell className="px-4 py-3 text-xs font-mono">{row.contaPdf || '-'}</TableCell>
+                      <TableCell className="px-4 py-3 text-xs">
+                        <div>{row.nomeLc || '-'}</div>
+                        <div className="font-mono text-muted-foreground">{row.contaLc || '-'}</div>
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-xs font-semibold text-status-warning">{statusLabel[row.status]}</TableCell>
+                      <TableCell className="px-4 py-3 text-xs">{row.arquivoPdf}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </div>
-        </div>
-      </SectionPanel>
+          <div className="flex items-center justify-between px-4 py-3 border-t border-border-default/50">
+            <span className="text-xs text-muted-foreground">
+              {pendenciasFiltradas.length} resultado(s)
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setPagePendencias((p) => Math.max(1, p - 1))}
+                disabled={pagePendencias <= 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                Pag. {pagePendencias} de {totalPagesPendencias}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setPagePendencias((p) => Math.min(totalPagesPendencias, p + 1))}
+                disabled={pagePendencias >= totalPagesPendencias}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </SectionPanel>
+      ) : null}
 
       <DataTablePanel>
         <Table>

@@ -65,26 +65,27 @@ vi.mock('@/components/dashboard/DashboardRapTab', () => ({
   DashboardRapTab: ({
     filteredRapCount,
     rapTotalInscrito,
-    rapTotalALiquidar,
-    rapTotalLiquidado,
-    rapTotalPago,
+    rapTotalReinscrito,
+    rapTotalLiquidadoNoAno,
+    rapTotalSaldoAtual,
     dadosRapPorOrigem,
   }: {
     filteredRapCount: number;
     rapTotalInscrito: number;
-    rapTotalALiquidar: number;
-    rapTotalLiquidado: number;
-    rapTotalPago: number;
-    dadosRapPorOrigem: Array<{ origem: string; inscrito: number; pago: number }>;
+    rapTotalReinscrito: number;
+    rapTotalLiquidadoNoAno: number;
+    rapTotalSaldoAtual: number;
+    dadosRapPorOrigem: Array<{ origem: string; baseVigente: number; liquidadoNoAno: number; saldoAtual: number }>;
   }) => (
     <div data-testid="rap-tab">
       <span data-testid="rap-count">{filteredRapCount}</span>
       <span data-testid="rap-total-inscrito">{rapTotalInscrito}</span>
-      <span data-testid="rap-total-a-liquidar">{rapTotalALiquidar}</span>
-      <span data-testid="rap-total-liquidado">{rapTotalLiquidado}</span>
-      <span data-testid="rap-total-pago">{rapTotalPago}</span>
-      <span data-testid="rap-origem-inscrito">{dadosRapPorOrigem[0]?.inscrito ?? 0}</span>
-      <span data-testid="rap-origem-pago">{dadosRapPorOrigem[0]?.pago ?? 0}</span>
+      <span data-testid="rap-total-reinscrito">{rapTotalReinscrito}</span>
+      <span data-testid="rap-total-liquidado-no-ano">{rapTotalLiquidadoNoAno}</span>
+      <span data-testid="rap-total-saldo-atual">{rapTotalSaldoAtual}</span>
+      <span data-testid="rap-origem-base">{dadosRapPorOrigem[0]?.baseVigente ?? 0}</span>
+      <span data-testid="rap-origem-liquidado">{dadosRapPorOrigem[0]?.liquidadoNoAno ?? 0}</span>
+      <span data-testid="rap-origem-saldo">{dadosRapPorOrigem[0]?.saldoAtual ?? 0}</span>
     </div>
   ),
 }));
@@ -262,22 +263,29 @@ describe('Dashboard', () => {
     expect(screen.queryByText(/Dimensao ativa:/)).not.toBeInTheDocument();
   });
 
-  it('usa os campos proprios de RAP no resumo por origem', async () => {
+  it('separa inscritos e reinscritos e usa RAP pagos como liquidado no ano', async () => {
     mockedUseData.mockReturnValue({
       atividades: [],
       empenhos: [
         makeEmpenho({
-          id: 'rap-base',
+          id: 'rap-inscrito',
           numero: '2025NE0009',
           tipo: 'rap',
           origemRecurso: 'Tesouro',
-          valor: 999,
-          valorPagoOficial: 555,
           rapInscrito: 120,
           rapALiquidar: 30,
-          rapLiquidado: 90,
           saldoRapOficial: 20,
-          rapPago: 70,
+          rapPago: 100,
+        }),
+        makeEmpenho({
+          id: 'rap-reinscrito',
+          numero: '2024NE0010',
+          tipo: 'rap',
+          origemRecurso: 'Tesouro',
+          rapInscrito: 150,
+          rapALiquidar: 90,
+          saldoRapOficial: 60,
+          rapPago: 30,
         }),
       ],
       descentralizacoes: [],
@@ -306,11 +314,12 @@ describe('Dashboard', () => {
     render(<Dashboard />);
 
     expect(screen.getByTestId('rap-total-inscrito')).toHaveTextContent('120');
-    expect(screen.getByTestId('rap-total-a-liquidar')).toHaveTextContent('30');
-    expect(screen.getByTestId('rap-total-liquidado')).toHaveTextContent('20');
-    expect(screen.getByTestId('rap-total-pago')).toHaveTextContent('70');
+    expect(screen.getByTestId('rap-total-reinscrito')).toHaveTextContent('90');
+    expect(screen.getByTestId('rap-total-liquidado-no-ano')).toHaveTextContent('130');
+    expect(screen.getByTestId('rap-total-saldo-atual')).toHaveTextContent('80');
 
-    expect(screen.getByTestId('rap-origem-inscrito')).toHaveTextContent('120');
-    expect(screen.getByTestId('rap-origem-pago')).toHaveTextContent('70');
+    expect(screen.getByTestId('rap-origem-base')).toHaveTextContent('210');
+    expect(screen.getByTestId('rap-origem-liquidado')).toHaveTextContent('130');
+    expect(screen.getByTestId('rap-origem-saldo')).toHaveTextContent('80');
   });
 });

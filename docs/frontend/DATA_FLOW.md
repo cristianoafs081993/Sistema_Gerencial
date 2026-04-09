@@ -83,10 +83,13 @@ Alguns services usam fallback para REST quando `supabase-js` falha ou retorna va
 Observacao para a aba RAP do dashboard:
 
 - os cards de topo devem usar os campos proprios de RAP do empenho
-- `inscrito`: `rapInscrito`
-- `a liquidar`: `rapALiquidar`
-- `liquidado / a pagar`: `saldoRapOficial` com fallback derivado quando ausente
-- `pago`: `rapPago`
+- separar `inscrito` e `reinscrito` pelo ano do empenho:
+  - ano imediatamente anterior ao exercicio corrente: usar a base inscrita do RAP
+  - anos anteriores a esse: tratar como `reinscrito`
+- `restos a pagar pagos` deve ser lido como o valor liquidado/executado no exercicio corrente
+- `restos a pagar a pagar` deve ser tratado como o saldo atual do empenho RAP
+- quando o saldo oficial nao vier preenchido, derivar o saldo pela base vigente do RAP menos o valor executado no ano
+- a mesma regra deve valer para dashboard, tela de empenhos, agrupamentos e contratos vinculados
 - nao reutilizar `valor` ou `valorPagoOficial` como substitutos desses totais na agregacao da aba RAP
 
 ### Financeiro

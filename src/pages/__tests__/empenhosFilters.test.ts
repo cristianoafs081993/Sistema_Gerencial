@@ -1,6 +1,7 @@
 import type { Empenho } from '@/types';
 import {
   filterEmpenhos,
+  getRapBase,
   getRapLiquidado,
   getRapSaldo,
   matchesEmpenhoStatusFilter,
@@ -68,11 +69,22 @@ describe('empenhosFilters', () => {
     });
     const rapLiquidado = createEmpenho({
       id: 'rap-liquidado',
+      numero: '2025NE0002',
       tipo: 'rap',
       rapInscrito: 100,
       rapALiquidar: 0,
       saldoRapOficial: 20,
-      rapPago: 0,
+      rapPago: 80,
+      status: 'pendente',
+    });
+    const rapReinscrito = createEmpenho({
+      id: 'rap-reinscrito',
+      numero: '2024NE0003',
+      tipo: 'rap',
+      rapInscrito: 150,
+      rapALiquidar: 90,
+      saldoRapOficial: 60,
+      rapPago: 30,
       status: 'pendente',
     });
     const rapPago = createEmpenho({
@@ -91,6 +103,9 @@ describe('empenhosFilters', () => {
     expect(matchesEmpenhoStatusFilter(rapLiquidado, 'liquidado')).toBe(true);
     expect(getRapSaldo(rapLiquidado)).toBe(20);
     expect(getRapLiquidado(rapLiquidado)).toBe(80);
+    expect(getRapBase(rapReinscrito)).toBe(90);
+    expect(getRapSaldo(rapReinscrito)).toBe(60);
+    expect(getRapLiquidado(rapReinscrito)).toBe(30);
 
     expect(matchesEmpenhoStatusFilter(rapPago, 'pago')).toBe(true);
     expect(matchesEmpenhoStatusFilter(rapPago, 'pendente')).toBe(false);

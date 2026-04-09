@@ -38,7 +38,8 @@ import { parseSiafiCsv, syncSiafiDataToDb } from '@/lib/siafi-parser';
 import { transparenciaService } from '@/services/transparencia';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { splitCsvLine } from '@/utils/csvParser';
-import { filterEmpenhos, getRapLiquidado, getRapSaldo } from './empenhosFilters';
+import { getRapReferenceYear, isRapReinscrito } from '@/utils/rapMetrics';
+import { filterEmpenhos, getRapBase, getRapLiquidado, getRapSaldo } from './empenhosFilters';
 
 
 const statusColors: Record<string, string> = {
@@ -577,13 +578,20 @@ function EmpenhoRow({
   empenho,
   type,
   handleOpenDialog,
+  rapReferenceYear,
   isChild = false
 }: {
   empenho: Empenho;
   type: 'execucao' | 'restos';
   handleOpenDialog: (e: Empenho) => void;
+  rapReferenceYear: number;
   isChild?: boolean;
 }) {
+  const rapBase = type === 'restos' ? getRapBase(empenho, rapReferenceYear) : 0;
+  const rapSaldoAtual = type === 'restos' ? getRapSaldo(empenho, rapReferenceYear) : 0;
+  const rapLiquidadoNoAno = type === 'restos' ? getRapLiquidado(empenho) : 0;
+  const rapBaseLabel = isRapReinscrito(empenho, rapReferenceYear) ? 'Reinscrito' : 'Inscrito';
+
   return (
     <TableRow className={`hover:bg-slate-50/80 transition-colors border-b border-border-default/50 ${isChild ? 'bg-slate-50/30' : ''}`}>
       <TableCell className={`py-4 px-6 align-top ${isChild ? 'pl-10' : ''}`}>
@@ -628,17 +636,11 @@ function EmpenhoRow({
         <div className="flex flex-col gap-1 items-end">
           {type === 'restos' && empenho.rapInscrito != null ? (
             <>
-              <span className="font-semibold text-sm" title="Inscrito (original)">
-                {formatCurrency(empenho.rapInscrito || 0)}
+              <span className="font-semibold text-sm" title={`${rapBaseLabel} (base vigente do RAP)`}>
+                {rapBaseLabel}: {formatCurrency(rapBase)}
               </span>
-              <span className={`text-xs ${getRapSaldo(empenho) > 0 ? 'text-status-warning' : 'text-muted-foreground'}`} title="A Liquidar">
-                A Liq: {formatCurrency(getRapSaldo(empenho))}
-              </span>
-              <span className={`text-xs ${getRapLiquidado(empenho) > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado">
-                Liq: {formatCurrency(getRapLiquidado(empenho))}
-              </span>
-              <span className={`text-xs ${(empenho.rapPago || 0) > 0 ? 'text-status-success' : 'text-muted-foreground'}`} title="Pago">
-                Pg: {formatCurrency(empenho.rapPago || 0)}
+              <span className={`text-xs ${rapLiquidadoNoAno > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado no Ano">
+                Liq Ano: {formatCurrency(rapLiquidadoNoAno)}
               </span>
             </>
           ) : (
@@ -669,10 +671,9 @@ function EmpenhoRow({
       <TableCell className="py-4 px-4 text-right align-top whitespace-nowrap">
         {(() => {
           if (type === 'restos') {
-            const aLiquidar = getRapSaldo(empenho);
             return (
-              <span className={`font-semibold text-sm ${aLiquidar > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}>
-                {formatCurrency(aLiquidar)}
+              <span className={`font-semibold text-sm ${rapSaldoAtual > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}>
+                {formatCurrency(rapSaldoAtual)}
               </span>
             );
           }
@@ -725,6 +726,7 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
 
   const [groupBy, setGroupBy] = useState<'none' | 'favorecido'>('none');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const rapReferenceYear = useMemo(() => getRapReferenceYear(empenhos), [empenhos]);
 
   const toggleGroup = (name: string) => {
     setExpandedGroups(prev => ({ ...prev, [name]: !prev[name] }));
@@ -746,12 +748,12 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
       isGroup: true as const,
       name,
       items,
-      valorTotal: items.reduce((acc, e) => acc + (type === 'restos' ? (e.rapInscrito || e.valor) : e.valor), 0),
-      saldoTotal: items.reduce((acc, e) => acc + (type === 'restos' ? getRapSaldo(e) : (e.valor - (e.valorLiquidado || 0))), 0),
-      pagoTotal: items.reduce((acc, e) => acc + (type === 'restos' ? (e.rapPago || 0) : (e.valorPago || 0)), 0),
+      valorTotal: items.reduce((acc, e) => acc + (type === 'restos' ? getRapBase(e, rapReferenceYear) : e.valor), 0),
+      saldoTotal: items.reduce((acc, e) => acc + (type === 'restos' ? getRapSaldo(e, rapReferenceYear) : (e.valor - (e.valorLiquidado || 0))), 0),
+      pagoTotal: items.reduce((acc, e) => acc + (type === 'restos' ? getRapLiquidado(e) : (e.valorPago || 0)), 0),
       liquidadoTotal: items.reduce((acc, e) => acc + (type === 'restos' ? getRapLiquidado(e) : (e.valorLiquidado || 0)), 0),
     }));
-  }, [empenhos, groupBy, type]);
+  }, [empenhos, groupBy, rapReferenceYear, type]);
 
   const sortedData = useMemo(() => {
     const sorted = [...processData].sort((a, b) => {
@@ -773,16 +775,16 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
           case 'numero': valA = itemA.numero; valB = itemB.numero; break;
           case 'favorecido': valA = itemA.favorecidoNome || ''; valB = itemB.favorecidoNome || ''; break;
           case 'valor':
-            valA = type === 'restos' ? (itemA.rapInscrito || itemA.valor) : itemA.valor;
-            valB = type === 'restos' ? (itemB.rapInscrito || itemB.valor) : itemB.valor;
+            valA = type === 'restos' ? getRapBase(itemA, rapReferenceYear) : itemA.valor;
+            valB = type === 'restos' ? getRapBase(itemB, rapReferenceYear) : itemB.valor;
             break;
           case 'saldo':
-            valA = type === 'restos' ? getRapSaldo(itemA) : (itemA.valor - (itemA.valorLiquidado || 0));
-            valB = type === 'restos' ? getRapSaldo(itemB) : (itemB.valor - (itemB.valorLiquidado || 0));
+            valA = type === 'restos' ? getRapSaldo(itemA, rapReferenceYear) : (itemA.valor - (itemA.valorLiquidado || 0));
+            valB = type === 'restos' ? getRapSaldo(itemB, rapReferenceYear) : (itemB.valor - (itemB.valorLiquidado || 0));
             break;
           case 'pago':
-            valA = type === 'restos' ? (itemA.rapPago || 0) : (itemA.valorPago || 0);
-            valB = type === 'restos' ? (itemB.rapPago || 0) : (itemB.valorPago || 0);
+            valA = type === 'restos' ? getRapLiquidado(itemA) : (itemA.valorPago || 0);
+            valB = type === 'restos' ? getRapLiquidado(itemB) : (itemB.valorPago || 0);
             break;
           default: valA = itemA.numero; valB = itemB.numero;
         }
@@ -842,8 +844,8 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
                 ) : (
                   <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">Descrição</TableHead>
                 )}
-                <SortHeader label={type === 'execucao' ? 'Empenhado / Liquidado' : 'Inscrito / A Liq / Liq / Pago'} colKey="valor" align="right" />
-                <SortHeader label={type === 'execucao' ? 'Saldo' : 'A Liquidar'} colKey="saldo" align="right" />
+                <SortHeader label={type === 'execucao' ? 'Empenhado / Liquidado' : 'Inscrito / Reinscrito / Liq Ano'} colKey="valor" align="right" />
+                <SortHeader label={type === 'execucao' ? 'Saldo' : 'Saldo Atual'} colKey="saldo" align="right" />
                 <TableHead className="h-11 px-6 text-center text-xs font-semibold uppercase tracking-wider">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -899,14 +901,8 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
                                 </>
                               ) : (
                                 <>
-                                  <span className={`text-[11px] ${(row.saldoTotal || 0) > 0 ? 'text-status-warning' : 'text-muted-foreground'}`} title="A Liquidar">
-                                    A Liq: {formatCurrency(row.saldoTotal)}
-                                  </span>
-                                  <span className={`text-[11px] ${(row.liquidadoTotal || 0) > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado">
-                                    Liq: {formatCurrency(row.liquidadoTotal)}
-                                  </span>
-                                  <span className={`text-[11px] ${(row.pagoTotal || 0) > 0 ? 'text-status-success' : 'text-muted-foreground'}`} title="Pago">
-                                    Pg: {formatCurrency(row.pagoTotal)}
+                                  <span className={`text-[11px] ${(row.liquidadoTotal || 0) > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado no Ano">
+                                    Liq Ano: {formatCurrency(row.liquidadoTotal)}
                                   </span>
                                 </>
                               )}
@@ -931,13 +927,13 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
                           <TableCell className="py-4 px-6 text-center"></TableCell>
                         </TableRow>
                         {isExpanded && row.items.map(empenho => (
-                          <EmpenhoRow key={empenho.id} empenho={empenho} type={type} handleOpenDialog={handleOpenDialog} isChild />
+                          <EmpenhoRow key={empenho.id} empenho={empenho} type={type} handleOpenDialog={handleOpenDialog} rapReferenceYear={rapReferenceYear} isChild />
                         ))}
                       </Fragment>
                     );
                   } else {
                     const singleRow = row as { isGroup: false; item: Empenho };
-                    return <EmpenhoRow key={singleRow.item.id} empenho={singleRow.item} type={type} handleOpenDialog={handleOpenDialog} />;
+                    return <EmpenhoRow key={singleRow.item.id} empenho={singleRow.item} type={type} handleOpenDialog={handleOpenDialog} rapReferenceYear={rapReferenceYear} />;
                   }
                 })
               )}

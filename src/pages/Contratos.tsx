@@ -22,6 +22,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { HeaderActions } from '@/components/HeaderParts';
 import { ContratosSyncDialog } from '@/components/modals/ContratosSyncDialog';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
+import { getRapBaseVigente, getRapReferenceYear, getRapSaldoAtual } from '@/utils/rapMetrics';
 
 export default function Contratos() {
   const { contratos, empenhos, contratosEmpenhos, isLoading, refreshData } = useData();
@@ -74,11 +75,7 @@ export default function Contratos() {
     }
   };
 
-  const getRapSaldo = (rapALiquidar?: number, saldoRapOficial?: number) => {
-    const aLiq = rapALiquidar || 0;
-    if (aLiq > 0) return aLiq;
-    return saldoRapOficial || 0;
-  };
+  const rapReferenceYear = useMemo(() => getRapReferenceYear(empenhos), [empenhos]);
 
   const getEmpenhosDoContrato = useCallback((contratoId: string) => {
     const linkIds = contratosEmpenhos
@@ -122,12 +119,12 @@ export default function Contratos() {
     return contratos.reduce((sumContrato, c) => {
       const emps = getEmpenhosDoContrato(c.id);
       return sumContrato + emps.reduce((sumEmp, e) => {
-        if (e.tipo === 'rap') return sumEmp + getRapSaldo(e.rapALiquidar, e.saldoRapOficial);
+        if (e.tipo === 'rap') return sumEmp + getRapSaldoAtual(e, rapReferenceYear);
         const liquidado = (e.valorLiquidadoAPagar || 0) + (e.valorPagoOficial || 0);
         return sumEmp + Math.max(0, e.valor - liquidado);
       }, 0);
     }, 0);
-  }, [contratos, getEmpenhosDoContrato]);
+  }, [contratos, getEmpenhosDoContrato, rapReferenceYear]);
 
   const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -180,7 +177,7 @@ export default function Contratos() {
         />
 
         <StatCard
-          title="Saldo a Liquidar"
+          title="Saldo Atual"
           value={formatCurrency(totalALiquidarGlobal)}
           icon={Calendar}
           stitchColor="amber"
@@ -191,7 +188,7 @@ export default function Contratos() {
           title="Valor Empenhado"
           value={formatCurrency(contratos.reduce((sum, c) => {
             const emps = getEmpenhosDoContrato(c.id);
-            return sum + emps.reduce((s, e) => s + (e.valor || 0), 0);
+            return sum + emps.reduce((s, e) => s + (e.tipo === 'rap' ? getRapBaseVigente(e, rapReferenceYear) : (e.valor || 0)), 0);
           }, 0))}
           icon={ExternalLink}
           stitchColor="emerald-green"
@@ -245,7 +242,7 @@ export default function Contratos() {
                   </TableHead>
                   <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Valor Total</TableHead>
                   <TableHead className="h-11 px-6 text-xs font-semibold uppercase tracking-wider">EMPENHADO</TableHead>
-                  <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Saldo a Liquidar</TableHead>
+                  <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Saldo Atual</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -258,13 +255,16 @@ export default function Contratos() {
                 ) : (
                   filteredContratos.map((c) => {
                     const empenhosVinculados = getEmpenhosDoContrato(c.id);
-                    const totalEmpenhado = empenhosVinculados.reduce((sum, e) => sum + e.valor, 0);
+                    const totalEmpenhado = empenhosVinculados.reduce(
+                      (sum, e) => sum + (e.tipo === 'rap' ? getRapBaseVigente(e, rapReferenceYear) : e.valor),
+                      0,
+                    );
                     const percentualEmpenhado = c.valor && c.valor > 0
                       ? Math.min(100, (totalEmpenhado / c.valor) * 100)
                       : 0;
 
                     const totalALiquidar = empenhosVinculados.reduce((sum, e) => {
-                      if (e.tipo === 'rap') return sum + getRapSaldo(e.rapALiquidar, e.saldoRapOficial);
+                      if (e.tipo === 'rap') return sum + getRapSaldoAtual(e, rapReferenceYear);
                       const liquidado = (e.valorLiquidadoAPagar || 0) + (e.valorPagoOficial || 0);
                       return sum + Math.max(0, e.valor - liquidado);
                     }, 0);
@@ -309,8 +309,9 @@ export default function Contratos() {
                             {empenhosVinculados.length > 0 ? (
                               empenhosVinculados.map((e) => {
                                 const balance = e.tipo === 'rap'
-                                  ? getRapSaldo(e.rapALiquidar, e.saldoRapOficial)
+                                  ? getRapSaldoAtual(e, rapReferenceYear)
                                   : Math.max(0, e.valor - ((e.valorLiquidadoAPagar || 0) + (e.valorPagoOficial || 0)));
+                                const rapBase = e.tipo === 'rap' ? getRapBaseVigente(e, rapReferenceYear) : 0;
 
                                 return (
                                   <Popover key={e.id}>
@@ -331,9 +332,9 @@ export default function Contratos() {
                                           </Badge>
                                         </div>
                                         <div className="grid grid-cols-2 gap-y-1.5 text-xs py-1">
-                                          <span className="text-muted-foreground">Valor Total:</span>
-                                          <span className="text-right font-medium">{formatCurrency(e.valor || 0)}</span>
-                                          <span className="text-muted-foreground font-semibold">Saldo a Liquidar:</span>
+                                          <span className="text-muted-foreground">{e.tipo === 'rap' ? 'Base Vigente:' : 'Valor Total:'}</span>
+                                          <span className="text-right font-medium">{formatCurrency(e.tipo === 'rap' ? rapBase : (e.valor || 0))}</span>
+                                          <span className="text-muted-foreground font-semibold">{e.tipo === 'rap' ? 'Saldo Atual:' : 'Saldo a Liquidar:'}</span>
                                           <span className={cn(
                                             "text-right font-bold underline decoration-dotted",
                                             balance > 0 ? "text-orange-600" : "text-green-600"

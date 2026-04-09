@@ -7,18 +7,18 @@ import { formatCurrency } from '@/lib/utils';
 
 type RapResumo = {
   origem: string;
-  inscrito: number;
-  pago: number;
-  saldo: number;
+  baseVigente: number;
+  liquidadoNoAno: number;
+  saldoAtual: number;
   percentual: number;
 };
 
 type DashboardRapTabProps = {
   isLoading: boolean;
   rapTotalInscrito: number;
-  rapTotalALiquidar: number;
-  rapTotalLiquidado: number;
-  rapTotalPago: number;
+  rapTotalReinscrito: number;
+  rapTotalLiquidadoNoAno: number;
+  rapTotalSaldoAtual: number;
   filteredRapCount: number;
   dadosRapPorOrigem: RapResumo[];
 };
@@ -26,46 +26,49 @@ type DashboardRapTabProps = {
 export function DashboardRapTab({
   isLoading,
   rapTotalInscrito,
-  rapTotalALiquidar,
-  rapTotalLiquidado,
-  rapTotalPago,
+  rapTotalReinscrito,
+  rapTotalLiquidadoNoAno,
+  rapTotalSaldoAtual,
   filteredRapCount,
   dadosRapPorOrigem,
 }: DashboardRapTabProps) {
+  const rapTotalBaseVigente = rapTotalInscrito + rapTotalReinscrito;
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Inscrito"
           value={formatCurrency(rapTotalInscrito)}
-          subtitle={`${filteredRapCount} RAPs`}
+          subtitle="Ano anterior"
           icon={Flag}
           stitchColor="vibrant-blue"
-          progress={100}
+          progress={rapTotalBaseVigente > 0 ? (rapTotalInscrito / rapTotalBaseVigente) * 100 : 0}
           isLoading={isLoading}
         />
         <StatCard
-          title="A liquidar"
-          value={formatCurrency(rapTotalALiquidar)}
+          title="Reinscrito"
+          value={formatCurrency(rapTotalReinscrito)}
+          subtitle={`${filteredRapCount} RAPs filtrados`}
           icon={Receipt}
           stitchColor="amber"
-          progress={rapTotalInscrito > 0 ? (rapTotalALiquidar / rapTotalInscrito) * 100 : 0}
+          progress={rapTotalBaseVigente > 0 ? (rapTotalReinscrito / rapTotalBaseVigente) * 100 : 0}
           isLoading={isLoading}
         />
         <StatCard
-          title="Liquidado / a pagar"
-          value={formatCurrency(rapTotalLiquidado)}
+          title="Liquidado no ano"
+          value={formatCurrency(rapTotalLiquidadoNoAno)}
           icon={Lock}
           stitchColor="purple"
-          progress={rapTotalInscrito > 0 ? (rapTotalLiquidado / rapTotalInscrito) * 100 : 0}
+          progress={rapTotalBaseVigente > 0 ? (rapTotalLiquidadoNoAno / rapTotalBaseVigente) * 100 : 0}
           isLoading={isLoading}
         />
         <StatCard
-          title="Pago"
-          value={formatCurrency(rapTotalPago)}
+          title="Saldo atual"
+          value={formatCurrency(rapTotalSaldoAtual)}
           icon={Wallet}
           stitchColor="emerald-green"
-          progress={rapTotalLiquidado > 0 ? (rapTotalPago / rapTotalLiquidado) * 100 : 0}
+          progress={rapTotalBaseVigente > 0 ? (rapTotalSaldoAtual / rapTotalBaseVigente) * 100 : 0}
           isLoading={isLoading}
         />
       </div>
@@ -73,7 +76,7 @@ export function DashboardRapTab({
       <Card className="card-system overflow-hidden">
         <CardHeader className="border-b border-border-default/50 px-6 py-4">
           <CardTitle className="table-title">Resumo de RAPs por Origem</CardTitle>
-          <CardDescription>Acompanhamento de inscritos vs pagamentos efetivados</CardDescription>
+          <CardDescription>Base vigente do ano, liquidado no exercicio e saldo remanescente</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -81,10 +84,10 @@ export function DashboardRapTab({
               <TableHeader className="bg-slate-50/50">
                 <TableRow className="border-b border-border-default/50 hover:bg-transparent">
                   <TableHead className="h-11 px-6 text-xs font-semibold uppercase tracking-wider">Origem de Recurso</TableHead>
-                  <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Inscrito Original</TableHead>
-                  <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Pago</TableHead>
-                  <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Saldo Restante</TableHead>
-                  <TableHead className="h-11 px-6 text-right text-xs font-semibold uppercase tracking-wider">Taxa de Pgto</TableHead>
+                  <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Inscrito / Reinscrito</TableHead>
+                  <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Liquidado no Ano</TableHead>
+                  <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Saldo Atual</TableHead>
+                  <TableHead className="h-11 px-6 text-right text-xs font-semibold uppercase tracking-wider">Taxa de Liquidacao</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -98,10 +101,10 @@ export function DashboardRapTab({
                   dadosRapPorOrigem.map((item, index) => (
                     <TableRow key={index} className="border-b transition-colors last:border-0 hover:bg-slate-50/80">
                       <TableCell className="px-6 py-4 text-sm font-medium">{item.origem}</TableCell>
-                      <TableCell className="px-4 py-4 text-right text-sm">{formatCurrency(item.inscrito)}</TableCell>
-                      <TableCell className="px-4 py-4 text-right text-sm">{formatCurrency(item.pago)}</TableCell>
+                      <TableCell className="px-4 py-4 text-right text-sm">{formatCurrency(item.baseVigente)}</TableCell>
+                      <TableCell className="px-4 py-4 text-right text-sm">{formatCurrency(item.liquidadoNoAno)}</TableCell>
                       <TableCell className="px-4 py-4 text-right text-sm font-medium text-status-error">
-                        {formatCurrency(item.saldo)}
+                        {formatCurrency(item.saldoAtual)}
                       </TableCell>
                       <TableCell className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">

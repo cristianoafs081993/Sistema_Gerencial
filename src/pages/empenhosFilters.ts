@@ -1,5 +1,11 @@
 import type { Empenho } from '@/types';
 import { matchesDimensionFilter } from '@/utils/dimensionFilters';
+import {
+  getRapBaseVigente,
+  getRapLiquidadoNoAno,
+  getRapReferenceYear,
+  getRapSaldoAtual,
+} from '@/utils/rapMetrics';
 
 export type EmpenhosFilters = {
   searchTerm: string;
@@ -15,25 +21,28 @@ export type EmpenhosFilters = {
 export const normalizeEmpenhoSearch = (value: string) =>
   value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
-export const getRapSaldo = (empenho: Empenho): number => {
-  const aLiquidar = empenho.rapALiquidar || 0;
-  if (aLiquidar > 0) return aLiquidar;
-  return empenho.saldoRapOficial || 0;
-};
+export const getRapBase = (empenho: Empenho, referenceYear = getRapReferenceYear([empenho])): number =>
+  getRapBaseVigente(empenho, referenceYear);
 
-export const getRapLiquidado = (empenho: Empenho): number => {
-  const inscrito = empenho.rapInscrito || 0;
-  return Math.max(0, inscrito - getRapSaldo(empenho));
-};
+export const getRapSaldo = (empenho: Empenho, referenceYear = getRapReferenceYear([empenho])): number =>
+  getRapSaldoAtual(empenho, referenceYear);
 
-export const matchesEmpenhoStatusFilter = (empenho: Empenho, filterStatus: string) => {
+export const getRapLiquidado = (empenho: Empenho): number => getRapLiquidadoNoAno(empenho);
+
+export const matchesEmpenhoStatusFilter = (
+  empenho: Empenho,
+  filterStatus: string,
+  referenceYear = getRapReferenceYear([empenho]),
+) => {
   if (filterStatus === 'all') return true;
 
   if (empenho.tipo === 'rap') {
-    const isCompletamentePago = getRapSaldo(empenho) <= 0 && (empenho.rapPago || 0) > 0;
+    const saldoAtual = getRapSaldo(empenho, referenceYear);
+    const liquidadoNoAno = getRapLiquidado(empenho);
+    const isCompletamentePago = saldoAtual <= 0 && liquidadoNoAno > 0;
 
     if (filterStatus === 'pago') return isCompletamentePago;
-    if (filterStatus === 'liquidado') return getRapLiquidado(empenho) > 0 && !isCompletamentePago;
+    if (filterStatus === 'liquidado') return liquidadoNoAno > 0 && !isCompletamentePago;
     if (filterStatus === 'pendente') return !isCompletamentePago;
   }
 
@@ -54,6 +63,7 @@ export const matchesEmpenhoDateRange = (empenho: Empenho, dataInicio: string, da
 export const filterEmpenhos = (empenhos: Empenho[], filters: EmpenhosFilters) => {
   const searchNormalized = normalizeEmpenhoSearch(filters.searchTerm);
   const searchDigits = filters.searchTerm.replace(/\D/g, '');
+  const rapReferenceYear = getRapReferenceYear(empenhos);
 
   return empenhos.filter((empenho) => {
     const matchesSearch =
@@ -64,7 +74,7 @@ export const filterEmpenhos = (empenhos: Empenho[], filters: EmpenhosFilters) =>
       (searchDigits !== '' &&
         (empenho.favorecidoDocumento || '').replace(/\D/g, '').includes(searchDigits));
 
-    const matchesStatus = matchesEmpenhoStatusFilter(empenho, filters.filterStatus);
+    const matchesStatus = matchesEmpenhoStatusFilter(empenho, filters.filterStatus, rapReferenceYear);
     const matchesDimensao = matchesDimensionFilter({
       dimensionValue: empenho.dimensao,
       planInternal: empenho.planoInterno,

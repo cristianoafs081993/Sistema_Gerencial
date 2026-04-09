@@ -1,23 +1,5 @@
 import { formatCurrency } from '@/lib/utils';
 
-export const getRapALiquidar = (rapALiquidar?: number) => rapALiquidar || 0;
-
-export const getRapAPagar = (
-  saldoRapOficial?: number,
-  rapInscrito?: number,
-  rapALiquidar?: number,
-  rapPago?: number,
-) => {
-  if (saldoRapOficial != null) return saldoRapOficial;
-  return Math.max(0, (rapInscrito || 0) - (rapALiquidar || 0) - (rapPago || 0));
-};
-
-export const getRapSaldo = (rapALiquidar?: number, saldoRapOficial?: number) => {
-  const aLiq = getRapALiquidar(rapALiquidar);
-  if (aLiq > 0) return aLiq;
-  return saldoRapOficial || 0;
-};
-
 export const formatCompactCurrency = (value: number) => {
   if (Math.abs(value) >= 1000000) return `R$${(value / 1000000).toFixed(1)}M`;
   if (Math.abs(value) >= 1000) return `R$${(value / 1000).toFixed(0)}k`;

@@ -66,6 +66,19 @@ describe('compararBolsistasComLC', () => {
     expect(result[0].status).toBe('conta_divergente');
   });
 
+  it('lista todas as contas da LC na divergencia quando o CPF possui multiplas contas', () => {
+    const bolsistas = [makeBolsista({ cpf: '126.729.284-95', conta: '99999999-9' })];
+    const lcRows = [
+      makeLC({ favorecidoDocumento: '12672928495', contaBancaria: '11111111' }),
+      makeLC({ obListaCredores: 'OB2', sequencial: 2, favorecidoDocumento: '12672928495', contaBancaria: '347107508' }),
+    ];
+
+    const result = compararBolsistasComLC(bolsistas, lcRows);
+    expect(result).toHaveLength(1);
+    expect(result[0].status).toBe('conta_divergente');
+    expect(result[0].contaLc).toBe('11111111, 347107508');
+  });
+
   it('nao gera pendencia se houver multiplas LCs e uma delas bater a conta', () => {
     const bolsistas = [makeBolsista({ cpf: '126.729.284-95', conta: '34710750-8' })];
     const lcRows = [

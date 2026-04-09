@@ -17,6 +17,30 @@ function onlyDigits(value: string) {
   return (value || '').replace(/\D/g, '');
 }
 
+function buildContaLcResumo(lcList: LCRegistro[]): string {
+  const contas = Array.from(
+    new Set(
+      lcList
+        .map((row) => row.contaBancaria || '')
+        .filter(Boolean),
+    ),
+  );
+
+  return contas.join(', ');
+}
+
+function buildNomeLcResumo(lcList: LCRegistro[]): string {
+  const nomes = Array.from(
+    new Set(
+      lcList
+        .map((row) => row.favorecidoNome || '')
+        .filter(Boolean),
+    ),
+  );
+
+  return nomes.join(', ');
+}
+
 export function compararBolsistasComLC(
   bolsistas: BolsistaPdfRecord[],
   lcRows: LCRegistro[],
@@ -50,36 +74,42 @@ export function compararBolsistasComLC(
       continue;
     }
 
-    const preferred =
-      lcList.find((x) => onlyDigits(x.contaBancaria) && onlyDigits(x.contaBancaria) === onlyDigits(b.conta)) ||
-      lcList.find((x) => onlyDigits(x.contaBancaria)) ||
-      lcList[0];
-
-    const contaLcDigits = onlyDigits(preferred.contaBancaria);
+    const matchingRow = lcList.find(
+      (x) => onlyDigits(x.contaBancaria) && onlyDigits(x.contaBancaria) === onlyDigits(b.conta),
+    );
+    const contaLcDigitsList = lcList
+      .map((x) => onlyDigits(x.contaBancaria))
+      .filter(Boolean);
     const contaPdfDigits = onlyDigits(b.conta);
+    const contaLcResumo = buildContaLcResumo(lcList);
+    const nomeLcResumo = buildNomeLcResumo(lcList);
 
-    if (!contaLcDigits) {
+    if (matchingRow) {
+      continue;
+    }
+
+    if (!contaLcDigitsList.length) {
       pend.push({
         cpf: b.cpf,
         nome: b.nome,
         contaPdf: b.conta,
         arquivoPdf: b.sourceFile,
         status: 'sem_conta_lc',
-        contaLc: preferred.contaBancaria || '',
-        nomeLc: preferred.favorecidoNome || '',
+        contaLc: contaLcResumo,
+        nomeLc: nomeLcResumo,
       });
       continue;
     }
 
-    if (contaPdfDigits && contaPdfDigits !== contaLcDigits) {
+    if (contaPdfDigits) {
       pend.push({
         cpf: b.cpf,
         nome: b.nome,
         contaPdf: b.conta,
         arquivoPdf: b.sourceFile,
         status: 'conta_divergente',
-        contaLc: preferred.contaBancaria || '',
-        nomeLc: preferred.favorecidoNome || '',
+        contaLc: contaLcResumo,
+        nomeLc: nomeLcResumo,
       });
     }
   }

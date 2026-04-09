@@ -8,7 +8,14 @@ import { HeaderActions } from '@/components/HeaderParts';
 import { DashboardCurrentTab } from '@/components/dashboard/DashboardCurrentTab';
 import { DashboardFiltersSheet } from '@/components/dashboard/DashboardFiltersSheet';
 import { DashboardRapTab } from '@/components/dashboard/DashboardRapTab';
-import { getRapALiquidar, getRapAPagar, getReadableTextColor, mixHexColors } from '@/components/dashboard/utils';
+import { getReadableTextColor, mixHexColors } from '@/components/dashboard/utils';
+import {
+  getRapBaseVigente,
+  getRapLiquidadoNoAno,
+  getRapReferenceYear,
+  getRapSaldoAtual,
+  isRapReinscrito,
+} from '@/utils/rapMetrics';
 import { useData } from '@/contexts/DataContext';
 import { extractDimensionCode, getDimensionLabel, matchesDimensionFilter } from '@/utils/dimensionFilters';
 
@@ -128,13 +135,24 @@ export default function Dashboard() {
     0,
   );
 
-  const rapTotalInscrito = filteredData.empenhosRap.reduce((total, empenho) => total + (empenho.rapInscrito || 0), 0);
-  const rapTotalALiquidar = filteredData.empenhosRap.reduce((total, empenho) => total + getRapALiquidar(empenho.rapALiquidar), 0);
-  const rapTotalLiquidado = filteredData.empenhosRap.reduce(
-    (total, empenho) => total + getRapAPagar(empenho.saldoRapOficial, empenho.rapInscrito, empenho.rapALiquidar, empenho.rapPago),
+  const rapReferenceYear = useMemo(() => getRapReferenceYear(empenhos), [empenhos]);
+
+  const rapTotalInscrito = filteredData.empenhosRap.reduce((total, empenho) => {
+    if (isRapReinscrito(empenho, rapReferenceYear)) return total;
+    return total + getRapBaseVigente(empenho, rapReferenceYear);
+  }, 0);
+  const rapTotalReinscrito = filteredData.empenhosRap.reduce((total, empenho) => {
+    if (!isRapReinscrito(empenho, rapReferenceYear)) return total;
+    return total + getRapBaseVigente(empenho, rapReferenceYear);
+  }, 0);
+  const rapTotalLiquidadoNoAno = filteredData.empenhosRap.reduce(
+    (total, empenho) => total + getRapLiquidadoNoAno(empenho),
     0,
   );
-  const rapTotalPago = filteredData.empenhosRap.reduce((total, empenho) => total + (empenho.rapPago || 0), 0);
+  const rapTotalSaldoAtual = filteredData.empenhosRap.reduce(
+    (total, empenho) => total + getRapSaldoAtual(empenho, rapReferenceYear),
+    0,
+  );
 
   const dadosPorOrigem = useMemo(() => {
     const map = new Map<string, { planejado: number; empenhado: number }>();
@@ -320,14 +338,15 @@ export default function Dashboard() {
   }, [filteredData]);
 
   const dadosRapPorOrigem = useMemo(() => {
-    const map = new Map<string, { inscrito: number; pago: number }>();
+    const map = new Map<string, { baseVigente: number; liquidadoNoAno: number; saldoAtual: number }>();
 
     filteredData.empenhosRap.forEach((empenho) => {
       const origem = empenho.origemRecurso || 'Sem origem';
-      const item = map.get(origem) || { inscrito: 0, pago: 0 };
+      const item = map.get(origem) || { baseVigente: 0, liquidadoNoAno: 0, saldoAtual: 0 };
 
-      item.inscrito += empenho.rapInscrito || 0;
-      item.pago += empenho.rapPago || 0;
+      item.baseVigente += getRapBaseVigente(empenho, rapReferenceYear);
+      item.liquidadoNoAno += getRapLiquidadoNoAno(empenho);
+      item.saldoAtual += getRapSaldoAtual(empenho, rapReferenceYear);
 
       map.set(origem, item);
     });
@@ -335,14 +354,14 @@ export default function Dashboard() {
     return Array.from(map.entries())
       .map(([origem, values]) => ({
         origem,
-        inscrito: values.inscrito,
-        pago: values.pago,
-        saldo: values.inscrito - values.pago,
-        percentual: values.inscrito > 0 ? (values.pago / values.inscrito) * 100 : 0,
+        baseVigente: values.baseVigente,
+        liquidadoNoAno: values.liquidadoNoAno,
+        saldoAtual: values.saldoAtual,
+        percentual: values.baseVigente > 0 ? (values.liquidadoNoAno / values.baseVigente) * 100 : 0,
       }))
-      .filter((item) => item.inscrito > 0)
-      .sort((a, b) => b.saldo - a.saldo);
-  }, [filteredData]);
+      .filter((item) => item.baseVigente > 0)
+      .sort((a, b) => b.saldoAtual - a.saldoAtual);
+  }, [filteredData, rapReferenceYear]);
 
   const clearFilters = () => {
     setFilterDimensao('all');
@@ -482,9 +501,9 @@ export default function Dashboard() {
           <DashboardRapTab
             isLoading={isLoading}
             rapTotalInscrito={rapTotalInscrito}
-            rapTotalALiquidar={rapTotalALiquidar}
-            rapTotalLiquidado={rapTotalLiquidado}
-            rapTotalPago={rapTotalPago}
+            rapTotalReinscrito={rapTotalReinscrito}
+            rapTotalLiquidadoNoAno={rapTotalLiquidadoNoAno}
+            rapTotalSaldoAtual={rapTotalSaldoAtual}
             filteredRapCount={filteredData.empenhosRap.length}
             dadosRapPorOrigem={dadosRapPorOrigem}
           />
