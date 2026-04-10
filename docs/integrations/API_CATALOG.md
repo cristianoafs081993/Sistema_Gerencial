@@ -175,7 +175,9 @@ Status:
 
 - o frontend monta a URL por `getSupabaseFunctionUrl('consultor')`
 - a implementacao da function nao foi localizada no repo nesta rodada
-- as conversas do frontend ficam em `localStorage` com chave derivada do usuario autenticado, evitando compartilhar historico entre contas no mesmo navegador
+- a rota `/consultor` esta temporariamente publica para demonstracao e reutiliza a `anon key` do projeto na chamada HTTP
+- o frontend envia `Authorization: Bearer <anon key>` e `apikey` ao chamar a function
+- as conversas do frontend ficam em `localStorage` com chave derivada do usuario autenticado ou na chave fixa `consultor-chat-sessions:v2:anonymous-preview` quando aberto sem login
 
 ## 7. Edge Function `verificar-conformidade`
 

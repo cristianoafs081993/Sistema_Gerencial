@@ -25,7 +25,7 @@ Esse fluxo agora concentra:
 - aceite de convite ou recuperacao de acesso na rota publica `/auth`
 - definicao de senha inicial por `supabase.auth.updateUser`
 - encerramento da sessao no cabecalho global do layout
-- protecao de todas as rotas por um guard central antes do `Layout`
+- sessao global consumida pelas telas autenticadas, mesmo com o roteamento temporariamente aberto para demonstracao
 - derivacao local de permissoes de superadministrador pelo e-mail autenticado
 
 ## Camada 2: origem do dado
@@ -142,8 +142,10 @@ Observacoes:
 - a pagina [Auth.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Auth.tsx) centraliza login, convite e redefinicao de senha
 - convites enviados pelo cabecalho usam a Edge Function `invite-user` e retornam para `/auth?mode=invite`
 - o cliente Supabase ficou com `detectSessionInUrl` habilitado para consumir o token do link de convite ou recuperacao
+- o roteamento principal esta temporariamente sem `ProtectedRoute` para demonstracao; a autenticao continua disponivel via `AuthContext`
 - no estado atual, uploads e importacoes do frontend so aparecem para `cristiano.cnrn@gmail.com`
-- o Consultor salva sessoes em `localStorage`, mas agora com chave isolada por usuario autenticado em vez de um historico global compartilhado
+- a rota `/consultor` fica em um shell publico separado, reutilizando o `Layout` sem carregar o `DataContext`
+- o Consultor salva sessoes em `localStorage` por usuario autenticado e usa a chave `consultor-chat-sessions:v2:anonymous-preview` quando aberto sem login
 - no Consultor, o upload de PDF fica liberado para qualquer usuario autenticado; a restricao de superadmin continua apenas nos uploads/importacoes CSV das demais telas
 
 ## Regras de cautela

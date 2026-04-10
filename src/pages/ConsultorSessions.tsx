@@ -37,6 +37,8 @@ import { cn } from '@/lib/utils';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
+const ANONYMOUS_STORAGE_KEY = 'consultor-chat-sessions:v2:anonymous-preview';
+
 const loadingTexts = [
   'Analisando normativos do IFRN...',
   'Consultando a base juridica...',
@@ -67,7 +69,11 @@ type PendingAttachment = {
 
 export default function ConsultorSessions() {
   const { user } = useAuth();
-  const storageKey = useMemo(() => getConsultorStorageKey(user?.id, user?.email), [user?.email, user?.id]);
+  const isAnonymousPreview = !user?.id && !user?.email;
+  const storageKey = useMemo(
+    () => getConsultorStorageKey(user?.id, user?.email) || ANONYMOUS_STORAGE_KEY,
+    [user?.email, user?.id],
+  );
   const [sessions, setSessions] = useState<ConsultorSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [portalTargets, setPortalTargets] = useState<{
@@ -173,7 +179,11 @@ export default function ConsultorSessions() {
 
   const handleClearHistory = () => {
     if (!storageKey) return;
-    if (!window.confirm('Limpar todas as conversas salvas deste usuario neste navegador?')) {
+    const confirmMessage = isAnonymousPreview
+      ? 'Limpar todas as conversas salvas deste navegador no modo demonstracao?'
+      : 'Limpar todas as conversas salvas deste usuario neste navegador?';
+
+    if (!window.confirm(confirmMessage)) {
       return;
     }
 
@@ -183,7 +193,11 @@ export default function ConsultorSessions() {
     setActiveSessionId(resetSessions[0].id);
     setAttachedFile(null);
     setInput('');
-    toast.success('Historico do Consultor limpo para este usuario.');
+    toast.success(
+      isAnonymousPreview
+        ? 'Historico do Consultor limpo neste navegador.'
+        : 'Historico do Consultor limpo para este usuario.',
+    );
   };
 
   const handleDeleteSession = (sessionId: string) => {
@@ -307,6 +321,7 @@ export default function ConsultorSessions() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          apikey: anonKey,
           Authorization: `Bearer ${anonKey}`,
         },
         body: JSON.stringify({
@@ -319,7 +334,32 @@ export default function ConsultorSessions() {
       });
 
       if (!response.ok) {
-        throw new Error('Falha de conexao com o Consultor.');
+        let errorMessage = 'Falha de conexao com o Consultor.';
+
+        try {
+          const responseText = await response.text();
+          if (responseText) {
+            try {
+              const parsedBody = JSON.parse(responseText);
+              const parsedMessage =
+                parsedBody?.error ||
+                parsedBody?.message ||
+                parsedBody?.msg ||
+                parsedBody?.details ||
+                parsedBody?.hint;
+
+              if (typeof parsedMessage === 'string' && parsedMessage.trim()) {
+                errorMessage = parsedMessage.trim();
+              }
+            } catch {
+              errorMessage = responseText.trim() || errorMessage;
+            }
+          }
+        } catch {
+          // Mantem a mensagem padrao quando nao for possivel ler o corpo.
+        }
+
+        throw new Error(errorMessage);
       }
 
       if (!response.body) {
@@ -440,6 +480,11 @@ export default function ConsultorSessions() {
       {portalTargets.actions &&
         createPortal(
           <div className="flex items-center gap-2">
+            {isAnonymousPreview && (
+              <span className="inline-flex h-8 items-center rounded-full border border-amber-200 bg-amber-50 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-700">
+                Modo demonstracao
+              </span>
+            )}
             <Button
               type="button"
               variant="ghost"

@@ -1,7 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Outlet, Route, Routes } from 'react-router-dom';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Layout } from '@/components/Layout';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { Toaster } from '@/components/ui/toaster';
@@ -53,6 +52,14 @@ const AppShell = () => (
   </DataProvider>
 );
 
+const PublicShell = () => (
+  <Layout>
+    <Suspense fallback={<RouteFallback />}>
+      <Outlet />
+    </Suspense>
+  </Layout>
+);
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -68,33 +75,33 @@ const App = () => (
           <Suspense fallback={<RouteFallback />}>
             <Routes>
               <Route path="/auth" element={<AuthPage />} />
-              <Route element={<ProtectedRoute />}>
-                <Route element={<AppShell />}>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/atividades" element={<Atividades />} />
-                  <Route path="/descentralizacoes" element={<Descentralizacoes />} />
-                  <Route path="/empenhos" element={<Empenhos />} />
-                  <Route path="/contratos" element={<Contratos />} />
-                  <Route path="/liquidacoes-pagamentos" element={<LiquidacoesPagamentos />} />
-                  <Route path="/financeiro" element={<Financeiro />} />
-                  <Route path="/lc" element={<LCPage />} />
-                  <Route path="/retencoes-efd-reinf" element={<RetencoesEfdReinfPage />} />
-                  <Route path="/rastreabilidade-pfs" element={<RastreabilidadePFs />} />
-                  <Route path="/conciliacao-pfs" element={<ConciliacaoPfs />} />
-                  <Route path="/gerador-documentos" element={<GeradorDocumentos />} />
-                  <Route path="/editor-documentos" element={<EditorDocumentos />} />
-                  <Route path="/consultor" element={<Consultor />} />
-                  <Route path="/suap" element={<Suap />} />
-                  <Route path="/design-system-preview" element={<DesignSystemPreview />} />
-                  {atasModuleConfig.enabled && (
-                    <>
-                      <Route path="/atas/adesao" element={<AtasAdesao />} />
-                      <Route path="/atas/pesquisa-precos" element={<AtasPesquisaPrecos />} />
-                      <Route path="/atas/observabilidade" element={<AtasObservabilidade />} />
-                    </>
-                  )}
-                  <Route path="*" element={<NotFound />} />
-                </Route>
+              <Route element={<PublicShell />}>
+                <Route path="/consultor" element={<Consultor />} />
+              </Route>
+              <Route element={<AppShell />}>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/atividades" element={<Atividades />} />
+                <Route path="/descentralizacoes" element={<Descentralizacoes />} />
+                <Route path="/empenhos" element={<Empenhos />} />
+                <Route path="/contratos" element={<Contratos />} />
+                <Route path="/liquidacoes-pagamentos" element={<LiquidacoesPagamentos />} />
+                <Route path="/financeiro" element={<Financeiro />} />
+                <Route path="/lc" element={<LCPage />} />
+                <Route path="/retencoes-efd-reinf" element={<RetencoesEfdReinfPage />} />
+                <Route path="/rastreabilidade-pfs" element={<RastreabilidadePFs />} />
+                <Route path="/conciliacao-pfs" element={<ConciliacaoPfs />} />
+                <Route path="/gerador-documentos" element={<GeradorDocumentos />} />
+                <Route path="/editor-documentos" element={<EditorDocumentos />} />
+                <Route path="/suap" element={<Suap />} />
+                <Route path="/design-system-preview" element={<DesignSystemPreview />} />
+                {atasModuleConfig.enabled && (
+                  <>
+                    <Route path="/atas/adesao" element={<AtasAdesao />} />
+                    <Route path="/atas/pesquisa-precos" element={<AtasPesquisaPrecos />} />
+                    <Route path="/atas/observabilidade" element={<AtasObservabilidade />} />
+                  </>
+                )}
+                <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>
           </Suspense>

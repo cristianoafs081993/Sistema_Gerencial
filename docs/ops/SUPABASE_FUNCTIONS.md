@@ -78,6 +78,8 @@ Observacao:
 
 - o frontend monta a URL para `functions/v1/consultor`
 - a implementacao nao foi localizada em `supabase/functions`
+- a rota `/consultor` esta temporariamente fora do `ProtectedRoute` para demonstracao
+- o frontend envia `Authorization: Bearer <anon key>` e `apikey` na chamada publica atual
 
 ### `verificar-conformidade`
 
