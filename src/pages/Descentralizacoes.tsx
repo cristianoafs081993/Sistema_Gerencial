@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Trash2, Search, Filter, Upload, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, Filter, Upload, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Descentralizacao, DIMENSOES } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -23,14 +23,21 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 
-import { ConfirmDialog } from '@/components/modals/ConfirmDialog';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { HeaderActions } from '@/components/HeaderParts';
+import { FilterPanel } from '@/components/design-system/FilterPanel';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { formatCurrency, parseCurrency } from '@/lib/utils';
-import { Checkbox } from '@/components/ui/checkbox';
+import { formatCurrency } from '@/lib/utils';
+import { descentralizacoesService } from '@/services/descentralizacoes';
+import { matchesDimensionFilter } from '@/utils/dimensionFilters';
+import {
+    createDescentralizacaoImportIdentity,
+    shouldImportDescentralizacaoAsNegative,
+    summarizeNotaCredito,
+} from '@/utils/descentralizacoesImport';
 
 // Mapeamento de sufixo de PI para código de dimensão
 const PI_DIMENSAO_MAP: Record<string, string> = {
@@ -86,7 +93,8 @@ function parseValorBR(valorStr: string): number {
 }
 
 export default function Descentralizacoes() {
-    const { descentralizacoes, isLoading, addDescentralizacao, deleteDescentralizacao } = useData();
+    const { isSuperAdmin } = useAuth();
+    const { descentralizacoes, isLoading, addDescentralizacao, refreshData } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [filterDimensao, setFilterDimensao] = useState('all');
     const [filterOrigem, setFilterOrigem] = useState('all');
@@ -95,9 +103,9 @@ export default function Descentralizacoes() {
     // Sorting
     const [sortConfig, setSortConfig] = useState<{ key: keyof Descentralizacao; direction: 'asc' | 'desc' } | null>(null);
 
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
-    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+    const [isDevolucoesDialogOpen, setIsDevolucoesDialogOpen] = useState(false);
 
     // Extrair opções únicas para os filtros
     const origensUnicas = Array.from(new Set(descentralizacoes.map(d => d.origemRecurso?.trim()).filter(Boolean))).sort();
@@ -109,7 +117,12 @@ export default function Descentralizacoes() {
             (d.planoInterno || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
             (d.descricao || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-        const matchesDimensao = filterDimensao === 'all' || d.dimensao.includes(filterDimensao);
+        const matchesDimensao = matchesDimensionFilter({
+            dimensionValue: d.dimensao,
+            planInternal: d.planoInterno,
+            description: d.descricao,
+            filterValue: filterDimensao,
+        });
         const matchesOrigem = filterOrigem === 'all' || d.origemRecurso?.trim() === filterOrigem;
 
         return matchesSearch && matchesDimensao && matchesOrigem;
@@ -150,69 +163,80 @@ export default function Descentralizacoes() {
     const totalFiltrado = sortedDescentralizacoes.reduce((sum, d) => sum + d.valor, 0);
 
 
-
-    const handleSelectAll = (checked: boolean) => {
-        if (checked) {
-            setSelectedIds(new Set(sortedDescentralizacoes.map((d) => d.id)));
-        } else {
-            setSelectedIds(new Set());
-        }
-    };
-
-    const handleSelectOne = (id: string, checked: boolean) => {
-        const newSelected = new Set(selectedIds);
-        if (checked) {
-            newSelected.add(id);
-        } else {
-            newSelected.delete(id);
-        }
-        setSelectedIds(newSelected);
-    };
-
-    const handleBulkDelete = () => {
-        selectedIds.forEach((id) => deleteDescentralizacao(id));
-        setSelectedIds(new Set());
-        setIsDeleteDialogOpen(false);
-        toast.success(`${selectedIds.size} descentralizações excluídas com sucesso!`);
-    };
-
     const handleCsvImport = (data: Record<string, string>[]) => {
-        // Build deduplication set from existing records (in memory)
-        const existingKeys = new Set(
+        // Build deduplication set from existing persisted records.
+        const existingBaseKeys = new Set(
             descentralizacoes.map(d => {
                 const dateStr = d.dataEmissao ? d.dataEmissao.toISOString().split('T')[0] : '';
                 return `${dateStr}|${(d.planoInterno || '').trim().toUpperCase()}|${(d.origemRecurso || '').trim()}|${(d.naturezaDespesa || '').trim()}|${d.valor}`;
             })
         );
+        const importedRowKeys = new Set<string>();
 
         let importCount = 0;
         let skipCount = 0;
 
+        const findValue = (row: Record<string, string>, patterns: RegExp[], fallbacks: string[] = []) => {
+            for (const key of fallbacks) {
+                if (row[key] != null && String(row[key]).trim() !== '') return row[key];
+            }
+            const keys = Object.keys(row);
+            for (const k of keys) {
+                if (patterns.some(p => p.test(k))) {
+                    const v = row[k];
+                    if (v != null && String(v).trim() !== '') return v;
+                }
+            }
+            return '';
+        };
+
         data.forEach((row) => {
-            const planoInterno = row['nccelula-planointerno'] || row['planointerno'] || row['plano_interno'] || '';
-            const origemRecurso = row['nccelula-ptres'] || row['origemrecurso'] || row['origem_recurso'] || '';
-            const naturezaDespesa = row['nccelula-naturezadespesa'] || row['naturezadespesa'] || row['natureza_despesa'] || '';
-            const valorStr = row['nccelula-valor'] || row['valor'] || '0';
-            const dataEmissaoStr = row['nc-diaemissao'] || row['dataemissao'] || row['data_emissao'] || '';
-            const descricao = row['nc-descricao'] || row['descricao'] || '';
+            // O JsonImportDialog normaliza headers removendo acentos e tudo que nao e [a-z0-9].
+            // Para os arquivos novos, as chaves mais comuns ficam como: nc, ncoperacaotipo,
+            // ncdiaemissao, ncdescricao, nccelulaptres, nccelulanaturezadespesa,
+            // nccelulaplanointerno, nccelulavalor.
+            const notaCredito = summarizeNotaCredito(
+                findValue(row, [/^nc$/i, /notacredito/i, /notadecredito/i], ['nc', 'notacredito', 'notadecredito']),
+            );
+            const operacaoTipo = findValue(
+                row,
+                [/operacaotip/i, /tipooperacao/i, /operacao/i],
+                ['ncoperacaotipo', 'operacaotipo', 'tipooperacao'],
+            );
+            const planoInterno = findValue(row, [/planointern/i, /plano/i], ['nccelulaplanointerno', 'planointerno', 'plano_interno', 'plano']);
+            const origemRecurso = findValue(row, [/ptres/i, /origemrecurso/i, /origem/i], ['nccelulaptres', 'origemrecurso', 'origem_recurso', 'ptres']);
+            const naturezaDespesa = findValue(row, [/naturezadesp/i, /natureza/i], ['nccelulanaturezadespesa', 'naturezadespesa', 'natureza_despesa', 'natureza']);
+            const valorStr = findValue(row, [/valor/i], ['nccelulavalor', 'valor']);
+            const dataEmissaoStr = findValue(row, [/diaemiss/i, /dataemiss/i, /data/i], ['ncdiaemissao', 'dataemissao', 'data_emissao']);
+            const descricao = findValue(row, [/descr/i], ['ncdescricao', 'descricao', 'ncdrescricao']);
 
             const piNorm = planoInterno.trim().toUpperCase();
             const orNorm = origemRecurso.trim();
             const ndNorm = naturezaDespesa.trim();
-            const valor = parseValorBR(valorStr);
+            let valor = parseValorBR(valorStr || '0');
 
-            // Check for duplicate (date + PI + PTRES + ND + valor)
+            if (shouldImportDescentralizacaoAsNegative({ operationType: operacaoTipo, description: descricao })) {
+                valor = -Math.abs(valor);
+            }
+
             const dataEmissao = parseDateBR(dataEmissaoStr);
             const dateKey = dataEmissao ? dataEmissao.toISOString().split('T')[0] : '';
-            const key = `${dateKey}|${piNorm}|${orNorm}|${ndNorm}|${valor}`;
-            if (existingKeys.has(key)) {
+            const { baseKey, rowKey } = createDescentralizacaoImportIdentity({
+                dateKey,
+                planoInterno: piNorm,
+                origemRecurso: orNorm,
+                naturezaDespesa: ndNorm,
+                valor,
+                notaCredito,
+            });
+            if (existingBaseKeys.has(baseKey) || importedRowKeys.has(rowKey)) {
                 skipCount++;
                 return;
             }
 
             const dimensao = deriveDimensaoFromPI(planoInterno);
 
-            const descentralizacao: any = {
+            const descentralizacao: Omit<Descentralizacao, 'id' | 'createdAt' | 'updatedAt'> = {
                 dimensao,
                 origemRecurso: orNorm,
                 naturezaDespesa: ndNorm,
@@ -225,9 +249,9 @@ export default function Descentralizacoes() {
                 descentralizacao.dataEmissao = dataEmissao;
             }
 
-            if (valor > 0) {
+            if (valor !== 0) {
                 addDescentralizacao(descentralizacao);
-                existingKeys.add(key); // prevent duplicates within the same CSV
+                importedRowKeys.add(rowKey);
                 importCount++;
             }
         });
@@ -241,7 +265,98 @@ export default function Descentralizacoes() {
         }
     };
 
+    const handleDevolucoesImport = async (data: Record<string, string>[]) => {
+        let importCount = 0;
+        let skipCount = 0;
+
+        const existingKeys = new Set(
+            descentralizacoes.map(d => {
+                const dateStr = d.dataEmissao ? d.dataEmissao.toISOString().split('T')[0] : '';
+                return `${dateStr}|${(d.origemRecurso || '').trim()}|${(d.naturezaDespesa || '').trim()}|${(d.planoInterno || '').trim().toUpperCase()}|${d.valor}`;
+            })
+        );
+
+        const findValue = (row: Record<string, string>, patterns: RegExp[], fallbacks: string[] = []) => {
+            for (const key of fallbacks) {
+                if (row[key] != null && String(row[key]).trim() !== '') return row[key];
+            }
+            const keys = Object.keys(row);
+            for (const k of keys) {
+                if (patterns.some(p => p.test(k))) {
+                    const v = row[k];
+                    if (v != null && String(v).trim() !== '') return v;
+                }
+            }
+            return '';
+        };
+
+        for (const row of data) {
+            // Obs: o JsonImportDialog já normaliza as chaves (lowercase + remove acentos + remove não-alfanuméricos),
+            // mas quando o CSV vem com encoding ruim, algumas letras podem "sumir". Por isso, buscamos por padrões.
+            const diaEmissaoStr = findValue(row, [/diaemiss/i, /ncdiaemiss/i], ['ncdiaemissao', 'ncdiaemisso', 'dataemissao', 'data']);
+            const descricao = findValue(row, [/descr/i, /ncdescr/i], ['ncdescricao', 'descricao']);
+            const ptres = findValue(row, [/ptres/i], ['nccelulaptres', 'ptres', 'origemrecurso']);
+            const naturezaDespesa = findValue(row, [/naturezadesp/i, /natureza/i], ['nccelulanaturezadespesa', 'naturezadespesa', 'natureza']);
+            const planoInterno = findValue(row, [/planointern/i, /plano/i], ['nccelulaplanointerno', 'planointerno', 'plano']);
+            const valorStr = findValue(row, [/valor/i], ['nccelulavalor', 'valor']);
+
+            if (!diaEmissaoStr || !ptres || !naturezaDespesa || !planoInterno || valorStr === undefined || valorStr === null) {
+                skipCount++;
+                continue;
+            }
+
+            const dataEmissao = parseDateBR(diaEmissaoStr);
+            if (!dataEmissao) {
+                skipCount++;
+                continue;
+            }
+
+            const parsedValor = parseValorBR(String(valorStr));
+            if (!parsedValor || isNaN(parsedValor)) {
+                skipCount++;
+                continue;
+            }
+
+            const piNorm = String(planoInterno).trim().toUpperCase();
+            const ptresNorm = String(ptres).trim();
+            const ndNorm = String(naturezaDespesa).trim();
+            const descricaoNorm = String(descricao || '').trim() || 'DEVOLUCAO';
+            const dateKey = dataEmissao.toISOString().split('T')[0];
+            const valorNeg = -Math.abs(parsedValor);
+
+            const key = `${dateKey}|${ptresNorm}|${ndNorm}|${piNorm}|${valorNeg}`;
+            if (existingKeys.has(key)) {
+                skipCount++;
+                continue;
+            }
+
+            const dimensao = deriveDimensaoFromPI(piNorm);
+
+            const result = await descentralizacoesService.processDevolucao({
+                dataEmissao: dateKey,
+                descricao: descricaoNorm,
+                ptres: ptresNorm,
+                naturezaDespesa: ndNorm,
+                planoInterno: piNorm,
+                valor: parsedValor,
+                dimensao,
+            });
+
+            if (result) {
+                importCount++;
+                existingKeys.add(key);
+            } else {
+                skipCount++;
+            }
+        }
+
+        await refreshData();
+        toast.success(`${importCount} devolução(ões) processada(s), ${skipCount} linha(s) ignorada(s).`);
+    };
+
     const descentralizacoesCsvFields = [
+        'NC',
+        'NC - Operacao (Tipo)',
         'NC - Dia Emissão',
         'NC - Descrição',
         'NC Célula - PTRES',
@@ -252,12 +367,8 @@ export default function Descentralizacoes() {
     return (
         <div className="space-y-6 pb-10">
             <HeaderActions>
-                {selectedIds.size > 0 && (
-                    <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)} className="gap-2 h-8 text-xs sm:h-9 sm:text-sm shadow-sm transition-all">
-                        <Trash2 className="h-4 w-4" />
-                        Excluir ({selectedIds.size})
-                    </Button>
-                )}
+                {isSuperAdmin ? (
+                    <>
                 <Button 
                     variant="outline" 
                     onClick={() => setIsImportDialogOpen(true)} 
@@ -266,6 +377,16 @@ export default function Descentralizacoes() {
                     <Upload className="h-4 w-4 text-action-primary" />
                     Importar CSV
                 </Button>
+                <Button 
+                    variant="outline" 
+                    onClick={() => setIsDevolucoesDialogOpen(true)} 
+                    className="gap-2 h-8 text-xs sm:h-9 sm:text-sm bg-surface-card border-border-default shadow-sm transition-all"
+                >
+                    <Upload className="h-4 w-4 text-action-primary" />
+                    Importar Devoluções
+                </Button>
+                    </>
+                ) : null}
             </HeaderActions>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -296,10 +417,7 @@ export default function Descentralizacoes() {
             </div>
 
             {/* Filters */}
-            <Card className="card-system">
-                <CardHeader className="pb-3 px-0 pt-0">
-                    <CardTitle className="text-xl font-bold">Filtros</CardTitle>
-                </CardHeader>
+            <FilterPanel className="shadow-sm">
                 <CardContent className="p-0">
                     <div className="flex flex-col sm:flex-row gap-4">
                         <div className="relative flex-1">
@@ -311,7 +429,7 @@ export default function Descentralizacoes() {
                                 className="pl-9 h-10 text-sm input-system"
                             />
                         </div>
-                        <div className="w-full sm:w-[150px]">
+                        <div className="w-full sm:w-[190px]">
                             <Select value={filterDimensao} onValueChange={setFilterDimensao}>
                                 <SelectTrigger className="input-system h-10">
                                     <SelectValue placeholder="Dimensão" />
@@ -369,12 +487,12 @@ export default function Descentralizacoes() {
                         </div>
                     )}
                 </CardContent>
-            </Card>
+            </FilterPanel>
 
             {/* Table */}
             <Card className="card-system overflow-hidden border-none shadow-none mt-6">
                 <CardHeader className="px-6 py-4 border-b border-border-default/50 flex flex-row items-center justify-between">
-                    <CardTitle className="text-base font-semibold">
+                    <CardTitle className="table-title">
                         <span>{sortedDescentralizacoes.length} {sortedDescentralizacoes.length !== 1 ? 'descentralizações' : 'descentralização'} encontrada{sortedDescentralizacoes.length !== 1 ? 's' : ''}</span>
                     </CardTitle>
                     <Badge variant="secondary" className="text-sm px-3 py-1 bg-slate-100 text-slate-700 border-none">
@@ -382,40 +500,31 @@ export default function Descentralizacoes() {
                     </Badge>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <Table>
+                    <div className="overflow-hidden">
+                        <Table className="table-fixed w-full">
                             <TableHeader className="bg-slate-50/50">
                                 <TableRow className="hover:bg-transparent border-b border-border-default/50">
-                                    <TableHead className="h-11 px-6 w-10">
-                                        <Checkbox
-                                            checked={
-                                                sortedDescentralizacoes.length > 0 &&
-                                                sortedDescentralizacoes.every((d) => selectedIds.has(d.id))
-                                            }
-                                            onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
-                                        />
-                                    </TableHead>
-                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">
+                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider w-[108px]">
                                         <Button variant="ghost" className="hover:bg-transparent px-0 font-semibold text-xs uppercase tracking-wider" onClick={() => requestSort('dataEmissao')}>
                                             Data {getSortIcon('dataEmissao')}
                                         </Button>
                                     </TableHead>
-                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">
+                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider w-[112px]">
                                         <Button variant="ghost" className="hover:bg-transparent px-0 font-semibold text-xs uppercase tracking-wider" onClick={() => requestSort('dimensao')}>
                                             Dimensão {getSortIcon('dimensao')}
                                         </Button>
                                     </TableHead>
-                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">
+                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider w-[112px]">
                                         <Button variant="ghost" className="hover:bg-transparent px-0 font-semibold text-xs uppercase tracking-wider" onClick={() => requestSort('origemRecurso')}>
                                             PTRES {getSortIcon('origemRecurso')}
                                         </Button>
                                     </TableHead>
-                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">
+                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider hidden xl:table-cell w-[110px]">
                                         <Button variant="ghost" className="hover:bg-transparent px-0 font-semibold text-xs uppercase tracking-wider" onClick={() => requestSort('naturezaDespesa')}>
                                             ND {getSortIcon('naturezaDespesa')}
                                         </Button>
                                     </TableHead>
-                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">
+                                    <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider hidden xl:table-cell w-[140px]">
                                         <Button variant="ghost" className="hover:bg-transparent px-0 font-semibold text-xs uppercase tracking-wider" onClick={() => requestSort('planoInterno')}>
                                             PI {getSortIcon('planoInterno')}
                                         </Button>
@@ -434,29 +543,22 @@ export default function Descentralizacoes() {
                                 {isLoading ? (
                                     Array.from({ length: 5 }).map((_, i) => (
                                         <TableRow key={i}>
-                                            <TableCell className="px-6"><Skeleton className="h-4 w-4 rounded" /></TableCell>
                                             <TableCell className="px-4"><Skeleton className="h-4 w-20" /></TableCell>
                                             <TableCell className="px-4"><Skeleton className="h-5 w-16" /></TableCell>
                                             <TableCell className="px-4"><Skeleton className="h-4 w-20" /></TableCell>
-                                            <TableCell className="px-4"><Skeleton className="h-4 w-16" /></TableCell>
-                                            <TableCell className="px-4"><Skeleton className="h-4 w-28" /></TableCell>
+                                            <TableCell className="px-4 hidden xl:table-cell"><Skeleton className="h-4 w-16" /></TableCell>
+                                            <TableCell className="px-4 hidden xl:table-cell"><Skeleton className="h-4 w-28" /></TableCell>
                                             <TableCell className="px-4"><Skeleton className="h-4 w-32" /></TableCell>
                                             <TableCell className="px-6"><Skeleton className="h-4 w-24 ml-auto" /></TableCell>
                                         </TableRow>
                                     ))
                                 ) : sortedDescentralizacoes.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={8} className="h-32 text-center text-muted-foreground italic">Nenhuma descentralização encontrada.</TableCell>
+                                        <TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic">Nenhuma descentralização encontrada.</TableCell>
                                     </TableRow>
                                 ) : (
                                     sortedDescentralizacoes.map((descentralizacao) => (
                                         <TableRow key={descentralizacao.id} className="hover:bg-slate-50/80 transition-colors border-b last:border-0">
-                                            <TableCell className="py-4 px-6">
-                                                <Checkbox
-                                                    checked={selectedIds.has(descentralizacao.id)}
-                                                    onCheckedChange={(checked) => handleSelectOne(descentralizacao.id, checked as boolean)}
-                                                />
-                                            </TableCell>
                                             <TableCell className="py-4 px-4">
                                                 <span className="text-sm text-muted-foreground whitespace-nowrap">{formatDateBR(descentralizacao.dataEmissao)}</span>
                                             </TableCell>
@@ -468,19 +570,21 @@ export default function Descentralizacoes() {
                                             <TableCell className="py-4 px-4">
                                                 <span className="text-sm font-medium">{descentralizacao.origemRecurso}</span>
                                             </TableCell>
-                                            <TableCell className="py-4 px-4">
+                                            <TableCell className="py-4 px-4 hidden xl:table-cell">
                                                 <span className="text-sm text-muted-foreground">{descentralizacao.naturezaDespesa || '-'}</span>
                                             </TableCell>
-                                            <TableCell className="py-4 px-4">
+                                            <TableCell className="py-4 px-4 hidden xl:table-cell">
                                                 <span className="text-sm text-muted-foreground">{descentralizacao.planoInterno || '-'}</span>
                                             </TableCell>
-                                            <TableCell className="py-4 px-4 max-w-[200px]">
-                                                <span className="text-xs text-muted-foreground line-clamp-2" title={descentralizacao.descricao || ''}>
+                                            <TableCell className="py-4 px-4 min-w-0">
+                                                <span className="text-xs text-muted-foreground block truncate" title={descentralizacao.descricao || ''}>
                                                     {descentralizacao.descricao || '-'}
                                                 </span>
                                             </TableCell>
                                             <TableCell className="py-4 px-6 text-right">
-                                                <span className="font-bold text-sm text-action-primary">{formatCurrency(descentralizacao.valor)}</span>
+                                                <span className={`font-bold text-sm ${descentralizacao.valor < 0 ? 'text-red-600' : 'text-action-primary'}`}>
+                                                    {formatCurrency(descentralizacao.valor)}
+                                                </span>
                                             </TableCell>
                                         </TableRow>
                                     ))
@@ -490,18 +594,9 @@ export default function Descentralizacoes() {
                     </div>
                 </CardContent>
             </Card>
-
-
-            <ConfirmDialog
-                open={isDeleteDialogOpen}
-                onOpenChange={setIsDeleteDialogOpen}
-                onConfirm={handleBulkDelete}
-                title="Confirmar exclusão"
-                description={`Tem certeza que deseja excluir as ${selectedIds.size} descentralizações selecionadas? Esta ação não pode ser desfeita.`}
-                confirmText="Excluir"
-            />
-
             {/* CSV/JSON Import Dialog */}
+            {isSuperAdmin ? (
+                <>
             <JsonImportDialog
                 open={isImportDialogOpen}
                 onOpenChange={setIsImportDialogOpen}
@@ -509,8 +604,20 @@ export default function Descentralizacoes() {
                 title="Importar Descentralizações"
                 expectedFields={descentralizacoesCsvFields}
                 acceptCsv={true}
-                csvSeparator=";"
+                csvSeparator="\t"
             />
+            <JsonImportDialog
+                open={isDevolucoesDialogOpen}
+                onOpenChange={setIsDevolucoesDialogOpen}
+                onImport={handleDevolucoesImport}
+                title="Importar Devoluções"
+                expectedFields={["NC - Dia Emissão", "NC - Descrição", "NC Célula - PTRES", "NC Célula - Natureza Despesa", "NC Célula - Plano Interno", "NC Célula - Valor"]}
+                acceptCsv={true}
+                csvSeparator="\t"
+            />
+                </>
+            ) : null}
         </div>
     );
 }
+

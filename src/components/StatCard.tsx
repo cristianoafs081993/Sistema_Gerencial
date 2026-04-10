@@ -87,9 +87,9 @@ export function StatCard({
         )} />
 
         <div className="flex items-start justify-between mb-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {title}
-          </p>
+          </div>
           {/* Ícone com glassmorphism leve */}
           <div className={cn("p-2 rounded-xl", iconBgMap[stitchColor])}>
             <Icon className="w-4 h-4" />
@@ -158,12 +158,12 @@ export function StatCard({
         <Icon className="h-5 w-5" />
       </div>
       <div className="pr-16">
-        <p className={cn(
+        <div className={cn(
           "text-sm font-medium",
           variant === 'default' ? 'text-muted-foreground' : 'text-white/80'
         )}>
           {title}
-        </p>
+        </div>
         {isLoading ? (
           <Skeleton className="h-9 w-1/2 mt-2 mb-1" />
         ) : (

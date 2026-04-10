@@ -1,14 +1,18 @@
 import { supabase } from '@/lib/supabase';
-import { DocumentoDespesa, DocumentoDespesaAPI, OperacaoEmpenho, DocumentoItem, Retencao } from '@/types';
+import { DocumentoDespesa, DocumentoDespesaAPI, OperacaoEmpenho, DocumentoItem, Retencao, CreditoDisponivel } from '@/types';
 import { parseCurrency } from '@/lib/utils';
 import { addDays, format, isAfter, isBefore, parse } from 'date-fns';
 import { dominioService } from './dominio';
+import { creditosDisponiveisService } from './creditosDisponiveis';
 
 const API_BASE = '/api-transparencia/api-de-dados/despesas/documentos';
 const API_HISTORICO = '/api-transparencia/api-de-dados/despesas/itens-de-empenho/historico';
 const UNIDADE_GESTORA = '158366';
 const GESTAO = '26435';
 const API_KEY = '931d4d57337bef94e775337c318342e9';
+const DOCUMENTOS_HABEIS_SELECT = 'id,valor_original,valor_pago,estado,processo,favorecido_nome,favorecido_documento,data_emissao,fonte_sof,empenho_id';
+const DOCUMENTOS_HABEIS_ITENS_SELECT = 'id,documento_habil_id,doc_tipo,data_emissao,valor,observacao';
+const DOCUMENTOS_HABEIS_SITUACOES_SELECT = 'id,documento_habil_id,situacao_codigo,valor,is_retencao,created_at';
 
 // Delay para evitar Rate Limit (se necessário)
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -17,6 +21,33 @@ const normalizeDocId = (id: string | undefined): string => {
     if (!id) return '';
     const trimmed = id.trim();
     return trimmed.length > 12 ? trimmed.slice(-12) : trimmed;
+};
+
+type DocumentoImportState = {
+    doc: {
+        id: string;
+        valor_original: number;
+        processo: string;
+        estado: string;
+        favorecido_documento: string;
+        favorecido_nome: string;
+        data_emissao: string;
+        updated_at: string;
+    };
+    situacoes: Map<string, {
+        documento_habil_id: string;
+        situacao_codigo: string;
+        valor: number;
+        is_retencao: boolean;
+    }>;
+    itens: Map<string, {
+        id: string;
+        documento_habil_id: string;
+        doc_tipo: string;
+        valor: number;
+        data_emissao: string;
+        observacao: string;
+    }>;
 };
 
 export const transparenciaService = {
@@ -62,31 +93,31 @@ export const transparenciaService = {
         const { data, error, count } = await query;
         if (error) throw error;
 
-        const mappedData: DocumentoDespesa[] = (data as any[]).map((doc) => ({
-            id: doc.id,
+        const mappedData: DocumentoDespesa[] = (data as Array<Record<string, unknown>>).map((doc) => ({
+            id: String(doc.id || ''),
             valor_original: Number(doc.valor_original || 0),
             valor_pago: Number(doc.valor_pago || 0),
-            estado: doc.estado || 'PENDENTE DE REALIZAÇÃO',
-            processo: doc.processo || '',
-            favorecido_nome: doc.favorecido_nome || '',
-            favorecido_documento: doc.favorecido_documento || '',
-            data_emissao: doc.data_emissao,
-            fonte_sof: doc.fonte_sof,
-            empenho_id: doc.empenho_id,
-            itens: (doc.itens || []).map((item: any) => ({
-                id: item.id,
-                documento_habil_id: item.documento_habil_id,
-                doc_tipo: item.doc_tipo,
-                data_emissao: item.data_emissao,
+            estado: String(doc.estado || 'PENDENTE DE REALIZAÇÃO'),
+            processo: String(doc.processo || ''),
+            favorecido_nome: String(doc.favorecido_nome || ''),
+            favorecido_documento: String(doc.favorecido_documento || ''),
+            data_emissao: String(doc.data_emissao || ''),
+            fonte_sof: doc.fonte_sof ? String(doc.fonte_sof) : undefined,
+            empenho_id: doc.empenho_id ? String(doc.empenho_id) : undefined,
+            itens: ((doc.itens || []) as Array<Record<string, unknown>>).map((item) => ({
+                id: String(item.id || ''),
+                documento_habil_id: String(item.documento_habil_id || ''),
+                doc_tipo: String(item.doc_tipo || ''),
+                data_emissao: item.data_emissao ? String(item.data_emissao) : undefined,
                 valor: Number(item.valor || 0),
-                observacao: item.observacao
+                observacao: item.observacao ? String(item.observacao) : undefined
             })),
-            situacoes: (doc.situacoes || []).map((sit: any) => ({
-                id: sit.id,
-                documento_habil_id: sit.documento_habil_id,
-                situacao_codigo: sit.situacao_codigo,
+            situacoes: ((doc.situacoes || []) as Array<Record<string, unknown>>).map((sit) => ({
+                id: sit.id ? String(sit.id) : undefined,
+                documento_habil_id: String(sit.documento_habil_id || ''),
+                situacao_codigo: String(sit.situacao_codigo || ''),
                 valor: Number(sit.valor || 0),
-                is_retencao: sit.is_retencao
+                is_retencao: Boolean(sit.is_retencao)
             }))
         }));
 
@@ -126,7 +157,7 @@ export const transparenciaService = {
     async getDocumentoCompleto(id: string): Promise<DocumentoDespesa> {
         const { data: doc, error: docError } = await supabase
             .from('documentos_habeis')
-            .select('*')
+            .select(DOCUMENTOS_HABEIS_SELECT)
             .eq('id', id)
             .single();
 
@@ -134,7 +165,7 @@ export const transparenciaService = {
 
         const { data: itens, error: itensError } = await supabase
             .from('documentos_habeis_itens')
-            .select('*')
+            .select(DOCUMENTOS_HABEIS_ITENS_SELECT)
             .eq('documento_habil_id', id)
             .order('data_emissao', { ascending: false });
 
@@ -142,7 +173,7 @@ export const transparenciaService = {
 
         const { data: situacoes, error: sitError } = await supabase
             .from('documentos_habeis_situacoes')
-            .select('*')
+            .select(DOCUMENTOS_HABEIS_SITUACOES_SELECT)
             .eq('documento_habil_id', id);
 
         if (sitError) throw sitError;
@@ -151,28 +182,28 @@ export const transparenciaService = {
             id: doc.id,
             valor_original: Number(doc.valor_original || 0),
             valor_pago: Number(doc.valor_pago || 0),
-            estado: doc.estado || 'PENDENTE DE REALIZAÇÃO',
+            estado: String(doc.estado || 'PENDENTE DE REALIZAÇÃO'),
             processo: doc.processo || '',
             favorecido_nome: doc.favorecido_nome || '',
             favorecido_documento: doc.favorecido_documento || '',
             data_emissao: doc.data_emissao,
             fonte_sof: doc.fonte_sof,
             empenho_id: doc.empenho_id,
-            itens: (itens as any[]).map((item) => ({
-                id: item.id,
-                documento_habil_id: item.documento_habil_id,
-                doc_tipo: item.doc_tipo,
-                data_emissao: item.data_emissao,
+            itens: (itens as Array<Record<string, unknown>>).map((item) => ({
+                id: String(item.id || ''),
+                documento_habil_id: String(item.documento_habil_id || ''),
+                doc_tipo: String(item.doc_tipo || ''),
+                data_emissao: item.data_emissao ? String(item.data_emissao) : undefined,
                 valor: Number(item.valor || 0),
-                observacao: item.observacao
+                observacao: item.observacao ? String(item.observacao) : undefined
             })),
-            situacoes: (situacoes as any[]).map((sit) => ({
-                id: sit.id,
-                documento_habil_id: sit.documento_habil_id,
-                situacao_codigo: sit.situacao_codigo,
+            situacoes: (situacoes as Array<Record<string, unknown>>).map((sit) => ({
+                id: sit.id ? String(sit.id) : undefined,
+                documento_habil_id: String(sit.documento_habil_id || ''),
+                situacao_codigo: String(sit.situacao_codigo || ''),
                 valor: Number(sit.valor || 0),
-                is_retencao: sit.is_retencao,
-                created_at: sit.created_at
+                is_retencao: Boolean(sit.is_retencao),
+                created_at: sit.created_at ? String(sit.created_at) : undefined
             }))
         };
     },
@@ -190,7 +221,7 @@ export const transparenciaService = {
     },
 
     async importDocumentosHabeis(data: Record<string, string>[]): Promise<void> {
-        const docsMap = new Map<string, any>();
+        const docsMap = new Map<string, DocumentoImportState>();
         
         for (const row of data) {
             const rawId = row['documentohabil'] || row['dhdocumentohabil'] || row['documento_habil'] || '';
@@ -225,12 +256,13 @@ export const transparenciaService = {
                         data_emissao: formattedDate,
                         updated_at: new Date().toISOString()
                     },
-                    situacoes: new Map<string, any>(),
-                    itens: new Map<string, any>()
+                    situacoes: new Map<string, DocumentoImportState['situacoes'] extends Map<string, infer V> ? V : never>(),
+                    itens: new Map<string, DocumentoImportState['itens'] extends Map<string, infer V> ? V : never>()
                 });
             }
 
             const docData = docsMap.get(id);
+            if (!docData) continue;
 
             const situacaoCodigo = row['dhsituacao'] || '';
             const valueSituacao = Number((row['metricavalor'] || row['dhvalordocorigem'] || row['valor'] || '0').replace(/[^\d.,]/g, '').replace(',', '.'));
@@ -300,7 +332,7 @@ export const transparenciaService = {
             const neccor = row['ne ccor'] || row['neccor'] || row['empenho'] || '';
             const fonte = row['fontesof'] || row['fonte'] || row['fontedo_recurso'] || '';
             
-            const updateData: any = {};
+            const updateData: { empenho_numero?: string; fonte_sof?: string } = {};
             if (neccor) {
                 updateData.empenho_numero = neccor;
                 empenhoNumbers.add(neccor);
@@ -333,7 +365,7 @@ export const transparenciaService = {
     },
 
     async importOrdensBancarias(data: Record<string, string>[]): Promise<void> {
-        const itemsMap: Map<string, any> = new Map();
+        const itemsMap: Map<string, { id: string; documento_habil_id: string; doc_tipo: string; valor: number; data_emissao: string; observacao: string }> = new Map();
         const parentUpdates: Map<string, { empenho_numero?: string, fonte_sof?: string }> = new Map();
         const empenhoNumbers = new Set<string>();
 
@@ -413,17 +445,12 @@ export const transparenciaService = {
         }
     },
 
-    async getCreditosDisponiveis(): Promise<any[]> {
-        const { data, error } = await supabase
-            .from('creditos_disponiveis')
-            .select('*')
-            .order('ptres', { ascending: true });
-        if (error) throw error;
-        return data || [];
+    async getCreditosDisponiveis(): Promise<CreditoDisponivel[]> {
+        return creditosDisponiveisService.getAll();
     },
 
     async importCreditosDisponiveis(data: Record<string, string>[]): Promise<void> {
-        const updatesMap = new Map<string, any>();
+        const updatesMap = new Map<string, { ptres: string; metrica: string; valor: number; updated_at: string }>();
         data.forEach(row => {
             const ptres = (row['ptres'] || row['PTRES'] || '').toString().trim();
             const metrica = (row['metrica'] || row['métrica'] || row['Métrica'] || '').toString().trim();
@@ -464,3 +491,4 @@ export const transparenciaService = {
         }
     }
 };
+

@@ -1,3 +1,5 @@
+import { normalizeFunctionalComponentName } from '@/utils/functionalComponentLabels';
+
 export * from './atas';
 
 export interface Atividade {
@@ -90,7 +92,6 @@ export interface Descentralizacao {
   updatedAt: Date;
 }
 
-// Interfaces de Domínio (tabelas de lookup)
 export interface DimensaoDB {
   id: string;
   codigo: string;
@@ -135,27 +136,25 @@ export const DIMENSOES: Dimensao[] = [
   { codigo: 'TI', nome: 'TI - Tecnologia da Informação e Comunicação' },
 ];
 
-export const COMPONENTES_POR_DIMENSAO: Record<string, string[]> = {
-  'AD': [
+const COMPONENTES_POR_DIMENSAO_BRUTOS: Record<string, string[]> = {
+  AD: [
     '8 - Orçamento',
     '9 - Contabilidade e Finanças',
     '10 - Compras e Licitações',
     '11 - Contratos',
     '12 - Material',
-    '13 - Patrimônio'
+    '13 - Patrimônio',
   ],
-  'AE': [
+  AE: [
     '1 - Política de Atividades Estudantis',
     '2 - Serviço Social',
     '3 - Saúde Estudantil',
     '4 - Psicologia Escolar',
     '5 - Alimentação e Nutrição',
-    'Programas e Projetos de Protagonismo Estudantil'
+    'Programas e Projetos de Protagonismo Estudantil',
   ],
-  'CI': [
-    '13 - Apoio a Eventos Institucionais'
-  ],
-  'EN': [
+  CI: ['13 - Apoio a Eventos Institucionais'],
+  EN: [
     'Política de Ensino - Política de Ensino',
     'Política de Ensino - Planejamento do Ensino',
     'Política de Ensino - Corpo Docente e Técnico do Ensino',
@@ -196,42 +195,41 @@ export const COMPONENTES_POR_DIMENSAO: Record<string, string[]> = {
     'Apoio ao Ensino - Apoio ao Ensino',
     'Apoio ao Ensino - Administração Escolar',
     'Apoio ao Ensino - Laboratórios Acadêmicos',
-    'Gestão de Esportes Estudantis'
+    'Gestão de Esportes Estudantis',
   ],
-  'EX': [
+  EX: [
     '1 - Política de Extensão',
     '2 - Interação com a Sociedade',
     '3 - Relações com o Mundo do Trabalho',
     '4 - Difusão e Cultura',
-    '5 - Gestão da Formação Inicial e Continuada'
+    '5 - Gestão da Formação Inicial e Continuada',
   ],
-  'GE': [
-    '7 - Gestão da Unidade Agrícola/ Industrial-Escola'
-  ],
-  'GO': [
-    '19 - Suporte aos Colegiados de Apoio à Governança do IFRN'
-  ],
-  'GP': [
+  GE: ['7 - Gestão da Unidade Agrícola/ Industrial-Escola'],
+  GO: ['19 - Suporte aos Colegiados de Apoio à Governança do IFRN'],
+  GP: [
     '25 - Cadastro e pagamento de Pessoal',
     '27 - Desenvolvimento de Pessoal',
-    '28 - Atenção à Saúde do Servidor'
+    '28 - Atenção à Saúde do Servidor',
   ],
-  'IE': [
+  IE: [
     '14 - Gestão de Manutenção e Engenharia',
-    '15 - Gestão de Serviços de Infraestrutura, Logística e Sustentabilidade'
+    '15 - Gestão de Serviços de Infraestrutura, Logística e Sustentabilidade',
   ],
-  'IN': [
-    '5 - Relações Internacionais'
-  ],
-  'PI': [
-    '2 - Inovação Tecnológica'
-  ],
-  'TI': [
+  IN: ['5 - Relações Internacionais'],
+  PI: ['2 - Inovação Tecnológica'],
+  TI: [
     '1 - Política de Tecnologia da Informação e Comunicação',
     '2 - Governança de TIC',
-    '4 - Infraestrutura e Operações de TIC'
-  ]
+    '4 - Infraestrutura e Operações de TIC',
+  ],
 };
+
+export const COMPONENTES_POR_DIMENSAO: Record<string, string[]> = Object.fromEntries(
+  Object.entries(COMPONENTES_POR_DIMENSAO_BRUTOS).map(([dimensao, componentes]) => [
+    dimensao,
+    componentes.map(normalizeFunctionalComponentName),
+  ]),
+) as Record<string, string[]>;
 
 export interface DocumentoDespesaAPI {
   data: string;
@@ -282,7 +280,85 @@ export interface DocumentoDespesa {
   situacoes?: DocumentoSituacao[];
 }
 
-// Nota: A interface Retencao antiga foi descontinuada em favor de DocumentoSituacao
+export interface SuapNotaFiscal {
+  numero?: string;
+  data_emissao?: string;
+}
+
+export interface SuapDadosBancarios {
+  banco?: string;
+  agencia?: string;
+  conta?: string;
+}
+
+export interface SuapRetencoesTributarias {
+  optante_simples_nacional?: boolean;
+  iss?: string;
+  inss?: string;
+  ir?: string;
+  csll?: string;
+  cofins?: string;
+  pis_pasep?: string;
+}
+
+export interface SuapLiquidacaoAnaliseItem {
+  campo: string;
+  status: 'ok' | 'warning' | 'error';
+  esperado?: string;
+  encontrado?: string;
+  observacao: string;
+}
+
+export interface SuapLiquidacaoAnalise {
+  statusGeral: 'ok' | 'warning' | 'error';
+  resumo: string;
+  recomendacao?: string;
+  itens: SuapLiquidacaoAnaliseItem[];
+  analisadoEm?: string;
+  modelo?: string;
+  quantidadePrints?: number;
+}
+
+export interface SuapWorkflowConclusao {
+  concluido?: boolean;
+  concluidoEm?: string;
+  concluidoPor?: string;
+  nsNumero?: string;
+  solicitarAnaliseLiquidacao?: boolean;
+  arquivosSiafi?: string[];
+  analiseLiquidacao?: SuapLiquidacaoAnalise;
+  reabertoEm?: string;
+}
+
+export interface SuapDadosCompletos {
+  val_nf?: string;
+  contrato_numero?: string;
+  ns_numero?: string;
+  status_processo?: string;
+  empenhos?: string[];
+  notas_fiscais?: SuapNotaFiscal[];
+  dados_bancarios?: SuapDadosBancarios;
+  retencoes_tributarias?: SuapRetencoesTributarias;
+  workflow?: SuapWorkflowConclusao;
+}
+
+export interface SuapProcesso {
+  id: string;
+  tenantId?: string;
+  suapId: string;
+  url: string;
+  status: string;
+  numProcesso?: string;
+  beneficiario?: string;
+  cpfCnpj?: string;
+  assunto?: string;
+  contrato?: string;
+  pdfUrl?: string;
+  dadosCompletos?: SuapDadosCompletos;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 export interface Retencao {
   id: string;
   documento_habil_id: string;
@@ -295,6 +371,7 @@ export interface Contrato {
   id: string;
   numero: string;
   contratada: string;
+  cnpj?: string;
   valor?: number;
   data_inicio?: Date;
   data_termino?: Date;

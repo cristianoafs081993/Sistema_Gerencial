@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { NaturezaDespesaDB, DimensaoDB, OrigemRecursoDB, ComponenteFuncionalDB } from '@/types';
+import { normalizeFunctionalComponentName } from '@/utils/functionalComponentLabels';
 
 /**
  * Service para buscar dados das tabelas de domínio (lookup tables).
@@ -9,11 +10,11 @@ export const dominioService = {
     async getNaturezasDespesa(): Promise<NaturezaDespesaDB[]> {
         const { data, error } = await supabase
             .from('naturezas_despesa')
-            .select('*')
+            .select('id,codigo,nome')
             .order('codigo');
 
         if (error) throw error;
-        return (data || []).map((item: any) => ({
+        return (data || []).map((item) => ({
             id: item.id,
             codigo: item.codigo,
             nome: item.nome || '',
@@ -23,11 +24,11 @@ export const dominioService = {
     async getDimensoes(): Promise<DimensaoDB[]> {
         const { data, error } = await supabase
             .from('dimensoes')
-            .select('*')
+            .select('id,codigo,nome')
             .order('codigo');
 
         if (error) throw error;
-        return (data || []).map((item: any) => ({
+        return (data || []).map((item) => ({
             id: item.id,
             codigo: item.codigo,
             nome: item.nome,
@@ -37,11 +38,11 @@ export const dominioService = {
     async getOrigensRecurso(): Promise<OrigemRecursoDB[]> {
         const { data, error } = await supabase
             .from('origens_recurso')
-            .select('*')
+            .select('id,codigo,descricao')
             .order('codigo');
 
         if (error) throw error;
-        return (data || []).map((item: any) => ({
+        return (data || []).map((item) => ({
             id: item.id,
             codigo: item.codigo,
             descricao: item.descricao || '',
@@ -51,7 +52,7 @@ export const dominioService = {
     async getComponentesFuncionais(dimensaoId?: string): Promise<ComponenteFuncionalDB[]> {
         let query = supabase
             .from('componentes_funcionais')
-            .select('*')
+            .select('id,dimensao_id,nome')
             .order('nome');
 
         if (dimensaoId) {
@@ -60,10 +61,10 @@ export const dominioService = {
 
         const { data, error } = await query;
         if (error) throw error;
-        return (data || []).map((item: any) => ({
+        return (data || []).map((item) => ({
             id: item.id,
             dimensaoId: item.dimensao_id,
-            nome: item.nome,
+            nome: normalizeFunctionalComponentName(item.nome),
         }));
     },
 

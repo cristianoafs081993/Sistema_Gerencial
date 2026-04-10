@@ -9,8 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatCard } from '@/components/StatCard';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
+import { useAuth } from '@/contexts/AuthContext';
 import { retencoesService } from '@/services/retencoes';
-import {
+import { 
     Table,
     TableBody,
     TableCell,
@@ -46,6 +47,7 @@ import {
 import { toast } from 'sonner';
 import { DocumentoDetalhesDialog } from '@/components/DocumentoDetalhesDialog';
 import { HeaderActions } from '@/components/HeaderParts';
+import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { 
     DropdownMenu, 
     DropdownMenuContent, 
@@ -53,7 +55,10 @@ import {
     DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 
+type CsvRow = Record<string, string>;
+
 export default function LiquidacoesPagamentos() {
+    const { isSuperAdmin } = useAuth();
     const queryClient = useQueryClient();
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
     const [isImportDocsOpen, setIsImportDocsOpen] = useState(false);
@@ -139,16 +144,17 @@ export default function LiquidacoesPagamentos() {
         }
     };
 
-    const handleImportOB = async (data: any[]) => {
+    const handleImportOB = async (data: CsvRow[]) => {
         const toastId = toast.loading('Processando Ordens Bancárias...');
         try {
             await transparenciaService.importOrdensBancarias(data);
             toast.success(`${data.length} ordens bancárias importadas com sucesso!`, { id: toastId });
             setIsImportOBOpen(false);
             handleRefresh();
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Erro import OB:', error);
-            toast.error(`Falha na importação: ${error.message}`, { id: toastId });
+            const message = error instanceof Error ? error.message : 'Erro desconhecido';
+            toast.error(`Falha na importação: ${message}`, { id: toastId });
         }
     };
 
@@ -165,7 +171,7 @@ export default function LiquidacoesPagamentos() {
         }
     };
 
-    const handleRetencoesImport = async (data: any[]) => {
+    const handleRetencoesImport = async (data: CsvRow[]) => {
         const toastId = toast.loading('Processando importação de situações...');
         
         try {
@@ -190,10 +196,10 @@ export default function LiquidacoesPagamentos() {
             
             // Invalida transparência para atualizar os documentos
             queryClient.invalidateQueries({ queryKey: ['transparencia'] });
-        } catch (error) {
-            const err = error as any;
-            console.error('Erro ao importar situações:', err);
-            toast.error(`Erro na importação: ${err.message}`, { id: toastId });
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Erro desconhecido';
+            console.error('Erro ao importar situações:', error);
+            toast.error(`Erro na importação: ${message}`, { id: toastId });
         }
     };
 
@@ -211,6 +217,7 @@ export default function LiquidacoesPagamentos() {
 
             <HeaderActions>
                 <div className="flex items-center gap-3">
+                    {isSuperAdmin ? (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button 
@@ -237,6 +244,7 @@ export default function LiquidacoesPagamentos() {
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
+                    ) : null}
 
                     <Button 
                         variant="outline" 
@@ -281,7 +289,8 @@ export default function LiquidacoesPagamentos() {
                 />
             </div>
 
-            <JsonImportDialog
+            {isSuperAdmin ? (
+            <JsonImportDialog 
                 open={isImportDialogOpen}
                 onOpenChange={setIsImportDialogOpen}
                 onImport={handleRetencoesImport}
@@ -290,12 +299,10 @@ export default function LiquidacoesPagamentos() {
                 acceptCsv={true}
                 csvSeparator="\t"
             />
+            ) : null}
 
             {/* Standard Filter Card */}
-            <Card className="card-system shadow-sm">
-                <CardHeader className="pb-3 px-0 pt-0">
-                    <CardTitle className="text-xl font-bold">Filtros</CardTitle>
-                </CardHeader>
+            <FilterPanel className="shadow-sm">
                 <CardContent className="p-0">
                     <div className="flex flex-col sm:flex-row gap-4">
                         <div className="relative flex-1">
@@ -331,55 +338,49 @@ export default function LiquidacoesPagamentos() {
                         )}
                     </div>
                 </CardContent>
-            </Card>
+            </FilterPanel>
 
             {/* Main Table Card */}
             <Card className="card-system shadow-sm border-none shadow-none mt-6">
                 <CardHeader className="px-6 py-4 border-b border-border-default/50 flex flex-row items-center justify-between bg-white">
                     <div className="flex items-center gap-3">
-                        <CardTitle className="text-base font-semibold">Documentos Hábeis</CardTitle>
+                        <CardTitle className="table-title">Documentos Hábeis</CardTitle>
                         <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-bold px-2 py-0 h-5">
                             {totalRecords}
                         </Badge>
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <Table>
+                    <div className="overflow-hidden">
+                        <Table className="table-fixed w-full">
                             <TableHeader className="bg-slate-50/50">
                                 <TableRow className="hover:bg-transparent border-b border-border-default/50">
-                                    <TableHead className="w-[120px] font-semibold text-xs uppercase tracking-wider py-4 px-6 text-muted-foreground whitespace-nowrap">
+                                    <TableHead className="w-[92px] font-semibold text-xs uppercase tracking-wider py-4 px-3 text-muted-foreground whitespace-nowrap">
                                         <Button variant="ghost" className="h-auto p-0 hover:bg-transparent font-semibold text-xs uppercase tracking-wider" onClick={() => handleSort('data_emissao')}>
                                             Emissão {getSortIcon('data_emissao')}
                                         </Button>
                                     </TableHead>
-                                    <TableHead className="font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-4">
-                                        <Button variant="ghost" className="h-auto p-0 hover:bg-transparent font-semibold text-xs uppercase tracking-wider" onClick={() => handleSort('id')}>
-                                            Documento / Processo {getSortIcon('id')}
+                                    <TableHead className="w-[160px] font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-3">
+                                        <Button variant="ghost" className="h-auto max-w-full truncate p-0 hover:bg-transparent font-semibold text-xs uppercase tracking-wider" onClick={() => handleSort('id')}>
+                                            Documento {getSortIcon('id')}
                                         </Button>
                                     </TableHead>
-                                    <TableHead className="font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-4">
+                                    <TableHead className="font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-3">
                                         <Button variant="ghost" className="h-auto p-0 hover:bg-transparent font-semibold text-xs uppercase tracking-wider" onClick={() => handleSort('favorecido_nome')}>
                                             Favorecido {getSortIcon('favorecido_nome')}
                                         </Button>
                                     </TableHead>
-                                    <TableHead className="font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-4 text-center">
-                                        <Button variant="ghost" className="h-auto p-0 hover:bg-transparent font-semibold text-xs uppercase tracking-wider mx-auto" onClick={() => handleSort('fonte_sof')}>
-                                            Fonte {getSortIcon('fonte_sof')}
-                                        </Button>
-                                    </TableHead>
-                                    <TableHead className="font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-4 text-center">
+                                    <TableHead className="w-[132px] font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-3 text-center">
                                         <Button variant="ghost" className="h-auto p-0 hover:bg-transparent font-semibold text-xs uppercase tracking-wider mx-auto" onClick={() => handleSort('estado')}>
-                                            Estado {getSortIcon('estado')}
+                                            Situação {getSortIcon('estado')}
                                         </Button>
                                     </TableHead>
-                                    <TableHead className="font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-4 text-right">
+                                    <TableHead className="w-[112px] font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-3 text-right">
                                         <Button variant="ghost" className="h-auto p-0 hover:bg-transparent font-semibold text-xs uppercase tracking-wider ml-auto" onClick={() => handleSort('valor_original')}>
                                             Bruto {getSortIcon('valor_original')}
                                         </Button>
                                     </TableHead>
-                                    <TableHead className="text-right font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap px-4 border-l border-slate-100/50">Valor Pago</TableHead>
-                                    <TableHead className="w-[80px] py-4 pr-6 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground border-l border-slate-100/50">Ações</TableHead>
+                                    <TableHead className="w-[112px] text-right font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap px-3 border-l border-slate-100/50">Pago</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -392,12 +393,11 @@ export default function LiquidacoesPagamentos() {
                                             <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                                             <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
                                             <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
-                                            <TableCell className="pr-6 text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                                         </TableRow>
                                     ))
                                 ) : documentos.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic">
+                                        <TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">
                                             Nenhum registro encontrado com os parâmetros selecionados.
                                         </TableCell>
                                     </TableRow>
@@ -408,7 +408,7 @@ export default function LiquidacoesPagamentos() {
                                             className="group hover:bg-slate-50/80 transition-colors border-b last:border-0 cursor-pointer"
                                             onClick={() => handleViewDetails(doc)}
                                         >
-                                            <TableCell className="whitespace-nowrap font-medium text-xs py-5 px-6">
+                                            <TableCell className="whitespace-nowrap font-medium text-xs py-4 px-3 align-top">
                                                 {(() => {
                                                     if (!doc.data_emissao) return '-';
                                                     try {
@@ -419,20 +419,15 @@ export default function LiquidacoesPagamentos() {
                                                     }
                                                 })()}
                                             </TableCell>
-                                            <TableCell className="py-5">
-                                                <div className="flex flex-col gap-1">
-                                                    <span className="font-mono text-[11px] font-black text-primary group-hover:underline underline-offset-4 decoration-primary/30 tracking-tighter">
+                                            <TableCell className="py-4 px-3 align-top">
+                                                <div className="flex flex-col gap-1 min-w-0">
+                                                    <span className="font-mono text-[11px] font-black text-primary group-hover:underline underline-offset-4 decoration-primary/30 tracking-tighter truncate">
                                                         {formatDocumentoId(doc.id)}
                                                     </span>
-                                                    {doc.processo && (
-                                                        <div className="flex items-center gap-1.5 opacity-60">
-                                                            <span className="text-[9px] font-black tracking-tight whitespace-nowrap text-slate-500 bg-slate-100 px-1 rounded uppercase">Proc: {doc.processo}</span>
-                                                        </div>
-                                                    )}
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="py-5">
-                                                <div className="flex flex-col max-w-[340px] gap-0.5">
+                                            <TableCell className="py-4 px-3 align-top">
+                                                <div className="flex flex-col min-w-0 gap-0.5">
                                                     <span className="truncate text-xs font-bold leading-tight group-hover:text-primary transition-colors" title={doc.favorecido_nome}>
                                                         {doc.favorecido_nome}
                                                     </span>
@@ -441,13 +436,10 @@ export default function LiquidacoesPagamentos() {
                                                     </span>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="py-5 text-center font-black text-[10px] text-blue-600/80 bg-blue-50/10">
-                                                {doc.fonte_sof || '-'}
-                                            </TableCell>
-                                            <TableCell className="py-5 text-center px-2">
+                                            <TableCell className="py-4 px-3 text-center align-top">
                                                 <Badge 
                                                     variant={doc.estado === 'REALIZADO' ? 'default' : 'outline'}
-                                                    className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                                    className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full max-w-full truncate ${
                                                         doc.estado === 'REALIZADO' 
                                                             ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 hover:bg-emerald-500/20' 
                                                             : doc.estado === 'CANCELADO'
@@ -458,24 +450,15 @@ export default function LiquidacoesPagamentos() {
                                                     {doc.estado}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="text-right font-black text-[11px] text-blue-600 dark:text-blue-400 py-5">
+                                            <TableCell className="text-right font-black text-[11px] text-blue-600 dark:text-blue-400 py-4 px-3 align-top">
                                                 {doc.valor_original ? formatCurrency(doc.valor_original) : '-'}
                                             </TableCell>
-                                            <TableCell className="text-right font-black text-[11px] text-emerald-600 dark:text-emerald-400 py-5">
+                                            <TableCell className="text-right font-black text-[11px] text-emerald-600 dark:text-emerald-400 py-4 px-3 align-top">
                                                  {(() => {
                                                      const vPago = calculateDocumentoValorPago(doc);
                                                      return vPago > 0 ? formatCurrency(vPago) : '-';
                                                  })()}
                                              </TableCell>
-                                            <TableCell className="pr-6 text-right py-5">
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    className="h-8 w-8 text-muted-foreground hover:bg-slate-200 transition-all rounded-full"
-                                                >
-                                                    <ChevronRightIcon className="h-4 w-4" />
-                                                </Button>
-                                            </TableCell>
                                         </TableRow>
                                     ))
                                 )}
@@ -565,6 +548,8 @@ export default function LiquidacoesPagamentos() {
                 </div>
             </Card>
 
+            {isSuperAdmin ? (
+                <>
             <JsonImportDialog 
                 open={isImportDocsOpen} 
                 onOpenChange={setIsImportDocsOpen} 
@@ -585,11 +570,15 @@ export default function LiquidacoesPagamentos() {
                 csvSeparator="\t"
             />
 
+            </>
+            ) : null}
+
             <DocumentoDetalhesDialog 
                 open={isDetailsOpen}
                 onOpenChange={setIsDetailsOpen}
                 documento={selectedDoc}
             />
+            {isSuperAdmin ? (
             <JsonImportDialog 
                 open={isImportOBOpen} 
                 onOpenChange={setIsImportOBOpen} 
@@ -599,6 +588,9 @@ export default function LiquidacoesPagamentos() {
                 acceptCsv={true}
                 csvSeparator="\t"
             />
+            ) : null}
         </div>
     );
 }
+
+

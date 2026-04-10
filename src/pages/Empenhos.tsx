@@ -31,12 +31,16 @@ import { ptBR } from 'date-fns/locale';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { EmpenhoDialog } from '@/components/modals/EmpenhoDialog';
 import { HeaderActions } from '@/components/HeaderParts';
+import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { toast } from 'sonner';
 import { formatCurrency, parseCurrency, formatarDocumento } from '@/lib/utils';
 import { parseSiafiCsv, syncSiafiDataToDb } from '@/lib/siafi-parser';
 import { transparenciaService } from '@/services/transparencia';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { splitCsvLine } from '@/utils/csvParser';
+import { getRapReferenceYear, isRapReinscrito } from '@/utils/rapMetrics';
+import { useAuth } from '@/contexts/AuthContext';
+import { filterEmpenhos, getRapBase, getRapLiquidado, getRapSaldo } from './empenhosFilters';
 
 
 const statusColors: Record<string, string> = {
@@ -53,9 +57,8 @@ const statusLabels: Record<string, string> = {
   cancelado: 'Cancelado',
 };
 
-
-
 export default function Empenhos() {
+  const { isSuperAdmin } = useAuth();
   const { empenhos, atividades, creditosDisponiveis, isLoading, addEmpenho, updateEmpenho, deleteEmpenho, refreshData } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('pendente');
@@ -82,56 +85,37 @@ export default function Empenhos() {
   const componentesUnicos = Array.from(new Set(empenhos.map(e => e.componenteFuncional?.trim()).filter(Boolean))).sort();
   const origensUnicas = Array.from(new Set(empenhos.map(e => e.origemRecurso?.trim()).filter(Boolean))).sort();
   const planosUnicos = Array.from(new Set(empenhos.map(e => e.planoInterno?.trim()).filter(Boolean))).sort();
-  const normalizeString = (str: string) =>
-    str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-
-  const filteredEmpenhos = empenhos.filter((e) => {
-    const searchNormalized = normalizeString(searchTerm);
-    const searchDigits = searchTerm.replace(/\D/g, '');
-
-    const matchesSearch =
-      normalizeString(e.numero).includes(searchNormalized) ||
-      normalizeString(e.descricao).includes(searchNormalized) ||
-      normalizeString(e.componenteFuncional || '').includes(searchNormalized) ||
-      normalizeString(e.favorecidoNome || '').includes(searchNormalized) ||
-      (searchDigits !== '' && (e.favorecidoDocumento || '').replace(/\D/g, '').includes(searchDigits));
-
-    const matchesStatus = filterStatus === 'all' || (() => {
-      // Regra específica para Restos a Pagar
-      if (e.tipo === 'rap') {
-        const isCompletamentePago = (e.rapALiquidar || 0) <= 0 && (e.saldoRapOficial || 0) <= 0 && (e.rapPago || 0) > 0;
-
-        if (filterStatus === 'pago') return isCompletamentePago;
-        if (filterStatus === 'liquidado') return (e.rapLiquidado || 0) > 0 && !isCompletamentePago;
-        if (filterStatus === 'pendente') return !isCompletamentePago;
-      }
-
-      return e.status === filterStatus;
-    })();
-    const matchesDimensao = filterDimensao === 'all' || e.dimensao.includes(filterDimensao);
-    const matchesComponente = filterComponente === 'all' || e.componenteFuncional?.trim() === filterComponente;
-    const matchesOrigem = filterOrigem === 'all' || e.origemRecurso?.trim() === filterOrigem;
-    const matchesPlano = filterPlanoInterno === 'all' || e.planoInterno?.trim() === filterPlanoInterno;
-
-    // Filtro de Data
-    let matchesData = true;
-    if (dataInicio && dataFim) {
-      const data = new Date(e.dataEmpenho);
-      const inicio = new Date(dataInicio);
-      const fim = new Date(dataFim);
-      fim.setHours(23, 59, 59, 999);
-      matchesData = data >= inicio && data <= fim;
-    }
-
-    return matchesSearch && matchesStatus && matchesDimensao && matchesComponente && matchesOrigem && matchesPlano && matchesData;
-  });
+  const filteredEmpenhos = useMemo(
+    () =>
+      filterEmpenhos(empenhos, {
+        searchTerm,
+        filterStatus,
+        filterDimensao,
+        filterComponente,
+        filterOrigem,
+        filterPlanoInterno,
+        dataInicio,
+        dataFim,
+      }),
+    [
+      empenhos,
+      searchTerm,
+      filterStatus,
+      filterDimensao,
+      filterComponente,
+      filterOrigem,
+      filterPlanoInterno,
+      dataInicio,
+      dataFim,
+    ],
+  );
 
   const handleOpenDialog = (empenho?: Empenho) => {
     setSelectedEmpenho(empenho || null);
     setIsDialogOpen(true);
   };
 
-  const handleSaveEmpenho = (id: string, data: any) => {
+  const handleSaveEmpenho = (id: string, data: Partial<Empenho>) => {
     updateEmpenho(id, data);
     setIsDialogOpen(false);
   };
@@ -150,7 +134,7 @@ export default function Empenhos() {
     data.forEach((row) => {
       const parseDate = (dateStr: string): Date => {
         if (!dateStr) return new Date();
-        const parts = dateStr.split(/[\/\-]/);
+        const parts = dateStr.split(/[/-]/);
         if (parts.length === 3) {
           if (parts[0].length === 4) {
             return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
@@ -245,9 +229,10 @@ export default function Empenhos() {
         toast.error(`Houve erro ao salvar ${result.erros} registros.`, { duration: 5000 });
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao processar SIAFI CSV:', error);
-      toast.error(error.message || 'Erro ao ler a planilha. Verifique o formato do arquivo.', { id: toastId });
+      const message = error instanceof Error ? error.message : 'Erro ao ler a planilha. Verifique o formato do arquivo.';
+      toast.error(message, { id: toastId });
     } finally {
       setIsUpdatingSaldos(false);
       if (saldosInputRef.current) {
@@ -294,9 +279,10 @@ export default function Empenhos() {
       await transparenciaService.importCreditosDisponiveis(data);
       await refreshData();
       toast.success('Créditos disponíveis atualizados com sucesso!', { id: toastId });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao importar créditos:', error);
-      toast.error('Erro ao importar créditos: ' + error.message, { id: toastId });
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
+      toast.error('Erro ao importar créditos: ' + message, { id: toastId });
     } finally {
       setIsUpdatingSaldos(false);
       if (creditosInputRef.current) creditosInputRef.current.value = '';
@@ -316,6 +302,7 @@ export default function Empenhos() {
   return (
     <div className="space-y-space-6 pb-space-10">
       <HeaderActions>
+        {isSuperAdmin ? (
         <div className="flex gap-space-2">
           <input
             type="file"
@@ -379,6 +366,7 @@ export default function Empenhos() {
             </Tooltip>
           </TooltipProvider>
         </div>
+        ) : null}
       </HeaderActions>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -411,10 +399,7 @@ export default function Empenhos() {
           />
         )}
       </div>
-      <Card className="card-system shadow-sm">
-        <CardHeader className="pb-3 px-0 pt-0">
-          <CardTitle className="text-xl font-bold">Filtros</CardTitle>
-        </CardHeader>
+      <FilterPanel className="shadow-sm">
         <CardContent className="p-0">
           {/* Linha 1: Busca e Filtros Básicos */}
           <div className="flex flex-col sm:flex-row gap-4">
@@ -556,7 +541,7 @@ export default function Empenhos() {
             </div>
           )}
         </CardContent>
-      </Card>
+      </FilterPanel>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6 mt-6">
         <TabsList className="bg-slate-100 p-1 rounded-lg h-auto">
           <TabsTrigger value="execucao" className="px-6 py-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md text-sm font-semibold">Execução {new Date().getFullYear()}</TabsTrigger>
@@ -597,13 +582,20 @@ function EmpenhoRow({
   empenho,
   type,
   handleOpenDialog,
+  rapReferenceYear,
   isChild = false
 }: {
   empenho: Empenho;
   type: 'execucao' | 'restos';
   handleOpenDialog: (e: Empenho) => void;
+  rapReferenceYear: number;
   isChild?: boolean;
 }) {
+  const rapBase = type === 'restos' ? getRapBase(empenho, rapReferenceYear) : 0;
+  const rapSaldoAtual = type === 'restos' ? getRapSaldo(empenho, rapReferenceYear) : 0;
+  const rapLiquidadoNoAno = type === 'restos' ? getRapLiquidado(empenho) : 0;
+  const rapBaseLabel = isRapReinscrito(empenho, rapReferenceYear) ? 'Reinscrito' : 'Inscrito';
+
   return (
     <TableRow className={`hover:bg-slate-50/80 transition-colors border-b border-border-default/50 ${isChild ? 'bg-slate-50/30' : ''}`}>
       <TableCell className={`py-4 px-6 align-top ${isChild ? 'pl-10' : ''}`}>
@@ -648,17 +640,11 @@ function EmpenhoRow({
         <div className="flex flex-col gap-1 items-end">
           {type === 'restos' && empenho.rapInscrito != null ? (
             <>
-              <span className="font-semibold text-sm" title="Inscrito (original)">
-                {formatCurrency(empenho.rapInscrito || 0)}
+              <span className="font-semibold text-sm" title={`${rapBaseLabel} (base vigente do RAP)`}>
+                {rapBaseLabel}: {formatCurrency(rapBase)}
               </span>
-              <span className={`text-xs ${(empenho.rapALiquidar || 0) > 0 ? 'text-status-warning' : 'text-muted-foreground'}`} title="A Liquidar">
-                A Liq: {formatCurrency(empenho.rapALiquidar || 0)}
-              </span>
-              <span className={`text-xs ${(empenho.rapLiquidado || 0) > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado">
-                Liq: {formatCurrency(empenho.rapLiquidado || 0)}
-              </span>
-              <span className={`text-xs ${(empenho.rapPago || 0) > 0 ? 'text-status-success' : 'text-muted-foreground'}`} title="Pago">
-                Pg: {formatCurrency(empenho.rapPago || 0)}
+              <span className={`text-xs ${rapLiquidadoNoAno > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado no Ano">
+                Liq Ano: {formatCurrency(rapLiquidadoNoAno)}
               </span>
             </>
           ) : (
@@ -689,10 +675,9 @@ function EmpenhoRow({
       <TableCell className="py-4 px-4 text-right align-top whitespace-nowrap">
         {(() => {
           if (type === 'restos') {
-            const aLiquidar = empenho.rapALiquidar || 0;
             return (
-              <span className={`font-semibold text-sm ${aLiquidar > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}>
-                {formatCurrency(aLiquidar)}
+              <span className={`font-semibold text-sm ${rapSaldoAtual > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}>
+                {formatCurrency(rapSaldoAtual)}
               </span>
             );
           }
@@ -745,6 +730,7 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
 
   const [groupBy, setGroupBy] = useState<'none' | 'favorecido'>('none');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const rapReferenceYear = useMemo(() => getRapReferenceYear(empenhos), [empenhos]);
 
   const toggleGroup = (name: string) => {
     setExpandedGroups(prev => ({ ...prev, [name]: !prev[name] }));
@@ -766,12 +752,12 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
       isGroup: true as const,
       name,
       items,
-      valorTotal: items.reduce((acc, e) => acc + (type === 'restos' ? (e.rapInscrito || e.valor) : e.valor), 0),
-      saldoTotal: items.reduce((acc, e) => acc + (type === 'restos' ? (e.rapALiquidar || 0) : (e.valor - (e.valorLiquidado || 0))), 0),
-      pagoTotal: items.reduce((acc, e) => acc + (type === 'restos' ? (e.rapPago || 0) : (e.valorPago || 0)), 0),
-      liquidadoTotal: items.reduce((acc, e) => acc + (type === 'restos' ? (e.rapLiquidado || 0) : (e.valorLiquidado || 0)), 0),
+      valorTotal: items.reduce((acc, e) => acc + (type === 'restos' ? getRapBase(e, rapReferenceYear) : e.valor), 0),
+      saldoTotal: items.reduce((acc, e) => acc + (type === 'restos' ? getRapSaldo(e, rapReferenceYear) : (e.valor - (e.valorLiquidado || 0))), 0),
+      pagoTotal: items.reduce((acc, e) => acc + (type === 'restos' ? getRapLiquidado(e) : (e.valorPago || 0)), 0),
+      liquidadoTotal: items.reduce((acc, e) => acc + (type === 'restos' ? getRapLiquidado(e) : (e.valorLiquidado || 0)), 0),
     }));
-  }, [empenhos, groupBy, type]);
+  }, [empenhos, groupBy, rapReferenceYear, type]);
 
   const sortedData = useMemo(() => {
     const sorted = [...processData].sort((a, b) => {
@@ -793,16 +779,16 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
           case 'numero': valA = itemA.numero; valB = itemB.numero; break;
           case 'favorecido': valA = itemA.favorecidoNome || ''; valB = itemB.favorecidoNome || ''; break;
           case 'valor':
-            valA = type === 'restos' ? (itemA.rapInscrito || itemA.valor) : itemA.valor;
-            valB = type === 'restos' ? (itemB.rapInscrito || itemB.valor) : itemB.valor;
+            valA = type === 'restos' ? getRapBase(itemA, rapReferenceYear) : itemA.valor;
+            valB = type === 'restos' ? getRapBase(itemB, rapReferenceYear) : itemB.valor;
             break;
           case 'saldo':
-            valA = type === 'restos' ? (itemA.rapALiquidar || 0) : (itemA.valor - (itemA.valorLiquidado || 0));
-            valB = type === 'restos' ? (itemB.rapALiquidar || 0) : (itemB.valor - (itemB.valorLiquidado || 0));
+            valA = type === 'restos' ? getRapSaldo(itemA, rapReferenceYear) : (itemA.valor - (itemA.valorLiquidado || 0));
+            valB = type === 'restos' ? getRapSaldo(itemB, rapReferenceYear) : (itemB.valor - (itemB.valorLiquidado || 0));
             break;
           case 'pago':
-            valA = type === 'restos' ? (itemA.rapPago || 0) : (itemA.valorPago || 0);
-            valB = type === 'restos' ? (itemB.rapPago || 0) : (itemB.valorPago || 0);
+            valA = type === 'restos' ? getRapLiquidado(itemA) : (itemA.valorPago || 0);
+            valB = type === 'restos' ? getRapLiquidado(itemB) : (itemB.valorPago || 0);
             break;
           default: valA = itemA.numero; valB = itemB.numero;
         }
@@ -837,7 +823,7 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
   return (
     <Card className="card-system overflow-hidden">
       <CardHeader className="px-6 py-4 border-b border-border-default/50 flex flex-row items-center justify-between">
-        <CardTitle className="text-base font-semibold">
+        <CardTitle className="table-title">
           {empenhos.length} empenho{empenhos.length !== 1 ? 's' : ''} encontrado{empenhos.length !== 1 ? 's' : ''}
         </CardTitle>
         <Button
@@ -862,8 +848,8 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
                 ) : (
                   <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">Descrição</TableHead>
                 )}
-                <SortHeader label={type === 'execucao' ? 'Empenhado / Liquidado' : 'Inscrito / A Liq / Liq / Pago'} colKey="valor" align="right" />
-                <SortHeader label={type === 'execucao' ? 'Saldo' : 'A Liquidar'} colKey="saldo" align="right" />
+                <SortHeader label={type === 'execucao' ? 'Empenhado / Liquidado' : 'Inscrito / Reinscrito / Liq Ano'} colKey="valor" align="right" />
+                <SortHeader label={type === 'execucao' ? 'Saldo' : 'Saldo Atual'} colKey="saldo" align="right" />
                 <TableHead className="h-11 px-6 text-center text-xs font-semibold uppercase tracking-wider">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -919,14 +905,8 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
                                 </>
                               ) : (
                                 <>
-                                  <span className={`text-[11px] ${(row.saldoTotal || 0) > 0 ? 'text-status-warning' : 'text-muted-foreground'}`} title="A Liquidar">
-                                    A Liq: {formatCurrency(row.saldoTotal)}
-                                  </span>
-                                  <span className={`text-[11px] ${(row.liquidadoTotal || 0) > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado">
-                                    Liq: {formatCurrency(row.liquidadoTotal)}
-                                  </span>
-                                  <span className={`text-[11px] ${(row.pagoTotal || 0) > 0 ? 'text-status-success' : 'text-muted-foreground'}`} title="Pago">
-                                    Pg: {formatCurrency(row.pagoTotal)}
+                                  <span className={`text-[11px] ${(row.liquidadoTotal || 0) > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado no Ano">
+                                    Liq Ano: {formatCurrency(row.liquidadoTotal)}
                                   </span>
                                 </>
                               )}
@@ -951,13 +931,13 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
                           <TableCell className="py-4 px-6 text-center"></TableCell>
                         </TableRow>
                         {isExpanded && row.items.map(empenho => (
-                          <EmpenhoRow key={empenho.id} empenho={empenho} type={type} handleOpenDialog={handleOpenDialog} isChild />
+                          <EmpenhoRow key={empenho.id} empenho={empenho} type={type} handleOpenDialog={handleOpenDialog} rapReferenceYear={rapReferenceYear} isChild />
                         ))}
                       </Fragment>
                     );
                   } else {
                     const singleRow = row as { isGroup: false; item: Empenho };
-                    return <EmpenhoRow key={singleRow.item.id} empenho={singleRow.item} type={type} handleOpenDialog={handleOpenDialog} />;
+                    return <EmpenhoRow key={singleRow.item.id} empenho={singleRow.item} type={type} handleOpenDialog={handleOpenDialog} rapReferenceYear={rapReferenceYear} />;
                   }
                 })
               )}
@@ -1031,5 +1011,6 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
     </Card>
   );
 }
+
 
 

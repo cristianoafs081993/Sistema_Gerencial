@@ -1,10 +1,11 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Search, FileText, Calendar, DollarSign, ExternalLink, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import { Search, FileText, Calendar, DollarSign, ExternalLink, ArrowUpDown, ChevronUp, ChevronDown, RefreshCw } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatCard } from '@/components/StatCard';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -14,32 +15,46 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency, formatarDocumento, cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { HeaderActions } from '@/components/HeaderParts';
+import { ContratosSyncDialog } from '@/components/modals/ContratosSyncDialog';
+import { FilterPanel } from '@/components/design-system/FilterPanel';
+import { useAuth } from '@/contexts/AuthContext';
+import { getRapBaseVigente, getRapReferenceYear, getRapSaldoAtual } from '@/utils/rapMetrics';
+import { shouldIgnoreContratoNumero } from '@/utils/contratosSync';
 
 export default function Contratos() {
-  const { contratos, empenhos, contratosEmpenhos, isLoading } = useData();
+  const { isSuperAdmin } = useAuth();
+  const { contratos, empenhos, contratosEmpenhos, isLoading, refreshData } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
 
   const normalizeString = useCallback((str: string) =>
     str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "", []);
 
+  const visibleContratos = useMemo(
+    () => contratos.filter((c) => !shouldIgnoreContratoNumero(c.numero)),
+    [contratos],
+  );
+
   const filteredContratos = useMemo(() => {
     const searchNormalized = normalizeString(searchTerm);
-    let result = contratos.filter((c) => {
+    let result = visibleContratos.filter((c) => {
       return (
         normalizeString(c.numero).includes(searchNormalized) ||
-        normalizeString(c.contratada).includes(searchNormalized)
+        normalizeString(c.contratada).includes(searchNormalized) ||
+        normalizeString(c.cnpj || '').includes(searchNormalized)
       );
     });
 
     if (sortConfig) {
       result = [...result].sort((a, b) => {
-        let aValue: any;
-        let bValue: any;
+        let aValue: string | number = '';
+        let bValue: string | number = '';
 
         if (sortConfig.key === 'numero') {
           aValue = a.numero;
@@ -56,9 +71,9 @@ export default function Contratos() {
     }
 
     return result;
-  }, [contratos, searchTerm, normalizeString, sortConfig]);
+  }, [visibleContratos, searchTerm, normalizeString, sortConfig]);
 
-  const safeFormatDate = (dateVal: any) => {
+  const safeFormatDate = (dateVal: Date | string | null | undefined) => {
     if (!dateVal) return '-';
     try {
       const d = new Date(dateVal);
@@ -69,24 +84,56 @@ export default function Contratos() {
     }
   };
 
+  const rapReferenceYear = useMemo(() => getRapReferenceYear(empenhos), [empenhos]);
+
   const getEmpenhosDoContrato = useCallback((contratoId: string) => {
     const linkIds = contratosEmpenhos
       .filter((l) => l.contrato_id === contratoId)
       .map((l) => l.empenho_id);
-    
-    return empenhos.filter((e) => linkIds.includes(e.id));
+
+    // Compatibilidade: dependendo do histórico/imports, `contratos_empenhos.empenho_id`
+    // pode estar armazenando o UUID do empenho OU o número do empenho.
+    // Para não "sumir" vínculos na UI, resolvemos por ambos.
+    const normalizeRef = (s: string) => (s || '')
+      .toString()
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '');
+
+    const byId = new Map(empenhos.map(e => [e.id, e] as const));
+    const byNumero = new Map(empenhos.map(e => [e.numero, e] as const));
+    const byNumeroNorm = new Map(empenhos.map(e => [normalizeRef(e.numero), e] as const));
+    // Alguns vínculos antigos guardam só o final do número
+    const byNumeroSuffix12 = new Map(empenhos.map(e => [normalizeRef(e.numero).slice(-12), e] as const));
+
+    const resolved: typeof empenhos = [];
+    const seen = new Set<string>();
+    for (const ref of linkIds) {
+      const refStr = (ref || '').toString().trim();
+      const refNorm = normalizeRef(refStr);
+      const emp =
+        byId.get(refStr) ||
+        byNumero.get(refStr) ||
+        byNumeroNorm.get(refNorm) ||
+        (refNorm.length >= 12 ? byNumeroSuffix12.get(refNorm.slice(-12)) : undefined);
+      if (!emp) continue;
+      if (seen.has(emp.id)) continue;
+      seen.add(emp.id);
+      resolved.push(emp);
+    }
+    return resolved;
   }, [empenhos, contratosEmpenhos]);
 
   const totalALiquidarGlobal = useMemo(() => {
-    return contratos.reduce((sumContrato, c) => {
+    return visibleContratos.reduce((sumContrato, c) => {
       const emps = getEmpenhosDoContrato(c.id);
       return sumContrato + emps.reduce((sumEmp, e) => {
-        if (e.tipo === 'rap') return sumEmp + (e.rapALiquidar || 0);
+        if (e.tipo === 'rap') return sumEmp + getRapSaldoAtual(e, rapReferenceYear);
         const liquidado = (e.valorLiquidadoAPagar || 0) + (e.valorPagoOficial || 0);
         return sumEmp + Math.max(0, e.valor - liquidado);
       }, 0);
     }, 0);
-  }, [contratos, getEmpenhosDoContrato]);
+  }, [visibleContratos, getEmpenhosDoContrato, rapReferenceYear]);
 
   const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -111,24 +158,37 @@ export default function Contratos() {
   return (
     <div className="space-y-6 pb-10">
 
+      <HeaderActions>
+        {isSuperAdmin ? (
+          <Button
+            variant="outline"
+            className="gap-2 h-8 text-xs sm:h-9 sm:text-sm bg-surface-card border-border-default shadow-sm transition-all"
+            onClick={() => setIsSyncDialogOpen(true)}
+          >
+            <RefreshCw className="h-4 w-4 text-action-primary" />
+            Sincronizar Contratos
+          </Button>
+        ) : null}
+      </HeaderActions>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
         <StatCard
           title="Contratos Ativos"
-          value={contratos.length}
+          value={visibleContratos.length}
           icon={FileText}
           stitchColor="vibrant-blue"
         />
-        
+
         <StatCard
           title="Valor Global"
-          value={formatCurrency(contratos.reduce((sum, c) => sum + (c.valor || 0), 0))}
+          value={formatCurrency(visibleContratos.reduce((sum, c) => sum + (c.valor || 0), 0))}
           icon={DollarSign}
           stitchColor="purple"
         />
 
         <StatCard
-          title="Saldo a Liquidar"
+          title="Saldo Atual"
           value={formatCurrency(totalALiquidarGlobal)}
           icon={Calendar}
           stitchColor="amber"
@@ -136,18 +196,18 @@ export default function Contratos() {
         />
 
         <StatCard
-          title="Vínculos"
-          value={contratosEmpenhos.length}
+          title="Valor Empenhado"
+          value={formatCurrency(visibleContratos.reduce((sum, c) => {
+            const emps = getEmpenhosDoContrato(c.id);
+            return sum + emps.reduce((s, e) => s + (e.tipo === 'rap' ? getRapBaseVigente(e, rapReferenceYear) : (e.valor || 0)), 0);
+          }, 0))}
           icon={ExternalLink}
           stitchColor="emerald-green"
         />
       </div>
 
       {/* Standard Filter Card */}
-      <Card className="card-system shadow-sm">
-        <CardHeader className="pb-3 px-0 pt-0">
-          <CardTitle className="text-xl font-bold">Filtros</CardTitle>
-        </CardHeader>
+      <FilterPanel className="shadow-sm">
         <CardContent className="p-0">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
@@ -161,11 +221,11 @@ export default function Contratos() {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </FilterPanel>
 
       <Card className="card-system shadow-sm overflow-hidden border-none shadow-none mt-6">
         <CardHeader className="px-6 py-4 border-b border-border-default/50">
-          <CardTitle className="text-base font-semibold">Contratos Ativos</CardTitle>
+          <CardTitle className="table-title">Contratos Ativos</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -192,8 +252,8 @@ export default function Contratos() {
                     </div>
                   </TableHead>
                   <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Valor Total</TableHead>
-                  <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Saldo a Liquidar</TableHead>
-                  <TableHead className="h-11 px-6 text-xs font-semibold uppercase tracking-wider">Empenhos Vinculados</TableHead>
+                  <TableHead className="h-11 px-6 text-xs font-semibold uppercase tracking-wider">EMPENHADO</TableHead>
+                  <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Saldo Atual</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -206,10 +266,16 @@ export default function Contratos() {
                 ) : (
                   filteredContratos.map((c) => {
                     const empenhosVinculados = getEmpenhosDoContrato(c.id);
-                    const totalEmpenhado = empenhosVinculados.reduce((sum, e) => sum + e.valor, 0);
-                    
+                    const totalEmpenhado = empenhosVinculados.reduce(
+                      (sum, e) => sum + (e.tipo === 'rap' ? getRapBaseVigente(e, rapReferenceYear) : e.valor),
+                      0,
+                    );
+                    const percentualEmpenhado = c.valor && c.valor > 0
+                      ? Math.min(100, (totalEmpenhado / c.valor) * 100)
+                      : 0;
+
                     const totalALiquidar = empenhosVinculados.reduce((sum, e) => {
-                      if (e.tipo === 'rap') return sum + (e.rapALiquidar || 0);
+                      if (e.tipo === 'rap') return sum + getRapSaldoAtual(e, rapReferenceYear);
                       const liquidado = (e.valorLiquidadoAPagar || 0) + (e.valorPagoOficial || 0);
                       return sum + Math.max(0, e.valor - liquidado);
                     }, 0);
@@ -220,48 +286,56 @@ export default function Contratos() {
                           <span className="font-mono font-medium text-sm">{c.numero}</span>
                         </TableCell>
                         <TableCell className="py-4 px-4">
-                          <span className="font-medium text-sm">{c.contratada}</span>
-                        </TableCell>
-                        <TableCell className="py-4 px-4 text-right">
-                          <div className="flex flex-col text-xs space-y-0.5">
-                            <span className="text-muted-foreground">Início: {safeFormatDate(c.data_inicio)}</span>
-                            <span className="font-medium text-muted-foreground">Fim: {safeFormatDate(c.data_termino)}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-4 px-4 text-right">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-action-primary text-sm">{formatCurrency(c.valor || 0)}</span>
-                            {totalEmpenhado > 0 && (
-                              <span className="text-[10px] text-muted-foreground">
-                                Empenhado: {formatCurrency(totalEmpenhado)}
+                          <div className="flex flex-col gap-1">
+                            <span className="font-medium text-sm">{c.contratada}</span>
+                            {c.cnpj && (
+                              <span className="font-mono text-xs text-muted-foreground">
+                                {formatarDocumento(c.cnpj)}
                               </span>
                             )}
                           </div>
                         </TableCell>
                         <TableCell className="py-4 px-4 text-right">
-                          <div className="flex flex-col">
-                            <span className={cn(
-                              "font-semibold text-sm",
-                              totalALiquidar > 0 ? "text-status-warning" : "text-status-success"
-                            )}>
-                              {formatCurrency(totalALiquidar)}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground uppercase">A Liquidar</span>
+                          <div className="flex flex-col text-xs space-y-0.5">
+                            <span className="text-muted-foreground">+ {safeFormatDate(c.data_inicio)}</span>
+                            <span className="font-medium text-muted-foreground">- {safeFormatDate(c.data_termino)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-4 text-right">
+                          <div className="flex flex-col items-end gap-1.5">
+                            <span className="font-bold text-action-primary text-sm">{formatCurrency(c.valor || 0)}</span>
                           </div>
                         </TableCell>
                         <TableCell className="py-4 px-6">
-                          <div className="flex flex-wrap gap-1">
+                          <div className="space-y-2">
+                            {totalEmpenhado > 0 && (
+                              <div className="rounded-md border border-slate-200 bg-slate-50 p-2">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="font-bold text-slate-700">{formatCurrency(totalEmpenhado)}</span>
+                                  <span className="font-medium text-slate-500">{percentualEmpenhado.toFixed(1)}%</span>
+                                </div>
+                                <div className="mt-1 h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-slate-500 rounded-full transition-all"
+                                    style={{ width: `${percentualEmpenhado}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="flex flex-wrap gap-1">
                             {empenhosVinculados.length > 0 ? (
                               empenhosVinculados.map((e) => {
-                                const balance = e.tipo === 'rap' 
-                                  ? (e.rapALiquidar || 0) 
+                                const balance = e.tipo === 'rap'
+                                  ? getRapSaldoAtual(e, rapReferenceYear)
                                   : Math.max(0, e.valor - ((e.valorLiquidadoAPagar || 0) + (e.valorPagoOficial || 0)));
-                                
+                                const rapBase = e.tipo === 'rap' ? getRapBaseVigente(e, rapReferenceYear) : 0;
+
                                 return (
                                   <Popover key={e.id}>
                                     <PopoverTrigger asChild>
-                                      <Badge 
-                                        variant="secondary" 
+                                      <Badge
+                                        variant="secondary"
                                         className="text-[10px] font-mono py-0 h-5 cursor-pointer hover:bg-muted-foreground/20 transition-colors"
                                       >
                                         {e.numero}
@@ -276,9 +350,9 @@ export default function Contratos() {
                                           </Badge>
                                         </div>
                                         <div className="grid grid-cols-2 gap-y-1.5 text-xs py-1">
-                                          <span className="text-muted-foreground">Valor Total:</span>
-                                          <span className="text-right font-medium">{formatCurrency(e.valor || 0)}</span>
-                                          <span className="text-muted-foreground font-semibold">Saldo a Liquidar:</span>
+                                          <span className="text-muted-foreground">{e.tipo === 'rap' ? 'Base Vigente:' : 'Valor Total:'}</span>
+                                          <span className="text-right font-medium">{formatCurrency(e.tipo === 'rap' ? rapBase : (e.valor || 0))}</span>
+                                          <span className="text-muted-foreground font-semibold">{e.tipo === 'rap' ? 'Saldo Atual:' : 'Saldo a Liquidar:'}</span>
                                           <span className={cn(
                                             "text-right font-bold underline decoration-dotted",
                                             balance > 0 ? "text-orange-600" : "text-green-600"
@@ -304,6 +378,17 @@ export default function Contratos() {
                             ) : (
                               <span className="text-xs text-muted-foreground italic">Sem empenhos</span>
                             )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-4 text-right">
+                          <div className="flex flex-col">
+                            <span className={cn(
+                              "font-semibold text-sm",
+                              totalALiquidar > 0 ? "text-status-warning" : "text-status-success"
+                            )}>
+                              {formatCurrency(totalALiquidar)}
+                            </span>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -316,6 +401,14 @@ export default function Contratos() {
         </CardContent>
       </Card>
 
+      {isSuperAdmin ? (
+        <ContratosSyncDialog
+          open={isSyncDialogOpen}
+          onOpenChange={setIsSyncDialogOpen}
+          onSyncComplete={refreshData}
+        />
+      ) : null}
     </div>
   );
 }
+

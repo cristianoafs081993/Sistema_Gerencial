@@ -39,9 +39,19 @@ interface NecessidadeFonte {
   status_analise: 'REGULAR' | 'SUFICIENTE' | 'NECESSITA_PF';
 }
 
+interface DocumentoPendente {
+  id: string;
+  fonte_sof: string;
+  data_emissao: string;
+  favorecido_nome: string;
+  valor_liquidado: number;
+  valor_pago: number;
+  valor_pendente: number;
+}
+
 export default function ConciliacaoPfs() {
   const [fontes, setFontes] = useState<NecessidadeFonte[]>([]);
-  const [docsPendentes, setDocsPendentes] = useState<any[]>([]);
+  const [docsPendentes, setDocsPendentes] = useState<DocumentoPendente[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedFonte, setSelectedFonte] = useState<string | null>(null);
 
@@ -181,7 +191,7 @@ export default function ConciliacaoPfs() {
                 <ArrowRightCircle className="h-5 w-5 text-blue-500" />
               </div>
               <div>
-                <CardTitle className="text-base font-semibold">
+                <CardTitle className="table-title">
                   {selectedFonte ? `Liquidações Pendentes - Fonte ${selectedFonte}` : "Todas as Liquidações Pendentes"}
                 </CardTitle>
                 <CardDescription className="text-[10px] font-medium uppercase tracking-wider mt-0.5">
@@ -259,3 +269,4 @@ export default function ConciliacaoPfs() {
     </div>
   );
 }
+

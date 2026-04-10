@@ -38,12 +38,16 @@ import {
 import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { AtividadeDialog } from '@/components/modals/AtividadeDialog';
 import { ConfirmDialog } from '@/components/modals/ConfirmDialog';
+import { FilterPanel } from '@/components/design-system/FilterPanel';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { formatCurrency, parseCurrency } from '@/lib/utils';
 import { HeaderActions } from '@/components/HeaderParts';
 import { atividadesService } from '@/services/atividades';
+import { matchesDimensionFilter } from '@/utils/dimensionFilters';
 
 export default function Atividades() {
+  const { isSuperAdmin } = useAuth();
   const [atividades, setAtividades] = useState<Atividade[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -138,7 +142,12 @@ export default function Atividades() {
         a.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
         a.planoInterno?.toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchesDimensao = filterDimensao === 'all' || a.dimensao === filterDimensao;
+      const matchesDimensao = matchesDimensionFilter({
+        dimensionValue: a.dimensao,
+        planInternal: a.planoInterno,
+        description: a.descricao,
+        filterValue: filterDimensao,
+      });
       const matchesComponente = filterComponente === 'all' || a.componenteFuncional === filterComponente;
       const matchesOrigem = filterOrigem === 'all' || a.origemRecurso === filterOrigem;
 
@@ -194,10 +203,12 @@ export default function Atividades() {
                 Excluir ({selectedIds.size})
               </Button>
             )}
-            <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} className="gap-2 h-9 text-sm">
-              <Upload className="h-4 w-4" />
-              Importar JSON
-            </Button>
+            {isSuperAdmin ? (
+              <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} className="gap-2 h-9 text-sm">
+                <Upload className="h-4 w-4" />
+                Importar JSON
+              </Button>
+            ) : null}
             <Button onClick={() => handleOpenDialog()} className="btn-primary">
               <Plus className="h-4 w-4" />
               Nova Atividade
@@ -238,10 +249,7 @@ export default function Atividades() {
       </div>
 
       {/* Standard Filter Card */}
-      <Card className="card-system shadow-sm">
-        <CardHeader className="pb-3 px-0 pt-0">
-          <CardTitle className="text-xl font-bold">Filtros</CardTitle>
-        </CardHeader>
+      <FilterPanel className="shadow-sm">
         <CardContent className="p-0">
           {isPageLoading ? (
             <div className="flex flex-col sm:flex-row gap-4">
@@ -337,13 +345,13 @@ export default function Atividades() {
             </div>
           )}
         </CardContent>
-      </Card>
+      </FilterPanel>
 
       {/* Main Table Card */}
       <Card className="card-system shadow-sm border-none shadow-none mt-6">
         <CardHeader className="px-6 py-4 border-b border-border-default/50 flex flex-row items-center justify-between bg-white">
           <div className="flex items-center gap-3">
-            <CardTitle className="text-base font-semibold">Atividades Planejadas</CardTitle>
+            <CardTitle className="table-title">Atividades Planejadas</CardTitle>
             <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-bold px-2 py-0 h-5">
               {filteredAtividades.length}
             </Badge>
@@ -510,15 +518,18 @@ export default function Atividades() {
         confirmText="Excluir Atividades"
       />
 
-      <JsonImportDialog
-        open={isImportDialogOpen}
-        onOpenChange={setIsImportDialogOpen}
-        onImport={handleImport}
-        title="Importar Atividades (JSON)"
-        expectedFields={atividadesJsonFields}
-      />
+      {isSuperAdmin ? (
+        <JsonImportDialog
+          open={isImportDialogOpen}
+          onOpenChange={setIsImportDialogOpen}
+          onImport={handleImport}
+          title="Importar Atividades (JSON)"
+          expectedFields={atividadesJsonFields}
+        />
+      ) : null}
     </div>
   );
 }
+
 
 

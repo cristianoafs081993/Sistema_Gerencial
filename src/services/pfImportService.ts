@@ -6,6 +6,47 @@ export const EVENTOS_CANCELAMENTO = new Set(['596292', '596296']);
 export const EVENTOS_APROVACAO = new Set(['591290', '591294']);
 export const EVENTOS_LIBERACAO = new Set(['561611', '561618', '701230', '701330']);
 
+type PFValue = string | number | Date | null | undefined;
+type PFRow = Record<string, PFValue> & {
+  numero_pf?: string;
+  valor_num?: number;
+};
+
+type PFLink = {
+  s: PFRow;
+  a: PFRow | null;
+  l: PFRow | null;
+};
+
+function decodeCsvBuffer(arrayBuffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(arrayBuffer);
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+    return new TextDecoder('utf-16le').decode(bytes);
+  }
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+    return new TextDecoder('utf-16be').decode(bytes);
+  }
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+async function readWorkbook(file: File): Promise<XLSX.WorkBook> {
+  const arrayBuffer = await file.arrayBuffer();
+  const isCsv = file.name.toLowerCase().endsWith('.csv') || file.type.includes('csv');
+
+  if (isCsv) {
+    const text = decodeCsvBuffer(arrayBuffer).replace(/^\uFEFF/, '');
+    const delimiter = text.includes(';') ? ';' : ',';
+    return XLSX.read(text, {
+      type: 'string',
+      raw: false,
+      FS: delimiter,
+      cellDates: true,
+    });
+  }
+
+  return XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+}
+
 export function parseNumeroPF(numero: string | number): string {
   const numStr = String(numero).trim();
   const pfRegex = /^\\d{6}\\d{9}\\d{4}PF\\d{6}$/;
@@ -48,9 +89,8 @@ export function safeFormatDate(val: unknown): string {
   return str.substring(0, 10);
 }
 
-export async function parseSolicitacoes(file: File): Promise<any[]> {
-  const arrayBuffer = await file.arrayBuffer();
-  const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+export async function parseSolicitacoes(file: File): Promise<PFRow[]> {
+  const workbook = await readWorkbook(file);
   const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
   
@@ -60,16 +100,16 @@ export async function parseSolicitacoes(file: File): Promise<any[]> {
   // df.columns = raw.iloc[5].tolist()
   // This means the headers are on row 6 (index 5) and data starts on row 7 (index 6)
   
-  const rawData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
+  const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' }) as unknown[][];
   if (rawData.length <= 5) return [];
 
   const headers = rawData[5].map(String);
   const dataRows = rawData.slice(6);
   
-  const rows = dataRows.map(row => {
-    const obj: Record<string, any> = {};
+  const rows = dataRows.map((row): PFRow => {
+    const obj: PFRow = {};
     headers.forEach((header, index) => {
-      obj[header] = row[index];
+      obj[header] = row[index] as PFValue;
     });
     return obj;
   });
@@ -84,9 +124,8 @@ export async function parseSolicitacoes(file: File): Promise<any[]> {
   }));
 }
 
-export async function parseAprovacoesLiberacoes(file: File): Promise<any[]> {
-  const arrayBuffer = await file.arrayBuffer();
-  const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+export async function parseAprovacoesLiberacoes(file: File): Promise<PFRow[]> {
+  const workbook = await readWorkbook(file);
   // python says: sheet_name='PFs'
   let worksheet = workbook.Sheets['PFs'];
   if (!worksheet) {
@@ -94,7 +133,7 @@ export async function parseAprovacoesLiberacoes(file: File): Promise<any[]> {
     worksheet = workbook.Sheets[workbook.SheetNames[0]];
   }
 
-  const rawData = XLSX.utils.sheet_to_json(worksheet, { raw: false, dateNF: 'yyyy-mm-dd' }) as any[];
+  const rawData = XLSX.utils.sheet_to_json(worksheet, { raw: false, dateNF: 'yyyy-mm-dd' }) as PFRow[];
   return rawData.map(r => ({
     ...r,
     numero_pf: parseNumeroPF(r['PF']),
@@ -102,13 +141,13 @@ export async function parseAprovacoesLiberacoes(file: File): Promise<any[]> {
   }));
 }
 
-export function matchAndLink(sol: any[], pfs: any[]) {
+export function matchAndLink(sol: PFRow[], pfs: PFRow[]): PFLink[] {
   const apr = pfs.filter(p => String(p['PF - Ação']) === '3')
     .sort((a, b) => safeFormatDate(a['Emissão - Dia']).localeCompare(safeFormatDate(b['Emissão - Dia'])));
   const lib = pfs.filter(p => String(p['PF - Ação']) === '7');
 
   const used = new Set<number>();
-  const links: { s: any, a: any | null, l: any | null }[] = [];
+  const links: PFLink[] = [];
 
   const solFiltered = sol.filter(s => String(s['PF - Ação']) === '1')
     .sort((a, b) => safeFormatDate(a['Emissão - Dia']).localeCompare(safeFormatDate(b['Emissão - Dia'])));
@@ -249,7 +288,7 @@ export async function importPFs(file_solicitacoes: File, file_aprovacoes: File) 
 export async function getNecessidadePFs() {
   const { data, error } = await supabase
     .from('vw_controle_pfs_pendentes')
-    .select('*')
+    .select('fonte,total_solicitado,total_pago,total_a_pagar,saldo_pf_disponivel,qtd_docs_pendentes,necessidade_pf,status_analise')
     .order('fonte', { ascending: true });
 
   if (error) throw error;
@@ -259,7 +298,7 @@ export async function getNecessidadePFs() {
 export async function getDocumentosPendentes(fonte?: string) {
   let query = supabase
     .from('vw_documentos_pendentes_pagamento')
-    .select('*')
+    .select('id,fonte_sof,data_emissao,favorecido_nome,valor_liquidado,valor_pago,valor_pendente')
     .order('data_emissao', { ascending: true });
 
   if (fonte) {

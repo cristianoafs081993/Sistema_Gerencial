@@ -1,4 +1,19 @@
-# Welcome to your Lovable project
+# Sistema Gerencial
+
+Aplicacao web de gestao para o IFRN com modulos de execucao orcamentaria, documentos habeis, contratos, PFs, conciliacoes e assistentes apoiados por IA.
+
+## Leia primeiro
+
+- Guia principal do repositorio: [docs/REPOSITORY_GUIDE.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/REPOSITORY_GUIDE.md)
+- Ponto de entrada para IA e manutencao: [docs/ai/START_HERE.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/ai/START_HERE.md)
+- Indice da documentacao: [docs/README.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/README.md)
+
+## Regras operacionais
+
+- Antes de alterar importadores, leia [docs/data-import/README.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/data-import/README.md).
+- Antes de alterar banco, leia [docs/database/SCHEMA_OVERVIEW.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/database/SCHEMA_OVERVIEW.md) e [docs/database/TABLE_CATALOG.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/database/TABLE_CATALOG.md).
+- Antes de alterar integracoes ou functions, leia [docs/integrations/API_CATALOG.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/integrations/API_CATALOG.md) e [docs/ops/SUPABASE_FUNCTIONS.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/ops/SUPABASE_FUNCTIONS.md).
+- A pasta `docs/llm` e legado auxiliar, nao fonte primaria.
 
 ## Project info
 
@@ -59,6 +74,12 @@ This project is built with:
 - React
 - shadcn-ui
 - Tailwind CSS
+
+## Design System
+
+- Documentação oficial: `docs/DESIGN_SYSTEM.md`
+- Preview visual: `src/pages/DesignSystemPreview.tsx` (`/design-system-preview`)
+- Regras de adoção: `.antigravity/rules.md`
 
 ## How can I deploy this project?
 

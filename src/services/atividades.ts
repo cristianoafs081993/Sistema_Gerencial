@@ -1,43 +1,85 @@
 
 import { supabase } from '@/lib/supabase';
+import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { Atividade } from '@/types';
+import { normalizeActivityName, normalizeFunctionalComponentName } from '@/utils/functionalComponentLabels';
+
+const ATIVIDADES_SELECT = 'id,dimensao,dimensao_id,componente_funcional,componente_funcional_id,processo,atividade,descricao,valor_total,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,created_at,updated_at';
+
+type AtividadeRow = {
+    id: string;
+    dimensao: string;
+    dimensao_id?: string | null;
+    componente_funcional: string;
+    componente_funcional_id?: string | null;
+    processo?: string | null;
+    atividade: string;
+    descricao: string;
+    valor_total: number | string;
+    origem_recurso: string;
+    origem_recurso_id?: string | null;
+    natureza_despesa: string;
+    natureza_despesa_id?: string | null;
+    plano_interno: string;
+    created_at: string;
+    updated_at: string;
+};
+
+const mapAtividadeRow = (item: AtividadeRow): Atividade => ({
+    id: item.id,
+    dimensao: item.dimensao,
+    dimensaoId: item.dimensao_id || undefined,
+    componenteFuncional: normalizeFunctionalComponentName(item.componente_funcional),
+    componenteFuncionalId: item.componente_funcional_id || undefined,
+    processo: item.processo || '',
+    atividade: normalizeActivityName(item.atividade, item.dimensao),
+    descricao: item.descricao,
+    valorTotal: Number(item.valor_total),
+    origemRecurso: item.origem_recurso,
+    origemRecursoId: item.origem_recurso_id || undefined,
+    naturezaDespesa: item.natureza_despesa,
+    naturezaDespesaId: item.natureza_despesa_id || undefined,
+    planoInterno: item.plano_interno,
+    createdAt: new Date(item.created_at),
+    updatedAt: new Date(item.updated_at),
+});
 
 export const atividadesService = {
     async getAll(): Promise<Atividade[]> {
         const { data, error } = await supabase
             .from('atividades')
-            .select('*')
+            .select(ATIVIDADES_SELECT)
             .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+            console.warn('atividadesService.getAll: fallback para Supabase REST', error);
+            const fallbackData = await fetchSupabaseRestRows<AtividadeRow>('atividades', ATIVIDADES_SELECT, {
+                orderBy: 'created_at',
+            });
+            return fallbackData.map(mapAtividadeRow);
+        }
 
-        return data.map((item: any) => ({
-            id: item.id,
-            dimensao: item.dimensao,
-            dimensaoId: item.dimensao_id || undefined,
-            componenteFuncional: item.componente_funcional,
-            componenteFuncionalId: item.componente_funcional_id || undefined,
-            processo: item.processo,
-            atividade: item.atividade,
-            descricao: item.descricao,
-            valorTotal: Number(item.valor_total),
-            origemRecurso: item.origem_recurso,
-            origemRecursoId: item.origem_recurso_id || undefined,
-            naturezaDespesa: item.natureza_despesa,
-            naturezaDespesaId: item.natureza_despesa_id || undefined,
-            planoInterno: item.plano_interno,
-            createdAt: new Date(item.created_at),
-            updatedAt: new Date(item.updated_at),
-        }));
+        if (!data || data.length === 0) {
+            console.warn('atividadesService.getAll: resultado vazio via supabase-js, consultando REST');
+            const fallbackData = await fetchSupabaseRestRows<AtividadeRow>('atividades', ATIVIDADES_SELECT, {
+                orderBy: 'created_at',
+            });
+            return fallbackData.map(mapAtividadeRow);
+        }
+
+        return (data as AtividadeRow[]).map(mapAtividadeRow);
     },
 
     async create(atividade: Omit<Atividade, 'id' | 'createdAt' | 'updatedAt'>): Promise<Atividade> {
-        const payload: any = {
-            dimensao: atividade.dimensao,
+        const dimensao = atividade.dimensao;
+        const componenteFuncional = normalizeFunctionalComponentName(atividade.componenteFuncional);
+        const nomeAtividade = normalizeActivityName(atividade.atividade, dimensao);
+        const payload: Record<string, unknown> = {
+            dimensao,
             dimensao_id: atividade.dimensaoId || null,
-            componente_funcional: atividade.componenteFuncional,
+            componente_funcional: componenteFuncional,
             componente_funcional_id: atividade.componenteFuncionalId || null,
-            atividade: atividade.atividade,
+            atividade: nomeAtividade,
             descricao: atividade.descricao,
             valor_total: atividade.valorTotal,
             origem_recurso: atividade.origemRecurso,
@@ -56,36 +98,26 @@ export const atividadesService = {
 
         if (error) throw error;
 
-        return {
-            id: data.id,
-            dimensao: data.dimensao,
-            dimensaoId: data.dimensao_id || undefined,
-            componenteFuncional: data.componente_funcional,
-            componenteFuncionalId: data.componente_funcional_id || undefined,
-            processo: data.processo,
-            atividade: data.atividade,
-            descricao: data.descricao,
-            valorTotal: Number(data.valor_total),
-            origemRecurso: data.origem_recurso,
-            origemRecursoId: data.origem_recurso_id || undefined,
-            naturezaDespesa: data.natureza_despesa,
-            naturezaDespesaId: data.natureza_despesa_id || undefined,
-            planoInterno: data.plano_interno,
-            createdAt: new Date(data.created_at),
-            updatedAt: new Date(data.updated_at),
-        };
+        return mapAtividadeRow(data as AtividadeRow);
     },
 
     async update(id: string, atividade: Partial<Atividade>): Promise<void> {
-        const updates: any = {
+        const updates: Record<string, unknown> = {
             updated_at: new Date().toISOString(),
         };
 
         if (atividade.dimensao) updates.dimensao = atividade.dimensao;
         if (atividade.dimensaoId !== undefined) updates.dimensao_id = atividade.dimensaoId || null;
-        if (atividade.componenteFuncional) updates.componente_funcional = atividade.componenteFuncional;
+        if (atividade.componenteFuncional) {
+            updates.componente_funcional = normalizeFunctionalComponentName(atividade.componenteFuncional);
+        }
         if (atividade.componenteFuncionalId !== undefined) updates.componente_funcional_id = atividade.componenteFuncionalId || null;
-        if (atividade.atividade) updates.atividade = atividade.atividade;
+        if (atividade.atividade) {
+            updates.atividade = normalizeActivityName(
+                atividade.atividade,
+                atividade.dimensao ?? updates.dimensao?.toString() ?? undefined,
+            );
+        }
         if (atividade.descricao) updates.descricao = atividade.descricao;
         if (atividade.valorTotal !== undefined) updates.valor_total = atividade.valorTotal;
         if (atividade.origemRecurso) updates.origem_recurso = atividade.origemRecurso;

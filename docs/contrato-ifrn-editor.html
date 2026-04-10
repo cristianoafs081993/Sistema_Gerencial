@@ -1,0 +1,1413 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ContratoIFRN — Editor Inteligente</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg: #f7f5f0;
+  --surface: #ffffff;
+  --surface2: #f0ede6;
+  --border: #e2ddd4;
+  --border2: #ccc8be;
+  --text: #1a1814;
+  --text-muted: #7a7468;
+  --text-dim: #b5b0a6;
+  --accent: #1a4f3a;
+  --accent-light: #e8f0ec;
+  --accent-mid: #2d7a55;
+  --warn: #92400e;
+  --warn-light: #fef3c7;
+  --warn-border: #d97706;
+  --danger: #991b1b;
+  --danger-light: #fef2f2;
+  --danger-border: #ef4444;
+  --ok: #14532d;
+  --ok-light: #f0fdf4;
+  --ok-border: #22c55e;
+  --info: #1e3a5f;
+  --info-light: #eff6ff;
+  --info-border: #3b82f6;
+  --serif: 'Instrument Serif', Georgia, serif;
+  --sans: 'DM Sans', system-ui, sans-serif;
+  --radius: 10px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  --shadow-lg: 0 4px 24px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ── TOP BAR ── */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 52px;
+  background: var(--accent);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px;
+  z-index: 100;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+}
+
+.topbar-left { display: flex; align-items: center; gap: 12px; }
+
+.topbar-logo {
+  font-family: var(--serif);
+  font-size: 18px;
+  color: #fff;
+  letter-spacing: -0.3px;
+}
+
+.topbar-logo span { color: rgba(255,255,255,0.5); }
+
+.topbar-doc-type {
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 6px;
+  padding: 4px 10px;
+  color: rgba(255,255,255,0.9);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+  transition: background 0.15s;
+}
+.topbar-doc-type:hover { background: rgba(255,255,255,0.18); }
+
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+
+.btn-conform {
+  background: #fff;
+  color: var(--accent);
+  border: none;
+  border-radius: 7px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 16px;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 7px;
+  transition: all 0.15s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+.btn-conform:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0,0,0,0.15); }
+
+.btn-conform .icon { font-size: 15px; }
+
+.topbar-user {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  border: 2px solid rgba(255,255,255,0.3);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ── LAYOUT ── */
+.layout {
+  display: grid;
+  grid-template-columns: 220px 1fr 300px;
+  margin-top: 52px;
+  min-height: calc(100vh - 52px);
+}
+
+/* ── LEFT NAV ── */
+.left-nav {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 20px 0;
+  position: sticky;
+  top: 52px;
+  height: calc(100vh - 52px);
+  overflow-y: auto;
+}
+
+.nav-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding: 0 16px 8px;
+}
+
+.nav-section {
+  display: flex; align-items: center;
+  padding: 9px 16px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all 0.15s;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.nav-section:hover { background: var(--surface2); color: var(--text); }
+.nav-section.active {
+  border-left-color: var(--accent);
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 500;
+}
+.nav-section.done { color: var(--accent-mid); }
+.nav-section.done::after {
+  content: '✓';
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--accent-mid);
+}
+
+.nav-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--border2);
+  flex-shrink: 0;
+}
+.nav-section.active .nav-dot { background: var(--accent); }
+.nav-section.done .nav-dot { background: var(--accent-mid); }
+
+.nav-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 12px 0;
+}
+
+/* ── EDITOR ── */
+.editor-area {
+  padding: 40px 48px;
+  max-width: 860px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.doc-header {
+  margin-bottom: 36px;
+  padding-bottom: 24px;
+  border-bottom: 2px solid var(--border);
+}
+
+.doc-meta {
+  display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap;
+}
+
+.doc-tag {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 100px;
+  letter-spacing: 0.3px;
+}
+.doc-tag.type { background: var(--accent-light); color: var(--accent); border: 1px solid rgba(26,79,58,0.2); }
+.doc-tag.obj { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); }
+
+.doc-title {
+  font-family: var(--serif);
+  font-size: 28px;
+  color: var(--text);
+  line-height: 1.2;
+  letter-spacing: -0.5px;
+  margin-bottom: 6px;
+}
+
+.doc-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ── SECTION BLOCK ── */
+.section-block {
+  margin-bottom: 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+}
+.section-block:focus-within { box-shadow: var(--shadow-lg); border-color: var(--border2); }
+
+.section-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+  cursor: pointer;
+}
+
+.section-title-row { display: flex; align-items: center; gap: 10px; }
+
+.section-num {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--border2);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.section-block.active .section-num { background: var(--accent); color: #fff; }
+.section-block.done .section-num { background: var(--accent-mid); color: #fff; }
+
+.section-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.1px;
+}
+
+.section-status {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-weight: 500;
+}
+.status-pending { background: var(--surface2); color: var(--text-dim); border: 1px solid var(--border); }
+.status-writing { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
+.status-done { background: var(--ok-light); color: var(--ok); border: 1px solid var(--ok-border); }
+
+.section-body { padding: 18px; display: none; }
+.section-block.open .section-body { display: block; }
+
+.section-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: var(--info-light);
+  border-left: 3px solid var(--info-border);
+  border-radius: 0 6px 6px 0;
+  line-height: 1.5;
+}
+
+.editor-field {
+  width: 100%;
+  min-height: 120px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 14px;
+  font-family: var(--sans);
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--text);
+  background: var(--bg);
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.editor-field:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(26,79,58,0.08);
+}
+
+.section-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 12px;
+}
+
+.char-count { font-size: 11px; color: var(--text-dim); }
+
+.btn-section-done {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 14px;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+  transition: all 0.15s;
+}
+.btn-section-done:hover { background: var(--accent-mid); }
+
+/* ── SUGGESTIONS PANEL ── */
+.suggestions-panel {
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  position: sticky;
+  top: 52px;
+  height: calc(100vh - 52px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-header {
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+  flex-shrink: 0;
+}
+
+.panel-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.panel-subtitle {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.panel-body { padding: 14px; flex: 1; }
+
+/* Cards de sugestão */
+.suggestion-card {
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+  border: 1px solid transparent;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.suggestion-card.operational { background: var(--warn-light); border-color: #fde68a; }
+.suggestion-card.legal { background: var(--info-light); border-color: #bfdbfe; }
+.suggestion-card.historic { background: var(--ok-light); border-color: #bbf7d0; }
+.suggestion-card.normative { background: #faf5ff; border-color: #e9d5ff; }
+
+.card-header { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
+
+.card-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+
+.card-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.operational .card-label { color: var(--warn); }
+.legal .card-label { color: var(--info); }
+.historic .card-label { color: var(--ok); }
+.normative .card-label { color: #6b21a8; }
+
+.card-text {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.card-source {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(0,0,0,0.06);
+  font-style: italic;
+}
+
+/* Normativos */
+.normative-item {
+  padding: 10px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: var(--surface);
+}
+.normative-item:hover { border-color: var(--accent); background: var(--accent-light); }
+
+.norm-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.norm-desc { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+.norm-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+.norm-tag.lei { background: #dbeafe; color: #1e40af; }
+.norm-tag.in { background: #fae8ff; color: #7e22ce; }
+.norm-tag.resolucao { background: #dcfce7; color: #15803d; }
+.norm-tag.parecer { background: #fef9c3; color: #854d0e; }
+
+/* Panel tabs */
+.panel-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.panel-tab {
+  flex: 1;
+  padding: 10px 8px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+.panel-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.panel-tab:hover:not(.active) { color: var(--text); background: var(--surface2); }
+
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Empty state */
+.empty-panel {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--text-dim);
+}
+.empty-panel .empty-icon { font-size: 28px; margin-bottom: 8px; }
+.empty-panel p { font-size: 12px; line-height: 1.5; }
+
+/* ── CONFORMIDADE MODAL ── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(10,12,10,0.6);
+  z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(3px);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.2s;
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+
+.modal-box {
+  background: var(--surface);
+  border-radius: 14px;
+  width: 640px;
+  max-width: 95vw;
+  max-height: 85vh;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.2);
+  transform: translateY(12px);
+  transition: transform 0.25s;
+}
+.modal-overlay.open .modal-box { transform: translateY(0); }
+
+.modal-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--surface2);
+}
+
+.modal-title {
+  font-family: var(--serif);
+  font-size: 20px;
+  color: var(--text);
+}
+
+.modal-close {
+  background: var(--border);
+  border: none;
+  border-radius: 50%;
+  width: 28px; height: 28px;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.modal-close:hover { background: var(--border2); color: var(--text); }
+
+.modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+
+/* Camadas de conformidade */
+.layer-item {
+  margin-bottom: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.layer-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 16px;
+  cursor: pointer;
+  background: var(--surface2);
+  transition: background 0.15s;
+}
+.layer-header:hover { background: var(--border); }
+
+.layer-num {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.layer-0 .layer-num { background: #fde68a; color: #92400e; }
+.layer-1 .layer-num { background: #bfdbfe; color: #1e3a5f; }
+.layer-2 .layer-num { background: #e9d5ff; color: #6b21a8; }
+.layer-3 .layer-num { background: #bbf7d0; color: #14532d; }
+
+.layer-name { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
+.layer-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 100px;
+}
+.badge-ok { background: var(--ok-light); color: var(--ok); border: 1px solid var(--ok-border); }
+.badge-warn { background: var(--warn-light); color: var(--warn); border: 1px solid var(--warn-border); }
+.badge-error { background: var(--danger-light); color: var(--danger); border: 1px solid var(--danger-border); }
+
+.layer-body {
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+  display: none;
+}
+.layer-item.open .layer-body { display: block; }
+
+.finding-item {
+  display: flex; gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.finding-item:last-child { border-bottom: none; }
+
+.finding-icon { flex-shrink: 0; font-size: 14px; margin-top: 1px; }
+.finding-text { color: var(--text); }
+.finding-ref { font-size: 11px; color: var(--text-muted); margin-top: 2px; font-style: italic; }
+
+/* Loading animation */
+.loading-layers { padding: 8px 0; }
+.loading-bar {
+  height: 8px;
+  border-radius: 100px;
+  background: var(--border);
+  margin-bottom: 10px;
+  overflow: hidden;
+  position: relative;
+}
+.loading-bar::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, var(--accent-light), transparent);
+  animation: shimmer 1.2s infinite;
+}
+@keyframes shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+.loading-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+/* Progress bar no modal */
+.conform-progress {
+  display: flex; gap: 6px;
+  margin-bottom: 20px;
+}
+.progress-step {
+  flex: 1;
+  height: 4px;
+  border-radius: 100px;
+  background: var(--border);
+  transition: background 0.4s;
+}
+.progress-step.active { background: var(--accent); }
+.progress-step.done { background: var(--accent-mid); }
+
+/* Resumo */
+.conform-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.summary-card {
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}
+.summary-card.ok { background: var(--ok-light); border: 1px solid var(--ok-border); }
+.summary-card.warn { background: var(--warn-light); border: 1px solid var(--warn-border); }
+.summary-card.err { background: var(--danger-light); border: 1px solid var(--danger-border); }
+.summary-num { font-size: 24px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+.summary-card.ok .summary-num { color: var(--ok); }
+.summary-card.warn .summary-num { color: var(--warn); }
+.summary-card.err .summary-num { color: var(--danger); }
+.summary-label { font-size: 11px; font-weight: 500; }
+.summary-card.ok .summary-label { color: var(--ok); }
+.summary-card.warn .summary-label { color: var(--warn); }
+.summary-card.err .summary-label { color: var(--danger); }
+
+/* Doc type selector */
+.doc-type-modal {
+  position: fixed; inset: 0;
+  background: rgba(10,12,10,0.5);
+  z-index: 300;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(3px);
+}
+
+.doc-type-box {
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 28px;
+  width: 480px;
+  max-width: 95vw;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.2);
+}
+
+.doc-type-title {
+  font-family: var(--serif);
+  font-size: 22px;
+  margin-bottom: 6px;
+}
+.doc-type-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+
+.doc-type-options { display: flex; flex-direction: column; gap: 8px; }
+
+.doc-type-option {
+  padding: 14px 16px;
+  border-radius: 9px;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex; align-items: center; gap: 14px;
+}
+.doc-type-option:hover { border-color: var(--accent); background: var(--accent-light); }
+.doc-type-option.selected { border-color: var(--accent); background: var(--accent-light); }
+
+.doc-type-icon { font-size: 22px; }
+.doc-type-info {}
+.doc-type-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.doc-type-desc { font-size: 12px; color: var(--text-muted); }
+
+.btn-start {
+  margin-top: 20px;
+  width: 100%;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-start:hover { background: var(--accent-mid); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 10px; }
+
+/* Alert operational */
+.op-alert {
+  display: flex; gap: 10px;
+  background: var(--warn-light);
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 11px 13px;
+  margin-top: 10px;
+  animation: slideIn 0.3s ease;
+}
+.op-alert-icon { font-size: 15px; flex-shrink: 0; }
+.op-alert-text { font-size: 12px; color: #78350f; line-height: 1.5; }
+.op-alert-title { font-weight: 600; margin-bottom: 2px; }
+</style>
+</head>
+<body>
+
+<!-- DOC TYPE SELECTOR -->
+<div class="doc-type-modal" id="docTypeModal">
+  <div class="doc-type-box">
+    <div class="doc-type-title">Novo documento</div>
+    <div class="doc-type-sub">Selecione o tipo de documento para manutenção predial contínua</div>
+    <div class="doc-type-options">
+      <div class="doc-type-option selected" data-type="ETP" onclick="selectDocType(this)">
+        <div class="doc-type-icon">📋</div>
+        <div class="doc-type-info">
+          <div class="doc-type-name">Estudo Técnico Preliminar (ETP)</div>
+          <div class="doc-type-desc">Análise de viabilidade e levantamento de requisitos</div>
+        </div>
+      </div>
+      <div class="doc-type-option" data-type="TR" onclick="selectDocType(this)">
+        <div class="doc-type-icon">📄</div>
+        <div class="doc-type-info">
+          <div class="doc-type-name">Termo de Referência (TR)</div>
+          <div class="doc-type-desc">Especificações técnicas e condições de contratação</div>
+        </div>
+      </div>
+      <div class="doc-type-option" data-type="MINUTA" onclick="selectDocType(this)">
+        <div class="doc-type-icon">📝</div>
+        <div class="doc-type-info">
+          <div class="doc-type-name">Minuta de Contrato</div>
+          <div class="doc-type-desc">Instrumento contratual com cláusulas e condições</div>
+        </div>
+      </div>
+    </div>
+    <button class="btn-start" onclick="startEditor()">Iniciar elaboração →</button>
+  </div>
+</div>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-logo">Contrato<span>IFRN</span></div>
+    <div class="topbar-doc-type" onclick="document.getElementById('docTypeModal').style.display='flex'">
+      <span id="topbarDocType">📋 ETP</span>
+      <span style="opacity:0.5;font-size:10px">▼</span>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <button class="btn-conform" onclick="openConformModal()">
+      <span class="icon">🔍</span> Verificar Conformidade
+    </button>
+    <div class="topbar-user">CS</div>
+  </div>
+</div>
+
+<!-- LAYOUT -->
+<div class="layout">
+
+  <!-- LEFT NAV -->
+  <nav class="left-nav">
+    <div class="nav-label">Seções do documento</div>
+    <div class="nav-section active" onclick="scrollToSection(0)">
+      <div class="nav-dot"></div> Identificação
+    </div>
+    <div class="nav-section" id="nav1" onclick="scrollToSection(1)">
+      <div class="nav-dot"></div> Descrição do Objeto
+    </div>
+    <div class="nav-section" id="nav2" onclick="scrollToSection(2)">
+      <div class="nav-dot"></div> Justificativa
+    </div>
+    <div class="nav-section" id="nav3" onclick="scrollToSection(3)">
+      <div class="nav-dot"></div> Requisitos da Contratação
+    </div>
+    <div class="nav-section" id="nav4" onclick="scrollToSection(4)">
+      <div class="nav-dot"></div> Estimativa de Valor
+    </div>
+    <div class="nav-section" id="nav5" onclick="scrollToSection(5)">
+      <div class="nav-dot"></div> Gestão e Fiscalização
+    </div>
+    <hr class="nav-divider"/>
+    <div class="nav-label">Ferramentas</div>
+    <div class="nav-section" style="font-size:12px; color:var(--text-muted)">
+      <span>📎</span> Anexar documentos
+    </div>
+    <div class="nav-section" style="font-size:12px; color:var(--text-muted)">
+      <span>💾</span> Salvar rascunho
+    </div>
+  </nav>
+
+  <!-- EDITOR -->
+  <div class="editor-area" id="editorArea">
+
+    <div class="doc-header">
+      <div class="doc-meta">
+        <span class="doc-tag type" id="docTagType">📋 Estudo Técnico Preliminar</span>
+        <span class="doc-tag obj">🔧 Manutenção Predial Contínua</span>
+        <span class="doc-tag obj">IFRN – Campus Currais Novos</span>
+      </div>
+      <div class="doc-title" id="docTitleMain">Estudo Técnico Preliminar<br><em>Serviços de Manutenção Predial</em></div>
+      <div class="doc-subtitle">Processo nº ____/2025 · Elaborado em <span id="dateNow"></span></div>
+    </div>
+
+    <!-- SEÇÃO 1 -->
+    <div class="section-block open active" id="sec0">
+      <div class="section-head" onclick="toggleSection(0)">
+        <div class="section-title-row">
+          <div class="section-num">1</div>
+          <div class="section-name">Identificação da Unidade Demandante</div>
+        </div>
+        <span class="section-status status-writing" id="status0">Editando</span>
+      </div>
+      <div class="section-body">
+        <div class="section-desc">
+          Identifique a unidade administrativa responsável pela demanda, o setor requisitante e o responsável pela elaboração deste estudo.
+        </div>
+        <textarea class="editor-field" id="field0" rows="5" placeholder="Ex: A presente contratação é demandada pela Coordenação de Infraestrutura e Manutenção do IFRN – Campus Currais Novos, vinculada à Diretoria de Administração..." oninput="updateCharCount(0)" onfocus="setActiveSection(0)">A presente contratação é demandada pela Coordenação de Infraestrutura e Manutenção do IFRN – Campus Currais Novos, vinculada à Diretoria de Administração e Planejamento. O servidor responsável pela elaboração deste Estudo Técnico Preliminar é o servidor Cristiano Silva, Analista de TI, designado pela Portaria nº 12/2025-GDG.</textarea>
+        <div class="section-footer">
+          <span class="char-count" id="chars0">0 caracteres</span>
+          <button class="btn-section-done" onclick="completeSection(0)">Concluir seção ✓</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEÇÃO 2 -->
+    <div class="section-block" id="sec1">
+      <div class="section-head" onclick="toggleSection(1)">
+        <div class="section-title-row">
+          <div class="section-num">2</div>
+          <div class="section-name">Descrição do Objeto</div>
+        </div>
+        <span class="section-status status-pending" id="status1">Pendente</span>
+      </div>
+      <div class="section-body">
+        <div class="section-desc">
+          Descreva de forma clara e precisa o objeto da contratação, incluindo as categorias de serviços de manutenção, abrangência das instalações e regime de execução.
+        </div>
+        <textarea class="editor-field" id="field1" rows="6" placeholder="Ex: Contratação de empresa especializada para prestação de serviços contínuos de manutenção predial preventiva e corretiva nas instalações do IFRN..." oninput="updateCharCount(1)" onfocus="setActiveSection(1)"></textarea>
+        <div class="section-footer">
+          <span class="char-count" id="chars1">0 caracteres</span>
+          <button class="btn-section-done" onclick="completeSection(1)">Concluir seção ✓</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEÇÃO 3 -->
+    <div class="section-block" id="sec2">
+      <div class="section-head" onclick="toggleSection(2)">
+        <div class="section-title-row">
+          <div class="section-num">3</div>
+          <div class="section-name">Justificativa da Contratação</div>
+        </div>
+        <span class="section-status status-pending" id="status2">Pendente</span>
+      </div>
+      <div class="section-body">
+        <div class="section-desc">
+          Apresente a necessidade administrativa que justifica a contratação, com dados quantitativos quando possível (área construída, número de edificações, histórico de ocorrências).
+        </div>
+        <textarea class="editor-field" id="field2" rows="6" placeholder="Ex: O Campus Currais Novos possui área construída de aproximadamente 8.200 m², distribuídos em 14 edificações com idades entre 5 e 30 anos..." oninput="updateCharCount(2)" onfocus="setActiveSection(2)"></textarea>
+        <div class="section-footer">
+          <span class="char-count" id="chars2">0 caracteres</span>
+          <button class="btn-section-done" onclick="completeSection(2)">Concluir seção ✓</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEÇÃO 4 -->
+    <div class="section-block" id="sec3">
+      <div class="section-head" onclick="toggleSection(3)">
+        <div class="section-title-row">
+          <div class="section-num">4</div>
+          <div class="section-name">Requisitos da Contratação</div>
+        </div>
+        <span class="section-status status-pending" id="status3">Pendente</span>
+      </div>
+      <div class="section-body">
+        <div class="section-desc">
+          Especifique os requisitos técnicos mínimos, qualificações exigidas, habilitações e eventuais restrições ao objeto.
+        </div>
+        <textarea class="editor-field" id="field3" rows="6" placeholder="Ex: A contratada deverá comprovar registro no CREA, apresentar atestado de capacidade técnica em manutenção predial para áreas acima de 5.000 m²..." oninput="updateCharCount(3)" onfocus="setActiveSection(3)"></textarea>
+        <div class="section-footer">
+          <span class="char-count" id="chars3">0 caracteres</span>
+          <button class="btn-section-done" onclick="completeSection(3)">Concluir seção ✓</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEÇÃO 5 -->
+    <div class="section-block" id="sec4">
+      <div class="section-head" onclick="toggleSection(4)">
+        <div class="section-title-row">
+          <div class="section-num">5</div>
+          <div class="section-name">Estimativa de Valor</div>
+        </div>
+        <span class="section-status status-pending" id="status4">Pendente</span>
+      </div>
+      <div class="section-body">
+        <div class="section-desc">
+          Apresente a metodologia utilizada para estimativa do valor da contratação e os preços de referência consultados (SINAPI, SICRO, painel de preços, etc.).
+        </div>
+        <textarea class="editor-field" id="field4" rows="6" placeholder="Ex: O valor estimado foi apurado com base em pesquisa de preços realizada junto ao Painel de Preços do Governo Federal (paineldeprecos.economia.gov.br) e consulta à tabela SINAPI..." oninput="updateCharCount(4)" onfocus="setActiveSection(4)"></textarea>
+        <div class="section-footer">
+          <span class="char-count" id="chars4">0 caracteres</span>
+          <button class="btn-section-done" onclick="completeSection(4)">Concluir seção ✓</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEÇÃO 6 -->
+    <div class="section-block" id="sec5">
+      <div class="section-head" onclick="toggleSection(5)">
+        <div class="section-title-row">
+          <div class="section-num">6</div>
+          <div class="section-name">Gestão e Fiscalização</div>
+        </div>
+        <span class="section-status status-pending" id="status5">Pendente</span>
+      </div>
+      <div class="section-body">
+        <div class="section-desc">
+          Descreva a estrutura de gestão e fiscalização do contrato, incluindo a designação de fiscal técnico e administrativo conforme art. 117 da Lei 14.133/2021.
+        </div>
+        <textarea class="editor-field" id="field5" rows="6" placeholder="Ex: A fiscalização do contrato será exercida por servidor designado por portaria, com as atribuições de fiscal técnico e fiscal administrativo distintas, conforme §1º do art. 117 da Lei 14.133/2021..." oninput="updateCharCount(5)" onfocus="setActiveSection(5)"></textarea>
+        <div class="section-footer">
+          <span class="char-count" id="chars5">0 caracteres</span>
+          <button class="btn-section-done" onclick="completeSection(5)">Concluir seção ✓</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- SUGGESTIONS PANEL -->
+  <aside class="suggestions-panel">
+    <div class="panel-header">
+      <div class="panel-title">Assistente de elaboração</div>
+      <div class="panel-subtitle" id="panelSubtitle">Manutenção predial contínua · ETP</div>
+    </div>
+    <div class="panel-tabs">
+      <div class="panel-tab active" onclick="switchTab('sugestoes')">💡 Sugestões</div>
+      <div class="panel-tab" onclick="switchTab('normativos')">📚 Normativos</div>
+    </div>
+
+    <div class="panel-body">
+      <!-- TAB SUGESTÕES -->
+      <div class="tab-content active" id="tab-sugestoes">
+        <div id="suggestions-area">
+          <div class="empty-panel">
+            <div class="empty-icon">✍️</div>
+            <p>Conclua uma seção para receber sugestões contextualizadas para este tipo de contrato.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB NORMATIVOS -->
+      <div class="tab-content" id="tab-normativos">
+        <div class="normative-item">
+          <div class="norm-title">Lei nº 14.133/2021</div>
+          <div class="norm-desc">Art. 6º, 22º, 117º — Definições, ETP e fiscalização de contratos</div>
+          <span class="norm-tag lei">Lei Federal</span>
+        </div>
+        <div class="normative-item">
+          <div class="norm-title">IN SEGES nº 65/2021</div>
+          <div class="norm-desc">Padroniza o ETP para serviços e fornecimentos contínuos</div>
+          <span class="norm-tag in">Instrução Normativa</span>
+        </div>
+        <div class="normative-item">
+          <div class="norm-title">Resolução CONSUP nº 38/2022</div>
+          <div class="norm-desc">Regulamento interno de compras e contratações do IFRN</div>
+          <span class="norm-tag resolucao">Resolução IFRN</span>
+        </div>
+        <div class="normative-item">
+          <div class="norm-title">Parecer Ref. PF/IFRN nº 01/2023</div>
+          <div class="norm-desc">Orientações sobre habilitação em serviços de engenharia</div>
+          <span class="norm-tag parecer">Parecer PF/IFRN</span>
+        </div>
+        <div class="normative-item">
+          <div class="norm-title">Tabela SINAPI — RN</div>
+          <div class="norm-desc">Referência de preços para manutenção predial no RN</div>
+          <span class="norm-tag in">Referência de Preços</span>
+        </div>
+        <div class="normative-item">
+          <div class="norm-title">Acórdão TCU 1.214/2023</div>
+          <div class="norm-desc">Orientações sobre preposto e fiscalização em serviços contínuos</div>
+          <span class="norm-tag parecer">TCU</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+</div>
+
+<!-- MODAL CONFORMIDADE -->
+<div class="modal-overlay" id="conformModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title">Verificação de Conformidade</div>
+      <button class="modal-close" onclick="closeConformModal()">✕</button>
+    </div>
+    <div class="modal-body" id="conformBody">
+      <!-- conteúdo injetado por JS -->
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Estado ──
+const state = {
+  docType: 'ETP',
+  activeSection: 0,
+  completedSections: new Set(),
+  currentTab: 'sugestoes',
+};
+
+// ── Data ──
+document.getElementById('dateNow').textContent = new Date().toLocaleDateString('pt-BR', {day:'2-digit',month:'long',year:'numeric'});
+
+// ── Char count ──
+function updateCharCount(idx) {
+  const field = document.getElementById('field' + idx);
+  document.getElementById('chars' + idx).textContent = field.value.length + ' caracteres';
+}
+updateCharCount(0);
+
+// ── Sections ──
+function toggleSection(idx) {
+  const block = document.getElementById('sec' + idx);
+  block.classList.toggle('open');
+}
+
+function setActiveSection(idx) {
+  document.querySelectorAll('.section-block').forEach(b => b.classList.remove('active'));
+  document.getElementById('sec' + idx).classList.add('active');
+  document.querySelectorAll('.nav-section').forEach((n, i) => {
+    n.classList.remove('active');
+    if (i === idx) n.classList.add('active');
+  });
+  state.activeSection = idx;
+}
+
+function scrollToSection(idx) {
+  const sec = document.getElementById('sec' + idx);
+  sec.classList.add('open');
+  sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setActiveSection(idx);
+}
+
+function completeSection(idx) {
+  state.completedSections.add(idx);
+  const block = document.getElementById('sec' + idx);
+  block.classList.add('done');
+  block.classList.remove('active');
+  document.getElementById('status' + idx).textContent = 'Concluída';
+  document.getElementById('status' + idx).className = 'section-status status-done';
+
+  const navEl = document.getElementById('nav' + idx);
+  if (navEl) navEl.classList.add('done');
+
+  // Fecha seção atual e abre próxima
+  block.classList.remove('open');
+  if (idx + 1 <= 5) {
+    const next = document.getElementById('sec' + (idx+1));
+    next.classList.add('open');
+    document.getElementById('status' + (idx+1)).textContent = 'Editando';
+    document.getElementById('status' + (idx+1)).className = 'section-status status-writing';
+    next.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setActiveSection(idx + 1);
+  }
+
+  showSuggestionsForSection(idx);
+}
+
+// ── Sugestões por seção ──
+const SUGGESTIONS = {
+  0: [],
+  1: [
+    {
+      type: 'operational',
+      icon: '⚠️',
+      label: 'Alerta Operacional',
+      text: 'Contratos de manutenção predial do IFRN que não especificaram o regime de execução (por demanda vs. equipe residente) resultaram em disputas contratuais em 3 dos últimos 5 contratos. Defina claramente o modelo antes de avançar.',
+      source: 'Histórico ContratoIFRN · 2019–2024'
+    },
+    {
+      type: 'historic',
+      icon: '📊',
+      label: 'Padrão Histórico',
+      text: 'O escopo de manutenção predial no Campus CN abrange elétrica, hidráulica, alvenaria e ar-condicionado. Contratos anteriores que omitiam climatização geraram aditivos médios de 18% do valor original.',
+      source: 'Contratos nº 08/2019 e 11/2021 – IFRN/CN'
+    }
+  ],
+  2: [
+    {
+      type: 'legal',
+      icon: '⚖️',
+      label: 'Orientação Legal',
+      text: 'A justificativa deve demonstrar a necessidade pública de forma objetiva, com dados mensuráveis. O TCU tem glosado ETP com justificativas genéricas em contratos de manutenção (Acórdão 2.172/2022).',
+      source: 'TCU · Acórdão 2.172/2022-Plenário'
+    },
+    {
+      type: 'operational',
+      icon: '⚠️',
+      label: 'Alerta Operacional',
+      text: 'Inclua o histórico de ordens de serviço abertas nos últimos 12 meses. Contratos sem essa baseline dificultam a mensuração dos resultados e a aplicação de glosas por desempenho.',
+      source: 'PF/IFRN · Nota nº 04/2022'
+    }
+  ],
+  3: [
+    {
+      type: 'legal',
+      icon: '⚖️',
+      label: 'Orientação Legal',
+      text: 'Para serviços de engenharia, a habilitação deve exigir registro no CREA e atestado técnico de responsabilidade. Exigir atestado de "empresa" (e não de profissional) é irregular conforme Súmula TCU 263/2011.',
+      source: 'Súmula TCU nº 263/2011'
+    },
+    {
+      type: 'normative',
+      icon: '📋',
+      label: 'Normativo Interno',
+      text: 'A Resolução CONSUP 38/2022 do IFRN exige que os requisitos de habilitação técnica sejam validados pela Procuradoria antes da publicação do edital para contratos acima de R$ 80 mil.',
+      source: 'Resolução CONSUP nº 38/2022 – Art. 14'
+    }
+  ],
+  4: [
+    {
+      type: 'legal',
+      icon: '⚖️',
+      label: 'Orientação Legal',
+      text: 'Para manutenção predial, o SINAPI é a fonte primária de referência de preços conforme Decreto nº 7.983/2013. O Painel de Preços é complementar. Utilize ao menos três fontes distintas.',
+      source: 'Decreto nº 7.983/2013 · Art. 3º'
+    },
+    {
+      type: 'historic',
+      icon: '📊',
+      label: 'Padrão Histórico',
+      text: 'A faixa de valor por m² para manutenção predial contínua no RN registrada nos últimos contratos IFRN ficou entre R$ 18,50 e R$ 24,80/m²/mês. Valores fora dessa faixa exigem justificativa expressa.',
+      source: 'Histórico ContratoIFRN · Contratos 2020–2024'
+    },
+    {
+      type: 'operational',
+      icon: '⚠️',
+      label: 'Alerta Operacional',
+      text: 'Dois contratos anteriores tiveram reequilíbrio solicitado logo no 3º mês por não prever o custo de materiais de reposição. Considere se o objeto incluirá materiais ou será só mão de obra.',
+      source: 'Contratos nº 11/2021 e 03/2023 – IFRN/CN'
+    }
+  ],
+  5: [
+    {
+      type: 'legal',
+      icon: '⚖️',
+      label: 'Orientação Legal',
+      text: 'O art. 117 da Lei 14.133/2021 exige a designação formal de fiscal técnico e administrativo distintos. A acumulação das funções só é possível em casos excepcionais documentados.',
+      source: 'Lei 14.133/2021 · Art. 117, §1º'
+    },
+    {
+      type: 'operational',
+      icon: '⚠️',
+      label: 'Alerta Operacional',
+      text: 'Contratos de manutenção do IFRN sem exigência de preposto em tempo integral registraram média de 4,2 dias para resposta a chamados emergenciais. Avalie incluir SLA de atendimento com cláusula de glosa.',
+      source: 'Relatórios de fiscalização 2022–2024 – IFRN/CN'
+    },
+    {
+      type: 'normative',
+      icon: '📋',
+      label: 'Normativo Interno',
+      text: 'O IFRN adota modelo de lista de verificação mensal de fiscalização para contratos de manutenção. Recomenda-se referenciar esse instrumento já no ETP para facilitar a elaboração do TR.',
+      source: 'Instrução Normativa PROEN/IFRN nº 02/2023'
+    }
+  ]
+};
+
+function showSuggestionsForSection(idx) {
+  switchTab('sugestoes');
+  const area = document.getElementById('suggestions-area');
+  const sgs = SUGGESTIONS[idx] || [];
+
+  if (sgs.length === 0) return;
+
+  const title = document.createElement('div');
+  title.style.cssText = 'font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;margin-top:4px';
+  title.textContent = `Seção ${idx + 1} concluída`;
+
+  // Remove empty state se existir
+  area.querySelector('.empty-panel') && (area.innerHTML = '');
+  area.appendChild(title);
+
+  sgs.forEach(sg => {
+    const card = document.createElement('div');
+    card.className = `suggestion-card ${sg.type}`;
+    card.innerHTML = `
+      <div class="card-header">
+        <span class="card-icon">${sg.icon}</span>
+        <div>
+          <div class="card-label">${sg.label}</div>
+        </div>
+      </div>
+      <div class="card-text">${sg.text}</div>
+      <div class="card-source">${sg.source}</div>
+    `;
+    area.appendChild(card);
+  });
+}
+
+// ── Tabs ──
+function switchTab(tab) {
+  state.currentTab = tab;
+  document.querySelectorAll('.panel-tab').forEach((t, i) => {
+    t.classList.toggle('active', (i === 0 && tab === 'sugestoes') || (i === 1 && tab === 'normativos'));
+  });
+  document.getElementById('tab-sugestoes').classList.toggle('active', tab === 'sugestoes');
+  document.getElementById('tab-normativos').classList.toggle('active', tab === 'normativos');
+}
+
+// ── Doc Type ──
+function selectDocType(el) {
+  document.querySelectorAll('.doc-type-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  state.docType = el.dataset.type;
+}
+
+const DOC_TYPES = {
+  ETP: { label: '📋 ETP', fullName: 'Estudo Técnico Preliminar', title: 'Estudo Técnico Preliminar<br><em>Serviços de Manutenção Predial</em>' },
+  TR:  { label: '📄 TR',  fullName: 'Termo de Referência',       title: 'Termo de Referência<br><em>Serviços de Manutenção Predial</em>' },
+  MINUTA: { label: '📝 Minuta', fullName: 'Minuta de Contrato',  title: 'Minuta de Contrato<br><em>Serviços de Manutenção Predial</em>' },
+};
+
+function startEditor() {
+  const dt = DOC_TYPES[state.docType];
+  document.getElementById('topbarDocType').textContent = dt.label;
+  document.getElementById('docTagType').textContent = dt.fullName;
+  document.getElementById('docTitleMain').innerHTML = dt.title;
+  document.getElementById('panelSubtitle').textContent = `Manutenção predial contínua · ${state.docType}`;
+  document.getElementById('docTypeModal').style.display = 'none';
+}
+
+// ── Conformidade Modal ──
+const CONFORMIDADE = [
+  {
+    layer: 'layer-0',
+    num: '0',
+    name: 'Alertas Operacionais',
+    badge: 'badge-warn',
+    badgeText: '2 alertas',
+    findings: [
+      { icon: '⚠️', text: 'Regime de execução (equipe residente vs. demanda) não está definido na seção Descrição do Objeto. Contratos anteriores sem essa definição geraram disputas.', ref: 'Histórico ContratoIFRN 2019–2024' },
+      { icon: '⚠️', text: 'Custo de materiais de reposição não está contemplado na estimativa de valor. Risco de solicitação de reequilíbrio nos primeiros meses.', ref: 'Contratos nº 11/2021 e 03/2023 – IFRN/CN' },
+    ]
+  },
+  {
+    layer: 'layer-1',
+    num: '1',
+    name: 'Lei 14.133/2021 e Decretos',
+    badge: 'badge-warn',
+    badgeText: '1 divergência',
+    findings: [
+      { icon: '✅', text: 'ETP contém os elementos mínimos exigidos pelo art. 18 da Lei 14.133/2021: descrição, justificativa, requisitos e estimativa de valor.', ref: 'Lei 14.133/2021 · Art. 18' },
+      { icon: '✅', text: 'Referência ao SINAPI como fonte de preços está em conformidade com o Decreto nº 7.983/2013.', ref: 'Decreto nº 7.983/2013 · Art. 3º' },
+      { icon: '⚠️', text: 'A seção de fiscalização não menciona expressamente a distinção entre fiscal técnico e administrativo exigida pelo art. 117, §1º.', ref: 'Lei 14.133/2021 · Art. 117, §1º' },
+    ]
+  },
+  {
+    layer: 'layer-2',
+    num: '2',
+    name: 'Normativos AGU / CPIFES',
+    badge: 'badge-ok',
+    badgeText: 'Conforme',
+    findings: [
+      { icon: '✅', text: 'Exigência de atestado técnico de profissional (e não de empresa) está alinhada com a Súmula TCU 263/2011, conforme orientação da PF/IFRN.', ref: 'PF/IFRN · Nota nº 04/2022' },
+      { icon: '✅', text: 'Estrutura do ETP está compatível com o modelo padronizado pela CPIFES para IFES.', ref: 'CPIFES · Modelo ETP Revisão 2023' },
+    ]
+  },
+  {
+    layer: 'layer-3',
+    num: '3',
+    name: 'Normativos Internos IFRN',
+    badge: 'badge-warn',
+    badgeText: '1 pendência',
+    findings: [
+      { icon: '✅', text: 'Documento identifica a unidade demandante com servidor nominalmente responsável, conforme Resolução CONSUP 38/2022.', ref: 'Resolução CONSUP nº 38/2022 · Art. 8º' },
+      { icon: '🔴', text: 'Não há referência ao instrumento de lista de verificação de fiscalização adotado pelo IFRN, obrigatório para contratos de manutenção por IN interna.', ref: 'IN PROEN/IFRN nº 02/2023 · Art. 5º' },
+    ]
+  }
+];
+
+function openConformModal() {
+  const modal = document.getElementById('conformModal');
+  const body = document.getElementById('conformBody');
+  modal.classList.add('open');
+
+  // Loading state
+  body.innerHTML = `
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">Analisando o documento em 4 camadas...</p>
+    <div class="conform-progress">
+      <div class="progress-step" id="ps0"></div>
+      <div class="progress-step" id="ps1"></div>
+      <div class="progress-step" id="ps2"></div>
+      <div class="progress-step" id="ps3"></div>
+    </div>
+    <div class="loading-layers">
+      <div class="loading-text" id="loadingText">⏳ Camada 0 — Verificando alertas operacionais...</div>
+      <div class="loading-bar"></div>
+      <div class="loading-bar" style="width:70%;opacity:0.6"></div>
+      <div class="loading-bar" style="width:45%;opacity:0.35"></div>
+    </div>
+  `;
+
+  // Simula progresso por camadas
+  const steps = [
+    [400,  '⏳ Camada 1 — Lei 14.133/2021 e Decretos...', 0],
+    [900,  '⏳ Camada 2 — Normativos AGU / CPIFES...', 1],
+    [1500, '⏳ Camada 3 — Resoluções internas IFRN...', 2],
+    [2100, '✅ Análise concluída.', 3],
+  ];
+
+  steps.forEach(([delay, text, stepIdx]) => {
+    setTimeout(() => {
+      const lt = document.getElementById('loadingText');
+      const ps = document.getElementById('ps' + stepIdx);
+      if (lt) lt.textContent = text;
+      if (ps) { ps.classList.add('active'); if (stepIdx > 0) document.getElementById('ps' + (stepIdx-1)).classList.replace('active','done'); }
+    }, delay);
+  });
+
+  setTimeout(() => renderConformResult(body), 2500);
+}
+
+function renderConformResult(body) {
+  body.innerHTML = `
+    <div class="conform-summary">
+      <div class="summary-card ok"><div class="summary-num">5</div><div class="summary-label">Conformes</div></div>
+      <div class="summary-card warn"><div class="summary-num">4</div><div class="summary-label">Alertas</div></div>
+      <div class="summary-card err"><div class="summary-num">1</div><div class="summary-label">Pendência</div></div>
+    </div>
+  `;
+
+  CONFORMIDADE.forEach((layer, i) => {
+    const item = document.createElement('div');
+    item.className = `layer-item ${layer.layer}`;
+    item.innerHTML = `
+      <div class="layer-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="layer-num">${layer.num}</div>
+        <div class="layer-name">${layer.name}</div>
+        <span class="layer-badge ${layer.badge}">${layer.badgeText}</span>
+      </div>
+      <div class="layer-body">
+        ${layer.findings.map(f => `
+          <div class="finding-item">
+            <span class="finding-icon">${f.icon}</span>
+            <div>
+              <div class="finding-text">${f.text}</div>
+              <div class="finding-ref">${f.ref}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    // Abre a primeira com problema automaticamente
+    if (i === 0 || layer.badge !== 'badge-ok') item.classList.add('open');
+    body.appendChild(item);
+  });
+}
+
+function closeConformModal() {
+  document.getElementById('conformModal').classList.remove('open');
+}
+
+document.getElementById('conformModal').addEventListener('click', function(e) {
+  if (e.target === this) closeConformModal();
+});
+</script>
+</body>
+</html>

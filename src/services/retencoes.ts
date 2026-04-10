@@ -5,7 +5,7 @@ export const retencoesService = {
     async getSituacoes(documentoHabilId?: string) {
         let query = supabase
             .from('documentos_habeis_situacoes')
-            .select('*')
+            .select('id,documento_habil_id,situacao_codigo,valor,is_retencao,created_at')
             .order('created_at', { ascending: false });
 
         if (documentoHabilId) {

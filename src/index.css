@@ -3,8 +3,8 @@
    Baseado nos 11 conceitos UI/UX (Every UI/UX Concept Explained)
    ============================================================ */
 
-/* 1. TYPOGRAPHY — Importing Inter with full weight range */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+/* 1. TYPOGRAPHY - Interface + Data Pairing */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -21,7 +21,7 @@
   :root {
     /* === NEUTROS (60%) === */
     /* Nunca usar branco puro — levemente azulado para conforto visual */
-    --background: 220 20% 97%;      /* #f4f6fa */
+    --background: 210 16% 98.4%;    /* #f8f9fb */
     --foreground: 222 39% 11%;      /* #161d2f */
 
     --card: 0 0% 100%;              /* #ffffff — cards sobre o fundo */
@@ -30,15 +30,15 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 39% 11%;
 
-    --border: 220 20% 88%;          /* #dde2ec */
-    --input: 220 20% 91%;
+    --border: 214 12% 89%;          /* #dfe3e8 */
+    --input: 214 13% 92.5%;
     --ring: 220 80% 55%;
 
-    --muted: 220 20% 94%;           /* superfície suave */
+    --muted: 210 14% 95.8%;         /* superfície suave */
     --muted-foreground: 220 13% 46%; /* texto secundário */
 
     /* === SECUNDÁRIO (30%) === */
-    --secondary: 220 30% 92%;
+    --secondary: 210 15% 94.8%;
     --secondary-foreground: 222 39% 20%;
 
     /* === ACCENT / PRIMARY (10%) === */
@@ -68,33 +68,33 @@
     --sidebar-foreground: 220 13% 46%;
     --sidebar-primary: 220 80% 52%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 20% 94%;
+    --sidebar-accent: 210 14% 95.8%;
     --sidebar-accent-foreground: 220 80% 52%;
     --sidebar-border: 220 20% 91%;
     --sidebar-ring: 220 80% 52%;
 
     /* === SOMBRAS MULTICAMADAS (conceito 7 do vídeo) ===
        Nunca usar uma sombra dura única — sempre camadas suaves */
-    --shadow-xs:  0 1px 2px 0 rgba(0,0,0,.04);
-    --shadow-sm:  0 1px 3px 0 rgba(0,0,0,.06),  0 1px 2px -1px rgba(0,0,0,.04);
-    --shadow-md:  0 4px 6px -1px rgba(0,0,0,.07), 0 2px 4px -2px rgba(0,0,0,.05);
-    --shadow-lg:  0 10px 15px -3px rgba(0,0,0,.08), 0 4px 6px -4px rgba(0,0,0,.05);
-    --shadow-xl:  0 20px 25px -5px rgba(0,0,0,.08), 0 8px 10px -6px rgba(0,0,0,.04);
-    --shadow-primary: 0 4px 14px 0 rgba(26,92,230,.25);
+    --shadow-xs:  0 1px 2px 0 rgba(15,23,42,.03);
+    --shadow-sm:  0 1px 2px 0 rgba(15,23,42,.04),  0 1px 1px -1px rgba(15,23,42,.03);
+    --shadow-md:  0 6px 12px -8px rgba(15,23,42,.09), 0 2px 4px -3px rgba(15,23,42,.05);
+    --shadow-lg:  0 12px 24px -18px rgba(15,23,42,.12), 0 6px 12px -8px rgba(15,23,42,.06);
+    --shadow-xl:  0 20px 36px -24px rgba(15,23,42,.14), 0 10px 18px -12px rgba(15,23,42,.07);
+    --shadow-primary: 0 8px 20px -12px rgba(26,92,230,.22);
 
-    /* Glassmorphism light — borders luminosas (Aura Style) */
-    --glass-border: rgba(99,102,241,0.12);
-    --glass-bg:     rgba(255,255,255,0.70);
-    --glass-highlight: rgba(255,255,255,0.90);
+    /* Glass light mais contido */
+    --glass-border: rgba(148,163,184,0.12);
+    --glass-bg:     rgba(255,255,255,0.82);
+    --glass-highlight: rgba(255,255,255,0.55);
 
     /* Dot-pattern SVG para fundo do main */
-    --dot-pattern: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='2' cy='2' r='1' fill='%23c7d2fe' fill-opacity='0.4'/%3E%3C/svg%3E");
+    --dot-pattern: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='2' cy='2' r='1' fill='%23dde3ea' fill-opacity='0.28'/%3E%3C/svg%3E");
 
     /* === GRADIENTES === */
     --gradient-primary: linear-gradient(135deg, hsl(220,80%,52%) 0%, hsl(220,80%,40%) 100%);
     --gradient-accent:  linear-gradient(135deg, hsl(152,65%,33%) 0%, hsl(152,65%,26%) 100%);
     --gradient-warning: linear-gradient(135deg, hsl(38,90%,50%)  0%, hsl(38,90%,40%)  100%);
-    --gradient-card:    linear-gradient(180deg, hsl(0,0%,100%)   0%, hsl(220,20%,98%) 100%);
+    --gradient-card:    linear-gradient(180deg, hsl(0,0%,100%)   0%, hsl(210,15%,97.7%) 100%);
   }
 
   /* ============================================================
@@ -105,10 +105,10 @@
     /* Fundo base — tom de cinza azulado escuro (não preto puro) */
     --background: 222 28% 10%;      /* #111827 — base */
 
-    /* Glassmorphism dark — borders luminosas (Aura Style) */
-    --glass-border: rgba(255,255,255,0.08);
-    --glass-bg:     rgba(17,24,39,0.75);
-    --glass-highlight: rgba(255,255,255,0.04);
+    /* Glass dark mais contido */
+    --glass-border: rgba(255,255,255,0.06);
+    --glass-bg:     rgba(17,24,39,0.82);
+    --glass-highlight: rgba(255,255,255,0.03);
     --foreground: 210 35% 93%;      /* #dce6f4 */
 
     /* Elevação 1 — cards elevados sobre o fundo */
@@ -172,7 +172,7 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Public Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     /* Line-height 1.5 para legibilidade (conceito 4) */
     line-height: 1.5;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
@@ -188,6 +188,17 @@
   h6 { @apply text-text-xs font-font-semibold uppercase tracking-wider text-text-secondary; }
 
   p  { @apply text-text-base text-text-secondary; line-height: 1.6; }
+
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  .font-mono {
+    font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
 
   /* Seleção de texto com cor primária */
   ::selection {
@@ -230,7 +241,7 @@
   /* === CARDS (Semantic Tokens) === */
   .card-system {
     @apply bg-surface-card rounded-radius-xl p-space-6 shadow-shadow-card
-           hover:shadow-shadow-card-hover hover:-translate-y-0.5
+           hover:shadow-shadow-card-hover hover:-translate-y-px
            transition-all duration-300 border border-border-subtle;
   }
 
@@ -241,7 +252,7 @@
   }
   .stat-card:hover {
     box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
+    transform: translateY(-0.5px);
   }
 
   .stat-card-primary {
@@ -323,6 +334,58 @@
   }
   .input-label {
     @apply text-text-xs font-font-semibold uppercase tracking-wide text-text-secondary;
+  }
+
+  /* === TYPOGRAPHY HELPERS === */
+  .font-ui {
+    font-family: 'Public Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  .font-data {
+    font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    letter-spacing: 0.01em;
+  }
+
+  .label-eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted;
+    font-family: 'Public Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  .panel-title {
+    @apply font-ui text-lg font-semibold leading-tight tracking-tight text-text-primary;
+  }
+
+  .panel-description {
+    @apply font-ui text-sm text-text-muted leading-relaxed;
+  }
+
+  .table-title {
+    @apply panel-title;
+  }
+
+  .table-description {
+    @apply panel-description;
+  }
+
+  /* === FILTER PANEL === */
+  .filter-panel {
+    @apply rounded-radius-xl border border-border-default/55 bg-surface-card shadow-shadow-sm;
+  }
+
+  .filter-panel-header {
+    @apply px-space-4 pt-space-4 pb-space-2;
+  }
+
+  .filter-title {
+    @apply inline-flex items-center gap-space-2 text-text-sm font-font-semibold uppercase tracking-[0.12em] text-text-secondary;
+  }
+
+  .filter-title-custom {
+    @apply normal-case tracking-normal text-text-base font-font-semibold text-text-primary;
+  }
+
+  .filter-content {
+    @apply px-space-4 pt-space-3 pb-space-4;
   }
 }
 
@@ -406,25 +469,27 @@
   .shadow-lifted  { box-shadow: var(--shadow-lg); }
   .shadow-primary { box-shadow: var(--shadow-primary); }
 
-  /* === GLASS MORPHISM INTENSIFICADO (Aura Style) ===
-     Usa backdrop-blur-xl + border luminosa para profundidade real */
+  /* === GLASS MAIS DISCRETO ===
+     Usa blur moderado e highlight contido para nao competir com o conteudo */
   .glass {
     background: var(--glass-bg);
-    backdrop-filter: blur(20px) saturate(200%);
-    -webkit-backdrop-filter: blur(20px) saturate(200%);
-    border: 1px solid var(--glass-border);
-    box-shadow: 0 0 0 1px var(--glass-highlight) inset;
-  }
-
-  /* Glass mais forte — para cards de destaque */
-  .glass-heavy {
-    background: var(--glass-bg);
-    backdrop-filter: blur(40px) saturate(250%);
-    -webkit-backdrop-filter: blur(40px) saturate(250%);
+    backdrop-filter: blur(12px) saturate(145%);
+    -webkit-backdrop-filter: blur(12px) saturate(145%);
     border: 1px solid var(--glass-border);
     box-shadow:
       0 0 0 1px var(--glass-highlight) inset,
-      0 8px 32px rgba(0,0,0,0.10);
+      0 6px 16px -14px rgba(15,23,42,0.18);
+  }
+
+  /* Glass ainda visivel, mas sem aspecto "molhado" */
+  .glass-heavy {
+    background: var(--glass-bg);
+    backdrop-filter: blur(18px) saturate(165%);
+    -webkit-backdrop-filter: blur(18px) saturate(165%);
+    border: 1px solid var(--glass-border);
+    box-shadow:
+      0 0 0 1px var(--glass-highlight) inset,
+      0 12px 28px -22px rgba(15,23,42,0.24);
   }
 
   /* === DOT-PATTERN BACKGROUND === */
@@ -436,6 +501,21 @@
   /* Dot-pattern dark */
   .dark .dot-pattern {
     --dot-pattern: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='2' cy='2' r='1' fill='%234f46e5' fill-opacity='0.15'/%3E%3C/svg%3E");
+  }
+
+  /* === APP BACKGROUND (SUAVE CLEAN) === */
+  .app-bg-soft {
+    background-color: #f8f9fb;
+    background-image:
+      radial-gradient(1100px 520px at 10% -20%, rgba(56, 112, 226, 0.022), rgba(56, 112, 226, 0) 54%),
+      linear-gradient(180deg, #fcfcfd 0%, #f8f9fb 100%);
+  }
+
+  .dark .app-bg-soft {
+    background-color: hsl(222 28% 10%);
+    background-image:
+      radial-gradient(1100px 560px at 12% -22%, rgba(86, 144, 255, 0.14), rgba(86, 144, 255, 0) 62%),
+      linear-gradient(180deg, hsl(222 28% 11%) 0%, hsl(222 28% 9%) 100%);
   }
 
   /* === BORDERS LUMINOSAS (Aura Style) === */
@@ -501,3 +581,4 @@
     background-color: hsl(var(--muted-foreground) / 0.5);
   }
 }
+

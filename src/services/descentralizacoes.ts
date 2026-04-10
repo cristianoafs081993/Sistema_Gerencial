@@ -1,31 +1,66 @@
 import { supabase } from '@/lib/supabase';
+import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { Descentralizacao } from '@/types';
+
+const DESCENTRALIZACOES_SELECT = 'id,dimensao,dimensao_id,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,plano_interno_id,data_emissao,descricao,valor,created_at,updated_at';
+
+type DescentralizacaoRow = {
+    id: string;
+    dimensao: string;
+    dimensao_id?: string | null;
+    origem_recurso: string;
+    origem_recurso_id?: string | null;
+    natureza_despesa?: string | null;
+    natureza_despesa_id?: string | null;
+    plano_interno?: string | null;
+    plano_interno_id?: string | null;
+    data_emissao?: string | null;
+    descricao?: string | null;
+    valor: number | string;
+    created_at: string;
+    updated_at: string;
+};
+
+const mapDescentralizacaoRow = (item: DescentralizacaoRow): Descentralizacao => ({
+    id: item.id,
+    dimensao: item.dimensao,
+    dimensaoId: item.dimensao_id || undefined,
+    origemRecurso: item.origem_recurso,
+    origemRecursoId: item.origem_recurso_id || undefined,
+    naturezaDespesa: item.natureza_despesa || undefined,
+    naturezaDespesaId: item.natureza_despesa_id || undefined,
+    planoInterno: item.plano_interno || undefined,
+    planoInternoId: item.plano_interno_id || undefined,
+    dataEmissao: item.data_emissao ? new Date(item.data_emissao) : undefined,
+    descricao: item.descricao || undefined,
+    valor: Number(item.valor),
+    createdAt: new Date(item.created_at),
+    updatedAt: new Date(item.updated_at),
+});
 
 export const descentralizacoesService = {
     async getAll(): Promise<Descentralizacao[]> {
         const { data, error } = await supabase
             .from('descentralizacoes')
-            .select('*')
+            .select(DESCENTRALIZACOES_SELECT)
             .order('data_emissao', { ascending: false, nullsFirst: false });
 
-        if (error) throw error;
+        if (error) {
+            console.warn('descentralizacoesService.getAll: fallback para Supabase REST', error);
+            const fallbackData = await fetchSupabaseRestRows<DescentralizacaoRow>('descentralizacoes', DESCENTRALIZACOES_SELECT, {
+                orderBy: 'data_emissao',
+            });
+            return fallbackData.map(mapDescentralizacaoRow);
+        }
 
-        return data.map((item: any) => ({
-            id: item.id,
-            dimensao: item.dimensao,
-            dimensaoId: item.dimensao_id || undefined,
-            origemRecurso: item.origem_recurso,
-            origemRecursoId: item.origem_recurso_id || undefined,
-            naturezaDespesa: item.natureza_despesa || undefined,
-            naturezaDespesaId: item.natureza_despesa_id || undefined,
-            planoInterno: item.plano_interno || undefined,
-            planoInternoId: item.plano_interno_id || undefined,
-            dataEmissao: item.data_emissao ? new Date(item.data_emissao) : undefined,
-            descricao: item.descricao || undefined,
-            valor: Number(item.valor),
-            createdAt: new Date(item.created_at),
-            updatedAt: new Date(item.updated_at),
-        }));
+        if (!data || data.length === 0) {
+            const fallbackData = await fetchSupabaseRestRows<DescentralizacaoRow>('descentralizacoes', DESCENTRALIZACOES_SELECT, {
+                orderBy: 'data_emissao',
+            });
+            return fallbackData.map(mapDescentralizacaoRow);
+        }
+
+        return (data as DescentralizacaoRow[]).map(mapDescentralizacaoRow);
     },
 
     async create(descentralizacao: Omit<Descentralizacao, 'id' | 'createdAt' | 'updatedAt'>): Promise<Descentralizacao> {
@@ -44,31 +79,16 @@ export const descentralizacoesService = {
                 descricao: descentralizacao.descricao || '',
                 valor: descentralizacao.valor,
             })
-            .select()
+            .select(DESCENTRALIZACOES_SELECT)
             .single();
 
         if (error) throw error;
 
-        return {
-            id: data.id,
-            dimensao: data.dimensao,
-            dimensaoId: data.dimensao_id || undefined,
-            origemRecurso: data.origem_recurso,
-            origemRecursoId: data.origem_recurso_id || undefined,
-            naturezaDespesa: data.natureza_despesa || undefined,
-            naturezaDespesaId: data.natureza_despesa_id || undefined,
-            planoInterno: data.plano_interno || undefined,
-            planoInternoId: data.plano_interno_id || undefined,
-            dataEmissao: data.data_emissao ? new Date(data.data_emissao) : undefined,
-            descricao: data.descricao || undefined,
-            valor: Number(data.valor),
-            createdAt: new Date(data.created_at),
-            updatedAt: new Date(data.updated_at),
-        };
+        return mapDescentralizacaoRow(data as DescentralizacaoRow);
     },
 
     async update(id: string, descentralizacao: Partial<Descentralizacao>): Promise<void> {
-        const updates: any = {
+        const updates: Record<string, unknown> = {
             updated_at: new Date().toISOString(),
         };
 
@@ -99,5 +119,36 @@ export const descentralizacoesService = {
             .eq('id', id);
 
         if (error) throw error;
+    },
+
+    async processDevolucao(devolucao) {
+        const { ptres, planoInterno, valor } = devolucao;
+
+        // Buscar descentralização correspondente
+        const { data, error } = await supabase
+            .from('descentralizacoes')
+            .select('id,valor')
+            .eq('plano_interno', planoInterno)
+            .eq('ptres', ptres)
+            .single();
+
+        if (error) {
+            console.error('Erro ao buscar descentralização:', error);
+            return;
+        }
+
+        // Atualizar saldo
+        const novoValor = data.valor - valor;
+
+        const { error: updateError } = await supabase
+            .from('descentralizacoes')
+            .update({ valor: novoValor })
+            .eq('id', data.id);
+
+        if (updateError) {
+            console.error('Erro ao atualizar saldo:', updateError);
+        } else {
+            console.log(`Saldo atualizado para o plano interno ${planoInterno}: ${novoValor}`);
+        }
     },
 };
