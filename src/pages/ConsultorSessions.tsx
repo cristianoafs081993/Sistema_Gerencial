@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
 import { getSupabaseEnv, getSupabaseFunctionUrl } from '@/lib/env';
+import { getSupabaseAccessToken } from '@/lib/supabaseFunctionAuth';
 import {
   clearConsultorSessions,
   createConsultorSession,
@@ -300,6 +301,9 @@ export default function ConsultorSessions() {
     try {
       const functionUrl = getSupabaseFunctionUrl('consultor');
       const { anonKey } = getSupabaseEnv();
+      const accessToken = await getSupabaseAccessToken(
+        'Sua sessao expirou. Faca login novamente para falar com o Consultor.',
+      );
       const activeFileMeta = [...nextMessages].reverse().find((message) => message.attachedFile?.text)?.attachedFile;
       const metadataPayload = metadataFilters.servico ? { servicos: [metadataFilters.servico] } : null;
 
@@ -307,7 +311,8 @@ export default function ConsultorSessions() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${anonKey}`,
+          apikey: anonKey,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           messages: nextMessages.slice(-10).map((message) => ({ role: message.role, content: message.content })),
@@ -319,7 +324,19 @@ export default function ConsultorSessions() {
       });
 
       if (!response.ok) {
-        throw new Error('Falha de conexao com o Consultor.');
+        const rawError = await response.text();
+        let message = `Falha de conexao com o Consultor (${response.status}).`;
+
+        if (rawError) {
+          try {
+            const parsed = JSON.parse(rawError) as { error?: string; message?: string };
+            message = parsed.error || parsed.message || rawError;
+          } catch {
+            message = rawError;
+          }
+        }
+
+        throw new Error(message);
       }
 
       if (!response.body) {

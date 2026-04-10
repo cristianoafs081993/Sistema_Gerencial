@@ -1,5 +1,6 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
 
+import { getSupabaseAccessToken } from '@/lib/supabaseFunctionAuth';
 import { supabase } from '@/lib/supabase';
 
 export type InviteUserInput = {
@@ -12,43 +13,10 @@ export type InviteUserResult = {
   inviterEmail: string;
 };
 
-async function getInviteAccessToken() {
-  const {
-    data: { session },
-    error: sessionError,
-  } = await supabase.auth.getSession();
-
-  if (sessionError) {
-    throw sessionError;
-  }
-
-  if (!session?.access_token) {
-    throw new Error('Sessao ausente. Faca login novamente para enviar convites.');
-  }
-
-  const { error: userError } = await supabase.auth.getUser();
-  if (!userError) {
-    const {
-      data: { session: refreshedSession },
-    } = await supabase.auth.getSession();
-
-    return refreshedSession?.access_token || session.access_token;
-  }
-
-  const {
-    data: { session: nextSession },
-    error: refreshError,
-  } = await supabase.auth.refreshSession();
-
-  if (refreshError || !nextSession?.access_token) {
-    throw new Error('Sua sessao expirou. Entre novamente para enviar convites.');
-  }
-
-  return nextSession.access_token;
-}
-
 export async function inviteUserByEmail(input: InviteUserInput) {
-  const accessToken = await getInviteAccessToken();
+  const accessToken = await getSupabaseAccessToken(
+    'Sessao ausente. Faca login novamente para enviar convites.',
+  );
 
   const { data, error } = await supabase.functions.invoke('invite-user', {
     body: input,

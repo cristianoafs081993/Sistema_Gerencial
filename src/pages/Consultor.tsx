@@ -19,8 +19,8 @@ import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase';
 import { getSupabaseEnv, getSupabaseFunctionUrl } from '@/lib/env';
+import { getSupabaseAccessToken } from '@/lib/supabaseFunctionAuth';
 import { useAuth } from '@/contexts/AuthContext';
 // PDF.js import (using dynamic import to avoid SSR issues if any, but since it's vite, standard import works)
 import * as pdfjsLib from 'pdfjs-dist';
@@ -222,6 +222,9 @@ export default function Consultor() {
     try {
       const functionUrl = getSupabaseFunctionUrl('consultor');
       const { anonKey } = getSupabaseEnv();
+      const accessToken = await getSupabaseAccessToken(
+        'Sua sessao expirou. Faca login novamente para falar com o Consultor.',
+      );
       
       const allMsgs = messages.concat(userMsg);
       // Sempre buscar o último PDF anexado na conversa para manter o contexto
@@ -235,7 +238,8 @@ export default function Consultor() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${anonKey}`
+          apikey: anonKey,
+          Authorization: `Bearer ${accessToken}`
         },
         body: JSON.stringify({ 
           messages: allMsgs.slice(-10).map(m => ({ role: m.role, content: m.content })),

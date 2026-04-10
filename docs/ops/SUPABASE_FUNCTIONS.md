@@ -77,6 +77,7 @@ Chamador:
 Observacao:
 
 - o frontend monta a URL para `functions/v1/consultor`
+- o frontend envia o `access_token` da sessao autenticada no header `Authorization` e a anon key no header `apikey`
 - a implementacao nao foi localizada em `supabase/functions`
 
 ### `verificar-conformidade`

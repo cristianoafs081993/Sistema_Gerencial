@@ -174,6 +174,7 @@ Chamador:
 Status:
 
 - o frontend monta a URL por `getSupabaseFunctionUrl('consultor')`
+- a chamada HTTP envia `Authorization: Bearer <access_token da sessao>` e `apikey` com a anon key do projeto
 - a implementacao da function nao foi localizada no repo nesta rodada
 - as conversas do frontend ficam em `localStorage` com chave derivada do usuario autenticado, evitando compartilhar historico entre contas no mesmo navegador
 
