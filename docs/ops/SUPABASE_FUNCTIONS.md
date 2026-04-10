@@ -45,6 +45,27 @@ Dependencias:
 - `OPENAI_API_KEY`
 - opcional `OPENAI_VISION_MODEL`
 
+### `invite-user`
+
+Local:
+
+- [invite-user/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/invite-user/index.ts)
+
+Chamador:
+
+- [authInvites.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/authInvites.ts)
+
+Uso:
+
+- envia convite de acesso por e-mail via `auth.admin.inviteUserByEmail`
+- valida o usuario autenticado a partir do JWT recebido pelo frontend
+- restringe o disparo ao superadministrador `cristiano.cnrn@gmail.com`
+- e publicada com `verify_jwt = false`, porque a validacao do token ocorre dentro da function
+
+Dependencias:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+
 ## Functions chamadas pelo frontend, mas nao localizadas neste repo
 
 ### `consultor`

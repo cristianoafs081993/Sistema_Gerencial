@@ -15,16 +15,19 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency, formatarDocumento, cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { HeaderActions } from '@/components/HeaderParts';
 import { ContratosSyncDialog } from '@/components/modals/ContratosSyncDialog';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
+import { useAuth } from '@/contexts/AuthContext';
 import { getRapBaseVigente, getRapReferenceYear, getRapSaldoAtual } from '@/utils/rapMetrics';
+import { shouldIgnoreContratoNumero } from '@/utils/contratosSync';
 
 export default function Contratos() {
+  const { isSuperAdmin } = useAuth();
   const { contratos, empenhos, contratosEmpenhos, isLoading, refreshData } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
@@ -33,12 +36,18 @@ export default function Contratos() {
   const normalizeString = useCallback((str: string) =>
     str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "", []);
 
+  const visibleContratos = useMemo(
+    () => contratos.filter((c) => !shouldIgnoreContratoNumero(c.numero)),
+    [contratos],
+  );
+
   const filteredContratos = useMemo(() => {
     const searchNormalized = normalizeString(searchTerm);
-    let result = contratos.filter((c) => {
+    let result = visibleContratos.filter((c) => {
       return (
         normalizeString(c.numero).includes(searchNormalized) ||
-        normalizeString(c.contratada).includes(searchNormalized)
+        normalizeString(c.contratada).includes(searchNormalized) ||
+        normalizeString(c.cnpj || '').includes(searchNormalized)
       );
     });
 
@@ -62,7 +71,7 @@ export default function Contratos() {
     }
 
     return result;
-  }, [contratos, searchTerm, normalizeString, sortConfig]);
+  }, [visibleContratos, searchTerm, normalizeString, sortConfig]);
 
   const safeFormatDate = (dateVal: Date | string | null | undefined) => {
     if (!dateVal) return '-';
@@ -116,7 +125,7 @@ export default function Contratos() {
   }, [empenhos, contratosEmpenhos]);
 
   const totalALiquidarGlobal = useMemo(() => {
-    return contratos.reduce((sumContrato, c) => {
+    return visibleContratos.reduce((sumContrato, c) => {
       const emps = getEmpenhosDoContrato(c.id);
       return sumContrato + emps.reduce((sumEmp, e) => {
         if (e.tipo === 'rap') return sumEmp + getRapSaldoAtual(e, rapReferenceYear);
@@ -124,7 +133,7 @@ export default function Contratos() {
         return sumEmp + Math.max(0, e.valor - liquidado);
       }, 0);
     }, 0);
-  }, [contratos, getEmpenhosDoContrato, rapReferenceYear]);
+  }, [visibleContratos, getEmpenhosDoContrato, rapReferenceYear]);
 
   const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -150,28 +159,30 @@ export default function Contratos() {
     <div className="space-y-6 pb-10">
 
       <HeaderActions>
-        <Button
-          variant="outline"
-          className="gap-2 h-8 text-xs sm:h-9 sm:text-sm bg-surface-card border-border-default shadow-sm transition-all"
-          onClick={() => setIsSyncDialogOpen(true)}
-        >
-          <RefreshCw className="h-4 w-4 text-action-primary" />
-          Sincronizar Contratos
-        </Button>
+        {isSuperAdmin ? (
+          <Button
+            variant="outline"
+            className="gap-2 h-8 text-xs sm:h-9 sm:text-sm bg-surface-card border-border-default shadow-sm transition-all"
+            onClick={() => setIsSyncDialogOpen(true)}
+          >
+            <RefreshCw className="h-4 w-4 text-action-primary" />
+            Sincronizar Contratos
+          </Button>
+        ) : null}
       </HeaderActions>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
         <StatCard
           title="Contratos Ativos"
-          value={contratos.length}
+          value={visibleContratos.length}
           icon={FileText}
           stitchColor="vibrant-blue"
         />
 
         <StatCard
           title="Valor Global"
-          value={formatCurrency(contratos.reduce((sum, c) => sum + (c.valor || 0), 0))}
+          value={formatCurrency(visibleContratos.reduce((sum, c) => sum + (c.valor || 0), 0))}
           icon={DollarSign}
           stitchColor="purple"
         />
@@ -186,7 +197,7 @@ export default function Contratos() {
 
         <StatCard
           title="Valor Empenhado"
-          value={formatCurrency(contratos.reduce((sum, c) => {
+          value={formatCurrency(visibleContratos.reduce((sum, c) => {
             const emps = getEmpenhosDoContrato(c.id);
             return sum + emps.reduce((s, e) => s + (e.tipo === 'rap' ? getRapBaseVigente(e, rapReferenceYear) : (e.valor || 0)), 0);
           }, 0))}
@@ -275,7 +286,14 @@ export default function Contratos() {
                           <span className="font-mono font-medium text-sm">{c.numero}</span>
                         </TableCell>
                         <TableCell className="py-4 px-4">
-                          <span className="font-medium text-sm">{c.contratada}</span>
+                          <div className="flex flex-col gap-1">
+                            <span className="font-medium text-sm">{c.contratada}</span>
+                            {c.cnpj && (
+                              <span className="font-mono text-xs text-muted-foreground">
+                                {formatarDocumento(c.cnpj)}
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="py-4 px-4 text-right">
                           <div className="flex flex-col text-xs space-y-0.5">
@@ -383,11 +401,13 @@ export default function Contratos() {
         </CardContent>
       </Card>
 
-      <ContratosSyncDialog
-        open={isSyncDialogOpen}
-        onOpenChange={setIsSyncDialogOpen}
-        onSyncComplete={refreshData}
-      />
+      {isSuperAdmin ? (
+        <ContratosSyncDialog
+          open={isSyncDialogOpen}
+          onOpenChange={setIsSyncDialogOpen}
+          onSyncComplete={refreshData}
+        />
+      ) : null}
     </div>
   );
 }

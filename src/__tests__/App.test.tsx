@@ -1,9 +1,14 @@
 import type { ReactNode } from 'react';
 import { render, screen } from '@testing-library/react';
+import { Outlet } from 'react-router-dom';
 import App from '@/App';
 
 vi.mock('@/components/Layout', () => ({
   Layout: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}));
+
+vi.mock('@/components/auth/ProtectedRoute', () => ({
+  ProtectedRoute: () => <Outlet />,
 }));
 
 vi.mock('@/components/ui/sonner', () => ({
@@ -18,8 +23,16 @@ vi.mock('@/components/ui/tooltip', () => ({
   TooltipProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
+vi.mock('@/contexts/AuthContext', () => ({
+  AuthProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+}));
+
 vi.mock('@/contexts/DataContext', () => ({
   DataProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+}));
+
+vi.mock('@/pages/Auth', () => ({
+  default: () => <div>auth-page</div>,
 }));
 
 vi.mock('@/pages/Dashboard', () => ({
@@ -74,7 +87,7 @@ vi.mock('@/pages/EditorDocumentos', () => ({
   default: () => <div>editor-page</div>,
 }));
 
-vi.mock('@/pages/Consultor', () => ({
+vi.mock('@/pages/ConsultorSessions', () => ({
   default: () => <div>consultor-page</div>,
 }));
 
@@ -105,6 +118,14 @@ describe('App routes', () => {
     render(<App />);
 
     expect(await screen.findByText('empenhos-page')).toBeInTheDocument();
+  });
+
+  it('renderiza a rota de autenticacao', async () => {
+    window.history.pushState({}, '', '/auth');
+
+    render(<App />);
+
+    expect(await screen.findByText('auth-page')).toBeInTheDocument();
   });
 
   it('renderiza a pagina not found para rota desconhecida', async () => {

@@ -28,6 +28,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { HeaderActions } from '@/components/HeaderParts';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 import { descentralizacoesService } from '@/services/descentralizacoes';
@@ -92,6 +93,7 @@ function parseValorBR(valorStr: string): number {
 }
 
 export default function Descentralizacoes() {
+    const { isSuperAdmin } = useAuth();
     const { descentralizacoes, isLoading, addDescentralizacao, refreshData } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [filterDimensao, setFilterDimensao] = useState('all');
@@ -365,6 +367,8 @@ export default function Descentralizacoes() {
     return (
         <div className="space-y-6 pb-10">
             <HeaderActions>
+                {isSuperAdmin ? (
+                    <>
                 <Button 
                     variant="outline" 
                     onClick={() => setIsImportDialogOpen(true)} 
@@ -381,6 +385,8 @@ export default function Descentralizacoes() {
                     <Upload className="h-4 w-4 text-action-primary" />
                     Importar Devoluções
                 </Button>
+                    </>
+                ) : null}
             </HeaderActions>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -589,6 +595,8 @@ export default function Descentralizacoes() {
                 </CardContent>
             </Card>
             {/* CSV/JSON Import Dialog */}
+            {isSuperAdmin ? (
+                <>
             <JsonImportDialog
                 open={isImportDialogOpen}
                 onOpenChange={setIsImportDialogOpen}
@@ -607,6 +615,8 @@ export default function Descentralizacoes() {
                 acceptCsv={true}
                 csvSeparator="\t"
             />
+                </>
+            ) : null}
         </div>
     );
 }

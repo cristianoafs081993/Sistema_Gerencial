@@ -21,6 +21,7 @@ import remarkGfm from 'remark-gfm';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { getSupabaseEnv, getSupabaseFunctionUrl } from '@/lib/env';
+import { useAuth } from '@/contexts/AuthContext';
 // PDF.js import (using dynamic import to avoid SSR issues if any, but since it's vite, standard import works)
 import * as pdfjsLib from 'pdfjs-dist';
 
@@ -46,6 +47,7 @@ const getErrorMessage = (error: unknown): string => {
 };
 
 export default function Consultor() {
+  const { isSuperAdmin } = useAuth();
   const [messages, setMessages] = useState<Message[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
@@ -503,6 +505,8 @@ export default function Consultor() {
 
           <div className="flex items-end gap-3 relative">
             
+            {isSuperAdmin ? (
+              <>
             <input 
               type="file" 
               accept=".pdf" 
@@ -521,6 +525,8 @@ export default function Consultor() {
             >
               <Paperclip className="w-5 h-5" />
             </Button>
+              </>
+            ) : null}
 
             <textarea
               className="flex-1 min-h-[48px] max-h-32 px-4 py-3 bg-white border border-slate-300 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm text-[15px] placeholder:text-slate-400"

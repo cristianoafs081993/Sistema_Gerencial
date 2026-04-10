@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Upload } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Table,
   TableBody,
@@ -22,6 +23,7 @@ import {
 } from '@/services/financeiroImportService';
 
 export default function Financeiro() {
+  const { isSuperAdmin } = useAuth();
   const [cards, setCards] = useState<FinanceiroDisponivelCard[]>([]);
   const [fileName, setFileName] = useState('');
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
@@ -74,25 +76,27 @@ export default function Financeiro() {
   return (
     <div className="space-y-6 pb-10">
       <HeaderActions>
-        <div className="flex items-center gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,.xlsx,.xls"
-            className="hidden"
-            onChange={(e) => handleUpload(e.target.files?.[0])}
-          />
-          <Button
-            onClick={() => fileInputRef.current?.click()}
-            size="sm"
-            variant="outline"
-            disabled={isUploading}
-            className="gap-space-2 h-space-9 shadow-shadow-sm"
-          >
-            <Upload className="h-4 w-4" />
-            {isUploading ? 'Carregando...' : 'Upload CSV Financeiro'}
-          </Button>
-        </div>
+        {isSuperAdmin ? (
+          <div className="flex items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              className="hidden"
+              onChange={(e) => handleUpload(e.target.files?.[0])}
+            />
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              size="sm"
+              variant="outline"
+              disabled={isUploading}
+              className="gap-space-2 h-space-9 shadow-shadow-sm"
+            >
+              <Upload className="h-4 w-4" />
+              {isUploading ? 'Carregando...' : 'Upload CSV Financeiro'}
+            </Button>
+          </div>
+        ) : null}
       </HeaderActions>
 
       <DataTablePanel

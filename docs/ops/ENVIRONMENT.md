@@ -17,6 +17,22 @@ Sem elas:
 - o fallback REST nao funciona
 - chamadas a Edge Functions montadas pelo frontend falham
 
+## Configuracao obrigatoria no Supabase Auth
+
+Nao ha novas variaveis de frontend para o login por e-mail e senha.
+Mas o projeto Supabase precisa estar configurado com:
+
+- provider `Email` habilitado no Supabase Auth
+- o usuario `cristiano.cnrn@gmail.com` existente no Auth como superadministrador
+- template e redirect URLs aceitando o retorno para `/auth`
+- politicas e tabelas que exigem sessao usando o papel `authenticated`
+
+Sem isso:
+
+- o login por `signInWithPassword` falha
+- o fluxo de convite nao conclui o primeiro acesso
+- as rotas protegidas redirecionam continuamente para `/auth`
+
 ## Variaveis opcionais usadas pelo frontend
 
 - `VITE_SIAFI_CONTA_PAGADORA`
@@ -52,6 +68,18 @@ Necessarias no Apps Script que varre o Gmail:
   - `GMAIL_CSV_ERROR_LABEL`
   - `GMAIL_CSV_BATCH_SIZE`
   - `GMAIL_CSV_PIPELINE_HINT`
+
+### `invite-user`
+
+Necessarias no ambiente do Supabase:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Observacoes operacionais:
+
+- o projeto Supabase precisa aceitar o `redirectTo` usado pelo app, por exemplo `http://localhost:8080/auth?mode=invite&next=/`
+- para o usuario concluir o convite, o cliente do frontend precisa manter `detectSessionInUrl` habilitado
+- no estado atual, a function aceita convites apenas do usuario `cristiano.cnrn@gmail.com`
 
 ### Consultor
 

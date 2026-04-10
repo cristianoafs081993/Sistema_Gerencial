@@ -381,6 +381,7 @@ export interface Contrato {
   id: string;
   numero: string;
   contratada: string;
+  cnpj?: string;
   valor?: number;
   data_inicio?: Date;
   data_termino?: Date;

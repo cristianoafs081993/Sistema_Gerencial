@@ -8,6 +8,26 @@ As rotas sao lazy-loaded em [App.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/
 
 Cada rota cai em uma pagina em `src/pages`.
 
+## Camada 0: sessao e autenticacao
+
+Antes das paginas protegidas ou autenticadas, o app passa por:
+
+- [AuthContext.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/contexts/AuthContext.tsx)
+- [ProtectedRoute.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/auth/ProtectedRoute.tsx)
+- [Auth.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Auth.tsx)
+- [supabase.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/lib/supabase.ts)
+
+Esse fluxo agora concentra:
+
+- leitura inicial de sessao via `supabase.auth.getSession`
+- sincronizacao de mudancas por `onAuthStateChange`
+- login por e-mail e senha via `signInWithPassword`
+- aceite de convite ou recuperacao de acesso na rota publica `/auth`
+- definicao de senha inicial por `supabase.auth.updateUser`
+- encerramento da sessao no cabecalho global do layout
+- protecao de todas as rotas por um guard central antes do `Layout`
+- derivacao local de permissoes de superadministrador pelo e-mail autenticado
+
 ## Camada 2: origem do dado
 
 O frontend hoje usa tres padroes principais:
@@ -51,8 +71,10 @@ Usado quando a pagina tem pipeline proprio de importacao ou consulta:
 Usado em modulos com IA ou integracoes externas:
 
 - [Consultor.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Consultor.tsx)
+- [ConsultorSessions.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/ConsultorSessions.tsx)
 - [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx)
 - [Suap.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Suap.tsx)
+- [Auth.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Auth.tsx)
 
 ## Camada 3: services
 
@@ -116,7 +138,13 @@ Observacao para a aba RAP do dashboard:
 Observacoes:
 
 - a grade de processos sincronizados do editor tenta leitura publica via `supabase-js` e cai para REST anonimo quando necessario
-- a tela [Suap.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Suap.tsx) continua com sessao propria porque o modulo tambem executa acoes autenticadas de conclusao e reabertura
+- a tela [Suap.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Suap.tsx) passou a reutilizar a sessao global do app vinda de `AuthContext`
+- a pagina [Auth.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Auth.tsx) centraliza login, convite e redefinicao de senha
+- convites enviados pelo cabecalho usam a Edge Function `invite-user` e retornam para `/auth?mode=invite`
+- o cliente Supabase ficou com `detectSessionInUrl` habilitado para consumir o token do link de convite ou recuperacao
+- no estado atual, uploads e importacoes do frontend so aparecem para `cristiano.cnrn@gmail.com`
+- o Consultor salva sessoes em `localStorage`, mas agora com chave isolada por usuario autenticado em vez de um historico global compartilhado
+- no Consultor, o upload de PDF fica liberado para qualquer usuario autenticado; a restricao de superadmin continua apenas nos uploads/importacoes CSV das demais telas
 
 ## Regras de cautela
 

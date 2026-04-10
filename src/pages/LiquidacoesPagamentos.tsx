@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatCard } from '@/components/StatCard';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
+import { useAuth } from '@/contexts/AuthContext';
 import { retencoesService } from '@/services/retencoes';
 import { 
     Table,
@@ -57,6 +58,7 @@ import {
 type CsvRow = Record<string, string>;
 
 export default function LiquidacoesPagamentos() {
+    const { isSuperAdmin } = useAuth();
     const queryClient = useQueryClient();
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
     const [isImportDocsOpen, setIsImportDocsOpen] = useState(false);
@@ -215,6 +217,7 @@ export default function LiquidacoesPagamentos() {
 
             <HeaderActions>
                 <div className="flex items-center gap-3">
+                    {isSuperAdmin ? (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button 
@@ -241,6 +244,7 @@ export default function LiquidacoesPagamentos() {
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
+                    ) : null}
 
                     <Button 
                         variant="outline" 
@@ -285,7 +289,8 @@ export default function LiquidacoesPagamentos() {
                 />
             </div>
 
-            <JsonImportDialog
+            {isSuperAdmin ? (
+            <JsonImportDialog 
                 open={isImportDialogOpen}
                 onOpenChange={setIsImportDialogOpen}
                 onImport={handleRetencoesImport}
@@ -294,6 +299,7 @@ export default function LiquidacoesPagamentos() {
                 acceptCsv={true}
                 csvSeparator="\t"
             />
+            ) : null}
 
             {/* Standard Filter Card */}
             <FilterPanel className="shadow-sm">
@@ -542,6 +548,8 @@ export default function LiquidacoesPagamentos() {
                 </div>
             </Card>
 
+            {isSuperAdmin ? (
+                <>
             <JsonImportDialog 
                 open={isImportDocsOpen} 
                 onOpenChange={setIsImportDocsOpen} 
@@ -562,11 +570,15 @@ export default function LiquidacoesPagamentos() {
                 csvSeparator="\t"
             />
 
+            </>
+            ) : null}
+
             <DocumentoDetalhesDialog 
                 open={isDetailsOpen}
                 onOpenChange={setIsDetailsOpen}
                 documento={selectedDoc}
             />
+            {isSuperAdmin ? (
             <JsonImportDialog 
                 open={isImportOBOpen} 
                 onOpenChange={setIsImportOBOpen} 
@@ -576,6 +588,7 @@ export default function LiquidacoesPagamentos() {
                 acceptCsv={true}
                 csvSeparator="\t"
             />
+            ) : null}
         </div>
     );
 }

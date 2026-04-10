@@ -59,6 +59,17 @@ Mostrar a linhagem operacional dos dados de forma curta:
     - `vw_rastreabilidade_pf`
   - pagina: [RastreabilidadePFs/index.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/RastreabilidadePFs/index.tsx)
 
+### Contratos locais
+
+- planilhas `Relatorio.xlsx` e `Relatorio (1).xlsx`
+  - parser e orquestracao: [ContratosSyncDialog.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/modals/ContratosSyncDialog.tsx)
+  - persistencia: [contratos.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/contratos.ts)
+  - tabelas:
+    - `contratos`
+    - `contratos_empenhos`
+- observacao: o dialogo identifica automaticamente qual arquivo e o relatorio de contratos ativos e qual e o relatorio de vinculos/valores pelos cabecalhos; o relatorio de contratos ativos limpa a razao social removendo CNPJ e o sufixo `Pessoa Juridica`; contratos inativos no arquivo sao ignorados e contratos ausentes no arquivo nao devem ser removidos do banco; o relatorio de vinculos/valores atualiza o valor do contrato e os vinculos com empenhos, ignorando `Valor Liquidado` e `Valor Pago`; a escrita deduplica por `numero` e usa fallback para `insert/update` se o ambiente nao aceitar `upsert onConflict(numero)`; o contrato legado `00089/2016` da CAERN e tratado como excecao operacional e fica fora do modulo local
+  - pagina: [Contratos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Contratos.tsx)
+
 ### Documentos habeis
 
 - arquivo de documentos/situacoes/itens

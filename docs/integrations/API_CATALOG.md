@@ -22,6 +22,38 @@ Observacao:
 
 - o app usa tanto `supabase-js` quanto fallback REST.
 
+## 1A. Supabase Auth
+
+Uso:
+
+- sessao global do app
+- login por e-mail e senha
+- convite controlado por e-mail
+- protecao global das rotas do frontend
+
+Arquivos:
+
+- [supabase.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/lib/supabase.ts)
+- [AuthContext.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/contexts/AuthContext.tsx)
+- [Auth.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Auth.tsx)
+- [InviteUserDialog.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/auth/InviteUserDialog.tsx)
+- [SetupPasswordPanel.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/auth/SetupPasswordPanel.tsx)
+- [Suap.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Suap.tsx)
+
+Configuracao operacional:
+
+- provider `Email` habilitado no Supabase Auth
+- usuarios provisionados no Supabase Auth com convite ou senha
+- a rota publica de entrada e `/auth`
+- o superadministrador atual do app e `cristiano.cnrn@gmail.com`
+
+Observacao:
+
+- o app depende de sessao persistida pelo `supabase-js` no navegador
+- links de convite e recuperacao retornam para `/auth` com token na URL
+- ao perder a sessao, qualquer rota protegida redireciona novamente para `/auth`
+- botoes de upload/importacao no frontend so aparecem para o superadministrador autenticado
+
 ## 2. Supabase REST fallback
 
 Uso:
@@ -137,11 +169,13 @@ Uso:
 Chamador:
 
 - [Consultor.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Consultor.tsx)
+- [ConsultorSessions.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/ConsultorSessions.tsx)
 
 Status:
 
 - o frontend monta a URL por `getSupabaseFunctionUrl('consultor')`
 - a implementacao da function nao foi localizada no repo nesta rodada
+- as conversas do frontend ficam em `localStorage` com chave derivada do usuario autenticado, evitando compartilhar historico entre contas no mesmo navegador
 
 ## 7. Edge Function `verificar-conformidade`
 
@@ -157,6 +191,31 @@ Status:
 
 - invocada pelo frontend
 - nao localizada em `supabase/functions` nesta rodada
+
+## 7A. Edge Function `invite-user`
+
+Uso:
+
+- envio de convites de usuario a partir do cabecalho do app
+- validacao server-side do e-mail autorizador
+- disparo do `auth.admin.inviteUserByEmail` com `redirectTo` para `/auth?mode=invite`
+
+Chamador:
+
+- [authInvites.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/authInvites.ts)
+
+Implementacao no repo:
+
+- [invite-user/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/invite-user/index.ts)
+
+Dependencias externas:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Observacao:
+
+- a function valida localmente o convidante e so aceita convites disparados por `cristiano.cnrn@gmail.com`
+- o deploy atual usa `verify_jwt = false` para evitar rejeicao do gateway e deixar a validacao do token sob controle da propria function
 
 ## 8. Supabase Storage
 

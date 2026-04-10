@@ -20,17 +20,16 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { Session } from '@supabase/supabase-js';
 
 import { HeaderActions, HeaderSubtitle } from '@/components/HeaderParts';
 import { SuapConclusaoDialog } from '@/components/modals/SuapConclusaoDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { SuapProcesso } from '@/types';
 import { suapProcessosService } from '@/services/suapProcessos';
@@ -338,39 +337,18 @@ function InfoPanel({
 
 export default function Suap() {
   const queryClient = useQueryClient();
+  const { session } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [openingPdfId, setOpeningPdfId] = useState<string | null>(null);
   const [reopeningProcessId, setReopeningProcessId] = useState<string | null>(null);
   const [selectedProcesso, setSelectedProcesso] = useState<SuapProcesso | null>(null);
   const [isConclusaoDialogOpen, setIsConclusaoDialogOpen] = useState(false);
-  const [session, setSession] = useState<Session | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isAuthLoading, setIsAuthLoading] = useState(false);
 
   useEffect(() => {
-    let mounted = true;
-
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setSession(data.session);
-      setAuthChecked(true);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-      setAuthChecked(true);
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
+    setSelectedProcesso(null);
+    setIsConclusaoDialogOpen(false);
+  }, [session?.user.id]);
 
   const {
     data: processos = [],
@@ -382,7 +360,7 @@ export default function Suap() {
   } = useQuery({
     queryKey: ['suap-processos'],
     queryFn: suapProcessosService.getAll,
-    enabled: authChecked && !!session,
+    enabled: !!session,
     refetchInterval: 30000,
   });
 
@@ -459,49 +437,6 @@ export default function Suap() {
     }
   };
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      toast.error('Informe e-mail e senha do Supabase usados na extensão.');
-      return;
-    }
-
-    setIsAuthLoading(true);
-    try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (signInError) {
-        throw signInError;
-      }
-
-      toast.success('Login realizado. Carregando processos do SUAP...');
-      setPassword('');
-    } catch (loginError) {
-      console.error(loginError);
-      toast.error(loginError instanceof Error ? loginError.message : 'Falha ao autenticar no Supabase.');
-    } finally {
-      setIsAuthLoading(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    setIsAuthLoading(true);
-    try {
-      const { error: signOutError } = await supabase.auth.signOut();
-      if (signOutError) {
-        throw signOutError;
-      }
-      toast.success('Sessão SUAP encerrada.');
-    } catch (logoutError) {
-      console.error(logoutError);
-      toast.error(logoutError instanceof Error ? logoutError.message : 'Falha ao encerrar a sessão.');
-    } finally {
-      setIsAuthLoading(false);
-    }
-  };
-
   return (
     <div className="space-y-6 pb-10">
       <HeaderSubtitle>
@@ -510,32 +445,16 @@ export default function Suap() {
 
       <HeaderActions>
         <div className="flex items-center gap-2">
-          {session?.user?.email ? (
-            <Badge variant="outline" className="hidden sm:inline-flex">
-              {session.user.email}
-            </Badge>
-          ) : null}
-
           {session ? (
-            <>
-              <Button
-                variant="outline"
-                onClick={() => void refetch()}
-                disabled={isFetching}
-                className="gap-2 h-9 text-sm"
-              >
-                <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
-                {isFetching ? 'Atualizando...' : 'Atualizar'}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => void handleLogout()}
-                disabled={isAuthLoading}
-                className="h-9 text-sm"
-              >
-                Sair
-              </Button>
-            </>
+            <Button
+              variant="outline"
+              onClick={() => void refetch()}
+              disabled={isFetching}
+              className="gap-2 h-9 text-sm"
+            >
+              <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
+              {isFetching ? 'Atualizando...' : 'Atualizar'}
+            </Button>
           ) : null}
         </div>
       </HeaderActions>
@@ -553,62 +472,7 @@ export default function Suap() {
         onSuccess={handleConclusaoSuccess}
       />
 
-      {!authChecked ? (
-        <Card className="overflow-hidden">
-          <CardContent className="py-10">
-            <div className="space-y-4">
-              <Skeleton className="h-6 w-56" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-32" />
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {authChecked && !session ? (
-        <Card className="border-border-default/70 shadow-sm">
-          <CardHeader>
-            <CardTitle>Entrar para ver o espelho do SUAP</CardTitle>
-            <CardDescription>
-              A extensão sincroniza em um espaço autenticado no Supabase. Use aqui o mesmo login da extensão para ver os seus processos.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">E-mail Supabase</label>
-              <Input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="nome@exemplo.com"
-                autoComplete="email"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Senha</label>
-              <Input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Sua senha"
-                autoComplete="current-password"
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    void handleLogin();
-                  }
-                }}
-              />
-            </div>
-            <Button onClick={() => void handleLogin()} disabled={isAuthLoading} className="h-10">
-              {isAuthLoading ? 'Entrando...' : 'Entrar'}
-            </Button>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {session ? (
-        <>
+      <>
           <div className="space-y-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="relative flex-1">
@@ -1056,8 +920,7 @@ export default function Suap() {
           </CardContent>
         </Card>
       ) : null}
-        </>
-      ) : null}
+      </>
     </div>
   );
 }

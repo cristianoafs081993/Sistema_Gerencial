@@ -39,6 +39,7 @@ import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { AtividadeDialog } from '@/components/modals/AtividadeDialog';
 import { ConfirmDialog } from '@/components/modals/ConfirmDialog';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { formatCurrency, parseCurrency } from '@/lib/utils';
 import { HeaderActions } from '@/components/HeaderParts';
@@ -46,6 +47,7 @@ import { atividadesService } from '@/services/atividades';
 import { matchesDimensionFilter } from '@/utils/dimensionFilters';
 
 export default function Atividades() {
+  const { isSuperAdmin } = useAuth();
   const [atividades, setAtividades] = useState<Atividade[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -201,10 +203,12 @@ export default function Atividades() {
                 Excluir ({selectedIds.size})
               </Button>
             )}
-            <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} className="gap-2 h-9 text-sm">
-              <Upload className="h-4 w-4" />
-              Importar JSON
-            </Button>
+            {isSuperAdmin ? (
+              <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} className="gap-2 h-9 text-sm">
+                <Upload className="h-4 w-4" />
+                Importar JSON
+              </Button>
+            ) : null}
             <Button onClick={() => handleOpenDialog()} className="btn-primary">
               <Plus className="h-4 w-4" />
               Nova Atividade
@@ -514,13 +518,15 @@ export default function Atividades() {
         confirmText="Excluir Atividades"
       />
 
-      <JsonImportDialog
-        open={isImportDialogOpen}
-        onOpenChange={setIsImportDialogOpen}
-        onImport={handleImport}
-        title="Importar Atividades (JSON)"
-        expectedFields={atividadesJsonFields}
-      />
+      {isSuperAdmin ? (
+        <JsonImportDialog
+          open={isImportDialogOpen}
+          onOpenChange={setIsImportDialogOpen}
+          onImport={handleImport}
+          title="Importar Atividades (JSON)"
+          expectedFields={atividadesJsonFields}
+        />
+      ) : null}
     </div>
   );
 }

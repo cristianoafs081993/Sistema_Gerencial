@@ -11,15 +11,20 @@ import {
   FileStack,
   FileText,
   LayoutDashboard,
+  LogOut,
   Menu,
   MessageSquare,
   Receipt,
   ScanSearch,
   ShieldAlert,
+  User,
   Wand2,
   X,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
+import { InviteUserDialog } from '@/components/auth/InviteUserDialog';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -83,7 +88,9 @@ function isPathActive(pathname: string, href: string) {
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
+  const { isLoading: isAuthLoading, session, signOut, canInviteUsers } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem('sidebar-collapsed') === 'true');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => {
     const activeSection = navigationSections.find((section) =>
@@ -114,6 +121,24 @@ export function Layout({ children }: LayoutProps) {
     if (!activeSection) return;
     setExpandedSections((prev) => ({ ...prev, [activeSection.title]: true }));
   }, [location.pathname]);
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+
+    try {
+      const error = await signOut();
+      if (error) {
+        throw error;
+      }
+
+      toast.success('Sessao encerrada.');
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : 'Falha ao encerrar a sessao.');
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
 
   return (
     <TooltipProvider delayDuration={80}>
@@ -264,7 +289,34 @@ export function Layout({ children }: LayoutProps) {
               />
             </div>
 
-            <div id="header-actions" className="flex items-center gap-space-2 shrink-0" />
+            <div className="flex items-center gap-2 shrink-0">
+              <div id="header-actions" className="flex items-center gap-space-2 shrink-0" />
+
+              {isAuthLoading ? (
+                <div className="hidden h-9 w-28 rounded-lg bg-white/70 shadow-sm sm:block" />
+              ) : session ? (
+                <>
+                  {canInviteUsers ? <InviteUserDialog /> : null}
+                  <div className="hidden max-w-[240px] items-center gap-2 rounded-full border border-slate-200 bg-white/85 px-3 py-1.5 text-xs text-slate-600 shadow-sm md:flex">
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <User className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="truncate font-medium">{session.user.email || 'Sessao autenticada'}</span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isSigningOut}
+                    onClick={() => void handleSignOut()}
+                    className="h-9 border-slate-200 bg-white/85 text-slate-700"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    {isSigningOut ? 'Saindo...' : 'Sair'}
+                  </Button>
+                </>
+              ) : null}
+            </div>
           </header>
 
           <main

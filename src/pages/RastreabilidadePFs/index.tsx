@@ -27,9 +27,11 @@ import { PFImportDialog } from '@/components/modals/PFImportDialog';
 import { PFDetailsDialog } from '@/components/modals/PFDetailsDialog';
 import { HeaderActions } from '@/components/HeaderParts';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
+import { useAuth } from '@/contexts/AuthContext';
 import { rastreabilidadePFsService } from '@/services/rastreabilidadePFs';
 
 export default function RastreabilidadePFs() {
+  const { isSuperAdmin } = useAuth();
   const [data, setData] = useState<RastreabilidadePF[]>([]);
   const [loading, setLoading] = useState(true);
   const [importOpen, setImportOpen] = useState(false);
@@ -155,10 +157,12 @@ export default function RastreabilidadePFs() {
     <div className="space-y-6 pb-10">
 
       <HeaderActions>
-        <Button onClick={() => setImportOpen(true)} size="sm" className="gap-space-2 h-space-9 shadow-shadow-sm">
-          <Upload className="h-4 w-4" />
-          Importar arquivos
-        </Button>
+        {isSuperAdmin ? (
+          <Button onClick={() => setImportOpen(true)} size="sm" className="gap-space-2 h-space-9 shadow-shadow-sm">
+            <Upload className="h-4 w-4" />
+            Importar arquivos
+          </Button>
+        ) : null}
       </HeaderActions>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -361,11 +365,13 @@ export default function RastreabilidadePFs() {
         </CardContent>
       </Card>
 
-      <PFImportDialog
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        onSuccess={fetchData}
-      />
+      {isSuperAdmin ? (
+        <PFImportDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          onSuccess={fetchData}
+        />
+      ) : null}
 
       <PFDetailsDialog
         pf={selectedPF}

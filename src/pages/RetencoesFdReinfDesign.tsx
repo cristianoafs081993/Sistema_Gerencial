@@ -9,6 +9,7 @@ import { StatCard } from '@/components/StatCard';
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { TableSkeletonRows } from '@/components/design-system/TableSkeletonRows';
+import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,6 +53,7 @@ const formatDocumentoHabil = (value: string) => {
 const severityWeight = { critical: 3, warning: 2, ok: 1 } satisfies Record<'critical' | 'warning' | 'ok', number>;
 
 export default function RetencoesFdReinfDesign() {
+  const { isSuperAdmin } = useAuth();
   const [rows, setRows] = useState<RetencaoEfdReinfRegistro[]>([]);
   const [fileName, setFileName] = useState('');
   const [importedAt, setImportedAt] = useState<string | null>(null);
@@ -203,15 +205,19 @@ export default function RetencoesFdReinfDesign() {
 
       <HeaderActions>
         <div className="flex items-center gap-2">
-          <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={(event) => void handleUpload(event.target.files?.[0])} />
+          {isSuperAdmin ? (
+            <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={(event) => void handleUpload(event.target.files?.[0])} />
+          ) : null}
           <Button onClick={() => void loadLatest('refresh')} size="sm" variant="outline" disabled={isRefreshing || isUploading} className="gap-space-2 h-space-9 shadow-shadow-sm">
             <RefreshCw className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
             {isRefreshing ? 'Atualizando...' : 'Atualizar base'}
           </Button>
-          <Button onClick={() => fileInputRef.current?.click()} size="sm" variant="outline" disabled={isUploading} className="gap-space-2 h-space-9 shadow-shadow-sm">
-            <FileUp className="h-4 w-4" />
-            {isUploading ? 'Importando...' : 'Importar CSV FDReinf'}
-          </Button>
+          {isSuperAdmin ? (
+            <Button onClick={() => fileInputRef.current?.click()} size="sm" variant="outline" disabled={isUploading} className="gap-space-2 h-space-9 shadow-shadow-sm">
+              <FileUp className="h-4 w-4" />
+              {isUploading ? 'Importando...' : 'Importar CSV FDReinf'}
+            </Button>
+          ) : null}
         </div>
       </HeaderActions>
 

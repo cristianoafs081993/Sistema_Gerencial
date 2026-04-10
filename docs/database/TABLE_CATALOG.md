@@ -224,6 +224,20 @@ Consumido por:
 
 - modulo local de contratos
 
+Campos-chave:
+
+- `id`
+- `numero`
+- `contratada`
+- `valor`
+- `data_inicio`
+- `data_termino`
+
+Observacoes operacionais:
+
+- o campo `contratada` deve guardar apenas a razao social limpa, sem concatenar CNPJ e sem o sufixo textual `Pessoa Juridica`
+- o runtime atual do modulo local nao depende de uma coluna `cnpj` em `contratos`; se essa separacao for retomada no banco, a migration correspondente precisa estar aplicada antes da publicacao
+
 ### `contratos_empenhos`
 
 - relacao N:N entre contrato local e empenho

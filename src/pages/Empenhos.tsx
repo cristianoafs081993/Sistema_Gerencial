@@ -39,6 +39,7 @@ import { transparenciaService } from '@/services/transparencia';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { splitCsvLine } from '@/utils/csvParser';
 import { getRapReferenceYear, isRapReinscrito } from '@/utils/rapMetrics';
+import { useAuth } from '@/contexts/AuthContext';
 import { filterEmpenhos, getRapBase, getRapLiquidado, getRapSaldo } from './empenhosFilters';
 
 
@@ -57,6 +58,7 @@ const statusLabels: Record<string, string> = {
 };
 
 export default function Empenhos() {
+  const { isSuperAdmin } = useAuth();
   const { empenhos, atividades, creditosDisponiveis, isLoading, addEmpenho, updateEmpenho, deleteEmpenho, refreshData } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('pendente');
@@ -300,6 +302,7 @@ export default function Empenhos() {
   return (
     <div className="space-y-space-6 pb-space-10">
       <HeaderActions>
+        {isSuperAdmin ? (
         <div className="flex gap-space-2">
           <input
             type="file"
@@ -363,6 +366,7 @@ export default function Empenhos() {
             </Tooltip>
           </TooltipProvider>
         </div>
+        ) : null}
       </HeaderActions>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
