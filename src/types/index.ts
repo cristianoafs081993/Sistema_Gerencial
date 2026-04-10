@@ -1,3 +1,5 @@
+export * from './atas';
+
 export interface Atividade {
   id: string;
   dimensao: string;

@@ -1,0 +1,31 @@
+{
+  "atas": [
+    {
+      "id": "ata-001",
+      "numeroAta": "12/2026",
+      "anoAta": 2026,
+      "objeto": "Aquisicao de notebooks para laboratorios",
+      "orgaoGerenciador": {
+        "nome": "IFRN Reitoria"
+      },
+      "vigenciaInicio": "2026-01-10",
+      "vigenciaFim": "2026-12-31",
+      "itens": [
+        {
+          "numeroItem": 1,
+          "descricao": "Notebook tipo ultrafino com 16GB RAM",
+          "unidade": "un",
+          "quantidade": 25,
+          "catmat": "123456"
+        },
+        {
+          "numeroItem": 2,
+          "descricao": "Servico de garantia estendida de 36 meses",
+          "unidade": "servico",
+          "quantidade": 25,
+          "catser": "654321"
+        }
+      ]
+    }
+  ]
+}

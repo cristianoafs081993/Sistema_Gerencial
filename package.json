@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "update-context": "node scripts/generate-llm-context.js"
+    "update-context": "node scripts/generate-llm-context.js",
+    "atas:ingest": "node scripts/atas/ingest-atas.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

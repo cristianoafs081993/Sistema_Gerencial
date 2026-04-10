@@ -15,10 +15,14 @@ import {
   FileStack,
   ClipboardList,
   ScanSearch,
-  Wand2
+  Wand2,
+  FileSearch,
+  SearchCheck,
+  ChartColumnIncreasing
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { atasModuleConfig } from '@/lib/atas-config';
 import {
   Tooltip,
   TooltipContent,
@@ -40,6 +44,13 @@ const navigation = [
   { name: 'Rastreabilidade de PFs', href: '/rastreabilidade-pfs', icon: ClipboardList },
   { name: 'Conciliação de PFs',   href: '/conciliacao-pfs',       icon: ScanSearch },
   { name: 'Gerador de Documentos', href: '/gerador-documentos',   icon: Wand2 },
+  ...(atasModuleConfig.enabled
+    ? [
+        { name: 'Atas para Adesao', href: '/atas/adesao', icon: FileSearch },
+        { name: 'Atas para Pesquisa', href: '/atas/pesquisa-precos', icon: SearchCheck },
+        { name: 'Observabilidade de Atas', href: '/atas/observabilidade', icon: ChartColumnIncreasing },
+      ]
+    : []),
 ];
 
 export function Layout({ children }: LayoutProps) {
