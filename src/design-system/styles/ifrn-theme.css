@@ -1,0 +1,208 @@
+/* IFRN Design System - Tema Base */
+
+:root {
+  /* Cores Primárias */
+  --ifrn-green: #2f9e41;
+  --ifrn-green-dark: #1f6e2f;
+  --ifrn-green-light: #5fb96f;
+  
+  /* Cores Secundárias */
+  --ifrn-red: #cd191e;
+  --ifrn-red-dark: #9d1318;
+  --ifrn-red-light: #e63d42;
+  
+  /* Cores Neutras */
+  --ifrn-gray-50: #f9fafb;
+  --ifrn-gray-100: #f3f4f6;
+  --ifrn-gray-200: #e5e7eb;
+  --ifrn-gray-300: #d1d5db;
+  --ifrn-gray-400: #9ca3af;
+  --ifrn-gray-500: #6b7280;
+  --ifrn-gray-600: #4b5563;
+  --ifrn-gray-700: #374151;
+  --ifrn-gray-800: #1f2937;
+  --ifrn-gray-900: #111827;
+  
+  /* Cores de Status */
+  --ifrn-success: #10b981;
+  --ifrn-warning: #f59e0b;
+  --ifrn-error: #ef4444;
+  --ifrn-info: #3b82f6;
+  
+  /* Espaçamento */
+  --ifrn-spacing-xs: 0.25rem;
+  --ifrn-spacing-sm: 0.5rem;
+  --ifrn-spacing-md: 1rem;
+  --ifrn-spacing-lg: 1.5rem;
+  --ifrn-spacing-xl: 2rem;
+  --ifrn-spacing-2xl: 3rem;
+  
+  /* Tipografia */
+  --ifrn-font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ifrn-font-size-xs: 0.75rem;
+  --ifrn-font-size-sm: 0.875rem;
+  --ifrn-font-size-base: 1rem;
+  --ifrn-font-size-lg: 1.125rem;
+  --ifrn-font-size-xl: 1.25rem;
+  --ifrn-font-size-2xl: 1.5rem;
+  --ifrn-font-size-3xl: 1.875rem;
+  --ifrn-font-size-4xl: 2.25rem;
+  
+  /* Sombras */
+  --ifrn-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --ifrn-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --ifrn-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --ifrn-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  
+  /* Raio de Borda */
+  --ifrn-radius-sm: 0.375rem;
+  --ifrn-radius-md: 0.5rem;
+  --ifrn-radius-lg: 0.75rem;
+  --ifrn-radius-xl: 1rem;
+}
+
+/* Tipografia Base */
+body {
+  font-family: var(--ifrn-font-family);
+  font-size: var(--ifrn-font-size-base);
+  line-height: 1.5;
+  color: var(--ifrn-gray-900);
+  background-color: var(--ifrn-gray-50);
+}
+
+h1 {
+  font-size: var(--ifrn-font-size-4xl);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+h2 {
+  font-size: var(--ifrn-font-size-3xl);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+h3 {
+  font-size: var(--ifrn-font-size-2xl);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+h4 {
+  font-size: var(--ifrn-font-size-xl);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+h5 {
+  font-size: var(--ifrn-font-size-lg);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+h6 {
+  font-size: var(--ifrn-font-size-base);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+/* Componentes Base */
+.ifrn-card {
+  background-color: white;
+  border-radius: var(--ifrn-radius-lg);
+  box-shadow: var(--ifrn-shadow-sm);
+  border: 1px solid var(--ifrn-gray-200);
+  padding: var(--ifrn-spacing-lg);
+  transition: all 0.3s ease;
+}
+
+.ifrn-card:hover {
+  box-shadow: var(--ifrn-shadow-md);
+}
+
+.ifrn-button {
+  padding: var(--ifrn-spacing-md) var(--ifrn-spacing-lg);
+  border-radius: var(--ifrn-radius-md);
+  font-weight: 600;
+  font-size: var(--ifrn-font-size-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.ifrn-button-primary {
+  background-color: var(--ifrn-green);
+  color: white;
+}
+
+.ifrn-button-primary:hover {
+  background-color: var(--ifrn-green-dark);
+}
+
+.ifrn-button-secondary {
+  background-color: var(--ifrn-red);
+  color: white;
+}
+
+.ifrn-button-secondary:hover {
+  background-color: var(--ifrn-red-dark);
+}
+
+.ifrn-input {
+  width: 100%;
+  padding: var(--ifrn-spacing-md);
+  border: 1px solid var(--ifrn-gray-300);
+  border-radius: var(--ifrn-radius-md);
+  font-family: var(--ifrn-font-family);
+  font-size: var(--ifrn-font-size-base);
+  transition: all 0.2s ease;
+}
+
+.ifrn-input:focus {
+  outline: none;
+  border-color: var(--ifrn-green);
+  box-shadow: 0 0 0 3px rgba(47, 158, 65, 0.1);
+}
+
+.ifrn-badge {
+  display: inline-block;
+  padding: var(--ifrn-spacing-sm) var(--ifrn-spacing-md);
+  border-radius: var(--ifrn-radius-sm);
+  font-size: var(--ifrn-font-size-xs);
+  font-weight: 600;
+}
+
+.ifrn-badge-success {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: var(--ifrn-success);
+}
+
+.ifrn-badge-warning {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: var(--ifrn-warning);
+}
+
+.ifrn-badge-error {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--ifrn-error);
+}
+
+.ifrn-badge-info {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: var(--ifrn-info);
+}
+
+/* Utilitários */
+.ifrn-text-muted {
+  color: var(--ifrn-gray-600);
+}
+
+.ifrn-text-subtle {
+  color: var(--ifrn-gray-500);
+}
+
+.ifrn-divider {
+  border: none;
+  border-top: 1px solid var(--ifrn-gray-200);
+  margin: var(--ifrn-spacing-lg) 0;
+}
