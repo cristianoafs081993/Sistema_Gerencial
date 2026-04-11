@@ -389,13 +389,13 @@ export default function Dashboard() {
             <TabsList className="h-8 rounded-lg border border-border-default/60 bg-surface-card p-0.5 shadow-sm sm:h-9">
               <TabsTrigger
                 value="corrente"
-                className="h-7 rounded-md px-3 text-[11px] font-semibold text-slate-600 transition-all data-[state=active]:bg-slate-900 data-[state=active]:text-white sm:h-8 sm:px-4 sm:text-xs"
+                className="h-7 rounded-md px-3 text-[11px] font-semibold text-slate-600 transition-all data-[state=active]:bg-[#2f9e41] data-[state=active]:text-white sm:h-8 sm:px-4 sm:text-xs"
               >
                 Exercicio Atual
               </TabsTrigger>
               <TabsTrigger
                 value="rap"
-                className="h-7 rounded-md px-3 text-[11px] font-semibold text-slate-600 transition-all data-[state=active]:bg-slate-900 data-[state=active]:text-white sm:h-8 sm:px-4 sm:text-xs"
+                className="h-7 rounded-md px-3 text-[11px] font-semibold text-slate-600 transition-all data-[state=active]:bg-[#2f9e41] data-[state=active]:text-white sm:h-8 sm:px-4 sm:text-xs"
               >
                 RAP
               </TabsTrigger>
@@ -423,13 +423,13 @@ export default function Dashboard() {
           <TabsList className="h-auto rounded-lg bg-slate-100 p-1">
             <TabsTrigger
               value="corrente"
-              className="rounded-md px-6 py-2 text-sm font-semibold text-slate-500 transition-all hover:text-slate-900 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm"
+              className="rounded-md px-6 py-2 text-sm font-semibold text-slate-500 transition-all hover:text-slate-900 data-[state=active]:bg-[#2f9e41] data-[state=active]:text-white data-[state=active]:shadow-sm"
             >
               Exercicio Atual
             </TabsTrigger>
             <TabsTrigger
               value="rap"
-              className="rounded-md px-6 py-2 text-sm font-semibold text-slate-500 transition-all hover:text-slate-900 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm"
+              className="rounded-md px-6 py-2 text-sm font-semibold text-slate-500 transition-all hover:text-slate-900 data-[state=active]:bg-[#2f9e41] data-[state=active]:text-white data-[state=active]:shadow-sm"
             >
               Restos a Pagar (RAP)
             </TabsTrigger>

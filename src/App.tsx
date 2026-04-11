@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Outlet, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Layout } from '@/components/Layout';
 import { Toaster as Sonner } from '@/components/ui/sonner';
@@ -58,7 +58,9 @@ const App = () => (
               <Route element={<ProtectedRoute />}>
                 <Route element={<AppShell />}>
                   <Route path="/" element={<Dashboard />} />
-                  <Route path="/atividades" element={<Atividades />} />
+                  <Route path="/atividades/*" element={<Navigate replace to="/planejamento/campus" />} />
+                  <Route path="/planejamento" element={<Navigate replace to="/planejamento/campus" />} />
+                  <Route path="/planejamento/:scope" element={<Atividades />} />
                   <Route path="/descentralizacoes" element={<Descentralizacoes />} />
                   <Route path="/empenhos" element={<Empenhos />} />
                   <Route path="/contratos" element={<Contratos />} />

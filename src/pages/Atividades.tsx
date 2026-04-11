@@ -1,10 +1,27 @@
-import { useState, useMemo, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
-import { Atividade, DIMENSOES } from '@/types';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, Navigate, useParams } from 'react-router-dom';
+import { Filter, Pencil, Plus, Search, Trash2, Upload } from 'lucide-react';
+import { toast } from 'sonner';
+
+import { HeaderActions } from '@/components/HeaderParts';
+import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { StatCard } from '@/components/StatCard';
+import { FilterPanel } from '@/components/design-system/FilterPanel';
+import { TablePagination } from '@/components/design-system/TablePagination';
+import { AtividadeDialog } from '@/components/modals/AtividadeDialog';
+import { ConfirmDialog } from '@/components/modals/ConfirmDialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -13,41 +30,99 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  ChevronLeft as ChevronLeftIcon, 
-  ChevronRight as ChevronRightIcon, 
-  ChevronsLeft as ChevronsLeftIcon, 
-  ChevronsRight as ChevronsRightIcon, 
-  X, 
-  Trash2, 
-  Upload,
-  Pencil,
-} from 'lucide-react';
-import { JsonImportDialog } from '@/components/JsonImportDialog';
-import { AtividadeDialog } from '@/components/modals/AtividadeDialog';
-import { ConfirmDialog } from '@/components/modals/ConfirmDialog';
-import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
-import { formatCurrency, parseCurrency } from '@/lib/utils';
-import { HeaderActions } from '@/components/HeaderParts';
+import { cn, formatCurrency, parseCurrency } from '@/lib/utils';
 import { atividadesService } from '@/services/atividades';
+import { Atividade, DIMENSOES, TipoAtividade } from '@/types';
+import { resolveTipoAtividade } from '@/utils/atividadeScopes';
 import { matchesDimensionFilter } from '@/utils/dimensionFilters';
 
+type PlanningScope = TipoAtividade;
+
+type PlanningView = {
+  scope: PlanningScope;
+  label: string;
+  switcherLabel: string;
+  description: string;
+  tableTitle: string;
+};
+
+const DEFAULT_SCOPE: PlanningScope = 'campus';
+
+const PLANNING_VIEWS: PlanningView[] = [
+  {
+    scope: 'campus',
+    label: 'Campus',
+    switcherLabel: 'Campus',
+    description: 'Planejamento do campus com a estrutura operacional atual de filtros, tabela e cadastro.',
+    tableTitle: 'Planejamento Campus',
+  },
+  {
+    scope: 'sistemico',
+    label: 'Sistemico',
+    switcherLabel: 'Sistemico',
+    description: 'Visao sistemica com o mesmo modelo de acompanhamento e operacao usado no planejamento do campus.',
+    tableTitle: 'Planejamento Sistemico',
+  },
+  {
+    scope: 'emendas-parlamentares',
+    label: 'Emendas parlamentares',
+    switcherLabel: 'Emendas',
+    description: 'Acompanhamento de emendas parlamentares com a mesma experiencia de consulta e manutencao.',
+    tableTitle: 'Emendas Parlamentares',
+  },
+];
+
+const planningViewByScope = Object.fromEntries(
+  PLANNING_VIEWS.map((view) => [view.scope, view]),
+) as Record<PlanningScope, PlanningView>;
+
+const atividadesJsonFields = [
+  'dimensao',
+  'componentefuncional',
+  'atividade',
+  'descricao',
+  'valortotal',
+  'origemrecurso',
+  'naturezadespesa',
+  'planointerno',
+];
+
+function isPlanningScope(value: string | undefined): value is PlanningScope {
+  return value === 'campus' || value === 'sistemico' || value === 'emendas-parlamentares';
+}
+
+function PlanningScopeSwitcher({ currentScope }: { currentScope: PlanningScope }) {
+  return (
+    <div className="hidden h-9 items-center gap-2 md:flex">
+      <div className="inline-flex h-8 items-center justify-center rounded-lg border border-border-default/60 bg-surface-card p-0.5 shadow-sm sm:h-9">
+      {PLANNING_VIEWS.map((view) => {
+        const isActive = view.scope === currentScope;
+
+        return (
+          <Link
+            key={view.scope}
+            to={`/planejamento/${view.scope}`}
+            className={cn(
+              'inline-flex h-7 items-center justify-center whitespace-nowrap rounded-md px-3 text-[11px] font-semibold transition-all sm:h-8 sm:px-4 sm:text-xs',
+              isActive
+                ? 'bg-[#2f9e41] text-white shadow-sm'
+                : 'text-slate-600 hover:bg-background hover:text-foreground',
+            )}
+          >
+            {view.switcherLabel}
+          </Link>
+        );
+      })}
+      </div>
+    </div>
+  );
+}
+
 export default function Atividades() {
+  const { scope } = useParams<{ scope?: string }>();
   const { isSuperAdmin } = useAuth();
+
   const [atividades, setAtividades] = useState<Atividade[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -56,16 +131,21 @@ export default function Atividades() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
 
-  // Filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDimensao, setFilterDimensao] = useState('all');
   const [filterComponente, setFilterComponente] = useState('all');
   const [filterOrigem, setFilterOrigem] = useState('all');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
-  // Paginação
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
+
+  const resolvedScope = isPlanningScope(scope) ? scope : DEFAULT_SCOPE;
+  const currentView = planningViewByScope[resolvedScope];
+  const scopedAtividades = useMemo(
+    () => atividades.filter((atividade) => atividade.tipoAtividade === currentView.scope),
+    [atividades, currentView.scope],
+  );
 
   const fetchAtividades = async () => {
     try {
@@ -81,8 +161,72 @@ export default function Atividades() {
   };
 
   useEffect(() => {
-    fetchAtividades();
+    void fetchAtividades();
   }, []);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setShowAdvancedFilters(false);
+    setIsDialogOpen(false);
+    setIsImportDialogOpen(false);
+    setIsConfirmDeleteDialogOpen(false);
+    setPage(1);
+  }, [scope]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, filterDimensao, filterComponente, filterOrigem, perPage]);
+
+  const filteredAtividades = useMemo(
+    () =>
+      scopedAtividades.filter((atividade) => {
+        const search = searchTerm.trim().toLowerCase();
+        const matchesSearch =
+          search === '' ||
+          atividade.atividade.toLowerCase().includes(search) ||
+          atividade.descricao.toLowerCase().includes(search) ||
+          atividade.planoInterno?.toLowerCase().includes(search);
+
+        const matchesDimensao = matchesDimensionFilter({
+          dimensionValue: atividade.dimensao,
+          planInternal: atividade.planoInterno,
+          description: atividade.descricao,
+          filterValue: filterDimensao,
+        });
+
+        const matchesComponente =
+          filterComponente === 'all' || atividade.componenteFuncional === filterComponente;
+        const matchesOrigem = filterOrigem === 'all' || atividade.origemRecurso === filterOrigem;
+
+        return matchesSearch && matchesDimensao && matchesComponente && matchesOrigem;
+      }),
+    [scopedAtividades, searchTerm, filterDimensao, filterComponente, filterOrigem],
+  );
+
+  const componentesUnicos = useMemo(
+    () =>
+      Array.from(
+        new Set(scopedAtividades.map((atividade) => atividade.componenteFuncional).filter(Boolean)),
+      ).sort(),
+    [scopedAtividades],
+  );
+
+  const origensUnicas = useMemo(
+    () =>
+      Array.from(
+        new Set(scopedAtividades.map((atividade) => atividade.origemRecurso).filter(Boolean)),
+      ).sort(),
+    [scopedAtividades],
+  );
+
+  const totalPlanejado = useMemo(
+    () => scopedAtividades.reduce((sum, atividade) => sum + (atividade.valorTotal || 0), 0),
+    [scopedAtividades],
+  );
+
+  const totalPages = Math.ceil(filteredAtividades.length / perPage);
+  const safePage = Math.min(page, Math.max(1, totalPages || 1));
+  const paginatedAtividades = filteredAtividades.slice((safePage - 1) * perPage, safePage * perPage);
 
   const handleOpenDialog = (atividade?: Atividade) => {
     setSelectedAtividade(atividade || null);
@@ -90,105 +234,85 @@ export default function Atividades() {
   };
 
   const handleImport = async (data: Record<string, string>[]) => {
-    const toastId = toast.loading('Processando importação...');
+    const toastId = toast.loading('Processando importacao...');
+
     try {
-      const mappedData = data.map(row => ({
-        dimensao: row['dimensao'] || '',
-        componenteFuncional: row['componentefuncional'] || '',
-        atividade: row['atividade'] || '',
-        descricao: row['descricao'] || '',
-        valorTotal: parseCurrency(row['valortotal'] || row['valor'] || '0'),
-        origemRecurso: row['origemrecurso'] || '',
-        naturezaDespesa: row['naturezadespesa'] || '',
-        planoInterno: row['planointerno'] || ''
+      const mappedData = data.map((row) => ({
+        dimensao: row.dimensao || '',
+        componenteFuncional: row.componentefuncional || '',
+        tipoAtividade: currentView.scope,
+        atividade: row.atividade || '',
+        descricao: row.descricao || '',
+        valorTotal: parseCurrency(row.valortotal || row.valor || '0'),
+        origemRecurso: row.origemrecurso || '',
+        naturezaDespesa: row.naturezadespesa || '',
+        planoInterno: row.planointerno || '',
       }));
 
       for (const item of mappedData) {
         await atividadesService.create(item);
       }
 
-      toast.success('Importação concluída com sucesso!', { id: toastId });
+      toast.success('Importacao concluida com sucesso.', { id: toastId });
       setIsImportDialogOpen(false);
-      fetchAtividades();
+      void fetchAtividades();
     } catch (error) {
       console.error('Erro ao importar JSON:', error);
-      toast.error('Erro ao processar importação', { id: toastId });
+      toast.error('Erro ao processar importacao.', { id: toastId });
     }
   };
 
   const handleBulkDelete = async () => {
-      if (selectedIds.size === 0) return;
-      
-      const toastId = toast.loading('Excluindo atividades...');
-      try {
-          for (const id of Array.from(selectedIds)) {
-              await atividadesService.delete(id);
-          }
+    if (selectedIds.size === 0) return;
 
-          toast.success(`${selectedIds.size} atividades excluídas!`, { id: toastId });
-          setSelectedIds(new Set());
-          fetchAtividades();
-          setIsConfirmDeleteDialogOpen(false);
-      } catch (error) {
-          console.error('Erro ao excluir:', error);
-          toast.error('Erro ao excluir atividades', { id: toastId });
+    const toastId = toast.loading('Excluindo atividades...');
+
+    try {
+      for (const id of Array.from(selectedIds)) {
+        await atividadesService.delete(id);
       }
+
+      toast.success(`${selectedIds.size} atividades excluidas.`, { id: toastId });
+      setSelectedIds(new Set());
+      setIsConfirmDeleteDialogOpen(false);
+      void fetchAtividades();
+    } catch (error) {
+      console.error('Erro ao excluir atividades:', error);
+      toast.error('Erro ao excluir atividades.', { id: toastId });
+    }
   };
-
-  const filteredAtividades = useMemo(() => {
-    return atividades.filter(a => {
-      const matchesSearch = searchTerm === '' || 
-        a.atividade.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        a.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        a.planoInterno?.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesDimensao = matchesDimensionFilter({
-        dimensionValue: a.dimensao,
-        planInternal: a.planoInterno,
-        description: a.descricao,
-        filterValue: filterDimensao,
-      });
-      const matchesComponente = filterComponente === 'all' || a.componenteFuncional === filterComponente;
-      const matchesOrigem = filterOrigem === 'all' || a.origemRecurso === filterOrigem;
-
-      return matchesSearch && matchesDimensao && matchesComponente && matchesOrigem;
-    });
-  }, [atividades, searchTerm, filterDimensao, filterComponente, filterOrigem]);
 
   const toggleSelectAll = () => {
     if (selectedIds.size === filteredAtividades.length) {
       setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filteredAtividades.map(a => a.id.toString())));
+      return;
     }
+
+    setSelectedIds(new Set(filteredAtividades.map((atividade) => atividade.id.toString())));
   };
 
   const toggleSelect = (id: string) => {
-    const next = new Set(selectedIds);
-    if (next.has(id)) {
-      next.delete(id);
-    } else {
-      next.add(id);
-    }
-    setSelectedIds(next);
+    setSelectedIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
   };
 
-  const componentesUnicos = useMemo(() => 
-    Array.from(new Set(atividades.map(a => a.componenteFuncional).filter(Boolean))).sort(),
-    [atividades]
-  );
+  const clearFilters = () => {
+    setFilterDimensao('all');
+    setFilterComponente('all');
+    setFilterOrigem('all');
+    setSearchTerm('');
+  };
 
-  const origensUnicas = useMemo(() => 
-    Array.from(new Set(atividades.map(a => a.origemRecurso).filter(Boolean))).sort(),
-    [atividades]
-  );
-
-  const totalPages = Math.ceil(filteredAtividades.length / perPage);
-  const paginatedAtividades = filteredAtividades.slice((page - 1) * perPage, page * perPage);
-
-  const atividadesJsonFields = [
-    'dimensao', 'componentefuncional', 'atividade', 'descricao', 'valortotal', 'origemrecurso', 'naturezadespesa', 'planointerno'
-  ];
+  if (!isPlanningScope(scope)) {
+    return <Navigate replace to={`/planejamento/${DEFAULT_SCOPE}`} />;
+  }
 
   return (
     <div className="space-y-6 pb-10">
@@ -196,20 +320,38 @@ export default function Atividades() {
         {isPageLoading ? (
           <Skeleton className="h-9 w-32" />
         ) : (
-          <div className="flex gap-2">
-            {selectedIds.size > 0 && (
-              <Button variant="destructive" onClick={() => setIsConfirmDeleteDialogOpen(true)} className="gap-2 h-9 text-sm">
+          <div className="flex flex-wrap gap-2">
+            <PlanningScopeSwitcher currentScope={currentView.scope} />
+
+            {selectedIds.size > 0 ? (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => setIsConfirmDeleteDialogOpen(true)}
+                className="h-9 gap-2 text-sm"
+              >
                 <Trash2 className="h-4 w-4" />
                 Excluir ({selectedIds.size})
               </Button>
-            )}
+            ) : null}
+
             {isSuperAdmin ? (
-              <Button variant="outline" onClick={() => setIsImportDialogOpen(true)} className="gap-2 h-9 text-sm">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsImportDialogOpen(true)}
+                className="h-8 gap-2 px-4 text-xs sm:h-9 sm:text-sm"
+              >
                 <Upload className="h-4 w-4" />
                 Importar JSON
               </Button>
             ) : null}
-            <Button onClick={() => handleOpenDialog()} className="btn-primary">
+
+            <Button
+              type="button"
+              onClick={() => handleOpenDialog()}
+              className="btn-primary h-8 px-4 text-xs sm:h-9 sm:text-sm"
+            >
               <Plus className="h-4 w-4" />
               Nova Atividade
             </Button>
@@ -217,24 +359,24 @@ export default function Atividades() {
         )}
       </HeaderActions>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           title="Total Planejado"
-          value={formatCurrency(atividades.reduce((sum, a) => sum + (a.valorTotal || 0), 0))}
+          value={formatCurrency(totalPlanejado)}
           icon={Plus}
           stitchColor="purple"
           isLoading={isPageLoading}
         />
         <StatCard
-          title="Atividades"
-          value={atividades.length}
+          title="Registros"
+          value={scopedAtividades.length}
           icon={Filter}
           stitchColor="vibrant-blue"
           isLoading={isPageLoading}
         />
         <StatCard
-          title="Dimensões"
-          value={new Set(atividades.map(a => a.dimensao)).size}
+          title="Dimensoes"
+          value={new Set(scopedAtividades.map((atividade) => atividade.dimensao)).size}
           icon={Search}
           stitchColor="amber"
           isLoading={isPageLoading}
@@ -248,79 +390,89 @@ export default function Atividades() {
         />
       </div>
 
-      {/* Standard Filter Card */}
       <FilterPanel className="shadow-sm">
         <CardContent className="p-0">
           {isPageLoading ? (
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row">
               <Skeleton className="h-10 flex-1" />
-              <Skeleton className="h-10 w-[150px]" />
-              <Skeleton className="h-10 w-[150px]" />
+              <Skeleton className="h-10 w-full sm:w-[160px]" />
+              <Skeleton className="h-10 w-full sm:w-[160px]" />
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col gap-4 sm:flex-row">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    placeholder="Buscar por atividade, processo ou dimensão..."
+                    placeholder="Buscar por atividade, descricao ou plano interno..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9 h-10 text-sm input-system"
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    className="input-system h-10 pl-9 text-sm"
                   />
                 </div>
-                <div className="w-full sm:w-[150px]">
+
+                <div className="w-full sm:w-[180px]">
                   <Select value={filterDimensao} onValueChange={setFilterDimensao}>
                     <SelectTrigger className="input-system h-10">
-                      <SelectValue placeholder="Dimensão" />
+                      <SelectValue placeholder="Dimensao" />
                     </SelectTrigger>
                     <SelectContent className="rounded-sm">
-                      <SelectItem value="all">Todas as dimensões</SelectItem>
-                      {DIMENSOES.map((d) => (
-                        <SelectItem key={d.codigo} value={d.codigo}>
-                          {d.nome}
+                      <SelectItem value="all">Todas as dimensoes</SelectItem>
+                      {DIMENSOES.map((dimensao) => (
+                        <SelectItem key={dimensao.codigo} value={dimensao.codigo}>
+                          {dimensao.nome}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+
                 <Button
-                  variant={showAdvancedFilters ? "secondary" : "outline"}
-                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                  className="gap-2 h-10 font-bold"
+                  type="button"
+                  variant={showAdvancedFilters ? 'secondary' : 'outline'}
+                  onClick={() => setShowAdvancedFilters((value) => !value)}
+                  className="h-10 gap-2 font-bold"
                 >
-                  <Filter className="w-4 h-4" />
-                  Opções
+                  <Filter className="h-4 w-4" />
+                  Opcoes
                 </Button>
               </div>
 
-              {showAdvancedFilters && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-slate-50/50 rounded-lg border border-border-default/50 animate-in fade-in duration-200">
+              {showAdvancedFilters ? (
+                <div className="grid grid-cols-1 gap-4 rounded-lg border border-border-default/50 bg-slate-50/50 p-4 animate-in fade-in duration-200 md:grid-cols-3">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Componente Funcional</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Componente Funcional
+                    </label>
                     <Select value={filterComponente} onValueChange={setFilterComponente}>
                       <SelectTrigger className="input-system h-10">
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent className="rounded-sm">
                         <SelectItem value="all">Todos</SelectItem>
-                        {componentesUnicos.map(comp => (
-                          <SelectItem key={comp} value={comp}>{comp}</SelectItem>
+                        {componentesUnicos.map((componente) => (
+                          <SelectItem key={componente} value={componente}>
+                            {componente}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Origem de Recurso</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Origem de Recurso
+                    </label>
                     <Select value={filterOrigem} onValueChange={setFilterOrigem}>
                       <SelectTrigger className="input-system h-10">
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent className="rounded-sm">
                         <SelectItem value="all">Todas</SelectItem>
-                        {origensUnicas.map(origem => (
-                          <SelectItem key={origem} value={origem}>{origem}</SelectItem>
+                        {origensUnicas.map((origem) => (
+                          <SelectItem key={origem} value={origem}>
+                            {origem}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -328,194 +480,189 @@ export default function Atividades() {
 
                   <div className="flex items-end">
                     <Button
+                      type="button"
                       variant="ghost"
-                      className="w-full text-muted-foreground hover:text-primary h-10 font-bold"
-                      onClick={() => {
-                        setFilterDimensao('all');
-                        setFilterComponente('all');
-                        setFilterOrigem('all');
-                        setSearchTerm('');
-                      }}
+                      className="h-10 w-full font-bold text-muted-foreground hover:text-primary"
+                      onClick={clearFilters}
                     >
-                      Limpar Filtros
+                      Limpar filtros
                     </Button>
                   </div>
                 </div>
-              )}
+              ) : null}
             </div>
           )}
         </CardContent>
       </FilterPanel>
 
-      {/* Main Table Card */}
-      <Card className="card-system shadow-sm border-none shadow-none mt-6">
-        <CardHeader className="px-6 py-4 border-b border-border-default/50 flex flex-row items-center justify-between bg-white">
+      <Card className="card-system mt-6 border-none shadow-none">
+        <CardHeader className="flex flex-row items-center justify-between border-b border-border-default/50 bg-white px-6 py-4">
           <div className="flex items-center gap-3">
-            <CardTitle className="table-title">Atividades Planejadas</CardTitle>
-            <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-bold px-2 py-0 h-5">
+            <CardTitle className="table-title">{currentView.tableTitle}</CardTitle>
+            <Badge variant="secondary" className="h-5 bg-slate-100 px-2 py-0 font-bold text-slate-600">
               {filteredAtividades.length}
             </Badge>
           </div>
         </CardHeader>
+
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader className="bg-slate-50/50">
-                <TableRow className="hover:bg-transparent border-b border-border-default/50">
+                <TableRow className="border-b border-border-default/50 hover:bg-transparent">
                   <TableHead className="w-[50px] px-6">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       className="rounded border-slate-300"
                       checked={selectedIds.size === filteredAtividades.length && filteredAtividades.length > 0}
                       onChange={toggleSelectAll}
                     />
                   </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wider py-4 text-muted-foreground">Atividade</TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wider py-4 text-muted-foreground">Dimensão</TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wider py-4 text-muted-foreground">Componente Funcional</TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wider py-4 text-muted-foreground">Origem de Recurso</TableHead>
-                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wider py-4 text-muted-foreground">Valor</TableHead>
-                  <TableHead className="w-[100px] text-right text-xs font-semibold uppercase tracking-wider py-4 pr-6">Ações</TableHead>
+                  <TableHead className="py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Atividade
+                  </TableHead>
+                  <TableHead className="py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Dimensao
+                  </TableHead>
+                  <TableHead className="py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Componente Funcional
+                  </TableHead>
+                  <TableHead className="py-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Origem de Recurso
+                  </TableHead>
+                  <TableHead className="py-4 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Valor
+                  </TableHead>
+                  <TableHead className="w-[100px] py-4 pr-6 text-right text-xs font-semibold uppercase tracking-wider">
+                    Acoes
+                  </TableHead>
                 </TableRow>
               </TableHeader>
+
               <TableBody>
-                {isPageLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="px-6"><Skeleton className="h-4 w-4" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell className="text-right"><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
-                      <TableCell className="pr-6 text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : paginatedAtividades.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">
-                      Nenhuma atividade encontrada.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  paginatedAtividades.map((a) => (
-                    <TableRow key={a.id} className="group hover:bg-slate-50/80 transition-colors border-b last:border-0">
-                      <TableCell className="px-6">
-                        <input 
-                          type="checkbox" 
-                          className="rounded border-slate-300"
-                          checked={selectedIds.has(a.id.toString())}
-                          onChange={() => toggleSelect(a.id.toString())}
-                        />
-                      </TableCell>
-                      <TableCell className="py-4">
-                        <div className="flex flex-col gap-0.5 max-w-[400px]">
-                          <span className="font-semibold text-sm group-hover:text-primary transition-colors">{a.atividade}</span>
-                          <span className="text-xs text-muted-foreground line-clamp-1" title={a.descricao}>{a.descricao}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-4">
-                        <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider border-slate-200">
-                          {a.dimensao ? a.dimensao.split(' - ')[0] : 'N/D'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="py-4 text-xs">{a.componenteFuncional || '-'}</TableCell>
-                      <TableCell className="py-4 font-mono text-xs">{a.origemRecurso || '-'}</TableCell>
-                      <TableCell className="text-right font-bold text-sm py-4">{formatCurrency(a.valorTotal)}</TableCell>
-                      <TableCell className="text-right py-4 pr-6">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-full"
-                          onClick={() => handleOpenDialog(a)}
+                {isPageLoading
+                  ? Array.from({ length: 5 }).map((_, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="px-6">
+                          <Skeleton className="h-4 w-4" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-48" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-24" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-24" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-20" />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Skeleton className="ml-auto h-4 w-20" />
+                        </TableCell>
+                        <TableCell className="pr-6 text-right">
+                          <Skeleton className="ml-auto h-8 w-8" />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  : paginatedAtividades.length === 0
+                    ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="h-32 text-center italic text-muted-foreground">
+                          Nenhum registro encontrado em {currentView.label.toLowerCase()}.
+                        </TableCell>
+                      </TableRow>
+                      )
+                    : paginatedAtividades.map((atividade) => (
+                        <TableRow
+                          key={atividade.id}
+                          className="group border-b transition-colors last:border-0 hover:bg-slate-50/80"
                         >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
+                          <TableCell className="px-6">
+                            <input
+                              type="checkbox"
+                              className="rounded border-slate-300"
+                              checked={selectedIds.has(atividade.id.toString())}
+                              onChange={() => toggleSelect(atividade.id.toString())}
+                            />
+                          </TableCell>
+                          <TableCell className="py-4">
+                            <div className="flex max-w-[400px] flex-col gap-0.5">
+                              <span className="text-sm font-semibold transition-colors group-hover:text-primary">
+                                {atividade.atividade}
+                              </span>
+                              <span
+                                className="line-clamp-1 text-xs text-muted-foreground"
+                                title={atividade.descricao}
+                              >
+                                {atividade.descricao}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-4">
+                            <Badge
+                              variant="outline"
+                              className="border-slate-200 text-[10px] font-bold uppercase tracking-wider"
+                            >
+                              {atividade.dimensao ? atividade.dimensao.split(' - ')[0] : 'N/D'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-4 text-xs">
+                            {atividade.componenteFuncional || '-'}
+                          </TableCell>
+                          <TableCell className="py-4 font-mono text-xs">
+                            {atividade.origemRecurso || '-'}
+                          </TableCell>
+                          <TableCell className="py-4 text-right text-sm font-bold">
+                            {formatCurrency(atividade.valorTotal)}
+                          </TableCell>
+                          <TableCell className="py-4 pr-6 text-right">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                              onClick={() => handleOpenDialog(atividade)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
               </TableBody>
             </Table>
           </div>
         </CardContent>
 
-        {/* Improved Pagination */}
-        <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 bg-slate-50/70 border-t gap-4">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Exibir</span>
-              <Select value={String(perPage)} onValueChange={(val) => { setPerPage(Number(val)); setPage(1); }}>
-                <SelectTrigger className="h-8 w-[70px] bg-white border-slate-200/60">
-                  <SelectValue placeholder={String(perPage)} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="10">10</SelectItem>
-                  <SelectItem value="20">20</SelectItem>
-                  <SelectItem value="50">50</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="h-4 w-[1px] bg-slate-200 hidden sm:block"></div>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              Página <span className="text-foreground">{page}</span> de {totalPages || 1}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-9 w-9 border-slate-200/60 shadow-sm"
-              onClick={() => setPage(1)}
-              disabled={page <= 1}
-            >
-              <ChevronsLeftIcon className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-9 w-9 border-slate-200/60 shadow-sm"
-              onClick={() => setPage(page - 1)}
-              disabled={page <= 1}
-            >
-              <ChevronLeftIcon className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-9 w-9 border-slate-200/60 shadow-sm"
-              onClick={() => setPage(page + 1)}
-              disabled={page >= totalPages}
-            >
-              <ChevronRightIcon className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-9 w-9 border-slate-200/60 shadow-sm"
-              onClick={() => setPage(totalPages)}
-              disabled={page >= totalPages}
-            >
-              <ChevronsRightIcon className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        <TablePagination
+          page={safePage}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          totalItems={filteredAtividades.length}
+          pageSize={perPage}
+          onPageSizeChange={(value) => {
+            setPerPage(value);
+            setPage(1);
+          }}
+        />
       </Card>
 
       <AtividadeDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         atividade={selectedAtividade}
-        onSuccess={fetchAtividades}
+        defaultTipoAtividade={resolveTipoAtividade(selectedAtividade?.tipoAtividade, currentView.scope)}
+        onSuccess={() => void fetchAtividades()}
       />
 
       <ConfirmDialog
         open={isConfirmDeleteDialogOpen}
         onOpenChange={setIsConfirmDeleteDialogOpen}
         onConfirm={handleBulkDelete}
-        title="Confirmar Exclusão"
-        description={`Tem certeza que deseja excluir as ${selectedIds.size} atividades selecionadas? Esta ação não poderá ser desfeita.`}
-        confirmText="Excluir Atividades"
+        title="Confirmar Exclusao"
+        description={`Tem certeza que deseja excluir as ${selectedIds.size} atividades selecionadas? Esta acao nao podera ser desfeita.`}
+        confirmText="Excluir atividades"
       />
 
       {isSuperAdmin ? (
@@ -530,6 +677,3 @@ export default function Atividades() {
     </div>
   );
 }
-
-
-

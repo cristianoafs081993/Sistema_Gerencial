@@ -19,7 +19,6 @@ import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase';
 import { getSupabaseEnv, getSupabaseFunctionUrl } from '@/lib/env';
 import { useAuth } from '@/contexts/AuthContext';
 // PDF.js import (using dynamic import to avoid SSR issues if any, but since it's vite, standard import works)
@@ -235,6 +234,7 @@ export default function Consultor() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          apikey: anonKey,
           'Authorization': `Bearer ${anonKey}`
         },
         body: JSON.stringify({ 
@@ -246,7 +246,10 @@ export default function Consultor() {
         })
       });
 
-      if (!response.ok) throw new Error('Falha de conexão');
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Consultor HTTP ${response.status}: ${errorText || 'sem detalhes'}`);
+      }
       if (!response.body) throw new Error('Sem resposta');
 
       const reader = response.body.getReader();

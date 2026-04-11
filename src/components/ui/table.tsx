@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto">
+    <div className="relative w-full overflow-auto scrollbar-thin">
       <table ref={ref} className={cn("font-ui w-full caption-bottom text-sm", className)} {...props} />
     </div>
   ),
@@ -12,7 +12,7 @@ const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableE
 Table.displayName = "Table";
 
 const TableHeader = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(
-  ({ className, ...props }, ref) => <thead ref={ref} className={cn("[&_tr]:border-b bg-slate-50 text-slate-500 text-xs uppercase tracking-wider", className)} {...props} />,
+  ({ className, ...props }, ref) => <thead ref={ref} className={cn("[&_tr]:border-b bg-[rgba(255,255,252,0.92)] text-[rgba(97,90,79,0.82)] text-xs uppercase tracking-wider", className)} {...props} />,
 );
 TableHeader.displayName = "TableHeader";
 
@@ -34,7 +34,7 @@ const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTML
   ({ className, ...props }, ref) => (
     <tr
       ref={ref}
-      className={cn("border-b transition-colors hover:bg-slate-50 data-[state=selected]:bg-slate-50", className)}
+      className={cn("border-b border-[rgba(214,208,197,0.52)] transition-colors hover:bg-[rgba(252,252,248,0.9)] data-[state=selected]:bg-[rgba(250,251,246,0.95)]", className)}
       {...props}
     />
   ),
@@ -47,6 +47,7 @@ const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<
       ref={ref}
       className={cn(
         "label-eyebrow h-11 px-4 text-left align-middle text-slate-500 [&:has([role=checkbox])]:pr-0",
+        "text-[rgba(97,90,79,0.82)]",
         className,
       )}
       {...props}
@@ -57,7 +58,7 @@ TableHead.displayName = "TableHead";
 
 const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<HTMLTableCellElement>>(
   ({ className, ...props }, ref) => (
-    <td ref={ref} className={cn("font-ui p-4 align-middle text-slate-600 [&:has([role=checkbox])]:pr-0", className)} {...props} />
+    <td ref={ref} className={cn("font-ui p-4 align-middle text-[rgba(74,69,61,0.92)] [&:has([role=checkbox])]:pr-0", className)} {...props} />
   ),
 );
 TableCell.displayName = "TableCell";

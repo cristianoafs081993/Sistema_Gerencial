@@ -112,6 +112,7 @@ function baseAtividade() {
     id: 'atividade-1',
     dimensao: 'EN - Ensino',
     componenteFuncional: 'Ensino Base',
+    tipoAtividade: 'sistemico' as const,
     atividade: 'Atividade teste',
     descricao: 'Descricao teste',
     valorTotal: 100,
@@ -159,8 +160,8 @@ describe('Dashboard', () => {
   beforeEach(() => {
     mockedUseData.mockReturnValue({
       atividades: [
-        makeAtividade({ id: 'atividade-en', dimensao: 'EN - Ensino', valorTotal: 200 }),
-        makeAtividade({ id: 'atividade-ad', dimensao: 'AD - Administracao', valorTotal: 100, componenteFuncional: 'Gestao', planoInterno: 'PI-AD' }),
+        makeAtividade({ id: 'atividade-en', dimensao: 'EN - Ensino', tipoAtividade: 'sistemico', valorTotal: 200 }),
+        makeAtividade({ id: 'atividade-ad', dimensao: 'AD - Administracao', tipoAtividade: 'campus', valorTotal: 100, componenteFuncional: 'Gestao', planoInterno: 'PI-AD' }),
       ],
       empenhos: [
         makeEmpenho({

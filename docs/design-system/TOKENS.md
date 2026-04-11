@@ -3,20 +3,28 @@
 ## Fontes de verdade
 
 - [index.css](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/index.css)
+- [manus-stage1.css](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/manus-stage1.css)
 - [tailwind.config.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/tailwind.config.ts)
 
 ## Tipografia
 
 Fontes observadas:
 
-- `Public Sans`
-- `Inter`
+- `Open Sans`
 - `IBM Plex Mono`
 
 Uso esperado:
 
-- interface: `Public Sans`
+- interface: `Open Sans`
 - dados e codigos: `IBM Plex Mono`
+
+Hierarquia atual:
+
+- titulos principais: `Open Sans` 700 com tracking negativo curto
+- titulos de painel e tabela: `Open Sans` 700, mais compactos e densos
+- subtitulos e descricoes: `Open Sans` 400 em `#858481`
+- labels/eyebrows: `Open Sans` 700 em caixa alta com espacamento amplo e neutro escuro proximo de `#1a1a19`
+- shell e header: titulos principais em `#34322d`
 
 ## Tokens semanticos principais
 
@@ -36,9 +44,10 @@ Uso esperado:
 
 Base recomendada para a pagina:
 
-- `--background`: off-white neutro e claro, hoje em torno de `#f7f8fa`
-- `--muted`: apoio de superficie levemente mais visivel que o fundo, sem puxar o azul
-- `--border` e `--input`: contraste suave, suficiente para formularios e divisorias sem pesar a tela
+- `--background`: branco puro, proximo de `#ffffff`
+- `--primary` e `--accent`: verde IFRN, proximo de `#2f9e41`
+- `--destructive`: vermelho forte, proximo de `#cd191e`
+- `--muted`, `--border` e `--input`: neutros quase brancos, sem puxar para bege ou azul
 
 ### Sombras
 
@@ -77,6 +86,18 @@ Regra visual:
 - `table-description`
 - `input-system`
 - `stat-card`
+- `table-pagination`
+- `table-pagination__label`
+- `table-pagination__select`
+- `table-pagination__page-chip`
+
+Uso atual de superficies de apoio:
+
+- shell principal deve usar branco ou quase branco, com verde apenas como respiro muito sutil
+- tabelas e filtros devem usar branco ou quase branco, evitando `slate` azulado
+- `input-system` deve parecer campo claro, com borda quente suave e foco verde IFRN
+- `table-pagination` deve usar superficie branca, divisor sutil e navegacao compacta
+- estados vazios e skeletons devem usar contraste baixo e neutros quentes
 
 ## Regra pratica
 

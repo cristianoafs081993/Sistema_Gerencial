@@ -21,7 +21,7 @@ export function TableSkeletonRows({
         <TableRow key={`sk-row-${rowIndex}`}>
           {Array.from({ length: columns }).map((__, columnIndex) => (
             <TableCell key={`sk-cell-${rowIndex}-${columnIndex}`} className={cn('px-4 py-3', cellClassName)}>
-              <Skeleton className={cn('h-4 rounded', widths[columnIndex] || 'w-24')} />
+              <Skeleton className={cn('h-4 rounded-full bg-[rgba(237,234,226,0.95)]', widths[columnIndex] || 'w-24')} />
             </TableCell>
           ))}
         </TableRow>
@@ -29,4 +29,3 @@ export function TableSkeletonRows({
     </>
   );
 }
-

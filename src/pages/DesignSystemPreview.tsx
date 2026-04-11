@@ -193,7 +193,7 @@ const sidebarGroups: SidebarGroup[] = [
     title: 'Orcamentario',
     items: [
       { label: 'Dashboard', icon: LayoutDashboard },
-      { label: 'Atividades', icon: FileText },
+      { label: 'Planejamento', icon: FileText },
       { label: 'Descentralizacoes', icon: ArrowDownRight, badge: '3' },
       { label: 'Empenhos', icon: Receipt, active: true, badge: '12' },
     ],
@@ -284,7 +284,7 @@ const naturezaChartConfig: ChartConfig = {
 
 const coverageRows: CoverageRow[] = [
   { route: '/', modulo: 'Dashboard', filtros: true, dados: true, overlays: true, upload: false, visualizacao: true, ia: false, status: 'Coberto' },
-  { route: '/atividades', modulo: 'Atividades', filtros: true, dados: true, overlays: true, upload: true, visualizacao: false, ia: false, status: 'Coberto' },
+  { route: '/planejamento/campus', modulo: 'Planejamento', filtros: true, dados: true, overlays: true, upload: true, visualizacao: false, ia: false, status: 'Coberto' },
   { route: '/descentralizacoes', modulo: 'Descentralizacoes', filtros: true, dados: true, overlays: true, upload: true, visualizacao: false, ia: false, status: 'Coberto' },
   { route: '/empenhos', modulo: 'Empenhos', filtros: true, dados: true, overlays: true, upload: true, visualizacao: false, ia: false, status: 'Coberto' },
   { route: '/contratos', modulo: 'Contratos', filtros: true, dados: true, overlays: true, upload: false, visualizacao: false, ia: false, status: 'Coberto' },

@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, FileUp, RefreshCw, Search, ShieldAlert } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -9,6 +9,7 @@ import { StatCard } from '@/components/StatCard';
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { TableSkeletonRows } from '@/components/design-system/TableSkeletonRows';
+import { TablePagination } from '@/components/design-system/TablePagination';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,7 +30,6 @@ type ViewRow = { row: RetencaoEfdReinfRegistro; validation: ReturnType<typeof va
 type AlertFilter = 'all' | 'critical' | 'warning' | 'with-alert' | 'ok';
 type SortKey = 'documentoHabil' | 'dhSituacao' | 'dhUgPagadora' | 'dhDiaPagamento' | 'dhValorDocOrigem' | 'valorRetencao' | 'percentualRetencao' | 'severity';
 
-const pageSize = 100;
 const sortLabels: Record<SortKey, string> = {
   documentoHabil: 'Documento habil',
   dhSituacao: 'Situacao',
@@ -66,6 +66,7 @@ export default function RetencoesFdReinfDesign() {
   const [sortKey, setSortKey] = useState<SortKey>('severity');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(100);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const deferredQuery = useDeferredValue(query);
 
@@ -172,11 +173,11 @@ export default function RetencoesFdReinfDesign() {
 
   useEffect(() => {
     setPage(1);
-  }, [deferredQuery, rows.length, alertFilter, situacaoFilter, sortKey, sortDirection]);
+  }, [deferredQuery, rows.length, alertFilter, situacaoFilter, sortKey, sortDirection, pageSize]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
   const safePage = Math.min(page, totalPages);
-  const rowsPage = useMemo(() => filteredRows.slice((safePage - 1) * pageSize, safePage * pageSize), [filteredRows, safePage]);
+  const rowsPage = useMemo(() => filteredRows.slice((safePage - 1) * pageSize, safePage * pageSize), [filteredRows, safePage, pageSize]);
   const pageStart = filteredRows.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
   const pageEnd = filteredRows.length === 0 ? 0 : Math.min(filteredRows.length, safePage * pageSize);
   const importedAtLabel = importedAt ? format(new Date(importedAt), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR }) : null;
@@ -323,15 +324,19 @@ export default function RetencoesFdReinfDesign() {
             )}
           </TableBody>
         </Table>
-        <div className="flex flex-col gap-3 border-t border-border-default/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-xs text-muted-foreground">Mostrando {pageStart}-{pageEnd} de {filteredRows.length} resultado(s)</span>
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={safePage <= 1}><ChevronLeft className="h-4 w-4" /></Button>
-            <span className="text-xs text-muted-foreground">Pag. {safePage} de {totalPages}</span>
-            <Button size="sm" variant="outline" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={safePage >= totalPages}><ChevronRight className="h-4 w-4" /></Button>
-          </div>
-        </div>
+                <TablePagination
+          page={safePage}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          totalItems={filteredRows.length}
+          pageSize={pageSize}
+          onPageSizeChange={(value) => {
+            setPageSize(value);
+            setPage(1);
+          }}
+        />
       </DataTablePanel>
     </div>
   );
 }
+

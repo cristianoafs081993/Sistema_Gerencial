@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { transparenciaService } from '@/services/transparencia';
 import { DocumentoDespesa, DocumentoSituacao } from '@/types';
@@ -47,6 +47,7 @@ import {
 import { toast } from 'sonner';
 import { DocumentoDetalhesDialog } from '@/components/DocumentoDetalhesDialog';
 import { HeaderActions } from '@/components/HeaderParts';
+import { TablePagination } from '@/components/design-system/TablePagination';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { 
     DropdownMenu, 
@@ -70,7 +71,7 @@ export default function LiquidacoesPagamentos() {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
 
-    // Paginação e Ordenação
+    // PaginaÃ§Ã£o e OrdenaÃ§Ã£o
     const [page, setPage] = useState(1);
     const [perPage, setPerPage] = useState(10);
     const [sortColumn, setSortColumn] = useState('data_emissao');
@@ -99,6 +100,10 @@ export default function LiquidacoesPagamentos() {
     const documentos = queryData?.data || [];
     const totalRecords = queryData?.total || 0;
     const totalPages = Math.ceil(totalRecords / perPage);
+
+    useEffect(() => {
+        setPage(1);
+    }, [searchTerm, startDate, endDate, perPage, sortColumn, sortDirection]);
 
     const clearFilters = () => {
         setSearchTerm('');
@@ -136,25 +141,25 @@ export default function LiquidacoesPagamentos() {
         const toastId = toast.loading('Importando documentos...');
         try {
             await transparenciaService.importDocumentosHabeis(data);
-            toast.success('Importação concluída!', { id: toastId });
+            toast.success('ImportaÃ§Ã£o concluÃ­da!', { id: toastId });
             handleRefresh();
         } catch (error) {
             console.error(error);
-            toast.error('Erro na importação', { id: toastId });
+            toast.error('Erro na importaÃ§Ã£o', { id: toastId });
         }
     };
 
     const handleImportOB = async (data: CsvRow[]) => {
-        const toastId = toast.loading('Processando Ordens Bancárias...');
+        const toastId = toast.loading('Processando Ordens BancÃ¡rias...');
         try {
             await transparenciaService.importOrdensBancarias(data);
-            toast.success(`${data.length} ordens bancárias importadas com sucesso!`, { id: toastId });
+            toast.success(`${data.length} ordens bancÃ¡rias importadas com sucesso!`, { id: toastId });
             setIsImportOBOpen(false);
             handleRefresh();
         } catch (error: unknown) {
             console.error('Erro import OB:', error);
             const message = error instanceof Error ? error.message : 'Erro desconhecido';
-            toast.error(`Falha na importação: ${message}`, { id: toastId });
+            toast.error(`Falha na importaÃ§Ã£o: ${message}`, { id: toastId });
         }
     };
 
@@ -167,15 +172,15 @@ export default function LiquidacoesPagamentos() {
             setIsImportFonteOpen(false);
         } catch (error) {
             console.error(error);
-            toast.error('Erro na atualização', { id: toastId });
+            toast.error('Erro na atualizaÃ§Ã£o', { id: toastId });
         }
     };
 
     const handleRetencoesImport = async (data: CsvRow[]) => {
-        const toastId = toast.loading('Processando importação de situações...');
+        const toastId = toast.loading('Processando importaÃ§Ã£o de situaÃ§Ãµes...');
         
         try {
-            // Mapeamos para o novo formato de Situações
+            // Mapeamos para o novo formato de SituaÃ§Ãµes
             const mappedData: Partial<DocumentoSituacao>[] = data.map(row => {
                 const situacaoCodigo = row['dhsituacao'] || '';
                 return {
@@ -191,20 +196,20 @@ export default function LiquidacoesPagamentos() {
 
             await retencoesService.upsertSituacoesBatch(mappedData as DocumentoSituacao[]);
             
-            toast.success(`${mappedData.length} situações processadas com sucesso!`, { id: toastId });
+            toast.success(`${mappedData.length} situaÃ§Ãµes processadas com sucesso!`, { id: toastId });
             setIsImportDialogOpen(false);
             
-            // Invalida transparência para atualizar os documentos
+            // Invalida transparÃªncia para atualizar os documentos
             queryClient.invalidateQueries({ queryKey: ['transparencia'] });
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : 'Erro desconhecido';
-            console.error('Erro ao importar situações:', error);
-            toast.error(`Erro na importação: ${message}`, { id: toastId });
+            console.error('Erro ao importar situaÃ§Ãµes:', error);
+            toast.error(`Erro na importaÃ§Ã£o: ${message}`, { id: toastId });
         }
     };
 
     const retencoesFields = [
-        'Documento Hábil', 'DH - Situação', 'DH - Valor Doc.Origem'
+        'Documento HÃ¡bil', 'DH - SituaÃ§Ã£o', 'DH - Valor Doc.Origem'
     ];
 
     return (
@@ -231,16 +236,16 @@ export default function LiquidacoesPagamentos() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">
                             <DropdownMenuItem onClick={() => setIsImportDocsOpen(true)} className="text-xs font-semibold py-2">
-                                Documentos Hábeis (.csv)
+                                Documentos HÃ¡beis (.csv)
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setIsImportFonteOpen(true)} className="text-xs font-semibold py-2">
-                                Fonte SOF / Liquidações (.csv)
+                                Fonte SOF / LiquidaÃ§Ãµes (.csv)
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setIsImportOBOpen(true)} className="text-xs font-semibold py-2">
-                                Ordens Bancárias / Pagos (.csv)
+                                Ordens BancÃ¡rias / Pagos (.csv)
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setIsImportDialogOpen(true)} className="text-xs font-semibold py-2 border-t mt-1">
-                                Situações / Retenções (.csv)
+                                SituaÃ§Ãµes / RetenÃ§Ãµes (.csv)
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -294,7 +299,7 @@ export default function LiquidacoesPagamentos() {
                 open={isImportDialogOpen}
                 onOpenChange={setIsImportDialogOpen}
                 onImport={handleRetencoesImport}
-                title="Importar Situações (Despesas/Retenções)"
+                title="Importar SituaÃ§Ãµes (Despesas/RetenÃ§Ãµes)"
                 expectedFields={retencoesFields}
                 acceptCsv={true}
                 csvSeparator="\t"
@@ -344,7 +349,7 @@ export default function LiquidacoesPagamentos() {
             <Card className="card-system shadow-sm border-none shadow-none mt-6">
                 <CardHeader className="px-6 py-4 border-b border-border-default/50 flex flex-row items-center justify-between bg-white">
                     <div className="flex items-center gap-3">
-                        <CardTitle className="table-title">Documentos Hábeis</CardTitle>
+                        <CardTitle className="table-title">Documentos HÃ¡beis</CardTitle>
                         <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-bold px-2 py-0 h-5">
                             {totalRecords}
                         </Badge>
@@ -357,7 +362,7 @@ export default function LiquidacoesPagamentos() {
                                 <TableRow className="hover:bg-transparent border-b border-border-default/50">
                                     <TableHead className="w-[92px] font-semibold text-xs uppercase tracking-wider py-4 px-3 text-muted-foreground whitespace-nowrap">
                                         <Button variant="ghost" className="h-auto p-0 hover:bg-transparent font-semibold text-xs uppercase tracking-wider" onClick={() => handleSort('data_emissao')}>
-                                            Emissão {getSortIcon('data_emissao')}
+                                            EmissÃ£o {getSortIcon('data_emissao')}
                                         </Button>
                                     </TableHead>
                                     <TableHead className="w-[160px] font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-3">
@@ -372,7 +377,7 @@ export default function LiquidacoesPagamentos() {
                                     </TableHead>
                                     <TableHead className="w-[132px] font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-3 text-center">
                                         <Button variant="ghost" className="h-auto p-0 hover:bg-transparent font-semibold text-xs uppercase tracking-wider mx-auto" onClick={() => handleSort('estado')}>
-                                            Situação {getSortIcon('estado')}
+                                            SituaÃ§Ã£o {getSortIcon('estado')}
                                         </Button>
                                     </TableHead>
                                     <TableHead className="w-[112px] font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-3 text-right">
@@ -398,7 +403,7 @@ export default function LiquidacoesPagamentos() {
                                 ) : documentos.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">
-                                            Nenhum registro encontrado com os parâmetros selecionados.
+                                            Nenhum registro encontrado com os parÃ¢metros selecionados.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
@@ -466,87 +471,18 @@ export default function LiquidacoesPagamentos() {
                         </Table>
                     </div>
                 </CardContent>
-
-                {/* Paginação Premium */}
-                <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 bg-slate-50/70 border-t gap-4">
-                    <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Exibir</span>
-                            <Select value={String(perPage)} onValueChange={(val) => { setPerPage(Number(val)); setPage(1); }}>
-                                <SelectTrigger className="h-8 w-[70px] bg-white border-slate-200/60">
-                                    <SelectValue placeholder={String(perPage)} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="10">10</SelectItem>
-                                    <SelectItem value="20">20</SelectItem>
-                                    <SelectItem value="50">50</SelectItem>
-                                    <SelectItem value="100">100</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="h-4 w-[1px] bg-slate-200 hidden sm:block"></div>
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                            Página <span className="text-foreground">{page}</span> de {totalPages || 1}
-                        </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-9 w-9 border-slate-200/60 shadow-sm"
-                            onClick={() => setPage(1)}
-                            disabled={page <= 1 || isLoading}
-                        >
-                            <ChevronsLeftIcon className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-9 w-9 border-slate-200/60 shadow-sm"
-                            onClick={() => setPage(page - 1)}
-                            disabled={page <= 1 || isLoading}
-                        >
-                            <ChevronLeftIcon className="h-4 w-4" />
-                        </Button>
-                        <div className="flex items-center gap-1 mx-2">
-                            {Array.from({ length: Math.min(3, totalPages) }).map((_, i) => {
-                                const p = i + 1;
-                                return (
-                                    <Button
-                                        key={p}
-                                        variant={page === p ? "default" : "ghost"}
-                                        size="sm"
-                                        className={`h-8 w-8 text-xs font-bold transition-all ${page === p ? 'shadow-md' : ''}`}
-                                        onClick={() => setPage(p)}
-                                    >
-                                        {p}
-                                    </Button>
-                                );
-                            })}
-                            {totalPages > 3 && <span className="text-muted-foreground text-xs mx-1">...</span>}
-                        </div>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-9 w-9 border-slate-200/60 shadow-sm"
-                            onClick={() => setPage(page + 1)}
-                            disabled={page >= totalPages || isLoading}
-                        >
-                            <ChevronRightIcon className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-9 w-9 border-slate-200/60 shadow-sm"
-                            onClick={() => setPage(totalPages)}
-                            disabled={page >= totalPages || isLoading}
-                        >
-                            <ChevronsRightIcon className="h-4 w-4" />
-                        </Button>
-                    </div>
-                </div>
-            </Card>
+            <TablePagination
+                page={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                totalItems={totalRecords}
+                pageSize={perPage}
+                onPageSizeChange={(value) => {
+                    setPerPage(value);
+                    setPage(1);
+                }}
+            />
+        </Card>
 
             {isSuperAdmin ? (
                 <>
@@ -554,8 +490,8 @@ export default function LiquidacoesPagamentos() {
                 open={isImportDocsOpen} 
                 onOpenChange={setIsImportDocsOpen} 
                 onImport={handleImportDocs}
-                title="Importar Documentos Hábeis"
-                expectedFields={['Documento Hábil', 'DH - Valor Doc.Origem', 'DH - Processo', 'DH - Estado', 'DH - Credor']}
+                title="Importar Documentos HÃ¡beis"
+                expectedFields={['Documento HÃ¡bil', 'DH - Valor Doc.Origem', 'DH - Processo', 'DH - Estado', 'DH - Credor']}
                 acceptCsv
                 csvSeparator="\t"
             />
@@ -564,7 +500,7 @@ export default function LiquidacoesPagamentos() {
                 open={isImportFonteOpen} 
                 onOpenChange={setIsImportFonteOpen} 
                 onImport={handleImportFonte}
-                title="Importar Fonte SOF (Liquidações)"
+                title="Importar Fonte SOF (LiquidaÃ§Ãµes)"
                 expectedFields={['NE CCor', 'Documento Origem', 'Fonte SOF', 'Fonte']}
                 acceptCsv
                 csvSeparator="\t"
@@ -583,8 +519,8 @@ export default function LiquidacoesPagamentos() {
                 open={isImportOBOpen} 
                 onOpenChange={setIsImportOBOpen} 
                 onImport={handleImportOB}
-                title="Importar Ordens Bancárias"
-                expectedFields={['Documento', 'Documento Origem', 'DESPESAS PAGAS', 'RESTOS A PAGAR PAGOS', 'Dia Lançamento']}
+                title="Importar Ordens BancÃ¡rias"
+                expectedFields={['Documento', 'Documento Origem', 'DESPESAS PAGAS', 'RESTOS A PAGAR PAGOS', 'Dia LanÃ§amento']}
                 acceptCsv={true}
                 csvSeparator="\t"
             />
@@ -592,5 +528,7 @@ export default function LiquidacoesPagamentos() {
         </div>
     );
 }
+
+
 
 

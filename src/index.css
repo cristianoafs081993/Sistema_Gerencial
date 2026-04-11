@@ -4,7 +4,7 @@
    ============================================================ */
 
 /* 1. TYPOGRAPHY - Interface + Data Pairing */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Open+Sans:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -21,18 +21,18 @@
   :root {
     /* === NEUTROS (60%) === */
     /* Nunca usar branco puro — levemente azulado para conforto visual */
-    --background: 210 16% 98.4%;    /* #f8f9fb */
-    --foreground: 222 39% 11%;      /* #161d2f */
+    --background: 60 14% 98.6%;
+    --foreground: 39 8% 20.5%;
 
     --card: 0 0% 100%;              /* #ffffff — cards sobre o fundo */
-    --card-foreground: 222 39% 11%;
+    --card-foreground: 39 8% 20.5%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 39% 11%;
+    --popover-foreground: 39 8% 20.5%;
 
-    --border: 214 12% 89%;          /* #dfe3e8 */
-    --input: 214 13% 92.5%;
-    --ring: 220 80% 55%;
+    --border: 35 12% 87%;
+    --input: 35 10% 91%;
+    --ring: 132 54% 40%;
 
     --muted: 210 14% 95.8%;         /* superfície suave */
     --muted-foreground: 220 13% 46%; /* texto secundário */

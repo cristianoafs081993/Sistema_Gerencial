@@ -15,6 +15,7 @@ Campos-chave:
 - `id`
 - `dimensao`
 - `componente_funcional`
+- `tipo_atividade`
 - `atividade`
 - `descricao`
 - `valor_total`
@@ -27,6 +28,8 @@ Observacoes operacionais:
 
 - `componente_funcional` deve permanecer sem prefixo numerico inicial, por exemplo `Contratos` em vez de `11 - Contratos`
 - para a dimensao `EN`, `atividade` deve armazenar apenas o nome final da atividade, sem prefixos como `44 - COMPONENTE FUNCIONAL (PROEN):` e sem repetir o componente antes do nome
+- `tipo_atividade` define a aba da tela de planejamento entre `campus`, `sistemico` e `emendas-parlamentares`
+- no backfill atual, registros da dimensao `EN` foram classificados como `sistemico`; os demais ficaram em `campus`
 
 Consumido por:
 

@@ -17,7 +17,7 @@ function extractStaticRoutes(source) {
 
   while ((match = routePattern.exec(source)) !== null) {
     const routePath = match[1];
-    if (!routePath || routePath === "*" || routePath === "/" || routePath.includes(":")) {
+    if (!routePath || routePath === "*" || routePath === "/" || routePath.includes(":") || routePath.includes("*")) {
       continue;
     }
 

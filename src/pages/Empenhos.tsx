@@ -1,4 +1,4 @@
-import { Fragment, useState, useMemo, useRef } from 'react';
+﻿import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Pencil, Search, Filter, Calendar, Upload, FileSpreadsheet, Loader2, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, Layers, X } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Empenho, DIMENSOES, COMPONENTES_POR_DIMENSAO } from '@/types';
@@ -32,6 +32,7 @@ import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { EmpenhoDialog } from '@/components/modals/EmpenhoDialog';
 import { HeaderActions } from '@/components/HeaderParts';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
+import { TablePagination } from '@/components/design-system/TablePagination';
 import { toast } from 'sonner';
 import { formatCurrency, parseCurrency, formatarDocumento } from '@/lib/utils';
 import { parseSiafiCsv, syncSiafiDataToDb } from '@/lib/siafi-parser';
@@ -81,7 +82,7 @@ export default function Empenhos() {
   const creditosInputRef = useRef<HTMLInputElement>(null);
   const [selectedEmpenho, setSelectedEmpenho] = useState<Empenho | null>(null);
 
-  // Extrair opções únicas para filtros
+  // Extrair opÃ§Ãµes Ãºnicas para filtros
   const componentesUnicos = Array.from(new Set(empenhos.map(e => e.componenteFuncional?.trim()).filter(Boolean))).sort();
   const origensUnicas = Array.from(new Set(empenhos.map(e => e.origemRecurso?.trim()).filter(Boolean))).sort();
   const planosUnicos = Array.from(new Set(empenhos.map(e => e.planoInterno?.trim()).filter(Boolean))).sort();
@@ -176,11 +177,11 @@ export default function Empenhos() {
     });
 
     if (importCount > 0 && skipCount > 0) {
-      toast.success(`${importCount} novo(s) importado(s), ${skipCount} já existente(s) ignorado(s).`);
+      toast.success(`${importCount} novo(s) importado(s), ${skipCount} jÃ¡ existente(s) ignorado(s).`);
     } else if (importCount > 0) {
       toast.success(`${importCount} empenho(s) importado(s) com sucesso!`);
     } else {
-      toast.info(`Nenhum registro novo encontrado. ${skipCount} já existente(s) ignorado(s).`);
+      toast.info(`Nenhum registro novo encontrado. ${skipCount} jÃ¡ existente(s) ignorado(s).`);
     }
   };
 
@@ -200,7 +201,7 @@ export default function Empenhos() {
       const parsedData = await parseSiafiCsv(file);
 
       if (parsedData.length === 0) {
-        toast.error('Nenhum dado válido encontrado no arquivo CSV.', { id: toastId });
+        toast.error('Nenhum dado vÃ¡lido encontrado no arquivo CSV.', { id: toastId });
         return;
       }
 
@@ -246,7 +247,7 @@ export default function Empenhos() {
     if (!file) return;
 
     setIsUpdatingSaldos(true);
-    const toastId = toast.loading('Processando arquivo de Crédito Disponível...');
+    const toastId = toast.loading('Processando arquivo de CrÃ©dito DisponÃ­vel...');
 
     try {
       // FileReader para ler como UTF-16LE
@@ -260,7 +261,7 @@ export default function Empenhos() {
       });
 
       const lines = fileContent.split(/\r?\n/).filter(l => l.trim());
-      if (lines.length < 2) throw new Error('Arquivo vazio ou inválido');
+      if (lines.length < 2) throw new Error('Arquivo vazio ou invÃ¡lido');
 
       // Detect separator
       const headerLine = lines[0];
@@ -278,11 +279,11 @@ export default function Empenhos() {
 
       await transparenciaService.importCreditosDisponiveis(data);
       await refreshData();
-      toast.success('Créditos disponíveis atualizados com sucesso!', { id: toastId });
+      toast.success('CrÃ©ditos disponÃ­veis atualizados com sucesso!', { id: toastId });
     } catch (error: unknown) {
-      console.error('Erro ao importar créditos:', error);
+      console.error('Erro ao importar crÃ©ditos:', error);
       const message = error instanceof Error ? error.message : 'Erro desconhecido';
-      toast.error('Erro ao importar créditos: ' + message, { id: toastId });
+      toast.error('Erro ao importar crÃ©ditos: ' + message, { id: toastId });
     } finally {
       setIsUpdatingSaldos(false);
       if (creditosInputRef.current) creditosInputRef.current.value = '';
@@ -357,11 +358,11 @@ export default function Empenhos() {
                   disabled={isUpdatingSaldos}
                 >
                   <Upload className="h-space-4 w-space-4 text-action-primary" />
-                  Importar Crédito
+                  Importar CrÃ©dito
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Importar CSV de Crédito Disponível (UTF-16LE)</p>
+                <p>Importar CSV de CrÃ©dito DisponÃ­vel (UTF-16LE)</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -383,7 +384,7 @@ export default function Empenhos() {
                 </div>
               }
               value={formatCurrency(credito.valor)}
-              subtitle="Crédito Disponível"
+              subtitle="CrÃ©dito DisponÃ­vel"
               icon={Layers}
               stitchColor={idx === 0 ? "vibrant-blue" : idx === 1 ? "purple" : idx === 2 ? "emerald-green" : "amber"}
               isLoading={isLoading}
@@ -391,7 +392,7 @@ export default function Empenhos() {
           ))
         ) : (
           <StatCard
-            title="Crédito Disponível"
+            title="CrÃ©dito DisponÃ­vel"
             value="Importe os dados"
             icon={Layers}
             stitchColor="vibrant-blue"
@@ -401,7 +402,7 @@ export default function Empenhos() {
       </div>
       <FilterPanel className="shadow-sm">
         <CardContent className="p-0">
-          {/* Linha 1: Busca e Filtros Básicos */}
+          {/* Linha 1: Busca e Filtros BÃ¡sicos */}
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -415,10 +416,10 @@ export default function Empenhos() {
             <div className="w-full sm:w-[150px]">
               <Select value={filterDimensao} onValueChange={setFilterDimensao}>
                 <SelectTrigger className="input-system h-10">
-                  <SelectValue placeholder="Dimensão" />
+                  <SelectValue placeholder="DimensÃ£o" />
                 </SelectTrigger>
                 <SelectContent className="rounded-sm">
-                  <SelectItem value="all">Todas dimensões</SelectItem>
+                  <SelectItem value="all">Todas dimensÃµes</SelectItem>
                   {DIMENSOES.map((d) => (
                     <SelectItem key={d.codigo} value={d.codigo}>
                       {d.nome}
@@ -447,11 +448,11 @@ export default function Empenhos() {
               className="gap-2 h-10 font-bold"
             >
               <Filter className="w-4 h-4" />
-              Opções
+              OpÃ§Ãµes
             </Button>
           </div>
 
-          {/* Linha 2: Filtros Avançados (Colapsável) */}
+          {/* Linha 2: Filtros AvanÃ§ados (ColapsÃ¡vel) */}
           {showAdvancedFilters && (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 mt-4 bg-slate-50/50 rounded-lg border border-border-default/50">
               <div className="space-y-1">
@@ -499,7 +500,7 @@ export default function Empenhos() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Período (Início)</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">PerÃ­odo (InÃ­cio)</label>
                 <Input
                   type="date"
                   value={dataInicio}
@@ -509,7 +510,7 @@ export default function Empenhos() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Período (Fim)</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">PerÃ­odo (Fim)</label>
                 <div className="flex gap-2">
                   <Input
                     type="date"
@@ -543,10 +544,10 @@ export default function Empenhos() {
         </CardContent>
       </FilterPanel>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6 mt-6">
-        <TabsList className="bg-slate-100 p-1 rounded-lg h-auto">
-          <TabsTrigger value="execucao" className="px-6 py-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md text-sm font-semibold">Execução {new Date().getFullYear()}</TabsTrigger>
-          <TabsTrigger value="restos" className="px-6 py-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md text-sm font-semibold">Restos a Pagar</TabsTrigger>
-        </TabsList>
+          <TabsList className="bg-slate-100 p-1 rounded-lg h-auto">
+            <TabsTrigger value="execucao" className="px-6 py-2 text-sm font-semibold text-slate-600 data-[state=active]:bg-[#2f9e41] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md">ExecuÃ§Ã£o {new Date().getFullYear()}</TabsTrigger>
+            <TabsTrigger value="restos" className="px-6 py-2 text-sm font-semibold text-slate-600 data-[state=active]:bg-[#2f9e41] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md">Restos a Pagar</TabsTrigger>
+          </TabsList>
 
         <TabsContent value="execucao">
           <EmpenhosTable
@@ -607,7 +608,7 @@ function EmpenhoRow({
             </span>
           )}
           {empenho.historicoOperacoes && empenho.historicoOperacoes.length > 1 && (
-            <span className="text-[10px] text-action-primary flex items-center gap-0.5" title="Empenho com histórico de alterações">
+            <span className="text-[10px] text-action-primary flex items-center gap-0.5" title="Empenho com histÃ³rico de alteraÃ§Ãµes">
               <History className="h-3 w-3" />
               {empenho.historicoOperacoes.length} ops
             </span>
@@ -743,7 +744,7 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
 
     const groups = new Map<string, Empenho[]>();
     empenhos.forEach(e => {
-      const key = e.favorecidoNome || 'Não informado';
+      const key = e.favorecidoNome || 'NÃ£o informado';
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(e);
     });
@@ -804,7 +805,12 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
 
   const totalRecords = sortedData.length;
   const totalPages = Math.ceil(totalRecords / perPage);
-  const paginatedData = sortedData.slice((page - 1) * perPage, page * perPage);
+  const safePage = Math.min(page, Math.max(1, totalPages));
+  const paginatedData = sortedData.slice((safePage - 1) * perPage, safePage * perPage);
+
+  useEffect(() => {
+    setPage(1);
+  }, [empenhos.length, perPage, groupBy]);
 
   const SortHeader = ({ label, colKey, align = 'left' }: { label: string; colKey: string; align?: 'left' | 'right' | 'center' }) => (
     <TableHead
@@ -814,7 +820,7 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
       <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
         {label}
         {sortKey === colKey && (
-          <span className="text-action-primary text-xs transition-transform duration-200">{sortDir === 'asc' ? '▲' : '▼'}</span>
+          <span className="text-action-primary text-xs transition-transform duration-200">{sortDir === 'asc' ? 'â–²' : 'â–¼'}</span>
         )}
       </span>
     </TableHead>
@@ -841,16 +847,16 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
           <Table>
             <TableHeader className="bg-slate-50/50">
               <TableRow className="hover:bg-transparent border-b border-border-default/50">
-                {groupBy === 'none' && <SortHeader label="Número" colKey="numero" />}
+                {groupBy === 'none' && <SortHeader label="NÃºmero" colKey="numero" />}
                 <SortHeader label="Favorecido" colKey="favorecido" />
                 {type === 'execucao' ? (
                   <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">Origem / Plano</TableHead>
                 ) : (
-                  <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">Descrição</TableHead>
+                  <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">DescriÃ§Ã£o</TableHead>
                 )}
                 <SortHeader label={type === 'execucao' ? 'Empenhado / Liquidado' : 'Inscrito / Reinscrito / Liq Ano'} colKey="valor" align="right" />
                 <SortHeader label={type === 'execucao' ? 'Saldo' : 'Saldo Atual'} colKey="saldo" align="right" />
-                <TableHead className="h-11 px-6 text-center text-xs font-semibold uppercase tracking-wider">Ações</TableHead>
+                <TableHead className="h-11 px-6 text-center text-xs font-semibold uppercase tracking-wider">AÃ§Ãµes</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -944,73 +950,22 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
             </TableBody>
           </Table>
         </div>
-
-        {/* Footer Paginação */}
-        <div className="flex flex-col sm:flex-row items-center justify-between px-2 py-4 border-t border-border-default/50 mt-4 gap-4">
-          <div className="text-xs text-muted-foreground">
-            Mostrando <strong>{totalRecords === 0 ? 0 : ((page - 1) * perPage) + 1}</strong> a <strong>{Math.min(page * perPage, totalRecords)}</strong> de <strong>{totalRecords}</strong> registros
-          </div>
-          <div className="flex items-center space-x-2">
-            <Select value={String(perPage)} onValueChange={(val) => { setPerPage(Number(val)); setPage(1); }}>
-              <SelectTrigger className="h-8 w-[70px] input-system">
-                <SelectValue placeholder={String(perPage)} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="20">20</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-                <SelectItem value="100">100</SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 border-slate-200"
-                onClick={() => setPage(1)}
-                disabled={page <= 1 || isLoading}
-              >
-                <ChevronsLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 border-slate-200"
-                onClick={() => setPage(page - 1)}
-                disabled={page <= 1 || isLoading}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="flex items-center gap-1 px-2">
-                <span className="text-xs font-bold text-slate-600">
-                  {page} <span className="text-muted-foreground font-normal">/ {totalPages || 1}</span>
-                </span>
-              </div>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 border-slate-200"
-                onClick={() => setPage(page + 1)}
-                disabled={page >= totalPages || isLoading}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 border-slate-200"
-                onClick={() => setPage(totalPages)}
-                disabled={page >= totalPages || isLoading}
-              >
-                <ChevronsRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
+        <TablePagination
+          page={safePage}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          totalItems={totalRecords}
+          pageSize={perPage}
+          onPageSizeChange={(value) => {
+            setPerPage(value);
+            setPage(1);
+          }}
+        />
       </CardContent>
     </Card>
   );
 }
+
 
 
 

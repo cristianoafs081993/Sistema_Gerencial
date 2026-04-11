@@ -307,6 +307,7 @@ export default function ConsultorSessions() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          apikey: anonKey,
           Authorization: `Bearer ${anonKey}`,
         },
         body: JSON.stringify({
@@ -319,7 +320,8 @@ export default function ConsultorSessions() {
       });
 
       if (!response.ok) {
-        throw new Error('Falha de conexao com o Consultor.');
+        const errorText = await response.text();
+        throw new Error(`Consultor HTTP ${response.status}: ${errorText || 'sem detalhes'}`);
       }
 
       if (!response.body) {

@@ -6,7 +6,15 @@ Padronizar a composicao das telas mais comuns do sistema.
 
 ## Shell global
 
-- o header global nao exibe o titulo da pagina; a identificacao da pagina deve ficar no conteudo ou nos paineis.
+O shell principal em [Layout.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/Layout.tsx) segue a etapa atual do redesign inspirado na referencia externa:
+
+1. sidebar clara com agrupamento por secao
+2. item ativo em verde com fundo suave
+3. header e sidebar brancos, com divisorias suaves
+4. fundo da area principal branco, com apenas um vestigio de verde IFRN no topo
+5. tipografia do shell com titulos em `#34322d`, subtitulos em `#858481` e labels de secao em neutro escuro `#1a1a19`
+6. header global sem titulo da pagina; a identificacao da pagina deve ficar no conteudo ou nos paineis
+
 
 ## Padrao 1: tabela operacional
 
@@ -15,7 +23,7 @@ Estrutura recomendada:
 1. `HeaderActions`
 2. `FilterPanel`
 3. `DataTablePanel`
-4. paginacao/rodape
+4. `TablePagination`
 
 Exemplos:
 

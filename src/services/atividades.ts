@@ -3,8 +3,9 @@ import { supabase } from '@/lib/supabase';
 import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { Atividade } from '@/types';
 import { normalizeActivityName, normalizeFunctionalComponentName } from '@/utils/functionalComponentLabels';
+import { resolveTipoAtividade } from '@/utils/atividadeScopes';
 
-const ATIVIDADES_SELECT = 'id,dimensao,dimensao_id,componente_funcional,componente_funcional_id,processo,atividade,descricao,valor_total,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,created_at,updated_at';
+const ATIVIDADES_SELECT = 'id,dimensao,dimensao_id,componente_funcional,componente_funcional_id,processo,tipo_atividade,atividade,descricao,valor_total,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,created_at,updated_at';
 
 type AtividadeRow = {
     id: string;
@@ -13,6 +14,7 @@ type AtividadeRow = {
     componente_funcional: string;
     componente_funcional_id?: string | null;
     processo?: string | null;
+    tipo_atividade?: string | null;
     atividade: string;
     descricao: string;
     valor_total: number | string;
@@ -32,6 +34,7 @@ const mapAtividadeRow = (item: AtividadeRow): Atividade => ({
     componenteFuncional: normalizeFunctionalComponentName(item.componente_funcional),
     componenteFuncionalId: item.componente_funcional_id || undefined,
     processo: item.processo || '',
+    tipoAtividade: resolveTipoAtividade(item.tipo_atividade, item.dimensao),
     atividade: normalizeActivityName(item.atividade, item.dimensao),
     descricao: item.descricao,
     valorTotal: Number(item.valor_total),
@@ -79,6 +82,7 @@ export const atividadesService = {
             dimensao_id: atividade.dimensaoId || null,
             componente_funcional: componenteFuncional,
             componente_funcional_id: atividade.componenteFuncionalId || null,
+            tipo_atividade: resolveTipoAtividade(atividade.tipoAtividade, dimensao),
             atividade: nomeAtividade,
             descricao: atividade.descricao,
             valor_total: atividade.valorTotal,
@@ -112,6 +116,12 @@ export const atividadesService = {
             updates.componente_funcional = normalizeFunctionalComponentName(atividade.componenteFuncional);
         }
         if (atividade.componenteFuncionalId !== undefined) updates.componente_funcional_id = atividade.componenteFuncionalId || null;
+        if (atividade.tipoAtividade !== undefined) {
+            updates.tipo_atividade = resolveTipoAtividade(
+                atividade.tipoAtividade,
+                atividade.dimensao ?? updates.dimensao?.toString() ?? undefined,
+            );
+        }
         if (atividade.atividade) {
             updates.atividade = normalizeActivityName(
                 atividade.atividade,

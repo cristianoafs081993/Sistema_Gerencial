@@ -18,7 +18,7 @@
 Definidas em [App.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/App.tsx).
 
 - `/`: Dashboard
-- `/atividades`: planejamento orcamentario
+- `/planejamento/:scope`: planejamento orcamentario com visoes `campus`, `sistemico` e `emendas-parlamentares`
 - `/descentralizacoes`: movimentacao descentralizada
 - `/empenhos`: empenhos de exercicio e RAP
 - `/contratos`: contratos locais

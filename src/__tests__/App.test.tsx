@@ -120,6 +120,22 @@ describe('App routes', () => {
     expect(await screen.findByText('empenhos-page')).toBeInTheDocument();
   });
 
+  it('renderiza a rota de planejamento', async () => {
+    window.history.pushState({}, '', '/planejamento/campus');
+
+    render(<App />);
+
+    expect(await screen.findByText('atividades-page')).toBeInTheDocument();
+  });
+
+  it('redireciona a rota legada de atividades para planejamento', async () => {
+    window.history.pushState({}, '', '/atividades');
+
+    render(<App />);
+
+    expect(await screen.findByText('atividades-page')).toBeInTheDocument();
+  });
+
   it('renderiza a rota de autenticacao', async () => {
     window.history.pushState({}, '', '/auth');
 

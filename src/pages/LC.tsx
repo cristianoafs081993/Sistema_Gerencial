@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Upload, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -16,6 +16,7 @@ import {
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
 import { SectionPanel } from '@/components/design-system/SectionPanel';
 import { TableSkeletonRows } from '@/components/design-system/TableSkeletonRows';
+import { TablePagination } from '@/components/design-system/TablePagination';
 import { HeaderActions } from '@/components/HeaderParts';
 import { ConfirmDialog } from '@/components/modals/ConfirmDialog';
 import { LCRegistro, loadLatestLCRowsFromDb, parseLCCsv, saveLCRows } from '@/services/lcImportService';
@@ -52,11 +53,12 @@ export default function LCPage() {
   const [macroContext, setMacroContext] = useState<'sem_pendencias' | 'com_pendencias'>('sem_pendencias');
   const [pageLC, setPageLC] = useState(1);
   const [pagePendencias, setPagePendencias] = useState(1);
+  const [pageSizeLC, setPageSizeLC] = useState(100);
+  const [pageSizePendencias, setPageSizePendencias] = useState(100);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
   const queryLCDeferred = useDeferredValue(queryLC);
   const queryPendenciasDeferred = useDeferredValue(queryPendencias);
-  const pageSize = 100;
 
   const onlyDigits = (value: string) => (value || '').replace(/\D/g, '');
   const normalizeSearchValue = (value: string) =>
@@ -164,24 +166,26 @@ export default function LCPage() {
 
   useEffect(() => {
     setPageLC(1);
-  }, [queryLCDeferred, rowsForDisplay.length]);
+  }, [queryLCDeferred, rowsForDisplay.length, pageSizeLC]);
 
   useEffect(() => {
     setPagePendencias(1);
-  }, [queryPendenciasDeferred, pendencias.length]);
+  }, [queryPendenciasDeferred, pendencias.length, pageSizePendencias]);
 
-  const totalPagesLC = Math.max(1, Math.ceil(filteredRows.length / pageSize));
-  const totalPagesPendencias = Math.max(1, Math.ceil(pendenciasFiltradas.length / pageSize));
+  const totalPagesLC = Math.max(1, Math.ceil(filteredRows.length / pageSizeLC));
+  const totalPagesPendencias = Math.max(1, Math.ceil(pendenciasFiltradas.length / pageSizePendencias));
+  const safePageLC = Math.min(pageLC, totalPagesLC);
+  const safePagePendencias = Math.min(pagePendencias, totalPagesPendencias);
 
   const rowsPage = useMemo(() => {
-    const start = (pageLC - 1) * pageSize;
-    return filteredRows.slice(start, start + pageSize);
-  }, [filteredRows, pageLC]);
+    const start = (safePageLC - 1) * pageSizeLC;
+    return filteredRows.slice(start, start + pageSizeLC);
+  }, [filteredRows, safePageLC, pageSizeLC]);
 
   const pendenciasPage = useMemo(() => {
-    const start = (pagePendencias - 1) * pageSize;
-    return pendenciasFiltradas.slice(start, start + pageSize);
-  }, [pendenciasFiltradas, pagePendencias]);
+    const start = (safePagePendencias - 1) * pageSizePendencias;
+    return pendenciasFiltradas.slice(start, start + pageSizePendencias);
+  }, [pendenciasFiltradas, safePagePendencias, pageSizePendencias]);
   const shouldShowPendenciasSection = isComparingPdf || pendencias.length > 0;
 
   const buildMacroFileName = (sourcePdfNames: string[]) => {
@@ -376,32 +380,17 @@ export default function LCPage() {
               </TableBody>
             </Table>
           </div>
-          <div className="flex items-center justify-between px-4 py-3 border-t border-border-default/50">
-            <span className="text-xs text-muted-foreground">
-              {pendenciasFiltradas.length} resultado(s)
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setPagePendencias((p) => Math.max(1, p - 1))}
-                disabled={pagePendencias <= 1}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                Pag. {pagePendencias} de {totalPagesPendencias}
-              </span>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setPagePendencias((p) => Math.min(totalPagesPendencias, p + 1))}
-                disabled={pagePendencias >= totalPagesPendencias}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+                    <TablePagination
+            page={safePagePendencias}
+            totalPages={totalPagesPendencias}
+            onPageChange={setPagePendencias}
+            totalItems={pendenciasFiltradas.length}
+            pageSize={pageSizePendencias}
+            onPageSizeChange={(value) => {
+              setPageSizePendencias(value);
+              setPagePendencias(1);
+            }}
+          />
         </SectionPanel>
       ) : null}
 
@@ -449,32 +438,17 @@ export default function LCPage() {
             )}
           </TableBody>
         </Table>
-        <div className="flex items-center justify-between px-4 py-3 border-t border-border-default/50">
-          <span className="text-xs text-muted-foreground">
-            {filteredRows.length} resultado(s)
-          </span>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setPageLC((p) => Math.max(1, p - 1))}
-              disabled={pageLC <= 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-xs text-muted-foreground">
-              Pag. {pageLC} de {totalPagesLC}
-            </span>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setPageLC((p) => Math.min(totalPagesLC, p + 1))}
-              disabled={pageLC >= totalPagesLC}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+                <TablePagination
+          page={safePageLC}
+          totalPages={totalPagesLC}
+          onPageChange={setPageLC}
+          totalItems={filteredRows.length}
+          pageSize={pageSizeLC}
+          onPageSizeChange={(value) => {
+            setPageSizeLC(value);
+            setPageLC(1);
+          }}
+        />
       </DataTablePanel>
 
       <ConfirmDialog
@@ -494,3 +468,4 @@ export default function LCPage() {
     </div>
   );
 }
+

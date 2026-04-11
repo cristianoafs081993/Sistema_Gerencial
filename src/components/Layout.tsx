@@ -7,7 +7,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
-  FileSearch,
   FileStack,
   FileText,
   LayoutDashboard,
@@ -46,23 +45,23 @@ type NavigationSection = {
 
 const navigationSections: NavigationSection[] = [
   {
-    title: 'Orcamentario',
+    title: 'Orçamentário',
     items: [
       { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-      { name: 'Atividades', href: '/atividades', icon: FileText },
-      { name: 'Descentralizacoes', href: '/descentralizacoes', icon: ArrowDownRight },
+      { name: 'Planejamento', href: '/planejamento', icon: FileText },
+      { name: 'Descentralizações', href: '/descentralizacoes', icon: ArrowDownRight },
       { name: 'Empenhos', href: '/empenhos', icon: Receipt },
     ],
   },
   {
     title: 'Financeiro',
     items: [
-      { name: 'Liquidacoes', href: '/liquidacoes-pagamentos', icon: Banknote },
+      { name: 'Liquidações', href: '/liquidacoes-pagamentos', icon: Banknote },
       { name: 'Financeiro', href: '/financeiro', icon: ClipboardList },
       { name: 'Lista de Credores', href: '/lc', icon: ClipboardList },
-      { name: 'Retencoes EFD-Reinf', href: '/retencoes-efd-reinf', icon: ShieldAlert },
+      { name: 'Retenções EFD-Reinf', href: '/retencoes-efd-reinf', icon: ShieldAlert },
       { name: 'Rastreabilidade de PFs', href: '/rastreabilidade-pfs', icon: ClipboardList },
-      { name: 'Conciliacao de PFs', href: '/conciliacao-pfs', icon: ScanSearch },
+      { name: 'Conciliação de PFs', href: '/conciliacao-pfs', icon: ScanSearch },
     ],
   },
   {
@@ -74,7 +73,7 @@ const navigationSections: NavigationSection[] = [
     items: [
       { name: 'Gerador de Documentos', href: '/gerador-documentos', icon: Wand2 },
       { name: 'Editor de Documentos', href: '/editor-documentos', icon: Bot },
-      { name: 'Consultor Juridico', href: '/consultor', icon: MessageSquare },
+      { name: 'Consultor Jurídico', href: '/consultor', icon: MessageSquare },
     ],
   },
 ];
@@ -102,6 +101,7 @@ export function Layout({ children }: LayoutProps) {
   });
 
   const isConsultor = location.pathname === '/consultor';
+  const isPlanningRoute = location.pathname.startsWith('/planejamento');
 
   useEffect(() => {
     localStorage.setItem('sidebar-collapsed', String(isCollapsed));
@@ -135,7 +135,7 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <TooltipProvider delayDuration={80}>
-      <div className="min-h-screen bg-surface-page flex">
+      <div className="flex min-h-screen bg-surface-page">
         {sidebarOpen && (
           <button
             aria-label="Fechar menu"
@@ -146,14 +146,14 @@ export function Layout({ children }: LayoutProps) {
 
         <aside
           className={cn(
-            'fixed inset-y-0 left-0 z-50 flex flex-col overflow-hidden border-r border-slate-200 bg-white text-slate-600 shadow-lifted transition-all duration-300 ease-spring lg:relative lg:translate-x-0 group',
+            'group fixed inset-y-0 left-0 z-50 flex flex-col overflow-hidden border-r border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-background))] text-[hsl(var(--sidebar-foreground))] transition-all duration-300 ease-spring lg:relative lg:translate-x-0',
             sidebarOpen ? 'translate-x-0' : '-translate-x-full',
-            isCollapsed ? 'w-56 lg:w-[84px]' : 'w-[248px]',
+            isCollapsed ? 'w-56 lg:w-[88px]' : 'w-[280px]',
           )}
         >
           <button
             onClick={() => setIsCollapsed((prev) => !prev)}
-            className="absolute -right-3 top-20 z-20 hidden h-6 w-6 items-center justify-center rounded-full border border-border-default bg-surface-card text-text-muted shadow-soft transition-all hover:bg-surface-subtle hover:text-text-primary lg:flex lg:opacity-0 lg:group-hover:opacity-100"
+            className="absolute -right-3 top-20 z-20 hidden h-7 w-7 items-center justify-center rounded-full border border-border-default bg-white text-text-muted shadow-sm transition-all hover:bg-[hsl(var(--sidebar-accent))] hover:text-primary lg:flex lg:opacity-0 lg:group-hover:opacity-100"
             title={isCollapsed ? 'Expandir menu' : 'Recolher menu'}
             type="button"
           >
@@ -162,27 +162,26 @@ export function Layout({ children }: LayoutProps) {
 
           <div
             className={cn(
-              'flex h-16 items-center border-b border-slate-200 px-4 bg-white',
+              'flex h-16 items-center border-b border-[hsl(var(--sidebar-border))] px-5',
               isCollapsed ? 'justify-center' : 'justify-between',
             )}
           >
             {!isCollapsed && (
               <div className="min-w-0">
-                <p className="font-ui text-sm font-semibold tracking-tight text-text-primary truncate">Sistema Gerencial</p>
-                <p className="label-eyebrow mt-0.5">Controle Orcamentario</p>
+                <p className="font-ui truncate text-[1.08rem] font-bold tracking-[-0.02em] text-[#34322d]">Sistema Gerencial</p>
               </div>
             )}
             <Button
               variant="ghost"
               size="icon-sm"
-              className="lg:hidden text-slate-500 hover:bg-slate-100"
+              className="lg:hidden text-slate-500 hover:bg-[hsl(var(--sidebar-accent))]"
               onClick={() => setSidebarOpen(false)}
             >
               <X className="h-4 w-4" />
             </Button>
           </div>
 
-          <nav className="min-h-0 flex-1 overflow-y-auto px-2.5 py-3 scrollbar-thin bg-white">
+          <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4 scrollbar-thin">
             {navigationSections.map((section, sectionIndex) => {
               const open = isCollapsed ? true : (expandedSections[section.title] ?? true);
 
@@ -200,10 +199,10 @@ export function Layout({ children }: LayoutProps) {
                           [section.title]: !open,
                         }))
                       }
-                      className="w-full rounded-lg px-2 py-2 flex items-center justify-between text-left hover:bg-slate-50 transition-colors"
+                      className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-white"
                     >
-                      <span className="label-eyebrow text-slate-400/95">{section.title}</span>
-                      <ChevronRight className={cn('h-3.5 w-3.5 text-slate-400 transition-transform', open && 'rotate-90')} />
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1a1a19]">{section.title}</span>
+                      <ChevronRight className={cn('h-3.5 w-3.5 text-[#858481] transition-transform', open && 'rotate-90')} />
                     </button>
                   )}
 
@@ -214,27 +213,25 @@ export function Layout({ children }: LayoutProps) {
                         to={item.href}
                         onClick={() => setSidebarOpen(false)}
                         className={cn(
-                          'relative flex items-center rounded-xl transition-all duration-150',
-                          isCollapsed ? 'h-11 w-11 justify-center mx-auto' : 'px-3 py-[9px]',
+                          'relative flex items-center rounded-xl border transition-all duration-150',
+                          isCollapsed ? 'mx-auto h-11 w-11 justify-center px-0' : 'gap-3 px-3 py-[11px]',
                           active
-                            ? 'bg-[#2f67d8] text-white shadow-[0_8px_16px_rgba(47,103,216,0.28)]'
-                            : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700',
+                            ? 'border-[hsl(var(--primary)/0.16)] bg-[hsl(var(--primary)/0.1)] text-primary shadow-sm'
+                            : 'border-transparent text-[#34322d] hover:border-[hsl(var(--sidebar-border))] hover:bg-[hsl(var(--sidebar-accent))] hover:text-[#1a1a19]',
                         )}
                       >
-                        {isCollapsed ? (
-                          <item.icon
-                            className={cn(
-                              'h-[18px] w-[18px] shrink-0 transition-colors',
-                              active ? 'text-white' : 'text-slate-400',
-                            )}
-                          />
-                        ) : null}
+                        <item.icon
+                          className={cn(
+                            'h-[18px] w-[18px] shrink-0 transition-colors',
+                            active ? 'text-primary' : 'text-[#858481]',
+                          )}
+                        />
 
                         {!isCollapsed && (
-                          <span className={cn('font-ui text-[13px] truncate flex-1', active ? 'font-semibold' : 'font-medium')}>{item.name}</span>
+                          <span className={cn('font-ui flex-1 truncate text-[13px]', active ? 'font-semibold' : 'font-medium')}>{item.name}</span>
                         )}
 
-                        {!isCollapsed && active ? <ChevronRight className="h-3.5 w-3.5 text-white/80" /> : null}
+                        {!isCollapsed && active ? <div className="h-2 w-2 rounded-full bg-primary" /> : null}
                       </Link>
                     );
 
@@ -248,7 +245,7 @@ export function Layout({ children }: LayoutProps) {
                         <TooltipContent
                           side="right"
                           sideOffset={10}
-                          className="border border-border-default bg-surface-card text-text-primary shadow-card"
+                          className="border border-border-default bg-white text-text-primary shadow-card"
                         >
                           <span className="font-ui text-xs font-semibold">{item.name}</span>
                         </TooltipContent>
@@ -262,11 +259,11 @@ export function Layout({ children }: LayoutProps) {
         </aside>
 
         <div className="flex-1 flex min-w-0 flex-col">
-          <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-white/10 glass px-4 lg:px-8">
+          <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-[hsl(var(--sidebar-border))] bg-white px-4 lg:px-8">
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden text-text-secondary h-space-9 w-space-9"
+              className="h-space-9 w-space-9 text-text-secondary hover:bg-[hsl(var(--sidebar-accent))] lg:hidden"
               onClick={() => setSidebarOpen(true)}
             >
               <Menu className="h-space-5 w-space-5" />
@@ -275,7 +272,7 @@ export function Layout({ children }: LayoutProps) {
             <div className="min-w-0 flex-1">
               <div
                 id="header-subtitle"
-                className="font-ui text-[12px] text-text-muted font-medium leading-tight mt-0.5 truncate empty:hidden"
+                className="mt-0.5 truncate text-[0.82rem] font-normal leading-tight text-[#858481] empty:hidden"
               />
             </div>
 
@@ -283,11 +280,11 @@ export function Layout({ children }: LayoutProps) {
               <div id="header-actions" className="flex items-center gap-space-2 shrink-0" />
 
               {isAuthLoading ? (
-                <div className="hidden h-9 w-28 rounded-lg bg-white/70 shadow-sm sm:block" />
+                <div className="hidden h-9 w-28 rounded-xl border border-border-default bg-white sm:block" />
               ) : session ? (
                 <>
-                  {canInviteUsers ? <InviteUserDialog /> : null}
-                  <div className="hidden max-w-[240px] items-center gap-2 rounded-full border border-slate-200 bg-white/85 px-3 py-1.5 text-xs text-slate-600 shadow-sm md:flex">
+                  {canInviteUsers && !isPlanningRoute ? <InviteUserDialog /> : null}
+                  <div className="hidden max-w-[240px] items-center gap-2 rounded-full border border-border-default bg-[hsl(var(--secondary))] px-3 py-1.5 text-xs text-slate-600 md:flex">
                     <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary">
                       <User className="h-3.5 w-3.5" />
                     </span>
@@ -299,7 +296,7 @@ export function Layout({ children }: LayoutProps) {
                     size="sm"
                     disabled={isSigningOut}
                     onClick={() => void handleSignOut()}
-                    className="h-9 border-slate-200 bg-white/85 text-slate-700"
+                    className="h-9 border-border-default bg-white text-slate-700 hover:bg-[hsl(var(--secondary))]"
                   >
                     <LogOut className="h-4 w-4" />
                     {isSigningOut ? 'Saindo...' : 'Sair'}

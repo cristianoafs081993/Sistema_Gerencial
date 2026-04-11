@@ -501,7 +501,7 @@ export default function Suap() {
                     <TabsTrigger
                       key={value}
                       value={value}
-                      className="flex h-9 items-center gap-2 rounded-md px-3 font-ui text-xs font-semibold text-text-secondary transition-all data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-sm"
+                      className="flex h-9 items-center gap-2 rounded-md px-3 font-ui text-xs font-semibold text-text-secondary transition-all data-[state=active]:bg-[#2f9e41] data-[state=active]:text-white data-[state=active]:shadow-sm"
                     >
                       <span>{label}</span>
                       <span className="rounded-full bg-black/5 px-2 py-0.5 text-[11px] font-bold text-current/80">

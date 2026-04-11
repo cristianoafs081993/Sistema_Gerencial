@@ -1,5 +1,7 @@
 import { normalizeFunctionalComponentName } from '@/utils/functionalComponentLabels';
 
+export type TipoAtividade = 'campus' | 'sistemico' | 'emendas-parlamentares';
+
 export interface Atividade {
   id: string;
   dimensao: string;
@@ -7,6 +9,7 @@ export interface Atividade {
   componenteFuncional: string;
   componenteFuncionalId?: string;
   processo?: string;
+  tipoAtividade: TipoAtividade;
   atividade: string;
   descricao: string;
   valorTotal: number;

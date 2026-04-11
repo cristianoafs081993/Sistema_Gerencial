@@ -56,6 +56,12 @@ Paginas que dependem fortemente disso:
 - [Empenhos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Empenhos.tsx)
 - [Descentralizacoes.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Descentralizacoes.tsx)
 
+Observacao:
+
+- a pagina [Atividades.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Atividades.tsx) agora atende a rota `/planejamento/:scope`
+- as visoes `campus`, `sistemico` e `emendas-parlamentares` filtram a tabela `atividades` pelo campo `tipo_atividade`
+- cadastro manual e importacao JSON na pagina de planejamento persistem o `tipo_atividade` correspondente a aba atual
+
 ### Padrao B: pagina + service proprio
 
 Usado quando a pagina tem pipeline proprio de importacao ou consulta:

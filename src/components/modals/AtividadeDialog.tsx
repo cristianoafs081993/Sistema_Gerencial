@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Atividade, DIMENSOES } from '@/types';
+import { Atividade, DIMENSOES, TipoAtividade } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,10 +26,17 @@ interface AtividadeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   atividade: Atividade | null;
+  defaultTipoAtividade: TipoAtividade;
   onSuccess: () => void;
 }
 
-export function AtividadeDialog({ open, onOpenChange, atividade, onSuccess }: AtividadeDialogProps) {
+export function AtividadeDialog({
+  open,
+  onOpenChange,
+  atividade,
+  defaultTipoAtividade,
+  onSuccess,
+}: AtividadeDialogProps) {
   const [formData, setFormData] = useState<Partial<Atividade>>({});
   const [loading, setLoading] = useState(false);
   const basePayload = (): Omit<Atividade, 'id' | 'createdAt' | 'updatedAt'> => ({
@@ -38,6 +45,7 @@ export function AtividadeDialog({ open, onOpenChange, atividade, onSuccess }: At
     componenteFuncional: formData.componenteFuncional || '',
     componenteFuncionalId: formData.componenteFuncionalId,
     processo: formData.processo || '',
+    tipoAtividade: formData.tipoAtividade || defaultTipoAtividade,
     atividade: formData.atividade || '',
     descricao: formData.descricao || '',
     valorTotal: formData.valorTotal || 0,
@@ -53,6 +61,7 @@ export function AtividadeDialog({ open, onOpenChange, atividade, onSuccess }: At
       setFormData(atividade || {
         dimensao: '',
         componenteFuncional: '',
+        tipoAtividade: defaultTipoAtividade,
         atividade: '',
         descricao: '',
         valorTotal: 0,
@@ -61,7 +70,7 @@ export function AtividadeDialog({ open, onOpenChange, atividade, onSuccess }: At
         planoInterno: ''
       });
     }
-  }, [open, atividade]);
+  }, [open, atividade, defaultTipoAtividade]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
