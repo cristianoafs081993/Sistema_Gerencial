@@ -15,6 +15,12 @@ O shell principal em [Layout.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%2
 5. tipografia do shell com titulos em `#34322d`, subtitulos em `#858481` e labels de secao em neutro escuro `#1a1a19`
 6. header global sem titulo da pagina; a identificacao da pagina deve ficar no conteudo ou nos paineis
 
+## Textos e encoding
+
+- textos de interface, exemplos e documentacao do design system devem ser mantidos em UTF-8 legivel, com acentos reais em portugues
+- nao commitar mojibake em labels, titulos, mensagens, comentarios ou documentacao; exemplos tipicos sao acentos renderizados como sequencias iniciadas por `A`/`C` com til visual ou simbolos renderizados como tres caracteres no lugar de travessao, seta ou triangulo
+- quando uma importacao precisar aceitar cabecalhos externos com encoding quebrado, normalize isso na borda do parser e nao copie o texto quebrado para componentes visuais
+- depois de alterar copy de UI ou documentacao do design system, rode `npm test -- src/__tests__/encoding.test.ts` para barrar regressao de encoding
 
 ## Padrao 1: tabela operacional
 

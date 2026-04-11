@@ -71,7 +71,7 @@ export default function LiquidacoesPagamentos() {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
 
-    // PaginaÃ§Ã£o e OrdenaÃ§Ã£o
+    // Paginação e Ordenação
     const [page, setPage] = useState(1);
     const [perPage, setPerPage] = useState(10);
     const [sortColumn, setSortColumn] = useState('data_emissao');
@@ -141,25 +141,25 @@ export default function LiquidacoesPagamentos() {
         const toastId = toast.loading('Importando documentos...');
         try {
             await transparenciaService.importDocumentosHabeis(data);
-            toast.success('ImportaÃ§Ã£o concluÃ­da!', { id: toastId });
+            toast.success('Importação concluída!', { id: toastId });
             handleRefresh();
         } catch (error) {
             console.error(error);
-            toast.error('Erro na importaÃ§Ã£o', { id: toastId });
+            toast.error('Erro na importação', { id: toastId });
         }
     };
 
     const handleImportOB = async (data: CsvRow[]) => {
-        const toastId = toast.loading('Processando Ordens BancÃ¡rias...');
+        const toastId = toast.loading('Processando Ordens Bancárias...');
         try {
             await transparenciaService.importOrdensBancarias(data);
-            toast.success(`${data.length} ordens bancÃ¡rias importadas com sucesso!`, { id: toastId });
+            toast.success(`${data.length} ordens bancárias importadas com sucesso!`, { id: toastId });
             setIsImportOBOpen(false);
             handleRefresh();
         } catch (error: unknown) {
             console.error('Erro import OB:', error);
             const message = error instanceof Error ? error.message : 'Erro desconhecido';
-            toast.error(`Falha na importaÃ§Ã£o: ${message}`, { id: toastId });
+            toast.error(`Falha na importação: ${message}`, { id: toastId });
         }
     };
 
@@ -172,15 +172,15 @@ export default function LiquidacoesPagamentos() {
             setIsImportFonteOpen(false);
         } catch (error) {
             console.error(error);
-            toast.error('Erro na atualizaÃ§Ã£o', { id: toastId });
+            toast.error('Erro na atualização', { id: toastId });
         }
     };
 
     const handleRetencoesImport = async (data: CsvRow[]) => {
-        const toastId = toast.loading('Processando importaÃ§Ã£o de situaÃ§Ãµes...');
+        const toastId = toast.loading('Processando importação de situações...');
         
         try {
-            // Mapeamos para o novo formato de SituaÃ§Ãµes
+            // Mapeamos para o novo formato de Situações
             const mappedData: Partial<DocumentoSituacao>[] = data.map(row => {
                 const situacaoCodigo = row['dhsituacao'] || '';
                 return {
@@ -196,20 +196,20 @@ export default function LiquidacoesPagamentos() {
 
             await retencoesService.upsertSituacoesBatch(mappedData as DocumentoSituacao[]);
             
-            toast.success(`${mappedData.length} situaÃ§Ãµes processadas com sucesso!`, { id: toastId });
+            toast.success(`${mappedData.length} situações processadas com sucesso!`, { id: toastId });
             setIsImportDialogOpen(false);
             
-            // Invalida transparÃªncia para atualizar os documentos
+            // Invalida transparência para atualizar os documentos
             queryClient.invalidateQueries({ queryKey: ['transparencia'] });
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : 'Erro desconhecido';
-            console.error('Erro ao importar situaÃ§Ãµes:', error);
-            toast.error(`Erro na importaÃ§Ã£o: ${message}`, { id: toastId });
+            console.error('Erro ao importar situações:', error);
+            toast.error(`Erro na importação: ${message}`, { id: toastId });
         }
     };
 
     const retencoesFields = [
-        'Documento HÃ¡bil', 'DH - SituaÃ§Ã£o', 'DH - Valor Doc.Origem'
+        'Documento Hábil', 'DH - Situação', 'DH - Valor Doc.Origem'
     ];
 
     return (
@@ -236,16 +236,16 @@ export default function LiquidacoesPagamentos() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">
                             <DropdownMenuItem onClick={() => setIsImportDocsOpen(true)} className="text-xs font-semibold py-2">
-                                Documentos HÃ¡beis (.csv)
+                                Documentos Hábeis (.csv)
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setIsImportFonteOpen(true)} className="text-xs font-semibold py-2">
-                                Fonte SOF / LiquidaÃ§Ãµes (.csv)
+                                Fonte SOF / Liquidações (.csv)
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setIsImportOBOpen(true)} className="text-xs font-semibold py-2">
-                                Ordens BancÃ¡rias / Pagos (.csv)
+                                Ordens Bancárias / Pagos (.csv)
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setIsImportDialogOpen(true)} className="text-xs font-semibold py-2 border-t mt-1">
-                                SituaÃ§Ãµes / RetenÃ§Ãµes (.csv)
+                                Situações / Retenções (.csv)
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -299,7 +299,7 @@ export default function LiquidacoesPagamentos() {
                 open={isImportDialogOpen}
                 onOpenChange={setIsImportDialogOpen}
                 onImport={handleRetencoesImport}
-                title="Importar SituaÃ§Ãµes (Despesas/RetenÃ§Ãµes)"
+                title="Importar Situações (Despesas/Retenções)"
                 expectedFields={retencoesFields}
                 acceptCsv={true}
                 csvSeparator="\t"
@@ -349,7 +349,7 @@ export default function LiquidacoesPagamentos() {
             <Card className="card-system shadow-sm border-none shadow-none mt-6">
                 <CardHeader className="px-6 py-4 border-b border-border-default/50 flex flex-row items-center justify-between bg-white">
                     <div className="flex items-center gap-3">
-                        <CardTitle className="table-title">Documentos HÃ¡beis</CardTitle>
+                        <CardTitle className="table-title">Documentos Hábeis</CardTitle>
                         <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-bold px-2 py-0 h-5">
                             {totalRecords}
                         </Badge>
@@ -362,7 +362,7 @@ export default function LiquidacoesPagamentos() {
                                 <TableRow className="hover:bg-transparent border-b border-border-default/50">
                                     <TableHead className="w-[92px] font-semibold text-xs uppercase tracking-wider py-4 px-3 text-muted-foreground whitespace-nowrap">
                                         <Button variant="ghost" className="h-auto p-0 hover:bg-transparent font-semibold text-xs uppercase tracking-wider" onClick={() => handleSort('data_emissao')}>
-                                            EmissÃ£o {getSortIcon('data_emissao')}
+                                            Emissão {getSortIcon('data_emissao')}
                                         </Button>
                                     </TableHead>
                                     <TableHead className="w-[160px] font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-3">
@@ -377,7 +377,7 @@ export default function LiquidacoesPagamentos() {
                                     </TableHead>
                                     <TableHead className="w-[132px] font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-3 text-center">
                                         <Button variant="ghost" className="h-auto p-0 hover:bg-transparent font-semibold text-xs uppercase tracking-wider mx-auto" onClick={() => handleSort('estado')}>
-                                            SituaÃ§Ã£o {getSortIcon('estado')}
+                                            Situação {getSortIcon('estado')}
                                         </Button>
                                     </TableHead>
                                     <TableHead className="w-[112px] font-semibold text-xs uppercase tracking-wider py-4 text-muted-foreground whitespace-nowrap border-l border-slate-100/50 px-3 text-right">
@@ -403,7 +403,7 @@ export default function LiquidacoesPagamentos() {
                                 ) : documentos.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">
-                                            Nenhum registro encontrado com os parÃ¢metros selecionados.
+                                            Nenhum registro encontrado com os parâmetros selecionados.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
@@ -490,8 +490,8 @@ export default function LiquidacoesPagamentos() {
                 open={isImportDocsOpen} 
                 onOpenChange={setIsImportDocsOpen} 
                 onImport={handleImportDocs}
-                title="Importar Documentos HÃ¡beis"
-                expectedFields={['Documento HÃ¡bil', 'DH - Valor Doc.Origem', 'DH - Processo', 'DH - Estado', 'DH - Credor']}
+                title="Importar Documentos Hábeis"
+                expectedFields={['Documento Hábil', 'DH - Valor Doc.Origem', 'DH - Processo', 'DH - Estado', 'DH - Credor']}
                 acceptCsv
                 csvSeparator="\t"
             />
@@ -500,7 +500,7 @@ export default function LiquidacoesPagamentos() {
                 open={isImportFonteOpen} 
                 onOpenChange={setIsImportFonteOpen} 
                 onImport={handleImportFonte}
-                title="Importar Fonte SOF (LiquidaÃ§Ãµes)"
+                title="Importar Fonte SOF (Liquidações)"
                 expectedFields={['NE CCor', 'Documento Origem', 'Fonte SOF', 'Fonte']}
                 acceptCsv
                 csvSeparator="\t"
@@ -519,8 +519,8 @@ export default function LiquidacoesPagamentos() {
                 open={isImportOBOpen} 
                 onOpenChange={setIsImportOBOpen} 
                 onImport={handleImportOB}
-                title="Importar Ordens BancÃ¡rias"
-                expectedFields={['Documento', 'Documento Origem', 'DESPESAS PAGAS', 'RESTOS A PAGAR PAGOS', 'Dia LanÃ§amento']}
+                title="Importar Ordens Bancárias"
+                expectedFields={['Documento', 'Documento Origem', 'DESPESAS PAGAS', 'RESTOS A PAGAR PAGOS', 'Dia Lançamento']}
                 acceptCsv={true}
                 csvSeparator="\t"
             />

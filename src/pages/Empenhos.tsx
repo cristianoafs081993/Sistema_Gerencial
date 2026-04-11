@@ -82,7 +82,7 @@ export default function Empenhos() {
   const creditosInputRef = useRef<HTMLInputElement>(null);
   const [selectedEmpenho, setSelectedEmpenho] = useState<Empenho | null>(null);
 
-  // Extrair opÃ§Ãµes Ãºnicas para filtros
+  // Extrair opções únicas para filtros
   const componentesUnicos = Array.from(new Set(empenhos.map(e => e.componenteFuncional?.trim()).filter(Boolean))).sort();
   const origensUnicas = Array.from(new Set(empenhos.map(e => e.origemRecurso?.trim()).filter(Boolean))).sort();
   const planosUnicos = Array.from(new Set(empenhos.map(e => e.planoInterno?.trim()).filter(Boolean))).sort();
@@ -177,11 +177,11 @@ export default function Empenhos() {
     });
 
     if (importCount > 0 && skipCount > 0) {
-      toast.success(`${importCount} novo(s) importado(s), ${skipCount} jÃ¡ existente(s) ignorado(s).`);
+      toast.success(`${importCount} novo(s) importado(s), ${skipCount} já existente(s) ignorado(s).`);
     } else if (importCount > 0) {
       toast.success(`${importCount} empenho(s) importado(s) com sucesso!`);
     } else {
-      toast.info(`Nenhum registro novo encontrado. ${skipCount} jÃ¡ existente(s) ignorado(s).`);
+      toast.info(`Nenhum registro novo encontrado. ${skipCount} já existente(s) ignorado(s).`);
     }
   };
 
@@ -201,7 +201,7 @@ export default function Empenhos() {
       const parsedData = await parseSiafiCsv(file);
 
       if (parsedData.length === 0) {
-        toast.error('Nenhum dado vÃ¡lido encontrado no arquivo CSV.', { id: toastId });
+        toast.error('Nenhum dado válido encontrado no arquivo CSV.', { id: toastId });
         return;
       }
 
@@ -247,7 +247,7 @@ export default function Empenhos() {
     if (!file) return;
 
     setIsUpdatingSaldos(true);
-    const toastId = toast.loading('Processando arquivo de CrÃ©dito DisponÃ­vel...');
+    const toastId = toast.loading('Processando arquivo de Crédito Disponível...');
 
     try {
       // FileReader para ler como UTF-16LE
@@ -261,7 +261,7 @@ export default function Empenhos() {
       });
 
       const lines = fileContent.split(/\r?\n/).filter(l => l.trim());
-      if (lines.length < 2) throw new Error('Arquivo vazio ou invÃ¡lido');
+      if (lines.length < 2) throw new Error('Arquivo vazio ou inválido');
 
       // Detect separator
       const headerLine = lines[0];
@@ -279,11 +279,11 @@ export default function Empenhos() {
 
       await transparenciaService.importCreditosDisponiveis(data);
       await refreshData();
-      toast.success('CrÃ©ditos disponÃ­veis atualizados com sucesso!', { id: toastId });
+      toast.success('Créditos disponíveis atualizados com sucesso!', { id: toastId });
     } catch (error: unknown) {
-      console.error('Erro ao importar crÃ©ditos:', error);
+      console.error('Erro ao importar créditos:', error);
       const message = error instanceof Error ? error.message : 'Erro desconhecido';
-      toast.error('Erro ao importar crÃ©ditos: ' + message, { id: toastId });
+      toast.error('Erro ao importar créditos: ' + message, { id: toastId });
     } finally {
       setIsUpdatingSaldos(false);
       if (creditosInputRef.current) creditosInputRef.current.value = '';
@@ -358,11 +358,11 @@ export default function Empenhos() {
                   disabled={isUpdatingSaldos}
                 >
                   <Upload className="h-space-4 w-space-4 text-action-primary" />
-                  Importar CrÃ©dito
+                  Importar Crédito
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Importar CSV de CrÃ©dito DisponÃ­vel (UTF-16LE)</p>
+                <p>Importar CSV de Crédito Disponível (UTF-16LE)</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -384,7 +384,7 @@ export default function Empenhos() {
                 </div>
               }
               value={formatCurrency(credito.valor)}
-              subtitle="CrÃ©dito DisponÃ­vel"
+              subtitle="Crédito Disponível"
               icon={Layers}
               stitchColor={idx === 0 ? "vibrant-blue" : idx === 1 ? "purple" : idx === 2 ? "emerald-green" : "amber"}
               isLoading={isLoading}
@@ -392,7 +392,7 @@ export default function Empenhos() {
           ))
         ) : (
           <StatCard
-            title="CrÃ©dito DisponÃ­vel"
+            title="Crédito Disponível"
             value="Importe os dados"
             icon={Layers}
             stitchColor="vibrant-blue"
@@ -402,7 +402,7 @@ export default function Empenhos() {
       </div>
       <FilterPanel className="shadow-sm">
         <CardContent className="p-0">
-          {/* Linha 1: Busca e Filtros BÃ¡sicos */}
+          {/* Linha 1: Busca e Filtros Básicos */}
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -416,10 +416,10 @@ export default function Empenhos() {
             <div className="w-full sm:w-[150px]">
               <Select value={filterDimensao} onValueChange={setFilterDimensao}>
                 <SelectTrigger className="input-system h-10">
-                  <SelectValue placeholder="DimensÃ£o" />
+                  <SelectValue placeholder="Dimensão" />
                 </SelectTrigger>
                 <SelectContent className="rounded-sm">
-                  <SelectItem value="all">Todas dimensÃµes</SelectItem>
+                  <SelectItem value="all">Todas dimensões</SelectItem>
                   {DIMENSOES.map((d) => (
                     <SelectItem key={d.codigo} value={d.codigo}>
                       {d.nome}
@@ -448,11 +448,11 @@ export default function Empenhos() {
               className="gap-2 h-10 font-bold"
             >
               <Filter className="w-4 h-4" />
-              OpÃ§Ãµes
+              Opções
             </Button>
           </div>
 
-          {/* Linha 2: Filtros AvanÃ§ados (ColapsÃ¡vel) */}
+          {/* Linha 2: Filtros Avançados (Colapsável) */}
           {showAdvancedFilters && (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 mt-4 bg-slate-50/50 rounded-lg border border-border-default/50">
               <div className="space-y-1">
@@ -500,7 +500,7 @@ export default function Empenhos() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">PerÃ­odo (InÃ­cio)</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Período (Início)</label>
                 <Input
                   type="date"
                   value={dataInicio}
@@ -510,7 +510,7 @@ export default function Empenhos() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">PerÃ­odo (Fim)</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Período (Fim)</label>
                 <div className="flex gap-2">
                   <Input
                     type="date"
@@ -545,7 +545,7 @@ export default function Empenhos() {
       </FilterPanel>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6 mt-6">
           <TabsList className="bg-slate-100 p-1 rounded-lg h-auto">
-            <TabsTrigger value="execucao" className="px-6 py-2 text-sm font-semibold text-slate-600 data-[state=active]:bg-[#2f9e41] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md">ExecuÃ§Ã£o {new Date().getFullYear()}</TabsTrigger>
+            <TabsTrigger value="execucao" className="px-6 py-2 text-sm font-semibold text-slate-600 data-[state=active]:bg-[#2f9e41] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md">Execução {new Date().getFullYear()}</TabsTrigger>
             <TabsTrigger value="restos" className="px-6 py-2 text-sm font-semibold text-slate-600 data-[state=active]:bg-[#2f9e41] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md">Restos a Pagar</TabsTrigger>
           </TabsList>
 
@@ -608,7 +608,7 @@ function EmpenhoRow({
             </span>
           )}
           {empenho.historicoOperacoes && empenho.historicoOperacoes.length > 1 && (
-            <span className="text-[10px] text-action-primary flex items-center gap-0.5" title="Empenho com histÃ³rico de alteraÃ§Ãµes">
+            <span className="text-[10px] text-action-primary flex items-center gap-0.5" title="Empenho com histórico de alterações">
               <History className="h-3 w-3" />
               {empenho.historicoOperacoes.length} ops
             </span>
@@ -744,7 +744,7 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
 
     const groups = new Map<string, Empenho[]>();
     empenhos.forEach(e => {
-      const key = e.favorecidoNome || 'NÃ£o informado';
+      const key = e.favorecidoNome || 'Não informado';
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(e);
     });
@@ -820,7 +820,7 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
       <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
         {label}
         {sortKey === colKey && (
-          <span className="text-action-primary text-xs transition-transform duration-200">{sortDir === 'asc' ? 'â–²' : 'â–¼'}</span>
+          <span className="text-action-primary text-xs transition-transform duration-200">{sortDir === 'asc' ? '▲' : '▼'}</span>
         )}
       </span>
     </TableHead>
@@ -847,16 +847,16 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
           <Table>
             <TableHeader className="bg-slate-50/50">
               <TableRow className="hover:bg-transparent border-b border-border-default/50">
-                {groupBy === 'none' && <SortHeader label="NÃºmero" colKey="numero" />}
+                {groupBy === 'none' && <SortHeader label="Número" colKey="numero" />}
                 <SortHeader label="Favorecido" colKey="favorecido" />
                 {type === 'execucao' ? (
                   <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">Origem / Plano</TableHead>
                 ) : (
-                  <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">DescriÃ§Ã£o</TableHead>
+                  <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">Descrição</TableHead>
                 )}
                 <SortHeader label={type === 'execucao' ? 'Empenhado / Liquidado' : 'Inscrito / Reinscrito / Liq Ano'} colKey="valor" align="right" />
                 <SortHeader label={type === 'execucao' ? 'Saldo' : 'Saldo Atual'} colKey="saldo" align="right" />
-                <TableHead className="h-11 px-6 text-center text-xs font-semibold uppercase tracking-wider">AÃ§Ãµes</TableHead>
+                <TableHead className="h-11 px-6 text-center text-xs font-semibold uppercase tracking-wider">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

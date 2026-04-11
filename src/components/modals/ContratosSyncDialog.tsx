@@ -232,12 +232,10 @@ export function ContratosSyncDialog({
         const cNum = normalizeContratoNumero(
           row['Contrato'] ?? row['contrato'] ?? row['Número do Contrato'] ?? ''
         );
-        // "Número do empenho" - column may have encoding issues rendered as "NÃºmero" etc.
+        // Compatibilidade com headers que chegam com ou sem acento.
         const eNumFull = normalizeNumero(
           row['Número do empenho'] ??
           row['Numero do empenho'] ??
-          row['NÃºmero do empenho'] ??
-          row['N\xfamero do empenho'] ??
           // Fallback: find any key that looks like "empenho"
           Object.entries(row).find(([k]) => /empenho/i.test(k))?.[1] ??
           ''
