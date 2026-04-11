@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   ArrowDownRight,
@@ -79,8 +79,6 @@ const navigationSections: NavigationSection[] = [
   },
 ];
 
-const navigation = navigationSections.flatMap((section) => section.items);
-
 function isPathActive(pathname: string, href: string) {
   if (href === '/') return pathname === '/';
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -104,11 +102,6 @@ export function Layout({ children }: LayoutProps) {
   });
 
   const isConsultor = location.pathname === '/consultor';
-
-  const activeItem = useMemo(
-    () => navigation.find((item) => isPathActive(location.pathname, item.href)),
-    [location.pathname],
-  );
 
   useEffect(() => {
     localStorage.setItem('sidebar-collapsed', String(isCollapsed));
@@ -280,9 +273,6 @@ export function Layout({ children }: LayoutProps) {
             </Button>
 
             <div className="min-w-0 flex-1">
-              <h1 className="font-ui text-[15px] font-semibold tracking-tight text-text-primary truncate">
-                {activeItem?.name || 'Sistema Gerencial'}
-              </h1>
               <div
                 id="header-subtitle"
                 className="font-ui text-[12px] text-text-muted font-medium leading-tight mt-0.5 truncate empty:hidden"

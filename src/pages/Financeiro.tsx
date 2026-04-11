@@ -99,9 +99,7 @@ export default function Financeiro() {
         ) : null}
       </HeaderActions>
 
-      <DataTablePanel
-        title="Financeiro Disponivel por Fonte e Vinculacao"
-      >
+      <DataTablePanel>
         <Table>
           <TableHeader className="bg-slate-50/50">
             <TableRow className="hover:bg-transparent border-b border-border-default/50">

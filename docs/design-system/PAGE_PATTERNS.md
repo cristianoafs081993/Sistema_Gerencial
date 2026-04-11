@@ -4,6 +4,10 @@
 
 Padronizar a composicao das telas mais comuns do sistema.
 
+## Shell global
+
+- o header global nao exibe o titulo da pagina; a identificacao da pagina deve ficar no conteudo ou nos paineis.
+
 ## Padrao 1: tabela operacional
 
 Estrutura recomendada:
