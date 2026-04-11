@@ -212,11 +212,13 @@ Implementacao no repo:
 Dependencias externas:
 
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `VITE_APP_ORIGIN` no frontend, quando convites puderem ser enviados fora da URL pública de produção
 
 Observacao:
 
 - a function valida localmente o convidante e so aceita convites disparados por `cristiano.cnrn@gmail.com`
 - o deploy atual usa `verify_jwt = false` para evitar rejeicao do gateway e deixar a validacao do token sob controle da propria function
+- o frontend bloqueia o envio quando o `redirectTo` calculado aponta para `localhost` ou loopback, evitando convites com link local
 
 ## 8. Supabase Storage
 
@@ -281,3 +283,23 @@ Credenciais/segredos:
 - `EMAIL_CSV_INGEST_SECRET` no Apps Script e na Edge Function
 - `SUPABASE_SERVICE_ROLE_KEY` na Edge Function para gravacao no banco
 - opcional `EMAIL_CSV_ALLOWED_SENDERS` para restringir remetentes
+
+## 11. Extensao SUAP Scraper
+
+Uso:
+
+- sincronizacao da caixa de processos do SUAP para a tabela `processos`
+- envio de PDFs para o bucket `suap-pdfs`
+
+Repositorio:
+
+- `https://github.com/cristianoafs081993/suap-scraper/tree/master/extension`
+
+Consumidores no app:
+
+- [Suap.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Suap.tsx)
+- [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx)
+
+Observacao:
+
+- o link no app aponta para o GitHub; usuarios precisam ter acesso ao repositorio privado ou a extensao precisa ser publicada em uma forma de distribuicao acessivel.

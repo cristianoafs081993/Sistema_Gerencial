@@ -144,9 +144,12 @@ Observacao para a aba RAP do dashboard:
 Observacoes:
 
 - a grade de processos sincronizados do editor tenta leitura publica via `supabase-js` e cai para REST anonimo quando necessario
+- o detalhe do processo no Editor pode abrir o PDF sincronizado pelo bucket `suap-pdfs` usando URL assinada via `suapProcessosService.getPdfSignedUrl`
+- as telas [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx) e [Suap.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Suap.tsx) expõem link para a extensao SUAP Scraper no GitHub
 - a tela [Suap.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Suap.tsx) passou a reutilizar a sessao global do app vinda de `AuthContext`
 - a pagina [Auth.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Auth.tsx) centraliza login, convite e redefinicao de senha
 - convites enviados pelo cabecalho usam a Edge Function `invite-user` e retornam para `/auth?mode=invite`
+- a origem do link de convite usa `VITE_APP_ORIGIN` quando configurada; se o resultado apontar para `localhost` ou loopback, o envio é bloqueado no frontend
 - o cliente Supabase ficou com `detectSessionInUrl` habilitado para consumir o token do link de convite ou recuperacao
 - no estado atual, uploads e importacoes do frontend so aparecem para `cristiano.cnrn@gmail.com`
 - o Consultor salva sessoes em `localStorage`, mas agora com chave isolada por usuario autenticado em vez de um historico global compartilhado

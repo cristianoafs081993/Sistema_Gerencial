@@ -1,12 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const getSession = vi.fn();
+const getUser = vi.fn();
+const refreshSession = vi.fn();
 const invoke = vi.fn();
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     auth: {
       getSession,
+      getUser,
+      refreshSession,
     },
     functions: {
       invoke,
@@ -17,6 +21,8 @@ vi.mock('@/lib/supabase', () => ({
 describe('inviteUserByEmail', () => {
   beforeEach(() => {
     getSession.mockReset();
+    getUser.mockReset();
+    refreshSession.mockReset();
     invoke.mockReset();
   });
 
@@ -25,6 +31,14 @@ describe('inviteUserByEmail', () => {
       data: {
         session: {
           access_token: 'token-123',
+        },
+      },
+      error: null,
+    });
+    getUser.mockResolvedValue({
+      data: {
+        user: {
+          id: 'user-123',
         },
       },
       error: null,

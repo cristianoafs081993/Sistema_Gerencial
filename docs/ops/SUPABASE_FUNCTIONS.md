@@ -61,10 +61,15 @@ Uso:
 - valida o usuario autenticado a partir do JWT recebido pelo frontend
 - restringe o disparo ao superadministrador `cristiano.cnrn@gmail.com`
 - e publicada com `verify_jwt = false`, porque a validacao do token ocorre dentro da function
+- recebe do frontend um `redirectTo` montado com `VITE_APP_ORIGIN` quando configurado
 
 Dependencias:
 
 - `SUPABASE_SERVICE_ROLE_KEY`
+
+Observacao:
+
+- se `VITE_APP_ORIGIN` não estiver configurada e a aplicação estiver aberta em `localhost` ou loopback, o frontend bloqueia o envio para impedir convites com link local
 
 ## Functions chamadas pelo frontend, mas nao localizadas neste repo
 

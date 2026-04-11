@@ -4,7 +4,8 @@ import { toast } from 'sonner';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { SUPERADMIN_EMAIL } from '@/lib/authz';
-import { buildInviteRedirectUrl } from '@/lib/auth';
+import { buildInviteRedirectUrl, isLocalAuthRedirectUrl, resolveAuthRedirectOrigin } from '@/lib/auth';
+import { env } from '@/lib/env';
 import { inviteUserByEmail } from '@/services/authInvites';
 import { Button } from '@/components/ui/button';
 import {
@@ -28,15 +29,21 @@ export function InviteUserDialog({ defaultNextPath = '/' }: InviteUserDialogProp
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const redirectTo = useMemo(
-    () => buildInviteRedirectUrl(window.location.origin, defaultNextPath),
+    () => buildInviteRedirectUrl(resolveAuthRedirectOrigin(window.location.origin, env.appOrigin), defaultNextPath),
     [defaultNextPath],
   );
+  const isLocalRedirect = isLocalAuthRedirectUrl(redirectTo);
 
   const handleInvite = async () => {
     const normalizedEmail = email.trim().toLowerCase();
 
     if (!normalizedEmail) {
-      toast.error('Informe o e-mail do usuario a ser convidado.');
+      toast.error('Informe o e-mail do usuário a ser convidado.');
+      return;
+    }
+
+    if (isLocalRedirect) {
+      toast.error('Configure VITE_APP_ORIGIN com a URL pública do sistema antes de enviar convites.');
       return;
     }
 
@@ -74,9 +81,9 @@ export function InviteUserDialog({ defaultNextPath = '/' }: InviteUserDialogProp
       <DialogContent className="max-w-md border-none bg-white p-0 shadow-2xl">
         <div className="border-b border-slate-100 bg-[linear-gradient(135deg,rgba(47,103,216,0.08),rgba(16,185,129,0.04))] px-6 py-5">
           <DialogHeader className="space-y-2 text-left">
-            <DialogTitle className="text-xl font-semibold text-slate-950">Convidar usuario</DialogTitle>
+            <DialogTitle className="text-xl font-semibold text-slate-950">Convidar usuário</DialogTitle>
             <DialogDescription className="text-sm leading-6 text-slate-600">
-              Envia um e-mail de convite pelo Supabase. O usuario acessa o link e define a senha no primeiro login.
+              Envia um e-mail de convite pelo Supabase. O usuário acessa o link e define a senha no primeiro login.
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -86,7 +93,7 @@ export function InviteUserDialog({ defaultNextPath = '/' }: InviteUserDialogProp
             <div className="flex items-start gap-3">
               <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
               <p>
-                O envio tambem e validado no backend. No estado atual, apenas o superadministrador
+                O envio também é validado no backend. No estado atual, apenas o superadministrador
                 {' '}
                 <span className="font-semibold">{SUPERADMIN_EMAIL}</span>
                 {' '}
@@ -97,7 +104,7 @@ export function InviteUserDialog({ defaultNextPath = '/' }: InviteUserDialogProp
 
           <div className="space-y-2">
             <label htmlFor="invite-email" className="text-sm font-medium text-foreground">
-              E-mail do usuario
+              E-mail do usuário
             </label>
             <div className="relative">
               <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -119,9 +126,14 @@ export function InviteUserDialog({ defaultNextPath = '/' }: InviteUserDialogProp
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-xs leading-5 text-slate-500">
-            Redirecionamento apos o clique no convite:
+            Redirecionamento após o clique no convite:
             <br />
             <span className="font-medium text-slate-700">{redirectTo}</span>
+            {isLocalRedirect ? (
+              <span className="mt-2 block text-amber-700">
+                Defina VITE_APP_ORIGIN para evitar links de convite apontando para localhost.
+              </span>
+            ) : null}
           </div>
 
           <div className="flex justify-end gap-3">

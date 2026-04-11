@@ -1,6 +1,18 @@
 import { z } from 'zod';
 
+const emptyStringToUndefined = (value: unknown) => {
+  if (typeof value === 'string' && value.trim() === '') {
+    return undefined;
+  }
+
+  return value;
+};
+
 const optionalEnvSchema = z.object({
+  VITE_APP_ORIGIN: z.preprocess(
+    emptyStringToUndefined,
+    z.string().trim().url('VITE_APP_ORIGIN precisa ser uma URL valida.').optional(),
+  ),
   VITE_SIAFI_CONTA_PAGADORA: z.string().trim().min(1).optional().default('408034'),
   VITE_SIAFI_MACRO_CODIGO_FINAL: z.string().trim().min(1).optional().default('2200'),
 });
@@ -13,6 +25,7 @@ const requiredSupabaseEnvSchema = z.object({
 const optionalEnv = optionalEnvSchema.parse(import.meta.env);
 
 export const env = {
+  appOrigin: optionalEnv.VITE_APP_ORIGIN ? new URL(optionalEnv.VITE_APP_ORIGIN).origin : undefined,
   siafiContaPagadora: optionalEnv.VITE_SIAFI_CONTA_PAGADORA,
   siafiMacroCodigoFinal: optionalEnv.VITE_SIAFI_MACRO_CODIGO_FINAL,
 };

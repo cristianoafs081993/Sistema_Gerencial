@@ -45,7 +45,7 @@ describe('Auth page', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('setup-panel:Definir senha do primeiro acesso')).toBeInTheDocument();
+    expect(await screen.findByText('setup-panel:Senha do primeiro acesso')).toBeInTheDocument();
   });
 
   it('mantem o painel de login quando nao ha sessao ativa', async () => {
@@ -70,6 +70,6 @@ describe('Auth page', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('login-panel:Entrar no Sistema Gerencial')).toBeInTheDocument();
+    expect(await screen.findByText('login-panel:Entrar')).toBeInTheDocument();
   });
 });

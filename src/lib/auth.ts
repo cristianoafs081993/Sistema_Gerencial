@@ -33,3 +33,29 @@ export function buildInviteRedirectUrl(origin: string, nextPath = DEFAULT_AUTH_N
   redirectUrl.searchParams.set('next', normalizedNextPath);
   return redirectUrl.toString();
 }
+
+export function resolveAuthRedirectOrigin(currentOrigin: string, configuredOrigin?: string | null) {
+  const preferredOrigin = configuredOrigin?.trim();
+
+  if (preferredOrigin) {
+    return new URL(preferredOrigin).origin;
+  }
+
+  return new URL(currentOrigin).origin;
+}
+
+export function isLocalAuthRedirectUrl(redirectUrl: string) {
+  try {
+    const { hostname, protocol } = new URL(redirectUrl);
+    return (
+      protocol === 'file:' ||
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '0.0.0.0' ||
+      hostname === '[::1]' ||
+      hostname === '::1'
+    );
+  } catch {
+    return true;
+  }
+}

@@ -17,6 +17,17 @@ Sem elas:
 - o fallback REST nao funciona
 - chamadas a Edge Functions montadas pelo frontend falham
 
+## Variável recomendada para convites
+
+- `VITE_APP_ORIGIN`
+  - origem pública do frontend, por exemplo `https://sistema-gerencial-gamma.vercel.app`
+  - usada para montar o `redirectTo` dos convites como `/auth?mode=invite&next=/`
+
+Sem ela:
+
+- o app usa a origem da janela atual quando ela não for local
+- se a origem atual for `localhost`, o frontend bloqueia o envio do convite para evitar e-mails com link local
+
 ## Configuracao obrigatoria no Supabase Auth
 
 Nao ha novas variaveis de frontend para o login por e-mail e senha.
@@ -39,6 +50,9 @@ Sem isso:
   - default: `408034`
 - `VITE_SIAFI_MACRO_CODIGO_FINAL`
   - default: `2200`
+- `VITE_APP_ORIGIN`
+  - sem default
+  - recomendada para qualquer ambiente que possa enviar convites de usuário
 
 ## Variaveis necessarias em funcoes e integracoes
 
@@ -77,7 +91,9 @@ Necessarias no ambiente do Supabase:
 
 Observacoes operacionais:
 
-- o projeto Supabase precisa aceitar o `redirectTo` usado pelo app, por exemplo `http://localhost:8080/auth?mode=invite&next=/`
+- o projeto Supabase precisa aceitar o `redirectTo` usado pelo app, por exemplo `https://sistema-gerencial-gamma.vercel.app/auth?mode=invite&next=/`
+- o frontend usa `VITE_APP_ORIGIN` quando configurada; se ela não existir, usa a origem atual apenas quando ela não for local
+- o frontend bloqueia o envio quando o `redirectTo` resultante apontar para `localhost` ou loopback
 - para o usuario concluir o convite, o cliente do frontend precisa manter `detectSessionInUrl` habilitado
 - no estado atual, a function aceita convites apenas do usuario `cristiano.cnrn@gmail.com`
 

@@ -11,6 +11,7 @@ type SetupPasswordPanelProps = {
   title: string;
   description: string;
   submitLabel?: string;
+  statusMessage?: string;
   onSuccess?: () => void | Promise<void>;
 };
 
@@ -18,9 +19,10 @@ export function SetupPasswordPanel({
   title,
   description,
   submitLabel = 'Salvar senha',
+  statusMessage,
   onSuccess,
 }: SetupPasswordPanelProps) {
-  const { session, updatePassword } = useAuth();
+  const { updatePassword } = useAuth();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -37,7 +39,7 @@ export function SetupPasswordPanel({
     }
 
     if (password !== confirmPassword) {
-      toast.error('As senhas digitadas nao coincidem.');
+      toast.error('As senhas digitadas não coincidem.');
       return;
     }
 
@@ -73,11 +75,11 @@ export function SetupPasswordPanel({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 px-4 py-3 text-sm leading-6 text-emerald-900">
-          {session?.user.email
-            ? `Convite validado para ${session.user.email}. Defina a senha para concluir o primeiro acesso.`
-            : 'Convite validado. Defina a senha para concluir o primeiro acesso.'}
-        </div>
+        {statusMessage ? (
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 px-4 py-3 text-sm leading-6 text-emerald-900">
+            {statusMessage}
+          </div>
+        ) : null}
 
         <div className="space-y-2">
           <label htmlFor="setup-password" className="text-sm font-medium text-foreground">
@@ -90,7 +92,7 @@ export function SetupPasswordPanel({
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="Minimo de 8 caracteres"
+              placeholder="Mínimo de 8 caracteres"
               autoComplete="new-password"
               className="pl-9"
             />

@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 
 type AuthPanelProps = {
   title: string;
-  description: string;
+  description?: string;
 };
 
 export function AuthPanel({ title, description }: AuthPanelProps) {
@@ -51,7 +51,7 @@ export function AuthPanel({ title, description }: AuthPanelProps) {
         </div>
         <div className="space-y-1">
           <CardTitle>{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
+          {description ? <CardDescription>{description}</CardDescription> : null}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -101,10 +101,6 @@ export function AuthPanel({ title, description }: AuthPanelProps) {
           {isSubmitting ? 'Entrando...' : 'Entrar'}
         </Button>
 
-        <p className="text-xs leading-6 text-slate-500">
-          A conta precisa existir no Supabase Auth. Se voce recebeu um convite por e-mail, abra o link para definir a
-          senha do primeiro acesso.
-        </p>
       </CardContent>
     </Card>
   );
