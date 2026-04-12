@@ -169,6 +169,39 @@ describe('emailCsvIngestion', () => {
     });
   });
 
+  it('parseia o layout SIAFI virgulado com colunas RAP PROC E N PROC sem perder totais do exercicio', () => {
+    const parsed = parseEmailCsvImport({
+      fileName: 'Empenhos (3).csv',
+      text: [
+        '"NE CCor","NE CCor - Núm. Processo","UG Responsável","Fonte Recursos Detalhada","PTRES","PI Código PI","PI Nome","Natureza Despesa","NE CCor - Favorecido Número","NE CCor - Favorecido Nome","NE CCor - Descrição","DESPESAS EMPENHADAS (CONTROLE EMPENHO)","DESPESAS EMPENHADAS A LIQUIDAR (CONTROLE EMP)","DESPESAS LIQUIDADAS (CONTROLE EMPENHO)","DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)","DESPESAS PAGAS (CONTROLE EMPENHO)","RESTOS A PAGAR NAO PROCESSADOS REINSCRITOS","RESTOS A PAGAR INSCRITOS (PROC E N PROC)","RESTOS A PAGAR PAGOS (PROC E N PROC)","RESTOS A PAGAR A PAGAR (PROC E N PROC)"',
+        '"158366264352024NE000010","23035.000105.2024-42","151606","1000000000","231796","L20RLP99CIN","DICI-COMUNIC E EVENTOS OUTRAS DESPESAS","339039","33083309000141","VITA SERVICOS DE CERIMONIAL E EVENTOS LTDA","RAP antigo","","","","","","3.570,00","3.570,00","","3.570,00"',
+        '"158366264352026NE000003","23035.000003.2026-11","151606","1000000000","231796","L20RLP99ADN","PROAD-GESTAO ADMINISTRATIVA","339039","11111111000111","Fornecedor A","Empenho existente","6.095,00","4.345,41","1.749,59","0,00","1.749,59","","","",""',
+        '"158366264352026NE000017","23035.000017.2026-11","151606","1000000000","231796","L20RLP99IEN","DIENG-CONTRATOS CONTINUADOS-INFRAESTRUTURA","339039","22222222000122","Fornecedor B","Empenho pago","105.812,82","88.177,35","17.635,47","3.606,45","14.029,02","","","",""',
+        '"158366264352026NE000024","23035.000024.2026-11","151606","1000000000","231796","L20RLP99ADN","PROAD-GESTAO ADMINISTRATIVA","339039","33333333000133","Fornecedor C","Empenho novo","3.217,50","3.217,50","0,00","0,00","0,00","","","",""',
+      ].join('\n'),
+    });
+
+    expect(parsed.pipeline).toBe('siafi_empenhos');
+    if (parsed.pipeline !== 'siafi_empenhos') {
+      throw new Error('pipeline inesperado');
+    }
+
+    const exercicioRows = parsed.rows.filter((row) => !row.isRap);
+    expect(exercicioRows).toHaveLength(3);
+    expect(exercicioRows.reduce((total, row) => total + row.valorLiquidadoOficial, 0)).toBeCloseTo(19385.06);
+    expect(exercicioRows.reduce((total, row) => total + row.valorPagoOficial, 0)).toBeCloseTo(15778.61);
+
+    expect(parsed.rows.find((row) => row.numeroResumido === '2026NE000017')).toMatchObject({
+      valorPagoOficial: 14029.02,
+    });
+    expect(parsed.rows.find((row) => row.numeroResumido === '2024NE000010')).toMatchObject({
+      isRap: true,
+      rapInscrito: 3570,
+      rapPago: 0,
+      rapAPagar: 3570,
+    });
+  });
+
   it('faz fallback para ISO-8859-1 quando UTF-8 vier corrompido', () => {
     const bytes = new Uint8Array([0x43, 0x72, 0xe9, 0x64, 0x69, 0x74, 0x6f]);
     expect(decodeCsvBytes(bytes)).toBe('Crédito');

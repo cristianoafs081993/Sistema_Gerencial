@@ -41,16 +41,25 @@ vi.mock('@/components/dashboard/DashboardCurrentTab', () => ({
   DashboardCurrentTab: ({
     filteredData,
     totalPlanejado,
+    totalLiquidado,
+    totalPago,
+    dadosMensais,
     activeBudgetDimension,
     onSelectBudgetDimension,
   }: {
     filteredData: { empenhosCorrente: unknown[]; empenhosRap: unknown[] };
     totalPlanejado: number;
+    totalLiquidado: number;
+    totalPago: number;
+    dadosMensais: Array<{ name: string; pago: number }>;
     activeBudgetDimension: string | null;
     onSelectBudgetDimension: (value?: string | null) => void;
   }) => (
     <div data-testid="current-tab">
       <span data-testid="current-planejado">{totalPlanejado}</span>
+      <span data-testid="current-liquidado">{totalLiquidado}</span>
+      <span data-testid="current-pago">{totalPago}</span>
+      <span data-testid="current-mensal-pago">{dadosMensais.map((item) => item.pago).join(',')}</span>
       <span data-testid="current-empenhos-corrente">{filteredData.empenhosCorrente.length}</span>
       <span data-testid="current-empenhos-rap">{filteredData.empenhosRap.length}</span>
       <span data-testid="active-budget-dimension">{activeBudgetDimension ?? 'none'}</span>
@@ -262,6 +271,92 @@ describe('Dashboard', () => {
     expect(screen.getByTestId('current-planejado')).toHaveTextContent('300');
     expect(screen.getByTestId('current-empenhos-corrente')).toHaveTextContent('2');
     expect(screen.queryByText(/Dimensao ativa:/)).not.toBeInTheDocument();
+  });
+
+  it('soma liquidado e pago pelas colunas oficiais do SIAFI preservando zero oficial', () => {
+    mockedUseData.mockReturnValue({
+      atividades: [],
+      empenhos: [
+        makeEmpenho({
+          id: 'exercicio-a',
+          numero: '2026NE0001',
+          tipo: 'exercicio',
+          valor: 1000,
+          valorLiquidado: 9999,
+          valorPago: 9999,
+          valorLiquidadoOficial: 300,
+          valorPagoOficial: 200,
+          dataEmpenho: new Date('2026-01-10'),
+        }),
+        makeEmpenho({
+          id: 'exercicio-b-zero-oficial',
+          numero: '2026NE0002',
+          tipo: 'exercicio',
+          valor: 500,
+          valorLiquidado: 8888,
+          valorPago: 8888,
+          valorLiquidadoOficial: 0,
+          valorPagoOficial: 0,
+          dataEmpenho: new Date('2026-02-10'),
+        }),
+        makeEmpenho({
+          id: 'exercicio-c-fallback-legado',
+          numero: '2026NE0003',
+          tipo: 'exercicio',
+          valor: 700,
+          valorLiquidado: 70,
+          valorPago: 50,
+          dataEmpenho: new Date('2026-02-20'),
+        }),
+        makeEmpenho({
+          id: 'exercicio-cancelado',
+          numero: '2026NE0004',
+          tipo: 'exercicio',
+          status: 'cancelado',
+          valor: 100,
+          valorLiquidadoOficial: 100,
+          valorPagoOficial: 100,
+          dataEmpenho: new Date('2026-02-25'),
+        }),
+        makeEmpenho({
+          id: 'rap-fora-da-aba-corrente',
+          numero: '2025NE0001',
+          tipo: 'rap',
+          valor: 300,
+          valorLiquidadoOficial: 300,
+          valorPagoOficial: 300,
+          rapPago: 300,
+          dataEmpenho: new Date('2025-01-01'),
+        }),
+      ],
+      descentralizacoes: [],
+      contratos: [],
+      contratosEmpenhos: [],
+      creditosDisponiveis: [],
+      isLoading: false,
+      addAtividade: vi.fn(),
+      updateAtividade: vi.fn(),
+      deleteAtividade: vi.fn(),
+      addEmpenho: vi.fn(),
+      updateEmpenho: vi.fn(),
+      deleteEmpenho: vi.fn(),
+      addDescentralizacao: vi.fn(),
+      updateDescentralizacao: vi.fn(),
+      deleteDescentralizacao: vi.fn(),
+      getResumoOrcamentario: vi.fn(),
+      getTotalPlanejado: vi.fn(),
+      getTotalEmpenhado: vi.fn(),
+      getTotalDescentralizado: vi.fn(),
+      getADescentralizar: vi.fn(),
+      getSaldoTotal: vi.fn(),
+      refreshData: vi.fn(),
+    });
+
+    render(<Dashboard />);
+
+    expect(screen.getByTestId('current-liquidado')).toHaveTextContent('370');
+    expect(screen.getByTestId('current-pago')).toHaveTextContent('250');
+    expect(screen.getByTestId('current-mensal-pago')).toHaveTextContent('200,250');
   });
 
   it('separa inscritos e reinscritos e usa RAP pagos como liquidado no ano', async () => {

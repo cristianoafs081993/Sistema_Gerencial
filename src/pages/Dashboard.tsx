@@ -127,11 +127,11 @@ export default function Dashboard() {
   const aDescentralizar = totalPlanejado - totalDescentralizado;
   const percentualExecutado = totalPlanejado > 0 ? (totalEmpenhado / totalPlanejado) * 100 : 0;
   const totalLiquidado = filteredData.empenhosCorrente.reduce(
-    (total, empenho) => total + (empenho.valorLiquidadoOficial || empenho.valorLiquidado || 0),
+    (total, empenho) => total + (empenho.valorLiquidadoOficial ?? empenho.valorLiquidado ?? 0),
     0,
   );
   const totalPago = filteredData.empenhosCorrente.reduce(
-    (total, empenho) => total + (empenho.valorPagoOficial || empenho.valorPago || 0),
+    (total, empenho) => total + (empenho.valorPagoOficial ?? empenho.valorPago ?? 0),
     0,
   );
 
@@ -205,7 +205,7 @@ export default function Dashboard() {
     sortedEmpenhos.forEach((empenho) => {
       const mes = format(new Date(empenho.dataEmpenho), 'MMM/yy', { locale: ptBR });
       mapEmpenhado.set(mes, (mapEmpenhado.get(mes) || 0) + empenho.valor);
-      mapPago.set(mes, (mapPago.get(mes) || 0) + (empenho.valorPagoOficial || empenho.valorPago || 0));
+      mapPago.set(mes, (mapPago.get(mes) || 0) + (empenho.valorPagoOficial ?? empenho.valorPago ?? 0));
     });
 
     let accEmpenhado = 0;

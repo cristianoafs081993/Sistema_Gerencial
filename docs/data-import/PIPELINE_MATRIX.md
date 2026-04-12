@@ -15,6 +15,7 @@
 | Liquidacoes / Fonte SOF | `LiquidacoesPagamentos.tsx` | JSON/CSV tabulado | `transparencia.importLiquidacoes` | `documentos_habeis` | Atualiza `fonte_sof` e vinculo com empenho |
 | Ordens bancarias | `LiquidacoesPagamentos.tsx` | JSON/CSV tabulado | `transparencia.importOrdensBancarias` | `documentos_habeis_itens` e `documentos_habeis` | Atualiza pagos |
 | Situacoes / Retencoes | `LiquidacoesPagamentos.tsx` | JSON/CSV tabulado | `retencoes.upsertSituacoesBatch` | `documentos_habeis_situacoes` | Regras de retencao derivadas da situacao |
+| Saldos SIAFI de empenhos | `Empenhos.tsx` | CSV | `siafi-parser.ts` | `empenhos` | Upload manual atualiza empenhos existentes e cria empenhos de exercicio ou RAP ausentes; detecta UTF-8, UTF-16LE, UTF-16BE e Latin-1; o layout com virgulas e colunas `RESTOS A PAGAR ... (PROC E N PROC)` tem regressao em `siafiParser.test.ts` |
 | Creditos disponiveis | `Empenhos.tsx` | JSON/CSV tabulado | `transparencia.importCreditosDisponiveis` | `creditos_disponiveis` | Usa parser generico |
 | Ingestao automatica por Gmail | `Gmail + Apps Script` | CSV | `ingest-email-csv` | `email_csv_ingestion_runs` + tabela final do pipeline | Roteia anexos CSV para os parsers server-side; exige `EMAIL_CSV_INGEST_SECRET`; suporta os pipelines CSV de arquivo unico |
 

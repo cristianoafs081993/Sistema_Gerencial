@@ -54,6 +54,23 @@ function parseCsvLine(line: string, delimiter: string): string[] {
     });
 }
 
+function decodeCsvBytes(bytes: Uint8Array) {
+    if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+        return new TextDecoder('utf-16le').decode(bytes);
+    }
+
+    if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+        return new TextDecoder('utf-16be').decode(bytes);
+    }
+
+    const utf8 = new TextDecoder('utf-8').decode(bytes);
+    if (utf8.includes('\ufffd')) {
+        return new TextDecoder('iso-8859-1').decode(bytes);
+    }
+
+    return utf8;
+}
+
 /**
  * Lê o conteúdo do arquivo CSV do Tesouro Gerencial/SIAFI e extrai os saldos dos empenhos.
  */
@@ -63,7 +80,8 @@ export async function parseSiafiCsv(file: File): Promise<SiafiEmpenhoData[]> {
 
         reader.onload = (e) => {
             try {
-                const text = e.target?.result as string;
+                const bytes = new Uint8Array(e.target?.result as ArrayBuffer);
+                const text = decodeCsvBytes(bytes);
                 const lines = text.split(/\r?\n/);
 
                 if (lines.length < 2) {
@@ -95,8 +113,6 @@ export async function parseSiafiCsv(file: File): Promise<SiafiEmpenhoData[]> {
                     return headers.findIndex(h => normalize(h).includes(nk));
                 };
 
-                console.log('[SIAFI Parser] Headers encontrados:', headers.join(' | '));
-
                 const colNE = headers.findIndex(h => normalize(h).includes('NE CCOR') && !normalize(h).includes('-'));
                 const colProcesso = findCol('Num. Processo');
                 const colFavorecidoNome = findCol('Favorecido Nome');
@@ -110,7 +126,6 @@ export async function parseSiafiCsv(file: File): Promise<SiafiEmpenhoData[]> {
                 const colPI = findCol('PI Codigo') !== -1 ? findCol('PI Codigo') : findCol('Plano Interno');
                 const colPTRES = findCol('PTRES');
 
-                console.log('[SIAFI Parser] Column indices:', { colNE, colProcesso, colFavorecidoNome, colFavorecidoNum, colDescricao, colNatureza, colPI, colPTRES });
 
                 // Exercício Atual
                 const colEmpenhadas = findCol('DESPESAS EMPENHADAS (CONTROLE EMPENHO)');
@@ -223,7 +238,7 @@ export async function parseSiafiCsv(file: File): Promise<SiafiEmpenhoData[]> {
         };
 
         reader.onerror = () => reject(new Error('Falha ao ler o arquivo.'));
-        reader.readAsText(file, 'ISO-8859-1');
+        reader.readAsArrayBuffer(file);
     });
 }
 

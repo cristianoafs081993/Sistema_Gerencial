@@ -54,6 +54,15 @@ Arquivos reais de operacao presentes em [docs](/C:/Users/crist/OneDrive/Desktop/
 - alguns modulos aceitam XLSX na UI, mas nao necessariamente no parser real
 - parte da importacao usa heuristicas de normalizacao de colunas
 
+## Saldos SIAFI de empenhos
+
+- o upload manual em `Empenhos.tsx` usa `src/lib/siafi-parser.ts`
+- a ingestao automatica por e-mail usa `src/lib/emailCsvIngestion.ts`
+- os dois fluxos devem aceitar o layout `Exec_NE_Exercicio_RAP_UG_Executora.csv` e o layout virgulado com colunas `RESTOS A PAGAR ... (PROC E N PROC)`
+- o valor liquidado do exercicio vem de `DESPESAS LIQUIDADAS (CONTROLE EMPENHO)`
+- o valor pago do exercicio vem de `DESPESAS PAGAS (CONTROLE EMPENHO)`
+- empenhos de exercicio ausentes no banco devem ser criados no reprocessamento, nao apenas os RAP
+
 ## Automacao por e-mail
 
 - a automacao por Gmail foi centralizada na Edge Function `ingest-email-csv`

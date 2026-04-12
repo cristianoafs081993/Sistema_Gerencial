@@ -58,6 +58,7 @@ Campos-chave:
 Observacoes operacionais:
 
 - `componente_funcional` deve permanecer sem prefixo numerico inicial, seguindo o catalogo normalizado de `componentes_funcionais`
+- uploads/reprocessamentos SIAFI via frontend criam e atualizam registros em `empenhos`; a RLS deve permitir escrita apenas para o superadministrador autenticado ou papel `superadmin`
 
 Consumido por:
 

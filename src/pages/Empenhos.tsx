@@ -220,7 +220,7 @@ export default function Empenhos() {
       if (result.atualizados > 0 || result.criados > 0) {
         let msg = '';
         if (result.atualizados > 0) msg += `${result.atualizados} atualizado(s)`;
-        if (result.criados > 0) msg += `${msg ? ', ' : ''}${result.criados} RAP criado(s)`;
+        if (result.criados > 0) msg += `${msg ? ', ' : ''}${result.criados} criado(s)`;
         toast.success(`SIAFI: ${msg}!`, { id: toastId });
       } else {
         toast.info('Nenhum empenho do arquivo foi encontrado no sistema.', { id: toastId });
