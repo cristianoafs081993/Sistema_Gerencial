@@ -18,6 +18,16 @@ vi.mock('@/components/auth/SetupPasswordPanel', () => ({
 
 const mockedUseAuth = vi.mocked(useAuth);
 
+const authDefaults = {
+  isAccessLoading: false,
+  accessError: null,
+  canManageUsers: false,
+  userGroups: [],
+  screenAccessIds: [],
+  canAccessScreen: vi.fn(() => true),
+  canAccessPath: vi.fn(() => true),
+};
+
 describe('Auth page', () => {
   afterEach(() => {
     mockedUseAuth.mockReset();
@@ -29,6 +39,7 @@ describe('Auth page', () => {
       user: { id: 'invite-user', email: 'novo@ifrn.edu.br' } as never,
       isAuthenticated: true,
       isLoading: false,
+      ...authDefaults,
       isSuperAdmin: false,
       canInviteUsers: false,
       signInWithPassword: vi.fn(),
@@ -54,6 +65,7 @@ describe('Auth page', () => {
       user: null,
       isAuthenticated: false,
       isLoading: false,
+      ...authDefaults,
       isSuperAdmin: false,
       canInviteUsers: false,
       signInWithPassword: vi.fn(),

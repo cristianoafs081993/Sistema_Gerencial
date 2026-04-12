@@ -10,6 +10,16 @@ vi.mock('@/contexts/AuthContext', () => ({
 
 const mockedUseAuth = vi.mocked(useAuth);
 
+const authDefaults = {
+  isAccessLoading: false,
+  accessError: null,
+  canManageUsers: false,
+  userGroups: [],
+  screenAccessIds: [],
+  canAccessScreen: vi.fn(() => true),
+  canAccessPath: vi.fn(() => true),
+};
+
 describe('ProtectedRoute', () => {
   afterEach(() => {
     mockedUseAuth.mockReset();
@@ -21,6 +31,7 @@ describe('ProtectedRoute', () => {
       user: null,
       isAuthenticated: false,
       isLoading: false,
+      ...authDefaults,
       isSuperAdmin: false,
       canInviteUsers: false,
       signInWithPassword: vi.fn(),
@@ -49,6 +60,7 @@ describe('ProtectedRoute', () => {
       user: { id: 'user-1', email: 'teste@ifrn.edu.br' } as never,
       isAuthenticated: true,
       isLoading: false,
+      ...authDefaults,
       isSuperAdmin: false,
       canInviteUsers: false,
       signInWithPassword: vi.fn(),
@@ -69,5 +81,35 @@ describe('ProtectedRoute', () => {
     );
 
     expect(await screen.findByText('consultor-page')).toBeInTheDocument();
+  });
+
+  it('bloqueia acesso direto quando o grupo nao permite a tela', async () => {
+    mockedUseAuth.mockReturnValue({
+      session: { user: { id: 'user-1', email: 'teste@ifrn.edu.br' } } as never,
+      user: { id: 'user-1', email: 'teste@ifrn.edu.br' } as never,
+      isAuthenticated: true,
+      isLoading: false,
+      ...authDefaults,
+      canAccessPath: vi.fn(() => false),
+      isSuperAdmin: false,
+      canInviteUsers: false,
+      signInWithPassword: vi.fn(),
+      updatePassword: vi.fn(),
+      requestPasswordReset: vi.fn(),
+      signOut: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/controle-usuarios']}>
+        <Routes>
+          <Route element={<ProtectedRoute />}>
+            <Route path="/controle-usuarios" element={<div>controle-page</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('Acesso restrito')).toBeInTheDocument();
+    expect(screen.queryByText('controle-page')).not.toBeInTheDocument();
   });
 });

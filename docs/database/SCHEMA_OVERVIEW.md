@@ -52,6 +52,14 @@ Para mudancas sensiveis, confirme sempre nas migrations em [supabase/migrations]
 - `retencoes_efd_reinf`
 - `email_csv_ingestion_runs`
 
+### Autorizacao de telas
+
+- `screen_groups`
+- `app_screens`
+- `user_groups`
+- `user_group_screen_permissions`
+- `user_group_memberships`
+
 ## Views identificadas nas migrations
 
 - `vw_conciliacao_documento_pf`

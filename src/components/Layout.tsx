@@ -1,29 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import {
-  ArrowDownRight,
-  Banknote,
-  Bot,
-  ChevronLeft,
-  ChevronRight,
-  ClipboardList,
-  FileStack,
-  FileText,
-  LayoutDashboard,
-  LogOut,
-  Menu,
-  MessageSquare,
-  Receipt,
-  ScanSearch,
-  ShieldAlert,
-  User,
-  Wand2,
-  X,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, LogOut, Menu, User, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { InviteUserDialog } from '@/components/auth/InviteUserDialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { appScreenGroups, appScreens } from '@/lib/appScreens';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -36,6 +17,7 @@ type NavigationItem = {
   name: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
+  screenId: string;
 };
 
 type NavigationSection = {
@@ -43,40 +25,23 @@ type NavigationSection = {
   items: NavigationItem[];
 };
 
-const navigationSections: NavigationSection[] = [
-  {
-    title: 'Orçamentário',
-    items: [
-      { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-      { name: 'Planejamento', href: '/planejamento', icon: FileText },
-      { name: 'Descentralizações', href: '/descentralizacoes', icon: ArrowDownRight },
-      { name: 'Empenhos', href: '/empenhos', icon: Receipt },
-    ],
-  },
-  {
-    title: 'Financeiro',
-    items: [
-      { name: 'Liquidações', href: '/liquidacoes-pagamentos', icon: Banknote },
-      { name: 'Financeiro', href: '/financeiro', icon: ClipboardList },
-      { name: 'Lista de Credores', href: '/lc', icon: ClipboardList },
-      { name: 'Retenções EFD-Reinf', href: '/retencoes-efd-reinf', icon: ShieldAlert },
-      { name: 'Rastreabilidade de PFs', href: '/rastreabilidade-pfs', icon: ClipboardList },
-      { name: 'Conciliação de PFs', href: '/conciliacao-pfs', icon: ScanSearch },
-    ],
-  },
-  {
-    title: 'Contratos',
-    items: [{ name: 'Contratos', href: '/contratos', icon: FileStack }],
-  },
-  {
-    title: 'Documentos',
-    items: [
-      { name: 'Gerador de Documentos', href: '/gerador-documentos', icon: Wand2 },
-      { name: 'Editor de Documentos', href: '/editor-documentos', icon: Bot },
-      { name: 'Consultor Jurídico', href: '/consultor', icon: MessageSquare },
-    ],
-  },
-];
+function buildNavigationSections(canAccessScreen: (screenId: string) => boolean): NavigationSection[] {
+  return appScreenGroups
+    .map((group) => {
+      const items = appScreens
+        .filter((screen) => screen.groupId === group.id && !screen.hiddenFromNavigation && canAccessScreen(screen.id))
+        .sort((left, right) => left.sortOrder - right.sortOrder)
+        .map((screen) => ({
+          name: screen.name,
+          href: screen.path,
+          icon: screen.icon,
+          screenId: screen.id,
+        }));
+
+      return { title: group.name, items };
+    })
+    .filter((section) => section.items.length > 0);
+}
 
 function isPathActive(pathname: string, href: string) {
   if (href === '/') return pathname === '/';
@@ -85,10 +50,12 @@ function isPathActive(pathname: string, href: string) {
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
-  const { isLoading: isAuthLoading, session, signOut, canInviteUsers } = useAuth();
+  const { isLoading: isAuthLoading, session, signOut, canAccessScreen } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem('sidebar-collapsed') === 'true');
+  const navigationSections = useMemo(() => buildNavigationSections(canAccessScreen), [canAccessScreen]);
+  const defaultPasswordToastRef = useRef<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => {
     const activeSection = navigationSections.find((section) =>
       section.items.some((item) => isPathActive(location.pathname, item.href)),
@@ -101,11 +68,19 @@ export function Layout({ children }: LayoutProps) {
   });
 
   const isConsultor = location.pathname === '/consultor';
-  const isPlanningRoute = location.pathname.startsWith('/planejamento');
-
   useEffect(() => {
     localStorage.setItem('sidebar-collapsed', String(isCollapsed));
   }, [isCollapsed]);
+
+  useEffect(() => {
+    const userId = session?.user.id || null;
+    const usesDefaultPassword = session?.user.user_metadata?.uses_default_password === true;
+
+    if (!userId || !usesDefaultPassword || defaultPasswordToastRef.current === userId) return;
+
+    defaultPasswordToastRef.current = userId;
+    toast.warning('Sua conta foi criada com a senha padrão "ifrn". Recomenda-se trocar a senha no próximo acesso.');
+  }, [session?.user.id, session?.user.user_metadata?.uses_default_password]);
 
   useEffect(() => {
     const activeSection = navigationSections.find((section) =>
@@ -283,7 +258,6 @@ export function Layout({ children }: LayoutProps) {
                 <div className="hidden h-9 w-28 rounded-xl border border-border-default bg-white sm:block" />
               ) : session ? (
                 <>
-                  {canInviteUsers && !isPlanningRoute ? <InviteUserDialog /> : null}
                   <div className="hidden max-w-[240px] items-center gap-2 rounded-full border border-border-default bg-[hsl(var(--secondary))] px-3 py-1.5 text-xs text-slate-600 md:flex">
                     <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary">
                       <User className="h-3.5 w-3.5" />

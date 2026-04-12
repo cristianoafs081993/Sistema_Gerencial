@@ -71,6 +71,33 @@ Observacao:
 
 - se `VITE_APP_ORIGIN` não estiver configurada e a aplicação estiver aberta em `localhost` ou loopback, o frontend bloqueia o envio para impedir convites com link local
 
+### `admin-users`
+
+Local:
+
+- [admin-users/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/admin-users/index.ts)
+
+Chamador:
+
+- [userAdmin.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/userAdmin.ts)
+
+Uso:
+
+- lista usuarios do Supabase Auth e seus grupos
+- cria usuarios por e-mail com senha padrao `ifrn`
+- envia convite opcional e associa o usuario ao grupo escolhido
+- cria ou atualiza grupos de usuarios e permissoes de tela
+
+Dependencias:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Observacao:
+
+- e publicada com `verify_jwt = false`, porque a validacao do token ocorre dentro da function
+- somente o superadministrador pode executar acoes administrativas
+- usuarios criados diretamente recebem `user_metadata.uses_default_password = true`
+
 ## Functions chamadas pelo frontend, mas nao localizadas neste repo
 
 ### `consultor`

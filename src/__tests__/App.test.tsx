@@ -95,6 +95,10 @@ vi.mock('@/pages/Suap', () => ({
   default: () => <div>suap-page</div>,
 }));
 
+vi.mock('@/pages/ControleUsuarios', () => ({
+  default: () => <div>controle-usuarios-page</div>,
+}));
+
 vi.mock('@/pages/DesignSystemPreview', () => ({
   default: () => <div>design-system-page</div>,
 }));
@@ -142,6 +146,14 @@ describe('App routes', () => {
     render(<App />);
 
     expect(await screen.findByText('auth-page')).toBeInTheDocument();
+  });
+
+  it('renderiza a rota de controle de usuarios', async () => {
+    window.history.pushState({}, '', '/controle-usuarios');
+
+    render(<App />);
+
+    expect(await screen.findByText('controle-usuarios-page')).toBeInTheDocument();
   });
 
   it('renderiza a pagina not found para rota desconhecida', async () => {

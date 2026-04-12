@@ -36,7 +36,7 @@ Arquivos:
 - [supabase.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/lib/supabase.ts)
 - [AuthContext.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/contexts/AuthContext.tsx)
 - [Auth.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Auth.tsx)
-- [InviteUserDialog.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/auth/InviteUserDialog.tsx)
+- [ControleUsuarios.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/ControleUsuarios.tsx)
 - [SetupPasswordPanel.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/auth/SetupPasswordPanel.tsx)
 - [Suap.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Suap.tsx)
 
@@ -197,7 +197,7 @@ Status:
 
 Uso:
 
-- envio de convites de usuario a partir do cabecalho do app
+- envio legado de convites de usuario
 - validacao server-side do e-mail autorizador
 - disparo do `auth.admin.inviteUserByEmail` com `redirectTo` para `/auth?mode=invite`
 
@@ -219,6 +219,32 @@ Observacao:
 - a function valida localmente o convidante e so aceita convites disparados por `cristiano.cnrn@gmail.com`
 - o deploy atual usa `verify_jwt = false` para evitar rejeicao do gateway e deixar a validacao do token sob controle da propria function
 - o frontend bloqueia o envio quando o `redirectTo` calculado aponta para `localhost` ou loopback, evitando convites com link local
+
+## 7B. Edge Function `admin-users`
+
+Uso:
+
+- administracao de usuarios, grupos e permissoes por tela a partir de `/controle-usuarios`
+- criacao direta de usuarios com senha padrao `ifrn`
+- envio opcional de convite com associacao de grupo
+- listagem dos usuarios do Supabase Auth com os grupos vinculados
+
+Chamador:
+
+- [userAdmin.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/userAdmin.ts)
+
+Implementacao no repo:
+
+- [admin-users/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/admin-users/index.ts)
+
+Dependencias externas:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Observacao:
+
+- a function valida localmente o JWT recebido pelo frontend e so aceita chamadas do superadministrador
+- usuarios criados diretamente recebem `user_metadata.uses_default_password = true`, usado pelo frontend para exibir aviso de troca de senha
 
 ## 8. Supabase Storage
 

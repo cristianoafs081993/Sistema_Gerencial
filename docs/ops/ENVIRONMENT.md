@@ -97,6 +97,18 @@ Observacoes operacionais:
 - para o usuario concluir o convite, o cliente do frontend precisa manter `detectSessionInUrl` habilitado
 - no estado atual, a function aceita convites apenas do usuario `cristiano.cnrn@gmail.com`
 
+### `admin-users`
+
+Necessarias no ambiente do Supabase:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Observacoes operacionais:
+
+- a function valida o JWT recebido do frontend e aceita apenas chamadas do superadministrador
+- a criacao direta de usuarios usa a senha padrao `ifrn` e marca `user_metadata.uses_default_password = true`
+- `supabase/config.toml` deve manter `verify_jwt = false` para `admin-users`, pois a validacao ocorre dentro da function
+
 ### Consultor
 
 O frontend chama a function `consultor`, mas a implementacao nao foi localizada neste repo nesta rodada.

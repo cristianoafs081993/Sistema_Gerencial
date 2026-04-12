@@ -286,3 +286,49 @@ Consumido por:
 - trilha operacional da ingestao automatica de anexos CSV vindos do Gmail
 - guarda `message_id`, hash do anexo, pipeline detectado, status, volumetria e erro
 - usada para idempotencia e auditoria da automacao por e-mail
+
+## Autorizacao de telas
+
+### `screen_groups` e `app_screens`
+
+Finalidade:
+
+- catalogo dos grupos de telas e das rotas protegidas pelo frontend
+
+Observacoes operacionais:
+
+- o catalogo deve ficar alinhado com `src/lib/appScreens.ts`
+- `/auth` nao entra nesse catalogo porque e rota publica
+- `/controle-usuarios` e `/design-system-preview` ficam marcadas como telas administrativas
+
+### `user_groups`
+
+Finalidade:
+
+- grupos de usuarios gerenciados pelo superadministrador
+
+Observacoes operacionais:
+
+- o seed inicial cria o grupo `Diretores`
+- `Diretores` acessa as telas de producao e nao acessa `Controle de usuarios`
+
+### `user_group_screen_permissions`
+
+Finalidade:
+
+- matriz de permissao entre grupos de usuarios e telas
+
+Consumido por:
+
+- `AuthContext` no frontend, via leitura das permissoes do usuario autenticado
+
+### `user_group_memberships`
+
+Finalidade:
+
+- vinculo entre usuarios do Supabase Auth e grupos de usuarios
+
+Observacoes operacionais:
+
+- a migration inicial associa usuarios existentes, exceto o superadministrador, ao grupo `Diretores`
+- escritas administrativas passam pela Edge Function `admin-users` com `SUPABASE_SERVICE_ROLE_KEY`

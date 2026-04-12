@@ -27,6 +27,15 @@ Esse fluxo agora concentra:
 - encerramento da sessao no cabecalho global do layout
 - protecao de todas as rotas por um guard central antes do `Layout`
 - derivacao local de permissoes de superadministrador pelo e-mail autenticado
+- carregamento das permissoes de tela do usuario em `AuthContext`
+- bloqueio de acesso direto por rota em `ProtectedRoute`
+- filtro dos itens da sidebar pelo catalogo central de telas em `src/lib/appScreens.ts`
+
+### Controle de usuarios
+
+A tela `/controle-usuarios` e exclusiva do superadministrador. Ela usa a Edge Function `admin-users` para listar usuarios do Supabase Auth, criar usuarios com senha padrao `ifrn`, enviar convites, criar grupos e gravar permissoes por tela.
+
+O grupo inicial `Diretores` recebe acesso as telas de producao e nao recebe acesso ao controle de usuarios. Uploads e importacoes continuam dependentes de `isSuperAdmin`, portanto o grupo `Diretores` nao libera botoes de upload.
 
 ## Camada 2: origem do dado
 
@@ -148,7 +157,7 @@ Observacoes:
 - as telas [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx) e [Suap.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Suap.tsx) expõem no header o botao `Baixar extensão`, apontando para a extensao SUAP Scraper no GitHub
 - a tela [Suap.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Suap.tsx) passou a reutilizar a sessao global do app vinda de `AuthContext`
 - a pagina [Auth.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Auth.tsx) centraliza login, convite e redefinicao de senha
-- convites enviados pelo cabecalho usam a Edge Function `invite-user` e retornam para `/auth?mode=invite`
+- convites e criacao direta de usuarios ficam centralizados em `/controle-usuarios` e usam a Edge Function `admin-users`
 - a origem do link de convite usa `VITE_APP_ORIGIN` quando configurada; se o resultado apontar para `localhost` ou loopback, o envio é bloqueado no frontend
 - o cliente Supabase ficou com `detectSessionInUrl` habilitado para consumir o token do link de convite ou recuperacao
 - no estado atual, uploads e importacoes do frontend so aparecem para `cristiano.cnrn@gmail.com`
