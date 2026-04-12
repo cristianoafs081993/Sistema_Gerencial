@@ -33,6 +33,10 @@ Este indice organiza a documentacao operacional do repositorio por dominio.
 - [DEPLOY.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/ops/DEPLOY.md)
 - [SUPABASE_FUNCTIONS.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/ops/SUPABASE_FUNCTIONS.md)
 
+## Testes e qualidade
+
+- [TESTING.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/TESTING.md)
+
 ## Frontend e design system
 
 - [DATA_FLOW.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/frontend/DATA_FLOW.md)

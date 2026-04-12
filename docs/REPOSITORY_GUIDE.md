@@ -39,6 +39,10 @@ Aplicacao web de gestao para o IFRN com estes grupos principais:
 - [DEPLOY.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/ops/DEPLOY.md)
 - [SUPABASE_FUNCTIONS.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/ops/SUPABASE_FUNCTIONS.md)
 
+### Testes e qualidade
+
+- [TESTING.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/TESTING.md)
+
 ### Design system
 
 - [DESIGN_SYSTEM.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/DESIGN_SYSTEM.md)

@@ -7,6 +7,7 @@ Este repositorio possui documentacao operacional obrigatoria para tarefas em are
 1. [docs/ai/START_HERE.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/ai/START_HERE.md)
 2. [docs/REPOSITORY_GUIDE.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/REPOSITORY_GUIDE.md)
 3. [docs/README.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/README.md)
+4. [docs/TESTING.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/TESTING.md)
 
 ## Leitura obrigatoria por tipo de mudanca
 
@@ -33,9 +34,14 @@ Este repositorio possui documentacao operacional obrigatoria para tarefas em are
   - [docs/design-system/PAGE_PATTERNS.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/design-system/PAGE_PATTERNS.md)
   - [docs/design-system/TOKENS.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/design-system/TOKENS.md)
 
+- Testes e regressao:
+  - [docs/TESTING.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/TESTING.md)
+
 ## Regras de manutencao
 
 - Se a mudanca alterar comportamento real do sistema, atualize a documentacao correspondente no mesmo trabalho.
+- Se a mudanca corrigir bug ou acrescentar funcionalidade, adicione ou ajuste testes de regressao.
+- Mantenha testes unitarios e de integracao nos pontos mais criticos do sistema.
 - Se houver conflito entre documentacao legada em `docs/llm` e codigo atual, o codigo atual vence.
 - Nao assuma que o arquivo aceito pela UI e o mesmo realmente suportado pelo parser. Verifique pagina, dialog, service e tabela de destino.
 - Nao trate a documentacao como opcional em temas de banco, importacao, integracao ou design system.

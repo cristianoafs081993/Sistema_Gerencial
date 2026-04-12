@@ -18,17 +18,19 @@ Por isso, antes de mexer em qualquer modulo, leia a documentacao operacional cor
 1. [REPOSITORY_GUIDE.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/REPOSITORY_GUIDE.md)
 2. [SYSTEM_MAP.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/ai/SYSTEM_MAP.md)
 3. [SAFE_ENTRYPOINTS.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/ai/SAFE_ENTRYPOINTS.md)
-4. [README.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/data-import/README.md) da pasta `docs/data-import`
-5. [SCHEMA_OVERVIEW.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/database/SCHEMA_OVERVIEW.md)
-6. [TABLE_CATALOG.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/database/TABLE_CATALOG.md)
-7. [DATA_LINEAGE.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/database/DATA_LINEAGE.md)
-8. [API_CATALOG.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/integrations/API_CATALOG.md)
-9. [DATA_FLOW.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/frontend/DATA_FLOW.md)
+4. [TESTING.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/TESTING.md)
+5. [README.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/data-import/README.md) da pasta `docs/data-import`
+6. [SCHEMA_OVERVIEW.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/database/SCHEMA_OVERVIEW.md)
+7. [TABLE_CATALOG.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/database/TABLE_CATALOG.md)
+8. [DATA_LINEAGE.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/database/DATA_LINEAGE.md)
+9. [API_CATALOG.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/integrations/API_CATALOG.md)
+10. [DATA_FLOW.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/frontend/DATA_FLOW.md)
 
 ## Regras praticas para IA
 
 - Nao assumir que o schema do banco esta descrito corretamente em `docs/llm/DATABASE_SCHEMA.md`.
 - Nao assumir que o arquivo aceito pela UI e o mesmo realmente suportado pelo parser.
+- Sempre que corrigir bug ou acrescentar funcionalidade, adicionar ou ajustar testes de regressao conforme [TESTING.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/TESTING.md).
 - Antes de alterar um modulo de importacao, localizar:
   - a pagina
   - o dialog/componente de upload
