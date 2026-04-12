@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Copy,
   ExternalLink,
+  FileDown,
   FileText,
   Landmark,
   Loader2,
@@ -20,6 +21,7 @@ import {
 import { toast } from 'sonner';
 
 import RichTextEditor from '@/components/Editor/RichTextEditor';
+import { HeaderActions } from '@/components/HeaderParts';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -42,6 +44,7 @@ import {
   type DocumentIntent,
   type ResolvedDocumentContext,
 } from '@/lib/documentGeneration';
+import { suapExtensionGithubUrl } from '@/lib/suapExtension';
 import { cn, formatarDocumento } from '@/lib/utils';
 import { suapProcessosService } from '@/services/suapProcessos';
 import type { SuapProcesso } from '@/types';
@@ -320,6 +323,7 @@ export default function EditorDocumentos() {
   const [copiedDispatchIds, setCopiedDispatchIds] = useState<string[]>([]);
   const [clonedDispatchIds, setClonedDispatchIds] = useState<string[]>([]);
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
+  const [openingPdfId, setOpeningPdfId] = useState<string | null>(null);
 
   const resources = useMemo(
     () => ({ empenhos, contratos, contratosEmpenhos }),
@@ -575,6 +579,29 @@ export default function EditorDocumentos() {
     }
   };
 
+  const handleOpenPdf = async (processo: SuapProcesso) => {
+    if (!processo.pdfUrl) {
+      toast.info('Este processo ainda nao possui PDF sincronizado.');
+      return;
+    }
+
+    setOpeningPdfId(processo.id);
+    try {
+      const signedUrl = await suapProcessosService.getPdfSignedUrl(processo.pdfUrl);
+      if (!signedUrl) {
+        toast.error('Nao foi possivel gerar o link do PDF.');
+        return;
+      }
+
+      window.open(signedUrl, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      console.error(error);
+      toast.error('Falha ao abrir o PDF sincronizado.');
+    } finally {
+      setOpeningPdfId(null);
+    }
+  };
+
   const handleCopy = async () => {
     const html = editorContent;
     try {
@@ -616,6 +643,19 @@ export default function EditorDocumentos() {
 
   return (
     <div className="-m-4 min-h-[calc(100vh-4rem)] w-[calc(100%+2rem)] bg-surface-page lg:-m-8 lg:w-[calc(100%+4rem)]">
+      <HeaderActions>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-space-9 gap-space-2 border-border-default bg-white text-slate-700 shadow-shadow-sm hover:bg-[hsl(var(--secondary))]"
+          onClick={() => window.open(suapExtensionGithubUrl, '_blank', 'noopener,noreferrer')}
+        >
+          <ExternalLink className="h-4 w-4" />
+          Baixar extensão
+        </Button>
+      </HeaderActions>
+
       <div className="mx-auto flex max-w-[1560px] flex-col gap-5 px-4 py-5 lg:px-8 lg:py-6">
           <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
             <Card className="overflow-hidden border-border-default/70 bg-surface-card shadow-soft">
@@ -674,7 +714,7 @@ export default function EditorDocumentos() {
                   {!isLoadingSyncedProcesses && !isSyncedProcessesError && exampleProcesses.length === 0 ? (
                     <div className="rounded-radius-xl border border-dashed border-border-default/70 bg-surface-subtle/35 px-4 py-3">
                       <p className="font-ui text-sm text-text-secondary">
-                        Nenhum processo sincronizado disponivel para atalho no modo publico. Continue colando os numeros de processo manualmente.
+                        Nenhum processo sincronizado disponivel para atalho no modo publico. Use o botao Baixar extensão no cabecalho ou continue colando os numeros de processo manualmente.
                       </p>
                     </div>
                   ) : null}
@@ -1055,6 +1095,16 @@ export default function EditorDocumentos() {
                 >
                   <ExternalLink className="h-4 w-4" />
                   Abrir no SUAP
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 gap-2 border-slate-200 bg-white px-3.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 shadow-sm shadow-slate-200/50 hover:bg-slate-100"
+                  onClick={() => void handleOpenPdf(selectedProcess)}
+                  disabled={!selectedProcess.pdfUrl || openingPdfId === selectedProcess.id}
+                >
+                  {openingPdfId === selectedProcess.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                  Abrir PDF
                 </Button>
                 <Button
                   type="button"

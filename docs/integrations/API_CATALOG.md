@@ -293,7 +293,7 @@ Uso:
 
 Repositorio:
 
-- `https://github.com/cristianoafs081993/suap-scraper/tree/master/extension`
+- `https://github.com/cristianoafs081993/suap-scraper`
 
 Consumidores no app:
 
@@ -302,4 +302,4 @@ Consumidores no app:
 
 Observacao:
 
-- o link no app aponta para o GitHub; usuarios precisam ter acesso ao repositorio privado ou a extensao precisa ser publicada em uma forma de distribuicao acessivel.
+- o link no app aparece no header das telas consumidoras com o rotulo `Baixar extensão` e aponta para o GitHub da extensao.

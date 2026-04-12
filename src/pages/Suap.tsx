@@ -30,6 +30,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
+import { suapExtensionGithubUrl } from '@/lib/suapExtension';
 import { cn } from '@/lib/utils';
 import { SuapProcesso } from '@/types';
 import { suapProcessosService } from '@/services/suapProcessos';
@@ -445,6 +446,15 @@ export default function Suap() {
 
       <HeaderActions>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open(suapExtensionGithubUrl, '_blank', 'noopener,noreferrer')}
+            className="h-space-9 gap-space-2 border-border-default bg-white text-slate-700 shadow-shadow-sm hover:bg-[hsl(var(--secondary))]"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Baixar extensão
+          </Button>
           {session ? (
             <Button
               variant="outline"
