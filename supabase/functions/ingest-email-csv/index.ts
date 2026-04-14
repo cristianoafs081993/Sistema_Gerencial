@@ -313,27 +313,35 @@ async function applyDescentralizacoesImport(
 ) {
   const existingRows = (await supabase
     .from('descentralizacoes')
-    .select('data_emissao, plano_interno, origem_recurso, natureza_despesa, valor')
+    .select('data_emissao, plano_interno, origem_recurso, natureza_despesa, valor, nota_credito')
     .then(({ data, error }) => {
       if (error) throw error;
       return data || [];
     })) as Array<Record<string, unknown>>;
 
-  const existingBaseKeys = new Set(
-    existingRows.map((row) => {
+  const existingImportKeys = new Set(
+    existingRows.flatMap((row) => {
       const dateKey = String(row.data_emissao || '');
       const planoInterno = String(row.plano_interno || '').trim().toUpperCase();
       const origemRecurso = String(row.origem_recurso || '').trim();
       const naturezaDespesa = String(row.natureza_despesa || '').trim();
       const valor = Number(row.valor || 0);
-      return `${dateKey}|${planoInterno}|${origemRecurso}|${naturezaDespesa}|${valor}`;
+      const notaCredito = String(row.nota_credito || '').trim();
+      const baseKey = `${dateKey}|${planoInterno}|${origemRecurso}|${naturezaDespesa}|${valor}`;
+      const rowKey = notaCredito ? `${baseKey}|${notaCredito}` : baseKey;
+
+      return rowKey === baseKey ? [baseKey] : [baseKey, rowKey];
     }),
   );
 
   const importedRowKeys = new Set<string>();
   const payload = rows
     .filter((row) => {
-      if (existingBaseKeys.has(row.baseKey) || importedRowKeys.has(row.rowKey)) {
+      if (
+        existingImportKeys.has(row.baseKey) ||
+        existingImportKeys.has(row.rowKey) ||
+        importedRowKeys.has(row.rowKey)
+      ) {
         return false;
       }
       importedRowKeys.add(row.rowKey);
@@ -341,6 +349,8 @@ async function applyDescentralizacoesImport(
     })
     .map((row) => ({
       dimensao: row.dimensao,
+      nota_credito: row.notaCredito || null,
+      operacao_tipo: row.operacaoTipo || null,
       origem_recurso: row.origemRecurso,
       natureza_despesa: row.naturezaDespesa,
       plano_interno: row.planoInterno,

@@ -82,12 +82,38 @@ describe('emailCsvIngestion', () => {
     expect(parsed.rows).toHaveLength(1);
     expect(parsed.rows[0]).toMatchObject({
       notaCredito: '2026NC000001',
+      operacaoTipo: 'ANULACAO DE DESCENTRALIZACAO DE CREDITO',
       origemRecurso: '123456',
       naturezaDespesa: '339030',
       planoInterno: 'PI123ADN',
       dataEmissao: '2026-04-08',
       valor: -500,
     });
+  });
+
+  it('mantem linhas distintas quando a mesma NC vier quebrada em planos internos diferentes', () => {
+    const parsed = parseEmailCsvImport({
+      fileName: 'descentralizacoes.csv',
+      text: [
+        'NC\tNC - Operacao (Tipo)\tNC - Dia Emissao\tNC - Descricao\tNC Celula - PTRES\tNC Celula - Natureza Despesa\tNC Celula - Plano Interno\tNC Celula - Valor',
+        '158155264352026NC000179\tANULACAO DE DESCENTRALIZACAO DE CREDITO\t19/03/2026\tESTORNO PARA AJUSTE NO PI\t231798\t339000\tL21B3P19ENN\t3217,5',
+        '158155264352026NC000179\tANULACAO DE DESCENTRALIZACAO DE CREDITO\t19/03/2026\tESTORNO PARA AJUSTE NO PI\t231798\t339000\tL21B3P21EXN\t3217,5',
+      ].join('\n'),
+    });
+
+    expect(parsed.pipeline).toBe('descentralizacoes');
+    if (parsed.pipeline !== 'descentralizacoes') {
+      throw new Error('pipeline inesperado');
+    }
+
+    expect(parsed.rows).toHaveLength(2);
+    expect(parsed.rows[0].notaCredito).toBe('2026NC000179');
+    expect(parsed.rows[1].notaCredito).toBe('2026NC000179');
+    expect(parsed.rows[0].planoInterno).toBe('L21B3P19ENN');
+    expect(parsed.rows[1].planoInterno).toBe('L21B3P21EXN');
+    expect(parsed.rows[0].rowKey).not.toBe(parsed.rows[1].rowKey);
+    expect(parsed.rows[0].valor).toBe(-3217.5);
+    expect(parsed.rows[1].valor).toBe(-3217.5);
   });
 
   it('diferencia FD-Reinf de situacoes simples pelo cabecalho', () => {

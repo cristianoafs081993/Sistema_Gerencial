@@ -59,6 +59,7 @@ export interface DescentralizacaoImportRow {
   baseKey: string;
   rowKey: string;
   notaCredito: string;
+  operacaoTipo: string;
   dimensao: string;
   origemRecurso: string;
   naturezaDespesa: string;
@@ -877,6 +878,7 @@ function parseDescentralizacoes(text: string): ParsedEmailCsvImport {
         baseKey,
         rowKey,
         notaCredito,
+        operacaoTipo: operacaoTipo.trim(),
         dimensao: deriveDimensaoFromPI(planoInterno),
         origemRecurso,
         naturezaDespesa,

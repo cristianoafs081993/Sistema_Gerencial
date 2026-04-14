@@ -72,6 +72,8 @@ Campos-chave:
 
 - `id`
 - `dimensao`
+- `nota_credito`
+- `operacao_tipo`
 - `origem_recurso`
 - `natureza_despesa`
 - `plano_interno`

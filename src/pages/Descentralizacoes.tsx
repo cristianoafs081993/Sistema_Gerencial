@@ -165,11 +165,20 @@ export default function Descentralizacoes() {
 
     const handleCsvImport = (data: Record<string, string>[]) => {
         // Build deduplication set from existing persisted records.
-        const existingBaseKeys = new Set(
-            descentralizacoes.map(d => {
+        const existingImportKeys = new Set(
+            descentralizacoes.flatMap((d) => {
                 const dateStr = d.dataEmissao ? d.dataEmissao.toISOString().split('T')[0] : '';
-                return `${dateStr}|${(d.planoInterno || '').trim().toUpperCase()}|${(d.origemRecurso || '').trim()}|${(d.naturezaDespesa || '').trim()}|${d.valor}`;
-            })
+                const { baseKey, rowKey } = createDescentralizacaoImportIdentity({
+                    dateKey: dateStr,
+                    planoInterno: (d.planoInterno || '').trim().toUpperCase(),
+                    origemRecurso: (d.origemRecurso || '').trim(),
+                    naturezaDespesa: (d.naturezaDespesa || '').trim(),
+                    valor: d.valor,
+                    notaCredito: d.notaCredito,
+                });
+
+                return rowKey === baseKey ? [baseKey] : [baseKey, rowKey];
+            }),
         );
         const importedRowKeys = new Set<string>();
 
@@ -229,7 +238,7 @@ export default function Descentralizacoes() {
                 valor,
                 notaCredito,
             });
-            if (existingBaseKeys.has(baseKey) || importedRowKeys.has(rowKey)) {
+            if (existingImportKeys.has(baseKey) || existingImportKeys.has(rowKey) || importedRowKeys.has(rowKey)) {
                 skipCount++;
                 return;
             }
@@ -238,6 +247,8 @@ export default function Descentralizacoes() {
 
             const descentralizacao: Omit<Descentralizacao, 'id' | 'createdAt' | 'updatedAt'> = {
                 dimensao,
+                notaCredito: notaCredito || undefined,
+                operacaoTipo: operacaoTipo.trim() || undefined,
                 origemRecurso: orNorm,
                 naturezaDespesa: ndNorm,
                 planoInterno: piNorm,

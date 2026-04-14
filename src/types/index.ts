@@ -79,6 +79,8 @@ export interface Descentralizacao {
   id: string;
   dimensao: string;
   dimensaoId?: string;
+  notaCredito?: string;
+  operacaoTipo?: string;
   origemRecurso: string;
   origemRecursoId?: string;
   naturezaDespesa?: string;

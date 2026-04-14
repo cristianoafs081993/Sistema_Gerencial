@@ -2,12 +2,14 @@ import { supabase } from '@/lib/supabase';
 import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { Descentralizacao } from '@/types';
 
-const DESCENTRALIZACOES_SELECT = 'id,dimensao,dimensao_id,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,plano_interno_id,data_emissao,descricao,valor,created_at,updated_at';
+const DESCENTRALIZACOES_SELECT = 'id,dimensao,dimensao_id,nota_credito,operacao_tipo,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,plano_interno_id,data_emissao,descricao,valor,created_at,updated_at';
 
 type DescentralizacaoRow = {
     id: string;
     dimensao: string;
     dimensao_id?: string | null;
+    nota_credito?: string | null;
+    operacao_tipo?: string | null;
     origem_recurso: string;
     origem_recurso_id?: string | null;
     natureza_despesa?: string | null;
@@ -25,6 +27,8 @@ const mapDescentralizacaoRow = (item: DescentralizacaoRow): Descentralizacao => 
     id: item.id,
     dimensao: item.dimensao,
     dimensaoId: item.dimensao_id || undefined,
+    notaCredito: item.nota_credito || undefined,
+    operacaoTipo: item.operacao_tipo || undefined,
     origemRecurso: item.origem_recurso,
     origemRecursoId: item.origem_recurso_id || undefined,
     naturezaDespesa: item.natureza_despesa || undefined,
@@ -69,6 +73,8 @@ export const descentralizacoesService = {
             .insert({
                 dimensao: descentralizacao.dimensao,
                 dimensao_id: descentralizacao.dimensaoId || null,
+                nota_credito: descentralizacao.notaCredito || null,
+                operacao_tipo: descentralizacao.operacaoTipo || null,
                 origem_recurso: descentralizacao.origemRecurso,
                 origem_recurso_id: descentralizacao.origemRecursoId || null,
                 natureza_despesa: descentralizacao.naturezaDespesa || '',
@@ -94,6 +100,8 @@ export const descentralizacoesService = {
 
         if (descentralizacao.dimensao !== undefined) updates.dimensao = descentralizacao.dimensao;
         if (descentralizacao.dimensaoId !== undefined) updates.dimensao_id = descentralizacao.dimensaoId || null;
+        if (descentralizacao.notaCredito !== undefined) updates.nota_credito = descentralizacao.notaCredito || null;
+        if (descentralizacao.operacaoTipo !== undefined) updates.operacao_tipo = descentralizacao.operacaoTipo || null;
         if (descentralizacao.origemRecurso !== undefined) updates.origem_recurso = descentralizacao.origemRecurso;
         if (descentralizacao.origemRecursoId !== undefined) updates.origem_recurso_id = descentralizacao.origemRecursoId || null;
         if (descentralizacao.naturezaDespesa !== undefined) updates.natureza_despesa = descentralizacao.naturezaDespesa;
