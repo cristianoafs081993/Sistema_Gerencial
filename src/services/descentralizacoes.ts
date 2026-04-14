@@ -2,12 +2,14 @@ import { supabase } from '@/lib/supabase';
 import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { Descentralizacao } from '@/types';
 
-const DESCENTRALIZACOES_SELECT = 'id,dimensao,dimensao_id,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,plano_interno_id,data_emissao,descricao,valor,created_at,updated_at';
+const DESCENTRALIZACOES_SELECT = 'id,dimensao,dimensao_id,nota_credito,operacao_tipo,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,plano_interno_id,data_emissao,descricao,valor,created_at,updated_at';
 
 type DescentralizacaoRow = {
     id: string;
     dimensao: string;
     dimensao_id?: string | null;
+    nota_credito?: string | null;
+    operacao_tipo?: string | null;
     origem_recurso: string;
     origem_recurso_id?: string | null;
     natureza_despesa?: string | null;
@@ -21,10 +23,22 @@ type DescentralizacaoRow = {
     updated_at: string;
 };
 
+type ProcessDevolucaoInput = {
+    dataEmissao?: string;
+    descricao?: string;
+    ptres: string;
+    naturezaDespesa?: string;
+    planoInterno?: string;
+    valor: number;
+    dimensao: string;
+};
+
 const mapDescentralizacaoRow = (item: DescentralizacaoRow): Descentralizacao => ({
     id: item.id,
     dimensao: item.dimensao,
     dimensaoId: item.dimensao_id || undefined,
+    notaCredito: item.nota_credito || undefined,
+    operacaoTipo: item.operacao_tipo || undefined,
     origemRecurso: item.origem_recurso,
     origemRecursoId: item.origem_recurso_id || undefined,
     naturezaDespesa: item.natureza_despesa || undefined,
@@ -69,6 +83,8 @@ export const descentralizacoesService = {
             .insert({
                 dimensao: descentralizacao.dimensao,
                 dimensao_id: descentralizacao.dimensaoId || null,
+                nota_credito: descentralizacao.notaCredito || null,
+                operacao_tipo: descentralizacao.operacaoTipo || null,
                 origem_recurso: descentralizacao.origemRecurso,
                 origem_recurso_id: descentralizacao.origemRecursoId || null,
                 natureza_despesa: descentralizacao.naturezaDespesa || '',
@@ -94,6 +110,8 @@ export const descentralizacoesService = {
 
         if (descentralizacao.dimensao !== undefined) updates.dimensao = descentralizacao.dimensao;
         if (descentralizacao.dimensaoId !== undefined) updates.dimensao_id = descentralizacao.dimensaoId || null;
+        if (descentralizacao.notaCredito !== undefined) updates.nota_credito = descentralizacao.notaCredito || null;
+        if (descentralizacao.operacaoTipo !== undefined) updates.operacao_tipo = descentralizacao.operacaoTipo || null;
         if (descentralizacao.origemRecurso !== undefined) updates.origem_recurso = descentralizacao.origemRecurso;
         if (descentralizacao.origemRecursoId !== undefined) updates.origem_recurso_id = descentralizacao.origemRecursoId || null;
         if (descentralizacao.naturezaDespesa !== undefined) updates.natureza_despesa = descentralizacao.naturezaDespesa;
@@ -121,34 +139,31 @@ export const descentralizacoesService = {
         if (error) throw error;
     },
 
-    async processDevolucao(devolucao) {
-        const { ptres, planoInterno, valor } = devolucao;
+    async processDevolucao(devolucao: ProcessDevolucaoInput): Promise<Descentralizacao | null> {
+        const valorNormalizado = -Math.abs(devolucao.valor);
+        const dataEmissao = devolucao.dataEmissao?.trim() || null;
+        const descricao = devolucao.descricao?.trim() || 'DEVOLUCAO';
 
-        // Buscar descentralização correspondente
         const { data, error } = await supabase
             .from('descentralizacoes')
-            .select('id,valor')
-            .eq('plano_interno', planoInterno)
-            .eq('ptres', ptres)
+            .insert({
+                dimensao: devolucao.dimensao,
+                origem_recurso: devolucao.ptres.trim(),
+                natureza_despesa: devolucao.naturezaDespesa?.trim() || '',
+                plano_interno: devolucao.planoInterno?.trim().toUpperCase() || '',
+                data_emissao: dataEmissao,
+                descricao,
+                valor: valorNormalizado,
+                operacao_tipo: 'DEVOLUCAO',
+            })
+            .select(DESCENTRALIZACOES_SELECT)
             .single();
 
         if (error) {
-            console.error('Erro ao buscar descentralização:', error);
-            return;
+            console.error('Erro ao registrar devolucao de descentralizacao:', error);
+            return null;
         }
 
-        // Atualizar saldo
-        const novoValor = data.valor - valor;
-
-        const { error: updateError } = await supabase
-            .from('descentralizacoes')
-            .update({ valor: novoValor })
-            .eq('id', data.id);
-
-        if (updateError) {
-            console.error('Erro ao atualizar saldo:', updateError);
-        } else {
-            console.log(`Saldo atualizado para o plano interno ${planoInterno}: ${novoValor}`);
-        }
+        return mapDescentralizacaoRow(data as DescentralizacaoRow);
     },
 };
