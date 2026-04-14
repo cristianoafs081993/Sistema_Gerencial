@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Empenho, Atividade, DIMENSOES, COMPONENTES_POR_DIMENSAO } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,8 +21,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Pencil, History, DollarSign, Receipt, CheckCircle2, Landmark, Info } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import { Pencil, History, DollarSign, Receipt, CheckCircle2, Landmark, Info, Loader2 } from 'lucide-react';
+import { formatCurrency, formatDocumentoId } from '@/lib/utils';
+import { transparenciaService } from '@/services/transparencia';
 import { format } from 'date-fns';
 
 interface EmpenhoDialogProps {
@@ -32,16 +34,37 @@ interface EmpenhoDialogProps {
   onSave: (id: string, data: Partial<Empenho>) => void;
 }
 
+const getOperacaoLabel = (operacao: string) =>
+  operacao
+    .replace('INCLUSAO', 'Inclusão')
+    .replace('REFORCO', 'Reforço')
+    .replace('ANULACAO', 'Anulação');
+
+const formatDateCell = (value?: string) => {
+  if (!value) return '-';
+  const date = new Date(value.includes('T') ? value : `${value}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return '-';
+  return format(date, 'dd/MM/yyyy');
+};
+
+const buildFormData = (empenho: Empenho | null): Partial<Empenho> => {
+  if (!empenho) return {};
+
+  return {
+    ...empenho,
+    planoInterno: empenho.planoInterno || '',
+    processo: empenho.processo || '',
+    origemRecurso: empenho.origemRecurso || '',
+    componenteFuncional: empenho.componenteFuncional || '',
+  };
+};
+
 export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave }: EmpenhoDialogProps) {
-  const [formData, setFormData] = useState<Partial<Empenho>>({});
+  const [formData, setFormData] = useState<Partial<Empenho>>(() => buildFormData(empenho));
 
   useEffect(() => {
     if (open && empenho) {
-      setFormData({
-        ...empenho,
-        planoInterno: empenho.planoInterno || '',
-        processo: empenho.processo || '',
-      });
+      setFormData(buildFormData(empenho));
     }
   }, [open, empenho]);
 
@@ -56,6 +79,25 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
     )];
   }, [atividades, formData.dimensao]);
 
+  const { data: documentosEmpenho = [], isLoading: isLoadingDocumentos } = useQuery({
+    queryKey: ['documentos-habeis-empenho', empenho?.numero],
+    queryFn: () =>
+      empenho?.numero
+        ? transparenciaService.getDocumentosPorEmpenho(empenho.numero)
+        : Promise.resolve([]),
+    enabled: open && !!empenho?.numero,
+  });
+
+  const documentosQueDiminuemSaldo = useMemo(
+    () =>
+      documentosEmpenho.filter(
+        (documento) =>
+          Number(documento.valor_original || 0) > 0 &&
+          documento.estado?.toUpperCase() !== 'CANCELADO',
+      ),
+    [documentosEmpenho],
+  );
+
   if (!empenho) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -66,7 +108,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[95vh] flex flex-col p-0 overflow-hidden border-none shadow-2xl bg-white text-slate-900">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-4xl lg:max-w-5xl max-h-[calc(100dvh-2rem)] flex flex-col p-0 overflow-hidden border-none shadow-2xl bg-white text-slate-900">
         <DialogHeader className="p-6 bg-slate-50/80 border-b border-slate-100 space-y-1 relative">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-purple-100 rounded-lg text-purple-600">
@@ -143,18 +185,18 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                <div className="h-[1px] bg-slate-200/50 w-full" />
                <div className="flex flex-col">
                   <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Favorecido</span>
-                  <span className="text-xs font-black text-slate-800 line-clamp-1">{empenho.favorecidoNome}</span>
-                  <span className="text-[10px] font-mono font-medium text-slate-500">{empenho.favorecidoDocumento}</span>
+                  <span className="text-xs font-black text-slate-800 break-words">{empenho.favorecidoNome}</span>
+                  <span className="text-[10px] font-mono font-medium text-slate-500 break-all">{empenho.favorecidoDocumento}</span>
                </div>
                <div className="h-[1px] bg-slate-200/50 w-full" />
                <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col">
                       <span className="text-[9px] font-bold text-muted-foreground uppercase mb-0.5">Processo</span>
-                      <span className="text-xs font-bold font-mono text-slate-700">{empenho.processo || 'N/I'}</span>
+                      <span className="text-xs font-bold font-mono text-slate-700 break-all">{empenho.processo || 'N/I'}</span>
                   </div>
-                  <div className="flex flex-col items-end">
+                  <div className="flex flex-col items-end text-right">
                       <span className="text-[9px] font-bold text-muted-foreground uppercase mb-0.5">Natureza Despesa</span>
-                      <span className="text-xs font-black text-blue-600">{empenho.naturezaDespesa || '-'}</span>
+                      <span className="text-xs font-black text-blue-600 break-words">{empenho.naturezaDespesa || '-'}</span>
                   </div>
                </div>
                <div className="h-[1px] bg-slate-200/50 w-full" />
@@ -173,7 +215,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                         Histórico de Operações
                     </h3>
                 </div>
-                <div className="p-0">
+                <div className="p-0 overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-50/30 text-[9px] uppercase font-bold text-slate-400">
                       <tr>
@@ -203,7 +245,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                                   op.operacao === 'ANULACAO' ? 'bg-red-50 text-red-600' : 'bg-slate-50 text-slate-600'
                                 }`}
                               >
-                                {op.operacao.replace('INCLUSAO', 'Inclusão').replace('REFORCO', 'Reforço').replace('ANULACAO', 'Anulação')}
+                                {getOperacaoLabel(op.operacao)}
                               </Badge>
                             </td>
                             <td className={`px-5 py-3 text-right font-black ${op.operacao === 'ANULACAO' ? 'text-red-500' : 'text-emerald-600'}`}>
@@ -216,6 +258,75 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                 </div>
               </div>
             )}
+
+            {/* Documentos hábeis vinculados */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
+                <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
+                  <Receipt className="w-3 h-3" />
+                  Documentos hábeis que diminuíram o saldo
+                </h3>
+                {isLoadingDocumentos && <Loader2 className="w-3 h-3 animate-spin text-slate-400" />}
+              </div>
+              <div className="p-0 overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50/30 text-[9px] uppercase font-bold text-slate-400">
+                    <tr>
+                      <th className="px-5 py-2">Data</th>
+                      <th className="px-5 py-2">Documento</th>
+                      <th className="px-5 py-2">Estado</th>
+                      <th className="px-5 py-2">Processo</th>
+                      <th className="px-5 py-2 text-right">Impacto</th>
+                      <th className="px-5 py-2 text-right">Pago</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {isLoadingDocumentos ? (
+                      <tr>
+                        <td colSpan={6} className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
+                          Carregando documentos hábeis vinculados...
+                        </td>
+                      </tr>
+                    ) : documentosQueDiminuemSaldo.length > 0 ? (
+                      documentosQueDiminuemSaldo.map((documento) => (
+                        <tr key={documento.id} className="border-t border-slate-50 hover:bg-slate-50/50 transition-colors">
+                          <td className="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">
+                            {formatDateCell(documento.data_emissao)}
+                          </td>
+                          <td className="px-5 py-3 font-mono font-bold text-primary whitespace-nowrap">
+                            {formatDocumentoId(documento.id)}
+                          </td>
+                          <td className="px-5 py-3">
+                            <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-none font-black uppercase bg-amber-50 text-amber-700">
+                              {documento.estado || 'PENDENTE'}
+                            </Badge>
+                          </td>
+                          <td className="px-5 py-3 font-mono text-slate-500 max-w-[220px] break-all">
+                            {documento.processo || 'N/I'}
+                          </td>
+                          <td className="px-5 py-3 text-right font-black text-red-500 whitespace-nowrap">
+                            -{formatCurrency(documento.valor_original || 0)}
+                          </td>
+                          <td className="px-5 py-3 text-right font-black text-emerald-600 whitespace-nowrap">
+                            {(documento.valor_pago || 0) > 0 ? formatCurrency(documento.valor_pago || 0) : '-'}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={6} className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
+                          Nenhum documento hábil vinculado a este empenho reduziu o saldo.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div className="px-5 py-3 border-t border-slate-50 bg-slate-50/40 flex gap-2 text-[10px] text-muted-foreground leading-relaxed">
+                <Info className="w-3 h-3 shrink-0 mt-0.5 text-slate-400" />
+                <span>São considerados documentos hábeis vinculados ao empenho com valor original positivo e estado diferente de cancelado.</span>
+              </div>
+            </div>
 
             {/* Formulário de Edição */}
             <div className="space-y-4 pt-2">

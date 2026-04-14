@@ -287,6 +287,7 @@ export interface DocumentoDespesa {
   favorecido_documento: string;
   data_emissao: string;
   fonte_sof?: string;
+  empenho_numero?: string;
   empenho_id?: string;
   itens?: DocumentoItem[];
   situacoes?: DocumentoSituacao[];

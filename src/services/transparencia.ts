@@ -10,7 +10,7 @@ const API_HISTORICO = '/api-transparencia/api-de-dados/despesas/itens-de-empenho
 const UNIDADE_GESTORA = '158366';
 const GESTAO = '26435';
 const API_KEY = '931d4d57337bef94e775337c318342e9';
-const DOCUMENTOS_HABEIS_SELECT = 'id,valor_original,valor_pago,estado,processo,favorecido_nome,favorecido_documento,data_emissao,fonte_sof,empenho_id';
+const DOCUMENTOS_HABEIS_SELECT = 'id,valor_original,valor_pago,estado,processo,favorecido_nome,favorecido_documento,data_emissao,fonte_sof,empenho_numero';
 const DOCUMENTOS_HABEIS_ITENS_SELECT = 'id,documento_habil_id,doc_tipo,data_emissao,valor,observacao';
 const DOCUMENTOS_HABEIS_SITUACOES_SELECT = 'id,documento_habil_id,situacao_codigo,valor,is_retencao,created_at';
 
@@ -103,6 +103,7 @@ export const transparenciaService = {
             favorecido_documento: String(doc.favorecido_documento || ''),
             data_emissao: String(doc.data_emissao || ''),
             fonte_sof: doc.fonte_sof ? String(doc.fonte_sof) : undefined,
+            empenho_numero: doc.empenho_numero ? String(doc.empenho_numero) : undefined,
             empenho_id: doc.empenho_id ? String(doc.empenho_id) : undefined,
             itens: ((doc.itens || []) as Array<Record<string, unknown>>).map((item) => ({
                 id: String(item.id || ''),
@@ -188,7 +189,7 @@ export const transparenciaService = {
             favorecido_documento: doc.favorecido_documento || '',
             data_emissao: doc.data_emissao,
             fonte_sof: doc.fonte_sof,
-            empenho_id: doc.empenho_id,
+            empenho_numero: doc.empenho_numero,
             itens: (itens as Array<Record<string, unknown>>).map((item) => ({
                 id: String(item.id || ''),
                 documento_habil_id: String(item.documento_habil_id || ''),
@@ -206,6 +207,29 @@ export const transparenciaService = {
                 created_at: sit.created_at ? String(sit.created_at) : undefined
             }))
         };
+    },
+
+    async getDocumentosPorEmpenho(numeroEmpenho: string): Promise<DocumentoDespesa[]> {
+        const { data, error } = await supabase
+            .from('documentos_habeis')
+            .select(DOCUMENTOS_HABEIS_SELECT)
+            .eq('empenho_numero', numeroEmpenho)
+            .order('data_emissao', { ascending: false });
+
+        if (error) throw error;
+
+        return ((data || []) as Array<Record<string, unknown>>).map((doc) => ({
+            id: String(doc.id || ''),
+            valor_original: Number(doc.valor_original || 0),
+            valor_pago: Number(doc.valor_pago || 0),
+            estado: String(doc.estado || 'PENDENTE'),
+            processo: String(doc.processo || ''),
+            favorecido_nome: String(doc.favorecido_nome || ''),
+            favorecido_documento: String(doc.favorecido_documento || ''),
+            data_emissao: String(doc.data_emissao || ''),
+            fonte_sof: doc.fonte_sof ? String(doc.fonte_sof) : undefined,
+            empenho_numero: doc.empenho_numero ? String(doc.empenho_numero) : undefined,
+        }));
     },
 
     async getLastDocumentoDate(): Promise<Date | null> {
