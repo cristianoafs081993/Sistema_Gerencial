@@ -13,6 +13,20 @@ vi.mock('@/contexts/AuthContext', () => ({
   }),
 }));
 
+vi.mock('@/services/descentralizacoesContaSaldos', () => ({
+  descentralizacoesContaSaldosService: {
+    getAll: vi.fn(),
+    upsertBatch: vi.fn(),
+  },
+}));
+
+vi.mock('@/services/descentralizacoes', () => ({
+  descentralizacoesService: {
+    importFromCsv: vi.fn(),
+    processDevolucao: vi.fn(),
+  },
+}));
+
 vi.mock('sonner', () => ({
   toast: {
     success: vi.fn(),

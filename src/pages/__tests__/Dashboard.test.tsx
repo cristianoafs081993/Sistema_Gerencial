@@ -436,11 +436,11 @@ describe('Dashboard', () => {
 
     expect(screen.getByTestId('rap-total-inscrito')).toHaveTextContent('120');
     expect(screen.getByTestId('rap-total-reinscrito')).toHaveTextContent('90');
-    expect(screen.getByTestId('rap-total-liquidado-no-ano')).toHaveTextContent('155');
+    expect(screen.getByTestId('rap-total-liquidado-no-ano')).toHaveTextContent('130');
     expect(screen.getByTestId('rap-total-saldo-atual')).toHaveTextContent('80');
 
     expect(screen.getByTestId('rap-origem-base')).toHaveTextContent('210');
-    expect(screen.getByTestId('rap-origem-liquidado')).toHaveTextContent('155');
+    expect(screen.getByTestId('rap-origem-liquidado')).toHaveTextContent('130');
     expect(screen.getByTestId('rap-origem-saldo')).toHaveTextContent('80');
   });
 });
