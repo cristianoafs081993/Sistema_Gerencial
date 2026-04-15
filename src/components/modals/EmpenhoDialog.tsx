@@ -25,6 +25,13 @@ import { Pencil, History, DollarSign, Receipt, CheckCircle2, Landmark, Info, Loa
 import { formatCurrency, formatDocumentoId } from '@/lib/utils';
 import { transparenciaService } from '@/services/transparencia';
 import { format } from 'date-fns';
+import {
+  getRapBaseVigente,
+  getRapLiquidadoNoAno,
+  getRapReferenceYear,
+  getRapSaldoAtual,
+  isRapReinscrito,
+} from '@/utils/rapMetrics';
 
 interface EmpenhoDialogProps {
   open: boolean;
@@ -106,6 +113,20 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
     onOpenChange(false);
   };
 
+  const isRap = empenho.tipo === 'rap';
+  const rapReferenceYear = getRapReferenceYear([empenho]);
+  const rapBaseLabel = isRapReinscrito(empenho, rapReferenceYear) ? 'Valor Reinscrito' : 'Valor Inscrito';
+  const valorEmpenhadoResumo = isRap ? getRapBaseVigente(empenho, rapReferenceYear) : empenho.valor;
+  const valorLiquidadoResumo = isRap
+    ? getRapLiquidadoNoAno(empenho)
+    : empenho.valorLiquidadoOficial ?? empenho.valorLiquidado ?? 0;
+  const valorPagoResumo = isRap
+    ? getRapSaldoAtual(empenho, rapReferenceYear)
+    : empenho.valorPagoOficial ?? empenho.valorPago ?? 0;
+  const valorEmpenhadoLabel = isRap ? rapBaseLabel : 'Valor Empenhado';
+  const valorLiquidadoLabel = isRap ? 'Liquidado no Ano' : 'Valor Liquidado';
+  const valorPagoLabel = isRap ? 'Saldo Atual' : 'Valor Pago';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-4xl lg:max-w-5xl max-h-[calc(100dvh-2rem)] flex flex-col p-0 overflow-hidden border-none shadow-2xl bg-white text-slate-900">
@@ -132,11 +153,11 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                 <div className="h-1 bg-blue-500 w-full" />
                 <CardContent className="p-3">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Valor Empenhado</span>
+                    <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">{valorEmpenhadoLabel}</span>
                     <DollarSign className="w-3 h-3 text-blue-500" />
                   </div>
                   <p className="text-lg font-black text-slate-900 tracking-tighter">
-                    {formatCurrency(empenho.valor)}
+                    {formatCurrency(valorEmpenhadoResumo)}
                   </p>
                 </CardContent>
               </Card>
@@ -145,11 +166,11 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                 <div className="h-1 bg-amber-500 w-full" />
                 <CardContent className="p-3">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Valor Liquidado</span>
+                    <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">{valorLiquidadoLabel}</span>
                     <Receipt className="w-3 h-3 text-amber-500" />
                   </div>
                   <p className="text-lg font-black text-slate-900 tracking-tighter">
-                    {formatCurrency(empenho.valorLiquidado || empenho.valorLiquidadoAPagar || 0)}
+                    {formatCurrency(valorLiquidadoResumo)}
                   </p>
                 </CardContent>
               </Card>
@@ -158,11 +179,11 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                 <div className="h-1 bg-emerald-500 w-full" />
                 <CardContent className="p-3">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider">Valor Pago</span>
+                    <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider">{valorPagoLabel}</span>
                     <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                   </div>
                   <p className="text-lg font-black text-emerald-700 tracking-tighter">
-                    {formatCurrency(empenho.valorPago || empenho.valorPagoOficial || 0)}
+                    {formatCurrency(valorPagoResumo)}
                   </p>
                 </CardContent>
               </Card>
