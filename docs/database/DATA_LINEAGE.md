@@ -70,6 +70,23 @@ Mostrar a linhagem operacional dos dados de forma curta:
 - observacao: o dialogo identifica automaticamente qual arquivo e o relatorio de contratos ativos e qual e o relatorio de vinculos/valores pelos cabecalhos; o relatorio de contratos ativos limpa a razao social removendo CNPJ e o sufixo `Pessoa Juridica`; contratos inativos no arquivo sao ignorados e contratos ausentes no arquivo nao devem ser removidos do banco; o relatorio de vinculos/valores atualiza o valor do contrato e os vinculos com empenhos, ignorando `Valor Liquidado` e `Valor Pago`; a escrita deduplica por `numero` e usa fallback para `insert/update` se o ambiente nao aceitar `upsert onConflict(numero)`; o contrato legado `00089/2016` da CAERN e tratado como excecao operacional e fica fora do modulo local
   - pagina: [Contratos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Contratos.tsx)
 
+### Contratos API Comprasnet
+
+- API `https://contratos.comprasnet.gov.br/api`
+  - sincronizacao automatica: [sync-contratos-comprasnet/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-contratos-comprasnet/index.ts)
+  - service de leitura no frontend: [contratosApi.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/contratosApi.ts)
+  - tabelas:
+    - `contratos_api`
+    - `contratos_api_historico`
+    - `contratos_api_empenhos`
+    - `contratos_api_faturas`
+    - `contratos_api_itens`
+    - `contratos_api_fatura_itens`
+    - `contratos_api_fatura_empenhos`
+    - `contratos_api_sync_runs`
+  - pagina: [Contratos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Contratos.tsx)
+- observacao: a tela local continua vindo de `contratos` e `contratos_empenhos`; os dados da API enriquecem a linha quando o numero normalizado casa. Valor Total usa `contratos_api_historico` como fonte principal quando houver API, somando `valor_inicial` de cada termo; `valor_global` da API nao entra nessa metrica. Sem historico com `valor_inicial`, usa `contratos.valor` como fallback. A execucao por item soma faturas com situacao `Pago` ou `Siafi Apropriado` que tenham `dados_item_faturado`. O valor contratado por item no drawer soma `contratos_api_itens.historico_item[].valor_total` quando existir e cai para `contratos_api_itens.valor_total` sem historico do item. O historico da API exibe assinatura, aditivos e apostilamentos; `codigo_unidade_origem = 158155` deve ser sinalizado como origem Reitoria. Em contratos, Valor Empenhado usa `contratos_api_empenhos.valor_empenhado` quando houver API, com fallback para o valor original do empenho local.
+
 ### Documentos habeis
 
 - arquivo de documentos/situacoes/itens
@@ -110,3 +127,17 @@ Mostrar a linhagem operacional dos dados de forma curta:
   - roteamento e parse: [ingest-email-csv/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/ingest-email-csv/index.ts) + [emailCsvIngestion.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/lib/emailCsvIngestion.ts)
   - trilha operacional: `email_csv_ingestion_runs`
   - destino: tabela do pipeline detectado
+
+### Normativos do Consultor
+
+- fontes HTML oficiais e PDFs locais
+  - extracao: [normativos-pipeline/pipeline/extract.py](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/normativos-pipeline/pipeline/extract.py)
+  - chunking e embeddings: [normativos-pipeline/pipeline/process.py](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/normativos-pipeline/pipeline/process.py)
+  - persistencia e log: [normativos-pipeline/pipeline/ingest.py](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/normativos-pipeline/pipeline/ingest.py)
+  - tabelas:
+    - `normativos`
+    - `normativos_chunks`
+    - `normativos_log`
+  - busca: RPC `buscar_normativos`
+  - consumidor frontend: [ConsultorSessions.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/ConsultorSessions.tsx)
+  - backlog: [NORMATIVOS_CONSULTOR_INGESTION.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/integrations/NORMATIVOS_CONSULTOR_INGESTION.md)

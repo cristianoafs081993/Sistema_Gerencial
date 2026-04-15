@@ -109,6 +109,28 @@ Observacoes operacionais:
 - a criacao direta de usuarios usa a senha padrao `ifrn` e marca `user_metadata.uses_default_password = true`
 - `supabase/config.toml` deve manter `verify_jwt = false` para `admin-users`, pois a validacao ocorre dentro da function
 
+### `sync-contratos-comprasnet`
+
+Necessarias no ambiente do Supabase:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Opcional:
+
+- `CONTRATOS_SYNC_SECRET`
+  - se configurada, chamadas HTTP precisam enviar o header `x-contratos-sync-secret`
+  - se nao configurada, o cron criado pela migration consegue chamar a function sem header adicional
+
+Pre-requisitos no banco:
+
+- Supabase Cron (`pg_cron`)
+- `pg_net`
+
+Observacoes operacionais:
+
+- `supabase/config.toml` deve manter `verify_jwt = false` para `sync-contratos-comprasnet`, pois a chamada periodica vem do cron
+- a migration agenda chamada a cada 6 horas para a UG `158366`
+
 ### Consultor
 
 O frontend chama a function `consultor`, mas a implementacao nao foi localizada neste repo nesta rodada.

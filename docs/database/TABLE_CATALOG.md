@@ -250,17 +250,40 @@ Observacoes operacionais:
 
 - espelho local da API externa de contratos
 
+### `contratos_api_historico`
+
+- historico de assinatura, aditivos, apostilamentos e rescisao de cada contrato vindo da API externa
+- guarda valores originais da API, incluindo `valor_inicial`, `valor_global`, `novo_valor_global`, parcelas, retroativo e UGs do termo/origem
+- contratos com `codigo_unidade_origem = 158155` indicam origem Reitoria e devem ser exibidos como tal na UI
+
 ### `contratos_api_empenhos`
 
 - empenhos vinculados a cada contrato vindo da API externa
+- `valor_empenhado` representa o empenhado original e nao deve ser substituido por base RAP
 
 ### `contratos_api_faturas`
 
 - faturas vinculadas a cada contrato vindo da API externa
 
+### `contratos_api_itens`
+
+- itens de cada contrato vindo da API externa
+- guarda `api_item_id`, descricao principal em `catmatseritem_id`, complemento, quantidade, valores e historico do item
+
+### `contratos_api_fatura_itens`
+
+- vinculos entre faturas e itens, derivados de `dados_item_faturado`
+- base para calcular execucao por item apenas quando a API informa `id_item_contrato`
+
+### `contratos_api_fatura_empenhos`
+
+- vinculos entre faturas e empenhos, derivados de `dados_empenho`
+- usado como contexto no detalhe de faturas do contrato
+
 ### `contratos_api_sync_runs`
 
 - historico das sincronizacoes da API de contratos
+- guarda tambem contadores de historico, itens, vinculos fatura-item e vinculos fatura-empenho
 
 Consumido por:
 
@@ -286,6 +309,32 @@ Consumido por:
 - trilha operacional da ingestao automatica de anexos CSV vindos do Gmail
 - guarda `message_id`, hash do anexo, pipeline detectado, status, volumetria e erro
 - usada para idempotencia e auditoria da automacao por e-mail
+
+## Base semantica do Consultor
+
+### `normativos`
+
+- catalogo de documentos normativos ingeridos pelo pipeline local [normativos-pipeline](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/normativos-pipeline)
+- guarda tipo, titulo, numero, ano, `url_origem`, vigencia, `data_ingestao`, `hash_conteudo` e metadados
+- usada para deduplicacao por hash antes de gerar novos chunks
+
+### `normativos_chunks`
+
+- chunks textuais com embedding vetorial `vector(768)`
+- cada chunk referencia `normativos.id`
+- consultada pela RPC `buscar_normativos` por similaridade vetorial
+
+### `normativos_log`
+
+- trilha de execucao da pipeline de normativos
+- guarda titulo, status, quantidade de chunks, mensagem e data da execucao
+- deve ser consultada junto do backlog em [NORMATIVOS_CONSULTOR_INGESTION.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/integrations/NORMATIVOS_CONSULTOR_INGESTION.md)
+
+### RPC `buscar_normativos`
+
+- recebe `query_embedding vector(768)`
+- aplica filtros opcionais por tipo e vigencia
+- retorna trechos de `normativos_chunks` com metadados do normativo
 
 ## Autorizacao de telas
 

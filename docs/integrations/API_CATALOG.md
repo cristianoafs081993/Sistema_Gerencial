@@ -109,7 +109,7 @@ Observacao:
 
 Uso:
 
-- sincronizacao de contratos ativos e inativos, empenhos e faturas
+- sincronizacao de contratos ativos e inativos, historico, empenhos, faturas, itens e vinculos fatura-item/fatura-empenho
 
 Proxy local:
 
@@ -122,6 +122,12 @@ Configuracao:
 Service:
 
 - [contratosApi.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/contratosApi.ts)
+- [contratosApiMappers.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/contratosApiMappers.ts)
+
+Sincronizacao automatica:
+
+- [sync-contratos-comprasnet/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-contratos-comprasnet/index.ts)
+- cron a cada 6 horas para a UG `158366`
 
 Base usada:
 
@@ -133,13 +139,29 @@ Endpoints observados:
 - `/contrato/inativo/ug/{unidadeCodigo}`
 - `/contrato/{api_contrato_id}/empenhos`
 - `/contrato/{api_contrato_id}/faturas`
+- `/contrato/{api_contrato_id}/itens`
+- `/contrato/{api_contrato_id}/historico`
 
 Persistencia local:
 
 - `contratos_api`
+- `contratos_api_historico`
 - `contratos_api_empenhos`
 - `contratos_api_faturas`
+- `contratos_api_itens`
+- `contratos_api_fatura_itens`
+- `contratos_api_fatura_empenhos`
 - `contratos_api_sync_runs`
+
+Observacao:
+
+- execucao por item so deve ser exibida como oficial quando a fatura trouxer `dados_item_faturado[].id_item_contrato`; o total executado considera situacoes `Pago` e `Siafi Apropriado`
+- o historico de contrato deve mostrar os valores originais da API; variacoes derivadas entre termos nao sao valor oficial de aditivo
+- o Valor Total da lista deve usar `contratos_api_historico` como fonte principal, somando `valor_inicial` de cada termo. `valor_global` da API nao entra nessa metrica porque pode representar outro consolidado/periodo e distorcer a leitura. Sem historico com `valor_inicial`, usar `contratos.valor` como fallback
+- em contratos com `codigo_unidade_origem = 158155`, a UI deve sinalizar origem Reitoria e diferenciar valores globais do contrato da execucao do campus `158366`
+- empenhos da API alimentam o Valor Empenhado pelo campo `empenhado` na lista principal; o drawer nao exibe uma secao propria de empenhos para evitar misturar saldos da API com a regra local de `empenhos`
+- nos itens do drawer, o contratado deve somar `historico_item[].valor_total` quando a API trouxer historico por item; `valor_total` do item e fallback sem historico
+- a tela de contratos cruza a base local com a API por numero normalizado e abre os dados externos em drawer lateral
 
 ## 5. Edge Function `analisar-liquidacao-siafi`
 
@@ -165,6 +187,7 @@ Dependencias externas:
 Uso:
 
 - chat juridico e analise de PDF no modulo Consultor
+- consulta base semantica de normativos ingeridos pelo pipeline local, conforme [NORMATIVOS_CONSULTOR_INGESTION.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/integrations/NORMATIVOS_CONSULTOR_INGESTION.md)
 
 Chamador:
 
@@ -177,6 +200,7 @@ Status:
 - o frontend usa a `anonKey` do projeto no header `Authorization`
 - a implementacao da function nao foi localizada no repo nesta rodada
 - as conversas do frontend ficam em `localStorage` com chave derivada do usuario autenticado, evitando compartilhar historico entre contas no mesmo navegador
+- o backlog de ingestao dos normativos que alimentam a base semantica fica em [NORMATIVOS_CONSULTOR_INGESTION.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/integrations/NORMATIVOS_CONSULTOR_INGESTION.md)
 
 ## 7. Edge Function `verificar-conformidade`
 

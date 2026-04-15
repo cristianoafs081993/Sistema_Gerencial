@@ -98,6 +98,31 @@ Observacao:
 - somente o superadministrador pode executar acoes administrativas
 - usuarios criados diretamente recebem `user_metadata.uses_default_password = true`
 
+### `sync-contratos-comprasnet`
+
+Local:
+
+- [sync-contratos-comprasnet/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-contratos-comprasnet/index.ts)
+
+Uso:
+
+- sincroniza contratos da UG `158366` a partir de `https://contratos.comprasnet.gov.br/api`
+- busca contratos ativos, inativos, historico, empenhos, faturas e itens
+- deriva vinculos fatura-item de `dados_item_faturado`
+- deriva vinculos fatura-empenho de `dados_empenho`
+- grava contadores e falhas em `contratos_api_sync_runs`
+
+Dependencias:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- opcional `CONTRATOS_SYNC_SECRET` para exigir o header `x-contratos-sync-secret`
+
+Observacao:
+
+- publicada com `verify_jwt = false`, pois o cron chama a function por HTTP e a function usa service role apenas internamente
+- a migration agenda `sync-contratos-comprasnet-6h` com Supabase Cron/pg_net para executar a cada 6 horas
+- a primeira versao aceita apenas a UG `158366`
+
 ## Functions chamadas pelo frontend, mas nao localizadas neste repo
 
 ### `consultor`
@@ -110,6 +135,7 @@ Observacao:
 
 - o frontend monta a URL para `functions/v1/consultor`
 - a implementacao nao foi localizada em `supabase/functions`
+- a base semantica de normativos consumida pelo Consultor e o backlog de ingestao estao documentados em [NORMATIVOS_CONSULTOR_INGESTION.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/integrations/NORMATIVOS_CONSULTOR_INGESTION.md)
 
 ### `verificar-conformidade`
 

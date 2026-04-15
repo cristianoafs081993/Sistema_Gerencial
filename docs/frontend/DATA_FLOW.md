@@ -146,6 +146,26 @@ Observacao para a aba RAP do dashboard:
 
 `LiquidacoesPagamentos.tsx` -> `JsonImportDialog` -> `transparenciaService.import*` -> `documentos_habeis*`
 
+### Contratos
+
+`Contratos.tsx` -> `useData()` -> `contratos` / `contratos_empenhos`
+
+Enriquecimento por API:
+
+`sync-contratos-comprasnet` -> `contratos_api*` -> `contratosApiService` -> drawer de detalhes em `Contratos.tsx`
+
+Observacao:
+
+- a lista principal continua usando a base local de contratos
+- dados do Comprasnet aparecem apenas quando o numero normalizado do contrato local casa com `contratos_api.numero`
+- o historico da API (`contratos_api_historico`) aparece no drawer com assinatura, aditivos, apostilamentos e rescisao
+- contratos com origem `158155` recebem sinalizacao de Reitoria; a execucao operacional deve ser lida pela UG do campus `158366`
+- Valor Total da lista usa o historico da API como fonte principal quando houver match, somando `valor_inicial` de cada termo: assinatura, aditivos, apostilamentos ou termos equivalentes. `valor_global` da API nao entra nessa metrica. Sem historico com `valor_inicial`, usa `contratos.valor` como fallback
+- Valor Empenhado usa o empenhado original da API quando existir, ou o valor original do empenho local como fallback; RAP inscrito/reinscrito fica como detalhe separado
+- no drawer, a secao de itens usa `contratos_api_itens.historico_item` para somar o valor contratado por item quando a API traz historico de assinatura/aditivos; `contratos_api_itens.valor_total` e apenas fallback quando nao houver historico do item
+- a execucao por item soma faturas com situacao `Pago` ou `Siafi Apropriado` e vinculo `dados_item_faturado`
+- faturas sem item vinculado ficam em grupo separado e nao entram na execucao oficial por item
+
 ### Editor de Documentos
 
 `EditorDocumentos.tsx` -> `suapProcessosService.getAll` -> `processos`

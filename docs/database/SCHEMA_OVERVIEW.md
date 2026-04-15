@@ -41,8 +41,12 @@ Para mudancas sensiveis, confirme sempre nas migrations em [supabase/migrations]
 - `contratos`
 - `contratos_empenhos`
 - `contratos_api`
+- `contratos_api_historico`
 - `contratos_api_empenhos`
 - `contratos_api_faturas`
+- `contratos_api_itens`
+- `contratos_api_fatura_itens`
+- `contratos_api_fatura_empenhos`
 - `contratos_api_sync_runs`
 
 ### Importacoes auxiliares
@@ -51,6 +55,15 @@ Para mudancas sensiveis, confirme sempre nas migrations em [supabase/migrations]
 - `lc_credores`
 - `retencoes_efd_reinf`
 - `email_csv_ingestion_runs`
+
+### Base semantica do Consultor
+
+- `normativos`
+- `normativos_chunks`
+- `normativos_log`
+- RPC `buscar_normativos`
+
+Observacao: esses objetos sao criados pelo SQL embutido em [normativos-pipeline/pipeline/ingest.py](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/normativos-pipeline/pipeline/ingest.py), nao pelas migrations principais inspecionadas nesta rodada. O fluxo e o backlog ficam em [NORMATIVOS_CONSULTOR_INGESTION.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/integrations/NORMATIVOS_CONSULTOR_INGESTION.md).
 
 ### Autorizacao de telas
 
