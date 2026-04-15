@@ -5,6 +5,7 @@ import { DataProvider, useData } from '@/contexts/DataContext';
 import { atividadesService } from '@/services/atividades';
 import { contratosService } from '@/services/contratos';
 import { creditosDisponiveisService } from '@/services/creditosDisponiveis';
+import { descentralizacoesContaSaldosService } from '@/services/descentralizacoesContaSaldos';
 import { descentralizacoesService } from '@/services/descentralizacoes';
 import { empenhosService } from '@/services/empenhos';
 
@@ -57,11 +58,18 @@ vi.mock('@/services/creditosDisponiveis', () => ({
   },
 }));
 
+vi.mock('@/services/descentralizacoesContaSaldos', () => ({
+  descentralizacoesContaSaldosService: {
+    getAll: vi.fn(),
+  },
+}));
+
 const mockedAtividadesService = vi.mocked(atividadesService);
 const mockedEmpenhosService = vi.mocked(empenhosService);
 const mockedDescentralizacoesService = vi.mocked(descentralizacoesService);
 const mockedContratosService = vi.mocked(contratosService);
 const mockedCreditosService = vi.mocked(creditosDisponiveisService);
+const mockedContaDescentralizacoesService = vi.mocked(descentralizacoesContaSaldosService);
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -160,6 +168,7 @@ describe('DataContext', () => {
     mockedContratosService.getContratos.mockResolvedValue([]);
     mockedContratosService.getContratosEmpenhos.mockResolvedValue([]);
     mockedCreditosService.getAll.mockResolvedValue([]);
+    mockedContaDescentralizacoesService.getAll.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -181,6 +190,7 @@ describe('DataContext', () => {
     expect(mockedContratosService.getContratos).toHaveBeenCalledTimes(1);
     expect(mockedContratosService.getContratosEmpenhos).toHaveBeenCalledTimes(1);
     expect(mockedCreditosService.getAll).toHaveBeenCalledTimes(1);
+    expect(mockedContaDescentralizacoesService.getAll).toHaveBeenCalledTimes(1);
 
     expect(result.current.atividades).toHaveLength(2);
     expect(result.current.empenhos).toHaveLength(2);

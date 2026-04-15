@@ -4,6 +4,7 @@ import type {
   Atividade,
   Contrato,
   ContratoEmpenho,
+  ContaDescentralizacaoSaldo,
   CreditoDisponivel,
   Descentralizacao,
   Empenho,
@@ -28,6 +29,7 @@ interface DataContextType {
   atividades: Atividade[];
   empenhos: Empenho[];
   descentralizacoes: Descentralizacao[];
+  contaDescentralizacoes: ContaDescentralizacaoSaldo[];
   contratos: Contrato[];
   contratosEmpenhos: ContratoEmpenho[];
   creditosDisponiveis: CreditoDisponivel[];
@@ -58,6 +60,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     atividades,
     empenhos,
     descentralizacoes,
+    contaDescentralizacoes,
     contratos,
     contratosEmpenhos,
     creditosDisponiveis,
@@ -159,6 +162,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       atividades,
       empenhos,
       descentralizacoes,
+      contaDescentralizacoes,
       contratos,
       contratosEmpenhos,
       creditosDisponiveis,
@@ -184,6 +188,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       atividades,
       empenhos,
       descentralizacoes,
+      contaDescentralizacoes,
       contratos,
       contratosEmpenhos,
       creditosDisponiveis,

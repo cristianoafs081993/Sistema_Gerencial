@@ -76,6 +76,8 @@ Campos-chave:
 
 - `id`
 - `dimensao`
+- `nota_credito`
+- `operacao_tipo`
 - `origem_recurso`
 - `natureza_despesa`
 - `plano_interno`
@@ -86,6 +88,31 @@ Consumido por:
 
 - [descentralizacoes.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/descentralizacoes.ts)
 - [Descentralizacoes.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Descentralizacoes.tsx)
+
+### `descentralizacoes_conta_saldos`
+
+Finalidade:
+
+- saldos agregados por `ptres` carregados do relatorio de conta de descentralizacoes
+
+Campos-chave:
+
+- `ptres`
+- `metrica`
+- `valor`
+- `updated_at`
+
+Observacoes operacionais:
+
+- essa tabela nao substitui os lancamentos detalhados de `descentralizacoes`
+- ela deve ser usada apenas para os somatorios geral, por `ptres` e por dimensao
+- o agregado por dimensao no frontend reaproveita a distribuicao atual dos lancamentos detalhados do mesmo `ptres`
+
+Consumido por:
+
+- [descentralizacoesContaSaldos.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/descentralizacoesContaSaldos.ts)
+- [Descentralizacoes.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Descentralizacoes.tsx)
+- [Dashboard.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Dashboard.tsx)
 
 ### `creditos_disponiveis`
 

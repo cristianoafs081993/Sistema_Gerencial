@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { atividadesService } from '@/services/atividades';
 import { contratosService } from '@/services/contratos';
 import { creditosDisponiveisService } from '@/services/creditosDisponiveis';
+import { descentralizacoesContaSaldosService } from '@/services/descentralizacoesContaSaldos';
 import { descentralizacoesService } from '@/services/descentralizacoes';
 import { empenhosService } from '@/services/empenhos';
 import { dataQueryKeys } from '@/contexts/dataQueryKeys';
@@ -20,6 +21,11 @@ export function useDataQueries() {
   const { data: descentralizacoes = [], isLoading: isLoadingDescentralizacoes } = useQuery({
     queryKey: dataQueryKeys.descentralizacoes,
     queryFn: descentralizacoesService.getAll,
+  });
+
+  const { data: contaDescentralizacoes = [], isLoading: isLoadingContaDescentralizacoes } = useQuery({
+    queryKey: dataQueryKeys.descentralizacoesContaSaldos,
+    queryFn: descentralizacoesContaSaldosService.getAll,
   });
 
   const { data: contratos = [], isLoading: isLoadingContratos } = useQuery({
@@ -41,6 +47,7 @@ export function useDataQueries() {
     atividades,
     empenhos,
     descentralizacoes,
+    contaDescentralizacoes,
     contratos,
     contratosEmpenhos,
     creditosDisponiveis,
@@ -48,6 +55,7 @@ export function useDataQueries() {
       isLoadingAtividades ||
       isLoadingEmpenhos ||
       isLoadingDescentralizacoes ||
+      isLoadingContaDescentralizacoes ||
       isLoadingContratos ||
       isLoadingContratosEmpenhos ||
       isLoadingCreditos,

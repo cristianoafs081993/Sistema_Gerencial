@@ -48,6 +48,7 @@ Usado para os dados mais centrais do sistema:
 - atividades
 - empenhos
 - descentralizacoes
+- descentralizacoes_conta_saldos
 - contratos
 - contratos_empenhos
 - creditos_disponiveis
@@ -124,8 +125,9 @@ Observacao para a aba RAP do dashboard:
 - separar `inscrito` e `reinscrito` pelo ano do empenho:
   - ano imediatamente anterior ao exercicio corrente: usar a base inscrita do RAP
   - anos anteriores a esse: tratar como `reinscrito`
-- `restos a pagar pagos` deve ser lido como o valor liquidado/executado no exercicio corrente
+- `restos a pagar pagos` deve ser somado ao valor de `valor_liquidado_a_pagar` para representar o total liquidado/executado no exercicio corrente
 - `restos a pagar a pagar` deve ser tratado como o saldo atual do empenho RAP
+- no upload SIAFI de `Empenhos.tsx`, a coluna `RESTOS A PAGAR NAO PROCES. LIQUIDADOS A PAGAR` alimenta `valor_liquidado_a_pagar` tambem para RAP e e descontada do `saldo_rap_oficial`
 - quando o saldo oficial nao vier preenchido, derivar o saldo pela base vigente do RAP menos o valor executado no ano
 - a mesma regra deve valer para dashboard, tela de empenhos, agrupamentos e contratos vinculados
 - nao reutilizar `valor` ou `valorPagoOficial` como substitutos desses totais na agregacao da aba RAP

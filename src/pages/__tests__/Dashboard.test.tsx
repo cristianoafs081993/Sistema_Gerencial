@@ -41,6 +41,7 @@ vi.mock('@/components/dashboard/DashboardCurrentTab', () => ({
   DashboardCurrentTab: ({
     filteredData,
     totalPlanejado,
+    totalDescentralizado,
     totalLiquidado,
     totalPago,
     dadosMensais,
@@ -49,6 +50,7 @@ vi.mock('@/components/dashboard/DashboardCurrentTab', () => ({
   }: {
     filteredData: { empenhosCorrente: unknown[]; empenhosRap: unknown[] };
     totalPlanejado: number;
+    totalDescentralizado: number;
     totalLiquidado: number;
     totalPago: number;
     dadosMensais: Array<{ name: string; pago: number }>;
@@ -57,6 +59,7 @@ vi.mock('@/components/dashboard/DashboardCurrentTab', () => ({
   }) => (
     <div data-testid="current-tab">
       <span data-testid="current-planejado">{totalPlanejado}</span>
+      <span data-testid="current-descentralizado">{totalDescentralizado}</span>
       <span data-testid="current-liquidado">{totalLiquidado}</span>
       <span data-testid="current-pago">{totalPago}</span>
       <span data-testid="current-mensal-pago">{dadosMensais.map((item) => item.pago).join(',')}</span>
@@ -206,7 +209,23 @@ describe('Dashboard', () => {
       ],
       descentralizacoes: [
         makeDescentralizacao({ id: 'desc-en', dimensao: 'EN - Ensino', valor: 70 }),
-        makeDescentralizacao({ id: 'desc-ad', dimensao: 'AD - Administracao', valor: 20 }),
+        makeDescentralizacao({ id: 'desc-ad', dimensao: 'AD - Administracao', origemRecurso: 'ADM', valor: 20 }),
+      ],
+      contaDescentralizacoes: [
+        {
+          id: 'conta-tesouro',
+          ptres: 'Tesouro',
+          metrica: 'Saldo - Moeda Origem (Conta Contabil)',
+          valor: 100,
+          updatedAt: '2026-04-15T10:00:00.000Z',
+        },
+        {
+          id: 'conta-adm',
+          ptres: 'ADM',
+          metrica: 'Saldo - Moeda Origem (Conta Contabil)',
+          valor: 40,
+          updatedAt: '2026-04-15T10:00:00.000Z',
+        },
       ],
       contratos: [],
       contratosEmpenhos: [],
@@ -239,6 +258,7 @@ describe('Dashboard', () => {
     render(<Dashboard />);
 
     expect(screen.getByTestId('current-planejado')).toHaveTextContent('300');
+    expect(screen.getByTestId('current-descentralizado')).toHaveTextContent('140');
     expect(screen.getByTestId('current-empenhos-corrente')).toHaveTextContent('2');
     expect(screen.getByTestId('current-empenhos-rap')).toHaveTextContent('1');
 
@@ -248,9 +268,8 @@ describe('Dashboard', () => {
       expect(screen.getByTestId('current-planejado')).toHaveTextContent('200');
     });
 
+    expect(screen.getByTestId('current-descentralizado')).toHaveTextContent('100');
     expect(screen.getByTestId('current-empenhos-corrente')).toHaveTextContent('1');
-    expect(screen.getByTestId('current-empenhos-rap')).toHaveTextContent('1');
-
     expect(screen.getByTestId('current-empenhos-rap')).toHaveTextContent('1');
   });
 
@@ -259,6 +278,7 @@ describe('Dashboard', () => {
 
     expect(screen.getByTestId('current-planejado')).toHaveTextContent('300');
     expect(screen.getByTestId('current-empenhos-corrente')).toHaveTextContent('2');
+    expect(screen.getByTestId('current-descentralizado')).toHaveTextContent('140');
     expect(screen.getByTestId('active-budget-dimension')).toHaveTextContent('none');
     expect(screen.queryByText(/Dimensao ativa:/)).not.toBeInTheDocument();
 
@@ -270,6 +290,7 @@ describe('Dashboard', () => {
 
     expect(screen.getByTestId('current-planejado')).toHaveTextContent('300');
     expect(screen.getByTestId('current-empenhos-corrente')).toHaveTextContent('2');
+    expect(screen.getByTestId('current-descentralizado')).toHaveTextContent('140');
     expect(screen.queryByText(/Dimensao ativa:/)).not.toBeInTheDocument();
   });
 
@@ -330,6 +351,7 @@ describe('Dashboard', () => {
         }),
       ],
       descentralizacoes: [],
+      contaDescentralizacoes: [],
       contratos: [],
       contratosEmpenhos: [],
       creditosDisponiveis: [],
@@ -359,7 +381,7 @@ describe('Dashboard', () => {
     expect(screen.getByTestId('current-mensal-pago')).toHaveTextContent('200,250');
   });
 
-  it('separa inscritos e reinscritos e usa RAP pagos como liquidado no ano', async () => {
+  it('separa inscritos e reinscritos e soma RAP pagos com liquidado a pagar no ano', async () => {
     mockedUseData.mockReturnValue({
       atividades: [],
       empenhos: [
@@ -372,6 +394,7 @@ describe('Dashboard', () => {
           rapALiquidar: 30,
           saldoRapOficial: 20,
           rapPago: 100,
+          valorLiquidadoAPagar: 15,
         }),
         makeEmpenho({
           id: 'rap-reinscrito',
@@ -382,9 +405,11 @@ describe('Dashboard', () => {
           rapALiquidar: 90,
           saldoRapOficial: 60,
           rapPago: 30,
+          valorLiquidadoAPagar: 10,
         }),
       ],
       descentralizacoes: [],
+      contaDescentralizacoes: [],
       contratos: [],
       contratosEmpenhos: [],
       creditosDisponiveis: [],
@@ -411,11 +436,11 @@ describe('Dashboard', () => {
 
     expect(screen.getByTestId('rap-total-inscrito')).toHaveTextContent('120');
     expect(screen.getByTestId('rap-total-reinscrito')).toHaveTextContent('90');
-    expect(screen.getByTestId('rap-total-liquidado-no-ano')).toHaveTextContent('130');
+    expect(screen.getByTestId('rap-total-liquidado-no-ano')).toHaveTextContent('155');
     expect(screen.getByTestId('rap-total-saldo-atual')).toHaveTextContent('80');
 
     expect(screen.getByTestId('rap-origem-base')).toHaveTextContent('210');
-    expect(screen.getByTestId('rap-origem-liquidado')).toHaveTextContent('130');
+    expect(screen.getByTestId('rap-origem-liquidado')).toHaveTextContent('155');
     expect(screen.getByTestId('rap-origem-saldo')).toHaveTextContent('80');
   });
 });

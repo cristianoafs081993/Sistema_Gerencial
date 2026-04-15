@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Search, Filter, Upload, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Descentralizacao, DIMENSOES } from '@/types';
@@ -31,8 +31,14 @@ import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
+import { descentralizacoesContaSaldosService } from '@/services/descentralizacoesContaSaldos';
 import { descentralizacoesService } from '@/services/descentralizacoes';
 import { matchesDimensionFilter } from '@/utils/dimensionFilters';
+import {
+    buildDescentralizacaoSummaryRows,
+    getFilteredDescentralizacaoSummaryTotal,
+    normalizeContaDescentralizacaoImportRows,
+} from '@/utils/descentralizacoesContaSaldos';
 import {
     createDescentralizacaoImportIdentity,
     shouldImportDescentralizacaoAsNegative,
@@ -94,7 +100,7 @@ function parseValorBR(valorStr: string): number {
 
 export default function Descentralizacoes() {
     const { isSuperAdmin } = useAuth();
-    const { descentralizacoes, isLoading, addDescentralizacao, refreshData } = useData();
+    const { descentralizacoes, contaDescentralizacoes, isLoading, addDescentralizacao, refreshData } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [filterDimensao, setFilterDimensao] = useState('all');
     const [filterOrigem, setFilterOrigem] = useState('all');
@@ -106,9 +112,15 @@ export default function Descentralizacoes() {
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
     const [isDevolucoesDialogOpen, setIsDevolucoesDialogOpen] = useState(false);
+    const [isContaDialogOpen, setIsContaDialogOpen] = useState(false);
 
     // Extrair opções únicas para os filtros
-    const origensUnicas = Array.from(new Set(descentralizacoes.map(d => d.origemRecurso?.trim()).filter(Boolean))).sort();
+    const origensUnicas = Array.from(
+        new Set([
+            ...descentralizacoes.map(d => d.origemRecurso?.trim()).filter(Boolean),
+            ...contaDescentralizacoes.map(item => item.ptres.trim()).filter(Boolean),
+        ]),
+    ).sort();
 
     const filteredDescentralizacoes = descentralizacoes.filter((d) => {
         const matchesSearch =
@@ -161,15 +173,39 @@ export default function Descentralizacoes() {
 
     // Total descentralizado filtrado
     const totalFiltrado = sortedDescentralizacoes.reduce((sum, d) => sum + d.valor, 0);
+    const resumoSaldos = useMemo(
+        () =>
+            buildDescentralizacaoSummaryRows({
+                descentralizacoes,
+                contaSaldos: contaDescentralizacoes,
+            }),
+        [descentralizacoes, contaDescentralizacoes],
+    );
+    const totalResumoFiltrado = searchTerm.trim()
+        ? totalFiltrado
+        : getFilteredDescentralizacaoSummaryTotal({
+            rows: resumoSaldos,
+            filterDimensao,
+            filterOrigem,
+        });
 
 
     const handleCsvImport = (data: Record<string, string>[]) => {
         // Build deduplication set from existing persisted records.
-        const existingBaseKeys = new Set(
-            descentralizacoes.map(d => {
+        const existingImportKeys = new Set(
+            descentralizacoes.flatMap((d) => {
                 const dateStr = d.dataEmissao ? d.dataEmissao.toISOString().split('T')[0] : '';
-                return `${dateStr}|${(d.planoInterno || '').trim().toUpperCase()}|${(d.origemRecurso || '').trim()}|${(d.naturezaDespesa || '').trim()}|${d.valor}`;
-            })
+                const { baseKey, rowKey } = createDescentralizacaoImportIdentity({
+                    dateKey: dateStr,
+                    planoInterno: (d.planoInterno || '').trim().toUpperCase(),
+                    origemRecurso: (d.origemRecurso || '').trim(),
+                    naturezaDespesa: (d.naturezaDespesa || '').trim(),
+                    valor: d.valor,
+                    notaCredito: d.notaCredito,
+                });
+
+                return rowKey === baseKey ? [baseKey] : [baseKey, rowKey];
+            }),
         );
         const importedRowKeys = new Set<string>();
 
@@ -229,7 +265,7 @@ export default function Descentralizacoes() {
                 valor,
                 notaCredito,
             });
-            if (existingBaseKeys.has(baseKey) || importedRowKeys.has(rowKey)) {
+            if (existingImportKeys.has(baseKey) || existingImportKeys.has(rowKey) || importedRowKeys.has(rowKey)) {
                 skipCount++;
                 return;
             }
@@ -238,6 +274,8 @@ export default function Descentralizacoes() {
 
             const descentralizacao: Omit<Descentralizacao, 'id' | 'createdAt' | 'updatedAt'> = {
                 dimensao,
+                notaCredito: notaCredito || undefined,
+                operacaoTipo: operacaoTipo.trim() || undefined,
                 origemRecurso: orNorm,
                 naturezaDespesa: ndNorm,
                 planoInterno: piNorm,
@@ -354,6 +392,19 @@ export default function Descentralizacoes() {
         toast.success(`${importCount} devolução(ões) processada(s), ${skipCount} linha(s) ignorada(s).`);
     };
 
+    const handleContaImport = async (data: Record<string, string>[]) => {
+        const rows = normalizeContaDescentralizacaoImportRows(data);
+
+        if (rows.length === 0) {
+            toast.info('Nenhum saldo de conta valido encontrado no arquivo.');
+            return;
+        }
+
+        await descentralizacoesContaSaldosService.upsertBatch(rows);
+        await refreshData();
+        toast.success(`${rows.length} saldo(s) de conta atualizado(s) para os somatorios.`);
+    };
+
     const descentralizacoesCsvFields = [
         'NC',
         'NC - Operacao (Tipo)',
@@ -385,6 +436,14 @@ export default function Descentralizacoes() {
                     <Upload className="h-4 w-4 text-action-primary" />
                     Importar Devoluções
                 </Button>
+                <Button 
+                    variant="outline" 
+                    onClick={() => setIsContaDialogOpen(true)} 
+                    className="gap-2 h-8 text-xs sm:h-9 sm:text-sm bg-surface-card border-border-default shadow-sm transition-all"
+                >
+                    <Upload className="h-4 w-4 text-action-primary" />
+                    Importar Conta
+                </Button>
                     </>
                 ) : null}
             </HeaderActions>
@@ -392,7 +451,7 @@ export default function Descentralizacoes() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <StatCard
                     title="Total Descentralizado"
-                    value={formatCurrency(totalFiltrado)}
+                    value={formatCurrency(totalResumoFiltrado)}
                     icon={Upload}
                     stitchColor="vibrant-blue"
                 />
@@ -496,7 +555,7 @@ export default function Descentralizacoes() {
                         <span>{sortedDescentralizacoes.length} {sortedDescentralizacoes.length !== 1 ? 'descentralizações' : 'descentralização'} encontrada{sortedDescentralizacoes.length !== 1 ? 's' : ''}</span>
                     </CardTitle>
                     <Badge variant="secondary" className="text-sm px-3 py-1 bg-slate-100 text-slate-700 border-none">
-                        Total: {formatCurrency(totalFiltrado)}
+                        Total: {formatCurrency(totalResumoFiltrado)}
                     </Badge>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -612,6 +671,15 @@ export default function Descentralizacoes() {
                 onImport={handleDevolucoesImport}
                 title="Importar Devoluções"
                 expectedFields={["NC - Dia Emissão", "NC - Descrição", "NC Célula - PTRES", "NC Célula - Natureza Despesa", "NC Célula - Plano Interno", "NC Célula - Valor"]}
+                acceptCsv={true}
+                csvSeparator="\t"
+            />
+            <JsonImportDialog
+                open={isContaDialogOpen}
+                onOpenChange={setIsContaDialogOpen}
+                onImport={handleContaImport}
+                title="Importar Conta de DescentralizaÃ§Ãµes"
+                expectedFields={["PTRES", "MÃ©trica", "Valor"]}
                 acceptCsv={true}
                 csvSeparator="\t"
             />

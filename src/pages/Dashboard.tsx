@@ -18,9 +18,13 @@ import {
 } from '@/utils/rapMetrics';
 import { useData } from '@/contexts/DataContext';
 import { extractDimensionCode, getDimensionLabel, matchesDimensionFilter } from '@/utils/dimensionFilters';
+import {
+  buildDescentralizacaoSummaryRows,
+  getFilteredDescentralizacaoSummaryTotal,
+} from '@/utils/descentralizacoesContaSaldos';
 
 export default function Dashboard() {
-  const { atividades, empenhos, descentralizacoes, isLoading } = useData();
+  const { atividades, empenhos, descentralizacoes, contaDescentralizacoes, isLoading } = useData();
   const [hoveredBudgetDimension, setHoveredBudgetDimension] = useState<string | null>(null);
   const [selectedBudgetDimensionCode, setSelectedBudgetDimensionCode] = useState<string | null>(null);
   const [filterDimensao, setFilterDimensao] = useState('all');
@@ -52,9 +56,12 @@ export default function Dashboard() {
     descentralizacoes.forEach((descentralizacao) => {
       if (descentralizacao.origemRecurso) origens.add(descentralizacao.origemRecurso);
     });
+    contaDescentralizacoes.forEach((saldo) => {
+      if (saldo.ptres) origens.add(saldo.ptres);
+    });
 
     return Array.from(origens).sort();
-  }, [atividades, empenhos, descentralizacoes]);
+  }, [atividades, empenhos, descentralizacoes, contaDescentralizacoes]);
 
   const filteredData = useMemo(() => {
     const filteredAtividades = atividades.filter((atividade) => {
@@ -121,9 +128,23 @@ export default function Dashboard() {
     };
   }, [atividades, empenhos, descentralizacoes, effectiveFilterDimensao, filterOrigem, dateStart, dateEnd]);
 
+  const resumoDescentralizacoes = useMemo(
+    () =>
+      buildDescentralizacaoSummaryRows({
+        descentralizacoes,
+        contaSaldos: contaDescentralizacoes,
+      }),
+    [descentralizacoes, contaDescentralizacoes],
+  );
+
+  const totalDescentralizado = getFilteredDescentralizacaoSummaryTotal({
+    rows: resumoDescentralizacoes,
+    filterDimensao: effectiveFilterDimensao,
+    filterOrigem,
+  });
+
   const totalPlanejado = filteredData.atividades.reduce((total, atividade) => total + atividade.valorTotal, 0);
   const totalEmpenhado = filteredData.empenhosCorrente.reduce((total, empenho) => total + empenho.valor, 0);
-  const totalDescentralizado = filteredData.descentralizacoes.reduce((total, descentralizacao) => total + descentralizacao.valor, 0);
   const aDescentralizar = totalPlanejado - totalDescentralizado;
   const percentualExecutado = totalPlanejado > 0 ? (totalEmpenhado / totalPlanejado) * 100 : 0;
   const totalLiquidado = filteredData.empenhosCorrente.reduce(
@@ -311,7 +332,15 @@ export default function Dashboard() {
     const dimensionMap = new Map<string, Record<string, string | number>>();
     const origemSet = new Set<string>();
 
-    filteredData.descentralizacoes.forEach((descentralizacao) => {
+    resumoDescentralizacoes.forEach((descentralizacao) => {
+      const matchesDimensao = matchesDimensionFilter({
+        dimensionValue: descentralizacao.dimensao,
+        filterValue: effectiveFilterDimensao,
+      });
+      const matchesOrigem = filterOrigem === 'all' || descentralizacao.origemRecurso === filterOrigem;
+
+      if (!matchesDimensao || !matchesOrigem) return;
+
       const dimensao = descentralizacao.dimensao || 'Sem Dimensao';
       const origem = descentralizacao.origemRecurso || 'Sem Origem';
 
@@ -335,7 +364,7 @@ export default function Dashboard() {
       }),
       uniqueOrigens: Array.from(origemSet).sort(),
     };
-  }, [filteredData]);
+  }, [resumoDescentralizacoes, effectiveFilterDimensao, filterOrigem]);
 
   const dadosRapPorOrigem = useMemo(() => {
     const map = new Map<string, { baseVigente: number; liquidadoNoAno: number; saldoAtual: number }>();
