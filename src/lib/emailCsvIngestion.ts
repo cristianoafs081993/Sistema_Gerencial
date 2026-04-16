@@ -59,6 +59,7 @@ export interface DescentralizacaoImportRow {
   baseKey: string;
   rowKey: string;
   notaCredito: string;
+  operacaoTipo: string;
   dimensao: string;
   origemRecurso: string;
   naturezaDespesa: string;
@@ -147,6 +148,8 @@ export interface SiafiEmpenhoData {
   rapPago: number;
   rapAPagar: number;
   valorLiquidadoAPagar: number;
+  saldoRapOficial?: number;
+  rapSaldoOnly?: boolean;
 }
 
 export type ParsedEmailCsvImport =
@@ -294,6 +297,10 @@ function normalizeImportText(value?: string) {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ')
     .toUpperCase();
+}
+
+function normalizeSiafiHeader(value: string) {
+  return normalizeText(value).toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
 function summarizeNotaCredito(value?: string) {
@@ -610,6 +617,7 @@ function autoDetectPipeline(text: string, fileName: string, subject?: string) {
   if (
     hasHeader(
       (candidate) =>
+        (candidate.normalizedKeys.includes('neccor') && candidate.normalizedKeys.includes('metrica')) ||
         candidate.normalizedKeys.includes('despesasempenhadascontroleempenho') ||
         candidate.normalizedKeys.includes('restosapagarinscritos'),
     )
@@ -877,6 +885,7 @@ function parseDescentralizacoes(text: string): ParsedEmailCsvImport {
         baseKey,
         rowKey,
         notaCredito,
+        operacaoTipo: operacaoTipo.trim(),
         dimensao: deriveDimensaoFromPI(planoInterno),
         origemRecurso,
         naturezaDespesa,
@@ -1123,6 +1132,82 @@ function parseCreditosDisponiveis(text: string): ParsedEmailCsvImport {
 }
 
 function parseSiafiEmpenhos(text: string): ParsedEmailCsvImport {
+  const rapSaldoHeader = findMatrixHeader(
+    text,
+    (candidate) =>
+      candidate.normalizedKeys.includes('neccor') &&
+      candidate.normalizedKeys.includes('metrica') &&
+      !candidate.normalizedKeys.includes('despesasempenhadascontroleempenho'),
+  );
+
+  if (rapSaldoHeader) {
+    const lines = parseLines(text);
+    const headers = splitCsvLine(lines[rapSaldoHeader.index], rapSaldoHeader.separator);
+    const findCol = (...keywords: string[]) => {
+      for (const keyword of keywords) {
+        const normalizedKeyword = normalizeSiafiHeader(keyword);
+        const index = headers.findIndex((headerCell) =>
+          normalizeSiafiHeader(headerCell).includes(normalizedKeyword),
+        );
+        if (index !== -1) return index;
+      }
+
+      return -1;
+    };
+
+    const colNE = headers.findIndex((headerCell) => normalizeSiafiHeader(headerCell) === 'NECCOR');
+    const colMetrica = findCol('Metrica');
+    const colValor = findCol('Valor', 'Saldo', 'Saldo - Moeda Origem');
+
+    if (colNE === -1 || colMetrica === -1) {
+      throw new Error('Colunas "NE CCor" e "Metrica" sao obrigatorias no CSV de saldo de RAP.');
+    }
+
+    const rows = lines
+      .slice(rapSaldoHeader.index + 1)
+      .map((line) => splitCsvLine(line, rapSaldoHeader.separator))
+      .map((cols): SiafiEmpenhoData | null => {
+        const numeroCompleto = String(cols[colNE] || '').trim();
+        if (!numeroCompleto || !numeroCompleto.includes('NE')) return null;
+
+        const metrica = String(cols[colMetrica] || '').trim();
+        if (metrica && !normalizeImportText(metrica).includes('SALDO')) return null;
+
+        const fallbackValue = cols.find(
+          (value, index) => index !== colNE && index !== colMetrica && String(value || '').trim(),
+        );
+        const saldoRapOficial = parseCurrency(colValor >= 0 ? cols[colValor] : fallbackValue || '');
+        const numeroResumido = numeroCompleto.match(/(\d{4}NE\d+)/)?.[1] || numeroCompleto;
+
+        return {
+          numeroCompleto,
+          numeroResumido,
+          processo: '',
+          favorecidoNome: '',
+          favorecidoDocumento: '',
+          descricao: '',
+          naturezaDespesa: '',
+          planoInterno: '',
+          ptres: '',
+          isRap: true,
+          valorEmpenhado: 0,
+          valorLiquidadoOficial: 0,
+          valorPagoOficial: 0,
+          valorLiquidadoAPagar: 0,
+          rapInscrito: 0,
+          rapALiquidar: 0,
+          rapLiquidado: 0,
+          rapPago: 0,
+          rapAPagar: saldoRapOficial,
+          saldoRapOficial,
+          rapSaldoOnly: true,
+        };
+      })
+      .filter((row): row is SiafiEmpenhoData => row !== null);
+
+    return { pipeline: 'siafi_empenhos', rowCount: rows.length, rows };
+  }
+
   const header = findMatrixHeader(
     text,
     (candidate) =>
@@ -1137,24 +1222,23 @@ function parseSiafiEmpenhos(text: string): ParsedEmailCsvImport {
 
   const lines = parseLines(text);
   const headers = splitCsvLine(lines[header.index], header.separator);
-  const normalize = (value: string) => normalizeText(value).toUpperCase();
-  const findCol = (keyword: string) => {
-    const normalizedKeyword = normalize(keyword);
-    return headers.findIndex((headerCell) => normalize(headerCell).includes(normalizedKeyword));
+  const findCol = (...keywords: string[]) => {
+    for (const keyword of keywords) {
+      const normalizedKeyword = normalizeSiafiHeader(keyword);
+      const index = headers.findIndex((headerCell) =>
+        normalizeSiafiHeader(headerCell).includes(normalizedKeyword),
+      );
+      if (index !== -1) return index;
+    }
+
+    return -1;
   };
 
-  const colNE = headers.findIndex(
-    (headerCell) => normalize(headerCell).includes('NE CCOR') && !normalize(headerCell).includes('-'),
-  );
+  const colNE = headers.findIndex((headerCell) => normalizeSiafiHeader(headerCell) === 'NECCOR');
   const colProcesso = findCol('Num. Processo');
   const colFavorecidoNome = findCol('Favorecido Nome');
   const colFavorecidoNumero = findCol('Favorecido Numero');
-  const colDescricao =
-    findCol('Descricao') !== -1
-      ? findCol('Descricao')
-      : findCol('Observacao') !== -1
-        ? findCol('Observacao')
-        : findCol('Historico');
+  const colDescricao = findCol('Descricao', 'Observacao', 'Historico');
   const colNatureza = findCol('Natureza Despesa');
   const colPlanoInterno = findCol('PI Codigo') !== -1 ? findCol('PI Codigo') : findCol('Plano Interno');
   const colPtres = findCol('PTRES');
@@ -1163,10 +1247,14 @@ function parseSiafiEmpenhos(text: string): ParsedEmailCsvImport {
   const colPagas = findCol('DESPESAS PAGAS (CONTROLE EMPENHO)');
   const colLiquidadasAPagar = findCol('DESPESAS LIQUIDADAS A PAGAR (CONTROLE EMPENHO)');
   const colRapInscritos = findCol('RESTOS A PAGAR INSCRITOS');
-  const colRapALiquidar =
-    findCol('RESTOS A PAGAR NAO PROCESSADOS A LIQUIDAR') !== -1
-      ? findCol('RESTOS A PAGAR NAO PROCESSADOS A LIQUIDAR')
-      : findCol('RESTOS A PAGAR NAO PROCESSADOS REINSCRITOS');
+  const colRapALiquidar = findCol(
+    'RESTOS A PAGAR NAO PROCESSADOS A LIQUIDAR',
+    'RESTOS A PAGAR NAO PROCESSADOS REINSCRITOS',
+  );
+  const colRapLiquidadoAPagar = findCol(
+    'RESTOS A PAGAR NAO PROCES. LIQUIDADOS A PAGAR',
+    'RESTOS A PAGAR NAO PROCESSADOS LIQUIDADOS A PAGAR',
+  );
   const colRapPagos = findCol('RESTOS A PAGAR PAGOS');
   const colRapAPagar = findCol('RESTOS A PAGAR A PAGAR');
 
@@ -1198,8 +1286,9 @@ function parseSiafiEmpenhos(text: string): ParsedEmailCsvImport {
       const valorEmpenhado = parseCurrency(safeValue(colEmpenhadas));
       const valorLiquidadoOficial = parseCurrency(safeValue(colLiquidadas));
       const valorPagoOficial = parseCurrency(safeValue(colPagas));
-      const valorLiquidadoAPagar =
-        colLiquidadasAPagar !== -1
+      const valorLiquidadoAPagar = isRap
+        ? parseCurrency(safeValue(colRapLiquidadoAPagar))
+        : colLiquidadasAPagar !== -1
           ? parseCurrency(safeValue(colLiquidadasAPagar))
           : valorLiquidadoOficial - valorPagoOficial;
 

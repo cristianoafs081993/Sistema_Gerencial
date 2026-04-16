@@ -92,7 +92,10 @@ Campos esperados na UI:
 
 - o service tambem integra com o Portal da Transparencia por `fetch`
 - parte da logica de documentos gera itens, situacoes e atualizacoes cruzadas com empenhos
-- na leitura operacional do CSV `Exec_NE_Exercicio_RAP_UG_Executora.csv`:
+- na leitura operacional dos CSVs usados para reconciliar empenhos:
+  - o arquivo `Exec_NE_Exercicio_RAP_UG_Executora.csv` continua cobrindo o exercicio corrente e o contrato legado combinado
+  - o saldo atual de RAP tambem pode vir em um CSV especifico com `NE CCor` + `Metrica`, que atualiza somente `saldo_rap_oficial`
+- no contrato legado combinado `Exec_NE_Exercicio_RAP_UG_Executora.csv`:
   - empenhos do ano imediatamente anterior entram como `inscritos em RAP`
   - empenhos de anos anteriores entram como `reinscritos`
   - `RESTOS A PAGAR PAGOS` representa o valor executado/liquidado no exercicio atual

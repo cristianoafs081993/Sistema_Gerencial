@@ -82,12 +82,38 @@ describe('emailCsvIngestion', () => {
     expect(parsed.rows).toHaveLength(1);
     expect(parsed.rows[0]).toMatchObject({
       notaCredito: '2026NC000001',
+      operacaoTipo: 'ANULACAO DE DESCENTRALIZACAO DE CREDITO',
       origemRecurso: '123456',
       naturezaDespesa: '339030',
       planoInterno: 'PI123ADN',
       dataEmissao: '2026-04-08',
       valor: -500,
     });
+  });
+
+  it('mantem linhas distintas quando a mesma NC vier quebrada em planos internos diferentes', () => {
+    const parsed = parseEmailCsvImport({
+      fileName: 'descentralizacoes.csv',
+      text: [
+        'NC\tNC - Operacao (Tipo)\tNC - Dia Emissao\tNC - Descricao\tNC Celula - PTRES\tNC Celula - Natureza Despesa\tNC Celula - Plano Interno\tNC Celula - Valor',
+        '158155264352026NC000179\tANULACAO DE DESCENTRALIZACAO DE CREDITO\t19/03/2026\tESTORNO PARA AJUSTE NO PI\t231798\t339000\tL21B3P19ENN\t3217,5',
+        '158155264352026NC000179\tANULACAO DE DESCENTRALIZACAO DE CREDITO\t19/03/2026\tESTORNO PARA AJUSTE NO PI\t231798\t339000\tL21B3P21EXN\t3217,5',
+      ].join('\n'),
+    });
+
+    expect(parsed.pipeline).toBe('descentralizacoes');
+    if (parsed.pipeline !== 'descentralizacoes') {
+      throw new Error('pipeline inesperado');
+    }
+
+    expect(parsed.rows).toHaveLength(2);
+    expect(parsed.rows[0].notaCredito).toBe('2026NC000179');
+    expect(parsed.rows[1].notaCredito).toBe('2026NC000179');
+    expect(parsed.rows[0].planoInterno).toBe('L21B3P19ENN');
+    expect(parsed.rows[1].planoInterno).toBe('L21B3P21EXN');
+    expect(parsed.rows[0].rowKey).not.toBe(parsed.rows[1].rowKey);
+    expect(parsed.rows[0].valor).toBe(-3217.5);
+    expect(parsed.rows[1].valor).toBe(-3217.5);
   });
 
   it('diferencia FD-Reinf de situacoes simples pelo cabecalho', () => {
@@ -136,13 +162,13 @@ describe('emailCsvIngestion', () => {
     ]);
   });
 
-  it('parseia o CSV do SIAFI com valores de exercicio e RAP', () => {
+  it('parseia o CSV do SIAFI com valores de exercicio e RAP usando a nova coluna de liquidado a pagar', () => {
     const parsed = parseEmailCsvImport({
       fileName: 'Exec_NE_Exercicio_RAP_UG_Executora.csv',
       text: [
-        'NE CCor;Num. Processo;Favorecido Nome;Favorecido Numero;Descricao;Natureza Despesa;PI Codigo;PTRES;DESPESAS EMPENHADAS (CONTROLE EMPENHO);DESPESAS LIQUIDADAS (CONTROLE EMPENHO);DESPESAS PAGAS (CONTROLE EMPENHO);RESTOS A PAGAR INSCRITOS;RESTOS A PAGAR NAO PROCESSADOS A LIQUIDAR;RESTOS A PAGAR PAGOS;RESTOS A PAGAR A PAGAR',
-        '158366264352026NE000010;23001.000010/2026-11;Fornecedor B;12345678000190;Empenho exercicio;339039;PI123ADN;123456;2.000,00;1.500,00;1.000,00;0,00;0,00;0,00;0,00',
-        '158366264352025NE000011;23001.000011/2025-11;Fornecedor C;98765432000190;Empenho RAP;339030;PI456ADN;654321;0,00;0,00;0,00;3.000,00;1.000,00;500,00;2.500,00',
+        'NE CCor;Num. Processo;Favorecido Nome;Favorecido Numero;Descricao;Natureza Despesa;PI Codigo;PTRES;DESPESAS EMPENHADAS (CONTROLE EMPENHO);DESPESAS LIQUIDADAS (CONTROLE EMPENHO);DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO);DESPESAS PAGAS (CONTROLE EMPENHO);RESTOS A PAGAR INSCRITOS;RESTOS A PAGAR NAO PROCESSADOS A LIQUIDAR;RESTOS A PAGAR NAO PROCES. LIQUIDADOS A PAGAR;RESTOS A PAGAR PAGOS;RESTOS A PAGAR A PAGAR',
+        '158366264352026NE000010;23001.000010/2026-11;Fornecedor B;12345678000190;Empenho exercicio;339039;PI123ADN;123456;2.000,00;1.500,00;500,00;1.000,00;0,00;0,00;0,00;0,00;0,00',
+        '158366264352025NE000011;23001.000011/2025-11;Fornecedor C;98765432000190;Empenho RAP;339030;PI456ADN;654321;0,00;0,00;0,00;0,00;3.000,00;1.000,00;300,00;500,00;2.500,00',
       ].join('\n'),
     });
 
@@ -158,39 +184,36 @@ describe('emailCsvIngestion', () => {
       valorEmpenhado: 2000,
       valorLiquidadoOficial: 1500,
       valorPagoOficial: 1000,
+      valorLiquidadoAPagar: 500,
     });
     expect(parsed.rows[1]).toMatchObject({
       numeroResumido: '2025NE000011',
       isRap: true,
       rapInscrito: 3000,
       rapALiquidar: 1000,
+      valorLiquidadoAPagar: 300,
       rapPago: 500,
       rapAPagar: 2500,
     });
-  });
-
-  it('parseia o layout SIAFI virgulado com colunas RAP PROC E N PROC sem perder totais do exercicio', () => {
+  });  it('parseia o layout SIAFI virgulado com colunas RAP PROC E N PROC sem perder totais do exercicio', () => {
     const parsed = parseEmailCsvImport({
       fileName: 'Empenhos (3).csv',
       text: [
-        '"NE CCor","NE CCor - Núm. Processo","UG Responsável","Fonte Recursos Detalhada","PTRES","PI Código PI","PI Nome","Natureza Despesa","NE CCor - Favorecido Número","NE CCor - Favorecido Nome","NE CCor - Descrição","DESPESAS EMPENHADAS (CONTROLE EMPENHO)","DESPESAS EMPENHADAS A LIQUIDAR (CONTROLE EMP)","DESPESAS LIQUIDADAS (CONTROLE EMPENHO)","DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)","DESPESAS PAGAS (CONTROLE EMPENHO)","RESTOS A PAGAR NAO PROCESSADOS REINSCRITOS","RESTOS A PAGAR INSCRITOS (PROC E N PROC)","RESTOS A PAGAR PAGOS (PROC E N PROC)","RESTOS A PAGAR A PAGAR (PROC E N PROC)"',
+        '"NE CCor","NE CCor - N??m. Processo","UG Respons??vel","Fonte Recursos Detalhada","PTRES","PI C??digo PI","PI Nome","Natureza Despesa","NE CCor - Favorecido N??mero","NE CCor - Favorecido Nome","NE CCor - Descri????o","DESPESAS EMPENHADAS (CONTROLE EMPENHO)","DESPESAS EMPENHADAS A LIQUIDAR (CONTROLE EMP)","DESPESAS LIQUIDADAS (CONTROLE EMPENHO)","DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)","DESPESAS PAGAS (CONTROLE EMPENHO)","RESTOS A PAGAR NAO PROCESSADOS REINSCRITOS","RESTOS A PAGAR INSCRITOS (PROC E N PROC)","RESTOS A PAGAR PAGOS (PROC E N PROC)","RESTOS A PAGAR A PAGAR (PROC E N PROC)"',
         '"158366264352024NE000010","23035.000105.2024-42","151606","1000000000","231796","L20RLP99CIN","DICI-COMUNIC E EVENTOS OUTRAS DESPESAS","339039","33083309000141","VITA SERVICOS DE CERIMONIAL E EVENTOS LTDA","RAP antigo","","","","","","3.570,00","3.570,00","","3.570,00"',
         '"158366264352026NE000003","23035.000003.2026-11","151606","1000000000","231796","L20RLP99ADN","PROAD-GESTAO ADMINISTRATIVA","339039","11111111000111","Fornecedor A","Empenho existente","6.095,00","4.345,41","1.749,59","0,00","1.749,59","","","",""',
         '"158366264352026NE000017","23035.000017.2026-11","151606","1000000000","231796","L20RLP99IEN","DIENG-CONTRATOS CONTINUADOS-INFRAESTRUTURA","339039","22222222000122","Fornecedor B","Empenho pago","105.812,82","88.177,35","17.635,47","3.606,45","14.029,02","","","",""',
         '"158366264352026NE000024","23035.000024.2026-11","151606","1000000000","231796","L20RLP99ADN","PROAD-GESTAO ADMINISTRATIVA","339039","33333333000133","Fornecedor C","Empenho novo","3.217,50","3.217,50","0,00","0,00","0,00","","","",""',
       ].join('\n'),
     });
-
     expect(parsed.pipeline).toBe('siafi_empenhos');
     if (parsed.pipeline !== 'siafi_empenhos') {
       throw new Error('pipeline inesperado');
     }
-
     const exercicioRows = parsed.rows.filter((row) => !row.isRap);
     expect(exercicioRows).toHaveLength(3);
     expect(exercicioRows.reduce((total, row) => total + row.valorLiquidadoOficial, 0)).toBeCloseTo(19385.06);
     expect(exercicioRows.reduce((total, row) => total + row.valorPagoOficial, 0)).toBeCloseTo(15778.61);
-
     expect(parsed.rows.find((row) => row.numeroResumido === '2026NE000017')).toMatchObject({
       valorPagoOficial: 14029.02,
     });
@@ -201,9 +224,54 @@ describe('emailCsvIngestion', () => {
       rapAPagar: 3570,
     });
   });
+  it('usa zero no liquidado a pagar do RAP quando a coluna nova nao existir', () => {
+    const parsed = parseEmailCsvImport({
+      fileName: 'Exec_NE_Exercicio_RAP_UG_Executora.csv',
+      text: [
+        'NE CCor;Num. Processo;Favorecido Nome;Favorecido Numero;Descricao;Natureza Despesa;PI Codigo;PTRES;DESPESAS EMPENHADAS (CONTROLE EMPENHO);DESPESAS LIQUIDADAS (CONTROLE EMPENHO);DESPESAS PAGAS (CONTROLE EMPENHO);RESTOS A PAGAR INSCRITOS;RESTOS A PAGAR NAO PROCESSADOS REINSCRITOS;RESTOS A PAGAR PAGOS;RESTOS A PAGAR A PAGAR',
+        '158366264352026NE000010;23001.000010/2026-11;Fornecedor B;12345678000190;Empenho exercicio;339039;PI123ADN;123456;2.000,00;1.500,00;1.000,00;0,00;0,00;0,00;0,00',
+        '158366264352025NE000011;23001.000011/2025-11;Fornecedor C;98765432000190;Empenho RAP;339030;PI456ADN;654321;0,00;0,00;0,00;3.000,00;1.000,00;500,00;2.500,00',
+      ].join('\n'),
+    });
+
+    expect(parsed.pipeline).toBe('siafi_empenhos');
+    if (parsed.pipeline !== 'siafi_empenhos') {
+      throw new Error('pipeline inesperado');
+    }
+
+    expect(parsed.rows[1]).toMatchObject({
+      numeroResumido: '2025NE000011',
+      valorLiquidadoAPagar: 0,
+    });
+  });
+
+  it('detecta e parseia automaticamente o CSV especifico de saldo de RAP', () => {
+    const parsed = parseEmailCsvImport({
+      fileName: '6 - restos a pagar-_NE-_RO-_Documento (1).csv',
+      text: [
+        '"NE CCor"\t"Metrica"\t""',
+        '"158366264352024NE000010"\t"Saldo - Moeda Origem (Conta Contabil)"\t"3.570,00"',
+      ].join('\n'),
+    });
+
+    expect(parsed.pipeline).toBe('siafi_empenhos');
+    if (parsed.pipeline !== 'siafi_empenhos') {
+      throw new Error('pipeline inesperado');
+    }
+
+    expect(parsed.rows).toEqual([
+      expect.objectContaining({
+        numeroResumido: '2024NE000010',
+        isRap: true,
+        saldoRapOficial: 3570,
+        rapSaldoOnly: true,
+      }),
+    ]);
+  });
 
   it('faz fallback para ISO-8859-1 quando UTF-8 vier corrompido', () => {
     const bytes = new Uint8Array([0x43, 0x72, 0xe9, 0x64, 0x69, 0x74, 0x6f]);
     expect(decodeCsvBytes(bytes)).toBe('Crédito');
   });
 });
+

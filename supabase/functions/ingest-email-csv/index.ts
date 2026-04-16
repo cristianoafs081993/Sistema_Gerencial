@@ -313,27 +313,35 @@ async function applyDescentralizacoesImport(
 ) {
   const existingRows = (await supabase
     .from('descentralizacoes')
-    .select('data_emissao, plano_interno, origem_recurso, natureza_despesa, valor')
+    .select('data_emissao, plano_interno, origem_recurso, natureza_despesa, valor, nota_credito')
     .then(({ data, error }) => {
       if (error) throw error;
       return data || [];
     })) as Array<Record<string, unknown>>;
 
-  const existingBaseKeys = new Set(
-    existingRows.map((row) => {
+  const existingImportKeys = new Set(
+    existingRows.flatMap((row) => {
       const dateKey = String(row.data_emissao || '');
       const planoInterno = String(row.plano_interno || '').trim().toUpperCase();
       const origemRecurso = String(row.origem_recurso || '').trim();
       const naturezaDespesa = String(row.natureza_despesa || '').trim();
       const valor = Number(row.valor || 0);
-      return `${dateKey}|${planoInterno}|${origemRecurso}|${naturezaDespesa}|${valor}`;
+      const notaCredito = String(row.nota_credito || '').trim();
+      const baseKey = `${dateKey}|${planoInterno}|${origemRecurso}|${naturezaDespesa}|${valor}`;
+      const rowKey = notaCredito ? `${baseKey}|${notaCredito}` : baseKey;
+
+      return rowKey === baseKey ? [baseKey] : [baseKey, rowKey];
     }),
   );
 
   const importedRowKeys = new Set<string>();
   const payload = rows
     .filter((row) => {
-      if (existingBaseKeys.has(row.baseKey) || importedRowKeys.has(row.rowKey)) {
+      if (
+        existingImportKeys.has(row.baseKey) ||
+        existingImportKeys.has(row.rowKey) ||
+        importedRowKeys.has(row.rowKey)
+      ) {
         return false;
       }
       importedRowKeys.add(row.rowKey);
@@ -341,6 +349,8 @@ async function applyDescentralizacoesImport(
     })
     .map((row) => ({
       dimensao: row.dimensao,
+      nota_credito: row.notaCredito || null,
+      operacao_tipo: row.operacaoTipo || null,
       origem_recurso: row.origemRecurso,
       natureza_despesa: row.naturezaDespesa,
       plano_interno: row.planoInterno,
@@ -553,15 +563,45 @@ async function fetchExistingEmpenhosMap(
   supabase: ReturnType<typeof createClient>,
   numeros: string[],
 ) {
-  if (!numeros.length) return new Map<string, { id: string; tipo: string }>();
+  if (!numeros.length) return new Map<string, { id: string; tipo: string; status: string }>();
 
-  const rows = await selectRowsByColumnValues(supabase, 'empenhos', 'id, numero, tipo', 'numero', numeros);
+  const rows = await selectRowsByColumnValues(supabase, 'empenhos', 'id, numero, tipo, status', 'numero', numeros);
   return new Map(
     rows.map((row) => [
       String(row.numero || ''),
-      { id: String(row.id || ''), tipo: String(row.tipo || '') },
+      { id: String(row.id || ''), tipo: String(row.tipo || ''), status: String(row.status || '') },
     ]),
   );
+}
+
+function getRapSaldoAjustado(rapAPagar: number, valorLiquidadoAPagar: number) {
+  return Math.max(0, rapAPagar - valorLiquidadoAPagar);
+}
+
+function getImportedRapSaldo(item: Pick<SiafiEmpenhoData, 'saldoRapOficial' | 'rapAPagar' | 'valorLiquidadoAPagar'>) {
+  return item.saldoRapOficial != null
+    ? Math.max(0, item.saldoRapOficial)
+    : getRapSaldoAjustado(item.rapAPagar, item.valorLiquidadoAPagar);
+}
+
+function getRapStatus(
+  item: Pick<SiafiEmpenhoData, 'rapSaldoOnly' | 'saldoRapOficial' | 'rapAPagar' | 'rapPago' | 'valorLiquidadoAPagar'>,
+  existingStatus?: string,
+) {
+  if (item.rapSaldoOnly) {
+    const saldoAtual = getImportedRapSaldo(item);
+    if (saldoAtual <= 0) return 'pago';
+    if (existingStatus === 'liquidado') return 'liquidado';
+    return 'pendente';
+  }
+
+  const saldoAjustado = getImportedRapSaldo(item);
+  const houvePagamento = item.rapPago > 0;
+  const houveLiquidacao = houvePagamento || item.valorLiquidadoAPagar > 0;
+
+  if (saldoAjustado <= 0 && houvePagamento) return 'pago';
+  if (houveLiquidacao) return 'liquidado';
+  return 'pendente';
 }
 
 async function applySiafiEmpenhosImport(
@@ -581,20 +621,27 @@ async function applySiafiEmpenhosImport(
     const existing = existingEmpenhos.get(item.numeroResumido);
     if (existing) {
       const payload: Record<string, unknown> = {
-        valor_liquidado_oficial: item.valorLiquidadoOficial,
-        valor_pago_oficial: item.valorPagoOficial,
-        valor_liquidado_a_pagar: item.valorLiquidadoAPagar,
         ultima_atualizacao_siafi: ultimaAtualizacaoSiafi,
       };
 
+      if (!item.rapSaldoOnly) {
+        payload.valor_liquidado_oficial = item.valorLiquidadoOficial;
+        payload.valor_pago_oficial = item.valorPagoOficial;
+        payload.valor_liquidado_a_pagar = item.valorLiquidadoAPagar;
+      }
+
       if (item.isRap) {
         payload.tipo = 'rap';
-        payload.rap_inscrito = item.rapInscrito;
-        payload.rap_a_liquidar = item.rapALiquidar;
-        payload.rap_liquidado = item.rapLiquidado;
-        payload.rap_pago = item.rapPago;
-        payload.saldo_rap_oficial = item.rapAPagar;
-        payload.valor = item.rapInscrito;
+        payload.saldo_rap_oficial = getImportedRapSaldo(item);
+        payload.status = getRapStatus(item, existing.status);
+
+        if (!item.rapSaldoOnly) {
+          payload.rap_inscrito = item.rapInscrito;
+          payload.rap_a_liquidar = item.rapALiquidar;
+          payload.rap_liquidado = item.rapLiquidado;
+          payload.rap_pago = item.rapPago;
+          payload.valor = item.rapInscrito;
+        }
       } else {
         payload.valor = item.valorEmpenhado;
         payload.valor_liquidado = item.valorLiquidadoOficial;
@@ -628,7 +675,7 @@ async function applySiafiEmpenhosImport(
     inserts.push({
       numero: item.numeroResumido,
       descricao: item.descricao || `Empenho ${item.numeroResumido}`,
-      valor: item.isRap ? item.rapInscrito : item.valorEmpenhado,
+      valor: item.isRap ? (item.rapSaldoOnly ? getImportedRapSaldo(item) : item.rapInscrito) : item.valorEmpenhado,
       dimensao: '',
       componente_funcional: '',
       origem_recurso: item.ptres || '',
@@ -638,17 +685,17 @@ async function applySiafiEmpenhosImport(
       favorecido_documento: item.favorecidoDocumento || null,
       processo: item.processo || null,
       data_empenho: `${item.numeroResumido.substring(0, 4)}-01-01`,
-      status,
+      status: item.isRap ? getRapStatus(item) : status,
       tipo: item.isRap ? 'rap' : 'exercicio',
-      rap_inscrito: item.isRap ? item.rapInscrito : null,
-      rap_a_liquidar: item.isRap ? item.rapALiquidar : null,
-      rap_liquidado: item.isRap ? item.rapLiquidado : null,
-      rap_pago: item.isRap ? item.rapPago : null,
+      rap_inscrito: item.isRap ? (item.rapSaldoOnly ? getImportedRapSaldo(item) : item.rapInscrito) : null,
+      rap_a_liquidar: item.isRap ? (item.rapSaldoOnly ? null : item.rapALiquidar) : null,
+      rap_liquidado: item.isRap ? (item.rapSaldoOnly ? null : item.rapLiquidado) : null,
+      rap_pago: item.isRap ? (item.rapSaldoOnly ? null : item.rapPago) : null,
       valor_liquidado: item.isRap ? null : item.valorLiquidadoOficial,
-      valor_liquidado_a_pagar: item.isRap ? null : item.valorLiquidadoAPagar,
-      valor_liquidado_oficial: item.valorLiquidadoOficial,
-      valor_pago_oficial: item.valorPagoOficial,
-      saldo_rap_oficial: item.isRap ? item.rapAPagar : null,
+      valor_liquidado_a_pagar: item.isRap && item.rapSaldoOnly ? null : item.valorLiquidadoAPagar,
+      valor_liquidado_oficial: item.isRap && item.rapSaldoOnly ? null : item.valorLiquidadoOficial,
+      valor_pago_oficial: item.isRap && item.rapSaldoOnly ? null : item.valorPagoOficial,
+      saldo_rap_oficial: item.isRap ? getImportedRapSaldo(item) : null,
       ultima_atualizacao_siafi: ultimaAtualizacaoSiafi,
     });
   });

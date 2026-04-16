@@ -43,6 +43,8 @@ import { getRapReferenceYear, isRapReinscrito } from '@/utils/rapMetrics';
 import { useAuth } from '@/contexts/AuthContext';
 import { filterEmpenhos, getRapBase, getRapLiquidado, getRapSaldo } from './empenhosFilters';
 
+type SiafiImportMode = 'empenhos' | 'rap-saldo';
+
 
 const statusColors: Record<string, string> = {
   pendente: 'bg-status-warning/20 text-status-warning border-status-warning/30',
@@ -77,9 +79,12 @@ export default function Empenhos() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isUpdatingSaldos, setIsUpdatingSaldos] = useState(false);
+  const [activeImportAction, setActiveImportAction] = useState<'empenhos' | 'rap-saldo' | 'creditos' | null>(null);
 
-  const saldosInputRef = useRef<HTMLInputElement>(null);
+  const empenhosInputRef = useRef<HTMLInputElement>(null);
+  const rapSaldoInputRef = useRef<HTMLInputElement>(null);
   const creditosInputRef = useRef<HTMLInputElement>(null);
+  const saldosInputRef = empenhosInputRef;
   const [selectedEmpenho, setSelectedEmpenho] = useState<Empenho | null>(null);
 
   // Extrair opções únicas para filtros
@@ -242,6 +247,77 @@ export default function Empenhos() {
     }
   };
 
+  const importSiafiCsvFile = async (file: File, mode: SiafiImportMode) => {
+    setIsUpdatingSaldos(true);
+    setActiveImportAction(mode);
+    const importLabel = mode === 'empenhos' ? 'empenhos do exercicio' : 'saldo de RAP';
+    const toastId = toast.loading(`Processando arquivo de ${importLabel}...`);
+
+    try {
+      const parsedData = await parseSiafiCsv(file);
+
+      if (parsedData.length === 0) {
+        toast.error('Nenhum dado válido encontrado no arquivo CSV.', { id: toastId });
+        return;
+      }
+
+      const isRapSaldoCsv = parsedData.some(item => item.rapSaldoOnly);
+      if (mode === 'empenhos' && isRapSaldoCsv) {
+        toast.error('Este arquivo é de saldo de RAP. Use o botão "Importar Saldo RAP".', { id: toastId });
+        return;
+      }
+
+      if (mode === 'rap-saldo' && !isRapSaldoCsv) {
+        toast.error('Este botão espera o CSV específico de saldo de RAP.', { id: toastId });
+        return;
+      }
+
+      toast.loading(`Atualizando ${parsedData.length} registro(s) de ${importLabel} no banco...`, { id: toastId });
+
+      const result = await syncSiafiDataToDb(parsedData, (processed, total) => {
+        if (processed % 50 === 0) {
+          toast.loading(`Atualizando... ${processed}/${total}`, { id: toastId });
+        }
+      });
+
+      await refreshData();
+
+      if (result.atualizados > 0 || result.criados > 0) {
+        let msg = '';
+        if (result.atualizados > 0) msg += `${result.atualizados} atualizado(s)`;
+        if (result.criados > 0) msg += `${msg ? ', ' : ''}${result.criados} criado(s)`;
+        toast.success(`${mode === 'empenhos' ? 'Empenhos' : 'Saldo RAP'}: ${msg}!`, { id: toastId });
+      } else {
+        toast.info('Nenhum empenho do arquivo foi encontrado no sistema.', { id: toastId });
+      }
+
+      if (result.erros > 0) {
+        toast.error(`Houve erro ao salvar ${result.erros} registros.`, { duration: 5000 });
+      }
+    } catch (error: unknown) {
+      console.error('Erro ao processar SIAFI CSV:', error);
+      const message = error instanceof Error ? error.message : 'Erro ao ler a planilha. Verifique o formato do arquivo.';
+      toast.error(message, { id: toastId });
+    } finally {
+      setIsUpdatingSaldos(false);
+      setActiveImportAction(null);
+      if (empenhosInputRef.current) empenhosInputRef.current.value = '';
+      if (rapSaldoInputRef.current) rapSaldoInputRef.current.value = '';
+    }
+  };
+
+  const handleImportEmpenhos = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await importSiafiCsvFile(file, 'empenhos');
+  };
+
+  const handleImportRapSaldo = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await importSiafiCsvFile(file, 'rap-saldo');
+  };
+
   const handleImportCreditos = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -307,8 +383,15 @@ export default function Empenhos() {
         <div className="flex gap-space-2">
           <input
             type="file"
-            ref={saldosInputRef}
-            onChange={handleImportSaldos}
+            ref={empenhosInputRef}
+            onChange={handleImportEmpenhos}
+            accept=".csv"
+            className="hidden"
+          />
+          <input
+            type="file"
+            ref={rapSaldoInputRef}
+            onChange={handleImportRapSaldo}
             accept=".csv"
             className="hidden"
           />
@@ -325,11 +408,11 @@ export default function Empenhos() {
               <TooltipTrigger asChild>
                 <Button
                   variant="outline"
-                  onClick={() => saldosInputRef.current?.click()}
+                  onClick={() => empenhosInputRef.current?.click()}
                   className="gap-space-2 h-space-8 text-text-xs sm:h-space-9 sm:text-text-sm bg-surface-card border-border-default shadow-shadow-sm transition-all"
                   disabled={isUpdatingSaldos}
                 >
-                  {isUpdatingSaldos ? (
+                  {activeImportAction === 'empenhos' ? (
                     <>
                       <Loader2 className="h-space-4 w-space-4 animate-spin" />
                       Processando...
@@ -337,13 +420,41 @@ export default function Empenhos() {
                   ) : (
                     <>
                       <FileSpreadsheet className="h-space-4 w-space-4 text-status-success" />
-                      Importar CSV
+                      Importar Empenhos
                     </>
                   )}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Importar CSV SIAFI (Exec_NE_Exercicio_RAP_UG_Executora.csv)</p>
+                <p>Importar o CSV SIAFI de empenhos do exercicio atual</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  onClick={() => rapSaldoInputRef.current?.click()}
+                  className="gap-space-2 h-space-8 text-text-xs sm:h-space-9 sm:text-text-sm bg-surface-card border-border-default shadow-shadow-sm transition-all"
+                  disabled={isUpdatingSaldos}
+                >
+                  {activeImportAction === 'rap-saldo' ? (
+                    <>
+                      <Loader2 className="h-space-4 w-space-4 animate-spin" />
+                      Processando...
+                    </>
+                  ) : (
+                    <>
+                      <History className="h-space-4 w-space-4 text-status-warning" />
+                      Importar Saldo RAP
+                    </>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Importar o CSV especifico de saldo dos restos a pagar</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
