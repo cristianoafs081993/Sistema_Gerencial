@@ -132,8 +132,22 @@ const details: ContratoApiDetails = {
       valor_total: 201994.8,
       numero_item_compra: '00008',
       historico_item: [
-        { tipo_historico: 'Contrato', valor_total: '201.994,80' },
-        { tipo_historico: 'Termo Aditivo', valor_total: '27.000,00' },
+        {
+          tipo_historico: 'Contrato',
+          data_termo: '2021-12-10',
+          quantidade: '1',
+          periodicidade: 12,
+          valor_unitario: '16.832,90',
+          valor_total: '201.994,80',
+        },
+        {
+          tipo_historico: 'Termo Aditivo',
+          data_termo: '2025-12-04',
+          quantidade: '1',
+          periodicidade: 12,
+          valor_unitario: '2.250,00',
+          valor_total: '27.000,00',
+        },
       ],
     },
     {
@@ -147,10 +161,38 @@ const details: ContratoApiDetails = {
       valor_total: 12720,
       numero_item_compra: '00002',
       historico_item: [
-        { tipo_historico: 'Contrato', valor_total: '12.720,00' },
-        { tipo_historico: 'Termo Aditivo', valor_total: '12.720,00' },
-        { tipo_historico: 'Termo Aditivo', valor_total: '12.720,00' },
-        { tipo_historico: 'Termo Aditivo', valor_total: '12.720,00' },
+        {
+          tipo_historico: 'Contrato',
+          data_termo: '2023-02-07',
+          quantidade: '12',
+          periodicidade: 1,
+          valor_unitario: '1.060,00',
+          valor_total: '12.720,00',
+        },
+        {
+          tipo_historico: 'Termo Aditivo',
+          data_termo: '2024-01-16',
+          quantidade: '12',
+          periodicidade: 1,
+          valor_unitario: '1.060,00',
+          valor_total: '12.720,00',
+        },
+        {
+          tipo_historico: 'Termo Aditivo',
+          data_termo: '2025-01-25',
+          quantidade: '12',
+          periodicidade: 1,
+          valor_unitario: '1.060,00',
+          valor_total: '12.720,00',
+        },
+        {
+          tipo_historico: 'Termo Aditivo',
+          data_termo: '2026-01-29',
+          quantidade: '12',
+          periodicidade: 1,
+          valor_unitario: '1.060,00',
+          valor_total: '12.720,00',
+        },
       ],
     },
   ],
@@ -255,9 +297,26 @@ describe('ContratoApiDetailsSheet', () => {
     expect(screen.queryByText('Empenhos da API')).not.toBeInTheDocument();
     expect(screen.getAllByText('PRESTAÇÃO DE SERVIÇOS DE APOIO ADMINISTRATIVO').length).toBeGreaterThan(0);
     expect(screen.getByText('APARELHO / ACESSÓRIO - ACONDICIONAMENTO FÍSICO')).toBeInTheDocument();
+    expect(screen.getAllByText('Histórico do item').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Contrato').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Termo Aditivo').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('10/12/2021').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('07/02/2023').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Qtd. 12').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Periodicidade 12')).not.toBeInTheDocument();
+    expect(screen.queryByText('Periodicidade 1')).not.toBeInTheDocument();
+    expect(screen.getByText('Unitário R$ 16.832,90')).toBeInTheDocument();
+    expect(screen.getAllByText('Unitário R$ 1.060,00').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Total R$ 12.720,00').length).toBeGreaterThan(0);
     expect(screen.getByText('R$ 228.994,80')).toBeInTheDocument();
     expect(screen.getByText('R$ 50.880,00')).toBeInTheDocument();
     expect(screen.getByText('R$ 13.368,06')).toBeInTheDocument();
+    expect(screen.getByText('Qtd. 1 | Unitário R$ 12.368,06')).toBeInTheDocument();
+    expect(screen.getByText('Qtd. 1 | Unitário R$ 1.000,00')).toBeInTheDocument();
+    expect(screen.getByText('Qtd. contratada 2')).toBeInTheDocument();
+    expect(screen.getByText('Qtd. contratada 48')).toBeInTheDocument();
+    expect(screen.getByText('Qtd. executada 2')).toBeInTheDocument();
+    expect(screen.getByText('Qtd. executada 0')).toBeInTheDocument();
     expect(screen.getByText('Siafi Apropriado')).toBeInTheDocument();
     expect(screen.getByText('Sem item vinculado')).toBeInTheDocument();
     expect(screen.getByText('48162')).toBeInTheDocument();

@@ -161,6 +161,9 @@ Observacao:
 - em contratos com `codigo_unidade_origem = 158155`, a UI deve sinalizar origem Reitoria e diferenciar valores globais do contrato da execucao do campus `158366`
 - empenhos da API alimentam o Valor Empenhado pelo campo `empenhado` na lista principal; o drawer nao exibe uma secao propria de empenhos para evitar misturar saldos da API com a regra local de `empenhos`
 - nos itens do drawer, o contratado deve somar `historico_item[].valor_total` quando a API trouxer historico por item; `valor_total` do item e fallback sem historico
+- quando a API trouxer o `historico_item`, o drawer deve exibir tambem seus campos operacionais por termo: `tipo_historico`, `data_termo`, `quantidade`, `valor_unitario` e `valor_total`
+- no resumo de itens do drawer, `Contratado` e `Executado` tambem devem mostrar quantidade agregada: contratado pela soma de `historico_item[].quantidade` quando houver historico, e executado pela soma de `quantidade_faturado` nas faturas `Pago` ou `Siafi Apropriado`
+- quando houver `dados_item_faturado`, o drawer deve exibir tambem `quantidade_faturado` e `valor_unitario_faturado` na linha da fatura
 - a tela de contratos cruza a base local com a API por numero normalizado e abre os dados externos em drawer lateral
 
 ## 5. Edge Function `analisar-liquidacao-siafi`
@@ -216,6 +219,58 @@ Status:
 
 - invocada pelo frontend
 - nao localizada em `supabase/functions` nesta rodada
+
+## 7B. Edge Function `gerar-contrato-licitacao`
+
+Uso:
+
+- geracao assistida de contrato no Editor de Documentos a partir do PDF do processo sincronizado no SUAP
+- recebe do frontend o modelo contratual selecionado e trechos de apoio do mesmo PDF
+
+Chamador:
+
+- [contractDrafts.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/contractDrafts.ts)
+- [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx)
+
+Implementacao no repo:
+
+- [gerar-contrato-licitacao/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/gerar-contrato-licitacao/index.ts)
+
+Dependencias externas:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional `GEMINI_CONTRACT_MODEL`
+
+Observacao:
+
+- a function usa Gemini via REST e so deve montar contrato quando o frontend conseguir localizar um modelo contratual claro no PDF
+- PDFs sem texto pesquisavel ficam bloqueados no frontend; OCR ainda nao faz parte deste fluxo
+
+## 7C. Edge Function `gerar-termo-referencia-compras`
+
+Uso:
+
+- geracao assistida do Termo de Referencia de compras no Editor de Documentos
+- recebe do frontend o modelo DOCX ativo ja parseado localmente e trechos relevantes do PDF do processo sincronizado no SUAP
+
+Chamador:
+
+- [referenceTerms.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/referenceTerms.ts)
+- [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx)
+
+Implementacao no repo:
+
+- [gerar-termo-referencia-compras/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/gerar-termo-referencia-compras/index.ts)
+
+Dependencias externas:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional `GEMINI_REFERENCE_TERM_MODEL`
+
+Observacao:
+
+- a function usa Gemini via REST e devolve HTML editavel e um `templatePlan` para remontar o DOCX final sobre o modelo vigente
+- sem modelo ativo em `document_templates` ou sem texto pesquisavel no PDF do processo, o bloqueio acontece no frontend
 
 ## 7A. Edge Function `invite-user`
 
@@ -291,10 +346,23 @@ Bucket observado:
 Uso:
 
 - leitura de PDFs no frontend
+- extracao textual do PDF sincronizado do processo para os fluxos de contrato e Termo de Referencia no editor
 
 Arquivo:
 
 - [Consultor.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Consultor.tsx)
+- [contractProcessPdf.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/lib/contractProcessPdf.ts)
+- [referenceTermProcessPdf.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/lib/referenceTermProcessPdf.ts)
+
+### `cfb`
+
+Uso:
+
+- leitura e regravacao do container ZIP do DOCX para preservar o modelo oficial do Termo de Referencia
+
+Arquivos:
+
+- [docxDocumentTemplate.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/lib/docxDocumentTemplate.ts)
 
 ### `xlsx`
 

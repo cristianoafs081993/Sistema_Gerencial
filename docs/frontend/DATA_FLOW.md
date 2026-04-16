@@ -165,6 +165,9 @@ Observacao:
 - Valor Total da lista usa o historico da API como fonte principal quando houver match, somando `valor_inicial` de cada termo: assinatura, aditivos, apostilamentos ou termos equivalentes. `valor_global` da API nao entra nessa metrica. Sem historico com `valor_inicial`, usa `contratos.valor` como fallback
 - Valor Empenhado usa o empenhado original da API quando existir, ou o valor original do empenho local como fallback; RAP inscrito/reinscrito fica como detalhe separado
 - no drawer, a secao de itens usa `contratos_api_itens.historico_item` para somar o valor contratado por item quando a API traz historico de assinatura/aditivos; `contratos_api_itens.valor_total` e apenas fallback quando nao houver historico do item
+- no drawer, cada item tambem exibe o detalhamento do `historico_item` com tipo do termo, data, quantidade, valor unitario e valor total quando a API trouxer esses campos
+- no resumo de itens do drawer, `Contratado` e `Executado` mostram tambem quantidade agregada: quantidade contratada pela soma de `historico_item[].quantidade` quando existir, e quantidade executada pela soma de `quantidade_faturado` nas faturas `Pago` ou `Siafi Apropriado`
+- nas faturas associadas com `dados_item_faturado`, o drawer exibe quantidade faturada e valor unitario faturado alem do valor total do item
 - a execucao por item soma faturas com situacao `Pago` ou `Siafi Apropriado` e vinculo `dados_item_faturado`
 - faturas sem item vinculado ficam em grupo separado e nao entram na execucao oficial por item
 
@@ -176,6 +179,13 @@ Observacoes:
 
 - a grade de processos sincronizados do editor tenta leitura publica via `supabase-js` e cai para REST anonimo quando necessario
 - o detalhe do processo no Editor pode abrir o PDF sincronizado pelo bucket `suap-pdfs` usando URL assinada via `suapProcessosService.getPdfSignedUrl`
+- a opcao `Despacho de Liquidacao` continua usando `documentGeneration.ts` com dados de `processos`, `empenhos`, `contratos` e `contratos_api`
+- a opcao `Contrato de Servico IFRN` baixa o PDF sincronizado do processo, extrai texto com `pdfjs-dist`, identifica paginas candidatas de modelo contratual e envia o modelo escolhido com trechos de apoio para a Edge Function `gerar-contrato-licitacao`
+- a opcao `Termo de Referencia - Compras` exige um modelo DOCX ativo em `document_templates`, analisa o PDF sincronizado do processo com `pdfjs-dist`, envia o template e os trechos relevantes para a Edge Function `gerar-termo-referencia-compras` e libera download do DOCX final montado sobre esse modelo
+- a geracao de contrato exige `pdf_url` no processo e bloqueia quando o PDF nao traz texto pesquisavel, porque esta versao ainda nao faz OCR
+- a geracao do Termo de Referencia tambem bloqueia PDFs sem texto pesquisavel e nao tenta OCR
+- quando o processo contem mais de um termo/minuta de contrato, o editor pede selecao manual do modelo antes de chamar a IA
+- a tela administrativa `/modelos-documentos` publica novas versoes do DOCX, arquiva a versao ativa anterior e aparece apenas para superadmin
 - as telas [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx) e [Suap.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Suap.tsx) expõem no header o botao `Baixar extensão`, apontando para a extensao SUAP Scraper no GitHub
 - a tela [Suap.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Suap.tsx) passou a reutilizar a sessao global do app vinda de `AuthContext`
 - a pagina [Auth.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Auth.tsx) centraliza login, convite e redefinicao de senha

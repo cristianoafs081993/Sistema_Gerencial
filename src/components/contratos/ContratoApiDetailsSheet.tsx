@@ -57,6 +57,12 @@ const formatDate = (value: string | null | undefined) => {
   return new Intl.DateTimeFormat('pt-BR').format(date);
 };
 
+const normalizeDateValue = (value: unknown) => {
+  if (!value) return null;
+  const normalized = String(value).trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : null;
+};
+
 const parseApiCurrency = (value: unknown) => {
   if (typeof value === 'number') return value;
   if (value == null) return 0;
@@ -75,6 +81,14 @@ const parseApiCurrency = (value: unknown) => {
 
 const toCents = (value: number) => Math.round(value * 100);
 
+interface ContratoApiItemHistoricoEntry {
+  tipo: string;
+  dataTermo: string | null;
+  quantidade: number | null;
+  valorUnitario: number | null;
+  valorTotal: number | null;
+}
+
 const getItemContratadoTotal = (item: ContratoApiItemRow) => {
   const historico = item.historico_item ?? [];
   const historicoTotalCents = historico.reduce(
@@ -86,8 +100,36 @@ const getItemContratadoTotal = (item: ContratoApiItemRow) => {
   return Number(item.valor_total) || 0;
 };
 
+const getItemContratadoQuantidade = (item: ContratoApiItemRow) => {
+  const historico = item.historico_item ?? [];
+  const quantidadeHistorico = historico.reduce(
+    (sum, row) => sum + parseApiCurrency(row?.quantidade),
+    0,
+  );
+
+  if (quantidadeHistorico > 0) return quantidadeHistorico;
+  return Number(item.quantidade) || 0;
+};
+
 const getItemDescription = (item: ContratoApiItemRow) =>
   [item.catmatseritem_id, item.descricao_complementar].filter(Boolean).join(' - ') || `Item ${item.api_item_id}`;
+
+const formatNumber = (value: number | null | undefined) => {
+  if (value == null) return '-';
+  return new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+    maximumFractionDigits: 5,
+  }).format(value);
+};
+
+const getItemHistoricoEntries = (item: ContratoApiItemRow): ContratoApiItemHistoricoEntry[] =>
+  (item.historico_item ?? []).map((row) => ({
+    tipo: String(row?.tipo_historico ?? row?.tipo ?? '').trim() || 'Histórico',
+    dataTermo: normalizeDateValue(row?.data_termo),
+    quantidade: row?.quantidade == null ? null : parseApiCurrency(row.quantidade),
+    valorUnitario: row?.valor_unitario == null ? null : parseApiCurrency(row.valor_unitario),
+    valorTotal: row?.valor_total == null ? null : parseApiCurrency(row.valor_total),
+  }));
 
 const getHistoricoTipoLabel = (historico: ContratoApiHistoricoRow) =>
   normalizeStatus(historico.tipo) === 'contrato' ? 'Assinatura' : historico.tipo || 'Histórico';
@@ -132,6 +174,11 @@ function FaturaLine({
             Emissão {formatDate(fatura.data_emissao)}
             {empenhos.length > 0 ? ` | Empenho ${empenhos.map((item) => item.numero_empenho).filter(Boolean).join(', ')}` : ''}
           </p>
+          {faturaItem ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Qtd. {formatNumber(faturaItem.quantidade_faturado)} | Unitário {formatCurrency(faturaItem.valor_unitario_faturado ?? 0)}
+            </p>
+          ) : null}
         </div>
         <div className="text-right text-xs">
           <p className="font-semibold">
@@ -167,7 +214,18 @@ export function ContratoApiDetailsSheet({
       const fatura = faturaById.get(link.contrato_api_fatura_id);
       return isFaturaExecutada(fatura) ? sum + (Number(link.valor_total_faturado) || 0) : sum;
     }, 0);
-    return { item, links, valorContratado: getItemContratadoTotal(item), valorExecutado };
+    const quantidadeExecutada = links.reduce((sum, link) => {
+      const fatura = faturaById.get(link.contrato_api_fatura_id);
+      return isFaturaExecutada(fatura) ? sum + (Number(link.quantidade_faturado) || 0) : sum;
+    }, 0);
+    return {
+      item,
+      links,
+      valorContratado: getItemContratadoTotal(item),
+      quantidadeContratada: getItemContratadoQuantidade(item),
+      valorExecutado,
+      quantidadeExecutada,
+    };
   });
 
   const unknownItemLinks = faturaItens.filter((link) => !link.contrato_api_item_id || !itemById.has(link.contrato_api_item_id));
@@ -306,7 +364,9 @@ export function ContratoApiDetailsSheet({
                         </TableCell>
                       </TableRow>
                     ) : (
-                      itemSummaries.map(({ item, valorContratado, valorExecutado }) => (
+                      itemSummaries.map(({ item, valorContratado, quantidadeContratada, valorExecutado, quantidadeExecutada }) => {
+                        const historicoItem = getItemHistoricoEntries(item);
+                        return (
                         <TableRow key={item.id}>
                           <TableCell>
                             <div className="max-w-[34rem]">
@@ -314,12 +374,45 @@ export function ContratoApiDetailsSheet({
                               <p className="text-xs text-muted-foreground">
                                 Item {item.numero_item_compra || item.api_item_id} | Qtd. {item.quantidade ?? 0}
                               </p>
+                              {historicoItem.length > 0 ? (
+                                <div className="mt-3 border-l-2 border-border/60 pl-3">
+                                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Histórico do item
+                                  </p>
+                                  <div className="mt-2 space-y-2">
+                                    {historicoItem.map((entry, index) => (
+                                      <div key={`${item.id}-historico-${index}`} className="text-xs">
+                                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                          <span className="font-medium text-foreground">{entry.tipo}</span>
+                                          <span className="text-muted-foreground">{formatDate(entry.dataTermo)}</span>
+                                        </div>
+                                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
+                                          <span>Qtd. {formatNumber(entry.quantidade)}</span>
+                                          <span>Unitário {formatCurrency(entry.valorUnitario ?? 0)}</span>
+                                          <span>Total {formatCurrency(entry.valorTotal ?? 0)}</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(valorContratado)}</TableCell>
-                          <TableCell className="text-right font-semibold text-status-success">{formatCurrency(valorExecutado)}</TableCell>
+                          <TableCell className="text-right">
+                            <p className="font-medium">{formatCurrency(valorContratado)}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Qtd. contratada {formatNumber(quantidadeContratada)}
+                            </p>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <p className="font-semibold text-status-success">{formatCurrency(valorExecutado)}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Qtd. executada {formatNumber(quantidadeExecutada)}
+                            </p>
+                          </TableCell>
                         </TableRow>
-                      ))
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
