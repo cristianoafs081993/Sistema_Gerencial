@@ -45,6 +45,64 @@ Dependencias:
 - `OPENAI_API_KEY`
 - opcional `OPENAI_VISION_MODEL`
 
+### `gerar-contrato-licitacao`
+
+Local:
+
+- [gerar-contrato-licitacao/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/gerar-contrato-licitacao/index.ts)
+
+Chamador:
+
+- [contractDrafts.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/contractDrafts.ts)
+
+Uso:
+
+- gera minuta de contrato administrativo no Editor de Documentos a partir do PDF sincronizado do processo no SUAP
+- recebe o modelo contratual selecionado pelo frontend e trechos de apoio extraidos localmente do mesmo PDF
+- devolve HTML editavel, campos identificados, paginas-fonte, alertas e campos obrigatorios ausentes
+
+Dependencias:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional `GEMINI_CONTRACT_MODEL`
+
+Observacao:
+
+- a function so deve ser chamada depois que o frontend localizar uma minuta ou termo de contrato claro no PDF
+- quando o PDF nao tiver texto pesquisavel ou nao trouxer modelo contratual identificavel, o bloqueio acontece no frontend; OCR ainda nao faz parte deste fluxo
+
+### `gerar-termo-referencia-compras`
+
+Local:
+
+- [gerar-termo-referencia-compras/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/gerar-termo-referencia-compras/index.ts)
+
+Chamador:
+
+- [referenceTerms.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/referenceTerms.ts)
+
+Uso:
+
+- gera rascunho do Termo de Referencia de compras a partir do PDF sincronizado do processo e do modelo DOCX ativo
+- recebe blocos editaveis do template, questionario do modelo, respostas do usuario, trechos classificados do PDF e metadados do processo
+- devolve HTML editavel, campos identificados, alertas, pendencias e `templatePlan` para montar o DOCX final com marcas de revisao
+
+Dependencias:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional `GEMINI_REFERENCE_TERM_MODEL`
+
+Observacao:
+
+- a function pressupoe que o modelo vigente ja foi publicado em `document_templates`
+- o frontend bloqueia a chamada quando nao houver modelo ativo, quando o PDF nao tiver texto pesquisavel ou quando o processo nao tiver `pdf_url`
+- o deploy atual usa `verify_jwt = false` em `supabase/config.toml`, seguindo o padrao de functions publicadas pelo frontend neste projeto
+- a geracao e dividida em partes por blocos editaveis para evitar truncamento/JSON invalido em modelos DOCX grandes
+- perguntas puladas pelo usuario ficam como `[CAMPO PENDENTE]` ou blocos pendentes; a IA nao escolhe alternativas puladas
+- alternativas nao adotadas permanecem no DOCX com tachado e comentario lateral para revisao juridica
+- conteudo preenchido pela IA recebe marca de revisao no HTML e no DOCX
+- o modelo padrao e `gemini-2.5-flash-lite`, com fallback automatico para `gemini-2.5-flash`
+
 ### `invite-user`
 
 Local:

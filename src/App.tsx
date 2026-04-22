@@ -26,6 +26,7 @@ const EditorDocumentos = lazy(() => import('./pages/EditorDocumentos'));
 const Consultor = lazy(() => import('./pages/ConsultorSessions'));
 const Suap = lazy(() => import('./pages/Suap'));
 const ControleUsuarios = lazy(() => import('./pages/ControleUsuarios'));
+const ModelosDocumentos = lazy(() => import('./pages/ModelosDocumentos'));
 const DesignSystemPreview = lazy(() => import('./pages/DesignSystemPreview'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
@@ -76,6 +77,7 @@ const App = () => (
                   <Route path="/consultor" element={<Consultor />} />
                   <Route path="/suap" element={<Suap />} />
                   <Route path="/controle-usuarios" element={<ControleUsuarios />} />
+                  <Route path="/modelos-documentos" element={<ModelosDocumentos />} />
                   <Route path="/design-system-preview" element={<DesignSystemPreview />} />
                   <Route path="*" element={<NotFound />} />
                 </Route>

@@ -98,6 +98,23 @@ Mostrar a linhagem operacional dos dados de forma curta:
     - `documentos_habeis_situacoes`
   - pagina: [LiquidacoesPagamentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/LiquidacoesPagamentos.tsx)
 
+### Modelos de documentos e Termo de Referencia
+
+- upload manual do modelo DOCX vigente
+  - pagina: [ModelosDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/ModelosDocumentos.tsx)
+  - parser local do DOCX: [docxDocumentTemplate.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/lib/docxDocumentTemplate.ts)
+  - persistencia: [documentTemplates.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/documentTemplates.ts)
+  - tabela: `document_templates`
+  - saida derivada: `questionnaire_schema`, com perguntas de clausulas `OU`, lacunas e trechos opcionais do modelo AGU
+
+- processo sincronizado do SUAP + modelo DOCX ativo
+  - leitura do PDF do processo: [referenceTerms.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/referenceTerms.ts)
+  - extracao de contexto do PDF: [referenceTermProcessPdf.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/lib/referenceTermProcessPdf.ts)
+  - etapa intermediaria: [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx) apresenta o questionario do modelo, permitindo responder ou pular perguntas
+  - geracao assistida: [gerar-termo-referencia-compras/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/gerar-termo-referencia-compras/index.ts)
+  - consumidor frontend: [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx)
+  - saida operacional: HTML editavel no editor e download do DOCX final montado sobre o template ativo, com destaque para IA, pendencias e trechos nao adotados
+
 ### Liquidacoes e fonte SOF
 
 - arquivo de liquidacoes

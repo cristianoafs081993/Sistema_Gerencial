@@ -10,7 +10,7 @@ import type {
   SuapProcesso,
 } from '@/types';
 
-export type SupportedDocumentType = 'despacho-liquidacao';
+export type SupportedDocumentType = 'despacho-liquidacao' | 'contrato-servico-ifrn' | 'termo-referencia-compras';
 export type IntentLookupType = 'processo' | 'cpf' | 'cnpj';
 export type ContextFieldStatus = 'confirmed' | 'inferred' | 'missing';
 export type ContextFieldKey =
@@ -147,6 +147,24 @@ export const documentDefinitions = [
     name: 'Despacho de Liquidacao',
     acceptedLookups: ['processo'] as const,
     quickPrompt: 'Gerar despacho de liquidacao do processo ',
+    batchSupported: true,
+    requiresProcessPdf: false,
+  },
+  {
+    id: 'contrato-servico-ifrn' as const,
+    name: 'Contrato de Servico IFRN',
+    acceptedLookups: ['processo'] as const,
+    quickPrompt: 'Gerar contrato do processo ',
+    batchSupported: false,
+    requiresProcessPdf: true,
+  },
+  {
+    id: 'termo-referencia-compras' as const,
+    name: 'Termo de Referencia - Compras',
+    acceptedLookups: ['processo'] as const,
+    quickPrompt: 'Gerar termo de referencia do processo ',
+    batchSupported: false,
+    requiresProcessPdf: true,
   },
 ];
 

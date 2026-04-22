@@ -20,6 +20,19 @@ Transformar a criação de documentos administrativos (ETP, TR, Minutas) em um p
 - **TR (Termo de Referência)**
 - **Minuta de Contrato**
 - **Despacho de Autorização de Despesa** (Migrado do Gerador anterior).
+- **Contrato de Serviço IFRN**: gera minuta a partir do PDF sincronizado do processo, reutilizando o modelo contratual presente no próprio processo licitatório.
+
+### 2.1 Regras operacionais do contrato assistido
+- A IA deve usar como base o modelo ou a minuta de contrato localizado dentro do processo, e não um template genérico fixo.
+- O preenchimento deve priorizar dados extraídos do próprio processo: vencedora, CNPJ, objeto, valores, vigência, itens e referências do Termo de Referência.
+- Quando houver mais de um modelo contratual no mesmo PDF, o usuário precisa escolher qual minuta deve ser usada antes da geração.
+- Quando o PDF não tiver texto pesquisável ou não trouxer minuta clara de contrato, a geração deve ser bloqueada para revisão manual.
+
+### 2.2 Regras operacionais do TR assistido para compras
+- O Termo de Referencia deve partir do modelo DOCX oficial vigente publicado em uma tela administrativa separada do editor.
+- O preenchimento deve combinar dados do processo sincronizado, trechos relevantes do PDF e exigencias recorrentes da Lei 14.133/2021, sem inventar informacao ausente.
+- A saida principal continua editavel no editor, mas o usuario deve poder baixar o DOCX final preservando a estrutura do modelo publicado.
+- Quando nao houver modelo ativo ou quando o PDF do processo nao tiver texto pesquisavel, a geracao deve ser bloqueada para revisao manual.
 
 ### 3. Painel de Conformidade IA
 - **Análise em Tempo Real**: Verificação de conformidade ao longo da escrita.

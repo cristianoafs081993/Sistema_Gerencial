@@ -251,7 +251,7 @@ Observacao:
 Uso:
 
 - geracao assistida do Termo de Referencia de compras no Editor de Documentos
-- recebe do frontend o modelo DOCX ativo ja parseado localmente e trechos relevantes do PDF do processo sincronizado no SUAP
+- recebe do frontend o modelo DOCX ativo ja parseado localmente, o questionario revisado do modelo, as respostas ou pulos do usuario e trechos relevantes do PDF do processo sincronizado no SUAP
 
 Chamador:
 
@@ -270,6 +270,8 @@ Dependencias externas:
 Observacao:
 
 - a function usa Gemini via REST e devolve HTML editavel e um `templatePlan` para remontar o DOCX final sobre o modelo vigente
+- respostas do questionario travam escolhas do usuario antes da IA; perguntas puladas viram pendencia e nao sao decididas pelo Gemini
+- o `templatePlan` pode incluir marcas de revisao para o exportador DOCX: destaque de IA, pendencia, tachado de trecho nao adotado e comentarios laterais
 - sem modelo ativo em `document_templates` ou sem texto pesquisavel no PDF do processo, o bloqueio acontece no frontend
 
 ## 7A. Edge Function `invite-user`

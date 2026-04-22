@@ -63,6 +63,43 @@ Necessarias no ambiente do Supabase:
 - `OPENAI_API_KEY`
 - opcional: `OPENAI_VISION_MODEL`
 
+### `gerar-contrato-licitacao`
+
+Necessarias no ambiente do Supabase:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+
+Opcional:
+
+- `GEMINI_CONTRACT_MODEL`
+  - default no codigo: `gemini-2.0-flash`
+
+Observacoes operacionais:
+
+- a function consome Gemini via REST e espera receber do frontend o modelo de contrato ja extraido do PDF
+- o frontend bloqueia a chamada quando o processo nao tiver `pdf_url`, quando o PDF nao trouxer texto pesquisavel ou quando nao houver minuta/termo de contrato identificavel
+- esta versao ainda nao suporta OCR para PDF escaneado
+
+### `gerar-termo-referencia-compras`
+
+Necessarias no ambiente do Supabase:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+
+Opcional:
+
+- `GEMINI_REFERENCE_TERM_MODEL`
+  - default no codigo: `gemini-2.5-flash-lite`
+  - a function ainda tenta fallback automatico para `gemini-2.5-flash` quando o modelo configurado falha
+
+Observacoes operacionais:
+
+- a function consome Gemini via REST e espera receber do frontend o modelo DOCX ativo ja parseado em `document_templates`
+- o modelo ativo tambem pode trazer `questionnaire_schema`; esse JSON e preenchido no frontend antes da chamada final e nao exige novo segredo de ambiente
+- o frontend bloqueia a chamada quando nao houver modelo ativo para `termo-referencia-compras`, quando o processo nao tiver `pdf_url` ou quando o PDF nao trouxer texto pesquisavel
+- esta versao ainda nao suporta OCR para PDF escaneado
+- `supabase/config.toml` deve manter `verify_jwt = false` para `gerar-termo-referencia-compras`, conforme o deploy atual do projeto
+
 ### `ingest-email-csv`
 
 Necessarias no ambiente do Supabase:

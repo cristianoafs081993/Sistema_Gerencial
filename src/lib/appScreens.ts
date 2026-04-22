@@ -79,6 +79,15 @@ export const appScreens: AppScreen[] = [
     isAdminOnly: true,
     hiddenFromNavigation: true,
   },
+  {
+    id: 'modelos-documentos',
+    groupId: 'administracao',
+    name: 'Modelos de documentos',
+    path: '/modelos-documentos',
+    icon: FileText,
+    sortOrder: 30,
+    isAdminOnly: true,
+  },
 ];
 
 export function getScreenForPath(pathname: string) {

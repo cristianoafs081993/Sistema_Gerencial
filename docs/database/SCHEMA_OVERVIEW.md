@@ -26,6 +26,7 @@ Para mudancas sensiveis, confirme sempre nas migrations em [supabase/migrations]
 - `documentos_habeis`
 - `documentos_habeis_itens`
 - `documentos_habeis_situacoes`
+- `document_templates`
 - `liquidacoes`
 - `liquidacoes_empenhos`
 
@@ -89,6 +90,8 @@ Esta view aparece no frontend em [rastreabilidadePFs.ts](/C:/Users/crist/OneDriv
 ## Functions identificadas no repo
 
 - `analisar-liquidacao-siafi`
+- `gerar-contrato-licitacao`
+- `gerar-termo-referencia-compras`
 
 ## Functions invocadas no frontend que exigem confirmacao
 

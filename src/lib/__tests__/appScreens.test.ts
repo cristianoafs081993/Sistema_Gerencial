@@ -4,6 +4,7 @@ describe('app screen registry', () => {
   it('mapeia rotas diretas e escopos de planejamento para telas cadastradas', () => {
     expect(getScreenForPath('/empenhos')?.id).toBe('empenhos');
     expect(getScreenForPath('/planejamento/campus')?.id).toBe('planejamento');
+    expect(getScreenForPath('/modelos-documentos')?.id).toBe('modelos-documentos');
   });
 
   it('mantem controle de usuarios fora das telas de producao dos diretores', () => {
@@ -12,5 +13,6 @@ describe('app screen registry', () => {
     expect(directorScreenIds).toContain('dashboard');
     expect(directorScreenIds).toContain('contratos');
     expect(directorScreenIds).not.toContain(ADMIN_USERS_SCREEN_ID);
+    expect(directorScreenIds).not.toContain('modelos-documentos');
   });
 });

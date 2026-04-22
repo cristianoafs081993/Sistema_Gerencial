@@ -6,3 +6,6 @@ verify_jwt = false
 
 [functions.sync-contratos-comprasnet]
 verify_jwt = false
+
+[functions.gerar-termo-referencia-compras]
+verify_jwt = false

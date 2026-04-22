@@ -28,13 +28,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useData } from '@/contexts/DataContext';
+import { type ContractPdfAnalysis, type ContractTemplateCandidate } from '@/lib/contractProcessPdf';
+import { applyDocxTemplatePlan, type DocxTemplateExportPlan } from '@/lib/docxDocumentTemplate';
 import {
   buildDespachoLiquidacaoHtml,
   buildResolvedContextFromSuapProcess,
@@ -43,13 +44,18 @@ import {
   resolveDocumentIntent,
   type DocumentIntent,
   type ResolvedDocumentContext,
+  type SupportedDocumentType,
 } from '@/lib/documentGeneration';
+import { type ReferenceTermPdfAnalysis } from '@/lib/referenceTermProcessPdf';
 import { suapExtensionGithubUrl } from '@/lib/suapExtension';
 import { cn, formatarDocumento } from '@/lib/utils';
+import { contractDraftsService } from '@/services/contractDrafts';
+import type { DocumentTemplateQuestion, DocumentTemplateRecord } from '@/services/documentTemplates';
+import { referenceTermsService, type ReferenceTermQuestionAnswer } from '@/services/referenceTerms';
 import { suapProcessosService } from '@/services/suapProcessos';
 import type { SuapProcesso } from '@/types';
 
-type ScreenState = 'idle' | 'resolving' | 'ambiguous' | 'not_found';
+type ScreenState = 'idle' | 'resolving' | 'ambiguous' | 'reference_questionnaire' | 'not_found';
 type FeedbackTone = 'neutral' | 'warning' | 'success';
 
 type ExampleProcessCard = {
@@ -65,6 +71,23 @@ type GeneratedDispatch = {
   subtitle?: string;
   processo?: string;
   html: string;
+  documentType: SupportedDocumentType;
+  allowClone: boolean;
+  allowDocxDownload?: boolean;
+  docxFileName?: string;
+  docxTemplateBase64?: string;
+  docxExportPlan?: DocxTemplateExportPlan;
+};
+
+type PendingContractGeneration = {
+  processo: SuapProcesso;
+  analysis: ContractPdfAnalysis;
+};
+
+type PendingReferenceTermGeneration = {
+  processo: SuapProcesso;
+  analysis: ReferenceTermPdfAnalysis;
+  template: DocumentTemplateRecord;
 };
 
 const stripHtml = (html: string) => {
@@ -84,6 +107,9 @@ const buildIntentFromProcess = (processo: string): DocumentIntent => ({
   lookupValue: processo,
   rawPrompt: `Gerar despacho de liquidacao do processo ${processo}`,
 });
+
+const normalizeProcessNumber = (value?: string | null) => (value || '').replace(/\D/g, '');
+const sanitizeFileName = (value: string) => value.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim();
 
 const feedbackClasses: Record<FeedbackTone, string> = {
   neutral: 'border-border-default bg-surface-subtle/70 text-text-secondary',
@@ -140,6 +166,81 @@ function ModelSubmenu({
             <p className="mt-1 font-ui text-[11px] leading-relaxed text-text-secondary">{subtitle}</p>
           </div>
         </button>
+      </div>
+    </div>
+  );
+}
+
+function DocumentModelMenu({
+  activeId,
+  onSelect,
+}: {
+  activeId: SupportedDocumentType;
+  onSelect: (documentType: SupportedDocumentType) => void;
+}) {
+  const options = [
+    {
+      id: 'despacho-liquidacao' as const,
+      group: 'Liquidacao',
+      title: 'Despacho de Liquidacao',
+      subtitle: 'Gera a minuta a partir do numero do processo',
+      icon: <Wand2 className="h-3.5 w-3.5" />,
+    },
+    {
+      id: 'contrato-servico-ifrn' as const,
+      group: 'Contratos',
+      title: 'Contrato de Servico IFRN',
+      subtitle: 'Le o PDF do processo, identifica o modelo e monta o contrato com IA',
+      icon: <FileText className="h-3.5 w-3.5" />,
+    },
+    {
+      id: 'termo-referencia-compras' as const,
+      group: 'Compras',
+      title: 'Termo de Referencia - Compras',
+      subtitle: 'Usa o modelo DOCX ativo e os dados do processo para montar o rascunho com IA',
+      icon: <ReceiptText className="h-3.5 w-3.5" />,
+    },
+  ];
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-radius-lg border border-border-default/70 bg-surface-subtle/50 px-3 py-2">
+        <p className="font-ui text-[10px] font-semibold uppercase tracking-[0.14em] text-text-muted">Modelos</p>
+      </div>
+
+      <div className="space-y-3 pl-2">
+        {options.map((option) => {
+          const isActive = option.id === activeId;
+
+          return (
+            <div key={option.id} className="space-y-1.5">
+              <p className="font-ui text-[10px] font-semibold uppercase tracking-[0.14em] text-primary/70">{option.group}</p>
+              <button
+                type="button"
+                onClick={() => onSelect(option.id)}
+                className={cn(
+                  'group flex w-full items-start gap-3 rounded-radius-lg border px-3 py-3 text-left transition-all duration-200',
+                  isActive
+                    ? 'border-primary/25 bg-primary/[0.09]'
+                    : 'border-border-default/80 bg-surface-card hover:border-primary/20 hover:bg-primary/[0.04]',
+                )}
+              >
+                <span
+                  className={cn(
+                    'mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-radius-md shadow-soft',
+                    isActive ? 'bg-primary text-primary-foreground' : 'bg-surface-subtle text-text-primary',
+                  )}
+                >
+                  {option.icon}
+                </span>
+                <div className="min-w-0">
+                  <p className="font-ui text-sm font-semibold tracking-tight text-text-primary">{option.title}</p>
+                  <p className="mt-1 font-ui text-[11px] leading-relaxed text-text-secondary">{option.subtitle}</p>
+                </div>
+              </button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -309,19 +410,137 @@ function CandidateCard({
   );
 }
 
+function ContractModelCandidateCard({
+  candidate,
+  onSelect,
+}: {
+  candidate: ContractTemplateCandidate;
+  onSelect: (candidate: ContractTemplateCandidate) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(candidate)}
+      className="w-full rounded-radius-xl border border-border-default bg-surface-card px-4 py-4 text-left shadow-soft transition-all duration-200 hover:-translate-y-[1px] hover:border-primary/20 hover:bg-surface-subtle/30 hover:shadow-card"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-ui text-sm font-semibold tracking-tight text-text-primary">{candidate.title}</p>
+          <p className="mt-1 font-ui text-sm text-text-secondary">{candidate.subtitle}</p>
+          <p className="mt-2 line-clamp-3 font-ui text-[11px] leading-relaxed text-text-secondary">{candidate.excerpt}</p>
+        </div>
+        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary/45" />
+      </div>
+    </button>
+  );
+}
+
+function ReferenceTermQuestionCard({
+  question,
+  answer,
+  onAnswer,
+  onSkip,
+}: {
+  question: DocumentTemplateQuestion;
+  answer?: ReferenceTermQuestionAnswer;
+  onAnswer: (answer: ReferenceTermQuestionAnswer) => void;
+  onSkip: () => void;
+}) {
+  const isSkipped = answer?.skipped === true;
+  const selectedOptionId = answer?.selectedOptionId;
+
+  return (
+    <div className="rounded-radius-xl border border-border-default bg-surface-card p-4 shadow-xs">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="border-border-default bg-surface-subtle text-text-secondary">
+              {question.kind === 'exclusive' ? 'Escolha exclusiva' : question.kind === 'optional' ? 'Opcional' : 'Campo'}
+            </Badge>
+            {isSkipped ? (
+              <Badge variant="outline" className="border-warning/30 bg-warning/10 text-amber-900">
+                Pendente
+              </Badge>
+            ) : null}
+          </div>
+          <p className="mt-2 font-ui text-sm font-semibold text-text-primary">{question.title}</p>
+          <p className="mt-1 font-ui text-sm leading-6 text-text-secondary">{question.prompt}</p>
+          {question.guidance ? <p className="mt-1 font-ui text-xs leading-5 text-text-muted">{question.guidance}</p> : null}
+        </div>
+
+        <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={onSkip}>
+          Pular
+        </Button>
+      </div>
+
+      {question.kind === 'field' ? (
+        <Textarea
+          value={isSkipped ? '' : answer?.value || ''}
+          onChange={(event) =>
+            onAnswer({
+              questionId: question.id,
+              kind: 'field',
+              value: event.target.value,
+              skipped: false,
+            })
+          }
+          placeholder="Preencha este campo ou deixe em branco e clique em Pular."
+          className="mt-3 min-h-[92px] rounded-radius-lg border-border-default bg-white text-sm"
+        />
+      ) : (
+        <div className="mt-3 grid gap-2">
+          {(question.options || []).map((option) => {
+            const isSelected = selectedOptionId === option.id && !isSkipped;
+
+            return (
+              <button
+                type="button"
+                key={option.id}
+                onClick={() =>
+                  onAnswer({
+                    questionId: question.id,
+                    kind: question.kind,
+                    selectedOptionId: option.id,
+                    skipped: false,
+                  })
+                }
+                className={cn(
+                  'rounded-radius-lg border px-3 py-2 text-left transition-all duration-200',
+                  isSelected
+                    ? 'border-primary/35 bg-primary/[0.08] text-text-primary shadow-soft'
+                    : 'border-border-default bg-surface-subtle/40 text-text-secondary hover:border-primary/20 hover:bg-primary/[0.04]',
+                )}
+              >
+                <span className="block font-ui text-sm font-semibold">{option.label}</span>
+                <span className="mt-1 line-clamp-3 block font-ui text-xs leading-5">{option.text}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function EditorDocumentos() {
   const { empenhos, contratos, contratosEmpenhos } = useData();
   const editorCardRef = useRef<HTMLDivElement | null>(null);
+  const [activeDocumentId, setActiveDocumentId] = useState<SupportedDocumentType>('despacho-liquidacao');
   const [processInput, setProcessInput] = useState('');
   const [screenState, setScreenState] = useState<ScreenState>('idle');
   const [feedback, setFeedback] = useState('');
   const [feedbackTone, setFeedbackTone] = useState<FeedbackTone>('neutral');
   const [pendingCandidates, setPendingCandidates] = useState<ResolvedDocumentContext[]>([]);
+  const [pendingContractCandidates, setPendingContractCandidates] = useState<ContractTemplateCandidate[]>([]);
+  const [pendingContractGeneration, setPendingContractGeneration] = useState<PendingContractGeneration | null>(null);
+  const [pendingReferenceTermGeneration, setPendingReferenceTermGeneration] = useState<PendingReferenceTermGeneration | null>(null);
+  const [referenceTermAnswers, setReferenceTermAnswers] = useState<Record<string, ReferenceTermQuestionAnswer>>({});
   const [editorContent, setEditorContent] = useState('<p></p>');
   const [selectedTitle, setSelectedTitle] = useState('Despacho de Liquidacao');
   const [generatedDispatches, setGeneratedDispatches] = useState<GeneratedDispatch[]>([]);
   const [copiedDispatchIds, setCopiedDispatchIds] = useState<string[]>([]);
   const [clonedDispatchIds, setClonedDispatchIds] = useState<string[]>([]);
+  const [downloadedDocxIds, setDownloadedDocxIds] = useState<string[]>([]);
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   const [openingPdfId, setOpeningPdfId] = useState<string | null>(null);
 
@@ -330,7 +549,9 @@ export default function EditorDocumentos() {
     [empenhos, contratos, contratosEmpenhos],
   );
 
-  const activeDocument = documentDefinitions[0];
+  const activeDocument = documentDefinitions.find((document) => document.id === activeDocumentId) || documentDefinitions[0];
+  const isContractDocument = activeDocumentId === 'contrato-servico-ifrn';
+  const isReferenceTermDocument = activeDocumentId === 'termo-referencia-compras';
 
   const {
     data: syncedProcesses = [],
@@ -372,6 +593,8 @@ export default function EditorDocumentos() {
     () => exampleProcesses.find((processo) => processo.id === selectedProcessId)?.processoCompleto || null,
     [exampleProcesses, selectedProcessId],
   );
+  const findSyncedProcessByNumber = (processNumber: string) =>
+    syncedProcesses.find((processo) => normalizeProcessNumber(processo.numProcesso) === normalizeProcessNumber(processNumber));
   const visibleRetencoes = useMemo(
     () =>
       selectedProcess
@@ -389,10 +612,72 @@ export default function EditorDocumentos() {
 
   const focusEditor = () => {
     window.setTimeout(() => {
-      editorCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (typeof editorCardRef.current?.scrollIntoView === 'function') {
+        editorCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
       const editable = editorCardRef.current?.querySelector('[contenteditable="true"]') as HTMLElement | null;
       editable?.focus();
     }, 0);
+  };
+
+  const resetPendingStates = () => {
+    setPendingCandidates([]);
+    setPendingContractCandidates([]);
+    setPendingContractGeneration(null);
+    setPendingReferenceTermGeneration(null);
+    setReferenceTermAnswers({});
+  };
+
+  const referenceTermQuestions = pendingReferenceTermGeneration?.template.questionnaireSchema?.questions || [];
+  const answeredReferenceTermQuestions = referenceTermQuestions.filter((question) => {
+    const answer = referenceTermAnswers[question.id];
+    return Boolean(answer && !answer.skipped && (answer.value?.trim() || answer.selectedOptionId));
+  }).length;
+  const skippedReferenceTermQuestions = referenceTermQuestions.filter((question) => referenceTermAnswers[question.id]?.skipped).length;
+
+  const setReferenceTermAnswer = (answer: ReferenceTermQuestionAnswer) => {
+    setReferenceTermAnswers((current) => ({
+      ...current,
+      [answer.questionId]: answer,
+    }));
+  };
+
+  const skipReferenceTermQuestion = (question: DocumentTemplateQuestion) => {
+    setReferenceTermAnswer({
+      questionId: question.id,
+      kind: question.kind,
+      skipped: true,
+    });
+  };
+
+  const buildReferenceTermQuestionnaireAnswers = () =>
+    referenceTermQuestions.map((question) => {
+      const answer = referenceTermAnswers[question.id];
+      return answer || {
+        questionId: question.id,
+        kind: question.kind,
+        skipped: true,
+      };
+    });
+
+  const openGeneratedDocument = (
+    document: GeneratedDispatch,
+    options?: {
+      feedbackMessage?: string;
+      feedbackTone?: FeedbackTone;
+    },
+  ) => {
+    setSelectedTitle(document.title || activeDocument.name);
+    setEditorContent(document.html);
+    setGeneratedDispatches([document]);
+    setCopiedDispatchIds([]);
+    setClonedDispatchIds([]);
+    setDownloadedDocxIds([]);
+    resetPendingStates();
+    setFeedback(options?.feedbackMessage || '');
+    setFeedbackTone(options?.feedbackTone || 'neutral');
+    setScreenState('idle');
+    focusEditor();
   };
 
   const openContext = (
@@ -403,24 +688,18 @@ export default function EditorDocumentos() {
     },
   ) => {
     const html = buildDespachoLiquidacaoHtml(context);
-    setSelectedTitle(context.title || activeDocument.name);
-    setEditorContent(html);
-    setGeneratedDispatches([
+    openGeneratedDocument(
       {
         id: context.candidateId,
         title: context.title || activeDocument.name,
         subtitle: context.subtitle,
         processo: context.processo,
         html,
+        documentType: 'despacho-liquidacao',
+        allowClone: true,
       },
-    ]);
-    setCopiedDispatchIds([]);
-    setClonedDispatchIds([]);
-    setPendingCandidates([]);
-    setFeedback(options?.feedbackMessage || '');
-    setFeedbackTone(options?.feedbackTone || 'neutral');
-    setScreenState('idle');
-    focusEditor();
+      options,
+    );
   };
 
   const handleAppendProcess = (processo: SuapProcesso) => {
@@ -439,6 +718,262 @@ export default function EditorDocumentos() {
     });
   };
 
+  const handleGenerateContractDraft = async (
+    processo: SuapProcesso,
+    analysis: ContractPdfAnalysis,
+    candidate: ContractTemplateCandidate,
+  ) => {
+    setFeedback('');
+    setScreenState('resolving');
+
+    try {
+      const result = await contractDraftsService.generateDraft({ processo, analysis, candidate });
+
+      if (result.status === 'blocked') {
+        setFeedback(result.blockedReason || 'Nao foi possivel confirmar um modelo contratual claro neste processo.');
+        setFeedbackTone('warning');
+        setScreenState('not_found');
+        return;
+      }
+
+      const warningCount = result.warnings.length + result.missingRequiredFields.length;
+      openGeneratedDocument(
+        {
+          id: candidate.id,
+          title: result.title,
+          subtitle: result.subtitle || candidate.subtitle,
+          processo: processo.numProcesso,
+          html: result.html || '<p></p>',
+          documentType: 'contrato-servico-ifrn',
+          allowClone: false,
+        },
+        {
+          feedbackMessage: warningCount > 0 ? `Contrato gerado com ${warningCount} alerta(s) para revisao.` : 'Contrato gerado.',
+          feedbackTone: warningCount > 0 ? 'neutral' : 'success',
+        },
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro inesperado ao gerar o contrato.';
+      setFeedback(message);
+      setFeedbackTone('warning');
+      setScreenState('not_found');
+      toast.error(message);
+    }
+  };
+
+  const handleGenerateContract = async (processo: SuapProcesso) => {
+    if (!processo.numProcesso?.trim()) {
+      const message = 'O processo precisa estar sincronizado com numero valido para gerar contrato.';
+      setFeedback(message);
+      setFeedbackTone('warning');
+      setScreenState('not_found');
+      toast.error(message);
+      return;
+    }
+
+    if (!processo.pdfUrl) {
+      const message = 'Este processo ainda nao possui PDF sincronizado no SUAP.';
+      setFeedback(message);
+      setFeedbackTone('warning');
+      setScreenState('not_found');
+      toast.error(message);
+      return;
+    }
+
+    setFeedback('');
+    resetPendingStates();
+    setScreenState('resolving');
+
+    try {
+      const analysis = await contractDraftsService.analyzeProcessPdf(processo);
+
+      if (analysis.searchablePageCount === 0) {
+        const message = analysis.warnings[0] || 'O PDF do processo nao trouxe texto pesquisavel para a IA.';
+        setFeedback(message);
+        setFeedbackTone('warning');
+        setScreenState('not_found');
+        return;
+      }
+
+      if (analysis.templateCandidates.length === 0) {
+        const message = analysis.warnings[0] || 'Nao encontrei minuta ou termo de contrato dentro do processo.';
+        setFeedback(message);
+        setFeedbackTone('warning');
+        setScreenState('not_found');
+        return;
+      }
+
+      if (analysis.templateCandidates.length > 1) {
+        setPendingContractCandidates(analysis.templateCandidates);
+        setPendingContractGeneration({ processo, analysis });
+        setFeedback(
+          analysis.warnings[analysis.warnings.length - 1] ||
+            'Encontrei mais de um modelo de contrato possivel. Selecione o correto para continuar.',
+        );
+        setFeedbackTone('neutral');
+        setScreenState('ambiguous');
+        return;
+      }
+
+      await handleGenerateContractDraft(processo, analysis, analysis.templateCandidates[0]);
+      setSelectedProcessId(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro inesperado ao analisar o PDF do processo.';
+      setFeedback(message);
+      setFeedbackTone('warning');
+      setScreenState('not_found');
+      toast.error(message);
+    }
+  };
+
+  const handleGenerateReferenceTermDraft = async (
+    processo: SuapProcesso,
+    analysis: ReferenceTermPdfAnalysis,
+    template: DocumentTemplateRecord,
+    questionnaireAnswers: ReferenceTermQuestionAnswer[] = [],
+  ) => {
+    setFeedback('');
+    setScreenState('resolving');
+
+    try {
+      const result = await referenceTermsService.generateDraft({
+        processo,
+        analysis,
+        template,
+        questionnaireSchema: template.questionnaireSchema,
+        questionnaireAnswers,
+      });
+
+      if (result.status === 'blocked') {
+        setFeedback(result.blockedReason || 'Nao foi possivel gerar o Termo de Referencia com o modelo ativo.');
+        setFeedbackTone('warning');
+        setScreenState('not_found');
+        return;
+      }
+
+      const warningCount = result.warnings.length + result.missingRequiredFields.length;
+      const fileName = sanitizeFileName(
+        `Termo de Referencia - ${processo.numProcesso || processo.suapId || 'compras'}.docx`,
+      );
+
+      openGeneratedDocument(
+        {
+          id: `${processo.id}-termo-referencia`,
+          title: result.title,
+          subtitle: result.subtitle || template.versionLabel || template.fileName,
+          processo: processo.numProcesso,
+          html: result.html || '<p></p>',
+          documentType: 'termo-referencia-compras',
+          allowClone: false,
+          allowDocxDownload: Boolean(result.templatePlan),
+          docxFileName: fileName,
+          docxTemplateBase64: template.templateBase64,
+          docxExportPlan: result.templatePlan,
+        },
+        {
+          feedbackMessage:
+            warningCount > 0
+              ? `Termo de Referencia gerado com ${warningCount} alerta(s) para revisao.`
+              : 'Termo de Referencia gerado.',
+          feedbackTone: warningCount > 0 ? 'neutral' : 'success',
+        },
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro inesperado ao gerar o Termo de Referencia.';
+      setFeedback(message);
+      setFeedbackTone('warning');
+      setScreenState('not_found');
+      toast.error(message);
+    }
+  };
+
+  const handleContinueReferenceTermQuestionnaire = async () => {
+    if (!pendingReferenceTermGeneration) return;
+
+    const answers = buildReferenceTermQuestionnaireAnswers();
+    await handleGenerateReferenceTermDraft(
+      pendingReferenceTermGeneration.processo,
+      pendingReferenceTermGeneration.analysis,
+      pendingReferenceTermGeneration.template,
+      answers,
+    );
+  };
+
+  const handleGenerateReferenceTerm = async (processo: SuapProcesso) => {
+    if (!processo.numProcesso?.trim()) {
+      const message = 'O processo precisa estar sincronizado com numero valido para gerar o Termo de Referencia.';
+      setFeedback(message);
+      setFeedbackTone('warning');
+      setScreenState('not_found');
+      toast.error(message);
+      return;
+    }
+
+    if (!processo.pdfUrl) {
+      const message = 'Este processo ainda nao possui PDF sincronizado no SUAP.';
+      setFeedback(message);
+      setFeedbackTone('warning');
+      setScreenState('not_found');
+      toast.error(message);
+      return;
+    }
+
+    setFeedback('');
+    resetPendingStates();
+    setScreenState('resolving');
+
+    try {
+      const template = await referenceTermsService.getActiveTemplate();
+      if (!template) {
+        const message = 'Nao existe modelo ativo para Termo de Referencia - Compras. Publique o DOCX em Modelos de documentos.';
+        setFeedback(message);
+        setFeedbackTone('warning');
+        setScreenState('not_found');
+        toast.error(message);
+        return;
+      }
+
+      if (template.editableBlocks.length === 0) {
+        const message = 'O modelo ativo nao possui blocos editaveis reconhecidos. Reenvie o DOCX atualizado em Modelos de documentos.';
+        setFeedback(message);
+        setFeedbackTone('warning');
+        setScreenState('not_found');
+        toast.error(message);
+        return;
+      }
+
+      const analysis = await referenceTermsService.analyzeProcessPdf(processo);
+
+      if (analysis.searchablePageCount === 0) {
+        const message = analysis.warnings[0] || 'O PDF do processo nao trouxe texto pesquisavel para a IA.';
+        setFeedback(message);
+        setFeedbackTone('warning');
+        setScreenState('not_found');
+        return;
+      }
+
+      const questions = template.questionnaireSchema?.questions || [];
+      if (questions.length > 0) {
+        setPendingReferenceTermGeneration({ processo, analysis, template });
+        setReferenceTermAnswers({});
+        setFeedback(`Revise ${questions.length} pergunta(s) do modelo AGU antes da geracao final. Voce pode pular qualquer uma.`);
+        setFeedbackTone('neutral');
+        setScreenState('reference_questionnaire');
+        setSelectedProcessId(null);
+        return;
+      }
+
+      await handleGenerateReferenceTermDraft(processo, analysis, template);
+      setSelectedProcessId(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro inesperado ao analisar o PDF do processo.';
+      setFeedback(message);
+      setFeedbackTone('warning');
+      setScreenState('not_found');
+      toast.error(message);
+    }
+  };
+
   const handleBatchResolve = async (rawInput = processInput) => {
     const processes = extractProcessNumbers(rawInput);
 
@@ -446,15 +981,47 @@ export default function EditorDocumentos() {
       const message = 'Informe pelo menos um numero de processo valido para gerar a minuta.';
       setFeedback(message);
       setFeedbackTone('warning');
-      setPendingCandidates([]);
+      resetPendingStates();
       setScreenState('not_found');
       toast.error(message);
       return;
     }
 
-    setPendingCandidates([]);
+    resetPendingStates();
     setFeedback('');
     setScreenState('resolving');
+
+    if (isContractDocument || isReferenceTermDocument) {
+      if (processes.length !== 1) {
+        const message = isReferenceTermDocument
+          ? 'A geracao do Termo de Referencia funciona com um processo por vez.'
+          : 'A geracao de contrato funciona com um processo por vez.';
+        setFeedback(message);
+        setFeedbackTone('warning');
+        setScreenState('not_found');
+        toast.error(message);
+        return;
+      }
+
+      const matchedProcess = findSyncedProcessByNumber(processes[0]);
+      if (!matchedProcess) {
+        const message = isReferenceTermDocument
+          ? 'Para gerar o Termo de Referencia, o processo precisa estar sincronizado no SUAP com PDF disponivel.'
+          : 'Para gerar contrato, o processo precisa estar sincronizado no SUAP com PDF disponivel.';
+        setFeedback(message);
+        setFeedbackTone('warning');
+        setScreenState('not_found');
+        toast.error(message);
+        return;
+      }
+
+      if (isReferenceTermDocument) {
+        await handleGenerateReferenceTerm(matchedProcess);
+      } else {
+        await handleGenerateContract(matchedProcess);
+      }
+      return;
+    }
 
     try {
       const results = await Promise.all(
@@ -513,6 +1080,8 @@ export default function EditorDocumentos() {
         subtitle: context.subtitle,
         processo: context.processo,
         html: buildDespachoLiquidacaoHtml(context),
+        documentType: 'despacho-liquidacao' as const,
+        allowClone: true,
       }));
 
       setSelectedTitle(
@@ -522,7 +1091,8 @@ export default function EditorDocumentos() {
       setGeneratedDispatches(dispatches);
       setCopiedDispatchIds([]);
       setClonedDispatchIds([]);
-      setPendingCandidates([]);
+      setDownloadedDocxIds([]);
+      resetPendingStates();
       setScreenState('idle');
 
       const messageParts = [`${resolvedContexts.length} minuta${resolvedContexts.length > 1 ? 's' : ''} gerada${resolvedContexts.length > 1 ? 's' : ''}`];
@@ -556,10 +1126,20 @@ export default function EditorDocumentos() {
       return;
     }
 
+    if (isContractDocument) {
+      await handleGenerateContract(processo);
+      return;
+    }
+
+    if (isReferenceTermDocument) {
+      await handleGenerateReferenceTerm(processo);
+      return;
+    }
+
     if (processo.numProcesso?.trim()) {
       setProcessInput(processo.numProcesso.trim());
     }
-    setPendingCandidates([]);
+    resetPendingStates();
     setFeedback('');
     setScreenState('resolving');
 
@@ -602,6 +1182,34 @@ export default function EditorDocumentos() {
     }
   };
 
+  const handleDownloadDocx = async (dispatch: GeneratedDispatch) => {
+    if (!dispatch.docxTemplateBase64 || !dispatch.docxExportPlan) {
+      toast.error('Este documento ainda nao possui plano de exportacao para DOCX.');
+      return;
+    }
+
+    try {
+      const bytes = await applyDocxTemplatePlan(dispatch.docxTemplateBase64, dispatch.docxExportPlan);
+      const blob = new Blob([bytes], {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = dispatch.docxFileName || 'documento.docx';
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      window.URL.revokeObjectURL(url);
+
+      setDownloadedDocxIds((current) => (current.includes(dispatch.id) ? current : [...current, dispatch.id]));
+      toast.success(`DOCX gerado para ${dispatch.processo || dispatch.title}.`);
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : 'Falha ao montar o DOCX final.');
+    }
+  };
+
   const handleCopy = async () => {
     const html = editorContent;
     try {
@@ -627,11 +1235,11 @@ export default function EditorDocumentos() {
       });
       await navigator.clipboard.write([clipboard]);
       setCopiedDispatchIds((current) => (current.includes(dispatch.id) ? current : [...current, dispatch.id]));
-      toast.success(`Despacho ${dispatch.processo || dispatch.title} copiado.`);
+      toast.success(`Documento ${dispatch.processo || dispatch.title} copiado.`);
     } catch {
       await navigator.clipboard.writeText(stripHtml(dispatch.html));
       setCopiedDispatchIds((current) => (current.includes(dispatch.id) ? current : [...current, dispatch.id]));
-      toast.success(`Despacho ${dispatch.processo || dispatch.title} copiado em texto simples.`);
+      toast.success(`Documento ${dispatch.processo || dispatch.title} copiado em texto simples.`);
     }
   };
 
@@ -660,10 +1268,15 @@ export default function EditorDocumentos() {
           <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
             <Card className="overflow-hidden border-border-default/70 bg-surface-card shadow-soft">
               <CardContent className="p-4">
-                <ModelSubmenu
-                  title={activeDocument.name}
-                  subtitle="Gera a minuta a partir do numero do processo"
-                  onClick={() => setProcessInput('')}
+                <DocumentModelMenu
+                  activeId={activeDocumentId}
+                  onSelect={(documentType) => {
+                    setActiveDocumentId(documentType);
+                    setProcessInput('');
+                    resetPendingStates();
+                    setFeedback('');
+                    setScreenState('idle');
+                  }}
                 />
               </CardContent>
             </Card>
@@ -694,7 +1307,9 @@ export default function EditorDocumentos() {
                               appendDisabled={!example.processoCompleto.numProcesso?.trim()}
                               appendTitle={
                                 example.processoCompleto.numProcesso?.trim()
-                                  ? 'Adicionar ao lote'
+                                  ? isContractDocument || isReferenceTermDocument
+                                    ? 'Usar este processo'
+                                    : 'Adicionar ao lote'
                                   : 'Numero de processo indisponivel para lote'
                               }
                             />
@@ -731,7 +1346,11 @@ export default function EditorDocumentos() {
                     <Textarea
                       value={processInput}
                       onChange={(event) => setProcessInput(event.target.value)}
-                      placeholder="Cole um ou mais numeros de processo, um por linha."
+                      placeholder={
+                        isContractDocument || isReferenceTermDocument
+                          ? 'Cole um numero de processo sincronizado no SUAP.'
+                          : 'Cole um ou mais numeros de processo, um por linha.'
+                      }
                       className="min-h-[116px] resize-none rounded-radius-lg border-border-default bg-surface-card font-mono text-sm text-text-primary shadow-xs placeholder:font-ui placeholder:text-text-muted"
                     />
 
@@ -749,7 +1368,7 @@ export default function EditorDocumentos() {
                           disabled={screenState === 'resolving'}
                         >
                           {screenState === 'resolving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                          Gerar minuta
+                          {isContractDocument ? 'Gerar contrato' : isReferenceTermDocument ? 'Gerar Termo de Referencia' : 'Gerar minuta'}
                         </Button>
                       </div>
                     </div>
@@ -777,6 +1396,72 @@ export default function EditorDocumentos() {
                       </div>
                     </div>
                   ) : null}
+
+                  {screenState === 'ambiguous' && pendingContractCandidates.length > 0 && pendingContractGeneration ? (
+                    <div className="space-y-3 rounded-radius-xl border border-border-default/70 bg-surface-subtle/40 p-3">
+                      <div className="grid gap-3 lg:grid-cols-2">
+                        {pendingContractCandidates.map((candidate) => (
+                          <ContractModelCandidateCard
+                            key={candidate.id}
+                            candidate={candidate}
+                            onSelect={(selectedCandidate) =>
+                              void handleGenerateContractDraft(
+                                pendingContractGeneration.processo,
+                                pendingContractGeneration.analysis,
+                                selectedCandidate,
+                              )
+                            }
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {screenState === 'reference_questionnaire' && pendingReferenceTermGeneration ? (
+                    <div className="space-y-4 rounded-radius-xl border border-border-default/70 bg-surface-subtle/40 p-4">
+                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                        <div>
+                          <p className="font-ui text-sm font-semibold text-text-primary">Questionario do Termo de Referencia</p>
+                          <p className="mt-1 font-ui text-sm leading-6 text-text-secondary">
+                            Escolha clausulas, preencha lacunas ou pule pontos que devem ficar pendentes para revisao.
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Badge variant="outline" className="border-border-default bg-surface-card text-text-secondary">
+                              {answeredReferenceTermQuestions} respondida(s)
+                            </Badge>
+                            <Badge variant="outline" className="border-warning/30 bg-warning/10 text-amber-900">
+                              {skippedReferenceTermQuestions} pulada(s)
+                            </Badge>
+                            <Badge variant="outline" className="border-border-default bg-surface-card text-text-secondary">
+                              {referenceTermQuestions.length} total
+                            </Badge>
+                          </div>
+                        </div>
+
+                        <Button
+                          type="button"
+                          className="h-10 gap-2"
+                          onClick={() => void handleContinueReferenceTermQuestionnaire()}
+                          disabled={screenState === 'resolving'}
+                        >
+                          {screenState === 'resolving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                          Continuar geracao
+                        </Button>
+                      </div>
+
+                      <div className="grid max-h-[520px] gap-3 overflow-y-auto pr-1">
+                        {referenceTermQuestions.map((question) => (
+                          <ReferenceTermQuestionCard
+                            key={question.id}
+                            question={question}
+                            answer={referenceTermAnswers[question.id]}
+                            onAnswer={setReferenceTermAnswer}
+                            onSkip={() => skipReferenceTermQuestion(question)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </CardContent>
             </Card>
@@ -787,7 +1472,13 @@ export default function EditorDocumentos() {
             <RichTextEditor
               content={editorContent}
               onChange={setEditorContent}
-              placeholder="A minuta sera montada aqui..."
+              placeholder={
+                isContractDocument
+                  ? 'O contrato sera montado aqui...'
+                  : isReferenceTermDocument
+                    ? 'O Termo de Referencia sera montado aqui...'
+                    : 'A minuta sera montada aqui...'
+              }
               toolbarLeft={
                 <div className="flex items-center gap-2">
                   <span className="inline-flex h-7 w-7 items-center justify-center rounded-radius-md bg-primary/10 text-primary">
@@ -812,7 +1503,7 @@ export default function EditorDocumentos() {
             <CardContent className="bg-surface-subtle/40 px-4 py-3">
               <div className="mb-3 flex items-center gap-2 font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">
                 <Copy className="h-3.5 w-3.5" />
-                {generatedDispatches.length > 1 ? 'Copiar por despacho' : 'Acoes da minuta'}
+                {generatedDispatches.length > 1 ? 'Copiar por documento' : 'Acoes do documento'}
               </div>
               <div className={cn('grid gap-2', generatedDispatches.length > 1 ? 'md:grid-cols-2 xl:grid-cols-3' : 'max-w-md')}>
                 {generatedDispatches.map((dispatch, index) => {
@@ -826,7 +1517,14 @@ export default function EditorDocumentos() {
                     >
                       <div className="min-w-0">
                         <p className="truncate font-mono text-[12px] font-semibold text-text-primary">
-                          {dispatch.processo || `Despacho ${index + 1}`}
+                          {dispatch.processo ||
+                            `${
+                              dispatch.documentType === 'contrato-servico-ifrn'
+                                ? 'Contrato'
+                                : dispatch.documentType === 'termo-referencia-compras'
+                                  ? 'TR'
+                                  : 'Despacho'
+                            } ${index + 1}`}
                         </p>
                         <p className="mt-0.5 truncate font-ui text-[11px] text-text-secondary">
                           {dispatch.subtitle || dispatch.title}
@@ -837,7 +1535,7 @@ export default function EditorDocumentos() {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          aria-label={isCopied ? 'Despacho copiado' : 'Copiar despacho'}
+                          aria-label={isCopied ? 'Documento copiado' : 'Copiar documento'}
                           className={[
                             'h-7 px-2 transition-all duration-200 hover:-translate-y-px active:scale-95',
                             isCopied
@@ -848,20 +1546,41 @@ export default function EditorDocumentos() {
                         >
                           {isCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                         </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className={[
-                            'h-7 bg-surface-card px-2.5 font-ui text-[11px] transition-all duration-200 hover:-translate-y-px active:scale-95',
-                            isCloned
-                              ? 'border-primary/30 bg-primary/[0.08] text-primary shadow-sm hover:bg-primary/[0.12]'
-                              : 'border-border-default text-text-primary hover:border-primary/20 hover:bg-surface-subtle',
-                          ].join(' ')}
-                          onClick={() => handleCloneDispatch(dispatch)}
-                        >
-                          {isCloned ? 'Clonado' : 'Clonar no SUAP'}
-                        </Button>
+                        {dispatch.allowDocxDownload ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className={[
+                              'h-7 bg-surface-card px-2.5 font-ui text-[11px] transition-all duration-200 hover:-translate-y-px active:scale-95',
+                              downloadedDocxIds.includes(dispatch.id)
+                                ? 'border-primary/30 bg-primary/[0.08] text-primary shadow-sm hover:bg-primary/[0.12]'
+                                : 'border-border-default text-text-primary hover:border-primary/20 hover:bg-surface-subtle',
+                            ].join(' ')}
+                            onClick={() => void handleDownloadDocx(dispatch)}
+                          >
+                            {downloadedDocxIds.includes(dispatch.id) ? 'DOCX baixado' : 'Baixar DOCX'}
+                          </Button>
+                        ) : dispatch.allowClone ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className={[
+                              'h-7 bg-surface-card px-2.5 font-ui text-[11px] transition-all duration-200 hover:-translate-y-px active:scale-95',
+                              isCloned
+                                ? 'border-primary/30 bg-primary/[0.08] text-primary shadow-sm hover:bg-primary/[0.12]'
+                                : 'border-border-default text-text-primary hover:border-primary/20 hover:bg-surface-subtle',
+                            ].join(' ')}
+                            onClick={() => handleCloneDispatch(dispatch)}
+                          >
+                            {isCloned ? 'Clonado' : 'Clonar no SUAP'}
+                          </Button>
+                        ) : (
+                          <span className="font-ui text-[11px] text-text-muted">
+                            {dispatch.documentType === 'termo-referencia-compras' ? 'Revise e exporte em DOCX' : 'Edite e copie no editor'}
+                          </span>
+                        )}
                       </div>
                     </div>
                   );
@@ -1113,7 +1832,11 @@ export default function EditorDocumentos() {
                   disabled={!selectedProcess.numProcesso}
                 >
                   <FileText className="h-4 w-4" />
-                  Gerar Documento
+                  {isContractDocument
+                    ? 'Gerar Contrato'
+                    : isReferenceTermDocument
+                      ? 'Gerar Termo de Referencia'
+                      : 'Gerar Documento'}
                 </Button>
                 <Button
                   type="button"

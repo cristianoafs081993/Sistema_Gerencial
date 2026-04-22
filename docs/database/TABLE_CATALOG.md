@@ -337,6 +337,44 @@ Consumido por:
 - guarda `message_id`, hash do anexo, pipeline detectado, status, volumetria e erro
 - usada para idempotencia e auditoria da automacao por e-mail
 
+### `document_templates`
+
+Finalidade:
+
+- catalogo versionado dos modelos DOCX usados pelos fluxos assistidos do editor
+
+Campos-chave:
+
+- `id`
+- `code`
+- `name`
+- `version_label`
+- `file_name`
+- `mime_type`
+- `template_base64`
+- `template_text`
+- `editable_blocks`
+- `questionnaire_schema`
+- `status`
+- `created_by_email`
+- `created_at`
+- `updated_at`
+
+Consumido por:
+
+- [documentTemplates.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/documentTemplates.ts)
+- [referenceTerms.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/referenceTerms.ts)
+- [ModelosDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/ModelosDocumentos.tsx)
+- [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx)
+
+Observacoes operacionais:
+
+- a versao atual do Termo de Referencia - Compras fica em `status = active`, com indice unico por `code`
+- a tabela guarda o binario do DOCX em base64, o texto integral extraido do modelo, os blocos editaveis detectados localmente e o questionario revisavel do modelo
+- `questionnaire_schema` armazena perguntas derivadas de clausulas `OU`, lacunas entre colchetes e trechos opcionais; o editor envia as respostas para a Edge Function antes da geracao final do Termo de Referencia
+- leitura e liberada para `authenticated`; escrita fica restrita ao superadministrador por RLS
+- `updated_at` e mantido por trigger `trg_update_document_templates_updated_at`
+
 ## Base semantica do Consultor
 
 ### `normativos`
@@ -375,7 +413,7 @@ Observacoes operacionais:
 
 - o catalogo deve ficar alinhado com `src/lib/appScreens.ts`
 - `/auth` nao entra nesse catalogo porque e rota publica
-- `/controle-usuarios` e `/design-system-preview` ficam marcadas como telas administrativas
+- `/controle-usuarios`, `/design-system-preview` e `/modelos-documentos` ficam marcadas como telas administrativas
 
 ### `user_groups`
 

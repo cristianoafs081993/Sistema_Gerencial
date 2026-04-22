@@ -182,7 +182,9 @@ Observacoes:
 - o detalhe do processo no Editor pode abrir o PDF sincronizado pelo bucket `suap-pdfs` usando URL assinada via `suapProcessosService.getPdfSignedUrl`
 - a opcao `Despacho de Liquidacao` continua usando `documentGeneration.ts` com dados de `processos`, `empenhos`, `contratos` e `contratos_api`
 - a opcao `Contrato de Servico IFRN` baixa o PDF sincronizado do processo, extrai texto com `pdfjs-dist`, identifica paginas candidatas de modelo contratual e envia o modelo escolhido com trechos de apoio para a Edge Function `gerar-contrato-licitacao`
-- a opcao `Termo de Referencia - Compras` exige um modelo DOCX ativo em `document_templates`, analisa o PDF sincronizado do processo com `pdfjs-dist`, envia o template e os trechos relevantes para a Edge Function `gerar-termo-referencia-compras` e libera download do DOCX final montado sobre esse modelo
+- a opcao `Termo de Referencia - Compras` exige um modelo DOCX ativo em `document_templates`, analisa o PDF sincronizado do processo com `pdfjs-dist`, apresenta o questionario derivado do modelo AGU, envia respostas/pulos com o template e os trechos relevantes para a Edge Function `gerar-termo-referencia-compras` e libera download do DOCX final montado sobre esse modelo
+- no fluxo de Termo de Referencia, perguntas puladas permanecem pendentes; a IA nao escolhe clausulas alternativas no lugar do usuario
+- o DOCX exportado pelo Termo de Referencia preserva trechos nao adotados com tachado/comentario e destaca preenchimentos feitos pela IA
 - a geracao de contrato exige `pdf_url` no processo e bloqueia quando o PDF nao traz texto pesquisavel, porque esta versao ainda nao faz OCR
 - a geracao do Termo de Referencia tambem bloqueia PDFs sem texto pesquisavel e nao tenta OCR
 - quando o processo contem mais de um termo/minuta de contrato, o editor pede selecao manual do modelo antes de chamar a IA
