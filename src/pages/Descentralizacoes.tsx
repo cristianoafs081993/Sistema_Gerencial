@@ -188,8 +188,6 @@ export default function Descentralizacoes() {
             filterDimensao,
             filterOrigem,
         });
-
-
     const handleCsvImport = (data: Record<string, string>[]) => {
         // Build deduplication set from existing persisted records.
         const existingImportKeys = new Set(
@@ -394,11 +392,6 @@ export default function Descentralizacoes() {
 
     const handleContaImport = async (data: Record<string, string>[]) => {
         const rows = normalizeContaDescentralizacaoImportRows(data);
-
-        if (rows.length === 0) {
-            toast.info('Nenhum saldo de conta valido encontrado no arquivo.');
-            return;
-        }
 
         await descentralizacoesContaSaldosService.upsertBatch(rows);
         await refreshData();
@@ -678,8 +671,8 @@ export default function Descentralizacoes() {
                 open={isContaDialogOpen}
                 onOpenChange={setIsContaDialogOpen}
                 onImport={handleContaImport}
-                title="Importar Conta de DescentralizaÃ§Ãµes"
-                expectedFields={["PTRES", "MÃ©trica", "Valor"]}
+                title="Importar Conta de Descentralizações"
+                expectedFields={["PTRES", "Métrica", "Valor"]}
                 acceptCsv={true}
                 csvSeparator="\t"
             />

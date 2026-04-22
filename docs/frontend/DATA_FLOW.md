@@ -48,6 +48,7 @@ Usado para os dados mais centrais do sistema:
 - atividades
 - empenhos
 - descentralizacoes
+- descentralizacoes_conta_saldos
 - contratos
 - contratos_empenhos
 - creditos_disponiveis

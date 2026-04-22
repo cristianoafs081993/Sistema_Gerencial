@@ -1,5 +1,9 @@
 import type { ContaDescentralizacaoSaldo, Descentralizacao } from '@/types';
-import { getDimensionLabel, matchesDimensionFilter, resolveRecordDimensionCode } from '@/utils/dimensionFilters';
+import {
+  getDimensionLabel,
+  matchesDimensionFilter,
+  resolveRecordDimensionCode,
+} from '@/utils/dimensionFilters';
 
 export type ContaDescentralizacaoSaldoImportInput = {
   ptres: string;
@@ -13,13 +17,49 @@ export type DescentralizacaoResumoRow = {
   valor: number;
 };
 
-const parseValorBR = (valorStr: string): number => {
-  const cleaned = valorStr
-    .trim()
-    .replace(/\./g, '')
-    .replace(',', '.');
+const findRowValue = (
+  row: Record<string, string>,
+  patterns: RegExp[],
+  fallbacks: string[] = [],
+) => {
+  for (const key of fallbacks) {
+    const value = row[key];
+    if (value != null && String(value).trim() !== '') return String(value);
+  }
 
-  return Number.parseFloat(cleaned) || 0;
+  for (const [key, value] of Object.entries(row)) {
+    if (patterns.some((pattern) => pattern.test(key)) && String(value).trim() !== '') {
+      return String(value);
+    }
+  }
+
+  return '';
+};
+
+const hasAnyMatchingKey = (row: Record<string, string>, patterns: RegExp[], fallbacks: string[] = []) =>
+  fallbacks.some((key) => key in row) || Object.keys(row).some((key) => patterns.some((pattern) => pattern.test(key)));
+
+const parseValorBR = (valorStr: string): number | null => {
+  const cleaned = valorStr
+    .replace(/R\$\s*/gi, '')
+    .replace(/\s/g, '')
+    .trim();
+
+  if (!cleaned) return null;
+
+  let normalized = cleaned;
+
+  if (cleaned.includes(',') && cleaned.includes('.')) {
+    const lastComma = cleaned.lastIndexOf(',');
+    const lastDot = cleaned.lastIndexOf('.');
+    normalized =
+      lastComma > lastDot ? cleaned.replace(/\./g, '').replace(',', '.') : cleaned.replace(/,/g, '');
+  } else if (cleaned.includes(',')) {
+    normalized = cleaned.replace(',', '.');
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
 };
 
 const resolveDescentralizacaoDimensionLabel = (descentralizacao: Descentralizacao) => {
@@ -63,14 +103,35 @@ const aggregateRows = (rows: DescentralizacaoResumoRow[]) => {
 export const normalizeContaDescentralizacaoImportRows = (
   rows: Record<string, string>[],
 ): ContaDescentralizacaoSaldoImportInput[] => {
+  if (rows.length === 0) {
+    throw new Error('O arquivo da conta de descentralizacoes esta vazio.');
+  }
+
+  const ptresPatterns = [/^ptres$/i, /ptres/i];
+  const metricaPatterns = [/^metrica$/i, /metric/i, /mtric/i];
+  const valorPatterns = [/^valor$/i, /^valordisponivel$/i, /valor/i];
+
+  const hasPtresColumn = rows.some((row) => hasAnyMatchingKey(row, ptresPatterns, ['ptres']));
+  const hasValorColumn = rows.some((row) =>
+    hasAnyMatchingKey(row, valorPatterns, ['valor', 'valordisponivel', 'valor_disponivel']),
+  );
+
+  if (!hasPtresColumn || !hasValorColumn) {
+    throw new Error('O arquivo da conta deve conter as colunas PTRES e Valor.');
+  }
+
   const groupedRows = new Map<string, ContaDescentralizacaoSaldoImportInput>();
 
   rows.forEach((row) => {
-    const ptres = String(row.ptres || '').trim();
-    if (!ptres) return;
+    const ptres = findRowValue(row, ptresPatterns, ['ptres']).trim();
+    const metrica = findRowValue(row, metricaPatterns, ['metrica', 'mtrica']).trim();
+    const valorStr = findRowValue(row, valorPatterns, ['valor', 'valordisponivel', 'valor_disponivel']);
 
-    const metrica = String(row.metrica || row['mtrica'] || '').trim();
-    const valor = parseValorBR(String(row.valor || '0'));
+    if (!ptres || !valorStr.trim()) return;
+
+    const valor = parseValorBR(valorStr);
+    if (valor == null) return;
+
     const existing = groupedRows.get(ptres);
 
     if (existing) {
@@ -88,7 +149,17 @@ export const normalizeContaDescentralizacaoImportRows = (
     });
   });
 
-  return Array.from(groupedRows.values()).sort((left, right) => left.ptres.localeCompare(right.ptres));
+  const normalizedRows = Array.from(groupedRows.values()).sort((left, right) =>
+    left.ptres.localeCompare(right.ptres),
+  );
+
+  if (normalizedRows.length === 0) {
+    throw new Error(
+      'Nenhuma linha valida foi encontrada no arquivo da conta. Verifique as colunas PTRES, Metrica e Valor.',
+    );
+  }
+
+  return normalizedRows;
 };
 
 export const buildDescentralizacaoSummaryRows = ({

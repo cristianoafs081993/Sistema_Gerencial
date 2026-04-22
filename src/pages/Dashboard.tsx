@@ -59,7 +59,6 @@ export default function Dashboard() {
     contaDescentralizacoes.forEach((saldo) => {
       if (saldo.ptres) origens.add(saldo.ptres);
     });
-
     return Array.from(origens).sort();
   }, [atividades, empenhos, descentralizacoes, contaDescentralizacoes]);
 

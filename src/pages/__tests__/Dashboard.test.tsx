@@ -277,8 +277,8 @@ describe('Dashboard', () => {
     render(<Dashboard />);
 
     expect(screen.getByTestId('current-planejado')).toHaveTextContent('300');
-    expect(screen.getByTestId('current-empenhos-corrente')).toHaveTextContent('2');
     expect(screen.getByTestId('current-descentralizado')).toHaveTextContent('140');
+    expect(screen.getByTestId('current-empenhos-corrente')).toHaveTextContent('2');
     expect(screen.getByTestId('active-budget-dimension')).toHaveTextContent('none');
     expect(screen.queryByText(/Dimensao ativa:/)).not.toBeInTheDocument();
 

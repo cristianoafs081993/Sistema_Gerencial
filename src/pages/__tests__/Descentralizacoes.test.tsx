@@ -50,7 +50,7 @@ vi.mock('@/components/JsonImportDialog', () => ({
 
 vi.mock('@/components/StatCard', () => ({
   StatCard: ({ title, value }: { title: string; value: string | number }) => (
-    <section data-testid={`stat-card-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+    <section data-testid={`stat-card-${String(title).toLowerCase().replace(/\s+/g, '-')}`}>
       <h2>{title}</h2>
       <span>{value}</span>
     </section>
@@ -74,7 +74,9 @@ vi.mock('@/components/ui/select', () => ({
   SelectTrigger: () => null,
   SelectValue: () => null,
   SelectContent: ({ children }: { children: ReactNode }) => <>{children}</>,
-  SelectItem: ({ value, children }: { value: string; children: ReactNode }) => <option value={value}>{children}</option>,
+  SelectItem: ({ value, children }: { value: string; children: ReactNode }) => (
+    <option value={value}>{children}</option>
+  ),
 }));
 
 const mockedUseData = vi.mocked(useData);

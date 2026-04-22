@@ -5,11 +5,11 @@ import {
 } from '@/utils/descentralizacoesContaSaldos';
 
 describe('descentralizacoesContaSaldos', () => {
-  it('agrega o upload da conta por PTRES', () => {
+  it('agrega o upload da conta por PTRES e aceita metrica com variacoes de chave', () => {
     expect(
       normalizeContaDescentralizacaoImportRows([
         { ptres: '231796', metrica: 'Saldo - Moeda Origem (Conta Contabil)', valor: '100,00' },
-        { ptres: '231796', metrica: 'Saldo - Moeda Origem (Conta Contabil)', valor: '25,50' },
+        { ptres: '231796', mtrica: 'Saldo - Moeda Origem (Conta Contabil)', valor: '25,50' },
         { ptres: '261941', metrica: 'Saldo - Moeda Origem (Conta Contabil)', valor: '10,00' },
       ]),
     ).toEqual([
@@ -24,6 +24,30 @@ describe('descentralizacoesContaSaldos', () => {
         valor: 10,
       },
     ]);
+  });
+
+  it('ignora linhas sem valor parseavel, mas preserva zero explicito', () => {
+    expect(
+      normalizeContaDescentralizacaoImportRows([
+        { ptres: '231796', metrica: 'Saldo', valor: '' },
+        { ptres: '231798', metrica: 'Saldo', valor: 'abc' },
+        { ptres: '231802', metrica: 'Saldo', valor: '0,00' },
+      ]),
+    ).toEqual([
+      {
+        ptres: '231802',
+        metrica: 'Saldo',
+        valor: 0,
+      },
+    ]);
+  });
+
+  it('falha cedo quando o arquivo nao traz as colunas obrigatorias', () => {
+    expect(() =>
+      normalizeContaDescentralizacaoImportRows([
+        { origem: '231796', saldo: '100,00' },
+      ] as Record<string, string>[]),
+    ).toThrow('PTRES e Valor');
   });
 
   it('usa o saldo da conta para o total por PTRES e reparte por dimensao conforme os lancamentos atuais', () => {
