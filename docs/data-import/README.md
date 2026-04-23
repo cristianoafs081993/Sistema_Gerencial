@@ -49,6 +49,7 @@ Arquivos reais de operacao presentes em [docs](/C:/Users/crist/OneDrive/Desktop/
 - esse segundo fluxo grava uma nova linha negativa em `descentralizacoes`, com `operacao_tipo = DEVOLUCAO`, em vez de recalcular ou sobrescrever um lancamento anterior
 - esse segundo fluxo pode continuar recebendo valores negativos diretamente no CSV, mas o service normaliza o valor para negativo antes de persistir
 - o botao `Importar Conta` da mesma pagina aceita o relatorio `PTRES / Metrica / Valor` e grava os saldos agregados em `descentralizacoes_conta_saldos`
+- no export real dessa conta, o cabecalho pode vir apenas com `PTRES` e `Metrica`, deixando o valor na terceira coluna sem nome; o parser precisa aceitar esse formato
 - o parser desse upload so considera linhas com `PTRES` e `Valor` realmente preenchidos e parseaveis; linhas vazias ou com valor invalido sao descartadas para evitar gravacao indevida de saldo `0`
 - esses saldos de conta servem apenas para os somatorios geral, por PTRES e por dimensao; a tabela de lancamentos individuais continua vindo de `descentralizacoes`
 - quando um mesmo `PTRES` aparecer em mais de uma dimensao nos lancamentos detalhados, o saldo da conta e repartido proporcionalmente entre elas para montar o agregado por dimensao

@@ -39,6 +39,18 @@ const findRowValue = (
 const hasAnyMatchingKey = (row: Record<string, string>, patterns: RegExp[], fallbacks: string[] = []) =>
   fallbacks.some((key) => key in row) || Object.keys(row).some((key) => patterns.some((pattern) => pattern.test(key)));
 
+const findUnnamedValueColumn = (row: Record<string, string>) => {
+  const unnamedEntries = Object.entries(row)
+    .filter(([key, value]) => /^empty_\d+$/i.test(key) && String(value).trim() !== '')
+    .sort(([leftKey], [rightKey]) => {
+      const leftIndex = Number(leftKey.replace('empty_', ''));
+      const rightIndex = Number(rightKey.replace('empty_', ''));
+      return rightIndex - leftIndex;
+    });
+
+  return unnamedEntries[0]?.[1] ? String(unnamedEntries[0][1]) : '';
+};
+
 const parseValorBR = (valorStr: string): number | null => {
   const cleaned = valorStr
     .replace(/R\$\s*/gi, '')
@@ -112,9 +124,13 @@ export const normalizeContaDescentralizacaoImportRows = (
   const valorPatterns = [/^valor$/i, /^valordisponivel$/i, /valor/i];
 
   const hasPtresColumn = rows.some((row) => hasAnyMatchingKey(row, ptresPatterns, ['ptres']));
-  const hasValorColumn = rows.some((row) =>
-    hasAnyMatchingKey(row, valorPatterns, ['valor', 'valordisponivel', 'valor_disponivel']),
-  );
+  const hasValorColumn = rows.some((row) => {
+    if (hasAnyMatchingKey(row, valorPatterns, ['valor', 'valordisponivel', 'valor_disponivel'])) {
+      return true;
+    }
+
+    return findUnnamedValueColumn(row).trim() !== '';
+  });
 
   if (!hasPtresColumn || !hasValorColumn) {
     throw new Error('O arquivo da conta deve conter as colunas PTRES e Valor.');
@@ -125,7 +141,9 @@ export const normalizeContaDescentralizacaoImportRows = (
   rows.forEach((row) => {
     const ptres = findRowValue(row, ptresPatterns, ['ptres']).trim();
     const metrica = findRowValue(row, metricaPatterns, ['metrica', 'mtrica']).trim();
-    const valorStr = findRowValue(row, valorPatterns, ['valor', 'valordisponivel', 'valor_disponivel']);
+    const valorStr =
+      findRowValue(row, valorPatterns, ['valor', 'valordisponivel', 'valor_disponivel']) ||
+      findUnnamedValueColumn(row);
 
     if (!ptres || !valorStr.trim()) return;
 

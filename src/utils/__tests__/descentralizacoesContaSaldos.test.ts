@@ -42,6 +42,34 @@ describe('descentralizacoesContaSaldos', () => {
     ]);
   });
 
+  it('aceita o CSV real da conta quando o valor vem na terceira coluna sem cabecalho', () => {
+    expect(
+      normalizeContaDescentralizacaoImportRows([
+        {
+          ptres: '231796',
+          metrica: 'Saldo - Moeda Origem (Conta Contabil)',
+          empty_2: '797.328,04',
+        },
+        {
+          ptres: '261941',
+          metrica: 'Saldo - Moeda Origem (Conta Contabil)',
+          empty_2: '169.089,08',
+        },
+      ]),
+    ).toEqual([
+      {
+        ptres: '231796',
+        metrica: 'Saldo - Moeda Origem (Conta Contabil)',
+        valor: 797328.04,
+      },
+      {
+        ptres: '261941',
+        metrica: 'Saldo - Moeda Origem (Conta Contabil)',
+        valor: 169089.08,
+      },
+    ]);
+  });
+
   it('falha cedo quando o arquivo nao traz as colunas obrigatorias', () => {
     expect(() =>
       normalizeContaDescentralizacaoImportRows([
