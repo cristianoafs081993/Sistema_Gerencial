@@ -103,6 +103,117 @@ Observacao:
 - conteudo preenchido pela IA recebe marca de revisao no HTML e no DOCX
 - o modelo padrao e `gemini-2.5-flash-lite`, com fallback automatico para `gemini-2.5-flash`
 
+### `sugerir-respostas-termo-referencia`
+
+Local:
+
+- [sugerir-respostas-termo-referencia/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sugerir-respostas-termo-referencia/index.ts)
+
+Chamador:
+
+- [referenceTerms.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/referenceTerms.ts)
+
+Uso:
+
+- sugere respostas para o questionario do Termo de Referencia antes da revisao manual
+- recebe dados do processo, trechos classificados do PDF e o `questionnaireSchema` do modelo ativo
+- devolve sugestoes por pergunta apenas quando houver fonte explicita, com pagina, trecho-fonte, justificativa e confianca
+
+Dependencias:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional `GEMINI_REFERENCE_TERM_PREFILL_MODEL`
+- opcional `GEMINI_REFERENCE_TERM_MODEL`
+
+Observacao:
+
+- perguntas sem fonte clara retornam como `unanswered` e seguem para revisao manual
+- a function e separada da geracao final para que falhas na sugestao nao bloqueiem o fluxo manual
+- o deploy atual usa `verify_jwt = false` em `supabase/config.toml`, seguindo o padrao das functions do Editor de Documentos
+
+### `gerar-etp-servicos-continuos`
+
+Local:
+
+- [gerar-etp-servicos-continuos/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/gerar-etp-servicos-continuos/index.ts)
+
+Chamador:
+
+- [preliminaryStudies.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/preliminaryStudies.ts)
+
+Uso:
+
+- gera rascunho editavel do Estudo Tecnico Preliminar para servicos continuos no Editor de Documentos
+- recebe processo SUAP opcional, objeto manual, questionario fixo, respostas/pulos do usuario e trechos classificados do PDF
+- devolve HTML, secoes copiaveis, alertas, pendencias e campos identificados
+
+Dependencias:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional `GEMINI_ETP_MODEL`
+
+Observacao:
+
+- se nao houver chave Gemini, a function monta um fallback local com as respostas e pendencias
+- se a function ainda nao estiver publicada ou falhar por indisponibilidade/CORS, o frontend tambem monta fallback local em `preliminaryStudiesService`
+- nao usa modelo DOCX, nao persiste rascunho em banco e nao faz OCR
+- publicada com `verify_jwt = false`, seguindo o padrao das functions do Editor de Documentos
+
+### `sugerir-respostas-etp-servicos-continuos`
+
+Local:
+
+- [sugerir-respostas-etp-servicos-continuos/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sugerir-respostas-etp-servicos-continuos/index.ts)
+
+Chamador:
+
+- [preliminaryStudies.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/preliminaryStudies.ts)
+
+Uso:
+
+- sugere respostas para o questionario fixo do ETP de servicos continuos antes da revisao manual
+- recebe trechos classificados do PDF e so retorna sugestoes quando houver fonte explicita
+
+Dependencias:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional `GEMINI_ETP_PREFILL_MODEL`
+- opcional `GEMINI_ETP_MODEL`
+
+Observacao:
+
+- sugestoes sem pagina, trecho-fonte, justificativa e valor sao descartadas pelo frontend
+- quando o processo nao tem PDF pesquisavel ou a function nao responde, o frontend segue pelo questionario manual
+
+### `gerar-texto-etp-secao`
+
+Local:
+
+- [gerar-texto-etp-secao/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/gerar-texto-etp-secao/index.ts)
+
+Chamador:
+
+- [preliminaryStudies.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/preliminaryStudies.ts)
+- [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx)
+
+Uso:
+
+- gera texto para uma secao individual do questionario do ETP de servicos continuos
+- aceita notas curtas do usuario, mas tambem gera um texto preliminar quando a secao e solicitada sem digitacao previa
+- deve marcar dados concretos ausentes como pendencia, sem inventar numeros, datas, valores ou fatos especificos
+
+Dependencias:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional `GEMINI_ETP_MODEL`
+
+Observacao:
+
+- se nao houver chave Gemini, a function devolve texto local de apoio
+- se a function ainda nao estiver publicada ou falhar por indisponibilidade/CORS, o frontend tambem usa texto local de apoio em `preliminaryStudiesService.generateQuestionText`
+- publicada com `verify_jwt = false`, seguindo o padrao das functions do Editor de Documentos
+- publicada com `verify_jwt = false`, seguindo o padrao das functions do Editor de Documentos
+
 ### `invite-user`
 
 Local:

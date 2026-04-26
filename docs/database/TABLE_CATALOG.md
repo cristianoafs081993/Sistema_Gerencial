@@ -446,3 +446,39 @@ Observacoes operacionais:
 
 - a migration inicial associa usuarios existentes, exceto o superadministrador, ao grupo `Diretores`
 - escritas administrativas passam pela Edge Function `admin-users` com `SUPABASE_SERVICE_ROLE_KEY`
+
+## Automacoes e economia de tempo
+
+### `automation_savings_scenarios`
+
+Finalidade:
+
+- catalogo das interacoes automatizadas usadas pela pagina `/economia-tempo`
+- guarda tempo manual, tempo com o sistema, estimativa mensal de execucoes, modulo, origem e ordenacao
+
+Consumido por:
+
+- [automationSavingsService.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/automationSavingsService.ts)
+- [EconomiaTempo.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EconomiaTempo.tsx)
+
+Observacoes operacionais:
+
+- quando a tabela estiver vazia ou indisponivel, o frontend usa o catalogo local em `DEFAULT_AUTOMATION_SAVINGS_SCENARIOS`
+- o seed inicial cadastra os cenarios de SIAFI, relatorios, liquidacoes, PFs/LC, contratos, SUAP, importacoes e geracao de documentos
+
+### `automation_savings_events`
+
+Finalidade:
+
+- eventos reais de uso registrados pelo app, extensoes ou automacoes externas
+- cada evento replica os minutos vigentes do cenario no momento do registro para preservar o calculo historico
+
+Consumido por:
+
+- [record-automation-savings-event/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/record-automation-savings-event/index.ts)
+- [automationSavingsService.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/automationSavingsService.ts)
+
+Observacoes operacionais:
+
+- `metadata.count` multiplica as execucoes reais de um evento em lote
+- a escrita passa pela Edge Function `record-automation-savings-event`, com `AUTOMATION_EVENT_SECRET` para extensoes ou JWT para chamadas internas autenticadas

@@ -35,7 +35,7 @@ export type ReferenceTermPdfAnalysis = {
   warnings: string[];
 };
 
-const MAX_SNIPPETS = 14;
+const MAX_SNIPPETS = 24;
 
 const snippetRules: Array<{
   kind: ReferenceTermSnippetKind;
@@ -58,8 +58,8 @@ const snippetRules: Array<{
   {
     kind: 'justificativa',
     label: 'Justificativa da contratacao',
-    patterns: ['justificativa da contratacao', 'necessidade da contratacao', 'motivacao da contratacao'],
-    maxMatches: 2,
+    patterns: ['justificativa da contratacao', 'necessidade da contratacao', 'motivacao da contratacao', 'fundamentacao da necessidade'],
+    maxMatches: 3,
   },
   {
     kind: 'estimativa',
@@ -100,8 +100,17 @@ const snippetRules: Array<{
   {
     kind: 'etp-dfd',
     label: 'ETP ou DFD',
-    patterns: ['estudo tecnico preliminar', 'documento de formalizacao da demanda', 'dfd'],
-    maxMatches: 2,
+    patterns: [
+      'estudo tecnico preliminar',
+      'documento de formalizacao da demanda',
+      'dfd',
+      'etp',
+      'descricao da necessidade',
+      'area requisitante',
+      'solucao como um todo',
+      'requisitos da contratacao',
+    ],
+    maxMatches: 5,
   },
 ];
 
@@ -118,7 +127,7 @@ function collapseWhitespace(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
 
-function excerptText(value: string, maxLength = 360): string {
+function excerptText(value: string, maxLength = 900): string {
   const collapsed = collapseWhitespace(value);
   if (collapsed.length <= maxLength) return collapsed;
   return `${collapsed.slice(0, maxLength - 1).trimEnd()}...`;

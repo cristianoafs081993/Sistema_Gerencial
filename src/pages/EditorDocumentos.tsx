@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Building2,
@@ -15,6 +15,8 @@ import {
   ReceiptText,
   ShieldCheck,
   Sparkles,
+  Trash2,
+  Upload,
   Wallet,
   Wand2,
 } from 'lucide-react';
@@ -28,6 +30,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -46,16 +49,55 @@ import {
   type ResolvedDocumentContext,
   type SupportedDocumentType,
 } from '@/lib/documentGeneration';
+import {
+  buildReferenceTermFieldInstruction,
+  buildReferenceTermOptionFields,
+  buildReferenceTermOptionPreview,
+  getReferenceTermQuestionSourceText,
+  sanitizeReferenceTermQuestionnaireSchema,
+} from '@/lib/referenceTermQuestionnaire';
 import { type ReferenceTermPdfAnalysis } from '@/lib/referenceTermProcessPdf';
+import type { DocumentContextSnippet } from '@/lib/documentContextSnippets';
+import { type PreliminaryStudyPdfAnalysis } from '@/lib/preliminaryStudyProcessPdf';
+import {
+  analyzePreliminaryStudySupplementalPdfFile,
+  PRELIMINARY_STUDY_SUPPLEMENTAL_MAX_FILES,
+  type PreliminaryStudySupplementalPdfAnalysis,
+} from '@/lib/preliminaryStudySupplementalPdf';
+import {
+  buildInitialPreliminaryStudyAnswers,
+  buildPreliminaryStudyQuestionnaireAnswers,
+  isPreliminaryStudyQuestionAnswered,
+  preliminaryStudyQuestions,
+  type PreliminaryStudyQuestion,
+  type PreliminaryStudyQuestionAnswer,
+  type PreliminaryStudyQuestionSuggestion,
+} from '@/lib/preliminaryStudyQuestionnaire';
 import { suapExtensionGithubUrl } from '@/lib/suapExtension';
 import { cn, formatarDocumento } from '@/lib/utils';
 import { contractDraftsService } from '@/services/contractDrafts';
 import type { DocumentTemplateQuestion, DocumentTemplateRecord } from '@/services/documentTemplates';
-import { referenceTermsService, type ReferenceTermQuestionAnswer } from '@/services/referenceTerms';
+import {
+  preliminaryStudiesService,
+  type PreliminaryStudyDraftSection,
+} from '@/services/preliminaryStudies';
+import {
+  referenceTermsService,
+  type ReferenceTermQuestionAnswer,
+  type ReferenceTermQuestionSuggestion,
+} from '@/services/referenceTerms';
 import { suapProcessosService } from '@/services/suapProcessos';
 import type { SuapProcesso } from '@/types';
 
-type ScreenState = 'idle' | 'resolving' | 'ambiguous' | 'reference_questionnaire' | 'not_found';
+type ScreenState =
+  | 'idle'
+  | 'resolving'
+  | 'ambiguous'
+  | 'ai_questionnaire_prefill'
+  | 'reference_questionnaire'
+  | 'etp_questionnaire_prefill'
+  | 'etp_questionnaire'
+  | 'not_found';
 type FeedbackTone = 'neutral' | 'warning' | 'success';
 
 type ExampleProcessCard = {
@@ -77,6 +119,11 @@ type GeneratedDispatch = {
   docxFileName?: string;
   docxTemplateBase64?: string;
   docxExportPlan?: DocxTemplateExportPlan;
+  sections?: PreliminaryStudyDraftSection[];
+  etpContext?: {
+    processo?: SuapProcesso | null;
+    manualObject?: string;
+  };
 };
 
 type PendingContractGeneration = {
@@ -85,9 +132,30 @@ type PendingContractGeneration = {
 };
 
 type PendingReferenceTermGeneration = {
-  processo: SuapProcesso;
-  analysis: ReferenceTermPdfAnalysis;
+  processo?: SuapProcesso | null;
+  analysis?: ReferenceTermPdfAnalysis | null;
   template: DocumentTemplateRecord;
+  etpContextSnippets?: DocumentContextSnippet[];
+};
+
+type PendingPreliminaryStudyGeneration = {
+  processo?: SuapProcesso | null;
+  analysis?: PreliminaryStudyPdfAnalysis | null;
+  manualObject?: string;
+  supplementalSnippets?: DocumentContextSnippet[];
+};
+
+type ReferenceTermSuggestionReview = ReferenceTermQuestionSuggestion & {
+  decision: 'pending' | 'approved' | 'rejected';
+  editedSelectedOptionId?: string;
+  editedValue?: string;
+  editedJustification?: string;
+};
+
+type PreliminaryStudySuggestionReview = PreliminaryStudyQuestionSuggestion & {
+  decision: 'pending' | 'approved' | 'rejected';
+  editedValue?: string;
+  editedJustification?: string;
 };
 
 const stripHtml = (html: string) => {
@@ -95,6 +163,95 @@ const stripHtml = (html: string) => {
   const div = document.createElement('div');
   div.innerHTML = html;
   return div.textContent || div.innerText || '';
+};
+
+const normalizeContextText = (value: string) =>
+  value
+    .replace(/\[[^\]]*CAMPO PENDENTE[^\]]*\]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const etpSnippetKindFromTitle = (title: string) => {
+  const normalized = title
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  if (normalized.includes('necessidade')) return 'necessidade';
+  if (normalized.includes('objeto') || normalized.includes('solucao')) return 'objeto';
+  if (normalized.includes('requisito')) return 'requisitos';
+  if (normalized.includes('quantit')) return 'quantitativos';
+  if (normalized.includes('valor') || normalized.includes('estimativa')) return 'estimativa';
+  if (normalized.includes('vigencia') || normalized.includes('prazo')) return 'vigencia';
+  if (normalized.includes('sustent')) return 'sustentabilidade';
+  if (normalized.includes('parcelamento')) return 'parcelamento';
+  if (normalized.includes('resultado')) return 'resultados';
+  return 'etp';
+};
+
+const buildEtpContextSnippetsFromHtml = (html: string): DocumentContextSnippet[] => {
+  if (typeof document === 'undefined') {
+    const text = normalizeContextText(html);
+    return text
+      ? [{
+          id: 'etp-editado-1',
+          kind: 'etp',
+          label: 'ETP editado no editor',
+          excerpt: text.slice(0, 1200),
+          sourceType: 'etp',
+          sourceLabel: 'ETP editado no editor',
+        }]
+      : [];
+  }
+
+  const container = document.createElement('div');
+  container.innerHTML = html;
+  const sections: DocumentContextSnippet[] = [];
+  const headings = Array.from(container.querySelectorAll('h1,h2,h3'));
+
+  if (headings.length > 0) {
+    headings.forEach((heading, index) => {
+      const title = normalizeContextText(heading.textContent || `Secao ${index + 1}`);
+      const parts: string[] = [];
+      let current = heading.nextSibling;
+
+      while (current) {
+        if (current.nodeType === Node.ELEMENT_NODE && /^H[1-3]$/i.test((current as Element).tagName)) {
+          break;
+        }
+        parts.push(current.textContent || '');
+        current = current.nextSibling;
+      }
+
+      const excerpt = normalizeContextText(parts.join(' '));
+      if (title && excerpt.length >= 20) {
+        sections.push({
+          id: `etp-editado-${index + 1}`,
+          kind: etpSnippetKindFromTitle(title),
+          label: title,
+          excerpt: excerpt.slice(0, 1200),
+          sourceType: 'etp',
+          sourceLabel: 'ETP editado no editor',
+        });
+      }
+    });
+  }
+
+  if (sections.length > 0) {
+    return sections.slice(0, 12);
+  }
+
+  const text = normalizeContextText(stripHtml(html));
+  return text.length >= 40
+    ? [{
+        id: 'etp-editado-1',
+        kind: 'etp',
+        label: 'ETP editado no editor',
+        excerpt: text.slice(0, 1200),
+        sourceType: 'etp',
+        sourceLabel: 'ETP editado no editor',
+      }]
+    : [];
 };
 
 const dividerHtml =
@@ -199,6 +356,13 @@ function DocumentModelMenu({
       title: 'Termo de Referencia - Compras',
       subtitle: 'Usa o modelo DOCX ativo e os dados do processo para montar o rascunho com IA',
       icon: <ReceiptText className="h-3.5 w-3.5" />,
+    },
+    {
+      id: 'estudo-tecnico-preliminar-servicos-continuos' as const,
+      group: 'Planejamento',
+      title: 'ETP - Servicos Continuos',
+      subtitle: 'Monta o estudo tecnico preliminar com processo SUAP ou objeto digitado',
+      icon: <FileText className="h-3.5 w-3.5" />,
     },
   ];
 
@@ -437,35 +601,153 @@ function ContractModelCandidateCard({
 
 function ReferenceTermQuestionCard({
   question,
+  sourceText,
   answer,
   onAnswer,
   onSkip,
 }: {
   question: DocumentTemplateQuestion;
+  sourceText?: string;
   answer?: ReferenceTermQuestionAnswer;
   onAnswer: (answer: ReferenceTermQuestionAnswer) => void;
   onSkip: () => void;
 }) {
   const isSkipped = answer?.skipped === true;
-  const selectedOptionId = answer?.selectedOptionId;
+  const [fieldValue, setFieldValue] = useState(isSkipped ? '' : answer?.value || '');
+  const [selectedOptionId, setSelectedOptionId] = useState(answer?.selectedOptionId || '');
+  const [optionValues, setOptionValues] = useState<Record<string, string>>(answer?.optionValues || {});
+  const fieldInstruction = question.kind === 'field' ? buildReferenceTermFieldInstruction(question, sourceText) : null;
+  const selectedOption = getQuestionOptionById(question, selectedOptionId);
+  const selectedOptionFields = selectedOption ? buildReferenceTermOptionFields(selectedOption) : [];
+  const canSubmitOptionAnswer =
+    Boolean(selectedOptionId) &&
+    selectedOptionFields.every((field) =>
+      field.kind === 'choice'
+        ? field.choices.some((choice) => (optionValues[choice.key] || '').trim())
+        : (optionValues[field.key] || '').trim(),
+    );
+  const questionTitle = fieldInstruction?.label || question.title;
+  const normalizedQuestionTitle = questionTitle.trim().toLocaleLowerCase('pt-BR');
+  const isGenericKindTitle =
+    (question.kind === 'exclusive' &&
+      (normalizedQuestionTitle === 'escolha exclusiva' || normalizedQuestionTitle === 'escolha de clausula alternativa')) ||
+    (question.kind === 'optional' && normalizedQuestionTitle === 'opcional');
+  const shouldShowQuestionTitle = !isGenericKindTitle;
+
+  useEffect(() => {
+    setFieldValue(isSkipped ? '' : answer?.value || '');
+  }, [answer?.value, isSkipped, question.id]);
+
+  useEffect(() => {
+    setSelectedOptionId(isSkipped ? '' : answer?.selectedOptionId || '');
+  }, [answer?.selectedOptionId, isSkipped, question.id]);
+
+  useEffect(() => {
+    setOptionValues(isSkipped ? {} : answer?.optionValues || {});
+  }, [answer?.optionValues, isSkipped, question.id]);
+
+  const submitFieldAnswer = () => {
+    const value = fieldValue.trim();
+    if (!value) {
+      return;
+    }
+
+    onAnswer({
+      questionId: question.id,
+      kind: 'field',
+      value,
+      skipped: false,
+    });
+  };
+
+  const selectOption = (optionId: string) => {
+    const option = getQuestionOptionById(question, optionId);
+    if (!option) return;
+
+    const nextOptionFields = buildReferenceTermOptionFields(option);
+    setSelectedOptionId(optionId);
+    if (nextOptionFields.length === 0) {
+      onAnswer({
+        questionId: question.id,
+        kind: question.kind,
+        selectedOptionId: optionId,
+        skipped: false,
+      });
+      return;
+    }
+
+    const nextOptionValues = nextOptionFields.reduce<Record<string, string>>((current, field) => {
+      if (field.kind === 'choice') {
+        for (const choice of field.choices) {
+          const existingValue = answer?.selectedOptionId === optionId
+            ? answer.optionValues?.[choice.key] || answer.optionValues?.[choice.placeholder]
+            : undefined;
+          current[choice.key] = existingValue || '';
+        }
+        return current;
+      }
+
+      const existingValue = answer?.selectedOptionId === optionId
+        ? answer.optionValues?.[field.key] || answer.optionValues?.[field.placeholder]
+        : undefined;
+      current[field.key] = existingValue || '';
+      return current;
+    }, {});
+    setOptionValues(nextOptionValues);
+  };
+
+  const submitOptionAnswer = () => {
+    if (!selectedOptionId || !canSubmitOptionAnswer) {
+      return;
+    }
+
+    onAnswer({
+      questionId: question.id,
+      kind: question.kind,
+      selectedOptionId,
+      optionValues: selectedOptionFields.reduce<Record<string, string>>((current, field) => {
+        if (field.kind === 'choice') {
+          for (const choice of field.choices) {
+            current[choice.key] = (optionValues[choice.key] || '').trim();
+          }
+          return current;
+        }
+
+        current[field.key] = (optionValues[field.key] || '').trim();
+        return current;
+      }, {}),
+      skipped: false,
+    });
+  };
 
   return (
-    <div className="rounded-radius-xl border border-border-default bg-surface-card p-4 shadow-xs">
+    <div className="rounded-radius-xl border border-border-default/70 bg-white p-4 shadow-xs">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="border-border-default bg-surface-subtle text-text-secondary">
-              {question.kind === 'exclusive' ? 'Escolha exclusiva' : question.kind === 'optional' ? 'Opcional' : 'Campo'}
-            </Badge>
             {isSkipped ? (
               <Badge variant="outline" className="border-warning/30 bg-warning/10 text-amber-900">
                 Pendente
               </Badge>
             ) : null}
           </div>
-          <p className="mt-2 font-ui text-sm font-semibold text-text-primary">{question.title}</p>
-          <p className="mt-1 font-ui text-sm leading-6 text-text-secondary">{question.prompt}</p>
-          {question.guidance ? <p className="mt-1 font-ui text-xs leading-5 text-text-muted">{question.guidance}</p> : null}
+          {shouldShowQuestionTitle ? <p className="mt-2 font-ui text-sm font-semibold text-text-primary">{questionTitle}</p> : null}
+          {fieldInstruction ? (
+            <div className="mt-3 rounded-radius-lg border border-primary/15 bg-primary/[0.035] px-3 py-2.5">
+              <p className="font-ui text-sm leading-6 text-text-primary">{fieldInstruction.instruction}</p>
+              <p className="mt-1 font-ui text-xs leading-5 text-text-secondary">
+                Campo do modelo: <span className="font-medium text-text-primary">{fieldInstruction.modelField}</span>
+              </p>
+              {sourceText ? <ReferenceTermOriginalTextHover originalText={sourceText} className="mt-2" /> : null}
+            </div>
+          ) : (
+            <>
+              <p className="mt-1 font-ui text-sm leading-6 text-text-secondary">{question.prompt}</p>
+              {question.guidance && question.kind !== 'exclusive' ? (
+                <p className="mt-1 font-ui text-xs leading-5 text-text-muted">{question.guidance}</p>
+              ) : null}
+            </>
+          )}
         </div>
 
         <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={onSkip}>
@@ -475,49 +757,511 @@ function ReferenceTermQuestionCard({
 
       {question.kind === 'field' ? (
         <Textarea
-          value={isSkipped ? '' : answer?.value || ''}
-          onChange={(event) =>
-            onAnswer({
-              questionId: question.id,
-              kind: 'field',
-              value: event.target.value,
-              skipped: false,
-            })
-          }
-          placeholder="Preencha este campo ou deixe em branco e clique em Pular."
-          className="mt-3 min-h-[92px] rounded-radius-lg border-border-default bg-white text-sm"
+          value={fieldValue}
+          onChange={(event) => setFieldValue(event.target.value)}
+          onKeyDown={(event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+              event.preventDefault();
+              submitFieldAnswer();
+            }
+          }}
+          placeholder={fieldInstruction?.inputPlaceholder || 'Preencha este campo, salve a resposta ou pule para manter pendente.'}
+          className="mt-3 min-h-[116px] rounded-radius-lg border-border-default bg-white text-sm"
         />
+      ) : null}
+
+      {question.kind === 'field' ? (
+        <div className="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+          <Button type="button" className="h-9 gap-2" onClick={submitFieldAnswer} disabled={!fieldValue.trim()}>
+            <Check className="h-4 w-4" />
+            Salvar resposta
+          </Button>
+        </div>
+      ) : (
+        <>
+          <div className="mt-3 grid gap-2">
+            {(question.options || []).map((option) => {
+              const isSelected = selectedOptionId === option.id && !isSkipped;
+
+              return (
+                <ReferenceTermOptionButton
+                  key={option.id}
+                  option={option}
+                  isSelected={isSelected}
+                  onClick={() => selectOption(option.id)}
+                />
+              );
+            })}
+          </div>
+
+          {selectedOptionFields.length > 0 ? (
+            <div className="mt-3 space-y-3 rounded-radius-lg border border-border-default/70 bg-surface-subtle/25 p-3">
+              {selectedOptionFields.map((field) => (
+                field.kind === 'choice' ? (
+                  <div key={field.label} className="grid gap-2">
+                    <span className="font-ui text-sm font-semibold text-text-primary">{field.label}</span>
+                    <span className="font-ui text-xs leading-5 text-text-secondary">{field.instruction}</span>
+                    <div className="grid gap-2">
+                      {field.choices.map((choice) => {
+                        const isChoiceSelected = Boolean(optionValues[choice.key]?.trim());
+
+                        return (
+                          <button
+                            key={choice.key}
+                            type="button"
+                            className={cn(
+                              'w-full rounded-radius-lg border px-3 py-2 text-left text-sm transition-all duration-200',
+                              isChoiceSelected
+                                ? 'border-primary/35 bg-primary/[0.08] text-text-primary shadow-soft'
+                                : 'border-border-default bg-white text-text-secondary hover:border-primary/20 hover:bg-primary/[0.04]',
+                            )}
+                            onClick={() =>
+                              setOptionValues((current) => {
+                                const next = { ...current };
+                                for (const item of field.choices) {
+                                  next[item.key] = item.key === choice.key ? item.value : '';
+                                }
+                                return next;
+                              })
+                            }
+                          >
+                            {choice.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <label key={field.key} className="grid gap-1.5">
+                    <span className="font-ui text-sm font-semibold text-text-primary">{field.instruction.label}</span>
+                    <span className="font-ui text-xs leading-5 text-text-secondary">{field.instruction.instruction}</span>
+                    <span className="font-ui text-xs text-text-muted">
+                      Campo da clausula: <span className="font-medium text-text-primary">{field.instruction.modelField}</span>
+                    </span>
+                    <Textarea
+                      value={optionValues[field.key] || ''}
+                      onChange={(event) =>
+                        setOptionValues((current) => ({
+                          ...current,
+                          [field.key]: event.target.value,
+                        }))
+                      }
+                      placeholder={field.instruction.inputPlaceholder}
+                      className="min-h-[76px] rounded-radius-lg border-border-default bg-white text-sm"
+                    />
+                  </label>
+                )
+              ))}
+
+              <div className="flex justify-end">
+                <Button type="button" className="h-9 gap-2" onClick={submitOptionAnswer} disabled={!canSubmitOptionAnswer}>
+                  <Check className="h-4 w-4" />
+                  Salvar resposta
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ReferenceTermOriginalTextHover({
+  originalText,
+  className,
+}: {
+  originalText: string;
+  className?: string;
+}) {
+  if (!originalText.trim()) return null;
+
+  return (
+    <button
+      type="button"
+      className={cn(
+        'inline-flex items-center gap-1 rounded-radius-sm text-xs font-medium text-text-secondary underline decoration-border-default underline-offset-2 transition hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30',
+        className,
+      )}
+      title={originalText}
+    >
+      <FileText className="h-3.5 w-3.5" />
+      Ver texto original do TR
+    </button>
+  );
+}
+
+function getQuestionOptionById(
+  question: Pick<DocumentTemplateQuestion, 'options'>,
+  optionId?: string,
+) {
+  if (!optionId) return undefined;
+  return (question.options || []).find((option) => option.id === optionId);
+}
+
+function getQuestionAnswerMissingOptionFields(
+  question: DocumentTemplateQuestion,
+  answer?: ReferenceTermQuestionAnswer,
+) {
+  if (!answer || answer.skipped || (question.kind !== 'exclusive' && question.kind !== 'optional')) {
+    return [];
+  }
+
+  const option = getQuestionOptionById(question, answer.selectedOptionId);
+  if (!option) return [];
+
+  return buildReferenceTermOptionFields(option).filter((field) => {
+    if (field.kind === 'choice') {
+      return !field.choices.some((choice) => (answer.optionValues?.[choice.key] || answer.optionValues?.[choice.placeholder])?.trim());
+    }
+
+    return !(answer.optionValues?.[field.key] || answer.optionValues?.[field.placeholder])?.trim();
+  });
+}
+
+function isReferenceTermQuestionAnswered(
+  question: DocumentTemplateQuestion,
+  answer?: ReferenceTermQuestionAnswer,
+) {
+  if (!answer || answer.skipped) return false;
+
+  if (question.kind === 'field') {
+    return Boolean(answer.value?.trim());
+  }
+
+  if (!answer.selectedOptionId) {
+    return false;
+  }
+
+  return getQuestionAnswerMissingOptionFields(question, answer).length === 0;
+}
+
+function ReferenceTermOptionButton({
+  option,
+  isSelected,
+  onClick,
+}: {
+  option: NonNullable<DocumentTemplateQuestion['options']>[number];
+  isSelected: boolean;
+  onClick: () => void;
+}) {
+  const optionPreview = buildReferenceTermOptionPreview(option);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={optionPreview.originalText || 'Passe o mouse para ver o texto original do TR'}
+      className={cn(
+        'w-full rounded-radius-lg border px-3 py-2.5 text-left transition-all duration-200',
+        isSelected
+          ? 'border-primary/35 bg-primary/[0.08] text-text-primary shadow-soft'
+          : 'border-border-default bg-surface-subtle/40 text-text-secondary hover:border-primary/20 hover:bg-primary/[0.04]',
+      )}
+    >
+      <span className="block font-ui text-sm font-semibold leading-6">{optionPreview.summary}</span>
+    </button>
+  );
+}
+
+function ReferenceTermSuggestionReviewCard({
+  question,
+  sourceText,
+  review,
+  onChange,
+  onApprove,
+  onReject,
+}: {
+  question: DocumentTemplateQuestion;
+  sourceText?: string;
+  review: ReferenceTermSuggestionReview;
+  onChange: (review: ReferenceTermSuggestionReview) => void;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  const isApproved = review.decision === 'approved';
+  const isRejected = review.decision === 'rejected';
+  const canApprove = review.kind === 'field'
+    ? Boolean((review.editedValue ?? review.value ?? '').trim())
+    : Boolean(review.editedSelectedOptionId ?? review.selectedOptionId);
+  const fieldInstruction = question.kind === 'field' ? buildReferenceTermFieldInstruction(question, sourceText) : null;
+
+  return (
+    <div
+      className={cn(
+        'rounded-radius-xl border bg-surface-card p-4 shadow-xs transition-all duration-200',
+        isApproved
+          ? 'border-status-success/25 bg-status-success/[0.04]'
+          : isRejected
+            ? 'border-warning/25 bg-warning/[0.06]'
+            : 'border-border-default',
+      )}
+    >
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="border-primary/20 bg-primary/[0.07] text-primary">
+              Sugestao da IA
+            </Badge>
+            <Badge variant="outline" className="border-border-default bg-surface-subtle text-text-secondary">
+              {review.confidence === 'high' ? 'Alta confianca' : 'Confianca media'}
+            </Badge>
+            {isApproved ? (
+              <Badge variant="outline" className="border-status-success/25 bg-status-success/10 text-emerald-900">
+                Aprovada
+              </Badge>
+            ) : null}
+            {isRejected ? (
+              <Badge variant="outline" className="border-warning/30 bg-warning/10 text-amber-900">
+                Vai para pendencias
+              </Badge>
+            ) : null}
+          </div>
+          <p className="mt-2 font-ui text-sm font-semibold text-text-primary">{question.title}</p>
+          <p className="mt-1 font-ui text-sm leading-6 text-text-secondary">{question.prompt}</p>
+        </div>
+
+        <div className="flex shrink-0 gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={onReject}>
+            Rejeitar
+          </Button>
+          <Button type="button" size="sm" className="gap-2" onClick={onApprove} disabled={!canApprove}>
+            <Check className="h-4 w-4" />
+            Aprovar
+          </Button>
+        </div>
+      </div>
+
+      {review.kind === 'field' ? (
+        <>
+          {fieldInstruction ? (
+            <div className="mt-3 rounded-radius-lg border border-primary/15 bg-primary/[0.035] px-3 py-2.5">
+              <p className="font-ui text-sm leading-6 text-text-primary">{fieldInstruction.instruction}</p>
+              <p className="mt-1 font-ui text-xs leading-5 text-text-secondary">
+                Campo do modelo: <span className="font-medium text-text-primary">{fieldInstruction.modelField}</span>
+              </p>
+              {sourceText ? <ReferenceTermOriginalTextHover originalText={sourceText} className="mt-2" /> : null}
+            </div>
+          ) : null}
+          <Textarea
+            value={review.editedValue ?? review.value ?? ''}
+            onChange={(event) => onChange({ ...review, editedValue: event.target.value, decision: 'pending' })}
+            className="mt-3 min-h-[88px] rounded-radius-lg border-border-default bg-white text-sm"
+          />
+        </>
       ) : (
         <div className="mt-3 grid gap-2">
           {(question.options || []).map((option) => {
-            const isSelected = selectedOptionId === option.id && !isSkipped;
+            const selectedOptionId = review.editedSelectedOptionId ?? review.selectedOptionId;
+            const isSelected = selectedOptionId === option.id;
 
             return (
-              <button
-                type="button"
+              <ReferenceTermOptionButton
                 key={option.id}
-                onClick={() =>
-                  onAnswer({
-                    questionId: question.id,
-                    kind: question.kind,
-                    selectedOptionId: option.id,
-                    skipped: false,
-                  })
-                }
-                className={cn(
-                  'rounded-radius-lg border px-3 py-2 text-left transition-all duration-200',
-                  isSelected
-                    ? 'border-primary/35 bg-primary/[0.08] text-text-primary shadow-soft'
-                    : 'border-border-default bg-surface-subtle/40 text-text-secondary hover:border-primary/20 hover:bg-primary/[0.04]',
-                )}
-              >
-                <span className="block font-ui text-sm font-semibold">{option.label}</span>
-                <span className="mt-1 line-clamp-3 block font-ui text-xs leading-5">{option.text}</span>
-              </button>
+                option={option}
+                isSelected={isSelected}
+                onClick={() => onChange({ ...review, editedSelectedOptionId: option.id, decision: 'pending' })}
+              />
             );
           })}
         </div>
       )}
+
+      <div className="mt-3 grid gap-2 rounded-radius-lg border border-border-default/70 bg-surface-subtle/35 p-3">
+        <label className="grid gap-1">
+          <span className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Justificativa</span>
+          <Textarea
+            value={review.editedJustification ?? review.justification ?? ''}
+            onChange={(event) => onChange({ ...review, editedJustification: event.target.value, decision: 'pending' })}
+            className="min-h-[64px] rounded-radius-lg border-border-default bg-white text-sm"
+          />
+        </label>
+        <p className="font-ui text-xs leading-5 text-text-secondary">
+          Fonte: pagina {review.sourcePage}. {review.sourceExcerpt}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function PreliminaryStudyQuestionCard({
+  question,
+  answer,
+  onAnswer,
+  onSkip,
+  onGenerateText,
+}: {
+  question: PreliminaryStudyQuestion;
+  answer?: PreliminaryStudyQuestionAnswer;
+  onAnswer: (answer: PreliminaryStudyQuestionAnswer) => void;
+  onSkip: () => void;
+  onGenerateText: (currentValue: string) => Promise<string>;
+}) {
+  const [value, setValue] = useState(answer?.value || '');
+  const [generatedByAi, setGeneratedByAi] = useState(answer?.origin === 'ai');
+  const [isGeneratingText, setIsGeneratingText] = useState(false);
+  const [generationError, setGenerationError] = useState('');
+
+  useEffect(() => {
+    setValue(answer?.value || '');
+    setGeneratedByAi(answer?.origin === 'ai');
+    setGenerationError('');
+  }, [answer?.origin, answer?.value, question.id]);
+
+  const handleGenerateText = async () => {
+    setGenerationError('');
+    setIsGeneratingText(true);
+    try {
+      const generatedText = await onGenerateText(value);
+      if (!generatedText.trim()) {
+        setGenerationError('A IA nao retornou texto para esta secao.');
+        return;
+      }
+      setValue(generatedText);
+      setGeneratedByAi(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Nao foi possivel gerar o texto da secao.';
+      setGenerationError(message);
+    } finally {
+      setIsGeneratingText(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4 rounded-radius-xl border border-border-default bg-surface-card p-4">
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="font-ui text-sm font-semibold text-text-primary">{question.title}</p>
+          {question.required ? (
+            <Badge variant="outline" className="border-warning/30 bg-warning/10 text-amber-900">
+              Obrigatorio
+            </Badge>
+          ) : null}
+        </div>
+        <p className="font-ui text-sm leading-6 text-text-secondary">{question.prompt}</p>
+        <p className="font-ui text-xs leading-5 text-text-muted">{question.guidance}</p>
+      </div>
+
+      <Textarea
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        placeholder={question.placeholder}
+        className="min-h-[132px] resize-none rounded-radius-lg border-border-default bg-surface-subtle/35 text-sm text-text-primary"
+      />
+      {generationError ? (
+        <p className="font-ui text-xs leading-5 text-warning">{generationError}</p>
+      ) : null}
+
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <Button type="button" variant="outline" className="h-9" onClick={onSkip}>
+          Pular
+        </Button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9"
+            onClick={handleGenerateText}
+            disabled={isGeneratingText}
+          >
+            {isGeneratingText ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles className="mr-2 h-4 w-4" />
+            )}
+            Gerar texto com IA
+          </Button>
+          <Button
+            type="button"
+            className="h-9"
+            onClick={() =>
+              onAnswer({
+                questionId: question.id,
+                value,
+                skipped: false,
+                origin: generatedByAi ? 'ai' : 'user',
+                approved: generatedByAi || undefined,
+              })
+            }
+            disabled={!value.trim()}
+          >
+            Salvar resposta
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PreliminaryStudySuggestionReviewCard({
+  question,
+  review,
+  onChange,
+  onApprove,
+  onReject,
+}: {
+  question: PreliminaryStudyQuestion;
+  review: PreliminaryStudySuggestionReview;
+  onChange: (review: PreliminaryStudySuggestionReview) => void;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  const value = review.editedValue ?? review.value ?? '';
+  const justification = review.editedJustification ?? review.justification ?? '';
+
+  return (
+    <div
+      className={cn(
+        'rounded-radius-xl border p-4 transition-all duration-200',
+        review.decision === 'approved'
+          ? 'border-status-success/25 bg-status-success/10'
+          : review.decision === 'rejected'
+            ? 'border-border-default bg-surface-subtle/40 opacity-70'
+            : 'border-border-default bg-surface-card',
+      )}
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="mb-1 flex flex-wrap items-center gap-2">
+            <p className="font-ui text-sm font-semibold text-text-primary">{question.title}</p>
+            {question.required ? (
+              <Badge variant="outline" className="border-warning/30 bg-warning/10 text-amber-900">
+                Obrigatorio
+              </Badge>
+            ) : null}
+          </div>
+          <p className="font-ui text-xs leading-5 text-text-secondary">{question.prompt}</p>
+        </div>
+
+        <div className="flex shrink-0 gap-2">
+          <Button type="button" size="sm" variant="outline" className="h-8" onClick={onReject}>
+            Rejeitar
+          </Button>
+          <Button type="button" size="sm" className="h-8" onClick={onApprove}>
+            Aprovar
+          </Button>
+        </div>
+      </div>
+
+      <div className="mt-3 space-y-2">
+        <Textarea
+          value={value}
+          onChange={(event) => onChange({ ...review, editedValue: event.target.value })}
+          className="min-h-[96px] resize-none rounded-radius-lg border-border-default bg-white text-sm"
+        />
+        <label className="grid gap-1.5">
+          <span className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">
+            Justificativa
+          </span>
+          <Textarea
+            value={justification}
+            onChange={(event) => onChange({ ...review, editedJustification: event.target.value })}
+            className="min-h-[64px] resize-none rounded-radius-lg border-border-default bg-white text-xs"
+          />
+        </label>
+        <p className="font-ui text-xs leading-5 text-text-secondary">
+          Fonte: pagina {review.sourcePage}. {review.sourceExcerpt}
+        </p>
+      </div>
     </div>
   );
 }
@@ -534,11 +1278,21 @@ export default function EditorDocumentos() {
   const [pendingContractCandidates, setPendingContractCandidates] = useState<ContractTemplateCandidate[]>([]);
   const [pendingContractGeneration, setPendingContractGeneration] = useState<PendingContractGeneration | null>(null);
   const [pendingReferenceTermGeneration, setPendingReferenceTermGeneration] = useState<PendingReferenceTermGeneration | null>(null);
+  const [pendingPreliminaryStudyGeneration, setPendingPreliminaryStudyGeneration] =
+    useState<PendingPreliminaryStudyGeneration | null>(null);
   const [referenceTermAnswers, setReferenceTermAnswers] = useState<Record<string, ReferenceTermQuestionAnswer>>({});
+  const [referenceTermSuggestionReviews, setReferenceTermSuggestionReviews] = useState<ReferenceTermSuggestionReview[]>([]);
+  const [referenceTermManualQuestionIds, setReferenceTermManualQuestionIds] = useState<string[]>([]);
+  const [referenceTermQuestionIndex, setReferenceTermQuestionIndex] = useState(0);
+  const [preliminaryStudyAnswers, setPreliminaryStudyAnswers] = useState<Record<string, PreliminaryStudyQuestionAnswer>>({});
+  const [preliminaryStudySuggestionReviews, setPreliminaryStudySuggestionReviews] = useState<PreliminaryStudySuggestionReview[]>([]);
+  const [preliminaryStudyManualQuestionIds, setPreliminaryStudyManualQuestionIds] = useState<string[]>([]);
+  const [preliminaryStudyQuestionIndex, setPreliminaryStudyQuestionIndex] = useState(0);
   const [editorContent, setEditorContent] = useState('<p></p>');
   const [selectedTitle, setSelectedTitle] = useState('Despacho de Liquidacao');
   const [generatedDispatches, setGeneratedDispatches] = useState<GeneratedDispatch[]>([]);
   const [copiedDispatchIds, setCopiedDispatchIds] = useState<string[]>([]);
+  const [copiedSectionIds, setCopiedSectionIds] = useState<string[]>([]);
   const [clonedDispatchIds, setClonedDispatchIds] = useState<string[]>([]);
   const [downloadedDocxIds, setDownloadedDocxIds] = useState<string[]>([]);
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
@@ -552,6 +1306,7 @@ export default function EditorDocumentos() {
   const activeDocument = documentDefinitions.find((document) => document.id === activeDocumentId) || documentDefinitions[0];
   const isContractDocument = activeDocumentId === 'contrato-servico-ifrn';
   const isReferenceTermDocument = activeDocumentId === 'termo-referencia-compras';
+  const isPreliminaryStudyDocument = activeDocumentId === 'estudo-tecnico-preliminar-servicos-continuos';
 
   const {
     data: syncedProcesses = [],
@@ -625,15 +1380,79 @@ export default function EditorDocumentos() {
     setPendingContractCandidates([]);
     setPendingContractGeneration(null);
     setPendingReferenceTermGeneration(null);
+    setPendingPreliminaryStudyGeneration(null);
     setReferenceTermAnswers({});
+    setReferenceTermSuggestionReviews([]);
+    setReferenceTermManualQuestionIds([]);
+    setReferenceTermQuestionIndex(0);
+    setPreliminaryStudyAnswers({});
+    setPreliminaryStudySuggestionReviews([]);
+    setPreliminaryStudyManualQuestionIds([]);
+    setPreliminaryStudyQuestionIndex(0);
   };
 
-  const referenceTermQuestions = pendingReferenceTermGeneration?.template.questionnaireSchema?.questions || [];
+  const effectiveReferenceTermQuestionnaireSchema = useMemo(
+    () => sanitizeReferenceTermQuestionnaireSchema(
+      pendingReferenceTermGeneration?.template.questionnaireSchema,
+      pendingReferenceTermGeneration?.template.editableBlocks,
+    ),
+    [pendingReferenceTermGeneration?.template.editableBlocks, pendingReferenceTermGeneration?.template.questionnaireSchema],
+  );
+  const referenceTermQuestions = effectiveReferenceTermQuestionnaireSchema?.questions || [];
+  const referenceTermQuestionSourceById = useMemo(
+    () =>
+      new Map(
+        referenceTermQuestions.map((question) => [
+          question.id,
+          getReferenceTermQuestionSourceText(question, pendingReferenceTermGeneration?.template.editableBlocks),
+        ]),
+      ),
+    [pendingReferenceTermGeneration?.template.editableBlocks, referenceTermQuestions],
+  );
   const answeredReferenceTermQuestions = referenceTermQuestions.filter((question) => {
     const answer = referenceTermAnswers[question.id];
-    return Boolean(answer && !answer.skipped && (answer.value?.trim() || answer.selectedOptionId));
+    return isReferenceTermQuestionAnswered(question, answer);
   }).length;
   const skippedReferenceTermQuestions = referenceTermQuestions.filter((question) => referenceTermAnswers[question.id]?.skipped).length;
+  const completedReferenceTermQuestions = answeredReferenceTermQuestions + skippedReferenceTermQuestions;
+  const referenceTermQuestionById = new Map(referenceTermQuestions.map((question) => [question.id, question]));
+  const referenceTermManualQuestions = referenceTermManualQuestionIds
+    .map((questionId) => referenceTermQuestionById.get(questionId))
+    .filter((question): question is DocumentTemplateQuestion => Boolean(question));
+  const currentReferenceTermQuestion =
+    referenceTermManualQuestions[Math.min(referenceTermQuestionIndex, Math.max(referenceTermManualQuestions.length - 1, 0))];
+  const isReferenceTermQuestionnaireReviewStep =
+    referenceTermManualQuestions.length > 0 && referenceTermQuestionIndex >= referenceTermManualQuestions.length;
+  const referenceTermQuestionProgress = referenceTermQuestions.length
+    ? Math.round((completedReferenceTermQuestions / referenceTermQuestions.length) * 100)
+    : 0;
+  const pendingReferenceTermSuggestionReviews = referenceTermSuggestionReviews.filter((review) => review.decision !== 'rejected');
+  const approvedReferenceTermSuggestionReviews = referenceTermSuggestionReviews.filter((review) => review.decision === 'approved');
+
+  const preliminaryStudyQuestionById = new Map(preliminaryStudyQuestions.map((question) => [question.id, question]));
+  const preliminaryStudyManualQuestions = preliminaryStudyManualQuestionIds
+    .map((questionId) => preliminaryStudyQuestionById.get(questionId))
+    .filter((question): question is PreliminaryStudyQuestion => Boolean(question));
+  const currentPreliminaryStudyQuestion =
+    preliminaryStudyManualQuestions[
+      Math.min(preliminaryStudyQuestionIndex, Math.max(preliminaryStudyManualQuestions.length - 1, 0))
+    ];
+  const isPreliminaryStudyQuestionnaireReviewStep =
+    preliminaryStudyManualQuestions.length > 0 && preliminaryStudyQuestionIndex >= preliminaryStudyManualQuestions.length;
+  const answeredPreliminaryStudyQuestions = preliminaryStudyQuestions.filter((question) =>
+    isPreliminaryStudyQuestionAnswered(preliminaryStudyAnswers[question.id]),
+  ).length;
+  const skippedPreliminaryStudyQuestions = preliminaryStudyQuestions.filter((question) => preliminaryStudyAnswers[question.id]?.skipped).length;
+  const completedPreliminaryStudyQuestions = answeredPreliminaryStudyQuestions + skippedPreliminaryStudyQuestions;
+  const preliminaryStudyQuestionProgress = preliminaryStudyQuestions.length
+    ? Math.round((completedPreliminaryStudyQuestions / preliminaryStudyQuestions.length) * 100)
+    : 0;
+  const pendingPreliminaryStudySuggestionReviews = preliminaryStudySuggestionReviews.filter((review) => review.decision !== 'rejected');
+  const approvedPreliminaryStudySuggestionReviews = preliminaryStudySuggestionReviews.filter((review) => review.decision === 'approved');
+
+  const advanceReferenceTermQuestion = () => {
+    setReferenceTermQuestionIndex((current) => Math.min(current + 1, referenceTermManualQuestions.length));
+  };
 
   const setReferenceTermAnswer = (answer: ReferenceTermQuestionAnswer) => {
     setReferenceTermAnswers((current) => ({
@@ -648,6 +1467,18 @@ export default function EditorDocumentos() {
       kind: question.kind,
       skipped: true,
     });
+    advanceReferenceTermQuestion();
+  };
+
+  const cancelReferenceTermQuestionnaire = () => {
+    setPendingReferenceTermGeneration(null);
+    setReferenceTermAnswers({});
+    setReferenceTermSuggestionReviews([]);
+    setReferenceTermManualQuestionIds([]);
+    setReferenceTermQuestionIndex(0);
+    setScreenState('idle');
+    setFeedback('Questionario do Termo de Referencia cancelado.');
+    setFeedbackTone('neutral');
   };
 
   const buildReferenceTermQuestionnaireAnswers = () =>
@@ -660,6 +1491,278 @@ export default function EditorDocumentos() {
       };
     });
 
+  const suggestionReviewToAnswer = (review: ReferenceTermSuggestionReview): ReferenceTermQuestionAnswer | null => {
+    if (review.status !== 'suggested' || review.decision !== 'approved') {
+      return null;
+    }
+
+    const selectedOptionId = review.editedSelectedOptionId ?? review.selectedOptionId;
+    const value = (review.editedValue ?? review.value ?? '').trim();
+    const justification = (review.editedJustification ?? review.justification ?? '').trim();
+
+    if ((review.kind === 'exclusive' || review.kind === 'optional') && !selectedOptionId) {
+      return null;
+    }
+
+    if (review.kind === 'field' && !value) {
+      return null;
+    }
+
+    return {
+      questionId: review.questionId,
+      kind: review.kind,
+      selectedOptionId: selectedOptionId || undefined,
+      value: value || undefined,
+      optionValues: undefined,
+      skipped: false,
+      origin: 'ai',
+      approved: true,
+      confidence: review.confidence,
+      sourcePage: review.sourcePage,
+      sourceExcerpt: review.sourceExcerpt,
+      justification: justification || undefined,
+    };
+  };
+
+  const buildApprovedSuggestionAnswers = (reviews = referenceTermSuggestionReviews) => {
+    const answers: Record<string, ReferenceTermQuestionAnswer> = {};
+
+    for (const review of reviews) {
+      const answer = suggestionReviewToAnswer(review);
+      if (answer) {
+        answers[answer.questionId] = answer;
+      }
+    }
+
+    return answers;
+  };
+
+  const continueAfterReferenceTermSuggestions = async (reviews = referenceTermSuggestionReviews) => {
+    if (!pendingReferenceTermGeneration) return;
+
+    const approvedAnswers = buildApprovedSuggestionAnswers(reviews);
+    const nextAnswers = {
+      ...referenceTermAnswers,
+      ...approvedAnswers,
+    };
+    const pendingQuestionIds = referenceTermQuestions
+      .filter((question) => !isReferenceTermQuestionAnswered(question, nextAnswers[question.id]))
+      .map((question) => question.id);
+
+    setReferenceTermAnswers(nextAnswers);
+    setReferenceTermManualQuestionIds(pendingQuestionIds);
+    setReferenceTermQuestionIndex(0);
+
+    if (pendingQuestionIds.length === 0) {
+      await handleGenerateReferenceTermDraft(
+        pendingReferenceTermGeneration.processo,
+        pendingReferenceTermGeneration.analysis,
+        pendingReferenceTermGeneration.template,
+        referenceTermQuestions.map((question) => nextAnswers[question.id]).filter(Boolean),
+      );
+      return;
+    }
+
+    setFeedback(`${pendingQuestionIds.length} pergunta(s) ainda precisam de revisao manual.`);
+    setFeedbackTone('neutral');
+    setScreenState('reference_questionnaire');
+  };
+
+  const approveReferenceTermSuggestion = (questionId: string) => {
+    setReferenceTermSuggestionReviews((current) => {
+      const next = current.map((review) => (
+        review.questionId === questionId ? { ...review, decision: 'approved' as const } : review
+      ));
+      setReferenceTermAnswers((answers) => ({
+        ...answers,
+        ...buildApprovedSuggestionAnswers(next),
+      }));
+      return next;
+    });
+  };
+
+  const rejectReferenceTermSuggestion = (questionId: string) => {
+    setReferenceTermSuggestionReviews((current) => current.map((review) => (
+      review.questionId === questionId ? { ...review, decision: 'rejected' as const } : review
+    )));
+    setReferenceTermAnswers((current) => {
+      const next = { ...current };
+      delete next[questionId];
+      return next;
+    });
+  };
+
+  const updateReferenceTermSuggestionReview = (updatedReview: ReferenceTermSuggestionReview) => {
+    setReferenceTermSuggestionReviews((current) => current.map((review) => (
+      review.questionId === updatedReview.questionId ? updatedReview : review
+    )));
+    setReferenceTermAnswers((current) => {
+      const next = { ...current };
+      delete next[updatedReview.questionId];
+      return next;
+    });
+  };
+
+  const approveAllReferenceTermSuggestions = () => {
+    setReferenceTermSuggestionReviews((current) => {
+      const next = current.map((review) => (
+        review.status === 'suggested' ? { ...review, decision: 'approved' as const } : review
+      ));
+      setReferenceTermAnswers((answers) => ({
+        ...answers,
+        ...buildApprovedSuggestionAnswers(next),
+      }));
+      return next;
+    });
+  };
+
+  const advancePreliminaryStudyQuestion = () => {
+    setPreliminaryStudyQuestionIndex((current) => Math.min(current + 1, preliminaryStudyManualQuestions.length));
+  };
+
+  const setPreliminaryStudyAnswer = (answer: PreliminaryStudyQuestionAnswer) => {
+    setPreliminaryStudyAnswers((current) => ({
+      ...current,
+      [answer.questionId]: answer,
+    }));
+  };
+
+  const skipPreliminaryStudyQuestion = (question: PreliminaryStudyQuestion) => {
+    setPreliminaryStudyAnswer({
+      questionId: question.id,
+      skipped: true,
+    });
+    advancePreliminaryStudyQuestion();
+  };
+
+  const cancelPreliminaryStudyQuestionnaire = () => {
+    setPendingPreliminaryStudyGeneration(null);
+    setPreliminaryStudyAnswers({});
+    setPreliminaryStudySuggestionReviews([]);
+    setPreliminaryStudyManualQuestionIds([]);
+    setPreliminaryStudyQuestionIndex(0);
+    setScreenState('idle');
+    setFeedback('Questionario do ETP cancelado.');
+    setFeedbackTone('neutral');
+  };
+
+  const preliminaryStudySuggestionReviewToAnswer = (
+    review: PreliminaryStudySuggestionReview,
+  ): PreliminaryStudyQuestionAnswer | null => {
+    if (review.status !== 'suggested' || review.decision !== 'approved') {
+      return null;
+    }
+
+    const value = (review.editedValue ?? review.value ?? '').trim();
+    const justification = (review.editedJustification ?? review.justification ?? '').trim();
+    if (!value) return null;
+
+    return {
+      questionId: review.questionId,
+      value,
+      skipped: false,
+      origin: 'ai',
+      approved: true,
+      confidence: review.confidence,
+      sourcePage: review.sourcePage,
+      sourceExcerpt: review.sourceExcerpt,
+      justification: justification || undefined,
+    };
+  };
+
+  const buildApprovedPreliminaryStudySuggestionAnswers = (reviews = preliminaryStudySuggestionReviews) => {
+    const answers: Record<string, PreliminaryStudyQuestionAnswer> = {};
+
+    for (const review of reviews) {
+      const answer = preliminaryStudySuggestionReviewToAnswer(review);
+      if (answer) {
+        answers[answer.questionId] = answer;
+      }
+    }
+
+    return answers;
+  };
+
+  const continueAfterPreliminaryStudySuggestions = async (reviews = preliminaryStudySuggestionReviews) => {
+    if (!pendingPreliminaryStudyGeneration) return;
+
+    const approvedAnswers = buildApprovedPreliminaryStudySuggestionAnswers(reviews);
+    const nextAnswers = {
+      ...preliminaryStudyAnswers,
+      ...approvedAnswers,
+    };
+    const pendingQuestionIds = preliminaryStudyQuestions
+      .filter((question) => !isPreliminaryStudyQuestionAnswered(nextAnswers[question.id]))
+      .map((question) => question.id);
+
+    setPreliminaryStudyAnswers(nextAnswers);
+    setPreliminaryStudyManualQuestionIds(pendingQuestionIds);
+    setPreliminaryStudyQuestionIndex(0);
+
+    if (pendingQuestionIds.length === 0) {
+      await handleGeneratePreliminaryStudyDraft(
+        pendingPreliminaryStudyGeneration,
+        preliminaryStudyQuestions.map((question) => nextAnswers[question.id]).filter(Boolean),
+      );
+      return;
+    }
+
+    setFeedback(`${pendingQuestionIds.length} pergunta(s) do ETP ainda precisam de revisao manual.`);
+    setFeedbackTone('neutral');
+    setScreenState('etp_questionnaire');
+  };
+
+  const approvePreliminaryStudySuggestion = (questionId: string) => {
+    setPreliminaryStudySuggestionReviews((current) => {
+      const next = current.map((review) => (
+        review.questionId === questionId ? { ...review, decision: 'approved' as const } : review
+      ));
+      setPreliminaryStudyAnswers((answers) => ({
+        ...answers,
+        ...buildApprovedPreliminaryStudySuggestionAnswers(next),
+      }));
+      return next;
+    });
+  };
+
+  const rejectPreliminaryStudySuggestion = (questionId: string) => {
+    setPreliminaryStudySuggestionReviews((current) => current.map((review) => (
+      review.questionId === questionId ? { ...review, decision: 'rejected' as const } : review
+    )));
+    setPreliminaryStudyAnswers((current) => {
+      const next = { ...current };
+      delete next[questionId];
+      return next;
+    });
+  };
+
+  const updatePreliminaryStudySuggestionReview = (updatedReview: PreliminaryStudySuggestionReview) => {
+    setPreliminaryStudySuggestionReviews((current) => current.map((review) => (
+      review.questionId === updatedReview.questionId ? updatedReview : review
+    )));
+    setPreliminaryStudyAnswers((current) => {
+      const next = { ...current };
+      const answer = preliminaryStudySuggestionReviewToAnswer(updatedReview);
+      if (answer) {
+        next[answer.questionId] = answer;
+      }
+      return next;
+    });
+  };
+
+  const approveAllPreliminaryStudySuggestions = () => {
+    setPreliminaryStudySuggestionReviews((current) => {
+      const next = current.map((review) => (
+        review.status === 'suggested' ? { ...review, decision: 'approved' as const } : review
+      ));
+      setPreliminaryStudyAnswers((answers) => ({
+        ...answers,
+        ...buildApprovedPreliminaryStudySuggestionAnswers(next),
+      }));
+      return next;
+    });
+  };
+
   const openGeneratedDocument = (
     document: GeneratedDispatch,
     options?: {
@@ -671,6 +1774,7 @@ export default function EditorDocumentos() {
     setEditorContent(document.html);
     setGeneratedDispatches([document]);
     setCopiedDispatchIds([]);
+    setCopiedSectionIds([]);
     setClonedDispatchIds([]);
     setDownloadedDocxIds([]);
     resetPendingStates();
@@ -832,6 +1936,11 @@ export default function EditorDocumentos() {
     template: DocumentTemplateRecord,
     questionnaireAnswers: ReferenceTermQuestionAnswer[] = [],
   ) => {
+    const questionnaireSchema = sanitizeReferenceTermQuestionnaireSchema(
+      template.questionnaireSchema,
+      template.editableBlocks,
+    );
+
     setFeedback('');
     setScreenState('resolving');
 
@@ -840,7 +1949,7 @@ export default function EditorDocumentos() {
         processo,
         analysis,
         template,
-        questionnaireSchema: template.questionnaireSchema,
+        questionnaireSchema,
         questionnaireAnswers,
       });
 
@@ -952,15 +2061,58 @@ export default function EditorDocumentos() {
         return;
       }
 
-      const questions = template.questionnaireSchema?.questions || [];
+      const questionnaireSchema = sanitizeReferenceTermQuestionnaireSchema(
+        template.questionnaireSchema,
+        template.editableBlocks,
+      );
+      const questions = questionnaireSchema?.questions || [];
       if (questions.length > 0) {
         setPendingReferenceTermGeneration({ processo, analysis, template });
         setReferenceTermAnswers({});
-        setFeedback(`Revise ${questions.length} pergunta(s) do modelo AGU antes da geracao final. Voce pode pular qualquer uma.`);
+        setReferenceTermSuggestionReviews([]);
+        setReferenceTermManualQuestionIds(questions.map((question) => question.id));
+        setReferenceTermQuestionIndex(0);
+        setFeedback(`Analisando processo e sugerindo respostas para ${questions.length} pergunta(s) do modelo AGU.`);
         setFeedbackTone('neutral');
-        setScreenState('reference_questionnaire');
+        setScreenState('resolving');
         setSelectedProcessId(null);
-        return;
+
+        try {
+          const suggestionResult = await referenceTermsService.suggestQuestionnaireAnswers({
+            processo,
+            analysis,
+            template,
+            questionnaireSchema,
+          });
+          const suggestedReviews = suggestionResult.suggestions
+            .filter((suggestion) => suggestion.status === 'suggested')
+            .map((suggestion) => ({
+              ...suggestion,
+              decision: 'pending' as const,
+            }));
+
+          setReferenceTermSuggestionReviews(suggestedReviews);
+
+          if (suggestedReviews.length > 0) {
+            setFeedback(`${suggestedReviews.length} sugestao(oes) da IA encontradas com fonte explicita no processo.`);
+            setFeedbackTone('success');
+            setScreenState('ai_questionnaire_prefill');
+            return;
+          }
+
+          setFeedback('A IA nao encontrou respostas com fonte explicita. Revise manualmente as perguntas pendentes.');
+          setFeedbackTone('warning');
+          setScreenState('reference_questionnaire');
+          return;
+        } catch (suggestionError) {
+          const suggestionMessage = suggestionError instanceof Error
+            ? suggestionError.message
+            : 'Nao foi possivel sugerir respostas automaticamente.';
+          setFeedback(`${suggestionMessage} O questionario manual continua disponivel.`);
+          setFeedbackTone('warning');
+          setScreenState('reference_questionnaire');
+          return;
+        }
       }
 
       await handleGenerateReferenceTermDraft(processo, analysis, template);
@@ -974,8 +2126,272 @@ export default function EditorDocumentos() {
     }
   };
 
+  const handleGeneratePreliminaryStudyDraft = async (
+    pending: PendingPreliminaryStudyGeneration,
+    questionnaireAnswers: PreliminaryStudyQuestionAnswer[] = [],
+  ) => {
+    setFeedback('');
+    setScreenState('resolving');
+
+    try {
+      const result = await preliminaryStudiesService.generateDraft({
+        processo: pending.processo,
+        manualObject: pending.manualObject,
+        analysis: pending.analysis,
+        questionnaireAnswers,
+      });
+
+      if (result.status === 'blocked') {
+        setFeedback(result.blockedReason || 'Nao foi possivel gerar o ETP.');
+        setFeedbackTone('warning');
+        setScreenState('not_found');
+        return;
+      }
+
+      const warningCount = result.warnings.length + result.missingRequiredFields.length;
+      const processoLabel = pending.processo?.numProcesso || pending.processo?.suapId;
+
+      openGeneratedDocument(
+        {
+          id: `${pending.processo?.id || 'manual'}-etp-${Date.now()}`,
+          title: result.title,
+          subtitle: result.subtitle || (processoLabel ? `Processo ${processoLabel}` : pending.manualObject),
+          processo: pending.processo?.numProcesso,
+          html: result.html || '<p></p>',
+          documentType: 'estudo-tecnico-preliminar-servicos-continuos',
+          allowClone: false,
+          sections: result.sections || [],
+        },
+        {
+          feedbackMessage:
+            warningCount > 0
+              ? `ETP gerado com ${warningCount} alerta(s) para revisao.`
+              : 'ETP gerado.',
+          feedbackTone: warningCount > 0 ? 'neutral' : 'success',
+        },
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro inesperado ao gerar o ETP.';
+      setFeedback(message);
+      setFeedbackTone('warning');
+      setScreenState('not_found');
+      toast.error(message);
+    }
+  };
+
+  const handleContinuePreliminaryStudyQuestionnaire = async () => {
+    if (!pendingPreliminaryStudyGeneration) return;
+
+    const answers = buildPreliminaryStudyQuestionnaireAnswers(preliminaryStudyAnswers);
+    await handleGeneratePreliminaryStudyDraft(pendingPreliminaryStudyGeneration, answers);
+  };
+
+  const handleGeneratePreliminaryStudyQuestionText = async (
+    question: PreliminaryStudyQuestion,
+    currentValue: string,
+  ) => {
+    if (!pendingPreliminaryStudyGeneration) {
+      throw new Error('O contexto do ETP nao esta disponivel.');
+    }
+
+    const result = await preliminaryStudiesService.generateQuestionText({
+      processo: pendingPreliminaryStudyGeneration.processo,
+      manualObject: pendingPreliminaryStudyGeneration.manualObject,
+      analysis: pendingPreliminaryStudyGeneration.analysis,
+      questionnaireAnswers: buildPreliminaryStudyQuestionnaireAnswers(preliminaryStudyAnswers),
+      question,
+      userNotes: currentValue,
+    });
+
+    if (result.warnings.length > 0) {
+      toast.warning(result.warnings[0]);
+    }
+
+    return result.value;
+  };
+
+  const startPreliminaryStudyQuestionnaire = async (
+    pending: PendingPreliminaryStudyGeneration,
+    options?: { trySuggestions?: boolean; notice?: string; tone?: FeedbackTone },
+  ) => {
+    const initialAnswers = buildInitialPreliminaryStudyAnswers(pending.manualObject);
+    const pendingQuestionIds = preliminaryStudyQuestions
+      .filter((question) => !isPreliminaryStudyQuestionAnswered(initialAnswers[question.id]))
+      .map((question) => question.id);
+
+    setPendingPreliminaryStudyGeneration(pending);
+    setPreliminaryStudyAnswers(initialAnswers);
+    setPreliminaryStudySuggestionReviews([]);
+    setPreliminaryStudyManualQuestionIds(pendingQuestionIds);
+    setPreliminaryStudyQuestionIndex(0);
+    setSelectedProcessId(null);
+
+    if (options?.notice) {
+      setFeedback(options.notice);
+      setFeedbackTone(options.tone || 'neutral');
+    }
+
+    if (options?.trySuggestions && pending.analysis?.snippets.length) {
+      setScreenState('resolving');
+      try {
+        const suggestionResult = await preliminaryStudiesService.suggestQuestionnaireAnswers({
+          processo: pending.processo,
+          manualObject: pending.manualObject,
+          analysis: pending.analysis,
+        });
+        const suggestedReviews = suggestionResult.suggestions
+          .filter((suggestion) => suggestion.status === 'suggested')
+          .map((suggestion) => ({
+            ...suggestion,
+            decision: 'pending' as const,
+          }));
+
+        setPreliminaryStudySuggestionReviews(suggestedReviews);
+
+        if (suggestedReviews.length > 0) {
+          setFeedback(`${suggestedReviews.length} sugestao(oes) da IA encontradas com fonte explicita no processo.`);
+          setFeedbackTone('success');
+          setScreenState('etp_questionnaire_prefill');
+          return;
+        }
+
+        setFeedback('A IA nao encontrou respostas com fonte explicita. Revise manualmente as perguntas do ETP.');
+        setFeedbackTone('warning');
+      } catch (suggestionError) {
+        const suggestionMessage = suggestionError instanceof Error
+          ? suggestionError.message
+          : 'Nao foi possivel sugerir respostas automaticamente.';
+        setFeedback(`${suggestionMessage} O questionario manual do ETP continua disponivel.`);
+        setFeedbackTone('warning');
+      }
+    }
+
+    setScreenState('etp_questionnaire');
+  };
+
+  const handleGeneratePreliminaryStudy = async ({
+    processo,
+    manualObject,
+  }: {
+    processo?: SuapProcesso | null;
+    manualObject?: string;
+  }) => {
+    const objectFallback = manualObject?.trim() || processo?.assunto || '';
+    if (!processo && !objectFallback.trim()) {
+      const message = 'Informe um processo sincronizado ou descreva o objeto da licitacao para gerar o ETP.';
+      setFeedback(message);
+      setFeedbackTone('warning');
+      setScreenState('not_found');
+      toast.error(message);
+      return;
+    }
+
+    resetPendingStates();
+    setFeedback('');
+    setScreenState('resolving');
+
+    if (!processo?.pdfUrl) {
+      await startPreliminaryStudyQuestionnaire(
+        {
+          processo,
+          analysis: null,
+          manualObject: objectFallback,
+        },
+        {
+          notice: processo
+            ? 'Este processo ainda nao possui PDF sincronizado. O ETP sera montado pelo questionario manual.'
+            : 'Preencha o questionario do ETP com base no objeto informado.',
+          tone: processo ? 'warning' : 'neutral',
+        },
+      );
+      return;
+    }
+
+    try {
+      const analysis = await preliminaryStudiesService.analyzeProcessPdf(processo);
+      if (analysis.searchablePageCount === 0) {
+        await startPreliminaryStudyQuestionnaire(
+          {
+            processo,
+            analysis,
+            manualObject: objectFallback,
+          },
+          {
+            notice: analysis.warnings[0] || 'O PDF do processo nao trouxe texto pesquisavel. O ETP sera montado pelo questionario manual.',
+            tone: 'warning',
+          },
+        );
+        return;
+      }
+
+      await startPreliminaryStudyQuestionnaire(
+        {
+          processo,
+          analysis,
+          manualObject: objectFallback,
+        },
+        { trySuggestions: true },
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro inesperado ao analisar o PDF do processo.';
+      await startPreliminaryStudyQuestionnaire(
+        {
+          processo,
+          analysis: null,
+          manualObject: objectFallback,
+        },
+        {
+          notice: `${message} O questionario manual do ETP continua disponivel.`,
+          tone: 'warning',
+        },
+      );
+    }
+  };
+
   const handleBatchResolve = async (rawInput = processInput) => {
     const processes = extractProcessNumbers(rawInput);
+
+    if (isPreliminaryStudyDocument) {
+      resetPendingStates();
+      setFeedback('');
+
+      if (processes.length > 1) {
+        const message = 'A geracao do ETP funciona com um processo por vez.';
+        setFeedback(message);
+        setFeedbackTone('warning');
+        setScreenState('not_found');
+        toast.error(message);
+        return;
+      }
+
+      if (processes.length === 1) {
+        const matchedProcess = findSyncedProcessByNumber(processes[0]);
+        if (!matchedProcess) {
+          const message = 'Para usar PDF do processo no ETP, o processo precisa estar sincronizado no SUAP. Sem isso, descreva o objeto da licitacao no campo.';
+          setFeedback(message);
+          setFeedbackTone('warning');
+          setScreenState('not_found');
+          toast.error(message);
+          return;
+        }
+
+        await handleGeneratePreliminaryStudy({ processo: matchedProcess });
+        return;
+      }
+
+      const manualObject = rawInput.trim();
+      if (!manualObject) {
+        const message = 'Informe um processo sincronizado ou descreva o objeto da licitacao para gerar o ETP.';
+        setFeedback(message);
+        setFeedbackTone('warning');
+        setScreenState('not_found');
+        toast.error(message);
+        return;
+      }
+
+      await handleGeneratePreliminaryStudy({ manualObject });
+      return;
+    }
 
     if (processes.length === 0) {
       const message = 'Informe pelo menos um numero de processo valido para gerar a minuta.';
@@ -1090,6 +2506,7 @@ export default function EditorDocumentos() {
       setEditorContent(combinedHtml);
       setGeneratedDispatches(dispatches);
       setCopiedDispatchIds([]);
+      setCopiedSectionIds([]);
       setClonedDispatchIds([]);
       setDownloadedDocxIds([]);
       resetPendingStates();
@@ -1133,6 +2550,11 @@ export default function EditorDocumentos() {
 
     if (isReferenceTermDocument) {
       await handleGenerateReferenceTerm(processo);
+      return;
+    }
+
+    if (isPreliminaryStudyDocument) {
+      await handleGeneratePreliminaryStudy({ processo });
       return;
     }
 
@@ -1243,6 +2665,24 @@ export default function EditorDocumentos() {
     }
   };
 
+  const handleCopySection = async (dispatch: GeneratedDispatch, section: PreliminaryStudyDraftSection) => {
+    const sectionKey = `${dispatch.id}:${section.id}`;
+    try {
+      const blob = new Blob([section.html], { type: 'text/html' });
+      const clipboard = new ClipboardItem({
+        'text/html': blob,
+        'text/plain': new Blob([stripHtml(section.html)], { type: 'text/plain' }),
+      });
+      await navigator.clipboard.write([clipboard]);
+      setCopiedSectionIds((current) => (current.includes(sectionKey) ? current : [...current, sectionKey]));
+      toast.success(`Secao ${section.title} copiada.`);
+    } catch {
+      await navigator.clipboard.writeText(stripHtml(section.html));
+      setCopiedSectionIds((current) => (current.includes(sectionKey) ? current : [...current, sectionKey]));
+      toast.success(`Secao ${section.title} copiada em texto simples.`);
+    }
+  };
+
   const handleCloneDispatch = (dispatch: GeneratedDispatch) => {
     setClonedDispatchIds((current) => (current.includes(dispatch.id) ? current : [...current, dispatch.id]));
     window.open(cloneDocumentUrl, '_blank', 'noopener,noreferrer');
@@ -1307,7 +2747,7 @@ export default function EditorDocumentos() {
                               appendDisabled={!example.processoCompleto.numProcesso?.trim()}
                               appendTitle={
                                 example.processoCompleto.numProcesso?.trim()
-                                  ? isContractDocument || isReferenceTermDocument
+                                  ? isContractDocument || isReferenceTermDocument || isPreliminaryStudyDocument
                                     ? 'Usar este processo'
                                     : 'Adicionar ao lote'
                                   : 'Numero de processo indisponivel para lote'
@@ -1347,7 +2787,9 @@ export default function EditorDocumentos() {
                       value={processInput}
                       onChange={(event) => setProcessInput(event.target.value)}
                       placeholder={
-                        isContractDocument || isReferenceTermDocument
+                        isPreliminaryStudyDocument
+                          ? 'Cole um numero de processo sincronizado no SUAP ou descreva o objeto da licitacao.'
+                          : isContractDocument || isReferenceTermDocument
                           ? 'Cole um numero de processo sincronizado no SUAP.'
                           : 'Cole um ou mais numeros de processo, um por linha.'
                       }
@@ -1368,7 +2810,13 @@ export default function EditorDocumentos() {
                           disabled={screenState === 'resolving'}
                         >
                           {screenState === 'resolving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                          {isContractDocument ? 'Gerar contrato' : isReferenceTermDocument ? 'Gerar Termo de Referencia' : 'Gerar minuta'}
+                          {isContractDocument
+                            ? 'Gerar contrato'
+                            : isReferenceTermDocument
+                              ? 'Gerar Termo de Referencia'
+                              : isPreliminaryStudyDocument
+                                ? 'Gerar ETP'
+                                : 'Gerar minuta'}
                         </Button>
                       </div>
                     </div>
@@ -1417,51 +2865,6 @@ export default function EditorDocumentos() {
                     </div>
                   ) : null}
 
-                  {screenState === 'reference_questionnaire' && pendingReferenceTermGeneration ? (
-                    <div className="space-y-4 rounded-radius-xl border border-border-default/70 bg-surface-subtle/40 p-4">
-                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                        <div>
-                          <p className="font-ui text-sm font-semibold text-text-primary">Questionario do Termo de Referencia</p>
-                          <p className="mt-1 font-ui text-sm leading-6 text-text-secondary">
-                            Escolha clausulas, preencha lacunas ou pule pontos que devem ficar pendentes para revisao.
-                          </p>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            <Badge variant="outline" className="border-border-default bg-surface-card text-text-secondary">
-                              {answeredReferenceTermQuestions} respondida(s)
-                            </Badge>
-                            <Badge variant="outline" className="border-warning/30 bg-warning/10 text-amber-900">
-                              {skippedReferenceTermQuestions} pulada(s)
-                            </Badge>
-                            <Badge variant="outline" className="border-border-default bg-surface-card text-text-secondary">
-                              {referenceTermQuestions.length} total
-                            </Badge>
-                          </div>
-                        </div>
-
-                        <Button
-                          type="button"
-                          className="h-10 gap-2"
-                          onClick={() => void handleContinueReferenceTermQuestionnaire()}
-                          disabled={screenState === 'resolving'}
-                        >
-                          {screenState === 'resolving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                          Continuar geracao
-                        </Button>
-                      </div>
-
-                      <div className="grid max-h-[520px] gap-3 overflow-y-auto pr-1">
-                        {referenceTermQuestions.map((question) => (
-                          <ReferenceTermQuestionCard
-                            key={question.id}
-                            question={question}
-                            answer={referenceTermAnswers[question.id]}
-                            onAnswer={setReferenceTermAnswer}
-                            onSkip={() => skipReferenceTermQuestion(question)}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
                 </div>
               </CardContent>
             </Card>
@@ -1477,7 +2880,9 @@ export default function EditorDocumentos() {
                   ? 'O contrato sera montado aqui...'
                   : isReferenceTermDocument
                     ? 'O Termo de Referencia sera montado aqui...'
-                    : 'A minuta sera montada aqui...'
+                    : isPreliminaryStudyDocument
+                      ? 'O ETP sera montado aqui...'
+                      : 'A minuta sera montada aqui...'
               }
               toolbarLeft={
                 <div className="flex items-center gap-2">
@@ -1523,6 +2928,8 @@ export default function EditorDocumentos() {
                                 ? 'Contrato'
                                 : dispatch.documentType === 'termo-referencia-compras'
                                   ? 'TR'
+                                  : dispatch.documentType === 'estudo-tecnico-preliminar-servicos-continuos'
+                                    ? 'ETP'
                                   : 'Despacho'
                             } ${index + 1}`}
                         </p>
@@ -1578,10 +2985,40 @@ export default function EditorDocumentos() {
                           </Button>
                         ) : (
                           <span className="font-ui text-[11px] text-text-muted">
-                            {dispatch.documentType === 'termo-referencia-compras' ? 'Revise e exporte em DOCX' : 'Edite e copie no editor'}
+                            {dispatch.documentType === 'termo-referencia-compras'
+                              ? 'Revise e exporte em DOCX'
+                              : dispatch.documentType === 'estudo-tecnico-preliminar-servicos-continuos'
+                                ? 'Copie o documento ou as secoes'
+                                : 'Edite e copie no editor'}
                           </span>
                         )}
                       </div>
+                      {dispatch.sections?.length ? (
+                        <div className="mt-2 grid gap-1 border-t border-border-default/60 pt-2">
+                          {dispatch.sections.map((section) => {
+                            const sectionKey = `${dispatch.id}:${section.id}`;
+                            const isSectionCopied = copiedSectionIds.includes(sectionKey);
+                            return (
+                              <Button
+                                key={section.id}
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className={cn(
+                                  'h-7 justify-start px-2 font-ui text-[11px]',
+                                  isSectionCopied
+                                    ? 'bg-status-success/12 text-status-success hover:bg-status-success/18 hover:text-status-success'
+                                    : 'text-text-secondary hover:bg-surface-subtle hover:text-text-primary',
+                                )}
+                                onClick={() => void handleCopySection(dispatch, section)}
+                              >
+                                {isSectionCopied ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <Copy className="mr-1.5 h-3.5 w-3.5" />}
+                                Copiar {section.title}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                      ) : null}
                     </div>
                   );
                 })}
@@ -1590,6 +3027,382 @@ export default function EditorDocumentos() {
           </Card>
         ) : null}
       </div>
+
+      <Dialog
+        open={(screenState === 'ai_questionnaire_prefill' || screenState === 'reference_questionnaire') && Boolean(pendingReferenceTermGeneration)}
+        onOpenChange={(open) => {
+          if (!open && (screenState === 'ai_questionnaire_prefill' || screenState === 'reference_questionnaire')) {
+            cancelReferenceTermQuestionnaire();
+          }
+        }}
+      >
+        <DialogContent
+          className="grid max-h-[calc(100dvh-2rem)] w-[min(94vw,760px)] max-w-none grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden border-border-default bg-surface-card p-0 shadow-xl"
+          onInteractOutside={(event) => event.preventDefault()}
+          onEscapeKeyDown={(event) => event.preventDefault()}
+        >
+          {pendingReferenceTermGeneration ? (
+            <>
+              <DialogHeader className="space-y-3 border-b border-border-default/70 bg-surface-subtle/45 px-5 py-4 text-left">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className="border-primary/20 bg-primary/[0.07] text-primary">
+                        Termo de Referencia
+                      </Badge>
+                      {screenState === 'reference_questionnaire' &&
+                      currentReferenceTermQuestion &&
+                      !isReferenceTermQuestionnaireReviewStep &&
+                      currentReferenceTermQuestion.kind !== 'field' ? (
+                        <Badge variant="outline" className="border-border-default bg-surface-card text-text-secondary">
+                          {currentReferenceTermQuestion.kind === 'exclusive'
+                            ? 'Escolha exclusiva'
+                            : currentReferenceTermQuestion.kind === 'optional'
+                              ? 'Opcional'
+                              : null}
+                        </Badge>
+                      ) : null}
+                    </div>
+                    {screenState === 'ai_questionnaire_prefill' ? (
+                      <>
+                        <DialogTitle className="font-ui text-lg font-semibold tracking-tight text-text-primary">
+                          Sugestoes da IA para o Termo de Referencia
+                        </DialogTitle>
+                        <DialogDescription className="mt-1 font-ui text-sm leading-5 text-text-secondary">
+                          Revise as sugestoes com fonte explicita antes das pendencias.
+                        </DialogDescription>
+                      </>
+                    ) : null}
+                  </div>
+
+                  <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+                    {screenState === 'ai_questionnaire_prefill' ? (
+                      <>
+                        <Badge variant="outline" className="border-status-success/25 bg-status-success/10 text-emerald-900">
+                          {approvedReferenceTermSuggestionReviews.length} aprovada(s)
+                        </Badge>
+                        <Badge variant="outline" className="border-border-default bg-surface-card text-text-secondary">
+                          {pendingReferenceTermSuggestionReviews.length} sugerida(s)
+                        </Badge>
+                      </>
+                    ) : (
+                      <>
+                        <Badge variant="outline" className="border-border-default bg-surface-card text-text-secondary">
+                          {answeredReferenceTermQuestions} respondida(s)
+                        </Badge>
+                        <Badge variant="outline" className="border-warning/30 bg-warning/10 text-amber-900">
+                          {skippedReferenceTermQuestions} pulada(s)
+                        </Badge>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="h-2 overflow-hidden rounded-full bg-surface-card ring-1 ring-border-default/70">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-300"
+                    style={{ width: `${referenceTermQuestionProgress}%` }}
+                  />
+                </div>
+              </DialogHeader>
+
+              <div className="min-h-0 overflow-y-auto bg-white px-5 py-4">
+                {screenState === 'ai_questionnaire_prefill' ? (
+                  <div className="grid gap-3">
+                    {referenceTermSuggestionReviews.map((review) => {
+                      const question = referenceTermQuestionById.get(review.questionId);
+                      if (!question) return null;
+
+                      return (
+                        <ReferenceTermSuggestionReviewCard
+                          key={review.questionId}
+                          question={question}
+                          sourceText={referenceTermQuestionSourceById.get(review.questionId)}
+                          review={review}
+                          onChange={updateReferenceTermSuggestionReview}
+                          onApprove={() => approveReferenceTermSuggestion(review.questionId)}
+                          onReject={() => rejectReferenceTermSuggestion(review.questionId)}
+                        />
+                      );
+                    })}
+                  </div>
+                ) : isReferenceTermQuestionnaireReviewStep ? (
+                  <div className="rounded-radius-xl border border-primary/20 bg-primary/[0.04] p-5">
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-radius-lg bg-primary/10 text-primary">
+                        <ShieldCheck className="h-4.5 w-4.5" />
+                      </span>
+                      <div>
+                        <p className="font-ui text-sm font-semibold text-text-primary">Questionario pronto para geracao</p>
+                        <p className="mt-1 font-ui text-sm leading-6 text-text-secondary">
+                          As perguntas respondidas serao enviadas para a IA. As perguntas puladas permanecerao como pendencias de revisao juridica no documento.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : currentReferenceTermQuestion ? (
+                  <ReferenceTermQuestionCard
+                    key={currentReferenceTermQuestion.id}
+                    question={currentReferenceTermQuestion}
+                    sourceText={referenceTermQuestionSourceById.get(currentReferenceTermQuestion.id)}
+                    answer={referenceTermAnswers[currentReferenceTermQuestion.id]}
+                    onAnswer={(answer) => {
+                      setReferenceTermAnswer(answer);
+                      advanceReferenceTermQuestion();
+                    }}
+                    onSkip={() => skipReferenceTermQuestion(currentReferenceTermQuestion)}
+                  />
+                ) : null}
+              </div>
+
+              <DialogFooter className="gap-2 border-t border-border-default/70 bg-surface-subtle/45 px-5 py-4 sm:justify-between sm:space-x-0">
+                <Button type="button" variant="outline" className="h-10" onClick={cancelReferenceTermQuestionnaire}>
+                  Cancelar
+                </Button>
+
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
+                  {screenState === 'ai_questionnaire_prefill' ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10"
+                        onClick={approveAllReferenceTermSuggestions}
+                        disabled={referenceTermSuggestionReviews.length === 0}
+                      >
+                        Aprovar todas
+                      </Button>
+                      <Button
+                        type="button"
+                        className="h-10 gap-2"
+                        onClick={() => void continueAfterReferenceTermSuggestions()}
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        Continuar para pendencias
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10"
+                        onClick={() => setReferenceTermQuestionIndex((current) => Math.max(current - 1, 0))}
+                        disabled={referenceTermQuestionIndex <= 0}
+                      >
+                        Voltar
+                      </Button>
+                      {isReferenceTermQuestionnaireReviewStep ? (
+                        <Button
+                          type="button"
+                          className="h-10 gap-2"
+                          onClick={() => void handleContinueReferenceTermQuestionnaire()}
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          Continuar geracao
+                        </Button>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={(screenState === 'etp_questionnaire_prefill' || screenState === 'etp_questionnaire') && Boolean(pendingPreliminaryStudyGeneration)}
+        onOpenChange={(open) => {
+          if (!open && (screenState === 'etp_questionnaire_prefill' || screenState === 'etp_questionnaire')) {
+            cancelPreliminaryStudyQuestionnaire();
+          }
+        }}
+      >
+        <DialogContent
+          className="grid max-h-[calc(100dvh-2rem)] w-[min(94vw,760px)] max-w-none grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden border-border-default bg-surface-card p-0 shadow-xl"
+          onInteractOutside={(event) => event.preventDefault()}
+          onEscapeKeyDown={(event) => event.preventDefault()}
+        >
+          {pendingPreliminaryStudyGeneration ? (
+            <>
+              <DialogHeader className="space-y-3 border-b border-border-default/70 bg-surface-subtle/45 px-5 py-4 text-left">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className="border-primary/20 bg-primary/[0.07] text-primary">
+                        ETP
+                      </Badge>
+                      <Badge variant="outline" className="border-border-default bg-surface-card text-text-secondary">
+                        Servicos continuos
+                      </Badge>
+                    </div>
+                    {screenState === 'etp_questionnaire_prefill' ? (
+                      <>
+                        <DialogTitle className="font-ui text-lg font-semibold tracking-tight text-text-primary">
+                          Sugestoes da IA para o ETP
+                        </DialogTitle>
+                        <DialogDescription className="mt-1 font-ui text-sm leading-5 text-text-secondary">
+                          Revise as sugestoes com fonte explicita antes das pendencias.
+                        </DialogDescription>
+                      </>
+                    ) : (
+                      <>
+                        <DialogTitle className="font-ui text-lg font-semibold tracking-tight text-text-primary">
+                          Questionario do ETP
+                        </DialogTitle>
+                        <DialogDescription className="mt-1 font-ui text-sm leading-5 text-text-secondary">
+                          Responda uma pendencia por vez. Campos pulados permanecem marcados para revisao.
+                        </DialogDescription>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+                    {screenState === 'etp_questionnaire_prefill' ? (
+                      <>
+                        <Badge variant="outline" className="border-status-success/25 bg-status-success/10 text-emerald-900">
+                          {approvedPreliminaryStudySuggestionReviews.length} aprovada(s)
+                        </Badge>
+                        <Badge variant="outline" className="border-border-default bg-surface-card text-text-secondary">
+                          {pendingPreliminaryStudySuggestionReviews.length} sugerida(s)
+                        </Badge>
+                      </>
+                    ) : (
+                      <>
+                        <Badge variant="outline" className="border-border-default bg-surface-card text-text-secondary">
+                          {answeredPreliminaryStudyQuestions} respondida(s)
+                        </Badge>
+                        <Badge variant="outline" className="border-warning/30 bg-warning/10 text-amber-900">
+                          {skippedPreliminaryStudyQuestions} pulada(s)
+                        </Badge>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="h-2 overflow-hidden rounded-full bg-surface-card ring-1 ring-border-default/70">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-300"
+                    style={{ width: `${preliminaryStudyQuestionProgress}%` }}
+                  />
+                </div>
+              </DialogHeader>
+
+              <div className="min-h-0 overflow-y-auto bg-white px-5 py-4">
+                {screenState === 'etp_questionnaire_prefill' ? (
+                  <div className="grid gap-3">
+                    {preliminaryStudySuggestionReviews.map((review) => {
+                      const question = preliminaryStudyQuestionById.get(review.questionId);
+                      if (!question) return null;
+
+                      return (
+                        <PreliminaryStudySuggestionReviewCard
+                          key={review.questionId}
+                          question={question}
+                          review={review}
+                          onChange={updatePreliminaryStudySuggestionReview}
+                          onApprove={() => approvePreliminaryStudySuggestion(review.questionId)}
+                          onReject={() => rejectPreliminaryStudySuggestion(review.questionId)}
+                        />
+                      );
+                    })}
+                  </div>
+                ) : isPreliminaryStudyQuestionnaireReviewStep ? (
+                  <div className="rounded-radius-xl border border-primary/20 bg-primary/[0.04] p-5">
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-radius-lg bg-primary/10 text-primary">
+                        <ShieldCheck className="h-4.5 w-4.5" />
+                      </span>
+                      <div>
+                        <p className="font-ui text-sm font-semibold text-text-primary">Questionario pronto para geracao</p>
+                        <p className="mt-1 font-ui text-sm leading-6 text-text-secondary">
+                          As respostas serao enviadas para gerar o rascunho editavel. Campos pulados permanecerao como pendencias no ETP.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : currentPreliminaryStudyQuestion ? (
+                  <PreliminaryStudyQuestionCard
+                    key={currentPreliminaryStudyQuestion.id}
+                    question={currentPreliminaryStudyQuestion}
+                    answer={preliminaryStudyAnswers[currentPreliminaryStudyQuestion.id]}
+                    onAnswer={(answer) => {
+                      setPreliminaryStudyAnswer(answer);
+                      advancePreliminaryStudyQuestion();
+                    }}
+                    onSkip={() => skipPreliminaryStudyQuestion(currentPreliminaryStudyQuestion)}
+                    onGenerateText={(currentValue) =>
+                      handleGeneratePreliminaryStudyQuestionText(currentPreliminaryStudyQuestion, currentValue)
+                    }
+                  />
+                ) : null}
+              </div>
+
+              <DialogFooter className="gap-2 border-t border-border-default/70 bg-surface-subtle/45 px-5 py-4 sm:justify-between sm:space-x-0">
+                <Button type="button" variant="outline" className="h-10" onClick={cancelPreliminaryStudyQuestionnaire}>
+                  Cancelar
+                </Button>
+
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
+                  {screenState === 'etp_questionnaire_prefill' ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10"
+                        onClick={approveAllPreliminaryStudySuggestions}
+                        disabled={preliminaryStudySuggestionReviews.length === 0}
+                      >
+                        Aprovar todas
+                      </Button>
+                      <Button
+                        type="button"
+                        className="h-10 gap-2"
+                        onClick={() => void continueAfterPreliminaryStudySuggestions()}
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        Continuar para pendencias
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10"
+                        onClick={() => setPreliminaryStudyQuestionIndex((current) => Math.max(current - 1, 0))}
+                        disabled={preliminaryStudyQuestionIndex <= 0}
+                      >
+                        Voltar
+                      </Button>
+                      {isPreliminaryStudyQuestionnaireReviewStep ? (
+                        <Button
+                          type="button"
+                          className="h-10 gap-2"
+                          onClick={() => void handleContinuePreliminaryStudyQuestionnaire()}
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          Continuar geracao
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          className="h-10 gap-2"
+                          onClick={() => void handleContinuePreliminaryStudyQuestionnaire()}
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          Gerar com pendencias
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={Boolean(selectedProcess)} onOpenChange={(open) => !open && setSelectedProcessId(null)}>
         <DialogContent className="grid max-h-[calc(100dvh-2rem)] w-[min(95vw,1140px)] max-w-none grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden border-none bg-white p-0 text-slate-900 shadow-2xl">
@@ -1829,13 +3642,15 @@ export default function EditorDocumentos() {
                   type="button"
                   className="h-9 gap-2 px-3.5 text-[10px] font-bold uppercase tracking-[0.16em]"
                   onClick={() => void handleGenerateProcess(selectedProcess)}
-                  disabled={!selectedProcess.numProcesso}
+                  disabled={!isPreliminaryStudyDocument && !selectedProcess.numProcesso}
                 >
                   <FileText className="h-4 w-4" />
                   {isContractDocument
                     ? 'Gerar Contrato'
                     : isReferenceTermDocument
                       ? 'Gerar Termo de Referencia'
+                      : isPreliminaryStudyDocument
+                        ? 'Gerar ETP'
                       : 'Gerar Documento'}
                 </Button>
                 <Button

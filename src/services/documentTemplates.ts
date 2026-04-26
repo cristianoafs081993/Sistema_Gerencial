@@ -23,6 +23,9 @@ export type DocumentTemplateQuestionOption = {
   text: string;
   blockId?: string;
   blockIndex?: number;
+  blockIds?: string[];
+  blockIndexes?: number[];
+  blockTexts?: string[];
 };
 
 export type DocumentTemplateQuestion = {

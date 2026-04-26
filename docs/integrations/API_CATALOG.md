@@ -274,6 +274,114 @@ Observacao:
 - o `templatePlan` pode incluir marcas de revisao para o exportador DOCX: destaque de IA, pendencia, tachado de trecho nao adotado e comentarios laterais
 - sem modelo ativo em `document_templates` ou sem texto pesquisavel no PDF do processo, o bloqueio acontece no frontend
 
+## 7D. Edge Function `sugerir-respostas-termo-referencia`
+
+Uso:
+
+- pre-preenchimento assistido do questionario do Termo de Referencia
+- chama Gemini antes da etapa manual para sugerir respostas com fonte explicita no PDF do processo
+- devolve respostas aprovaveis pelo usuario e pendencias sem resposta quando nao houver evidencia suficiente
+
+Chamador:
+
+- [referenceTerms.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/referenceTerms.ts)
+- [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx)
+
+Implementacao no repo:
+
+- [sugerir-respostas-termo-referencia/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sugerir-respostas-termo-referencia/index.ts)
+
+Dependencias externas:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional `GEMINI_REFERENCE_TERM_PREFILL_MODEL`
+
+Observacao:
+
+- sugestoes sem `sourcePage`, `sourceExcerpt` e `justification` sao descartadas e tratadas como pendentes
+- a geracao final continua em `gerar-termo-referencia-compras`
+
+## 7E. Edge Function `gerar-etp-servicos-continuos`
+
+Uso:
+
+- geracao assistida do Estudo Tecnico Preliminar para servicos continuos no Editor de Documentos
+- recebe metadados do processo SUAP quando disponiveis, objeto digitado manualmente, questionario fixo do ETP, respostas ou pulos do usuario e trechos relevantes do PDF sincronizado
+
+Chamador:
+
+- [preliminaryStudies.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/preliminaryStudies.ts)
+- [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx)
+
+Implementacao no repo:
+
+- [gerar-etp-servicos-continuos/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/gerar-etp-servicos-continuos/index.ts)
+
+Dependencias externas:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional `GEMINI_ETP_MODEL`
+
+Observacao:
+
+- a function devolve HTML editavel, secoes copiaveis, campos, alertas e pendencias; se nao houver chave Gemini, monta um fallback local com as respostas e pendencias recebidas
+- se a chamada a function falhar no frontend por indisponibilidade, CORS ou function ainda nao publicada, `preliminaryStudiesService` monta o mesmo tipo de rascunho por fallback local para nao bloquear o usuario
+- a versao atual nao usa modelo DOCX, nao grava rascunhos no banco e nao faz OCR de PDF escaneado
+
+## 7F. Edge Function `sugerir-respostas-etp-servicos-continuos`
+
+Uso:
+
+- pre-preenchimento assistido do questionario fixo do ETP de servicos continuos
+- chama Gemini antes da etapa manual para sugerir respostas com fonte explicita no PDF do processo
+
+Chamador:
+
+- [preliminaryStudies.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/preliminaryStudies.ts)
+- [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx)
+
+Implementacao no repo:
+
+- [sugerir-respostas-etp-servicos-continuos/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sugerir-respostas-etp-servicos-continuos/index.ts)
+
+Dependencias externas:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional `GEMINI_ETP_PREFILL_MODEL`
+- opcional `GEMINI_ETP_MODEL`
+
+Observacao:
+
+- sugestoes sem `sourcePage`, `sourceExcerpt`, `justification` e `value` sao descartadas e tratadas como pendentes
+- quando nao houver trechos do PDF ou quando a function nao responder, o fluxo segue pelo questionario manual
+
+## 7G. Edge Function `gerar-texto-etp-secao`
+
+Uso:
+
+- geracao assistida de texto para uma secao individual do questionario fixo do ETP de servicos continuos
+- recebe a pergunta atual, notas digitadas pelo usuario quando houver, objeto manual, metadados do processo, respostas ja registradas e trechos do PDF sincronizado
+- pode gerar texto mesmo quando `userNotes` vier vazio; dados concretos ausentes devem ser marcados como pendencia, sem inventar numeros, datas, valores ou fatos
+
+Chamador:
+
+- [preliminaryStudies.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/preliminaryStudies.ts)
+- [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx)
+
+Implementacao no repo:
+
+- [gerar-texto-etp-secao/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/gerar-texto-etp-secao/index.ts)
+
+Dependencias externas:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional `GEMINI_ETP_MODEL`
+
+Observacao:
+
+- se nao houver chave Gemini, a function devolve texto local de apoio para revisao
+- se a chamada a function falhar no frontend por indisponibilidade, CORS ou function ainda nao publicada, `preliminaryStudiesService.generateQuestionText` devolve texto local de apoio para nao bloquear o preenchimento da secao
+
 ## 7A. Edge Function `invite-user`
 
 Uso:
@@ -423,3 +531,43 @@ Consumidores no app:
 Observacao:
 
 - o link no app aparece no header das telas consumidoras com o rotulo `Baixar extensão` e aponta para o GitHub da extensao.
+
+## 12. Edge Function `record-automation-savings-event`
+
+Uso:
+
+- registro de eventos reais de automacao para alimentar a tela `/economia-tempo`
+- chamada por extensoes, automacoes externas ou pelo app autenticado
+
+Chamador:
+
+- [automationSavingsService.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/automationSavingsService.ts)
+- [suap-atividades-extension/popup.js](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/suap-atividades-extension/popup.js)
+
+Implementacao no repo:
+
+- [record-automation-savings-event/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/record-automation-savings-event/index.ts)
+
+Credenciais/segredos:
+
+- `SUPABASE_SERVICE_ROLE_KEY` para gravar `automation_savings_events`
+- `AUTOMATION_EVENT_SECRET` para chamadas feitas por extensoes sem sessao do app
+- chamadas internas podem usar `Authorization: Bearer <jwt_do_usuario>`
+
+Payload:
+
+```json
+{
+  "scenarioId": "suap-processos",
+  "source": "suap-scraper",
+  "eventName": "processos_sincronizados",
+  "occurredAt": "2026-04-25T12:00:00.000Z",
+  "userEmail": "usuario@ifrn.edu.br",
+  "metadata": { "count": 3 }
+}
+```
+
+Observacao:
+
+- a function busca o cenario ativo em `automation_savings_scenarios`, copia os tempos vigentes para o evento e calcula `saved_minutes`
+- `metadata.count` representa execucoes em lote e e aplicado pelo agregador do frontend

@@ -57,6 +57,26 @@ Se a deteccao automatica falhar, a function retorna erro e o e-mail deve ficar c
   - `GMAIL_CSV_BATCH_SIZE`
   - `GMAIL_CSV_PIPELINE_HINT`
 
+## Diagnostico do Apps Script
+
+O script inclui a funcao `diagnoseCsvEmailIngestion()` para isolar problemas de configuracao sem ingerir arquivo.
+Ela registra no Logger:
+
+- resumo mascarado de `SUPABASE_FUNCTION_URL`, `SUPABASE_ANON_KEY` e `EMAIL_CSV_INGEST_SECRET`
+- quantidade de threads retornadas por `GMAIL_CSV_QUERY`
+- quantidade de anexos CSV na primeira thread encontrada
+- status HTTP e corpo retornado pela Edge Function
+
+Resultado esperado quando URL, anon key e segredo estao corretos:
+
+- HTTP `400` com erro de attachment ausente, porque o diagnostico nao envia arquivo real
+
+Resultados que indicam erro de configuracao:
+
+- HTTP `401`: `EMAIL_CSV_INGEST_SECRET` ausente/invalido ou problema no token enviado ao gateway
+- HTTP `404`: `SUPABASE_FUNCTION_URL` incorreta ou function nao publicada
+- `terminaComFunctionPath=false`: `SUPABASE_FUNCTION_URL` nao termina com `/functions/v1/ingest-email-csv`
+
 ## Operacao recomendada
 
 - criar um gatilho time-driven no Apps Script para executar a cada 5 minutos

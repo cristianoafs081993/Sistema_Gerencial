@@ -95,6 +95,10 @@ vi.mock('@/pages/Suap', () => ({
   default: () => <div>suap-page</div>,
 }));
 
+vi.mock('@/pages/EconomiaTempo', () => ({
+  default: () => <div>economia-tempo-page</div>,
+}));
+
 vi.mock('@/pages/ControleUsuarios', () => ({
   default: () => <div>controle-usuarios-page</div>,
 }));
@@ -154,6 +158,14 @@ describe('App routes', () => {
     render(<App />);
 
     expect(await screen.findByText('controle-usuarios-page')).toBeInTheDocument();
+  });
+
+  it('renderiza a rota de economia de tempo', async () => {
+    window.history.pushState({}, '', '/economia-tempo');
+
+    render(<App />);
+
+    expect(await screen.findByText('economia-tempo-page')).toBeInTheDocument();
   });
 
   it('renderiza a pagina not found para rota desconhecida', async () => {

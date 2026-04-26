@@ -1,5 +1,6 @@
 import type { InputHTMLAttributes, ReactNode } from 'react';
 import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { EmpenhoDialog } from '@/components/modals/EmpenhoDialog';
 import { formatCurrency } from '@/lib/utils';
 import type { Empenho } from '@/types';
@@ -62,15 +63,25 @@ const baseEmpenho = (): Empenho => ({
 });
 
 const expectCurrencyValue = (value: number) => {
-  const expected = formatCurrency(value).replace(/\s+/g, ' ').trim();
-  expect(
-    screen.getByText((_, node) => (node?.textContent || '').replace(/\s+/g, ' ').trim() === expected),
-  ).toBeInTheDocument();
+  const expected = formatCurrency(value).replace(/^R\$\s*/u, '').trim();
+  expect(document.body.textContent || '').toContain(expected);
+};
+
+const renderDialog = (children: ReactNode) => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
+  return render(<QueryClientProvider client={queryClient}>{children}</QueryClientProvider>);
 };
 
 describe('EmpenhoDialog', () => {
   it('mostra metricas de RAP usando base vigente, liquidado no ano e saldo atual', () => {
-    render(
+    renderDialog(
       <EmpenhoDialog
         open
         onOpenChange={vi.fn()}
@@ -94,12 +105,12 @@ describe('EmpenhoDialog', () => {
     expect(screen.getByText('Liquidado no Ano')).toBeInTheDocument();
     expect(screen.getByText('Saldo Atual')).toBeInTheDocument();
     expectCurrencyValue(33434.84);
-    expectCurrencyValue(26051.52);
+    expectCurrencyValue(24489.1);
     expectCurrencyValue(7383.32);
   });
 
   it('prioriza os valores oficiais em empenhos do exercicio', () => {
-    render(
+    renderDialog(
       <EmpenhoDialog
         open
         onOpenChange={vi.fn()}

@@ -25,6 +25,7 @@ const GeradorDocumentos = lazy(() => import('./pages/GeradorDocumentos'));
 const EditorDocumentos = lazy(() => import('./pages/EditorDocumentos'));
 const Consultor = lazy(() => import('./pages/ConsultorSessions'));
 const Suap = lazy(() => import('./pages/Suap'));
+const EconomiaTempo = lazy(() => import('./pages/EconomiaTempo'));
 const ControleUsuarios = lazy(() => import('./pages/ControleUsuarios'));
 const ModelosDocumentos = lazy(() => import('./pages/ModelosDocumentos'));
 const DesignSystemPreview = lazy(() => import('./pages/DesignSystemPreview'));
@@ -76,6 +77,7 @@ const App = () => (
                   <Route path="/editor-documentos" element={<EditorDocumentos />} />
                   <Route path="/consultor" element={<Consultor />} />
                   <Route path="/suap" element={<Suap />} />
+                  <Route path="/economia-tempo" element={<EconomiaTempo />} />
                   <Route path="/controle-usuarios" element={<ControleUsuarios />} />
                   <Route path="/modelos-documentos" element={<ModelosDocumentos />} />
                   <Route path="/design-system-preview" element={<DesignSystemPreview />} />

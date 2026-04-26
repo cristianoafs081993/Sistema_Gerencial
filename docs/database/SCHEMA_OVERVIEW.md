@@ -57,6 +57,11 @@ Para mudancas sensiveis, confirme sempre nas migrations em [supabase/migrations]
 - `retencoes_efd_reinf`
 - `email_csv_ingestion_runs`
 
+### Automacoes e economia de tempo
+
+- `automation_savings_scenarios`
+- `automation_savings_events`
+
 ### Base semantica do Consultor
 
 - `normativos`
@@ -92,6 +97,7 @@ Esta view aparece no frontend em [rastreabilidadePFs.ts](/C:/Users/crist/OneDriv
 - `analisar-liquidacao-siafi`
 - `gerar-contrato-licitacao`
 - `gerar-termo-referencia-compras`
+- `record-automation-savings-event`
 
 ## Functions invocadas no frontend que exigem confirmacao
 

@@ -4,6 +4,7 @@ import {
   Banknote,
   Bot,
   ClipboardList,
+  Clock3,
   FileStack,
   FileText,
   LayoutDashboard,
@@ -15,7 +16,13 @@ import {
   Wand2,
 } from 'lucide-react';
 
-export type AppScreenGroupId = 'orcamentario' | 'financeiro' | 'contratos' | 'documentos' | 'administracao';
+export type AppScreenGroupId =
+  | 'orcamentario'
+  | 'financeiro'
+  | 'contratos'
+  | 'documentos'
+  | 'automacoes'
+  | 'administracao';
 
 export type AppScreenGroup = {
   id: AppScreenGroupId;
@@ -41,6 +48,7 @@ export const appScreenGroups: AppScreenGroup[] = [
   { id: 'financeiro', name: 'Financeiro', sortOrder: 20 },
   { id: 'contratos', name: 'Contratos', sortOrder: 30 },
   { id: 'documentos', name: 'Documentos', sortOrder: 40 },
+  { id: 'automacoes', name: 'Automações', sortOrder: 50 },
   { id: 'administracao', name: 'Administração', sortOrder: 90 },
 ];
 
@@ -60,6 +68,7 @@ export const appScreens: AppScreen[] = [
   { id: 'editor-documentos', groupId: 'documentos', name: 'Editor de Documentos', path: '/editor-documentos', icon: Bot, sortOrder: 20 },
   { id: 'consultor', groupId: 'documentos', name: 'Consultor Jurídico', path: '/consultor', icon: MessageSquare, sortOrder: 30 },
   { id: 'suap', groupId: 'documentos', name: 'SUAP', path: '/suap', icon: FileStack, sortOrder: 40 },
+  { id: 'economia-tempo', groupId: 'automacoes', name: 'Economia de Tempo', path: '/economia-tempo', icon: Clock3, sortOrder: 10 },
   {
     id: ADMIN_USERS_SCREEN_ID,
     groupId: 'administracao',

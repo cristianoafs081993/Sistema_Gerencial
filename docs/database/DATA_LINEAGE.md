@@ -146,6 +146,21 @@ Mostrar a linhagem operacional dos dados de forma curta:
   - destino: tabela do pipeline detectado
   - observacao: o pipeline siafi_empenhos aplica a mesma regra do upload manual; quando recebe o CSV dedicado de RAP, atualiza apenas saldo_rap_oficial, e quando recebe o CSV legado combinado continua usando RESTOS A PAGAR NAO PROCES. LIQUIDADOS A PAGAR para compor o saldo operacional
 
+### Economia de tempo
+
+- catalogo de cenarios
+  - seed: [20260425100000_create_automation_savings.sql](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/migrations/20260425100000_create_automation_savings.sql)
+  - tabela: `automation_savings_scenarios`
+  - fallback frontend: [automationSavings.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/utils/automationSavings.ts)
+
+- eventos reais de automacao
+  - entrada externa: [record-automation-savings-event/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/record-automation-savings-event/index.ts)
+  - primeira extensao local: [suap-atividades-extension/popup.js](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/suap-atividades-extension/popup.js)
+  - tabela: `automation_savings_events`
+  - service agregador: [automationSavingsService.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/automationSavingsService.ts)
+  - pagina: [EconomiaTempo.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EconomiaTempo.tsx)
+  - observacao: quando um cenario nao possui evento real no periodo, a pagina usa a estimativa mensal proporcional ao intervalo filtrado
+
 ### Normativos do Consultor
 
 - fontes HTML oficiais e PDFs locais

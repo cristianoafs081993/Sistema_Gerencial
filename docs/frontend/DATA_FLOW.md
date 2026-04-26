@@ -91,6 +91,7 @@ Usado em modulos com IA ou integracoes externas:
 - [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx)
 - [Suap.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Suap.tsx)
 - [Auth.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Auth.tsx)
+- [EconomiaTempo.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EconomiaTempo.tsx)
 
 ## Camada 3: services
 
@@ -114,6 +115,17 @@ Alguns services usam fallback para REST quando `supabase-js` falha ou retorna va
 - [suapProcessos.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/suapProcessos.ts)
 
 ## Exemplos de fluxo
+
+### Economia de tempo
+
+`App.tsx` -> `EconomiaTempo.tsx` -> `automationSavingsService` -> `automation_savings_scenarios` / `automation_savings_events`
+
+Observacoes:
+
+- a pagina combina eventos reais e estimativas proporcionais ao periodo filtrado
+- quando um cenario nao possui evento real no periodo, a estimativa mensal do catalogo e usada como fallback daquele cenario
+- extensoes e automacoes externas registram eventos pela Edge Function `record-automation-savings-event`
+- a extensao local `suap-atividades-extension` envia evento `atividades_sincronizadas` para o cenario `suap-processos` quando novas atividades sao inseridas
 
 ### Dashboard
 
@@ -183,7 +195,17 @@ Observacoes:
 - o detalhe do processo no Editor pode abrir o PDF sincronizado pelo bucket `suap-pdfs` usando URL assinada via `suapProcessosService.getPdfSignedUrl`
 - a opcao `Despacho de Liquidacao` continua usando `documentGeneration.ts` com dados de `processos`, `empenhos`, `contratos` e `contratos_api`
 - a opcao `Contrato de Servico IFRN` baixa o PDF sincronizado do processo, extrai texto com `pdfjs-dist`, identifica paginas candidatas de modelo contratual e envia o modelo escolhido com trechos de apoio para a Edge Function `gerar-contrato-licitacao`
-- a opcao `Termo de Referencia - Compras` exige um modelo DOCX ativo em `document_templates`, analisa o PDF sincronizado do processo com `pdfjs-dist`, apresenta o questionario derivado do modelo AGU, envia respostas/pulos com o template e os trechos relevantes para a Edge Function `gerar-termo-referencia-compras` e libera download do DOCX final montado sobre esse modelo
+- a opcao `Termo de Referencia - Compras` exige um modelo DOCX ativo em `document_templates`, analisa o PDF sincronizado do processo com `pdfjs-dist`, pede sugestoes de respostas com fonte explicita a Edge Function `sugerir-respostas-termo-referencia`, apresenta aprovacao em lote das sugestoes, mostra pendencias restantes no questionario derivado do modelo AGU, envia respostas/pulos com o template e os trechos relevantes para a Edge Function `gerar-termo-referencia-compras` e libera download do DOCX final montado sobre esse modelo
+- a opcao `Estudo Tecnico Preliminar - Servicos Continuos` nao usa `document_templates` no v1; ela aceita um processo SUAP sincronizado ou a digitacao manual do objeto da licitacao, analisa o PDF quando existir texto pesquisavel, pede sugestoes com fonte explicita a Edge Function `sugerir-respostas-etp-servicos-continuos`, mostra um questionario fixo de ETP para servicos continuos, permite gerar texto por secao via `gerar-texto-etp-secao` com poucas notas ou mesmo sem digitacao previa, e envia respostas/pulos para a Edge Function `gerar-etp-servicos-continuos`
+- o ETP gerado fica como rascunho editavel no editor e oferece acoes de copiar documento ou copiar secoes; nao ha exportacao DOCX, persistencia de rascunho em banco ou OCR nesta versao
+- o questionario do Termo de Referencia abre em modal sobre o editor; primeiro revisa sugestoes da IA em lote e depois mostra uma pergunta pendente por vez, avancando apos selecao, pulo ou salvamento de campo aberto para reduzir poluicao visual
+- no modal do questionario, o progresso principal fica concentrado no cabecalho com barra e chips de status; o card da pergunta evita repetir contadores e, para campos abertos, esconde o badge generico `Campo`
+- nos campos abertos do Termo de Referencia, o modal traduz lacunas genericas do modelo em orientacoes operacionais, mostrando uma orientacao curta e o campo original do modelo em uma caixa fixa compacta
+- no modal do Termo de Referencia, a tela mostra apenas copy resumida e operacional; o texto original do modelo AGU, com artigos e redacao integral, fica disponivel na dica nativa do navegador ao passar o mouse ou focar perguntas e opcoes, evitando duplicacao visual
+- quando uma clausula exclusiva ou opcional traz lacunas no proprio texto, o modal permite escolher a alternativa e preencher esses placeholders na mesma etapa, antes de avancar para a proxima pergunta; se a propria clausula trouxer alternativas inline separadas por `OU`, como `Estudo Tecnico Preliminar` ou `Nota Tecnica`, o modal troca os campos livres por uma escolha direta; a resposta final segue para a Edge Function com `selectedOptionId` e os valores inline da clausula
+- no parser do TR, um `OU` entre clausulas pode agrupar varios paragrafos consecutivos da mesma alternativa, como uma clausula principal seguida de incisos `I)`, `II)` e similares; o questionario e o DOCX final tratam esse conjunto como uma unica opcao logica, sem quebrar os subitens
+- quando esses subitens agrupados repetem placeholders genericos como `[...]`, o modal cria um campo separado para cada inciso com rotulo contextual, em vez de colapsar tudo no primeiro placeholder
+- placeholders vazios ou apenas pontilhados, como `[...]` sem contexto util no bloco, deixam de virar pergunta; quando o marcador e generico, como `ANO`, o sistema tenta usar o texto do bloco para montar um rotulo compreensivel
 - no fluxo de Termo de Referencia, perguntas puladas permanecem pendentes; a IA nao escolhe clausulas alternativas no lugar do usuario
 - o DOCX exportado pelo Termo de Referencia preserva trechos nao adotados com tachado/comentario e destaca preenchimentos feitos pela IA
 - a geracao de contrato exige `pdf_url` no processo e bloqueia quando o PDF nao traz texto pesquisavel, porque esta versao ainda nao faz OCR

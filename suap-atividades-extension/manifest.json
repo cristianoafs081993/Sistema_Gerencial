@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SUAP Atividades Scraper",
-  "version": "1.0",
+  "version": "1.1",
   "description": "Extrai atividades do Planejamento Estratégico do SUAP para o Supabase",
   "permissions": [
     "activeTab",

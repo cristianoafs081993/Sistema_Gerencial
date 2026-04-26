@@ -1,5 +1,6 @@
 import * as CFB from 'cfb';
 
+import { sanitizeReferenceTermQuestionnaireSchema } from '@/lib/referenceTermQuestionnaire';
 import type {
   DocumentTemplateEditableBlock,
   DocumentTemplateEditableBlockKind,
@@ -197,6 +198,11 @@ type TemplateBodyBlock = {
   text: string;
 };
 
+type TemplateAlternativeGroup = {
+  blocks: TemplateBodyBlock[];
+  text: string;
+};
+
 function isOuSeparator(text: string) {
   return /^ou$/i.test(collapseWhitespace(text));
 }
@@ -204,6 +210,79 @@ function isOuSeparator(text: string) {
 function isPotentialOptionalClause(text: string) {
   const normalized = collapseWhitespace(text).toLowerCase();
   return /\b(?:se aplicavel|se aplicável|quando aplicavel|quando aplicável|caso aplicavel|caso aplicável)\b/.test(normalized);
+}
+
+function isMajorClauseStart(text: string) {
+  const normalized = collapseWhitespace(text);
+  return /^\d+(?:\.\d+)*\.?\s+\S/.test(normalized);
+}
+
+function isEnumerationItem(text: string) {
+  const normalized = collapseWhitespace(text);
+  return /^(?:[IVXLCDM]+|\d+|[A-Z])\)\s+\S/.test(normalized);
+}
+
+function isShortContinuationLine(text: string) {
+  const normalized = collapseWhitespace(text);
+  return normalized.length > 0 && normalized.length <= 80 && /[:;.]$/.test(normalized);
+}
+
+function findAlternativeAnchorStart(bodyBlocks: TemplateBodyBlock[], anchorIndex: number) {
+  let startIndex = anchorIndex;
+
+  while (startIndex > 0) {
+    const current = bodyBlocks[startIndex];
+    const previous = bodyBlocks[startIndex - 1];
+
+    if (previous.kind !== 'paragraph' || isOuSeparator(previous.text)) break;
+    if (current.kind !== 'paragraph') break;
+    if (isMajorClauseStart(current.text)) break;
+
+    if (isMajorClauseStart(previous.text) || isEnumerationItem(previous.text) || isShortContinuationLine(previous.text)) {
+      startIndex -= 1;
+      continue;
+    }
+
+    break;
+  }
+
+  return startIndex;
+}
+
+function collectAlternativeGroup(
+  bodyBlocks: TemplateBodyBlock[],
+  startIndex: number,
+  direction: 'forward' | 'backward',
+): TemplateAlternativeGroup | null {
+  const anchor = bodyBlocks[startIndex];
+  if (!anchor || anchor.kind !== 'paragraph' || isOuSeparator(anchor.text)) {
+    return null;
+  }
+
+  const rangeStart = direction === 'backward' ? findAlternativeAnchorStart(bodyBlocks, startIndex) : startIndex;
+  let rangeEnd = startIndex;
+
+  if (direction === 'forward') {
+    for (let index = startIndex + 1; index < bodyBlocks.length; index += 1) {
+      const candidate = bodyBlocks[index];
+      if (candidate.kind !== 'paragraph' || isOuSeparator(candidate.text)) break;
+      if (isMajorClauseStart(candidate.text)) break;
+      rangeEnd = index;
+    }
+  }
+
+  const blocks = bodyBlocks
+    .slice(rangeStart, rangeEnd + 1)
+    .filter((block) => block.kind === 'paragraph' && !isOuSeparator(block.text) && block.text.length > 0);
+
+  if (blocks.length === 0) {
+    return null;
+  }
+
+  return {
+    blocks,
+    text: blocks.map((block) => block.text).join('\n'),
+  };
 }
 
 function buildQuestionnaireSchema(
@@ -233,23 +312,34 @@ function buildQuestionnaireSchema(
 
     if (!previous || !next) return;
 
-    exclusiveBlockIndexes.add(previous.blockIndex);
-    exclusiveBlockIndexes.add(next.blockIndex);
+    const previousIndex = bodyBlocks.findIndex((candidate) => candidate.blockIndex === previous.blockIndex);
+    const nextIndex = bodyBlocks.findIndex((candidate) => candidate.blockIndex === next.blockIndex);
+    const previousGroup = collectAlternativeGroup(bodyBlocks, previousIndex, 'backward');
+    const nextGroup = collectAlternativeGroup(bodyBlocks, nextIndex, 'forward');
+
+    if (!previousGroup || !nextGroup) return;
+
+    for (const groupedBlock of [...previousGroup.blocks, ...nextGroup.blocks]) {
+      exclusiveBlockIndexes.add(groupedBlock.blockIndex);
+    }
 
     addQuestion({
-      id: `exclusive-${previous.blockIndex}-${next.blockIndex}`,
+      id: `exclusive-${previousGroup.blocks[0].blockIndex}-${nextGroup.blocks[0].blockIndex}`,
       kind: 'exclusive',
       title: 'Escolha de clausula alternativa',
       prompt: 'Escolha qual clausula deve permanecer ativa neste ponto do Termo de Referencia.',
       guidance: 'Se pular, todas as alternativas permanecerao marcadas como pendentes para revisao juridica.',
-      blockIndexes: [previous.blockIndex, next.blockIndex],
-      blockIds: [previous.id, next.id],
-      options: [previous, next].map((option, optionIndex) => ({
-        id: `${option.id}-option-${optionIndex + 1}`,
+      blockIndexes: [...previousGroup.blocks, ...nextGroup.blocks].map((groupedBlock) => groupedBlock.blockIndex),
+      blockIds: [...previousGroup.blocks, ...nextGroup.blocks].map((groupedBlock) => groupedBlock.id),
+      options: [previousGroup, nextGroup].map((option, optionIndex) => ({
+        id: `${option.blocks[0].id}-option-${optionIndex + 1}`,
         label: truncateLabel(option.text),
         text: option.text,
-        blockId: option.id,
-        blockIndex: option.blockIndex,
+        blockId: option.blocks[0].id,
+        blockIndex: option.blocks[0].blockIndex,
+        blockIds: option.blocks.map((groupedBlock) => groupedBlock.id),
+        blockIndexes: option.blocks.map((groupedBlock) => groupedBlock.blockIndex),
+        blockTexts: option.blocks.map((groupedBlock) => groupedBlock.text),
       })),
     });
   });
@@ -364,7 +454,14 @@ function extractEditableBlocksFromDocumentXml(documentXml: string): ParsedDocxTe
   return {
     templateText: textBlocks.join('\n\n'),
     editableBlocks,
-    questionnaireSchema: buildQuestionnaireSchema(bodyTextBlocks, editableBlocks),
+    questionnaireSchema: sanitizeReferenceTermQuestionnaireSchema(
+      buildQuestionnaireSchema(bodyTextBlocks, editableBlocks),
+      editableBlocks,
+    ) || {
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      questions: [],
+    },
     title,
   };
 }

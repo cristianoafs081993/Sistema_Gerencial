@@ -20,6 +20,9 @@ type QuestionnaireOption = {
   text?: string;
   blockId?: string;
   blockIndex?: number;
+  blockIds?: string[];
+  blockIndexes?: number[];
+  blockTexts?: string[];
 };
 
 type QuestionnaireQuestion = {
@@ -47,6 +50,12 @@ type QuestionnaireAnswer = {
   skipped?: boolean;
   selectedOptionId?: string;
   value?: string;
+  optionValues?: Record<string, string>;
+  origin?: 'user' | 'ai';
+  approved?: boolean;
+  confidence?: 'high' | 'medium';
+  sourcePage?: number;
+  sourceExcerpt?: string;
   justification?: string;
 };
 
@@ -400,6 +409,54 @@ function replaceQuestionPlaceholder(text: string, placeholder: string | undefine
   return text.replace(/\[[^\]]+\]/g, value);
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function replacePlaceholderOccurrence(text: string, placeholder: string, occurrenceIndex: number, value: string) {
+  let currentOccurrence = 0;
+  const expression = new RegExp(escapeRegExp(placeholder), 'g');
+
+  return text.replace(expression, (match) => {
+    if (currentOccurrence === occurrenceIndex) {
+      currentOccurrence += 1;
+      return value;
+    }
+
+    currentOccurrence += 1;
+    return match;
+  });
+}
+
+function buildOptionValueKey(blockId: string | undefined, placeholder: string, occurrenceIndex: number) {
+  const normalizedBlockId = (blockId || 'option').trim() || 'option';
+  return `${normalizedBlockId}::${occurrenceIndex}::${placeholder.trim()}`;
+}
+
+function normalizeAnswerOptionValues(answer?: QuestionnaireAnswer) {
+  const raw = answer?.optionValues;
+  if (!raw || typeof raw !== 'object') return {};
+
+  return Object.entries(raw).reduce<Record<string, string>>((current, [key, value]) => {
+    const normalizedKey = key.trim();
+    const normalizedValue = typeof value === 'string' ? value.trim() : '';
+    if (!normalizedKey) return current;
+    current[normalizedKey] = normalizedValue;
+    return current;
+  }, {});
+}
+
+function cleanupInlineOptionText(value: string) {
+  return value
+    .replace(/\s+OU\s+OU\s+/gi, ' OU ')
+    .replace(/\s+OU\s*(?=[,.;:]|$)/gi, '')
+    .replace(/^\s*OU\s+/gi, '')
+    .replace(/([([])\s*OU\s+/gi, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.;:])/g, '$1')
+    .trim();
+}
+
 function questionPrompt(question: QuestionnaireQuestion) {
   return typeof question.prompt === 'string' && question.prompt.trim()
     ? question.prompt.trim()
@@ -408,20 +465,116 @@ function questionPrompt(question: QuestionnaireQuestion) {
       : 'Pergunta do modelo';
 }
 
-function optionBlockIndex(option: QuestionnaireOption) {
-  return typeof option.blockIndex === 'number' ? option.blockIndex : -1;
+function optionBlockIndexes(option: QuestionnaireOption) {
+  if (Array.isArray(option.blockIndexes) && option.blockIndexes.length > 0) {
+    return option.blockIndexes.filter((value): value is number => typeof value === 'number' && value >= 0);
+  }
+
+  return typeof option.blockIndex === 'number' && option.blockIndex >= 0 ? [option.blockIndex] : [];
 }
 
-function optionBlockId(option: QuestionnaireOption, fallbackIndex: number) {
-  return typeof option.blockId === 'string' && option.blockId.trim() ? option.blockId.trim() : `block-${fallbackIndex}`;
+function optionBlockIds(option: QuestionnaireOption, fallbackIndexes: number[]) {
+  if (Array.isArray(option.blockIds) && option.blockIds.length > 0) {
+    return option.blockIds.map((value, index) => {
+      const fallbackIndex = fallbackIndexes[index] ?? fallbackIndexes[0] ?? index;
+      return typeof value === 'string' && value.trim() ? value.trim() : `block-${fallbackIndex}`;
+    });
+  }
+
+  return fallbackIndexes.map((fallbackIndex, index) => {
+    if (index === 0 && typeof option.blockId === 'string' && option.blockId.trim()) {
+      return option.blockId.trim();
+    }
+
+    return `block-${fallbackIndex}`;
+  });
 }
 
-function optionText(option: QuestionnaireOption) {
-  return typeof option.text === 'string' && option.text.trim() ? option.text.trim() : '';
+function optionBlockTexts(option: QuestionnaireOption, fallbackIndexes: number[]) {
+  if (Array.isArray(option.blockTexts) && option.blockTexts.length > 0) {
+    return option.blockTexts.map((value) => (typeof value === 'string' ? value.trim() : ''));
+  }
+
+  const text = typeof option.text === 'string' && option.text.trim() ? option.text.trim() : '';
+  return fallbackIndexes.map((_, index) => (index === 0 ? text : ''));
 }
 
 function makePendingComment(question: QuestionnaireQuestion) {
   return `Pergunta pulada pelo usuario: ${questionPrompt(question)}. A IA nao decidiu este ponto.`;
+}
+
+function answerSourceLabel(answer?: QuestionnaireAnswer) {
+  if (answer?.origin === 'ai') {
+    return answer.sourcePage ? `sugestao da IA aprovada pelo usuario, pagina ${answer.sourcePage}` : 'sugestao da IA aprovada pelo usuario';
+  }
+
+  return 'preenchido pelo usuario';
+}
+
+function notAdoptedComment(question: QuestionnaireQuestion, answer?: QuestionnaireAnswer) {
+  if (answer?.origin === 'ai') {
+    return answer.justification?.trim() ||
+      `Trecho nao adotado: alternativa nao selecionada em sugestao da IA aprovada para "${questionPrompt(question)}".`;
+  }
+
+  return answer?.justification?.trim() ||
+    `Trecho nao adotado: alternativa nao selecionada pelo usuario em "${questionPrompt(question)}".`;
+}
+
+function applyOptionValuesToText(
+  optionText: string,
+  question: QuestionnaireQuestion,
+  option: QuestionnaireOption,
+  answer: QuestionnaireAnswer | undefined,
+  fields: DraftField[],
+  warnings: string[],
+  missingRequiredFields: string[],
+  recordedPlaceholders?: Set<string>,
+  blockId?: string,
+) {
+  let nextText = optionText;
+  const optionValues = normalizeAnswerOptionValues(answer);
+  const placeholderOccurrences = new Map<string, number>();
+  const placeholderMatches = Array.from(optionText.matchAll(/\[[^\]]+\]/g));
+
+  for (const match of placeholderMatches) {
+    const placeholder = match[0]?.trim() || '';
+    if (!placeholder) continue;
+
+    const occurrenceIndex = placeholderOccurrences.get(placeholder) || 0;
+    placeholderOccurrences.set(placeholder, occurrenceIndex + 1);
+    const optionValueKey = buildOptionValueKey(blockId || option.blockId, placeholder, occurrenceIndex);
+    const value = optionValues[optionValueKey] || optionValues[placeholder] || '';
+    if (value) {
+      nextText = replacePlaceholderOccurrence(nextText, placeholder, occurrenceIndex, value);
+      if (!recordedPlaceholders?.has(optionValueKey)) {
+        fields.push({
+          key: `${question.id || option.id || option.blockId || 'option'}:${optionValueKey}`,
+          label: placeholder,
+          value,
+          status: 'confirmed',
+          source: answerSourceLabel(answer),
+        });
+        recordedPlaceholders?.add(optionValueKey);
+      }
+      continue;
+    }
+
+    nextText = replacePlaceholderOccurrence(nextText, placeholder, occurrenceIndex, '[CAMPO PENDENTE]');
+    if (!recordedPlaceholders?.has(optionValueKey)) {
+      warnings.push(`Campo pendente na clausula escolhida: ${placeholder}`);
+      missingRequiredFields.push(placeholder);
+      fields.push({
+        key: `${question.id || option.id || option.blockId || 'option'}:${optionValueKey}`,
+        label: placeholder,
+        status: 'missing',
+        source: 'questionario do modelo',
+      });
+      recordedPlaceholders?.add(optionValueKey);
+    }
+  }
+
+  return cleanupInlineOptionText(nextText);
 }
 
 function buildQuestionnairePrePlan(request: ReferenceTermRequest, editableBlocks: ValidEditableBlock[]): QuestionnairePrePlan {
@@ -450,45 +603,83 @@ function buildQuestionnairePrePlan(request: ReferenceTermRequest, editableBlocks
         missingRequiredFields.push(questionPrompt(question));
 
         for (const option of options) {
-          const blockIndex = optionBlockIndex(option);
-          const text = optionText(option);
-          if (blockIndex < 0 || !text) continue;
+          const blockIndexes = optionBlockIndexes(option);
+          const blockIds = optionBlockIds(option, blockIndexes);
+          const blockTexts = optionBlockTexts(option, blockIndexes);
 
-          lockedBlockIndexes.add(blockIndex);
-          paragraphReplacements.push({
-            blockId: optionBlockId(option, blockIndex),
-            blockIndex,
-            paragraphs: [text],
-            remove: false,
-            review: {
-              status: 'pending',
-              comment: makePendingComment(question),
-            },
+          blockIndexes.forEach((blockIndex, groupedIndex) => {
+            const text = blockTexts[groupedIndex] || '';
+            if (!text) return;
+
+            lockedBlockIndexes.add(blockIndex);
+            paragraphReplacements.push({
+              blockId: blockIds[groupedIndex] || `block-${blockIndex}`,
+              blockIndex,
+              paragraphs: [text],
+              remove: false,
+              review: {
+                status: 'pending',
+                comment: makePendingComment(question),
+              },
+            });
           });
         }
         continue;
       }
 
-      for (const option of options) {
-        const blockIndex = optionBlockIndex(option);
-        const text = optionText(option);
-        if (blockIndex < 0 || !text) continue;
+      const recordedPlaceholders = new Set<string>();
 
+      for (const option of options) {
         const isSelected = option.id === selectedOptionId;
-        if (!isSelected) {
+        const blockIndexes = optionBlockIndexes(option);
+        const blockIds = optionBlockIds(option, blockIndexes);
+        const blockTexts = optionBlockTexts(option, blockIndexes);
+
+        blockIndexes.forEach((blockIndex, groupedIndex) => {
+          const text = blockTexts[groupedIndex] || '';
+          if (!text) return;
+
           lockedBlockIndexes.add(blockIndex);
+
+          if (isSelected) {
+            paragraphReplacements.push({
+              blockId: blockIds[groupedIndex] || `block-${blockIndex}`,
+              blockIndex,
+              paragraphs: [
+                applyOptionValuesToText(
+                  text,
+                  question,
+                  option,
+                  answer,
+                  fields,
+                  warnings,
+                  missingRequiredFields,
+                  recordedPlaceholders,
+                  blockIds[groupedIndex] || `block-${blockIndex}`,
+                ),
+              ],
+              remove: false,
+              review: answer?.origin === 'ai'
+                ? {
+                    status: 'ai_generated',
+                    comment: 'Clausula escolhida no questionario da IA e aprovada pelo usuario.',
+                  }
+                : undefined,
+            });
+            return;
+          }
+
           paragraphReplacements.push({
-            blockId: optionBlockId(option, blockIndex),
+            blockId: blockIds[groupedIndex] || `block-${blockIndex}`,
             blockIndex,
             paragraphs: [text],
             remove: false,
             review: {
               status: 'not_adopted',
-              comment: answer?.justification?.trim() ||
-                `Trecho nao adotado: alternativa nao selecionada pelo usuario em "${questionPrompt(question)}".`,
+              comment: notAdoptedComment(question, answer),
             },
           });
-        }
+        });
       }
       continue;
     }
@@ -528,7 +719,36 @@ function buildQuestionnairePrePlan(request: ReferenceTermRequest, editableBlocks
             comment: answer?.justification?.trim() || `Trecho nao adotado: ${questionPrompt(question)}.`,
           },
         });
+        continue;
       }
+
+      const options = Array.isArray(question.options) ? question.options : [];
+      const selectedOption = options.find((option) => option.id === selectedOptionId);
+      const replacementText = selectedOption
+        ? applyOptionValuesToText(
+            selectedOption.text?.trim() || block.text,
+            question,
+            selectedOption,
+            answer,
+            fields,
+            warnings,
+            missingRequiredFields,
+            undefined,
+            block.id,
+          )
+        : block.text;
+      paragraphReplacements.push({
+        blockId: block.id,
+        blockIndex: block.blockIndex,
+        paragraphs: [replacementText],
+        remove: false,
+        review: answer?.origin === 'ai'
+          ? {
+              status: 'ai_generated',
+              comment: 'Clausula opcional mantida a partir de sugestao da IA aprovada pelo usuario.',
+            }
+          : undefined,
+      });
       continue;
     }
 
@@ -562,7 +782,7 @@ function buildQuestionnairePrePlan(request: ReferenceTermRequest, editableBlocks
           label: questionPrompt(question),
           value,
           status: 'confirmed',
-          source: 'preenchido pelo usuario',
+          source: answerSourceLabel(answer),
         });
       }
 

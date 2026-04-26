@@ -58,6 +58,28 @@ function buildMinimalDocxBytes() {
   return Uint8Array.from(CFB.write(cfb, { type: 'array', fileType: 'zip', compression: true }));
 }
 
+function buildGroupedOuDocxBytes() {
+  const xml = [
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`,
+    `<w:document xmlns:w="${WORD_NS}">`,
+    '<w:body>',
+    '<w:p><w:r><w:t>TERMO DE REFERENCIA</w:t></w:r></w:p>',
+    '<w:p><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>2.2. O objeto da contratacao esta previsto no Plano de Contratacoes Anual [ANO], conforme detalhamento a seguir.</w:t></w:r></w:p>',
+    '<w:p><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>I) ID PCA no PNCP: [...];</w:t></w:r></w:p>',
+    '<w:p><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>II) Data de publicacao no PNCP: [...];</w:t></w:r></w:p>',
+    '<w:p><w:r><w:t>OU</w:t></w:r></w:p>',
+    '<w:p><w:r><w:rPr><w:color w:val="FF0000"/></w:rPr><w:t>2.3. O objeto da contratacao esta previsto no Plano de Contratacoes Anual [ANO], conforme consta das informacoes basicas deste Termo de Referencia.</w:t></w:r></w:p>',
+    '<w:sectPr />',
+    '</w:body>',
+    '</w:document>',
+  ].join('');
+
+  const cfb = CFB.utils.cfb_new();
+  CFB.utils.cfb_add(cfb, 'word/document.xml', new TextEncoder().encode(xml));
+
+  return Uint8Array.from(CFB.write(cfb, { type: 'array', fileType: 'zip', compression: true }));
+}
+
 describe('docxDocumentTemplate', () => {
   it('extrai blocos editaveis do DOCX', async () => {
     const bytes = buildMinimalDocxBytes();
@@ -84,15 +106,50 @@ describe('docxDocumentTemplate', () => {
       expect.arrayContaining([
         expect.objectContaining({
           kind: 'exclusive',
-          blockIndexes: [1, 3],
+          blockIndexes: [1, 3, 4],
         }),
         expect.objectContaining({
-          kind: 'field',
-          blockIndex: 4,
-          placeholder: '[INSERIR OBJETO]',
+          kind: 'exclusive',
+          options: [
+            expect.objectContaining({
+              blockIndexes: [1],
+            }),
+            expect.objectContaining({
+              blockIndexes: [3, 4],
+            }),
+          ],
         }),
       ]),
     );
+  });
+
+  it('agrupa clausulas alternativas com multiplos paragrafos antes do OU', async () => {
+    const bytes = buildGroupedOuDocxBytes();
+    const parsed = await parseDocxTemplateArrayBuffer(bytes.buffer);
+    const exclusiveQuestion = parsed.questionnaireSchema.questions.find((question) => question.kind === 'exclusive');
+
+    expect(exclusiveQuestion).toMatchObject({
+      blockIndexes: [1, 2, 3, 5],
+      blockIds: ['block-1', 'block-2', 'block-3', 'block-5'],
+    });
+    expect(exclusiveQuestion?.options).toEqual([
+      expect.objectContaining({
+        blockIndexes: [1, 2, 3],
+        blockIds: ['block-1', 'block-2', 'block-3'],
+        blockTexts: [
+          '2.2. O objeto da contratacao esta previsto no Plano de Contratacoes Anual [ANO], conforme detalhamento a seguir.',
+          'I) ID PCA no PNCP: [...];',
+          'II) Data de publicacao no PNCP: [...];',
+        ],
+      }),
+      expect.objectContaining({
+        blockIndexes: [5],
+        blockIds: ['block-5'],
+        blockTexts: [
+          '2.3. O objeto da contratacao esta previsto no Plano de Contratacoes Anual [ANO], conforme consta das informacoes basicas deste Termo de Referencia.',
+        ],
+      }),
+    ]);
   });
 
   it('aplica o plano de exportacao preservando a estrutura do DOCX', async () => {

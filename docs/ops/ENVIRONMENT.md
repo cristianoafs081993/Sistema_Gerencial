@@ -100,6 +100,63 @@ Observacoes operacionais:
 - esta versao ainda nao suporta OCR para PDF escaneado
 - `supabase/config.toml` deve manter `verify_jwt = false` para `gerar-termo-referencia-compras`, conforme o deploy atual do projeto
 
+### `gerar-etp-servicos-continuos`
+
+Necessarias no ambiente do Supabase:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+
+Opcional:
+
+- `GEMINI_ETP_MODEL`
+  - default no codigo: `gemini-2.5-flash-lite`
+  - fallback automatico para `gemini-2.5-flash`
+
+Observacoes operacionais:
+
+- a function consome Gemini via REST e espera receber o questionario fixo do ETP, respostas do usuario, objeto manual opcional e trechos do PDF do processo quando houver
+- quando nao houver chave Gemini, a function devolve fallback local com respostas e pendencias, permitindo revisao manual no editor
+- quando a function ainda nao estiver publicada ou falhar por indisponibilidade/CORS, o frontend tambem usa fallback local com respostas e pendencias
+- esta versao nao usa modelo DOCX, nao persiste rascunhos no banco e nao suporta OCR
+- `supabase/config.toml` deve manter `verify_jwt = false` para `gerar-etp-servicos-continuos`, conforme o padrao das functions do Editor de Documentos
+
+### `sugerir-respostas-etp-servicos-continuos`
+
+Necessarias no ambiente do Supabase:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+
+Opcionais:
+
+- `GEMINI_ETP_PREFILL_MODEL`
+- `GEMINI_ETP_MODEL`
+
+Observacoes operacionais:
+
+- a function so sugere respostas quando recebe trechos do PDF do processo e consegue apontar pagina, trecho-fonte e justificativa
+- se a sugestao falhar ou a function nao estiver publicada, o frontend continua pelo questionario manual
+- `supabase/config.toml` deve manter `verify_jwt = false` para `sugerir-respostas-etp-servicos-continuos`
+
+### `gerar-texto-etp-secao`
+
+Necessarias no ambiente do Supabase:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+
+Opcional:
+
+- `GEMINI_ETP_MODEL`
+  - default no codigo: `gemini-2.5-flash-lite`
+  - fallback automatico para `gemini-2.5-flash`
+
+Observacoes operacionais:
+
+- a function consome Gemini via REST e recebe a pergunta atual do ETP, notas opcionais do usuario, respostas ja registradas, objeto manual e trechos do PDF quando existirem
+- quando a secao for solicitada sem notas do usuario, a function ainda deve gerar texto preliminar, marcando dados concretos ausentes como pendencia
+- quando nao houver chave Gemini, a function devolve texto local de apoio
+- quando a function ainda nao estiver publicada ou falhar por indisponibilidade/CORS, o frontend tambem usa texto local de apoio
+- `supabase/config.toml` deve manter `verify_jwt = false` para `gerar-texto-etp-secao`
+
 ### `ingest-email-csv`
 
 Necessarias no ambiente do Supabase:

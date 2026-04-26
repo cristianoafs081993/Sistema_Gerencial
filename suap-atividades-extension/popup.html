@@ -5,7 +5,7 @@
   <title>SUAP Atividades Scraper</title>
   <style>
     body {
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      font-family: Inter, system-ui, -apple-system, sans-serif;
       width: 380px;
       padding: 16px;
       background-color: #f8fafc;
@@ -19,6 +19,22 @@
       margin-bottom: 12px;
       padding-bottom: 8px;
       border-bottom: 1px solid #e2e8f0;
+    }
+    label {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+    }
+    input {
+      box-sizing: border-box;
+      width: 100%;
+      margin-top: 5px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 13px;
     }
     button {
       background-color: #2563eb;
@@ -59,7 +75,6 @@
       display: none;
       word-wrap: break-word;
     }
-    
     .status-line { margin-bottom: 4px; }
     .status-error { color: #ef4444; }
     .status-success { color: #10b981; }
@@ -68,7 +83,11 @@
 </head>
 <body>
   <h2>SUAP Scraper</h2>
-  <button id="btn-extract-en">🚀 Extrair Dimensão (EN - Ensino)</button>
+  <label>
+    Segredo de automação
+    <input id="automation-secret" type="password" autocomplete="off" placeholder="AUTOMATION_EVENT_SECRET">
+  </label>
+  <button id="btn-extract-en">Extrair Dimensão (EN - Ensino)</button>
   <button id="btn-extract-all" class="secondary">Extrair Todas as Dimensões</button>
   <div id="status"></div>
   <script src="popup.js"></script>
