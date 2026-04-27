@@ -88,7 +88,8 @@ function getManualChunk(id: string) {
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
-    port: 8080,
+    port: 5173,
+    allowedHosts: true,
     proxy: {
       '/api-transparencia': {
         target: 'https://api.portaldatransparencia.gov.br',
