@@ -59,9 +59,9 @@ const nestedNavigation: Record<string, NavigationLeaf[]> = {
   ],
   'editor-documentos': [
     { name: 'Despacho de Liquidação', href: '/editor-documentos/despacho-liquidacao', screenId: 'editor-documentos-despacho' },
-    { name: 'Contrato de Serviço IFRN', href: '/editor-documentos/contrato-servico-ifrn', screenId: 'editor-documentos-contrato' },
-    { name: 'Termo de Referência', href: '/editor-documentos/termo-referencia-compras', screenId: 'editor-documentos-termo' },
     { name: 'ETP — Serviços Contínuos', href: '/editor-documentos/estudo-tecnico-preliminar-servicos-continuos', screenId: 'editor-documentos-etp' },
+    { name: 'Termo de Referência', href: '/editor-documentos/termo-referencia-compras', screenId: 'editor-documentos-termo' },
+    { name: 'Contrato de Serviço IFRN', href: '/editor-documentos/contrato-servico-ifrn', screenId: 'editor-documentos-contrato' },
   ],
 };
 
@@ -88,7 +88,9 @@ function buildNavigationSections(canAccessScreen: (screenId: string) => boolean)
 function isPathActive(pathname: string, href: string) {
   if (href === '/') return pathname === '/';
   if (href === '/planejamento') return pathname.startsWith('/planejamento') || pathname.startsWith('/atividades');
-  if (href === '/editor-documentos') return pathname.startsWith('/editor-documentos');
+  // Para o pai editor-documentos: ativo apenas quando a rota é exatamente /editor-documentos
+  // (sem modelo na URL). Quando um filho está ativo, só o filho deve ser destacado.
+  if (href === '/editor-documentos') return pathname === '/editor-documentos';
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
