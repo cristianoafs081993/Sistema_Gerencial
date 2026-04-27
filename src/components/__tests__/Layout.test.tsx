@@ -97,4 +97,20 @@ describe('Layout', () => {
 
     expect(screen.getByText('Controle de usuários')).toBeInTheDocument();
   });
+
+  it('mantem a busca visual no header e expande submenus da sidebar', () => {
+    render(
+      <MemoryRouter>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByLabelText('Buscar módulo'), { target: { value: 'cred' } });
+    fireEvent.click(screen.getByText('Planejamento'));
+
+    expect(screen.getByText('Campus')).toBeInTheDocument();
+    expect(screen.getByText('Dashboard')).toBeInTheDocument();
+  });
 });

@@ -1,4 +1,4 @@
-# Sistema Gerencial
+# GovFlow
 
 Aplicacao web de gestao para o IFRN com modulos de execucao orcamentaria, documentos habeis, contratos, PFs, conciliacoes e assistentes apoiados por IA.
 

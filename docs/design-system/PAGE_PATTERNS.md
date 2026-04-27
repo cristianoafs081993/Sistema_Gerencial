@@ -1,83 +1,78 @@
 # PAGE_PATTERNS
 
-## Objetivo
-
-Padronizar a composicao das telas mais comuns do sistema.
+Esta documentacao foi atualizada porque a mudanca altera comportamento visual real em area critica de design system.
 
 ## Shell global
 
-O shell principal em [Layout.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/Layout.tsx) segue a etapa atual do redesign inspirado na referencia externa:
+O shell principal em `src/components/Layout.tsx` usa sidebar:
 
-1. sidebar clara com agrupamento por secao
-2. item ativo em verde com fundo suave
-3. header e sidebar brancos, com divisorias suaves
-4. fundo da area principal branco, com apenas um vestigio de verde IFRN no topo
-5. tipografia do shell com titulos em `#34322d`, subtitulos em `#858481` e labels de secao em neutro escuro `#1a1a19`
-6. header global sem titulo da pagina; a identificacao da pagina deve ficar no conteudo ou nos paineis
+1. sidebar branca com borda direita;
+2. marca GovFlow no topo com icone oficial em `public/govflow-icon-192.png` e avatar compacto quando ha sessao;
+3. busca visual no header principal, alinhada ao mesmo divisor horizontal da sidebar;
+4. grupos de modulos expansivos derivados de `appScreenGroups`, com icone, texto em caixa normal, borda suave, mesmo ritmo visual dos itens e transicao de altura/opacidade;
+5. itens derivados de `appScreens`, mantendo permissoes, rotas existentes e recuo visual em relacao ao grupo;
+6. submenus expansivos quando uma tela possui variacoes de rota, como Planejamento;
+7. item ativo com fundo neutro e barra lateral na cor primaria;
+8. subitem ativo com ponto e barra lateral menor;
+9. drawer lateral em mobile;
+10. header interno para busca, acoes de pagina e subtitulo.
+
+Nao trocar a sidebar por top nav sem validar que todos os itens continuam acessiveis.
+
+Os metadados de marca usam `public/govflow-logo.png`, `public/govflow-icon-192.png`, `public/govflow-icon-512.png`, `public/favicon.png` e `public/site.webmanifest`.
 
 ## Textos e encoding
 
-- textos de interface, exemplos e documentacao do design system devem ser mantidos em UTF-8 legivel, com acentos reais em portugues
-- nao commitar mojibake em labels, titulos, mensagens, comentarios ou documentacao; exemplos tipicos sao acentos renderizados como sequencias iniciadas por `A`/`C` com til visual ou simbolos renderizados como tres caracteres no lugar de travessao, seta ou triangulo
-- quando uma importacao precisar aceitar cabecalhos externos com encoding quebrado, normalize isso na borda do parser e nao copie o texto quebrado para componentes visuais
-- depois de alterar copy de UI ou documentacao do design system, rode `npm test -- src/__tests__/encoding.test.ts` para barrar regressao de encoding
+- Textos de UI e documentacao devem permanecer em UTF-8 legivel.
+- Nao commitar mojibake em labels, titulos, mensagens, comentarios ou documentacao.
+- Depois de alterar copy de UI ou documentacao do design system, rode `npm test -- src/__tests__/encoding.test.ts`.
 
 ## Padrao 1: tabela operacional
 
-Estrutura recomendada:
+Estrutura:
 
 1. `HeaderActions`
 2. `FilterPanel`
 3. `DataTablePanel`
 4. `TablePagination`
 
-Exemplos:
+Tabelas devem usar cabecalho suave, linhas com divisor claro e texto denso.
 
-- [Financeiro.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Financeiro.tsx)
-- [RetencoesFdReinfDesign.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/RetencoesFdReinfDesign.tsx)
+## Padrao 2: consulta com KPIs e tabela
 
-## Padrao 2: pagina de consulta com cards e tabela
-
-Estrutura recomendada:
+Estrutura:
 
 1. `HeaderActions`
 2. grid de `StatCard`
 3. `FilterPanel`
 4. tabela principal
 
-Exemplos:
+KPIs podem usar `tone` novo ou `stitchColor` legado enquanto a compatibilidade existir.
 
-- [RastreabilidadePFs/index.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/RastreabilidadePFs/index.tsx)
-- [LiquidacoesPagamentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/LiquidacoesPagamentos.tsx)
+## Padrao 3: importacao de arquivo
 
-## Padrao 3: pagina com importacao de arquivo
+Estrutura:
 
-Estrutura recomendada:
+1. `HeaderActions` com botao primario/secundario;
+2. informacao do arquivo atual quando existir;
+3. tabela ou cards derivados.
 
-1. `HeaderActions` com upload
-2. informacao de arquivo atual
-3. tabela ou cards derivados
-
-Exemplos:
-
-- [Financeiro.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Financeiro.tsx)
-- [LC.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/LC.tsx)
+Uploads devem manter estados de loading e erro claros.
 
 ## Padrao 4: dashboard analitico
 
-Estrutura recomendada:
+Estrutura:
 
-1. filtros globais
-2. cards KPI
-3. blocos de grafico com `ChartPanel`
-4. tabelas ou cards secundarios
+1. filtros globais;
+2. KPIs com `StatCard`;
+3. graficos com `ChartPanel`;
+4. tabelas secundarias.
 
-Exemplo:
+O dashboard preserva a paleta anterior para leitura analitica: azul para planejado/series base, verde para pago/naturezas, roxo para empenhado, amber para etapas intermediarias e cores complementares em barras empilhadas.
 
-- [Dashboard.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Dashboard.tsx)
+## Antipadroes
 
-## Anti-padroes
-
-- criar card ad hoc se `SectionPanel` ou `DataTablePanel` ja resolvem
-- inventar skeleton proprio para tabela quando `TableSkeletonRows` ja atende
-- abrir rota nova com visual paralelo sem passar pelo design system
+- Remover `src/manus-stage1.css` sem migrar antes todos os tokens legados equivalentes.
+- Trocar a sidebar por navegacao superior incompleta.
+- Apagar a paleta multicolorida do dashboard.
+- Criar card/tabela/filtro ad hoc quando houver componente oficial.

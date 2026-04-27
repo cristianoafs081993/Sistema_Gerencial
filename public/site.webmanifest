@@ -1,0 +1,22 @@
+{
+  "name": "GovFlow",
+  "short_name": "GovFlow",
+  "description": "GovFlow para controle e execucao orcamentaria",
+  "icons": [
+    {
+      "src": "/govflow-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/govflow-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "theme_color": "#ff263d",
+  "background_color": "#ffffff",
+  "display": "standalone"
+}

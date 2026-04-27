@@ -1,116 +1,61 @@
 # COMPONENT_CATALOG
 
-Este catalogo resume os blocos principais do design system proprio do projeto.
+Este catalogo resume os blocos oficiais do design system do GovFlow.
 
-## Base de referencia
-
-- [DESIGN_SYSTEM.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/DESIGN_SYSTEM.md)
-- [DesignSystemPreview.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/DesignSystemPreview.tsx)
+Esta documentacao foi atualizada porque a mudanca altera comportamento visual real em area critica de design system.
 
 ## Blocos de pagina
 
 ### `SectionPanel`
 
-Arquivo:
+Arquivo: `src/components/design-system/SectionPanel.tsx`
 
-- [SectionPanel.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/design-system/SectionPanel.tsx)
+Container padrao para secoes com titulo, descricao, acoes e conteudo. Usa superficie branca, borda clara e radius consistente.
 
-Uso:
-
-- container base para secoes de pagina
-- aceita `title`, `description`, `actions`
-
-Quando usar:
-
-- secoes de leitura
-- blocos de conteudo
-- agrupamento visual de tabelas, listas e formularios
 ### `FilterPanel`
 
-Arquivo:
+Arquivo: `src/components/design-system/FilterPanel.tsx`
 
-- [FilterPanel.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/design-system/FilterPanel.tsx)
+Area padronizada de filtros. Deve ser usada antes de tabelas e consultas operacionais.
 
-Uso:
-
-- area padronizada de filtros com titulo e acoes
-
-Quando usar:
-
-- filtros de busca
-- filtros tabulares
-- filtros de auditoria
 ### `DataTablePanel`
 
-Arquivo:
+Arquivo: `src/components/design-system/DataTablePanel.tsx`
 
-- [DataTablePanel.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/design-system/DataTablePanel.tsx)
+Wrapper oficial de tabela baseado em `SectionPanel`, com overflow horizontal padronizado.
 
-Uso:
-
-- wrapper de tabela baseado em `SectionPanel`
-- aplica overflow horizontal padrao
-
-Quando usar:
-
-- qualquer tabela principal de listagem
 ### `ChartPanel`
 
-Arquivo:
+Arquivo: `src/components/design-system/ChartPanel.tsx`
 
-- [ChartPanel.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/design-system/ChartPanel.tsx)
+Painel para graficos. Deve aceitar a paleta analitica do dashboard quando o contexto pedir comparacao visual.
 
-Uso:
-
-- cartao padronizado para graficos
-- suporta estado `loading`
-
-Quando usar:
-
-- graficos do dashboard
-- graficos analiticos em outras telas
 ### `TableSkeletonRows`
 
-Arquivo:
+Arquivo: `src/components/design-system/TableSkeletonRows.tsx`
 
-- [TableSkeletonRows.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/design-system/TableSkeletonRows.tsx)
-
-Uso:
-
-- skeleton de linhas tabulares parametrizado por linhas, colunas e larguras
-
-Quando usar:
-
-- carregamento de tabelas assincronas
+Skeleton reutilizavel para linhas tabulares.
 
 ### `TablePagination`
 
-Arquivo:
+Arquivo: `src/components/design-system/TablePagination.tsx`
 
-- [TablePagination.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/design-system/TablePagination.tsx)
+Rodape de tabela com seletor de quantidade, paginas e navegacao.
 
-Uso:
+## Componentes base
 
-- rodape padronizado de tabela com seletor de quantidade, estado da pagina e navegacao
-- suporta page size, total de itens e elipses entre paginas visiveis
+- `Button`: verde institucional para acao primaria; branco com borda para acoes secundarias.
+- `Card`: superficie branca com borda clara.
+- `Input`, `Textarea`, `Select`: branco, borda clara, foco verde.
+- `Badge`: pill neutro; variantes usam status semanticos e baixa opacidade.
+- `Tabs`: segmentado com ativo verde quando usado em paginas operacionais.
+- `Dialog`, `Sheet`, `Popover`, `DropdownMenu`: superficies brancas com elevacao suave.
+- `Layout`: sidebar global compacta com campo de busca visual, grupos expansivos, submenus expansivos, indicador ativo lateral e drawer mobile.
 
-Quando usar:
-
-- qualquer tabela paginada do sistema
-- tabelas operacionais e tabelas analiticas com mais de uma pagina
-
-## Componentes de apoio frequentemente usados
-
-- `StatCard`
-- `HeaderActions`
-- componentes `ui/*` do shadcn
 ## Regra pratica
 
-Se uma tela nova precisa:
-
-- filtros -> comece por `FilterPanel`
-- secao com cabecalho -> comece por `SectionPanel`
-- tabela -> comece por `DataTablePanel`
-- grafico -> comece por `ChartPanel`
-- loading tabular -> use `TableSkeletonRows`
-- rodape paginado -> use `TablePagination`
+- Filtros: `FilterPanel`.
+- Tabela: `DataTablePanel` + `TablePagination`.
+- Secao: `SectionPanel`.
+- Grafico: `ChartPanel`.
+- KPI: `StatCard` com `tone` ou `stitchColor` legado.
