@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Building2,
@@ -1266,10 +1267,28 @@ function PreliminaryStudySuggestionReviewCard({
   );
 }
 
+const VALID_MODEL_IDS: SupportedDocumentType[] = [
+  'despacho-liquidacao',
+  'contrato-servico-ifrn',
+  'termo-referencia-compras',
+  'estudo-tecnico-preliminar-servicos-continuos',
+];
+
 export default function EditorDocumentos() {
   const { empenhos, contratos, contratosEmpenhos } = useData();
+  const { modelId } = useParams<{ modelId?: string }>();
+  const navigate = useNavigate();
   const editorCardRef = useRef<HTMLDivElement | null>(null);
-  const [activeDocumentId, setActiveDocumentId] = useState<SupportedDocumentType>('despacho-liquidacao');
+
+  // Deriva o modelo ativo da URL; fallback para despacho-liquidacao
+  const activeDocumentId: SupportedDocumentType =
+    VALID_MODEL_IDS.includes(modelId as SupportedDocumentType)
+      ? (modelId as SupportedDocumentType)
+      : 'despacho-liquidacao';
+
+  const setActiveDocumentId = (documentType: SupportedDocumentType) => {
+    navigate(`/editor-documentos/${documentType}`, { replace: true });
+  };
   const [processInput, setProcessInput] = useState('');
   const [screenState, setScreenState] = useState<ScreenState>('idle');
   const [feedback, setFeedback] = useState('');
@@ -2705,22 +2724,7 @@ export default function EditorDocumentos() {
       </HeaderActions>
 
       <div className="mx-auto flex max-w-[1560px] flex-col gap-5 px-4 py-5 lg:px-8 lg:py-6">
-          <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-            <Card className="overflow-hidden border-border-default/70 bg-surface-card shadow-soft">
-              <CardContent className="p-4">
-                <DocumentModelMenu
-                  activeId={activeDocumentId}
-                  onSelect={(documentType) => {
-                    setActiveDocumentId(documentType);
-                    setProcessInput('');
-                    resetPendingStates();
-                    setFeedback('');
-                    setScreenState('idle');
-                  }}
-                />
-              </CardContent>
-            </Card>
-
+          <div>
             <Card className="overflow-hidden border-border-default/70 bg-surface-card shadow-soft">
               <CardContent className="p-4">
                 <div className="flex flex-col gap-4">

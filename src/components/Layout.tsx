@@ -57,6 +57,12 @@ const nestedNavigation: Record<string, NavigationLeaf[]> = {
     { name: 'Sistêmico', href: '/planejamento/sistemico', screenId: 'planejamento-sistemico' },
     { name: 'Emendas parlamentares', href: '/planejamento/emendas-parlamentares', screenId: 'planejamento-emendas' },
   ],
+  'editor-documentos': [
+    { name: 'Despacho de Liquidação', href: '/editor-documentos/despacho-liquidacao', screenId: 'editor-documentos-despacho' },
+    { name: 'Contrato de Serviço IFRN', href: '/editor-documentos/contrato-servico-ifrn', screenId: 'editor-documentos-contrato' },
+    { name: 'Termo de Referência', href: '/editor-documentos/termo-referencia-compras', screenId: 'editor-documentos-termo' },
+    { name: 'ETP — Serviços Contínuos', href: '/editor-documentos/estudo-tecnico-preliminar-servicos-continuos', screenId: 'editor-documentos-etp' },
+  ],
 };
 
 function buildNavigationSections(canAccessScreen: (screenId: string) => boolean): NavigationSection[] {
@@ -82,6 +88,7 @@ function buildNavigationSections(canAccessScreen: (screenId: string) => boolean)
 function isPathActive(pathname: string, href: string) {
   if (href === '/') return pathname === '/';
   if (href === '/planejamento') return pathname.startsWith('/planejamento') || pathname.startsWith('/atividades');
+  if (href === '/editor-documentos') return pathname.startsWith('/editor-documentos');
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -308,7 +315,7 @@ export function Layout({ children }: LayoutProps) {
                           <div
                             className={cn(
                               'overflow-hidden transition-[max-height,opacity] duration-200 ease-out',
-                              submenuExpanded ? 'max-h-[400px] opacity-100' : 'max-h-0 opacity-0',
+                              submenuExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0',
                             )}
                           >
                             {item.children.map((child) => {
