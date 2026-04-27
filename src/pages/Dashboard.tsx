@@ -410,7 +410,6 @@ export default function Dashboard() {
       <Tabs
         value={activeTab}
         onValueChange={(value) => setActiveTab(value as 'corrente' | 'rap')}
-        className="space-y-6"
       >
         <HeaderActions>
           <div className="hidden h-9 items-center gap-2 md:flex">
@@ -481,7 +480,7 @@ export default function Dashboard() {
         </div>
 
         {activeDimensionLabel ? (
-          <div className="flex items-center gap-3">
+          <div className="mb-6 flex items-center gap-3">
             <Badge
               variant="secondary"
               className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 font-ui text-xs font-semibold text-primary"
@@ -500,7 +499,7 @@ export default function Dashboard() {
           </div>
         ) : null}
 
-        <TabsContent value="corrente" className="space-y-6 border-none p-0">
+        <TabsContent value="corrente" className="mt-0 space-y-6 border-none p-0">
           <DashboardCurrentTab
             isLoading={isLoading}
             filteredData={filteredData}
@@ -525,7 +524,7 @@ export default function Dashboard() {
           />
         </TabsContent>
 
-        <TabsContent value="rap" className="space-y-6 border-none p-0">
+        <TabsContent value="rap" className="mt-0 space-y-6 border-none p-0">
           <DashboardRapTab
             isLoading={isLoading}
             rapTotalInscrito={rapTotalInscrito}
