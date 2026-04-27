@@ -290,6 +290,11 @@ export function Layout({ children }: LayoutProps) {
                 >
                   {section.items.map((item) => {
                     const active = isItemActive(location.pathname, item);
+                    // Para itens com filhos, o destaque visual (barra + negrito) só aparece
+                    // quando a rota é exatamente o href do pai, nunca quando um filho está ativo.
+                    const parentDirectlyActive = item.children?.length
+                      ? isPathActive(location.pathname, item.href)
+                      : active;
                     const submenuExpanded = expandedSubmenus[item.screenId] ?? false;
 
                     if (item.children?.length) {
@@ -299,8 +304,8 @@ export function Layout({ children }: LayoutProps) {
                             type="button"
                             className={cn(
                               'relative mb-px flex w-full cursor-pointer items-center gap-[9px] rounded-lg px-2.5 py-[7px] text-left text-[13px] font-medium text-[#6a6a6a] transition-colors duration-100 hover:bg-[#f7f7f7] hover:text-[#222222]',
-                              active && 'bg-[#f7f7f7] font-semibold text-[#222222]',
-                              active &&
+                              parentDirectlyActive && 'bg-[#f7f7f7] font-semibold text-[#222222]',
+                              parentDirectlyActive &&
                                 'before:absolute before:-left-2 before:top-1/2 before:h-4 before:w-[3px] before:-translate-y-1/2 before:rounded-r-[3px] before:bg-[#1a9b5f]',
                             )}
                             onClick={() => toggleSubmenu(item.screenId)}
