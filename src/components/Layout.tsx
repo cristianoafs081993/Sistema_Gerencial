@@ -220,7 +220,7 @@ export function Layout({ children }: LayoutProps) {
               src={APP_BRAND.iconPath}
               alt=""
               aria-hidden="true"
-              className="h-[26px] w-[26px] shrink-0 rounded-[7px] bg-[#ff385c] object-cover"
+              className="h-[26px] w-[26px] shrink-0 rounded-[7px] object-contain"
             />
             <span className="truncate text-sm font-bold tracking-[-0.3px] text-[#222222]">{APP_BRAND.name}</span>
           </Link>
@@ -262,7 +262,7 @@ export function Layout({ children }: LayoutProps) {
                   onClick={() => toggleSection(section.title)}
                 >
                   <span className="flex min-w-0 items-center gap-2">
-                    <SectionIcon className={cn('h-4 w-4 shrink-0 text-[#858481]', sectionExpanded && 'text-[#ff385c]')} />
+                    <SectionIcon className={cn('h-4 w-4 shrink-0 text-[#858481]', sectionExpanded && 'text-[#1a9b5f]')} />
                     <span className="truncate">{section.title}</span>
                   </span>
                   <ChevronRight
@@ -292,7 +292,7 @@ export function Layout({ children }: LayoutProps) {
                               'relative mb-px flex w-full cursor-pointer items-center gap-[9px] rounded-lg px-2.5 py-[7px] text-left text-[13px] font-medium text-[#6a6a6a] transition-colors duration-100 hover:bg-[#f7f7f7] hover:text-[#222222]',
                               active && 'bg-[#f7f7f7] font-semibold text-[#222222]',
                               active &&
-                                'before:absolute before:-left-2 before:top-1/2 before:h-4 before:w-[3px] before:-translate-y-1/2 before:rounded-r-[3px] before:bg-[#ff385c]',
+                                'before:absolute before:-left-2 before:top-1/2 before:h-4 before:w-[3px] before:-translate-y-1/2 before:rounded-r-[3px] before:bg-[#1a9b5f]',
                             )}
                             onClick={() => toggleSubmenu(item.screenId)}
                           >
@@ -323,10 +323,10 @@ export function Layout({ children }: LayoutProps) {
                                     'relative mb-px flex items-center gap-2 rounded-[7px] py-1.5 pl-[22px] pr-2.5 text-xs font-normal text-[#6a6a6a] transition-colors duration-100 hover:bg-[#f7f7f7] hover:text-[#222222]',
                                     childActive && 'bg-[#f7f7f7] font-semibold text-[#222222]',
                                     childActive &&
-                                      'before:absolute before:left-0 before:top-1/2 before:h-3 before:w-0.5 before:-translate-y-1/2 before:rounded-r-sm before:bg-[#ff385c]',
+                                      'before:absolute before:left-0 before:top-1/2 before:h-3 before:w-0.5 before:-translate-y-1/2 before:rounded-r-sm before:bg-[#1a9b5f]',
                                   )}
                                 >
-                                  <span className={cn('h-1 w-1 shrink-0 rounded-full bg-[#dddddd]', childActive && 'bg-[#ff385c]')} />
+                                  <span className={cn('h-1 w-1 shrink-0 rounded-full bg-[#dddddd]', childActive && 'bg-[#1a9b5f]')} />
                                   <span className="truncate">{child.name}</span>
                                 </Link>
                               );
@@ -345,7 +345,7 @@ export function Layout({ children }: LayoutProps) {
                           'relative mb-px flex items-center gap-[9px] rounded-lg px-2.5 py-[7px] text-[13px] font-medium text-[#6a6a6a] no-underline transition-colors duration-100 hover:bg-[#f7f7f7] hover:text-[#222222]',
                           active && 'bg-[#f7f7f7] font-semibold text-[#222222]',
                           active &&
-                            'before:absolute before:-left-2 before:top-1/2 before:h-4 before:w-[3px] before:-translate-y-1/2 before:rounded-r-[3px] before:bg-[#ff385c]',
+                            'before:absolute before:-left-2 before:top-1/2 before:h-4 before:w-[3px] before:-translate-y-1/2 before:rounded-r-[3px] before:bg-[#1a9b5f]',
                         )}
                       >
                         <span className="truncate">{item.name}</span>
