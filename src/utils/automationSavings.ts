@@ -1,3 +1,5 @@
+import { APP_BRAND } from '@/lib/brand';
+
 export type AutomationSavingsScenario = {
   id: string;
   interactionName: string;
@@ -59,7 +61,7 @@ export const DEFAULT_AUTOMATION_SAVINGS_SCENARIOS: AutomationSavingsScenario[] =
     id: 'relatorios-gerenciais',
     interactionName: 'Montagem de relatório gerencial',
     moduleName: 'Relatórios',
-    source: 'Sistema Gerencial',
+    source: APP_BRAND.name,
     baselineMinutes: 45,
     automatedMinutes: 5,
     estimatedMonthlyRuns: 12,
@@ -70,7 +72,7 @@ export const DEFAULT_AUTOMATION_SAVINGS_SCENARIOS: AutomationSavingsScenario[] =
     id: 'documentos-liquidacoes',
     interactionName: 'Consulta de documentos/liquidações',
     moduleName: 'Financeiro',
-    source: 'Sistema Gerencial',
+    source: APP_BRAND.name,
     baselineMinutes: 25,
     automatedMinutes: 4,
     estimatedMonthlyRuns: 30,
@@ -81,7 +83,7 @@ export const DEFAULT_AUTOMATION_SAVINGS_SCENARIOS: AutomationSavingsScenario[] =
     id: 'conciliacao-pfs-lc',
     interactionName: 'Conciliação de PFs/LC',
     moduleName: 'PFs e LC',
-    source: 'Sistema Gerencial',
+    source: APP_BRAND.name,
     baselineMinutes: 60,
     automatedMinutes: 10,
     estimatedMonthlyRuns: 8,

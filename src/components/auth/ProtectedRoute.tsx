@@ -3,6 +3,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { buildAuthRoute } from '@/lib/auth';
+import { APP_BRAND } from '@/lib/brand';
 
 export function ProtectedRoute() {
   const location = useLocation();
@@ -19,7 +20,7 @@ export function ProtectedRoute() {
             <div className="mt-5 space-y-2">
               <p className="text-lg font-semibold text-slate-900">Validando sessão</p>
               <p className="text-sm leading-6 text-slate-500">
-                O Sistema Gerencial está confirmando sua autenticação e permissões.
+                O {APP_BRAND.name} está confirmando sua autenticação e permissões.
               </p>
             </div>
             <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-primary/10 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary">

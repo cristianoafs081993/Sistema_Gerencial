@@ -1,5 +1,7 @@
 import * as CFB from 'cfb';
 
+import { APP_BRAND } from '@/lib/brand';
+
 import { sanitizeReferenceTermQuestionnaireSchema } from '@/lib/referenceTermQuestionnaire';
 import type {
   DocumentTemplateEditableBlock,
@@ -753,7 +755,7 @@ function createDocxCommentManager(cfb: CFB.CFB$Container): DocxCommentManager {
 
       const comment = commentsXml.createElementNS(WORD_NS, 'w:comment');
       setWordAttribute(comment, 'id', id);
-      setWordAttribute(comment, 'author', 'Sistema Gerencial');
+      setWordAttribute(comment, 'author', APP_BRAND.name);
       setWordAttribute(comment, 'date', new Date().toISOString());
 
       const paragraph = commentsXml.createElementNS(WORD_NS, 'w:p');

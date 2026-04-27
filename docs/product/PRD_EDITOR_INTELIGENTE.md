@@ -11,7 +11,7 @@ Transformar a criação de documentos administrativos (ETP, TR, Minutas) em um p
 ## 🚀 Funcionalidades Principais
 
 ### 1. Editor de Texto Rico (Powered by Tiptap)
-- **Headless UI**: Toolbar customizada com design system do Sistema Gerencial.
+- **Headless UI**: Toolbar customizada com design system do GovFlow.
 - **Seções Dinâmicas**: Divisão do documento em blocos editáveis conforme o template.
 - **Exportação**: Copiar HTML formatado ou gerar PDF (futuro).
 
@@ -60,7 +60,7 @@ Transformar a criação de documentos administrativos (ETP, TR, Minutas) em um p
   - **Esquerda**: Navegação de Seções / Status.
   - **Centro**: Editor de Texto (Foco no Conteúdo).
   - **Direita**: Painel de Sugestões e Conformidade IA.
-- **Estética**: Manter o conceito de "Sistema Gerencial" (Glassmorphism, sombreamento `shadow-lifted`, paleta slate/blue).
+- **Estética**: Manter o conceito de "GovFlow" (Glassmorphism, sombreamento `shadow-lifted`, paleta slate/blue).
 
 ## 🛠️ Stack Técnica
 - **Frontend**: React, Tiptap, Framer Motion, Tailwind CSS.

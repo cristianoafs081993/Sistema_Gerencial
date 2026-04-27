@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { AUTH_INVITE_MODE, AUTH_RECOVERY_MODE, normalizeAuthMode, normalizeNextPath } from '@/lib/auth';
+import { APP_BRAND } from '@/lib/brand';
 
 export default function Auth() {
   const { isLoading, session } = useAuth();
@@ -69,7 +70,7 @@ export default function Auth() {
     <main className="min-h-screen bg-background px-4 py-8 text-foreground">
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col justify-center gap-6">
         <div className="space-y-2 text-center">
-          <p className="text-sm font-semibold text-primary">Sistema Gerencial</p>
+          <img src={APP_BRAND.logoPath} alt={APP_BRAND.name} className="mx-auto h-16 w-auto max-w-full object-contain" />
           <h1 className="font-ui text-2xl font-bold tracking-tight text-foreground">{authTitle}</h1>
           <p className="text-sm leading-6 text-muted-foreground">{authDescription}</p>
         </div>
