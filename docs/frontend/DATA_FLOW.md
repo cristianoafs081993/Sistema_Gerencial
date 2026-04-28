@@ -180,6 +180,7 @@ Observacao:
 Observacoes:
 
 - a grade de processos sincronizados do editor tenta leitura publica via `supabase-js` e cai para REST anonimo quando necessario
+- a escolha entre `Despacho de Liquidacao`, `Contrato de Servico IFRN`, `Termo de Referencia - Compras` e `ETP - Servicos Continuos` vem da sidebar global, usando as rotas `/editor-documentos/:documentType`; a tela do editor nao replica essa navegacao no conteudo
 - o detalhe do processo no Editor pode abrir o PDF sincronizado pelo bucket `suap-pdfs` usando URL assinada via `suapProcessosService.getPdfSignedUrl`
 - a opcao `Despacho de Liquidacao` continua usando `documentGeneration.ts` com dados de `processos`, `empenhos`, `contratos` e `contratos_api`
 - a opcao `Contrato de Servico IFRN` baixa o PDF sincronizado do processo, extrai texto com `pdfjs-dist`, identifica paginas candidatas de modelo contratual e envia o modelo escolhido com trechos de apoio para a Edge Function `gerar-contrato-licitacao`

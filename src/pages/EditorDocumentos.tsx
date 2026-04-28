@@ -18,6 +18,7 @@ import {
   Wallet,
   Wand2,
 } from 'lucide-react';
+import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import RichTextEditor from '@/components/Editor/RichTextEditor';
@@ -135,6 +136,9 @@ const copyValue = async (value: string | undefined | null, message: string) => {
     toast.error('Nao foi possivel copiar este valor.');
   }
 };
+
+const isSupportedDocumentType = (value: string | undefined): value is SupportedDocumentType =>
+  Boolean(value && documentDefinitions.some((document) => document.id === value));
 
 function ModelSubmenu({
   title,
@@ -524,8 +528,11 @@ function ReferenceTermQuestionCard({
 
 export default function EditorDocumentos() {
   const { empenhos, contratos, contratosEmpenhos } = useData();
+  const { documentType } = useParams<{ documentType?: string }>();
   const editorCardRef = useRef<HTMLDivElement | null>(null);
-  const [activeDocumentId, setActiveDocumentId] = useState<SupportedDocumentType>('despacho-liquidacao');
+  const activeDocumentId: SupportedDocumentType = isSupportedDocumentType(documentType)
+    ? documentType
+    : 'despacho-liquidacao';
   const [processInput, setProcessInput] = useState('');
   const [screenState, setScreenState] = useState<ScreenState>('idle');
   const [feedback, setFeedback] = useState('');
@@ -552,6 +559,8 @@ export default function EditorDocumentos() {
   const activeDocument = documentDefinitions.find((document) => document.id === activeDocumentId) || documentDefinitions[0];
   const isContractDocument = activeDocumentId === 'contrato-servico-ifrn';
   const isReferenceTermDocument = activeDocumentId === 'termo-referencia-compras';
+  const isEtpDocument = activeDocumentId === 'etp-servicos-continuos';
+  const isSingleSyncedProcessDocument = isContractDocument || isReferenceTermDocument || isEtpDocument;
 
   const {
     data: syncedProcesses = [],
@@ -899,6 +908,14 @@ export default function EditorDocumentos() {
     );
   };
 
+  const handleGenerateEtp = () => {
+    const message = 'A geracao do ETP - Servicos Continuos ainda nao esta conectada neste editor.';
+    setFeedback(message);
+    setFeedbackTone('warning');
+    setScreenState('not_found');
+    toast.info(message);
+  };
+
   const handleGenerateReferenceTerm = async (processo: SuapProcesso) => {
     if (!processo.numProcesso?.trim()) {
       const message = 'O processo precisa estar sincronizado com numero valido para gerar o Termo de Referencia.';
@@ -991,11 +1008,13 @@ export default function EditorDocumentos() {
     setFeedback('');
     setScreenState('resolving');
 
-    if (isContractDocument || isReferenceTermDocument) {
+    if (isSingleSyncedProcessDocument) {
       if (processes.length !== 1) {
         const message = isReferenceTermDocument
           ? 'A geracao do Termo de Referencia funciona com um processo por vez.'
-          : 'A geracao de contrato funciona com um processo por vez.';
+          : isEtpDocument
+            ? 'A geracao do ETP funciona com um processo por vez.'
+            : 'A geracao de contrato funciona com um processo por vez.';
         setFeedback(message);
         setFeedbackTone('warning');
         setScreenState('not_found');
@@ -1007,7 +1026,9 @@ export default function EditorDocumentos() {
       if (!matchedProcess) {
         const message = isReferenceTermDocument
           ? 'Para gerar o Termo de Referencia, o processo precisa estar sincronizado no SUAP com PDF disponivel.'
-          : 'Para gerar contrato, o processo precisa estar sincronizado no SUAP com PDF disponivel.';
+          : isEtpDocument
+            ? 'Para gerar o ETP, o processo precisa estar sincronizado no SUAP com PDF disponivel.'
+            : 'Para gerar contrato, o processo precisa estar sincronizado no SUAP com PDF disponivel.';
         setFeedback(message);
         setFeedbackTone('warning');
         setScreenState('not_found');
@@ -1017,6 +1038,8 @@ export default function EditorDocumentos() {
 
       if (isReferenceTermDocument) {
         await handleGenerateReferenceTerm(matchedProcess);
+      } else if (isEtpDocument) {
+        handleGenerateEtp();
       } else {
         await handleGenerateContract(matchedProcess);
       }
@@ -1133,6 +1156,11 @@ export default function EditorDocumentos() {
 
     if (isReferenceTermDocument) {
       await handleGenerateReferenceTerm(processo);
+      return;
+    }
+
+    if (isEtpDocument) {
+      handleGenerateEtp();
       return;
     }
 
@@ -1265,22 +1293,7 @@ export default function EditorDocumentos() {
       </HeaderActions>
 
       <div className="mx-auto flex max-w-[1560px] flex-col gap-5 px-4 py-5 lg:px-8 lg:py-6">
-          <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-            <Card className="overflow-hidden border-border-default/70 bg-surface-card shadow-soft">
-              <CardContent className="p-4">
-                <DocumentModelMenu
-                  activeId={activeDocumentId}
-                  onSelect={(documentType) => {
-                    setActiveDocumentId(documentType);
-                    setProcessInput('');
-                    resetPendingStates();
-                    setFeedback('');
-                    setScreenState('idle');
-                  }}
-                />
-              </CardContent>
-            </Card>
-
+          <div className="grid gap-4">
             <Card className="overflow-hidden border-border-default/70 bg-surface-card shadow-soft">
               <CardContent className="p-4">
                 <div className="flex flex-col gap-4">
@@ -1307,7 +1320,7 @@ export default function EditorDocumentos() {
                               appendDisabled={!example.processoCompleto.numProcesso?.trim()}
                               appendTitle={
                                 example.processoCompleto.numProcesso?.trim()
-                                  ? isContractDocument || isReferenceTermDocument
+                                  ? isSingleSyncedProcessDocument
                                     ? 'Usar este processo'
                                     : 'Adicionar ao lote'
                                   : 'Numero de processo indisponivel para lote'
@@ -1347,7 +1360,7 @@ export default function EditorDocumentos() {
                       value={processInput}
                       onChange={(event) => setProcessInput(event.target.value)}
                       placeholder={
-                        isContractDocument || isReferenceTermDocument
+                        isSingleSyncedProcessDocument
                           ? 'Cole um numero de processo sincronizado no SUAP.'
                           : 'Cole um ou mais numeros de processo, um por linha.'
                       }
@@ -1368,7 +1381,13 @@ export default function EditorDocumentos() {
                           disabled={screenState === 'resolving'}
                         >
                           {screenState === 'resolving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                          {isContractDocument ? 'Gerar contrato' : isReferenceTermDocument ? 'Gerar Termo de Referencia' : 'Gerar minuta'}
+                          {isContractDocument
+                            ? 'Gerar contrato'
+                            : isReferenceTermDocument
+                              ? 'Gerar Termo de Referencia'
+                              : isEtpDocument
+                                ? 'Gerar ETP'
+                                : 'Gerar minuta'}
                         </Button>
                       </div>
                     </div>
@@ -1477,7 +1496,9 @@ export default function EditorDocumentos() {
                   ? 'O contrato sera montado aqui...'
                   : isReferenceTermDocument
                     ? 'O Termo de Referencia sera montado aqui...'
-                    : 'A minuta sera montada aqui...'
+                    : isEtpDocument
+                      ? 'O ETP sera montado aqui...'
+                      : 'A minuta sera montada aqui...'
               }
               toolbarLeft={
                 <div className="flex items-center gap-2">
@@ -1836,7 +1857,9 @@ export default function EditorDocumentos() {
                     ? 'Gerar Contrato'
                     : isReferenceTermDocument
                       ? 'Gerar Termo de Referencia'
-                      : 'Gerar Documento'}
+                      : isEtpDocument
+                        ? 'Gerar ETP'
+                        : 'Gerar Documento'}
                 </Button>
                 <Button
                   type="button"

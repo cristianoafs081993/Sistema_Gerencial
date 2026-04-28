@@ -74,6 +74,7 @@ const App = () => (
                   <Route path="/conciliacao-pfs" element={<ConciliacaoPfs />} />
                   <Route path="/gerador-documentos" element={<GeradorDocumentos />} />
                   <Route path="/editor-documentos" element={<EditorDocumentos />} />
+                  <Route path="/editor-documentos/:documentType" element={<EditorDocumentos />} />
                   <Route path="/consultor" element={<Consultor />} />
                   <Route path="/suap" element={<Suap />} />
                   <Route path="/controle-usuarios" element={<ControleUsuarios />} />

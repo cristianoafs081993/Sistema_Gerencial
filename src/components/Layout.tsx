@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, LogOut, Menu, User, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileText, LogOut, Menu, ReceiptText, User, Wand2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,6 +24,33 @@ type NavigationSection = {
   title: string;
   items: NavigationItem[];
 };
+
+const editorDocumentTypeItems: NavigationItem[] = [
+  {
+    name: 'Despacho de Liquidacao',
+    href: '/editor-documentos/despacho-liquidacao',
+    icon: Wand2,
+    screenId: 'editor-documentos',
+  },
+  {
+    name: 'ETP - Servicos Continuos',
+    href: '/editor-documentos/etp-servicos-continuos',
+    icon: FileText,
+    screenId: 'editor-documentos',
+  },
+  {
+    name: 'Termo de Referencia - Compras',
+    href: '/editor-documentos/termo-referencia-compras',
+    icon: ReceiptText,
+    screenId: 'editor-documentos',
+  },
+  {
+    name: 'Contrato de Servico IFRN',
+    href: '/editor-documentos/contrato-servico-ifrn',
+    icon: FileText,
+    screenId: 'editor-documentos',
+  },
+];
 
 function buildNavigationSections(canAccessScreen: (screenId: string) => boolean): NavigationSection[] {
   return appScreenGroups
@@ -211,7 +238,42 @@ export function Layout({ children }: LayoutProps) {
                     );
 
                     if (!isCollapsed) {
-                      return <div key={`${section.title}-${item.name}`}>{link}</div>;
+                      const documentTypeLinks = item.screenId === 'editor-documentos' ? (
+                        <div className="mt-1 space-y-1 pl-6">
+                          {editorDocumentTypeItems.map((documentItem) => {
+                            const documentActive = isPathActive(location.pathname, documentItem.href);
+
+                            return (
+                              <Link
+                                key={documentItem.href}
+                                to={documentItem.href}
+                                onClick={() => setSidebarOpen(false)}
+                                className={cn(
+                                  'flex items-center gap-2 rounded-lg border px-2.5 py-2 text-[12px] transition-all duration-150',
+                                  documentActive
+                                    ? 'border-[hsl(var(--primary)/0.16)] bg-[hsl(var(--primary)/0.1)] font-semibold text-primary'
+                                    : 'border-transparent text-[#34322d] hover:border-[hsl(var(--sidebar-border))] hover:bg-[hsl(var(--sidebar-accent))] hover:text-[#1a1a19]',
+                                )}
+                              >
+                                <documentItem.icon
+                                  className={cn(
+                                    'h-3.5 w-3.5 shrink-0 transition-colors',
+                                    documentActive ? 'text-primary' : 'text-[#858481]',
+                                  )}
+                                />
+                                <span className="font-ui flex-1 truncate">{documentItem.name}</span>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      ) : null;
+
+                      return (
+                        <div key={`${section.title}-${item.name}`}>
+                          {link}
+                          {documentTypeLinks}
+                        </div>
+                      );
                     }
 
                     return (

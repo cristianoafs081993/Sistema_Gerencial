@@ -97,4 +97,38 @@ describe('Layout', () => {
 
     expect(screen.getByText('Controle de usuários')).toBeInTheDocument();
   });
+
+  it('mostra os tipos do editor como navegacao da sidebar', () => {
+    render(
+      <MemoryRouter initialEntries={['/editor-documentos/contrato-servico-ifrn']}>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('Despacho de Liquidacao')).toBeInTheDocument();
+    expect(screen.getByText('ETP - Servicos Continuos')).toBeInTheDocument();
+    expect(screen.getByText('Termo de Referencia - Compras')).toBeInTheDocument();
+    expect(screen.getByText('Contrato de Servico IFRN')).toBeInTheDocument();
+
+    expect(
+      screen
+        .getAllByRole('link')
+        .map((link) => link.textContent)
+        .filter((text) =>
+          [
+            'Despacho de Liquidacao',
+            'ETP - Servicos Continuos',
+            'Termo de Referencia - Compras',
+            'Contrato de Servico IFRN',
+          ].includes(text || ''),
+        ),
+    ).toEqual([
+      'Despacho de Liquidacao',
+      'ETP - Servicos Continuos',
+      'Termo de Referencia - Compras',
+      'Contrato de Servico IFRN',
+    ]);
+  });
 });

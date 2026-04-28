@@ -10,7 +10,11 @@ import type {
   SuapProcesso,
 } from '@/types';
 
-export type SupportedDocumentType = 'despacho-liquidacao' | 'contrato-servico-ifrn' | 'termo-referencia-compras';
+export type SupportedDocumentType =
+  | 'despacho-liquidacao'
+  | 'contrato-servico-ifrn'
+  | 'termo-referencia-compras'
+  | 'etp-servicos-continuos';
 export type IntentLookupType = 'processo' | 'cpf' | 'cnpj';
 export type ContextFieldStatus = 'confirmed' | 'inferred' | 'missing';
 export type ContextFieldKey =
@@ -166,6 +170,14 @@ export const documentDefinitions = [
     batchSupported: false,
     requiresProcessPdf: true,
   },
+  {
+    id: 'etp-servicos-continuos' as const,
+    name: 'ETP - Servicos Continuos',
+    acceptedLookups: ['processo'] as const,
+    quickPrompt: 'Gerar ETP de servicos continuos do processo ',
+    batchSupported: false,
+    requiresProcessPdf: true,
+  },
 ];
 
 const DOCUMENTOS_SELECT =
@@ -243,8 +255,8 @@ const cleanObjectReference = (value: string | undefined, contrato: string | unde
     .replace(/[.;,:-]{2,}/g, '.')
     .replace(/\s{2,}/g, ' ')
     .trim()
-    .replace(/^[,.;:\-]\s*/, '')
-    .replace(/\s*[,.;:\-]$/, '')
+    .replace(/^[,.;:-]\s*/, '')
+    .replace(/\s*[,.;:-]$/, '')
     .trim();
 
   return cleaned || undefined;
