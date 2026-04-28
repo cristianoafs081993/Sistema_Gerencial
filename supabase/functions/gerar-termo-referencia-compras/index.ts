@@ -55,6 +55,8 @@ type QuestionnaireAnswer = {
   approved?: boolean;
   confidence?: 'high' | 'medium';
   sourcePage?: number;
+  sourceType?: 'processo' | 'anexo' | 'etp';
+  sourceLabel?: string;
   sourceExcerpt?: string;
   justification?: string;
 };
@@ -78,6 +80,9 @@ type ReferenceTermRequest = {
     kind?: string;
     pageNumber?: number;
     excerpt?: string;
+    sourceType?: 'processo' | 'anexo' | 'etp';
+    sourceName?: string;
+    sourceLabel?: string;
   }>;
   analysisWarnings?: string[];
 };
@@ -332,23 +337,30 @@ function extractGeminiText(responseBody: Record<string, unknown>): string {
 }
 
 function buildSources(request: ReferenceTermRequest) {
-  const sources: Array<{ label: string; pageStart: number; pageEnd: number }> = [];
+  const sources: Array<{ label: string; pageStart?: number; pageEnd?: number }> = [];
 
   for (const snippet of request.contextSnippets || []) {
-    if (typeof snippet?.pageNumber !== 'number') continue;
-    const label = typeof snippet.label === 'string' && snippet.label.trim()
-      ? snippet.label.trim()
-      : 'Trecho de apoio';
+    const label = typeof snippet.sourceLabel === 'string' && snippet.sourceLabel.trim()
+      ? snippet.sourceLabel.trim()
+      : typeof snippet.sourceName === 'string' && snippet.sourceName.trim()
+        ? snippet.sourceName.trim()
+        : typeof snippet.label === 'string' && snippet.label.trim()
+          ? snippet.label.trim()
+          : snippet.sourceType === 'etp'
+            ? 'ETP editado no editor'
+            : 'Trecho de apoio';
     const alreadyAdded = sources.some(
       (source) => source.label === label && source.pageStart === snippet.pageNumber && source.pageEnd === snippet.pageNumber,
     );
 
     if (!alreadyAdded) {
-      sources.push({
-        label,
-        pageStart: snippet.pageNumber,
-        pageEnd: snippet.pageNumber,
-      });
+      sources.push(typeof snippet?.pageNumber === 'number'
+        ? {
+            label,
+            pageStart: snippet.pageNumber,
+            pageEnd: snippet.pageNumber,
+          }
+        : { label });
     }
   }
 
@@ -505,6 +517,9 @@ function makePendingComment(question: QuestionnaireQuestion) {
 
 function answerSourceLabel(answer?: QuestionnaireAnswer) {
   if (answer?.origin === 'ai') {
+    if (answer.sourceType === 'etp' && answer.sourceLabel?.trim()) {
+      return `sugestao da IA aprovada pelo usuario, fonte ${answer.sourceLabel.trim()}`;
+    }
     return answer.sourcePage ? `sugestao da IA aprovada pelo usuario, pagina ${answer.sourcePage}` : 'sugestao da IA aprovada pelo usuario';
   }
 
@@ -847,6 +862,9 @@ function buildSnippetContext(request: ReferenceTermRequest) {
     label: snippet.label,
     kind: snippet.kind,
     pageNumber: snippet.pageNumber,
+    sourceType: snippet.sourceType,
+    sourceName: snippet.sourceName,
+    sourceLabel: snippet.sourceLabel,
     excerpt: truncate(String(snippet.excerpt || ''), 600),
   }));
 
@@ -863,6 +881,8 @@ function buildSectionPrompt(
     'Voce e um assistente especializado em contratacoes publicas e elabora Termos de Referencia de compras sob a Lei 14.133/2021.',
     'Gere somente os preenchimentos dos blocos editaveis informados nesta parte. Nao gere o documento inteiro.',
     'Use o modelo DOCX como base juridica e estrutural, mas responda apenas com os blocos desta parte.',
+    'Use os trechos de apoio como contexto factual. Eles podem vir do processo, de anexos opcionais ou do ETP editado no editor.',
+    'Quando houver fonte ETP, trate-a como contexto de planejamento revisado pelo usuario, mas mantenha pendencias para dados concretos ausentes.',
     'Nao invente dados. Quando faltar informacao obrigatoria, use [CAMPO PENDENTE] no texto final e registre o campo em missingRequiredFields.',
     'Responda somente JSON valido. Nao use markdown. Nao inclua HTML.',
     'O JSON deve seguir exatamente este formato:',
@@ -893,7 +913,7 @@ function buildSectionPrompt(
     '',
     `Blocos desta parte:\n${JSON.stringify(blocks, null, 2)}`,
     '',
-    `Trechos do processo:\n${buildSnippetContext(request)}`,
+    `Trechos de apoio:\n${buildSnippetContext(request)}`,
     '',
     `Alertas da analise local:\n${JSON.stringify(request.analysisWarnings || [], null, 2)}`,
   ].join('\n');

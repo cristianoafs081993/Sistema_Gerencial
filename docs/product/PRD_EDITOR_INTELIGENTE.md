@@ -32,16 +32,19 @@ Transformar a criação de documentos administrativos (ETP, TR, Minutas) em um p
 - O Termo de Referencia deve partir do modelo DOCX oficial vigente publicado em uma tela administrativa separada do editor.
 - O preenchimento deve combinar dados do processo sincronizado, trechos relevantes do PDF e exigencias recorrentes da Lei 14.133/2021, sem inventar informacao ausente.
 - A saida principal continua editavel no editor, mas o usuario deve poder baixar o DOCX final preservando a estrutura do modelo publicado.
-- Quando nao houver modelo ativo ou quando o PDF do processo nao tiver texto pesquisavel, a geracao deve ser bloqueada para revisao manual.
+- Quando iniciado diretamente por processo, o fluxo exige processo SUAP com PDF pesquisavel; quando iniciado pelo botao `Prosseguir para Termo de Referencia` do ETP, pode funcionar sem processo SUAP usando o ETP editado como fonte explicita.
+- Em todos os casos, a geracao do TR deve bloquear quando nao houver modelo DOCX ativo.
 
 ### 2.3 Regras operacionais do ETP assistido para servicos continuos
 - O Estudo Tecnico Preliminar de servicos continuos deve funcionar no Editor de Documentos sem modelo DOCX no v1.
 - O usuario pode informar um processo SUAP sincronizado ou digitar manualmente o objeto da licitacao.
 - Quando houver PDF sincronizado e pesquisavel, o sistema extrai trechos de apoio e solicita sugestoes com fonte explicita antes da revisao manual.
 - Quando nao houver PDF, quando o PDF nao tiver texto pesquisavel ou quando a sugestao falhar, o fluxo continua pelo questionario fixo do ETP.
+- O usuario pode anexar ate 5 PDFs auxiliares locais, como convencao coletiva, com limite de 20 MB por arquivo; esses PDFs sao lidos somente no navegador, sem OCR, sem upload bruto, sem Storage e sem persistencia no banco.
+- Os PDFs auxiliares entram apenas como snippets com nome da fonte, pagina quando disponivel, categoria e trecho extraido, apoiando sugestoes, geracao por secao e rascunho final.
 - Em cada etapa do questionario, o usuario pode solicitar geracao de texto da secao com IA a partir de poucas notas ou mesmo sem digitacao previa; o texto gerado permanece editavel e deve sinalizar pendencias quando faltarem dados concretos.
 - Campos sem fonte segura ou sem resposta do usuario permanecem como pendencias no rascunho; a IA nao deve inventar informacao ausente.
-- A saida v1 e um rascunho editavel no editor com acoes de copiar documento e copiar secoes. Exportacao DOCX, OCR e persistencia de rascunhos ficam fora do v1.
+- A saida v1 e um rascunho editavel no editor com acoes de copiar documento, copiar secoes e prosseguir para TR usando o conteudo atualmente editado. Exportacao DOCX do ETP, OCR, persistencia de rascunhos e vinculo ETP/TR ficam fora do v1.
 
 ### 3. Painel de Conformidade IA
 - **Análise em Tempo Real**: Verificação de conformidade ao longo da escrita.

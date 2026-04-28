@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import EditorDocumentos from '@/pages/EditorDocumentos';
 import { useData } from '@/contexts/DataContext';
 import { preliminaryStudyQuestions } from '@/lib/preliminaryStudyQuestionnaire';
+import { analyzePreliminaryStudySupplementalPdfFile } from '@/lib/preliminaryStudySupplementalPdf';
 import { contractDraftsService } from '@/services/contractDrafts';
 import { preliminaryStudiesService } from '@/services/preliminaryStudies';
 import { referenceTermsService } from '@/services/referenceTerms';
@@ -21,14 +22,22 @@ vi.mock('@/components/HeaderParts', () => ({
 vi.mock('@/components/Editor/RichTextEditor', () => ({
   default: ({
     content,
+    onChange,
     toolbarLeft,
   }: {
     content: string;
+    onChange?: (content: string) => void;
     toolbarLeft?: ReactNode;
   }) => (
     <div>
       <div>{toolbarLeft}</div>
       <div data-testid="editor-content">{content}</div>
+      <button
+        type="button"
+        onClick={() => onChange?.('<h1>ETP editado</h1><h2>Objeto</h2><p>Objeto editado pelo usuario para o TR.</p>')}
+      >
+        Simular edicao do editor
+      </button>
     </div>
   ),
 }));
@@ -65,11 +74,18 @@ vi.mock('@/services/preliminaryStudies', () => ({
   },
 }));
 
+vi.mock('@/lib/preliminaryStudySupplementalPdf', () => ({
+  PRELIMINARY_STUDY_SUPPLEMENTAL_MAX_FILES: 5,
+  PRELIMINARY_STUDY_SUPPLEMENTAL_MAX_FILE_SIZE: 20 * 1024 * 1024,
+  analyzePreliminaryStudySupplementalPdfFile: vi.fn(),
+}));
+
 const mockedUseData = vi.mocked(useData);
 const mockedSuapProcessosService = vi.mocked(suapProcessosService);
 const mockedContractDraftsService = vi.mocked(contractDraftsService);
 const mockedReferenceTermsService = vi.mocked(referenceTermsService);
 const mockedPreliminaryStudiesService = vi.mocked(preliminaryStudiesService);
+const mockedAnalyzePreliminaryStudySupplementalPdfFile = vi.mocked(analyzePreliminaryStudySupplementalPdfFile);
 
 describe('EditorDocumentos', () => {
   beforeEach(() => {
@@ -247,6 +263,25 @@ describe('EditorDocumentos', () => {
       value: 'Texto gerado para a secao do ETP.',
       warnings: [],
       model: 'gemini-2.5-flash-lite',
+    });
+
+    mockedAnalyzePreliminaryStudySupplementalPdfFile.mockResolvedValue({
+      fileName: 'cct.pdf',
+      pageCount: 2,
+      searchablePageCount: 2,
+      snippets: [
+        {
+          id: 'anexo-cct-estimativa-1',
+          kind: 'estimativa',
+          label: 'CCT - Piso salarial',
+          pageNumber: 1,
+          excerpt: 'Piso salarial da categoria.',
+          sourceType: 'anexo',
+          sourceName: 'cct.pdf',
+          sourceLabel: 'cct.pdf, pagina 1',
+        },
+      ],
+      warnings: [],
     });
 
     mockedPreliminaryStudiesService.generateDraft.mockResolvedValue({
@@ -503,7 +538,7 @@ describe('EditorDocumentos', () => {
         }),
       );
     });
-  }, 15000);
+  }, 30000);
 
   it('permite preencher placeholders da clausula escolhida antes de avancar', async () => {
     mockedReferenceTermsService.generateDraft.mockClear();
@@ -790,6 +825,99 @@ describe('EditorDocumentos', () => {
 
     expect(await screen.findByText('ETP gerado.')).toBeInTheDocument();
     expect(screen.getByTestId('editor-content')).toHaveTextContent('<h1>ETP gerado</h1>');
+    expect(screen.getByRole('button', { name: /Prosseguir para Termo de Referencia/i })).toBeInTheDocument();
+  }, 15000);
+
+  it('gera ETP com PDF auxiliar opcional e permite remover antes da geracao', async () => {
+    const queryClient = new QueryClient();
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <EditorDocumentos />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /ETP - Servicos Continuos/i }));
+
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, {
+      target: {
+        files: [new File(['pdf'], 'cct.pdf', { type: 'application/pdf' })],
+      },
+    });
+
+    expect(await screen.findByText('cct.pdf')).toBeInTheDocument();
+    expect(screen.getByText(/1 trecho/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Remover/i }));
+    await waitFor(() => {
+      expect(screen.queryByText('cct.pdf')).not.toBeInTheDocument();
+    });
+
+    fireEvent.change(fileInput, {
+      target: {
+        files: [new File(['pdf'], 'cct.pdf', { type: 'application/pdf' })],
+      },
+    });
+    expect(await screen.findByText('cct.pdf')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText(/descreva o objeto da licitacao/i), {
+      target: { value: 'Contratacao de servicos continuos de limpeza predial' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Gerar ETP/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Gerar com pendencias/i }));
+
+    await waitFor(() => {
+      expect(mockedPreliminaryStudiesService.generateDraft).toHaveBeenCalledWith(
+        expect.objectContaining({
+          supplementalSnippets: expect.arrayContaining([
+            expect.objectContaining({
+              sourceType: 'anexo',
+              sourceName: 'cct.pdf',
+            }),
+          ]),
+        }),
+      );
+    });
+
+  }, 15000);
+
+  it('prossegue do ETP manual para TR usando o texto editado como contexto', async () => {
+    mockedReferenceTermsService.generateDraft.mockClear();
+    const queryClient = new QueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <EditorDocumentos />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /ETP - Servicos Continuos/i }));
+    fireEvent.change(screen.getByPlaceholderText(/descreva o objeto da licitacao/i), {
+      target: { value: 'Contratacao de servicos continuos de limpeza predial' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Gerar ETP/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Gerar com pendencias/i }));
+
+    expect(await screen.findByText('ETP gerado.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Simular edicao do editor/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Prosseguir para Termo de Referencia/i }));
+
+    await waitFor(() => {
+      expect(mockedReferenceTermsService.generateDraft).toHaveBeenCalledWith(
+        expect.objectContaining({
+          processo: null,
+          etpContextSnippets: expect.arrayContaining([
+            expect.objectContaining({
+              sourceType: 'etp',
+              sourceLabel: 'ETP editado no editor',
+              excerpt: expect.stringContaining('Objeto editado pelo usuario'),
+            }),
+          ]),
+        }),
+      );
+    });
   }, 15000);
 
   it('gera texto de uma secao do ETP com IA mesmo sem digitacao previa', async () => {
@@ -894,6 +1022,23 @@ describe('EditorDocumentos', () => {
               origin: 'ai',
               approved: true,
             }),
+          ]),
+        }),
+      );
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Simular edicao do editor/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Prosseguir para Termo de Referencia/i }));
+
+    await waitFor(() => {
+      expect(mockedReferenceTermsService.analyzeProcessPdf).toHaveBeenCalledWith(
+        expect.objectContaining({ numProcesso: '23035.000123/2026-11' }),
+      );
+      expect(mockedReferenceTermsService.generateDraft).toHaveBeenCalledWith(
+        expect.objectContaining({
+          processo: expect.objectContaining({ numProcesso: '23035.000123/2026-11' }),
+          etpContextSnippets: expect.arrayContaining([
+            expect.objectContaining({ sourceType: 'etp' }),
           ]),
         }),
       );

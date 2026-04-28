@@ -38,6 +38,9 @@ type ReferenceTermSuggestionRequest = {
     kind?: string;
     pageNumber?: number;
     excerpt?: string;
+    sourceType?: 'processo' | 'anexo' | 'etp';
+    sourceName?: string;
+    sourceLabel?: string;
   }>;
   analysisWarnings?: string[];
 };
@@ -50,6 +53,8 @@ type QuestionSuggestion = {
   value?: string;
   justification?: string;
   sourcePage?: number;
+  sourceType?: 'processo' | 'anexo' | 'etp';
+  sourceLabel?: string;
   sourceExcerpt?: string;
   confidence?: 'high' | 'medium';
 };
@@ -176,15 +181,15 @@ function buildPrompt(request: ReferenceTermSuggestionRequest, questions: Questio
   return [
     'Voce e um assistente especializado em contratacoes publicas e Termos de Referencia de compras sob a Lei 14.133/2021.',
     'Sua tarefa e sugerir respostas para o questionario do modelo AGU antes da revisao do usuario.',
-    'Regra principal: responda somente quando houver fonte explicita nos trechos do processo. Nao inferir sem trecho-fonte.',
+    'Regra principal: responda somente quando houver fonte explicita nos trechos de apoio. Esses trechos podem vir do processo ou do ETP editado no editor. Nao inferir sem trecho-fonte.',
     'Se nao houver fonte clara para uma pergunta, marque status "unanswered".',
     'Para perguntas exclusive ou optional, escolha apenas uma option id existente quando o texto do processo sustentar diretamente a escolha.',
     'Para perguntas field, preencha value com texto objetivo baseado no processo.',
-    'Toda sugestao precisa trazer justification, sourcePage, sourceExcerpt e confidence.',
-    'sourceExcerpt deve copiar ou resumir fielmente o trecho do processo usado como evidencia.',
+    'Toda sugestao precisa trazer justification, sourceExcerpt e confidence. Quando a fonte for processo/anexo, traga sourcePage se existir. Quando a fonte for ETP, traga sourceType "etp" e sourceLabel.',
+    'sourceExcerpt deve copiar ou resumir fielmente o trecho usado como evidencia.',
     'Responda somente JSON valido, sem markdown e sem comentarios.',
     'O JSON deve seguir exatamente este formato:',
-    '{"status":"generated","warnings":["..."],"suggestions":[{"questionId":"...","kind":"exclusive|optional|field","status":"suggested|unanswered","selectedOptionId":"... opcional","value":"... opcional","justification":"...","sourcePage":1,"sourceExcerpt":"...","confidence":"high|medium"}]}',
+    '{"status":"generated","warnings":["..."],"suggestions":[{"questionId":"...","kind":"exclusive|optional|field","status":"suggested|unanswered","selectedOptionId":"... opcional","value":"... opcional","justification":"...","sourcePage":1,"sourceType":"processo|anexo|etp","sourceLabel":"...","sourceExcerpt":"...","confidence":"high|medium"}]}',
     '',
     `Processo: ${JSON.stringify(request.processo || {}, null, 2)}`,
     '',
@@ -199,7 +204,7 @@ function buildPrompt(request: ReferenceTermSuggestionRequest, questions: Questio
     '',
     `Perguntas do questionario:\n${JSON.stringify(buildQuestionContext(questions), null, 2)}`,
     '',
-    `Trechos do processo:\n${JSON.stringify(request.contextSnippets || [], null, 2)}`,
+    `Trechos de apoio:\n${JSON.stringify(request.contextSnippets || [], null, 2)}`,
     '',
     `Alertas da analise local:\n${JSON.stringify(request.analysisWarnings || [], null, 2)}`,
   ].join('\n');
@@ -221,6 +226,10 @@ function normalizeSuggestion(raw: unknown, questionById: Map<string, Questionnai
   const sourcePage = typeof record.sourcePage === 'number' && Number.isFinite(record.sourcePage)
     ? record.sourcePage
     : undefined;
+  const sourceType = record.sourceType === 'processo' || record.sourceType === 'anexo' || record.sourceType === 'etp'
+    ? record.sourceType
+    : undefined;
+  const sourceLabel = typeof record.sourceLabel === 'string' ? record.sourceLabel.trim() : '';
   const sourceExcerpt = typeof record.sourceExcerpt === 'string' ? record.sourceExcerpt.trim() : '';
   const confidence = normalizeConfidence(record.confidence) || 'medium';
 
@@ -232,7 +241,9 @@ function normalizeSuggestion(raw: unknown, questionById: Map<string, Questionnai
     };
   }
 
-  if (!justification || !sourcePage || !sourceExcerpt) {
+  const hasPageSource = Boolean(justification && sourcePage && sourceExcerpt);
+  const hasEtpSource = sourceType === 'etp' && Boolean(justification && sourceLabel && sourceExcerpt);
+  if (!hasPageSource && !hasEtpSource) {
     return {
       questionId,
       kind,
@@ -264,6 +275,8 @@ function normalizeSuggestion(raw: unknown, questionById: Map<string, Questionnai
     value: value || undefined,
     justification,
     sourcePage,
+    sourceType,
+    sourceLabel: sourceLabel || undefined,
     sourceExcerpt,
     confidence,
   };

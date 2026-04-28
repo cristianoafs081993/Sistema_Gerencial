@@ -43,8 +43,11 @@ type EtpSectionTextRequest = {
     id: string;
     kind: string;
     label: string;
-    pageNumber: number;
+    pageNumber?: number;
     excerpt: string;
+    sourceType?: 'processo' | 'anexo' | 'etp';
+    sourceName?: string;
+    sourceLabel?: string;
   }>;
   analysisWarnings?: string[];
 };
@@ -151,13 +154,14 @@ function buildPrompt(request: EtpSectionTextRequest) {
     'O texto deve ser formal, objetivo, editavel e adequado a minuta de apoio.',
     'Se o usuario nao informou nada, gere mesmo assim um texto preliminar util, mas use marcadores [CAMPO PENDENTE: ...] para dados concretos ausentes.',
     'Nao invente numeros, datas, valores, locais, nomes de unidades ou fatos especificos sem fonte.',
+    'Os trechos de apoio podem vir do processo ou de anexos opcionais. Quando usar anexo, preserve a referencia do arquivo/pagina indicada.',
     'Responda apenas JSON valido no formato: {"status":"generated","value":"texto da secao","warnings":["..."]}.',
     `Pergunta atual: ${JSON.stringify(request.question || {})}`,
     `Notas digitadas pelo usuario: ${request.userNotes || ''}`,
     `Processo: ${JSON.stringify(request.processo || {})}`,
     `Objeto manual: ${request.manualObject || ''}`,
     `Respostas ja registradas: ${JSON.stringify(request.questionnaireAnswers || [])}`,
-    `Trechos do processo: ${JSON.stringify(request.contextSnippets || [])}`,
+    `Trechos de apoio: ${JSON.stringify(request.contextSnippets || [])}`,
   ].join('\n\n');
 }
 

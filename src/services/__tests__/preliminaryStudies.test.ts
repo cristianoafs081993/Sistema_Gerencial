@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
   normalizePreliminaryStudyQuestionSuggestionResult,
@@ -17,6 +17,10 @@ vi.mock('@/lib/supabase', () => ({
 const mockedInvoke = vi.mocked(supabase.functions.invoke);
 
 describe('normalizePreliminaryStudyQuestionSuggestionResult', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('mantem apenas sugestoes com fonte explicita', () => {
     const result = normalizePreliminaryStudyQuestionSuggestionResult({
       suggestions: [
@@ -126,6 +130,51 @@ describe('normalizePreliminaryStudyQuestionSuggestionResult', () => {
     expect(result.value.length).toBeGreaterThan(80);
     expect(result.warnings).toContain(
       'A Edge Function de texto por secao do ETP nao respondeu. Foi usado um texto local de apoio para revisao.',
+    );
+  });
+
+  it('envia snippets auxiliares no payload do ETP', async () => {
+    mockedInvoke.mockResolvedValueOnce({
+      data: {
+        status: 'generated',
+        title: 'ETP',
+        warnings: [],
+        missingRequiredFields: [],
+        fields: [],
+      },
+      error: null,
+    });
+
+    await preliminaryStudiesService.generateDraft({
+      manualObject: 'Contratacao de servicos continuos de limpeza',
+      supplementalSnippets: [
+        {
+          id: 'anexo-cct-1',
+          kind: 'estimativa',
+          label: 'CCT - Piso salarial',
+          pageNumber: 4,
+          excerpt: 'Piso salarial da categoria.',
+          sourceType: 'anexo',
+          sourceName: 'cct.pdf',
+          sourceLabel: 'cct.pdf, pagina 4',
+        },
+      ],
+    });
+
+    expect(mockedInvoke).toHaveBeenCalledWith(
+      'gerar-etp-servicos-continuos',
+      expect.objectContaining({
+        body: expect.objectContaining({
+          contextSnippets: expect.arrayContaining([
+            expect.objectContaining({
+              id: 'anexo-cct-1',
+              sourceType: 'anexo',
+              sourceName: 'cct.pdf',
+              sourceLabel: 'cct.pdf, pagina 4',
+            }),
+          ]),
+        }),
+      }),
     );
   });
 });
