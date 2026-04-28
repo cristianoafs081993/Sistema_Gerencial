@@ -224,7 +224,7 @@ export default function RetencoesFdReinfDesign() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard title="Registros auditados" value={resumo.total} subtitle={fileName ? `Base atual: ${fileName}` : 'Aguardando importacao da base'} icon={FileUp} stitchColor="vibrant-blue" isLoading={isLoadingInitial} />
-        <StatCard title="Criticos de UG" value={resumo.criticos} subtitle="Itens com UG pagadora diferente de 158155" icon={ShieldAlert} stitchColor="red-500" progress={resumo.total ? (resumo.criticos / resumo.total) * 100 : 0} isLoading={isLoadingInitial} />
+        <StatCard title="Criticos de UG" value={resumo.criticos} subtitle="Itens com UG pagadora diferente de 158155, exceto DDR001 e DGR001" icon={ShieldAlert} stitchColor="red-500" progress={resumo.total ? (resumo.criticos / resumo.total) * 100 : 0} isLoading={isLoadingInitial} />
         <StatCard title="Alertas de prazo" value={resumo.alertasPrazo} subtitle="DDF021 e DDF025 fora da regra do dia 20" icon={AlertTriangle} stitchColor="amber" progress={resumo.total ? (resumo.alertasPrazo / resumo.total) * 100 : 0} isLoading={isLoadingInitial} />
         <StatCard title="Retencao total" value={formatCurrency(resumo.valorTotalRetencao)} subtitle={`${resumo.liquidados} item(ns) marcados como liquidados`} icon={ShieldAlert} stitchColor="emerald-green" isLoading={isLoadingInitial} />
       </div>
