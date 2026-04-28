@@ -40,8 +40,11 @@ type EtpRequest = {
     id: string;
     kind: string;
     label: string;
-    pageNumber: number;
+    pageNumber?: number;
     excerpt: string;
+    sourceType?: 'processo' | 'anexo' | 'etp';
+    sourceName?: string;
+    sourceLabel?: string;
   }>;
   analysisWarnings?: string[];
   localMissingRequiredFields?: string[];
@@ -248,7 +251,8 @@ function buildPrompt(request: EtpRequest, questions: EtpQuestion[], fallbackSect
   return [
     'Voce e um assistente especializado em contratacoes publicas brasileiras.',
     'Gere um rascunho de Estudo Tecnico Preliminar para servicos continuos sob a Lei 14.133/2021 e IN SEGES 58/2022.',
-    'Use somente respostas do questionario, objeto manual e trechos fornecidos. Nao invente dados ausentes.',
+    'Use somente respostas do questionario, objeto manual e trechos fornecidos. Os trechos podem vir do processo ou de anexos opcionais ja convertidos em texto pelo frontend. Nao invente dados ausentes.',
+    'Quando usar anexo, preserve a referencia do arquivo/pagina indicada em sourceName, sourceLabel ou pageNumber.',
     'Quando faltar informacao, escreva [CAMPO PENDENTE: ...].',
     'Preserve linguagem formal, objetiva e adequada a ETP. A saida sera revisada por servidor.',
     'Responda apenas JSON valido no formato:',
@@ -257,7 +261,7 @@ function buildPrompt(request: EtpRequest, questions: EtpQuestion[], fallbackSect
     `Objeto manual: ${request.manualObject || ''}`,
     `Perguntas: ${JSON.stringify(questions)}`,
     `Respostas: ${JSON.stringify(request.questionnaireAnswers || [])}`,
-    `Trechos do processo: ${JSON.stringify(request.contextSnippets || [])}`,
+    `Trechos de apoio: ${JSON.stringify(request.contextSnippets || [])}`,
     `Estrutura minima esperada: ${JSON.stringify(fallbackSections.map(({ id, title }) => ({ id, title })))}`,
   ].join('\n\n');
 }

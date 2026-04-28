@@ -96,7 +96,7 @@ Observacoes operacionais:
 
 - a function consome Gemini via REST e espera receber do frontend o modelo DOCX ativo ja parseado em `document_templates`
 - o modelo ativo tambem pode trazer `questionnaire_schema`; esse JSON e preenchido no frontend antes da chamada final e nao exige novo segredo de ambiente
-- o frontend bloqueia a chamada quando nao houver modelo ativo para `termo-referencia-compras`, quando o processo nao tiver `pdf_url` ou quando o PDF nao trouxer texto pesquisavel
+- o frontend bloqueia a chamada quando nao houver modelo ativo para `termo-referencia-compras`; quando o TR nasce de ETP manual, o processo SUAP pode ser nulo e o contexto vem do ETP editado no editor
 - esta versao ainda nao suporta OCR para PDF escaneado
 - `supabase/config.toml` deve manter `verify_jwt = false` para `gerar-termo-referencia-compras`, conforme o deploy atual do projeto
 
@@ -114,10 +114,10 @@ Opcional:
 
 Observacoes operacionais:
 
-- a function consome Gemini via REST e espera receber o questionario fixo do ETP, respostas do usuario, objeto manual opcional e trechos do PDF do processo quando houver
+- a function consome Gemini via REST e espera receber o questionario fixo do ETP, respostas do usuario, objeto manual opcional, trechos do PDF do processo quando houver e snippets auxiliares extraidos no navegador de PDFs locais opcionais
 - quando nao houver chave Gemini, a function devolve fallback local com respostas e pendencias, permitindo revisao manual no editor
 - quando a function ainda nao estiver publicada ou falhar por indisponibilidade/CORS, o frontend tambem usa fallback local com respostas e pendencias
-- esta versao nao usa modelo DOCX, nao persiste rascunhos no banco e nao suporta OCR
+- esta versao nao usa modelo DOCX, nao persiste rascunhos no banco, nao persiste PDFs auxiliares e nao suporta OCR
 - `supabase/config.toml` deve manter `verify_jwt = false` para `gerar-etp-servicos-continuos`, conforme o padrao das functions do Editor de Documentos
 
 ### `sugerir-respostas-etp-servicos-continuos`
@@ -133,7 +133,8 @@ Opcionais:
 
 Observacoes operacionais:
 
-- a function so sugere respostas quando recebe trechos do PDF do processo e consegue apontar pagina, trecho-fonte e justificativa
+- a function so sugere respostas quando recebe trechos do PDF do processo ou snippets auxiliares e consegue apontar pagina, trecho-fonte e justificativa
+- PDFs auxiliares opcionais nao exigem novo segredo de ambiente: o frontend extrai texto com `pdfjs-dist`, nao envia o arquivo bruto, nao usa Storage e nao persiste o conteudo
 - se a sugestao falhar ou a function nao estiver publicada, o frontend continua pelo questionario manual
 - `supabase/config.toml` deve manter `verify_jwt = false` para `sugerir-respostas-etp-servicos-continuos`
 
@@ -151,7 +152,7 @@ Opcional:
 
 Observacoes operacionais:
 
-- a function consome Gemini via REST e recebe a pergunta atual do ETP, notas opcionais do usuario, respostas ja registradas, objeto manual e trechos do PDF quando existirem
+- a function consome Gemini via REST e recebe a pergunta atual do ETP, notas opcionais do usuario, respostas ja registradas, objeto manual, trechos do PDF do processo quando existirem e snippets auxiliares de PDFs locais opcionais
 - quando a secao for solicitada sem notas do usuario, a function ainda deve gerar texto preliminar, marcando dados concretos ausentes como pendencia
 - quando nao houver chave Gemini, a function devolve texto local de apoio
 - quando a function ainda nao estiver publicada ou falhar por indisponibilidade/CORS, o frontend tambem usa texto local de apoio

@@ -83,8 +83,8 @@ Chamador:
 
 Uso:
 
-- gera rascunho do Termo de Referencia de compras a partir do PDF sincronizado do processo e do modelo DOCX ativo
-- recebe blocos editaveis do template, questionario do modelo, respostas do usuario, trechos classificados do PDF e metadados do processo
+- gera rascunho do Termo de Referencia de compras a partir do PDF sincronizado do processo e do modelo DOCX ativo, ou a partir de um ETP editado quando o fluxo nasce de ETP manual sem processo
+- recebe blocos editaveis do template, questionario do modelo, respostas do usuario, trechos classificados do PDF quando houver, snippets do ETP editado e metadados opcionais do processo
 - devolve HTML editavel, campos identificados, alertas, pendencias e `templatePlan` para montar o DOCX final com marcas de revisao
 
 Dependencias:
@@ -95,7 +95,7 @@ Dependencias:
 Observacao:
 
 - a function pressupoe que o modelo vigente ja foi publicado em `document_templates`
-- o frontend bloqueia a chamada quando nao houver modelo ativo, quando o PDF nao tiver texto pesquisavel ou quando o processo nao tiver `pdf_url`
+- o frontend bloqueia a chamada quando nao houver modelo ativo; quando iniciado a partir de ETP manual, `processo` pode ser nulo e o contexto vem de snippets `sourceType: "etp"` sem pagina
 - o deploy atual usa `verify_jwt = false` em `supabase/config.toml`, seguindo o padrao de functions publicadas pelo frontend neste projeto
 - a geracao e dividida em partes por blocos editaveis para evitar truncamento/JSON invalido em modelos DOCX grandes
 - perguntas puladas pelo usuario ficam como `[CAMPO PENDENTE]` ou blocos pendentes; a IA nao escolhe alternativas puladas
@@ -116,8 +116,8 @@ Chamador:
 Uso:
 
 - sugere respostas para o questionario do Termo de Referencia antes da revisao manual
-- recebe dados do processo, trechos classificados do PDF e o `questionnaireSchema` do modelo ativo
-- devolve sugestoes por pergunta apenas quando houver fonte explicita, com pagina, trecho-fonte, justificativa e confianca
+- recebe dados opcionais do processo, trechos classificados do PDF, snippets do ETP editado e o `questionnaireSchema` do modelo ativo
+- devolve sugestoes por pergunta apenas quando houver fonte explicita; fonte de processo exige pagina, trecho-fonte, justificativa e confianca, e fonte ETP pode omitir pagina quando trouxer `sourceType: "etp"`, `sourceLabel`, `sourceExcerpt` e justificativa
 
 Dependencias:
 
@@ -144,7 +144,7 @@ Chamador:
 Uso:
 
 - gera rascunho editavel do Estudo Tecnico Preliminar para servicos continuos no Editor de Documentos
-- recebe processo SUAP opcional, objeto manual, questionario fixo, respostas/pulos do usuario e trechos classificados do PDF
+- recebe processo SUAP opcional, objeto manual, questionario fixo, respostas/pulos do usuario, trechos classificados do PDF do processo e snippets auxiliares extraidos localmente de PDFs opcionais
 - devolve HTML, secoes copiaveis, alertas, pendencias e campos identificados
 
 Dependencias:
@@ -156,7 +156,8 @@ Observacao:
 
 - se nao houver chave Gemini, a function monta um fallback local com as respostas e pendencias
 - se a function ainda nao estiver publicada ou falhar por indisponibilidade/CORS, o frontend tambem monta fallback local em `preliminaryStudiesService`
-- nao usa modelo DOCX, nao persiste rascunho em banco e nao faz OCR
+- nao usa modelo DOCX, nao persiste rascunho em banco, nao persiste PDFs auxiliares e nao faz OCR
+- snippets auxiliares chegam como texto com `sourceType: "anexo"`, `sourceName`, `sourceLabel`, `pageNumber`, `kind` e `excerpt`; o PDF bruto nunca chega a function
 - publicada com `verify_jwt = false`, seguindo o padrao das functions do Editor de Documentos
 
 ### `sugerir-respostas-etp-servicos-continuos`
@@ -172,7 +173,7 @@ Chamador:
 Uso:
 
 - sugere respostas para o questionario fixo do ETP de servicos continuos antes da revisao manual
-- recebe trechos classificados do PDF e so retorna sugestoes quando houver fonte explicita
+- recebe trechos classificados do PDF do processo e snippets auxiliares extraidos localmente; so retorna sugestoes quando houver fonte explicita
 
 Dependencias:
 
@@ -183,6 +184,7 @@ Dependencias:
 Observacao:
 
 - sugestoes sem pagina, trecho-fonte, justificativa e valor sao descartadas pelo frontend
+- anexos locais do ETP nao sao persistidos nem enviados brutos; apenas snippets extraidos no navegador entram no payload
 - quando o processo nao tem PDF pesquisavel ou a function nao responde, o frontend segue pelo questionario manual
 
 ### `gerar-texto-etp-secao`
@@ -201,6 +203,7 @@ Uso:
 - gera texto para uma secao individual do questionario do ETP de servicos continuos
 - aceita notas curtas do usuario, mas tambem gera um texto preliminar quando a secao e solicitada sem digitacao previa
 - deve marcar dados concretos ausentes como pendencia, sem inventar numeros, datas, valores ou fatos especificos
+- pode usar snippets auxiliares de PDFs locais como apoio, sempre identificados por nome do arquivo e pagina quando disponivel
 
 Dependencias:
 
@@ -211,7 +214,6 @@ Observacao:
 
 - se nao houver chave Gemini, a function devolve texto local de apoio
 - se a function ainda nao estiver publicada ou falhar por indisponibilidade/CORS, o frontend tambem usa texto local de apoio em `preliminaryStudiesService.generateQuestionText`
-- publicada com `verify_jwt = false`, seguindo o padrao das functions do Editor de Documentos
 - publicada com `verify_jwt = false`, seguindo o padrao das functions do Editor de Documentos
 
 ### `invite-user`

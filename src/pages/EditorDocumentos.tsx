@@ -271,8 +271,8 @@ const sanitizeFileName = (value: string) => value.replace(/[\\/:*?"<>|]+/g, '-')
 
 const feedbackClasses: Record<FeedbackTone, string> = {
   neutral: 'border-border-default bg-surface-subtle/70 text-text-secondary',
-  warning: 'border-warning/20 bg-warning/10 text-amber-900',
-  success: 'border-status-success/20 bg-status-success/10 text-emerald-900',
+  warning: 'border-warning/20 bg-warning/10 text-foreground',
+  success: 'border-status-success/20 bg-status-success/10 text-foreground',
 };
 
 const isCopyableValue = (value?: string | null) => {
@@ -453,11 +453,11 @@ function SidebarSection({
   contentClassName?: string;
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
       <div className="h-0.5 w-full bg-slate-200" />
       <div className="p-3">
-        <div className="mb-2 flex items-center gap-2 font-ui text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
-          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+        <div className="mb-2 flex items-center gap-2 font-ui text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-muted text-muted-foreground">
           {icon}
         </span>
         {title}
@@ -482,14 +482,14 @@ function SidebarField({
   mono?: boolean;
 }) {
   return (
-    <div className="flex items-start justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
+    <div className="flex items-start justify-between gap-2 rounded-lg border border-border bg-muted/70 px-3 py-2">
       <div className="min-w-0">
-        <p className="font-ui text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">{label}</p>
-        <p className={cn('mt-0.5 break-words font-ui text-[13px] text-slate-900', mono && 'font-mono text-[12px] font-semibold')}>
+        <p className="font-ui text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+        <p className={cn('mt-0.5 break-words font-ui text-[13px] text-foreground', mono && 'font-mono text-[12px] font-semibold')}>
           {value}
         </p>
       </div>
-      <CopyValueButton value={valueToCopy} message={copyMessage} className="h-7 w-7 shrink-0 border-slate-200 bg-white shadow-none" />
+      <CopyValueButton value={valueToCopy} message={copyMessage} className="h-7 w-7 shrink-0 border-border bg-white shadow-none" />
     </div>
   );
 }
@@ -727,7 +727,7 @@ function ReferenceTermQuestionCard({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             {isSkipped ? (
-              <Badge variant="outline" className="border-warning/30 bg-warning/10 text-amber-900">
+              <Badge variant="outline" className="border-warning/30 bg-warning/10 text-foreground">
                 Pendente
               </Badge>
             ) : null}
@@ -1007,12 +1007,12 @@ function ReferenceTermSuggestionReviewCard({
               {review.confidence === 'high' ? 'Alta confianca' : 'Confianca media'}
             </Badge>
             {isApproved ? (
-              <Badge variant="outline" className="border-status-success/25 bg-status-success/10 text-emerald-900">
+              <Badge variant="outline" className="border-status-success/25 bg-status-success/10 text-foreground">
                 Aprovada
               </Badge>
             ) : null}
             {isRejected ? (
-              <Badge variant="outline" className="border-warning/30 bg-warning/10 text-amber-900">
+              <Badge variant="outline" className="border-warning/30 bg-warning/10 text-foreground">
                 Vai para pendencias
               </Badge>
             ) : null}
@@ -1133,7 +1133,7 @@ function PreliminaryStudyQuestionCard({
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-ui text-sm font-semibold text-text-primary">{question.title}</p>
           {question.required ? (
-            <Badge variant="outline" className="border-warning/30 bg-warning/10 text-amber-900">
+            <Badge variant="outline" className="border-warning/30 bg-warning/10 text-foreground">
               Obrigatorio
             </Badge>
           ) : null}
@@ -1225,7 +1225,7 @@ function PreliminaryStudySuggestionReviewCard({
           <div className="mb-1 flex flex-wrap items-center gap-2">
             <p className="font-ui text-sm font-semibold text-text-primary">{question.title}</p>
             {question.required ? (
-              <Badge variant="outline" className="border-warning/30 bg-warning/10 text-amber-900">
+              <Badge variant="outline" className="border-warning/30 bg-warning/10 text-foreground">
                 Obrigatorio
               </Badge>
             ) : null}
@@ -1260,7 +1260,7 @@ function PreliminaryStudySuggestionReviewCard({
           />
         </label>
         <p className="font-ui text-xs leading-5 text-text-secondary">
-          Fonte: pagina {review.sourcePage}. {review.sourceExcerpt}
+          Fonte: {review.sourcePage ? `pagina ${review.sourcePage}` : review.sourceLabel || 'ETP editado no editor'}. {review.sourceExcerpt}
         </p>
       </div>
     </div>
@@ -1279,6 +1279,7 @@ export default function EditorDocumentos() {
   const { modelId } = useParams<{ modelId?: string }>();
   const navigate = useNavigate();
   const editorCardRef = useRef<HTMLDivElement | null>(null);
+  const preliminaryStudySupplementalInputRef = useRef<HTMLInputElement | null>(null);
 
   // Deriva o modelo ativo da URL; fallback para despacho-liquidacao
   const activeDocumentId: SupportedDocumentType =
@@ -1316,6 +1317,8 @@ export default function EditorDocumentos() {
   const [downloadedDocxIds, setDownloadedDocxIds] = useState<string[]>([]);
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   const [openingPdfId, setOpeningPdfId] = useState<string | null>(null);
+  const [preliminaryStudySupplementalAnalyses, setPreliminaryStudySupplementalAnalyses] = useState<PreliminaryStudySupplementalPdfAnalysis[]>([]);
+  const [isAnalyzingPreliminaryStudySupplementalPdf, setIsAnalyzingPreliminaryStudySupplementalPdf] = useState(false);
 
   const resources = useMemo(
     () => ({ empenhos, contratos, contratosEmpenhos }),
@@ -1326,6 +1329,10 @@ export default function EditorDocumentos() {
   const isContractDocument = activeDocumentId === 'contrato-servico-ifrn';
   const isReferenceTermDocument = activeDocumentId === 'termo-referencia-compras';
   const isPreliminaryStudyDocument = activeDocumentId === 'estudo-tecnico-preliminar-servicos-continuos';
+  const preliminaryStudySupplementalSnippets = useMemo(
+    () => preliminaryStudySupplementalAnalyses.flatMap((analysis) => analysis.snippets),
+    [preliminaryStudySupplementalAnalyses],
+  );
 
   const {
     data: syncedProcesses = [],
@@ -1394,6 +1401,13 @@ export default function EditorDocumentos() {
     }, 0);
   };
 
+  const resetPreliminaryStudySupplementalFiles = () => {
+    setPreliminaryStudySupplementalAnalyses([]);
+    if (preliminaryStudySupplementalInputRef.current) {
+      preliminaryStudySupplementalInputRef.current.value = '';
+    }
+  };
+
   const resetPendingStates = () => {
     setPendingCandidates([]);
     setPendingContractCandidates([]);
@@ -1408,6 +1422,49 @@ export default function EditorDocumentos() {
     setPreliminaryStudySuggestionReviews([]);
     setPreliminaryStudyManualQuestionIds([]);
     setPreliminaryStudyQuestionIndex(0);
+  };
+
+  const handleAddPreliminaryStudySupplementalPdfs = async (files: FileList | null) => {
+    const selectedFiles = Array.from(files || []);
+    if (preliminaryStudySupplementalInputRef.current) {
+      preliminaryStudySupplementalInputRef.current.value = '';
+    }
+    if (selectedFiles.length === 0) return;
+
+    const availableSlots = PRELIMINARY_STUDY_SUPPLEMENTAL_MAX_FILES - preliminaryStudySupplementalAnalyses.length;
+    if (availableSlots <= 0) {
+      toast.warning(`O limite e de ${PRELIMINARY_STUDY_SUPPLEMENTAL_MAX_FILES} PDFs auxiliares.`);
+      return;
+    }
+
+    const filesToAnalyze = selectedFiles.slice(0, availableSlots);
+    if (selectedFiles.length > availableSlots) {
+      toast.warning(`Somente ${availableSlots} PDF(s) foram adicionados por causa do limite.`);
+    }
+
+    setIsAnalyzingPreliminaryStudySupplementalPdf(true);
+    try {
+      const analyses = await Promise.all(filesToAnalyze.map((file) => analyzePreliminaryStudySupplementalPdfFile(file)));
+      setPreliminaryStudySupplementalAnalyses((current) => [...current, ...analyses]);
+
+      const warningCount = analyses.reduce((count, analysis) => count + analysis.warnings.length, 0);
+      const snippetCount = analyses.reduce((count, analysis) => count + analysis.snippets.length, 0);
+      if (snippetCount > 0) {
+        toast.success(`${snippetCount} trecho(s) extraido(s) dos PDFs auxiliares.`);
+      }
+      if (warningCount > 0) {
+        toast.warning('Um ou mais PDFs auxiliares exigem revisao.');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Nao foi possivel analisar o PDF auxiliar.';
+      toast.error(message);
+    } finally {
+      setIsAnalyzingPreliminaryStudySupplementalPdf(false);
+    }
+  };
+
+  const handleRemovePreliminaryStudySupplementalPdf = (fileName: string) => {
+    setPreliminaryStudySupplementalAnalyses((current) => current.filter((analysis) => analysis.fileName !== fileName));
   };
 
   const effectiveReferenceTermQuestionnaireSchema = useMemo(
@@ -1660,6 +1717,7 @@ export default function EditorDocumentos() {
     setPreliminaryStudySuggestionReviews([]);
     setPreliminaryStudyManualQuestionIds([]);
     setPreliminaryStudyQuestionIndex(0);
+    resetPreliminaryStudySupplementalFiles();
     setScreenState('idle');
     setFeedback('Questionario do ETP cancelado.');
     setFeedbackTone('neutral');
@@ -1684,6 +1742,8 @@ export default function EditorDocumentos() {
       approved: true,
       confidence: review.confidence,
       sourcePage: review.sourcePage,
+      sourceType: review.sourceType,
+      sourceLabel: review.sourceLabel,
       sourceExcerpt: review.sourceExcerpt,
       justification: justification || undefined,
     };
@@ -1950,10 +2010,11 @@ export default function EditorDocumentos() {
   };
 
   const handleGenerateReferenceTermDraft = async (
-    processo: SuapProcesso,
-    analysis: ReferenceTermPdfAnalysis,
+    processo: SuapProcesso | null | undefined,
+    analysis: ReferenceTermPdfAnalysis | null | undefined,
     template: DocumentTemplateRecord,
     questionnaireAnswers: ReferenceTermQuestionAnswer[] = [],
+    etpContextSnippets: DocumentContextSnippet[] = [],
   ) => {
     const questionnaireSchema = sanitizeReferenceTermQuestionnaireSchema(
       template.questionnaireSchema,
@@ -1970,6 +2031,7 @@ export default function EditorDocumentos() {
         template,
         questionnaireSchema,
         questionnaireAnswers,
+        etpContextSnippets,
       });
 
       if (result.status === 'blocked') {
@@ -1981,15 +2043,15 @@ export default function EditorDocumentos() {
 
       const warningCount = result.warnings.length + result.missingRequiredFields.length;
       const fileName = sanitizeFileName(
-        `Termo de Referencia - ${processo.numProcesso || processo.suapId || 'compras'}.docx`,
+        `Termo de Referencia - ${processo?.numProcesso || processo?.suapId || 'compras'}.docx`,
       );
 
       openGeneratedDocument(
         {
-          id: `${processo.id}-termo-referencia`,
+          id: `${processo?.id || 'etp-manual'}-termo-referencia-${Date.now()}`,
           title: result.title,
           subtitle: result.subtitle || template.versionLabel || template.fileName,
-          processo: processo.numProcesso,
+          processo: processo?.numProcesso,
           html: result.html || '<p></p>',
           documentType: 'termo-referencia-compras',
           allowClone: false,
@@ -2024,6 +2086,7 @@ export default function EditorDocumentos() {
       pendingReferenceTermGeneration.analysis,
       pendingReferenceTermGeneration.template,
       answers,
+      pendingReferenceTermGeneration.etpContextSnippets || [],
     );
   };
 
@@ -2145,6 +2208,118 @@ export default function EditorDocumentos() {
     }
   };
 
+  const handleProceedFromPreliminaryStudyToReferenceTerm = async (dispatch: GeneratedDispatch) => {
+    const etpContextSnippets = buildEtpContextSnippetsFromHtml(editorContent);
+    if (etpContextSnippets.length === 0) {
+      const message = 'Revise o ETP no editor antes de prosseguir para o Termo de Referencia.';
+      setFeedback(message);
+      setFeedbackTone('warning');
+      setScreenState('not_found');
+      toast.error(message);
+      return;
+    }
+
+    setFeedback('');
+    resetPendingStates();
+    setActiveDocumentId('termo-referencia-compras');
+    setScreenState('resolving');
+
+    const processo = dispatch.etpContext?.processo || null;
+
+    try {
+      const template = await referenceTermsService.getActiveTemplate();
+      if (!template) {
+        const message = 'Nao existe modelo ativo para Termo de Referencia - Compras. Publique o DOCX em Modelos de documentos.';
+        setFeedback(message);
+        setFeedbackTone('warning');
+        setScreenState('not_found');
+        toast.error(message);
+        return;
+      }
+
+      if (template.editableBlocks.length === 0) {
+        const message = 'O modelo ativo nao possui blocos editaveis reconhecidos. Reenvie o DOCX atualizado em Modelos de documentos.';
+        setFeedback(message);
+        setFeedbackTone('warning');
+        setScreenState('not_found');
+        toast.error(message);
+        return;
+      }
+
+      let analysis: ReferenceTermPdfAnalysis | null = null;
+      if (processo?.pdfUrl) {
+        try {
+          analysis = await referenceTermsService.analyzeProcessPdf(processo);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Nao foi possivel analisar o PDF do processo.';
+          toast.warning(`${message} O Termo de Referencia usara o ETP editado como fonte principal.`);
+        }
+      }
+
+      const questionnaireSchema = sanitizeReferenceTermQuestionnaireSchema(
+        template.questionnaireSchema,
+        template.editableBlocks,
+      );
+      const questions = questionnaireSchema?.questions || [];
+
+      if (questions.length > 0) {
+        setPendingReferenceTermGeneration({ processo, analysis, template, etpContextSnippets });
+        setReferenceTermAnswers({});
+        setReferenceTermSuggestionReviews([]);
+        setReferenceTermManualQuestionIds(questions.map((question) => question.id));
+        setReferenceTermQuestionIndex(0);
+        setFeedback(`Analisando ETP e sugerindo respostas para ${questions.length} pergunta(s) do modelo AGU.`);
+        setFeedbackTone('neutral');
+
+        try {
+          const suggestionResult = await referenceTermsService.suggestQuestionnaireAnswers({
+            processo,
+            analysis,
+            template,
+            questionnaireSchema,
+            etpContextSnippets,
+          });
+          const suggestedReviews = suggestionResult.suggestions
+            .filter((suggestion) => suggestion.status === 'suggested')
+            .map((suggestion) => ({
+              ...suggestion,
+              decision: 'pending' as const,
+            }));
+
+          setReferenceTermSuggestionReviews(suggestedReviews);
+
+          if (suggestedReviews.length > 0) {
+            setFeedback(`${suggestedReviews.length} sugestao(oes) da IA encontradas com fonte no ETP.`);
+            setFeedbackTone('success');
+            setScreenState('ai_questionnaire_prefill');
+            return;
+          }
+
+          setFeedback('A IA nao encontrou respostas suficientes no ETP. Revise manualmente as perguntas pendentes.');
+          setFeedbackTone('warning');
+          setScreenState('reference_questionnaire');
+          return;
+        } catch (suggestionError) {
+          const suggestionMessage = suggestionError instanceof Error
+            ? suggestionError.message
+            : 'Nao foi possivel sugerir respostas automaticamente.';
+          setFeedback(`${suggestionMessage} O questionario manual continua disponivel com o ETP como contexto.`);
+          setFeedbackTone('warning');
+          setScreenState('reference_questionnaire');
+          return;
+        }
+      }
+
+      await handleGenerateReferenceTermDraft(processo, analysis, template, [], etpContextSnippets);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro inesperado ao iniciar o Termo de Referencia a partir do ETP.';
+      setFeedback(message);
+      setFeedbackTone('warning');
+      setScreenState('not_found');
+      toast.error(message);
+    }
+  };
+
   const handleGeneratePreliminaryStudyDraft = async (
     pending: PendingPreliminaryStudyGeneration,
     questionnaireAnswers: PreliminaryStudyQuestionAnswer[] = [],
@@ -2158,6 +2333,7 @@ export default function EditorDocumentos() {
         manualObject: pending.manualObject,
         analysis: pending.analysis,
         questionnaireAnswers,
+        supplementalSnippets: pending.supplementalSnippets,
       });
 
       if (result.status === 'blocked') {
@@ -2180,6 +2356,10 @@ export default function EditorDocumentos() {
           documentType: 'estudo-tecnico-preliminar-servicos-continuos',
           allowClone: false,
           sections: result.sections || [],
+          etpContext: {
+            processo: pending.processo || null,
+            manualObject: pending.manualObject,
+          },
         },
         {
           feedbackMessage:
@@ -2218,6 +2398,7 @@ export default function EditorDocumentos() {
       manualObject: pendingPreliminaryStudyGeneration.manualObject,
       analysis: pendingPreliminaryStudyGeneration.analysis,
       questionnaireAnswers: buildPreliminaryStudyQuestionnaireAnswers(preliminaryStudyAnswers),
+      supplementalSnippets: pendingPreliminaryStudyGeneration.supplementalSnippets,
       question,
       userNotes: currentValue,
     });
@@ -2250,13 +2431,14 @@ export default function EditorDocumentos() {
       setFeedbackTone(options.tone || 'neutral');
     }
 
-    if (options?.trySuggestions && pending.analysis?.snippets.length) {
+    if (options?.trySuggestions && ((pending.analysis?.snippets.length || 0) + (pending.supplementalSnippets?.length || 0)) > 0) {
       setScreenState('resolving');
       try {
         const suggestionResult = await preliminaryStudiesService.suggestQuestionnaireAnswers({
           processo: pending.processo,
           manualObject: pending.manualObject,
           analysis: pending.analysis,
+          supplementalSnippets: pending.supplementalSnippets,
         });
         const suggestedReviews = suggestionResult.suggestions
           .filter((suggestion) => suggestion.status === 'suggested')
@@ -2296,6 +2478,7 @@ export default function EditorDocumentos() {
     manualObject?: string;
   }) => {
     const objectFallback = manualObject?.trim() || processo?.assunto || '';
+    const supplementalSnippets = preliminaryStudySupplementalSnippets;
     if (!processo && !objectFallback.trim()) {
       const message = 'Informe um processo sincronizado ou descreva o objeto da licitacao para gerar o ETP.';
       setFeedback(message);
@@ -2315,12 +2498,14 @@ export default function EditorDocumentos() {
           processo,
           analysis: null,
           manualObject: objectFallback,
+          supplementalSnippets,
         },
         {
           notice: processo
             ? 'Este processo ainda nao possui PDF sincronizado. O ETP sera montado pelo questionario manual.'
             : 'Preencha o questionario do ETP com base no objeto informado.',
           tone: processo ? 'warning' : 'neutral',
+          trySuggestions: supplementalSnippets.length > 0,
         },
       );
       return;
@@ -2334,10 +2519,12 @@ export default function EditorDocumentos() {
             processo,
             analysis,
             manualObject: objectFallback,
+            supplementalSnippets,
           },
           {
             notice: analysis.warnings[0] || 'O PDF do processo nao trouxe texto pesquisavel. O ETP sera montado pelo questionario manual.',
             tone: 'warning',
+            trySuggestions: supplementalSnippets.length > 0,
           },
         );
         return;
@@ -2348,6 +2535,7 @@ export default function EditorDocumentos() {
           processo,
           analysis,
           manualObject: objectFallback,
+          supplementalSnippets,
         },
         { trySuggestions: true },
       );
@@ -2358,10 +2546,12 @@ export default function EditorDocumentos() {
           processo,
           analysis: null,
           manualObject: objectFallback,
+          supplementalSnippets,
         },
         {
           notice: `${message} O questionario manual do ETP continua disponivel.`,
           tone: 'warning',
+          trySuggestions: supplementalSnippets.length > 0,
         },
       );
     }
@@ -2715,7 +2905,7 @@ export default function EditorDocumentos() {
           type="button"
           variant="outline"
           size="sm"
-          className="h-space-9 gap-space-2 border-border-default bg-white text-slate-700 shadow-shadow-sm hover:bg-[hsl(var(--secondary))]"
+          className="h-space-9 gap-space-2 border-border-default bg-white text-foreground shadow-shadow-sm hover:bg-[hsl(var(--secondary))]"
           onClick={() => window.open(suapExtensionGithubUrl, '_blank', 'noopener,noreferrer')}
         >
           <ExternalLink className="h-4 w-4" />
@@ -2724,7 +2914,22 @@ export default function EditorDocumentos() {
       </HeaderActions>
 
       <div className="mx-auto flex max-w-[1560px] flex-col gap-5 px-4 py-5 lg:px-8 lg:py-6">
-          <div>
+          <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+            <Card className="overflow-hidden border-border-default/70 bg-surface-card shadow-soft">
+              <CardContent className="p-4">
+                <DocumentModelMenu
+                  activeId={activeDocumentId}
+                  onSelect={(documentType) => {
+                    setActiveDocumentId(documentType);
+                    setProcessInput('');
+                    resetPendingStates();
+                    resetPreliminaryStudySupplementalFiles();
+                    setFeedback('');
+                    setScreenState('idle');
+                  }}
+                />
+              </CardContent>
+            </Card>
             <Card className="overflow-hidden border-border-default/70 bg-surface-card shadow-soft">
               <CardContent className="p-4">
                 <div className="flex flex-col gap-4">
@@ -2780,7 +2985,7 @@ export default function EditorDocumentos() {
 
                   {isSyncedProcessesError ? (
                     <div className="rounded-radius-xl border border-warning/20 bg-warning/10 px-4 py-3">
-                      <p className="font-ui text-sm text-amber-900">
+                      <p className="font-ui text-sm text-foreground">
                         Nao foi possivel carregar a lista publica de processos sincronizados agora. A geracao manual continua disponivel.
                       </p>
                     </div>
@@ -2799,6 +3004,74 @@ export default function EditorDocumentos() {
                       }
                       className="min-h-[116px] resize-none rounded-radius-lg border-border-default bg-surface-card font-mono text-sm text-text-primary shadow-xs placeholder:font-ui placeholder:text-text-muted"
                     />
+
+                    {isPreliminaryStudyDocument ? (
+                      <div className="rounded-radius-lg border border-dashed border-border-default/80 bg-surface-card px-3 py-3">
+                        <input
+                          ref={preliminaryStudySupplementalInputRef}
+                          type="file"
+                          accept="application/pdf,.pdf"
+                          multiple
+                          className="hidden"
+                          onChange={(event) => void handleAddPreliminaryStudySupplementalPdfs(event.target.files)}
+                        />
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <p className="font-ui text-xs font-semibold text-text-primary">PDFs auxiliares opcionais</p>
+                            <p className="mt-1 font-ui text-xs leading-5 text-text-secondary">
+                              Convenção coletiva e outros apoios são lidos localmente; apenas trechos extraídos vão para a IA.
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-9 gap-2"
+                            onClick={() => preliminaryStudySupplementalInputRef.current?.click()}
+                            disabled={
+                              isAnalyzingPreliminaryStudySupplementalPdf ||
+                              preliminaryStudySupplementalAnalyses.length >= PRELIMINARY_STUDY_SUPPLEMENTAL_MAX_FILES
+                            }
+                          >
+                            {isAnalyzingPreliminaryStudySupplementalPdf ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Upload className="h-4 w-4" />
+                            )}
+                            Adicionar PDF
+                          </Button>
+                        </div>
+                        {preliminaryStudySupplementalAnalyses.length > 0 ? (
+                          <div className="mt-3 grid gap-2">
+                            {preliminaryStudySupplementalAnalyses.map((analysis) => (
+                              <div
+                                key={analysis.fileName}
+                                className="flex flex-col gap-2 rounded-radius-md border border-border-default/70 bg-surface-subtle/45 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                              >
+                                <div className="min-w-0">
+                                  <p className="truncate font-ui text-xs font-semibold text-text-primary">{analysis.fileName}</p>
+                                  <p className="mt-0.5 font-ui text-[11px] text-text-secondary">
+                                    {analysis.snippets.length} trecho(s) útil(eis), {analysis.searchablePageCount}/{analysis.pageCount} página(s) com texto
+                                  </p>
+                                  {analysis.warnings.length > 0 ? (
+                                    <p className="mt-1 font-ui text-[11px] text-foreground">{analysis.warnings[0]}</p>
+                                  ) : null}
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 justify-start px-2 text-text-secondary hover:bg-surface-subtle hover:text-text-primary"
+                                  onClick={() => handleRemovePreliminaryStudySupplementalPdf(analysis.fileName)}
+                                >
+                                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                                  Remover
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
 
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div className="flex items-center gap-2 font-ui text-xs text-text-secondary">
@@ -2972,6 +3245,22 @@ export default function EditorDocumentos() {
                           >
                             {downloadedDocxIds.includes(dispatch.id) ? 'DOCX baixado' : 'Baixar DOCX'}
                           </Button>
+                        ) : dispatch.documentType === 'estudo-tecnico-preliminar-servicos-continuos' ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 bg-surface-card px-2.5 font-ui text-[11px] transition-all duration-200 hover:-translate-y-px active:scale-95"
+                            onClick={() => void handleProceedFromPreliminaryStudyToReferenceTerm(dispatch)}
+                            disabled={screenState === 'resolving'}
+                          >
+                            {screenState === 'resolving' ? (
+                              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <ReceiptText className="mr-1.5 h-3.5 w-3.5" />
+                            )}
+                            Prosseguir para Termo de Referencia
+                          </Button>
                         ) : dispatch.allowClone ? (
                           <Button
                             type="button"
@@ -3082,7 +3371,7 @@ export default function EditorDocumentos() {
                   <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
                     {screenState === 'ai_questionnaire_prefill' ? (
                       <>
-                        <Badge variant="outline" className="border-status-success/25 bg-status-success/10 text-emerald-900">
+                        <Badge variant="outline" className="border-status-success/25 bg-status-success/10 text-foreground">
                           {approvedReferenceTermSuggestionReviews.length} aprovada(s)
                         </Badge>
                         <Badge variant="outline" className="border-border-default bg-surface-card text-text-secondary">
@@ -3094,7 +3383,7 @@ export default function EditorDocumentos() {
                         <Badge variant="outline" className="border-border-default bg-surface-card text-text-secondary">
                           {answeredReferenceTermQuestions} respondida(s)
                         </Badge>
-                        <Badge variant="outline" className="border-warning/30 bg-warning/10 text-amber-900">
+                        <Badge variant="outline" className="border-warning/30 bg-warning/10 text-foreground">
                           {skippedReferenceTermQuestions} pulada(s)
                         </Badge>
                       </>
@@ -3265,7 +3554,7 @@ export default function EditorDocumentos() {
                   <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
                     {screenState === 'etp_questionnaire_prefill' ? (
                       <>
-                        <Badge variant="outline" className="border-status-success/25 bg-status-success/10 text-emerald-900">
+                        <Badge variant="outline" className="border-status-success/25 bg-status-success/10 text-foreground">
                           {approvedPreliminaryStudySuggestionReviews.length} aprovada(s)
                         </Badge>
                         <Badge variant="outline" className="border-border-default bg-surface-card text-text-secondary">
@@ -3277,7 +3566,7 @@ export default function EditorDocumentos() {
                         <Badge variant="outline" className="border-border-default bg-surface-card text-text-secondary">
                           {answeredPreliminaryStudyQuestions} respondida(s)
                         </Badge>
-                        <Badge variant="outline" className="border-warning/30 bg-warning/10 text-amber-900">
+                        <Badge variant="outline" className="border-warning/30 bg-warning/10 text-foreground">
                           {skippedPreliminaryStudyQuestions} pulada(s)
                         </Badge>
                       </>
@@ -3409,10 +3698,10 @@ export default function EditorDocumentos() {
       </Dialog>
 
       <Dialog open={Boolean(selectedProcess)} onOpenChange={(open) => !open && setSelectedProcessId(null)}>
-        <DialogContent className="grid max-h-[calc(100dvh-2rem)] w-[min(95vw,1140px)] max-w-none grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden border-none bg-white p-0 text-slate-900 shadow-2xl">
+        <DialogContent className="grid max-h-[calc(100dvh-2rem)] w-[min(95vw,1140px)] max-w-none grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden border-none bg-white p-0 text-foreground shadow-2xl">
           {selectedProcess ? (
             <>
-              <DialogHeader className="relative space-y-1 border-b border-slate-100 bg-slate-50/80 p-4">
+              <DialogHeader className="relative space-y-1 border-b border-border bg-muted/80 p-4">
                 <div className="absolute left-0 top-0 h-1 w-full bg-cyan-500" />
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 flex-1 items-start gap-2.5">
@@ -3421,13 +3710,13 @@ export default function EditorDocumentos() {
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <DialogTitle className="font-ui text-[24px] font-black tracking-tight text-slate-900">
+                        <DialogTitle className="font-ui text-[24px] font-black tracking-tight text-foreground">
                           {selectedProcess.numProcesso || selectedProcess.suapId}
                         </DialogTitle>
                         <CopyValueButton
                           value={selectedProcess.numProcesso || selectedProcess.suapId}
                           message="Numero do processo copiado."
-                          className="h-7 w-7 border-slate-200 bg-white shadow-none"
+                          className="h-7 w-7 border-border bg-white shadow-none"
                         />
                       </div>
                       <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-600/70">
@@ -3438,16 +3727,16 @@ export default function EditorDocumentos() {
 
                   <div className="shrink-0 text-right">
                     <div className="flex items-center gap-2">
-                      <span className="font-ui text-[24px] font-black tracking-tight text-slate-900">
+                      <span className="font-ui text-[24px] font-black tracking-tight text-foreground">
                         {selectedProcess.suapId}
                       </span>
                       <CopyValueButton
                         value={selectedProcess.suapId}
                         message="SUAP ID copiado."
-                        className="h-7 w-7 border-slate-200 bg-white shadow-none"
+                        className="h-7 w-7 border-border bg-white shadow-none"
                       />
                     </div>
-                    <p className="mt-0.5 text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                    <p className="mt-0.5 text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
                       SUAP ID
                     </p>
                   </div>
@@ -3519,50 +3808,50 @@ export default function EditorDocumentos() {
 
                     <div className="flex flex-col gap-2 xl:flex-row xl:items-start">
                       <div className="min-w-0 flex-1 space-y-2.5">
-                        <p className="font-ui text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                        <p className="font-ui text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
                           Dados bancarios
                         </p>
-                        <div className="rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
+                        <div className="rounded-lg border border-border bg-muted/70 px-3 py-2">
                           <div className="grid gap-2 md:grid-cols-3">
-                            <div className="flex items-start justify-between gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2">
+                            <div className="flex items-start justify-between gap-2 rounded-lg border border-border bg-white px-3 py-2">
                               <div className="min-w-0">
-                                <p className="font-ui text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Banco</p>
-                                <p className="mt-0.5 break-words font-ui text-[13px] text-slate-900">
+                                <p className="font-ui text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">Banco</p>
+                                <p className="mt-0.5 break-words font-ui text-[13px] text-foreground">
                                   {selectedProcess.dadosCompletos?.dados_bancarios?.banco || 'Sem banco extraido'}
                                 </p>
                               </div>
                               <CopyValueButton
                                 value={selectedProcess.dadosCompletos?.dados_bancarios?.banco}
                                 message="Banco copiado."
-                                className="h-7 w-7 shrink-0 border-slate-200 bg-white shadow-none"
+                                className="h-7 w-7 shrink-0 border-border bg-white shadow-none"
                               />
                             </div>
 
-                            <div className="flex items-start justify-between gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2">
+                            <div className="flex items-start justify-between gap-2 rounded-lg border border-border bg-white px-3 py-2">
                               <div className="min-w-0">
-                                <p className="font-ui text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Agencia</p>
-                                <p className="mt-0.5 break-words font-mono text-[12px] font-semibold text-slate-900">
+                                <p className="font-ui text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">Agencia</p>
+                                <p className="mt-0.5 break-words font-mono text-[12px] font-semibold text-foreground">
                                   {selectedProcess.dadosCompletos?.dados_bancarios?.agencia || '-'}
                                 </p>
                               </div>
                               <CopyValueButton
                                 value={selectedProcess.dadosCompletos?.dados_bancarios?.agencia}
                                 message="Agencia copiada."
-                                className="h-7 w-7 shrink-0 border-slate-200 bg-white shadow-none"
+                                className="h-7 w-7 shrink-0 border-border bg-white shadow-none"
                               />
                             </div>
 
-                            <div className="flex items-start justify-between gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2">
+                            <div className="flex items-start justify-between gap-2 rounded-lg border border-border bg-white px-3 py-2">
                               <div className="min-w-0">
-                                <p className="font-ui text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Conta</p>
-                                <p className="mt-0.5 break-words font-mono text-[12px] font-semibold text-slate-900">
+                                <p className="font-ui text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">Conta</p>
+                                <p className="mt-0.5 break-words font-mono text-[12px] font-semibold text-foreground">
                                   {selectedProcess.dadosCompletos?.dados_bancarios?.conta || '-'}
                                 </p>
                               </div>
                               <CopyValueButton
                                 value={selectedProcess.dadosCompletos?.dados_bancarios?.conta}
                                 message="Conta copiada."
-                                className="h-7 w-7 shrink-0 border-slate-200 bg-white shadow-none"
+                                className="h-7 w-7 shrink-0 border-border bg-white shadow-none"
                               />
                             </div>
                           </div>
@@ -3572,16 +3861,16 @@ export default function EditorDocumentos() {
                       {(selectedProcess.dadosCompletos?.empenhos || []).length > 0 ? (
                         <div className="min-w-0 xl:w-[38%] xl:max-w-[420px] space-y-2.5">
                           <div className="flex items-center justify-between gap-2">
-                            <p className="font-ui text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                            <p className="font-ui text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
                               Empenhos
                             </p>
                             <CopyValueButton value={(selectedProcess.dadosCompletos?.empenhos || []).join(', ')} message="Lista de empenhos copiada." className="h-7 w-7" />
                           </div>
-                          <div className="flex flex-wrap gap-1.5 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
+                          <div className="flex flex-wrap gap-1.5 rounded-lg border border-border bg-muted/70 px-3 py-2">
                             {(selectedProcess.dadosCompletos?.empenhos || []).map((empenho) => (
                               <div
                                 key={empenho}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1"
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-white px-2 py-1"
                               >
                                 <span className="font-mono text-[12px] font-semibold text-text-primary">{empenho}</span>
                                 <CopyValueButton value={empenho} message="Empenho copiado." className="h-6 w-6 border-0 bg-transparent shadow-none" />
@@ -3597,11 +3886,11 @@ export default function EditorDocumentos() {
                       <>
                         <div className="space-y-2.5">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-ui text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                            <p className="font-ui text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
                               Retencoes
                             </p>
                             {selectedProcess.dadosCompletos?.retencoes_tributarias?.optante_simples_nacional ? (
-                              <Badge variant="outline" className="border-warning/30 bg-warning/10 text-amber-900">
+                              <Badge variant="outline" className="border-warning/30 bg-warning/10 text-foreground">
                                 Optante pelo Simples Nacional
                               </Badge>
                             ) : null}
@@ -3616,17 +3905,17 @@ export default function EditorDocumentos() {
 
                       </>
                     ) : (
-                      <p className="font-ui text-sm text-slate-500">Nenhuma retencao extraida para este processo.</p>
+                      <p className="font-ui text-sm text-muted-foreground">Nenhuma retencao extraida para este processo.</p>
                     )}
                   </SidebarSection>
                 </div>
               </div>
 
-              <DialogFooter className="shrink-0 border-t border-slate-100 bg-slate-50/80 px-4 py-2.5 sm:justify-end">
+              <DialogFooter className="shrink-0 border-t border-border bg-muted/80 px-4 py-2.5 sm:justify-end">
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-9 gap-2 border-slate-200 bg-white px-3.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 shadow-sm shadow-slate-200/50 hover:bg-slate-100"
+                  className="h-9 gap-2 border-border bg-white px-3.5 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground shadow-sm shadow-none hover:bg-muted"
                   onClick={() => window.open(selectedProcess.url, '_blank', 'noopener,noreferrer')}
                 >
                   <ExternalLink className="h-4 w-4" />
@@ -3635,7 +3924,7 @@ export default function EditorDocumentos() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-9 gap-2 border-slate-200 bg-white px-3.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 shadow-sm shadow-slate-200/50 hover:bg-slate-100"
+                  className="h-9 gap-2 border-border bg-white px-3.5 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground shadow-sm shadow-none hover:bg-muted"
                   onClick={() => void handleOpenPdf(selectedProcess)}
                   disabled={!selectedProcess.pdfUrl || openingPdfId === selectedProcess.id}
                 >
@@ -3661,7 +3950,7 @@ export default function EditorDocumentos() {
                   type="button"
                   variant="secondary"
                   onClick={() => setSelectedProcessId(null)}
-                  className="border border-slate-200 bg-white px-6 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 shadow-sm shadow-slate-200/50 hover:bg-slate-100"
+                  className="border border-border bg-white px-6 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground shadow-sm shadow-none hover:bg-muted"
                 >
                   Fechar
                 </Button>

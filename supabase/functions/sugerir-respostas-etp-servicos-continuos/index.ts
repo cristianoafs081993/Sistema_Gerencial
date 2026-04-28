@@ -23,8 +23,11 @@ type EtpSuggestionRequest = {
     id: string;
     kind: string;
     label: string;
-    pageNumber: number;
+    pageNumber?: number;
     excerpt: string;
+    sourceType?: 'processo' | 'anexo' | 'etp';
+    sourceName?: string;
+    sourceLabel?: string;
   }>;
   analysisWarnings?: string[];
 };
@@ -113,14 +116,14 @@ function buildPrompt(request: EtpSuggestionRequest, questions: EtpQuestion[]) {
   return [
     'Voce e um assistente especializado em contratacoes publicas brasileiras.',
     'Sugira respostas para o questionario de Estudo Tecnico Preliminar de servicos continuos.',
-    'Use somente os trechos-fonte fornecidos. Nao invente informacao ausente.',
+    'Use somente os trechos-fonte fornecidos. Eles podem vir do processo ou de anexos opcionais ja convertidos em texto. Nao invente informacao ausente.',
     'Se nao houver fonte suficiente para uma pergunta, retorne status "unanswered".',
     'Responda apenas JSON valido no formato:',
     '{"status":"generated","warnings":["..."],"suggestions":[{"questionId":"...","status":"suggested|unanswered","value":"...","justification":"...","sourcePage":1,"sourceExcerpt":"...","confidence":"high|medium"}]}',
     `Processo: ${JSON.stringify(request.processo || {})}`,
     `Objeto informado manualmente: ${request.manualObject || ''}`,
     `Perguntas: ${JSON.stringify(questions)}`,
-    `Trechos do processo: ${JSON.stringify(snippets)}`,
+    `Trechos de apoio: ${JSON.stringify(snippets)}`,
   ].join('\n\n');
 }
 
@@ -257,7 +260,7 @@ Deno.serve(async (request) => {
     if (!body.contextSnippets?.length) {
       return jsonResponse({
         status: 'generated',
-        warnings: ['Nao ha trechos do PDF para sugerir respostas com fonte explicita.'],
+        warnings: ['Nao ha trechos de apoio para sugerir respostas com fonte explicita.'],
         suggestions: questions.map((question) => ({ questionId: question.id, status: 'unanswered' })),
       });
     }

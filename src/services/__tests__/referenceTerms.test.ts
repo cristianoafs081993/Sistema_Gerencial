@@ -46,4 +46,34 @@ describe('normalizeReferenceTermQuestionSuggestionResult', () => {
       }),
     ]);
   });
+
+  it('aceita sugestao com fonte ETP sem pagina', () => {
+    const result = normalizeReferenceTermQuestionSuggestionResult({
+      suggestions: [
+        {
+          questionId: 'field-objeto',
+          kind: 'field',
+          status: 'suggested',
+          value: 'Contratacao de servicos continuos de limpeza.',
+          justification: 'Objeto consta no ETP editado.',
+          sourceType: 'etp',
+          sourceLabel: 'ETP editado no editor',
+          sourceExcerpt: 'A solucao proposta e a contratacao de servicos continuos de limpeza.',
+          confidence: 'medium',
+        },
+      ],
+      warnings: [],
+      model: 'gemini-2.5-flash-lite',
+    });
+
+    expect(result.suggestions).toEqual([
+      expect.objectContaining({
+        questionId: 'field-objeto',
+        status: 'suggested',
+        sourceType: 'etp',
+        sourceLabel: 'ETP editado no editor',
+        sourcePage: undefined,
+      }),
+    ]);
+  });
 });
