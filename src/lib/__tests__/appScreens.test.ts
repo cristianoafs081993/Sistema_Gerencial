@@ -1,4 +1,10 @@
-import { ADMIN_USERS_SCREEN_ID, appScreens, getScreenForPath, isProductionScreen } from '@/lib/appScreens';
+import {
+  ADMIN_USERS_SCREEN_ID,
+  appScreens,
+  getFirstAccessibleScreenPath,
+  getScreenForPath,
+  isProductionScreen,
+} from '@/lib/appScreens';
 
 describe('app screen registry', () => {
   it('mapeia rotas diretas e escopos de planejamento para telas cadastradas', () => {
@@ -16,5 +22,11 @@ describe('app screen registry', () => {
     expect(directorScreenIds).toContain('economia-tempo');
     expect(directorScreenIds).not.toContain(ADMIN_USERS_SCREEN_ID);
     expect(directorScreenIds).not.toContain('modelos-documentos');
+  });
+
+  it('encontra a primeira tela visivel permitida para entrada padrao', () => {
+    const canAccessScreen = (screenId: string) => screenId === 'financeiro';
+
+    expect(getFirstAccessibleScreenPath(canAccessScreen)).toBe('/financeiro');
   });
 });

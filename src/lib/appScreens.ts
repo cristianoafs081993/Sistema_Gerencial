@@ -115,3 +115,18 @@ export function getScreenForPath(pathname: string) {
 export function isProductionScreen(screen: AppScreen) {
   return !screen.isAdminOnly && !screen.hiddenFromNavigation;
 }
+
+export function getFirstAccessibleScreenPath(canAccessScreen: (screenId: string) => boolean) {
+  const sortedGroups = appScreenGroups.slice().sort((left, right) => left.sortOrder - right.sortOrder);
+
+  for (const group of sortedGroups) {
+    const screen = appScreens
+      .filter((candidate) => candidate.groupId === group.id && !candidate.hiddenFromNavigation)
+      .sort((left, right) => left.sortOrder - right.sortOrder)
+      .find((candidate) => canAccessScreen(candidate.id));
+
+    if (screen) return screen.path;
+  }
+
+  return null;
+}

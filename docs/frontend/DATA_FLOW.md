@@ -29,6 +29,7 @@ Esse fluxo agora concentra:
 - derivacao local de permissoes de superadministrador pelo e-mail autenticado
 - carregamento das permissoes de tela do usuario em `AuthContext`
 - bloqueio de acesso direto por rota em `ProtectedRoute`
+- redirecionamento da rota inicial `/` para a primeira tela visivel permitida quando o usuario nao possui acesso ao dashboard
 - filtro dos itens da sidebar pelo catalogo central de telas em `src/lib/appScreens.ts`
 
 ### Controle de usuarios

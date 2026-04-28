@@ -16,6 +16,7 @@ const authDefaults = {
   canManageUsers: false,
   userGroups: [],
   screenAccessIds: [],
+  defaultAccessiblePath: null,
   canAccessScreen: vi.fn(() => true),
   canAccessPath: vi.fn(() => true),
 };
@@ -111,5 +112,37 @@ describe('ProtectedRoute', () => {
 
     expect(await screen.findByText('Acesso restrito')).toBeInTheDocument();
     expect(screen.queryByText('controle-page')).not.toBeInTheDocument();
+  });
+
+  it('redireciona a rota inicial para a primeira tela permitida quando dashboard esta bloqueado', async () => {
+    mockedUseAuth.mockReturnValue({
+      session: { user: { id: 'user-1', email: 'teste@ifrn.edu.br' } } as never,
+      user: { id: 'user-1', email: 'teste@ifrn.edu.br' } as never,
+      isAuthenticated: true,
+      isLoading: false,
+      ...authDefaults,
+      defaultAccessiblePath: '/financeiro',
+      canAccessPath: vi.fn((pathname: string) => pathname === '/financeiro'),
+      isSuperAdmin: false,
+      canInviteUsers: false,
+      signInWithPassword: vi.fn(),
+      updatePassword: vi.fn(),
+      requestPasswordReset: vi.fn(),
+      signOut: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<div>dashboard-page</div>} />
+            <Route path="/financeiro" element={<div>financeiro-page</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('financeiro-page')).toBeInTheDocument();
+    expect(screen.queryByText('Acesso restrito')).not.toBeInTheDocument();
   });
 });

@@ -7,7 +7,7 @@ import { APP_BRAND } from '@/lib/brand';
 
 export function ProtectedRoute() {
   const location = useLocation();
-  const { isAuthenticated, isLoading, isAccessLoading, accessError, canAccessPath } = useAuth();
+  const { isAuthenticated, isLoading, isAccessLoading, accessError, defaultAccessiblePath, canAccessPath } = useAuth();
 
   if (isLoading || (isAuthenticated && isAccessLoading)) {
     return (
@@ -57,6 +57,10 @@ export function ProtectedRoute() {
   }
 
   if (!canAccessPath(location.pathname)) {
+    if (location.pathname === '/' && defaultAccessiblePath && defaultAccessiblePath !== '/') {
+      return <Navigate to={defaultAccessiblePath} replace />;
+    }
+
     return (
       <div className="min-h-screen bg-white px-4 py-10">
         <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-xl items-center justify-center">

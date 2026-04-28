@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { AuthError, Session, User } from '@supabase/supabase-js';
 
-import { getScreenForPath } from '@/lib/appScreens';
+import { getFirstAccessibleScreenPath, getScreenForPath } from '@/lib/appScreens';
 import { isSuperAdminUser } from '@/lib/authz';
 import { supabase } from '@/lib/supabase';
 import { fetchUserAccess, type UserAccessGroup } from '@/services/userAccess';
@@ -18,6 +18,7 @@ type AuthContextValue = {
   canManageUsers: boolean;
   userGroups: UserAccessGroup[];
   screenAccessIds: string[];
+  defaultAccessiblePath: string | null;
   canAccessScreen: (screenId: string) => boolean;
   canAccessPath: (pathname: string) => boolean;
   signInWithPassword: (email: string, password: string) => Promise<AuthError | null>;
@@ -139,6 +140,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const canAccessScreen = (screenId: string) => isSuperAdmin || screenAccessIds.includes(screenId);
 
+  const defaultAccessiblePath = getFirstAccessibleScreenPath(canAccessScreen);
+
   const canAccessPath = (pathname: string) => {
     const screen = getScreenForPath(pathname);
     if (!screen) return true;
@@ -159,6 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         canManageUsers: isSuperAdmin,
         userGroups,
         screenAccessIds,
+        defaultAccessiblePath,
         canAccessScreen,
         canAccessPath,
         signInWithPassword,
