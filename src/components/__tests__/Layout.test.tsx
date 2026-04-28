@@ -113,4 +113,33 @@ describe('Layout', () => {
     expect(screen.getByText('Campus')).toBeInTheDocument();
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
   });
+
+  it('mantem a ordem dos tipos do editor na sidebar', () => {
+    render(
+      <MemoryRouter initialEntries={['/editor-documentos/termo-referencia-compras']}>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen
+        .getAllByRole('link')
+        .map((link) => link.textContent)
+        .filter((text) =>
+          [
+            'Despacho de Liquidação',
+            'ETP — Serviços Contínuos',
+            'Termo de Referência',
+            'Contrato de Serviço IFRN',
+          ].includes(text || ''),
+        ),
+    ).toEqual([
+      'Despacho de Liquidação',
+      'ETP — Serviços Contínuos',
+      'Termo de Referência',
+      'Contrato de Serviço IFRN',
+    ]);
+  });
 });

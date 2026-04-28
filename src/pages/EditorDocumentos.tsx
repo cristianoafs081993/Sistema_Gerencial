@@ -2914,22 +2914,7 @@ export default function EditorDocumentos() {
       </HeaderActions>
 
       <div className="mx-auto flex max-w-[1560px] flex-col gap-5 px-4 py-5 lg:px-8 lg:py-6">
-          <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-            <Card className="overflow-hidden border-border-default/70 bg-surface-card shadow-soft">
-              <CardContent className="p-4">
-                <DocumentModelMenu
-                  activeId={activeDocumentId}
-                  onSelect={(documentType) => {
-                    setActiveDocumentId(documentType);
-                    setProcessInput('');
-                    resetPendingStates();
-                    resetPreliminaryStudySupplementalFiles();
-                    setFeedback('');
-                    setScreenState('idle');
-                  }}
-                />
-              </CardContent>
-            </Card>
+          <div className="grid gap-4">
             <Card className="overflow-hidden border-border-default/70 bg-surface-card shadow-soft">
               <CardContent className="p-4">
                 <div className="flex flex-col gap-4">

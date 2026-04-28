@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 import EditorDocumentos from '@/pages/EditorDocumentos';
 import { useData } from '@/contexts/DataContext';
@@ -86,6 +87,21 @@ const mockedContractDraftsService = vi.mocked(contractDraftsService);
 const mockedReferenceTermsService = vi.mocked(referenceTermsService);
 const mockedPreliminaryStudiesService = vi.mocked(preliminaryStudiesService);
 const mockedAnalyzePreliminaryStudySupplementalPdfFile = vi.mocked(analyzePreliminaryStudySupplementalPdfFile);
+
+function renderEditor(route = '/editor-documentos/despacho-liquidacao') {
+  const queryClient = new QueryClient();
+
+  return render(
+    <MemoryRouter initialEntries={[route]}>
+      <QueryClientProvider client={queryClient}>
+        <Routes>
+          <Route path="/editor-documentos" element={<EditorDocumentos />} />
+          <Route path="/editor-documentos/:modelId" element={<EditorDocumentos />} />
+        </Routes>
+      </QueryClientProvider>
+    </MemoryRouter>,
+  );
+}
 
 describe('EditorDocumentos', () => {
   beforeEach(() => {
@@ -303,17 +319,26 @@ describe('EditorDocumentos', () => {
     });
   });
 
-  it('gera contrato a partir de processo sincronizado', async () => {
-    const queryClient = new QueryClient();
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <EditorDocumentos />
-      </QueryClientProvider>,
-    );
+  it('nao renderiza a navegacao de tipos dentro do conteudo', async () => {
+    renderEditor();
 
     expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Contrato de Servico IFRN/i }));
+    expect(screen.queryByRole('button', { name: /Contrato de Servico IFRN/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Termo de Referencia - Compras/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /ETP - Servicos Continuos/i })).not.toBeInTheDocument();
+  });
+
+  it('mantem a rota do ETP reconhecida pelo editor', async () => {
+    renderEditor('/editor-documentos/estudo-tecnico-preliminar-servicos-continuos');
+
+    expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Gerar ETP/i })).toBeInTheDocument();
+  });
+
+  it('gera contrato a partir de processo sincronizado', async () => {
+    renderEditor('/editor-documentos/contrato-servico-ifrn');
+
+    expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
     fireEvent.change(screen.getByPlaceholderText('Cole um numero de processo sincronizado no SUAP.'), {
       target: { value: '23035.000123/2026-11' },
     });
@@ -332,16 +357,9 @@ describe('EditorDocumentos', () => {
   });
 
   it('gera termo de referencia e habilita download em DOCX', async () => {
-    const queryClient = new QueryClient();
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <EditorDocumentos />
-      </QueryClientProvider>,
-    );
+    renderEditor('/editor-documentos/termo-referencia-compras');
 
     expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Termo de Referencia - Compras/i }));
     fireEvent.change(screen.getByPlaceholderText('Cole um numero de processo sincronizado no SUAP.'), {
       target: { value: '23035.000123/2026-11' },
     });
@@ -463,16 +481,9 @@ describe('EditorDocumentos', () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
-    const queryClient = new QueryClient();
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <EditorDocumentos />
-      </QueryClientProvider>,
-    );
+    renderEditor('/editor-documentos/termo-referencia-compras');
 
     expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Termo de Referencia - Compras/i }));
     fireEvent.change(screen.getByPlaceholderText('Cole um numero de processo sincronizado no SUAP.'), {
       target: { value: '23035.000123/2026-11' },
     });
@@ -613,16 +624,9 @@ describe('EditorDocumentos', () => {
       model: 'gemini-2.5-flash-lite',
     });
 
-    const queryClient = new QueryClient();
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <EditorDocumentos />
-      </QueryClientProvider>,
-    );
+    renderEditor('/editor-documentos/termo-referencia-compras');
 
     expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Termo de Referencia - Compras/i }));
     fireEvent.change(screen.getByPlaceholderText('Cole um numero de processo sincronizado no SUAP.'), {
       target: { value: '23035.000123/2026-11' },
     });
@@ -740,16 +744,9 @@ describe('EditorDocumentos', () => {
       model: 'gemini-2.5-flash-lite',
     });
 
-    const queryClient = new QueryClient();
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <EditorDocumentos />
-      </QueryClientProvider>,
-    );
+    renderEditor('/editor-documentos/termo-referencia-compras');
 
     expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Termo de Referencia - Compras/i }));
     fireEvent.change(screen.getByPlaceholderText('Cole um numero de processo sincronizado no SUAP.'), {
       target: { value: '23035.000123/2026-11' },
     });
@@ -797,16 +794,9 @@ describe('EditorDocumentos', () => {
   }, 15000);
 
   it('gera ETP a partir de objeto digitado manualmente', async () => {
-    const queryClient = new QueryClient();
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <EditorDocumentos />
-      </QueryClientProvider>,
-    );
+    renderEditor('/editor-documentos/estudo-tecnico-preliminar-servicos-continuos');
 
     expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /ETP - Servicos Continuos/i }));
     fireEvent.change(screen.getByPlaceholderText(/descreva o objeto da licitacao/i), {
       target: { value: 'Contratacao de servicos continuos de limpeza predial' },
     });
@@ -829,15 +819,9 @@ describe('EditorDocumentos', () => {
   }, 15000);
 
   it('gera ETP com PDF auxiliar opcional e permite remover antes da geracao', async () => {
-    const queryClient = new QueryClient();
-    const { container } = render(
-      <QueryClientProvider client={queryClient}>
-        <EditorDocumentos />
-      </QueryClientProvider>,
-    );
+    const { container } = renderEditor('/editor-documentos/estudo-tecnico-preliminar-servicos-continuos');
 
     expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /ETP - Servicos Continuos/i }));
 
     const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
     fireEvent.change(fileInput, {
@@ -884,16 +868,9 @@ describe('EditorDocumentos', () => {
 
   it('prossegue do ETP manual para TR usando o texto editado como contexto', async () => {
     mockedReferenceTermsService.generateDraft.mockClear();
-    const queryClient = new QueryClient();
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <EditorDocumentos />
-      </QueryClientProvider>,
-    );
+    renderEditor('/editor-documentos/estudo-tecnico-preliminar-servicos-continuos');
 
     expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /ETP - Servicos Continuos/i }));
     fireEvent.change(screen.getByPlaceholderText(/descreva o objeto da licitacao/i), {
       target: { value: 'Contratacao de servicos continuos de limpeza predial' },
     });
@@ -928,16 +905,9 @@ describe('EditorDocumentos', () => {
       warnings: [],
       model: 'gemini-2.5-flash-lite',
     });
-    const queryClient = new QueryClient();
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <EditorDocumentos />
-      </QueryClientProvider>,
-    );
+    renderEditor('/editor-documentos/estudo-tecnico-preliminar-servicos-continuos');
 
     expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /ETP - Servicos Continuos/i }));
     fireEvent.change(screen.getByPlaceholderText(/descreva o objeto da licitacao/i), {
       target: { value: 'Contratacao de servicos continuos de limpeza predial' },
     });
@@ -993,16 +963,9 @@ describe('EditorDocumentos', () => {
       model: 'gemini-2.5-flash-lite',
     });
 
-    const queryClient = new QueryClient();
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <EditorDocumentos />
-      </QueryClientProvider>,
-    );
+    renderEditor('/editor-documentos/estudo-tecnico-preliminar-servicos-continuos');
 
     expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /ETP - Servicos Continuos/i }));
     fireEvent.change(screen.getByPlaceholderText(/descreva o objeto da licitacao/i), {
       target: { value: '23035.000123/2026-11' },
     });
@@ -1058,16 +1021,9 @@ describe('EditorDocumentos', () => {
         assunto: 'Servico continuado de limpeza sem PDF',
       },
     ] as never);
-    const queryClient = new QueryClient();
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <EditorDocumentos />
-      </QueryClientProvider>,
-    );
+    renderEditor('/editor-documentos/estudo-tecnico-preliminar-servicos-continuos');
 
     expect(await screen.findByText('23035.000456/2026-22')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /ETP - Servicos Continuos/i }));
     fireEvent.change(screen.getByPlaceholderText(/descreva o objeto da licitacao/i), {
       target: { value: '23035.000456/2026-22' },
     });
@@ -1092,16 +1048,9 @@ describe('EditorDocumentos', () => {
       warnings: [],
       model: 'gemini-2.5-flash-lite',
     });
-    const queryClient = new QueryClient();
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <EditorDocumentos />
-      </QueryClientProvider>,
-    );
+    renderEditor('/editor-documentos/estudo-tecnico-preliminar-servicos-continuos');
 
     expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /ETP - Servicos Continuos/i }));
     fireEvent.change(screen.getByPlaceholderText(/descreva o objeto da licitacao/i), {
       target: { value: '23035.000123/2026-11' },
     });
@@ -1115,16 +1064,9 @@ describe('EditorDocumentos', () => {
   }, 15000);
 
   it('bloqueia ETP quando nao ha processo nem objeto', async () => {
-    const queryClient = new QueryClient();
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <EditorDocumentos />
-      </QueryClientProvider>,
-    );
+    renderEditor('/editor-documentos/estudo-tecnico-preliminar-servicos-continuos');
 
     expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /ETP - Servicos Continuos/i }));
     fireEvent.click(screen.getByRole('button', { name: /Gerar ETP/i }));
 
     expect(await screen.findByText('Informe um processo sincronizado ou descreva o objeto da licitacao para gerar o ETP.')).toBeInTheDocument();
