@@ -82,6 +82,40 @@ describe('retencoesEfdReinfImportService', () => {
     expect(validation.issues).toContain('DH Item - UG Pagadora deve ser 158155.');
   });
 
+  it.each(['DDR001', 'DGR001'])(
+    'ignora a regra de UG critica quando DH - Situacao for %s',
+    (dhSituacao) => {
+      const validation = validateRetencaoEfdReinfRow({
+        sourceIndex: 1,
+        documentoHabil: '2026DH0001',
+        dhProcesso: '230010001',
+        dhEstado: 'RN',
+        dhUgPagadora: '153103',
+        dhItemUgPagadora: '999999',
+        dhCredorDocumento: '12345678000190',
+        dhCredorNome: 'Fornecedor A',
+        dhSituacao,
+        dhDataEmissaoDocOrigem: '2026-03-01',
+        dhDiaPagamento: '2026-03-15',
+        dhItemDiaVencimento: '2026-04-21',
+        dhItemDiaPagamento: '2026-04-21',
+        dhItemLiquidado: true,
+        dhValorDocOrigem: 1000,
+        metrica: 'INSS',
+        valorRetencao: 110,
+      });
+
+      expect(validation).toMatchObject({
+        severity: 'ok',
+        hasCriticalUgPagadora: false,
+        hasWarningPrazo: false,
+        expectedDate: null,
+        expectedRule: null,
+      });
+      expect(validation.issues).not.toContain('DH Item - UG Pagadora deve ser 158155.');
+    },
+  );
+
   it('formata datas ISO para exibicao brasileira', () => {
     expect(formatRetencaoEfdReinfDate('2026-04-20')).toBe('20/04/2026');
     expect(formatRetencaoEfdReinfDate(null)).toBe('-');

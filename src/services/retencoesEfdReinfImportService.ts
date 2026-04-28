@@ -46,6 +46,8 @@ type RetencaoEfdReinfDbRow = {
   imported_at: string;
 };
 
+const SITUACOES_IGNORADAS_REGRA_UG_CRITICA = new Set(['DDR001', 'DGR001']);
+
 export type RetencaoEfdReinfValidation = {
   severity: 'ok' | 'warning' | 'critical';
   hasCriticalUgPagadora: boolean;
@@ -224,7 +226,9 @@ export async function parseRetencoesEfdReinfCsv(file: File): Promise<RetencaoEfd
 export function validateRetencaoEfdReinfRow(row: RetencaoEfdReinfRegistro): RetencaoEfdReinfValidation {
   const issues: string[] = [];
   const itemUgPagadora = (row.dhItemUgPagadora || '').replace(/\D/g, '');
-  const hasCriticalUgPagadora = itemUgPagadora !== '158155';
+  const situacao = row.dhSituacao.trim().toUpperCase();
+  const shouldIgnoreUgCritica = SITUACOES_IGNORADAS_REGRA_UG_CRITICA.has(situacao);
+  const hasCriticalUgPagadora = !shouldIgnoreUgCritica && itemUgPagadora !== '158155';
 
   let expectedRule: 'DDF025' | 'DDF021' | null = null;
   let expectedDate: string | null = null;
