@@ -38,6 +38,8 @@ type QuestionSuggestion = {
   value?: string;
   justification?: string;
   sourcePage?: number;
+  sourceType?: 'processo' | 'anexo' | 'etp';
+  sourceLabel?: string;
   sourceExcerpt?: string;
   confidence?: 'high' | 'medium';
 };
@@ -118,8 +120,9 @@ function buildPrompt(request: EtpSuggestionRequest, questions: EtpQuestion[]) {
     'Sugira respostas para o questionario de Estudo Tecnico Preliminar de servicos continuos.',
     'Use somente os trechos-fonte fornecidos. Eles podem vir do processo ou de anexos opcionais ja convertidos em texto. Nao invente informacao ausente.',
     'Se nao houver fonte suficiente para uma pergunta, retorne status "unanswered".',
+    'Quando a fonte for anexo sem pagina, retorne sourceType "anexo" e preserve sourceLabel.',
     'Responda apenas JSON valido no formato:',
-    '{"status":"generated","warnings":["..."],"suggestions":[{"questionId":"...","status":"suggested|unanswered","value":"...","justification":"...","sourcePage":1,"sourceExcerpt":"...","confidence":"high|medium"}]}',
+    '{"status":"generated","warnings":["..."],"suggestions":[{"questionId":"...","status":"suggested|unanswered","value":"...","justification":"...","sourcePage":1,"sourceType":"processo|anexo","sourceLabel":"... opcional","sourceExcerpt":"...","confidence":"high|medium"}]}',
     `Processo: ${JSON.stringify(request.processo || {})}`,
     `Objeto informado manualmente: ${request.manualObject || ''}`,
     `Perguntas: ${JSON.stringify(questions)}`,
@@ -143,13 +146,21 @@ function normalizeSuggestion(raw: unknown, questionById: Map<string, EtpQuestion
   const sourcePage = typeof record.sourcePage === 'number' && Number.isFinite(record.sourcePage)
     ? record.sourcePage
     : undefined;
+  const sourceType = record.sourceType === 'processo' || record.sourceType === 'anexo' || record.sourceType === 'etp'
+    ? record.sourceType
+    : undefined;
+  const sourceLabel = typeof record.sourceLabel === 'string' ? record.sourceLabel.trim() : '';
   const sourceExcerpt = typeof record.sourceExcerpt === 'string' ? record.sourceExcerpt.trim() : '';
 
   if (status !== 'suggested') {
     return { questionId, status: 'unanswered' };
   }
 
-  if (!value || !justification || !sourcePage || !sourceExcerpt) {
+  if (!value || !justification || !sourceExcerpt) {
+    return { questionId, status: 'unanswered' };
+  }
+
+  if (!sourcePage && !(sourceType === 'anexo' && sourceLabel)) {
     return { questionId, status: 'unanswered' };
   }
 
@@ -159,6 +170,8 @@ function normalizeSuggestion(raw: unknown, questionById: Map<string, EtpQuestion
     value,
     justification,
     sourcePage,
+    sourceType,
+    sourceLabel: sourceLabel || undefined,
     sourceExcerpt,
     confidence: normalizeConfidence(record.confidence) || 'medium',
   };

@@ -61,10 +61,11 @@ import { type ReferenceTermPdfAnalysis } from '@/lib/referenceTermProcessPdf';
 import type { DocumentContextSnippet } from '@/lib/documentContextSnippets';
 import { type PreliminaryStudyPdfAnalysis } from '@/lib/preliminaryStudyProcessPdf';
 import {
-  analyzePreliminaryStudySupplementalPdfFile,
+  analyzePreliminaryStudySupplementalAttachmentFile,
+  PRELIMINARY_STUDY_SUPPLEMENTAL_ACCEPT,
   PRELIMINARY_STUDY_SUPPLEMENTAL_MAX_FILES,
-  type PreliminaryStudySupplementalPdfAnalysis,
-} from '@/lib/preliminaryStudySupplementalPdf';
+  type PreliminaryStudySupplementalAttachmentAnalysis,
+} from '@/lib/preliminaryStudySupplementalAttachments';
 import {
   buildInitialPreliminaryStudyAnswers,
   buildPreliminaryStudyQuestionnaireAnswers,
@@ -1316,8 +1317,8 @@ export default function EditorDocumentos() {
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   const [generationProcessIds, setGenerationProcessIds] = useState<string[]>([]);
   const [openingPdfId, setOpeningPdfId] = useState<string | null>(null);
-  const [preliminaryStudySupplementalAnalyses, setPreliminaryStudySupplementalAnalyses] = useState<PreliminaryStudySupplementalPdfAnalysis[]>([]);
-  const [isAnalyzingPreliminaryStudySupplementalPdf, setIsAnalyzingPreliminaryStudySupplementalPdf] = useState(false);
+  const [preliminaryStudySupplementalAnalyses, setPreliminaryStudySupplementalAnalyses] = useState<PreliminaryStudySupplementalAttachmentAnalysis[]>([]);
+  const [isAnalyzingPreliminaryStudySupplementalAttachment, setIsAnalyzingPreliminaryStudySupplementalAttachment] = useState(false);
 
   const resources = useMemo(
     () => ({ empenhos, contratos, contratosEmpenhos }),
@@ -1429,7 +1430,7 @@ export default function EditorDocumentos() {
     setPreliminaryStudyQuestionIndex(0);
   };
 
-  const handleAddPreliminaryStudySupplementalPdfs = async (files: FileList | null) => {
+  const handleAddPreliminaryStudySupplementalAttachments = async (files: FileList | null) => {
     const selectedFiles = Array.from(files || []);
     if (preliminaryStudySupplementalInputRef.current) {
       preliminaryStudySupplementalInputRef.current.value = '';
@@ -1438,37 +1439,37 @@ export default function EditorDocumentos() {
 
     const availableSlots = PRELIMINARY_STUDY_SUPPLEMENTAL_MAX_FILES - preliminaryStudySupplementalAnalyses.length;
     if (availableSlots <= 0) {
-      toast.warning(`O limite e de ${PRELIMINARY_STUDY_SUPPLEMENTAL_MAX_FILES} PDFs auxiliares.`);
+      toast.warning(`O limite e de ${PRELIMINARY_STUDY_SUPPLEMENTAL_MAX_FILES} anexos auxiliares.`);
       return;
     }
 
     const filesToAnalyze = selectedFiles.slice(0, availableSlots);
     if (selectedFiles.length > availableSlots) {
-      toast.warning(`Somente ${availableSlots} PDF(s) foram adicionados por causa do limite.`);
+      toast.warning(`Somente ${availableSlots} arquivo(s) foram adicionados por causa do limite.`);
     }
 
-    setIsAnalyzingPreliminaryStudySupplementalPdf(true);
+    setIsAnalyzingPreliminaryStudySupplementalAttachment(true);
     try {
-      const analyses = await Promise.all(filesToAnalyze.map((file) => analyzePreliminaryStudySupplementalPdfFile(file)));
+      const analyses = await Promise.all(filesToAnalyze.map((file) => analyzePreliminaryStudySupplementalAttachmentFile(file)));
       setPreliminaryStudySupplementalAnalyses((current) => [...current, ...analyses]);
 
       const warningCount = analyses.reduce((count, analysis) => count + analysis.warnings.length, 0);
       const snippetCount = analyses.reduce((count, analysis) => count + analysis.snippets.length, 0);
       if (snippetCount > 0) {
-        toast.success(`${snippetCount} trecho(s) extraido(s) dos PDFs auxiliares.`);
+        toast.success(`${snippetCount} trecho(s) extraido(s) dos anexos auxiliares.`);
       }
       if (warningCount > 0) {
-        toast.warning('Um ou mais PDFs auxiliares exigem revisao.');
+        toast.warning('Um ou mais anexos auxiliares exigem revisao.');
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Nao foi possivel analisar o PDF auxiliar.';
+      const message = error instanceof Error ? error.message : 'Nao foi possivel analisar o anexo auxiliar.';
       toast.error(message);
     } finally {
-      setIsAnalyzingPreliminaryStudySupplementalPdf(false);
+      setIsAnalyzingPreliminaryStudySupplementalAttachment(false);
     }
   };
 
-  const handleRemovePreliminaryStudySupplementalPdf = (fileName: string) => {
+  const handleRemovePreliminaryStudySupplementalAttachment = (fileName: string) => {
     setPreliminaryStudySupplementalAnalyses((current) => current.filter((analysis) => analysis.fileName !== fileName));
   };
 
@@ -3106,16 +3107,16 @@ export default function EditorDocumentos() {
                         <input
                           ref={preliminaryStudySupplementalInputRef}
                           type="file"
-                          accept="application/pdf,.pdf"
+                          accept={PRELIMINARY_STUDY_SUPPLEMENTAL_ACCEPT}
                           multiple
                           className="hidden"
-                          onChange={(event) => void handleAddPreliminaryStudySupplementalPdfs(event.target.files)}
+                          onChange={(event) => void handleAddPreliminaryStudySupplementalAttachments(event.target.files)}
                         />
                         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                           <div>
-                            <p className="font-ui text-xs font-semibold text-text-primary">PDFs auxiliares opcionais</p>
+                            <p className="font-ui text-xs font-semibold text-text-primary">Anexos auxiliares opcionais</p>
                             <p className="mt-1 font-ui text-xs leading-5 text-text-secondary">
-                              Convenção coletiva e outros apoios são lidos localmente; apenas trechos extraídos vão para a IA.
+                              PDF, planilhas, CSV, TXT, MD e DOCX sao lidos localmente; apenas trechos extraidos vao para a IA.
                             </p>
                           </div>
                           <Button
@@ -3124,16 +3125,16 @@ export default function EditorDocumentos() {
                             className="h-9 gap-2"
                             onClick={() => preliminaryStudySupplementalInputRef.current?.click()}
                             disabled={
-                              isAnalyzingPreliminaryStudySupplementalPdf ||
+                              isAnalyzingPreliminaryStudySupplementalAttachment ||
                               preliminaryStudySupplementalAnalyses.length >= PRELIMINARY_STUDY_SUPPLEMENTAL_MAX_FILES
                             }
                           >
-                            {isAnalyzingPreliminaryStudySupplementalPdf ? (
+                            {isAnalyzingPreliminaryStudySupplementalAttachment ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
                               <Upload className="h-4 w-4" />
                             )}
-                            Adicionar PDF
+                            Adicionar arquivo
                           </Button>
                         </div>
                         {preliminaryStudySupplementalAnalyses.length > 0 ? (
@@ -3146,7 +3147,7 @@ export default function EditorDocumentos() {
                                 <div className="min-w-0">
                                   <p className="truncate font-ui text-xs font-semibold text-text-primary">{analysis.fileName}</p>
                                   <p className="mt-0.5 font-ui text-[11px] text-text-secondary">
-                                    {analysis.snippets.length} trecho(s) útil(eis), {analysis.searchablePageCount}/{analysis.pageCount} página(s) com texto
+                                    {analysis.fileType} | {analysis.snippets.length} trecho(s) util(eis), {analysis.sourceSummary}
                                   </p>
                                   {analysis.warnings.length > 0 ? (
                                     <p className="mt-1 font-ui text-[11px] text-foreground">{analysis.warnings[0]}</p>
@@ -3157,7 +3158,7 @@ export default function EditorDocumentos() {
                                   variant="ghost"
                                   size="sm"
                                   className="h-7 justify-start px-2 text-text-secondary hover:bg-surface-subtle hover:text-text-primary"
-                                  onClick={() => handleRemovePreliminaryStudySupplementalPdf(analysis.fileName)}
+                                  onClick={() => handleRemovePreliminaryStudySupplementalAttachment(analysis.fileName)}
                                 >
                                   <Trash2 className="mr-1.5 h-3.5 w-3.5" />
                                   Remover

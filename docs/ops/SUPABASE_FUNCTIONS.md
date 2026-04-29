@@ -144,7 +144,7 @@ Chamador:
 Uso:
 
 - gera rascunho editavel do Estudo Tecnico Preliminar para servicos continuos no Editor de Documentos
-- recebe processo SUAP opcional, objeto manual, questionario fixo, respostas/pulos do usuario, trechos classificados do PDF do processo e snippets auxiliares extraidos localmente de PDFs opcionais
+- recebe processo SUAP opcional, objeto manual, questionario fixo, respostas/pulos do usuario, trechos classificados do PDF do processo e snippets auxiliares extraidos localmente de anexos opcionais PDF, XLSX, XLS, ODS, CSV, TXT, MD e DOCX
 - devolve HTML, secoes copiaveis, alertas, pendencias e campos identificados
 
 Dependencias:
@@ -156,8 +156,8 @@ Observacao:
 
 - se nao houver chave Gemini, a function monta um fallback local com as respostas e pendencias
 - se a function ainda nao estiver publicada ou falhar por indisponibilidade/CORS, o frontend tambem monta fallback local em `preliminaryStudiesService`
-- nao usa modelo DOCX, nao persiste rascunho em banco, nao persiste PDFs auxiliares e nao faz OCR
-- snippets auxiliares chegam como texto com `sourceType: "anexo"`, `sourceName`, `sourceLabel`, `pageNumber`, `kind` e `excerpt`; o PDF bruto nunca chega a function
+- nao usa modelo DOCX para o ETP, nao persiste rascunho em banco, nao persiste anexos auxiliares e nao faz OCR
+- snippets auxiliares chegam como texto com `sourceType: "anexo"`, `sourceName`, `sourceLabel`, `pageNumber` opcional, `kind` e `excerpt`; arquivos brutos nunca chegam a function
 - publicada com `verify_jwt = false`, seguindo o padrao das functions do Editor de Documentos
 
 ### `sugerir-respostas-etp-servicos-continuos`
@@ -183,7 +183,7 @@ Dependencias:
 
 Observacao:
 
-- sugestoes sem pagina, trecho-fonte, justificativa e valor sao descartadas pelo frontend
+- sugestoes sem trecho-fonte, justificativa e valor sao descartadas pelo frontend; fontes de processo precisam de pagina, e anexos sem pagina precisam de `sourceType: "anexo"` com `sourceLabel`
 - anexos locais do ETP nao sao persistidos nem enviados brutos; apenas snippets extraidos no navegador entram no payload
 - quando o processo nao tem PDF pesquisavel ou a function nao responde, o frontend segue pelo questionario manual
 
@@ -203,7 +203,7 @@ Uso:
 - gera texto para uma secao individual do questionario do ETP de servicos continuos
 - aceita notas curtas do usuario, mas tambem gera um texto preliminar quando a secao e solicitada sem digitacao previa
 - deve marcar dados concretos ausentes como pendencia, sem inventar numeros, datas, valores ou fatos especificos
-- pode usar snippets auxiliares de PDFs locais como apoio, sempre identificados por nome do arquivo e pagina quando disponivel
+- pode usar snippets auxiliares de anexos locais como apoio, sempre identificados por nome do arquivo e pagina, aba/linhas ou bloco quando disponivel
 
 Dependencias:
 

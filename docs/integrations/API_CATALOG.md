@@ -329,7 +329,7 @@ Observacao:
 Uso:
 
 - geracao assistida do Estudo Tecnico Preliminar para servicos continuos no Editor de Documentos
-- recebe metadados do processo SUAP quando disponiveis, objeto digitado manualmente, questionario fixo do ETP, respostas ou pulos do usuario, trechos relevantes do PDF sincronizado e snippets auxiliares extraidos localmente de PDFs opcionais
+- recebe metadados do processo SUAP quando disponiveis, objeto digitado manualmente, questionario fixo do ETP, respostas ou pulos do usuario, trechos relevantes do PDF sincronizado e snippets auxiliares extraidos localmente de anexos opcionais PDF, XLSX, XLS, ODS, CSV, TXT, MD e DOCX
 
 Chamador:
 
@@ -349,8 +349,8 @@ Observacao:
 
 - a function devolve HTML editavel, secoes copiaveis, campos, alertas e pendencias; se nao houver chave Gemini, monta um fallback local com as respostas e pendencias recebidas
 - se a chamada a function falhar no frontend por indisponibilidade, CORS ou function ainda nao publicada, `preliminaryStudiesService` monta o mesmo tipo de rascunho por fallback local para nao bloquear o usuario
-- a versao atual nao usa modelo DOCX, nao grava rascunhos no banco, nao persiste PDFs auxiliares e nao faz OCR de PDF escaneado
-- snippets auxiliares chegam com `sourceType: "anexo"` e podem trazer `sourceName`, `sourceLabel`, `pageNumber`, `kind` e `excerpt`; o PDF bruto nunca e enviado para a function
+- a versao atual nao usa modelo DOCX para o ETP, nao grava rascunhos no banco, nao persiste anexos auxiliares e nao faz OCR de PDF escaneado
+- snippets auxiliares chegam com `sourceType: "anexo"` e podem trazer `sourceName`, `sourceLabel`, `pageNumber` opcional, `kind` e `excerpt`; arquivos brutos nunca sao enviados para a function
 
 ## 7F. Edge Function `sugerir-respostas-etp-servicos-continuos`
 
@@ -376,7 +376,7 @@ Dependencias externas:
 
 Observacao:
 
-- sugestoes sem `sourcePage`, `sourceExcerpt`, `justification` e `value` sao descartadas e tratadas como pendentes
+- sugestoes sem `sourceExcerpt`, `justification` e `value` sao descartadas e tratadas como pendentes; fontes de processo devem trazer `sourcePage`, enquanto anexos sem pagina podem usar `sourceType: "anexo"` com `sourceLabel`
 - snippets auxiliares podem apoiar respostas, mas entram apenas como texto extraido pelo frontend; anexos locais nao sao persistidos nem enviados brutos
 - quando nao houver trechos do PDF ou quando a function nao responder, o fluxo segue pelo questionario manual
 
@@ -385,7 +385,7 @@ Observacao:
 Uso:
 
 - geracao assistida de texto para uma secao individual do questionario fixo do ETP de servicos continuos
-- recebe a pergunta atual, notas digitadas pelo usuario quando houver, objeto manual, metadados do processo, respostas ja registradas, trechos do PDF sincronizado e snippets auxiliares de PDFs locais opcionais
+- recebe a pergunta atual, notas digitadas pelo usuario quando houver, objeto manual, metadados do processo, respostas ja registradas, trechos do PDF sincronizado e snippets auxiliares de anexos locais opcionais
 - pode gerar texto mesmo quando `userNotes` vier vazio; dados concretos ausentes devem ser marcados como pendencia, sem inventar numeros, datas, valores ou fatos
 
 Chamador:

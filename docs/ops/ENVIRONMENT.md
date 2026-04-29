@@ -114,10 +114,10 @@ Opcional:
 
 Observacoes operacionais:
 
-- a function consome Gemini via REST e espera receber o questionario fixo do ETP, respostas do usuario, objeto manual opcional, trechos do PDF do processo quando houver e snippets auxiliares extraidos no navegador de PDFs locais opcionais
+- a function consome Gemini via REST e espera receber o questionario fixo do ETP, respostas do usuario, objeto manual opcional, trechos do PDF do processo quando houver e snippets auxiliares extraidos no navegador de anexos locais opcionais PDF, XLSX, XLS, ODS, CSV, TXT, MD e DOCX
 - quando nao houver chave Gemini, a function devolve fallback local com respostas e pendencias, permitindo revisao manual no editor
 - quando a function ainda nao estiver publicada ou falhar por indisponibilidade/CORS, o frontend tambem usa fallback local com respostas e pendencias
-- esta versao nao usa modelo DOCX, nao persiste rascunhos no banco, nao persiste PDFs auxiliares e nao suporta OCR
+- esta versao nao usa modelo DOCX para o ETP, nao persiste rascunhos no banco, nao persiste anexos auxiliares e nao suporta OCR
 - `supabase/config.toml` deve manter `verify_jwt = false` para `gerar-etp-servicos-continuos`, conforme o padrao das functions do Editor de Documentos
 
 ### `sugerir-respostas-etp-servicos-continuos`
@@ -133,8 +133,8 @@ Opcionais:
 
 Observacoes operacionais:
 
-- a function so sugere respostas quando recebe trechos do PDF do processo ou snippets auxiliares e consegue apontar pagina, trecho-fonte e justificativa
-- PDFs auxiliares opcionais nao exigem novo segredo de ambiente: o frontend extrai texto com `pdfjs-dist`, nao envia o arquivo bruto, nao usa Storage e nao persiste o conteudo
+- a function so sugere respostas quando recebe trechos do PDF do processo ou snippets auxiliares e consegue apontar fonte, trecho-fonte e justificativa; anexos sem pagina usam `sourceType: "anexo"` e `sourceLabel`
+- anexos auxiliares opcionais nao exigem novo segredo de ambiente: o frontend extrai texto com `pdfjs-dist`, `xlsx`, `cfb` e `TextDecoder`, nao envia o arquivo bruto, nao usa Storage e nao persiste o conteudo
 - se a sugestao falhar ou a function nao estiver publicada, o frontend continua pelo questionario manual
 - `supabase/config.toml` deve manter `verify_jwt = false` para `sugerir-respostas-etp-servicos-continuos`
 
@@ -152,7 +152,7 @@ Opcional:
 
 Observacoes operacionais:
 
-- a function consome Gemini via REST e recebe a pergunta atual do ETP, notas opcionais do usuario, respostas ja registradas, objeto manual, trechos do PDF do processo quando existirem e snippets auxiliares de PDFs locais opcionais
+- a function consome Gemini via REST e recebe a pergunta atual do ETP, notas opcionais do usuario, respostas ja registradas, objeto manual, trechos do PDF do processo quando existirem e snippets auxiliares de anexos locais opcionais
 - quando a secao for solicitada sem notas do usuario, a function ainda deve gerar texto preliminar, marcando dados concretos ausentes como pendencia
 - quando nao houver chave Gemini, a function devolve texto local de apoio
 - quando a function ainda nao estiver publicada ou falhar por indisponibilidade/CORS, o frontend tambem usa texto local de apoio

@@ -18,6 +18,8 @@ export type PreliminaryStudyQuestionAnswer = {
   approved?: boolean;
   confidence?: 'high' | 'medium';
   sourcePage?: number;
+  sourceType?: 'processo' | 'anexo' | 'etp';
+  sourceLabel?: string;
   sourceExcerpt?: string;
   justification?: string;
 };
@@ -28,6 +30,8 @@ export type PreliminaryStudyQuestionSuggestion = {
   value?: string;
   justification?: string;
   sourcePage?: number;
+  sourceType?: 'processo' | 'anexo' | 'etp';
+  sourceLabel?: string;
   sourceExcerpt?: string;
   confidence?: 'high' | 'medium';
 };

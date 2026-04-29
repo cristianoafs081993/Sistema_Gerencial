@@ -208,12 +208,17 @@ export function normalizePreliminaryStudyQuestionSuggestionResult(value: unknown
           const sourcePage = typeof record.sourcePage === 'number' && Number.isFinite(record.sourcePage)
             ? record.sourcePage
             : undefined;
+          const sourceType = record.sourceType === 'processo' || record.sourceType === 'anexo' || record.sourceType === 'etp'
+            ? record.sourceType
+            : undefined;
+          const sourceLabel = typeof record.sourceLabel === 'string' ? record.sourceLabel.trim() : '';
           const sourceExcerpt = typeof record.sourceExcerpt === 'string' ? record.sourceExcerpt.trim() : '';
           const justification = typeof record.justification === 'string' ? record.justification.trim() : '';
           const answerValue = typeof record.value === 'string' ? record.value.trim() : '';
 
           if (!questionId || !knownQuestionIds.has(questionId)) return null;
-          if (status === 'suggested' && (!sourcePage || !sourceExcerpt || !justification || !answerValue)) return null;
+          if (status === 'suggested' && (!sourceExcerpt || !justification || !answerValue)) return null;
+          if (status === 'suggested' && !sourcePage && !(sourceType === 'anexo' && sourceLabel)) return null;
 
           return {
             questionId,
@@ -221,6 +226,8 @@ export function normalizePreliminaryStudyQuestionSuggestionResult(value: unknown
             value: answerValue || undefined,
             justification: justification || undefined,
             sourcePage,
+            sourceType,
+            sourceLabel: sourceLabel || undefined,
             sourceExcerpt: sourceExcerpt || undefined,
             confidence: normalizeConfidence(record.confidence) || (status === 'suggested' ? 'medium' : undefined),
           } satisfies PreliminaryStudyQuestionSuggestion;

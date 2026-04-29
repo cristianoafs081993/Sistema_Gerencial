@@ -6,7 +6,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import EditorDocumentos from '@/pages/EditorDocumentos';
 import { useData } from '@/contexts/DataContext';
 import { preliminaryStudyQuestions } from '@/lib/preliminaryStudyQuestionnaire';
-import { analyzePreliminaryStudySupplementalPdfFile } from '@/lib/preliminaryStudySupplementalPdf';
+import { analyzePreliminaryStudySupplementalAttachmentFile } from '@/lib/preliminaryStudySupplementalAttachments';
 import { contractDraftsService } from '@/services/contractDrafts';
 import { preliminaryStudiesService } from '@/services/preliminaryStudies';
 import { referenceTermsService } from '@/services/referenceTerms';
@@ -75,10 +75,11 @@ vi.mock('@/services/preliminaryStudies', () => ({
   },
 }));
 
-vi.mock('@/lib/preliminaryStudySupplementalPdf', () => ({
+vi.mock('@/lib/preliminaryStudySupplementalAttachments', () => ({
+  PRELIMINARY_STUDY_SUPPLEMENTAL_ACCEPT: '.pdf,.xlsx,.xls,.ods,.csv,.txt,.md,.docx',
   PRELIMINARY_STUDY_SUPPLEMENTAL_MAX_FILES: 5,
   PRELIMINARY_STUDY_SUPPLEMENTAL_MAX_FILE_SIZE: 20 * 1024 * 1024,
-  analyzePreliminaryStudySupplementalPdfFile: vi.fn(),
+  analyzePreliminaryStudySupplementalAttachmentFile: vi.fn(),
 }));
 
 const mockedUseData = vi.mocked(useData);
@@ -86,7 +87,7 @@ const mockedSuapProcessosService = vi.mocked(suapProcessosService);
 const mockedContractDraftsService = vi.mocked(contractDraftsService);
 const mockedReferenceTermsService = vi.mocked(referenceTermsService);
 const mockedPreliminaryStudiesService = vi.mocked(preliminaryStudiesService);
-const mockedAnalyzePreliminaryStudySupplementalPdfFile = vi.mocked(analyzePreliminaryStudySupplementalPdfFile);
+const mockedAnalyzePreliminaryStudySupplementalAttachmentFile = vi.mocked(analyzePreliminaryStudySupplementalAttachmentFile);
 
 function renderEditor(route = '/editor-documentos/despacho-liquidacao') {
   const queryClient = new QueryClient();
@@ -296,20 +297,21 @@ describe('EditorDocumentos', () => {
       model: 'gemini-2.5-flash-lite',
     });
 
-    mockedAnalyzePreliminaryStudySupplementalPdfFile.mockResolvedValue({
-      fileName: 'cct.pdf',
-      pageCount: 2,
-      searchablePageCount: 2,
+    mockedAnalyzePreliminaryStudySupplementalAttachmentFile.mockResolvedValue({
+      fileName: 'planilha-custos.xlsx',
+      fileType: 'Planilha',
+      sourceSummary: '1/1 origem(ns) com texto',
+      pageCount: 1,
+      searchablePageCount: 1,
       snippets: [
         {
-          id: 'anexo-cct-estimativa-1',
+          id: 'anexo-planilha-estimativa-1',
           kind: 'estimativa',
-          label: 'CCT - Piso salarial',
-          pageNumber: 1,
-          excerpt: 'Piso salarial da categoria.',
+          label: 'Estimativa de valor',
+          excerpt: 'Planilha de custos com piso salarial da categoria.',
           sourceType: 'anexo',
-          sourceName: 'cct.pdf',
-          sourceLabel: 'cct.pdf, pagina 1',
+          sourceName: 'planilha-custos.xlsx',
+          sourceLabel: 'planilha-custos.xlsx, aba Custos, linhas 2-30',
         },
       ],
       warnings: [],
@@ -855,7 +857,7 @@ describe('EditorDocumentos', () => {
     expect(screen.getByRole('button', { name: /Prosseguir para Termo de Referencia/i })).toBeInTheDocument();
   }, 15000);
 
-  it('gera ETP com PDF auxiliar opcional e permite remover antes da geracao', async () => {
+  it('gera ETP com anexo auxiliar opcional e permite remover antes da geracao', async () => {
     const { container } = renderEditor('/editor-documentos/estudo-tecnico-preliminar-servicos-continuos');
 
     expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
@@ -863,24 +865,24 @@ describe('EditorDocumentos', () => {
     const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
     fireEvent.change(fileInput, {
       target: {
-        files: [new File(['pdf'], 'cct.pdf', { type: 'application/pdf' })],
+        files: [new File(['xlsx'], 'planilha-custos.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })],
       },
     });
 
-    expect(await screen.findByText('cct.pdf')).toBeInTheDocument();
+    expect(await screen.findByText('planilha-custos.xlsx')).toBeInTheDocument();
     expect(screen.getByText(/1 trecho/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Remover/i }));
     await waitFor(() => {
-      expect(screen.queryByText('cct.pdf')).not.toBeInTheDocument();
+      expect(screen.queryByText('planilha-custos.xlsx')).not.toBeInTheDocument();
     });
 
     fireEvent.change(fileInput, {
       target: {
-        files: [new File(['pdf'], 'cct.pdf', { type: 'application/pdf' })],
+        files: [new File(['xlsx'], 'planilha-custos.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })],
       },
     });
-    expect(await screen.findByText('cct.pdf')).toBeInTheDocument();
+    expect(await screen.findByText('planilha-custos.xlsx')).toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText(/descreva o objeto da licitacao/i), {
       target: { value: 'Contratacao de servicos continuos de limpeza predial' },
@@ -894,7 +896,8 @@ describe('EditorDocumentos', () => {
           supplementalSnippets: expect.arrayContaining([
             expect.objectContaining({
               sourceType: 'anexo',
-              sourceName: 'cct.pdf',
+              sourceName: 'planilha-custos.xlsx',
+              sourceLabel: 'planilha-custos.xlsx, aba Custos, linhas 2-30',
             }),
           ]),
         }),

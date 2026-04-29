@@ -40,8 +40,8 @@ Transformar a criação de documentos administrativos (ETP, TR, Minutas) em um p
 - O usuario pode informar um processo SUAP sincronizado ou digitar manualmente o objeto da licitacao.
 - Quando houver PDF sincronizado e pesquisavel, o sistema extrai trechos de apoio e solicita sugestoes com fonte explicita antes da revisao manual.
 - Quando nao houver PDF, quando o PDF nao tiver texto pesquisavel ou quando a sugestao falhar, o fluxo continua pelo questionario fixo do ETP.
-- O usuario pode anexar ate 5 PDFs auxiliares locais, como convencao coletiva, com limite de 20 MB por arquivo; esses PDFs sao lidos somente no navegador, sem OCR, sem upload bruto, sem Storage e sem persistencia no banco.
-- Os PDFs auxiliares entram apenas como snippets com nome da fonte, pagina quando disponivel, categoria e trecho extraido, apoiando sugestoes, geracao por secao e rascunho final.
+- O usuario pode anexar ate 5 arquivos auxiliares locais, como convencao coletiva, planilha de custos ou memoria em DOCX/TXT, com limite de 20 MB por arquivo; formatos suportados: PDF, XLSX, XLS, ODS, CSV, TXT, MD e DOCX. Esses arquivos sao lidos somente no navegador, sem OCR, sem upload bruto, sem Storage e sem persistencia no banco.
+- Os anexos auxiliares entram apenas como snippets com nome da fonte, pagina/aba/linhas/bloco quando disponivel, categoria e trecho extraido, apoiando sugestoes, geracao por secao e rascunho final.
 - Em cada etapa do questionario, o usuario pode solicitar geracao de texto da secao com IA a partir de poucas notas ou mesmo sem digitacao previa; o texto gerado permanece editavel e deve sinalizar pendencias quando faltarem dados concretos.
 - Campos sem fonte segura ou sem resposta do usuario permanecem como pendencias no rascunho; a IA nao deve inventar informacao ausente.
 - A saida v1 e um rascunho editavel no editor com acoes de copiar documento, copiar secoes e prosseguir para TR usando o conteudo atualmente editado. Exportacao DOCX do ETP, OCR, persistencia de rascunhos e vinculo ETP/TR ficam fora do v1.

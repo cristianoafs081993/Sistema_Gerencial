@@ -70,6 +70,32 @@ describe('normalizePreliminaryStudyQuestionSuggestionResult', () => {
     ]);
   });
 
+  it('aceita sugestao de anexo com sourceLabel mesmo sem pagina', () => {
+    const result = normalizePreliminaryStudyQuestionSuggestionResult({
+      suggestions: [
+        {
+          questionId: 'estimativa_valor',
+          status: 'suggested',
+          value: 'Usar a planilha de custos como base da estimativa.',
+          justification: 'A planilha traz os custos por item.',
+          sourceType: 'anexo',
+          sourceLabel: 'planilha-custos.xlsx, aba Custos, linhas 2-30',
+          sourceExcerpt: 'Planilha de custos com piso salarial da categoria.',
+          confidence: 'medium',
+        },
+      ],
+    });
+
+    expect(result.suggestions).toEqual([
+      expect.objectContaining({
+        questionId: 'estimativa_valor',
+        status: 'suggested',
+        sourceType: 'anexo',
+        sourceLabel: 'planilha-custos.xlsx, aba Custos, linhas 2-30',
+      }),
+    ]);
+  });
+
   it('gera fallback local quando a function de ETP nao responde', async () => {
     mockedInvoke.mockRejectedValueOnce(new TypeError('Failed to fetch'));
 
@@ -149,14 +175,13 @@ describe('normalizePreliminaryStudyQuestionSuggestionResult', () => {
       manualObject: 'Contratacao de servicos continuos de limpeza',
       supplementalSnippets: [
         {
-          id: 'anexo-cct-1',
+          id: 'anexo-planilha-1',
           kind: 'estimativa',
-          label: 'CCT - Piso salarial',
-          pageNumber: 4,
+          label: 'Planilha de custos',
           excerpt: 'Piso salarial da categoria.',
           sourceType: 'anexo',
-          sourceName: 'cct.pdf',
-          sourceLabel: 'cct.pdf, pagina 4',
+          sourceName: 'planilha-custos.xlsx',
+          sourceLabel: 'planilha-custos.xlsx, aba Custos, linhas 2-30',
         },
       ],
     });
@@ -167,10 +192,10 @@ describe('normalizePreliminaryStudyQuestionSuggestionResult', () => {
         body: expect.objectContaining({
           contextSnippets: expect.arrayContaining([
             expect.objectContaining({
-              id: 'anexo-cct-1',
+              id: 'anexo-planilha-1',
               sourceType: 'anexo',
-              sourceName: 'cct.pdf',
-              sourceLabel: 'cct.pdf, pagina 4',
+              sourceName: 'planilha-custos.xlsx',
+              sourceLabel: 'planilha-custos.xlsx, aba Custos, linhas 2-30',
             }),
           ]),
         }),
