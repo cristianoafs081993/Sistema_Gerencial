@@ -24,6 +24,8 @@ export interface RetencaoEfdReinfRegistro {
   valorRetencao: number;
 }
 
+export type RetencaoEfdReinfPaymentDateSource = 'ob' | 'dh' | 'missing-ob';
+
 type RetencaoEfdReinfDbRow = {
   source_index: number;
   documento_habil: string;
@@ -46,6 +48,13 @@ type RetencaoEfdReinfDbRow = {
   imported_at: string;
 };
 
+type RetencaoEfdReinfObRow = {
+  id: string;
+  documento_habil_id: string | null;
+  data_emissao: string | null;
+  observacao: string | null;
+};
+
 const SITUACOES_IGNORADAS_REGRA_UG_CRITICA = new Set(['DDR001', 'DGR001']);
 
 export type RetencaoEfdReinfValidation = {
@@ -54,8 +63,14 @@ export type RetencaoEfdReinfValidation = {
   hasWarningPrazo: boolean;
   expectedDate: string | null;
   expectedRule: 'DDF025' | 'DDF021' | null;
+  paymentDateSource: RetencaoEfdReinfPaymentDateSource;
+  paymentDateUsed: string | null;
   percentualRetencao: number | null;
   issues: string[];
+};
+
+export type RetencaoEfdReinfValidationOptions = {
+  obPaymentDates?: Map<string, string> | Record<string, string>;
 };
 
 function parseCurrencyBR(value: unknown): number {
@@ -141,6 +156,11 @@ function toIsoDate(value: unknown): string | null {
   return format(date, 'yyyy-MM-dd');
 }
 
+function normalizeDocumentoHabilId(value?: string | null) {
+  const trimmed = String(value || '').trim();
+  return trimmed.length > 12 ? trimmed.slice(-12).toUpperCase() : trimmed.toUpperCase();
+}
+
 function formatDateBr(value?: string | null) {
   if (!value) return '-';
   const parsed = parseISO(value);
@@ -175,6 +195,36 @@ function toBooleanLiquidado(value: unknown): boolean | null {
   if (normalized === 'SIM' || normalized === 'S') return true;
   if (normalized === 'NAO' || normalized === 'N') return false;
   return null;
+}
+
+function normalizeText(value?: string | null) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase();
+}
+
+function isObPagamentoPrincipal(row: RetencaoEfdReinfObRow) {
+  const observacao = normalizeText(row.observacao);
+  const indicaPagamento = /\b(PGTO|PAGAMENTO)\b/.test(observacao);
+  const indicaRetencao = /\bRETENCAO\b/.test(observacao);
+  return indicaPagamento && !indicaRetencao;
+}
+
+function getPaymentDateFromOptions(
+  documentoHabil: string,
+  options?: RetencaoEfdReinfValidationOptions,
+) {
+  const dates = options?.obPaymentDates;
+  if (!dates) return undefined;
+
+  const normalized = normalizeDocumentoHabilId(documentoHabil);
+  if (dates instanceof Map) {
+    return dates.get(documentoHabil) || dates.get(normalized);
+  }
+
+  return dates[documentoHabil] || dates[normalized];
 }
 
 export async function parseRetencoesEfdReinfCsv(file: File): Promise<RetencaoEfdReinfRegistro[]> {
@@ -223,7 +273,10 @@ export async function parseRetencoesEfdReinfCsv(file: File): Promise<RetencaoEfd
     .filter((item): item is RetencaoEfdReinfRegistro => item !== null);
 }
 
-export function validateRetencaoEfdReinfRow(row: RetencaoEfdReinfRegistro): RetencaoEfdReinfValidation {
+export function validateRetencaoEfdReinfRow(
+  row: RetencaoEfdReinfRegistro,
+  options?: RetencaoEfdReinfValidationOptions,
+): RetencaoEfdReinfValidation {
   const issues: string[] = [];
   const itemUgPagadora = (row.dhItemUgPagadora || '').replace(/\D/g, '');
   const situacao = row.dhSituacao.trim().toUpperCase();
@@ -233,21 +286,40 @@ export function validateRetencaoEfdReinfRow(row: RetencaoEfdReinfRegistro): Rete
   let expectedRule: 'DDF025' | 'DDF021' | null = null;
   let expectedDate: string | null = null;
   let hasWarningPrazo = false;
+  let paymentDateSource: RetencaoEfdReinfPaymentDateSource = 'dh';
+  let paymentDateUsed: string | null = null;
 
   if (row.dhSituacao === 'DDF025') {
     expectedRule = 'DDF025';
-    expectedDate = getExpectedNextMonthDay20(row.dhDiaPagamento);
-    hasWarningPrazo =
-      !expectedDate ||
-      !sameIsoDate(row.dhItemDiaVencimento, expectedDate) ||
-      !sameIsoDate(row.dhItemDiaPagamento, expectedDate);
-    if (hasWarningPrazo) {
-      issues.push('DDF025 deve vencer e pagar no dia 20 do mes seguinte ao DH - Dia Pagamento.');
+    const hasObPaymentDateMap = Boolean(options?.obPaymentDates);
+    const obPaymentDate = getPaymentDateFromOptions(row.documentoHabil, options);
+
+    paymentDateSource = hasObPaymentDateMap ? (obPaymentDate ? 'ob' : 'missing-ob') : 'dh';
+    paymentDateUsed = hasObPaymentDateMap ? (obPaymentDate || null) : row.dhDiaPagamento;
+    expectedDate = getExpectedNextMonthDay20(paymentDateUsed);
+
+    if (hasObPaymentDateMap && !obPaymentDate) {
+      hasWarningPrazo = true;
+      issues.push('DDF025 sem OB de pagamento localizada para calcular o vencimento esperado.');
+    } else {
+      hasWarningPrazo =
+        !expectedDate ||
+        !sameIsoDate(row.dhItemDiaVencimento, expectedDate) ||
+        !sameIsoDate(row.dhItemDiaPagamento, expectedDate);
+      if (hasWarningPrazo) {
+        issues.push(
+          paymentDateSource === 'ob'
+            ? 'DDF025 deve vencer e pagar no dia 20 do mes seguinte a OB de pagamento da NP.'
+            : 'DDF025 deve vencer e pagar no dia 20 do mes seguinte ao DH - Dia Pagamento.',
+        );
+      }
     }
   }
 
   if (row.dhSituacao === 'DDF021') {
     expectedRule = 'DDF021';
+    paymentDateSource = 'dh';
+    paymentDateUsed = row.dhDataEmissaoDocOrigem;
     expectedDate = getExpectedNextMonthDay20(row.dhDataEmissaoDocOrigem);
     hasWarningPrazo =
       !expectedDate ||
@@ -271,6 +343,8 @@ export function validateRetencaoEfdReinfRow(row: RetencaoEfdReinfRegistro): Rete
     hasWarningPrazo,
     expectedDate,
     expectedRule,
+    paymentDateSource,
+    paymentDateUsed,
     percentualRetencao,
     issues,
   };
@@ -405,6 +479,46 @@ export async function loadLatestRetencoesEfdReinfRowsFromDb(): Promise<{
     sourceFile: latest.source_file || '',
     importedAt: latest.imported_at,
   };
+}
+
+export async function loadRetencoesEfdReinfObPaymentDates(
+  rows: RetencaoEfdReinfRegistro[],
+): Promise<Map<string, string>> {
+  const documentoIds = Array.from(new Set(rows.map((row) => normalizeDocumentoHabilId(row.documentoHabil)).filter(Boolean)));
+  if (!documentoIds.length) return new Map();
+
+  const { data, error } = await supabase
+    .from('documentos_habeis_itens')
+    .select('id, documento_habil_id, data_emissao, observacao')
+    .in('documento_habil_id', documentoIds)
+    .eq('doc_tipo', 'OB')
+    .order('data_emissao', { ascending: true });
+
+  if (error) throw error;
+
+  const grouped = new Map<string, RetencaoEfdReinfObRow[]>();
+  for (const row of ((data || []) as RetencaoEfdReinfObRow[])) {
+    const documentoId = normalizeDocumentoHabilId(row.documento_habil_id);
+    if (!documentoId || !row.data_emissao) continue;
+    const existing = grouped.get(documentoId) || [];
+    existing.push(row);
+    grouped.set(documentoId, existing);
+  }
+
+  const paymentDates = new Map<string, string>();
+  for (const [documentoId, obRows] of grouped.entries()) {
+    const sortedRows = [...obRows].sort((left, right) => {
+      const leftDate = toIsoDate(left.data_emissao) || '';
+      const rightDate = toIsoDate(right.data_emissao) || '';
+      if (leftDate !== rightDate) return leftDate.localeCompare(rightDate);
+      return left.id.localeCompare(right.id);
+    });
+    const selected = sortedRows.find(isObPagamentoPrincipal) || sortedRows[0];
+    const paymentDate = toIsoDate(selected.data_emissao);
+    if (paymentDate) paymentDates.set(documentoId, paymentDate);
+  }
+
+  return paymentDates;
 }
 
 export function formatRetencaoEfdReinfDate(value?: string | null) {

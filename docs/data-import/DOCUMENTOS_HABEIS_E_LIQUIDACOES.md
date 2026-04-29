@@ -60,6 +60,11 @@ Campos esperados na UI:
 - `RESTOS A PAGAR PAGOS`
 - `Dia Lancamento`
 
+Regras de data:
+
+- `Dia Lancamento` e gravado em `documentos_habeis_itens.data_emissao` e representa a data de pagamento da OB vinculada a NP/RP.
+- Essa data tambem e usada pela auditoria FD-Reinf para calcular o vencimento esperado das situacoes `DDF025`.
+
 ### 4. Situacoes / Retencoes
 
 - entrada: JSON ou CSV tabulado
@@ -92,6 +97,7 @@ Campos esperados na UI:
 
 - o service tambem integra com o Portal da Transparencia por `fetch`
 - parte da logica de documentos gera itens, situacoes e atualizacoes cruzadas com empenhos
+- no import de Ordens Bancarias, o item `OB` fica vinculado ao documento habil por `Documento Origem`
 - na leitura operacional dos CSVs usados para reconciliar empenhos:
   - o arquivo `Exec_NE_Exercicio_RAP_UG_Executora.csv` continua cobrindo o exercicio corrente e o contrato legado combinado
   - o saldo atual de RAP tambem pode vir em um CSV especifico com `NE CCor` + `Metrica`, que atualiza somente `saldo_rap_oficial`

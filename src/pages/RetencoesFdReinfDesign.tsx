@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import {
   formatRetencaoEfdReinfDate,
   loadLatestRetencoesEfdReinfRowsFromDb,
+  loadRetencoesEfdReinfObPaymentDates,
   parseRetencoesEfdReinfCsv,
   type RetencaoEfdReinfRegistro,
   saveRetencoesEfdReinfRows,
@@ -55,6 +56,7 @@ const severityWeight = { critical: 3, warning: 2, ok: 1 } satisfies Record<'crit
 export default function RetencoesFdReinfDesign() {
   const { isSuperAdmin } = useAuth();
   const [rows, setRows] = useState<RetencaoEfdReinfRegistro[]>([]);
+  const [obPaymentDates, setObPaymentDates] = useState<Map<string, string>>(new Map());
   const [fileName, setFileName] = useState('');
   const [importedAt, setImportedAt] = useState<string | null>(null);
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
@@ -78,7 +80,9 @@ export default function RetencoesFdReinfDesign() {
         setIsLoadingInitial(true);
       }
       const latest = await loadLatestRetencoesEfdReinfRowsFromDb();
+      const paymentDates = await loadRetencoesEfdReinfObPaymentDates(latest.rows);
       setRows(latest.rows);
+      setObPaymentDates(paymentDates);
       setFileName(latest.sourceFile);
       setImportedAt(latest.importedAt);
     } catch (error) {
@@ -100,7 +104,9 @@ export default function RetencoesFdReinfDesign() {
       setIsUploading(true);
       const parsed = await parseRetencoesEfdReinfCsv(file);
       await saveRetencoesEfdReinfRows(parsed, file.name);
+      const paymentDates = await loadRetencoesEfdReinfObPaymentDates(parsed);
       setRows(parsed);
+      setObPaymentDates(paymentDates);
       setFileName(file.name);
       setImportedAt(new Date().toISOString());
       setPage(1);
@@ -115,8 +121,8 @@ export default function RetencoesFdReinfDesign() {
   };
 
   const rowsWithValidation = useMemo<ViewRow[]>(
-    () => rows.map((row) => ({ row, validation: validateRetencaoEfdReinfRow(row) })),
-    [rows],
+    () => rows.map((row) => ({ row, validation: validateRetencaoEfdReinfRow(row, { obPaymentDates }) })),
+    [rows, obPaymentDates],
   );
 
   const resumo = useMemo(() => ({
@@ -225,7 +231,7 @@ export default function RetencoesFdReinfDesign() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard title="Registros auditados" value={resumo.total} subtitle={fileName ? `Base atual: ${fileName}` : 'Aguardando importacao da base'} icon={FileUp} stitchColor="vibrant-blue" isLoading={isLoadingInitial} />
         <StatCard title="Criticos de UG" value={resumo.criticos} subtitle="Itens com UG pagadora diferente de 158155, exceto DDR001 e DGR001" icon={ShieldAlert} stitchColor="red-500" progress={resumo.total ? (resumo.criticos / resumo.total) * 100 : 0} isLoading={isLoadingInitial} />
-        <StatCard title="Alertas de prazo" value={resumo.alertasPrazo} subtitle="DDF021 e DDF025 fora da regra do dia 20" icon={AlertTriangle} stitchColor="amber" progress={resumo.total ? (resumo.alertasPrazo / resumo.total) * 100 : 0} isLoading={isLoadingInitial} />
+        <StatCard title="Alertas de prazo" value={resumo.alertasPrazo} subtitle="DDF025 usa a OB de pagamento; DDF021 usa a emissao" icon={AlertTriangle} stitchColor="amber" progress={resumo.total ? (resumo.alertasPrazo / resumo.total) * 100 : 0} isLoading={isLoadingInitial} />
         <StatCard title="Retencao total" value={formatCurrency(resumo.valorTotalRetencao)} subtitle={`${resumo.liquidados} item(ns) marcados como liquidados`} icon={ShieldAlert} stitchColor="emerald-green" isLoading={isLoadingInitial} />
       </div>
 
@@ -304,9 +310,14 @@ export default function RetencoesFdReinfDesign() {
                   <TableCell className="px-4 py-3 align-top">
                     <div className="text-xs">Emissao: {formatRetencaoEfdReinfDate(row.dhDataEmissaoDocOrigem)}</div>
                     <div className="mt-1 text-xs">DH pgto: {formatRetencaoEfdReinfDate(row.dhDiaPagamento)}</div>
+                    {row.dhSituacao === 'DDF025' ? (
+                      <div className={cn('mt-1 text-xs', validation.paymentDateSource === 'missing-ob' && 'text-red-700')}>
+                        OB pgto: {validation.paymentDateSource === 'missing-ob' ? 'nao localizada' : formatRetencaoEfdReinfDate(validation.paymentDateUsed)}
+                      </div>
+                    ) : null}
                     <div className="mt-1 text-xs">Item vencto: {formatRetencaoEfdReinfDate(row.dhItemDiaVencimento)}</div>
                     <div className="mt-1 text-xs">Item pgto: {formatRetencaoEfdReinfDate(row.dhItemDiaPagamento)}</div>
-                    {validation.expectedDate ? <div className="mt-2 text-[11px] font-medium text-amber-700">Esperado ({validation.expectedRule}): {formatRetencaoEfdReinfDate(validation.expectedDate)}</div> : null}
+                    {validation.expectedDate ? <div className="mt-2 text-[11px] font-medium text-amber-700">Esperado ({validation.expectedRule}{validation.paymentDateSource === 'ob' ? '/OB' : ''}): {formatRetencaoEfdReinfDate(validation.expectedDate)}</div> : null}
                   </TableCell>
                   <TableCell className="px-4 py-3 align-top text-right text-xs font-semibold text-text-primary">{formatCurrency(row.dhValorDocOrigem)}</TableCell>
                   <TableCell className="px-4 py-3 align-top text-right text-xs font-semibold text-status-warning">{formatCurrency(row.valorRetencao)}</TableCell>

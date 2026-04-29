@@ -59,7 +59,9 @@ Este ponto deve ser tratado como debito de documentacao e de UX.
 
 ### Aviso
 
-- `DDF025`: vencimento e pagamento devem ocorrer no dia 20 do mes seguinte a `DH - Dia Pagamento`
+- `DDF025`: vencimento e pagamento devem ocorrer no dia 20 do mes seguinte ao `Dia Lancamento` da OB de pagamento vinculada a NP em `documentos_habeis_itens`
+  - a OB de pagamento e a primeira OB cuja observacao indique pagamento principal, como `PGTO` ou `PAGAMENTO`, ignorando retencoes quando identificaveis
+  - se nao houver OB de pagamento vinculada a NP, a linha fica em alerta porque nao ha data-base confiavel para calcular o vencimento esperado
 - `DDF021`: vencimento e pagamento devem ocorrer no dia 20 do mes seguinte a `DH - Data Emissao Doc.Origem`
 
 ## Destino no banco

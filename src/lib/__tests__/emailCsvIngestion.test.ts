@@ -138,6 +138,31 @@ describe('emailCsvIngestion', () => {
     });
   });
 
+  it('mantem Dia Lancamento como data_emissao das ordens bancarias na ingestao por e-mail', () => {
+    const parsed = parseEmailCsvImport({
+      fileName: '12 - Ordens Bancarias.csv',
+      text: [
+        'Dia Lancamento\tDocumento\tDocumento Origem\tNE CCor\tDoc - Tipo\tDoc - Observacao\tDESPESAS PAGAS\tRESTOS A PAGAR PAGOS (PROC E N PROC)',
+        '08/01/2026\t158366264352026OB000001\t158366264352025NP000421\t158366264352025NE000021\tOB\tPGTO DO(S) INSTR.(S) DE COBRANCA(S)\t\t744,61',
+      ].join('\n'),
+    });
+
+    expect(parsed.pipeline).toBe('ordens_bancarias');
+    if (parsed.pipeline !== 'ordens_bancarias') {
+      throw new Error('pipeline inesperado');
+    }
+
+    expect(parsed.items).toHaveLength(1);
+    expect(parsed.items[0]).toMatchObject({
+      id: '2026OB000001',
+      documento_habil_id: '2025NP000421',
+      doc_tipo: 'OB',
+      valor: 744.61,
+      data_emissao: '2026-01-08',
+      observacao: 'PGTO DO(S) INSTR.(S) DE COBRANCA(S)',
+    });
+  });
+
   it('agrega creditos disponiveis por PTRES', () => {
     const parsed = parseEmailCsvImport({
       fileName: 'credito-disponivel.csv',
