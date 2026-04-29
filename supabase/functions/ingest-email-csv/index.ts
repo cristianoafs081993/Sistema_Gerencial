@@ -311,43 +311,46 @@ async function applyDescentralizacoesImport(
   supabase: ReturnType<typeof createClient>,
   rows: DescentralizacaoImportRow[],
 ) {
+  const importedAt = new Date().toISOString();
   const existingRows = (await supabase
     .from('descentralizacoes')
-    .select('data_emissao, plano_interno, origem_recurso, natureza_despesa, valor, nota_credito')
+    .select('id, data_emissao, plano_interno, origem_recurso, natureza_despesa, valor, nota_credito')
     .then(({ data, error }) => {
       if (error) throw error;
       return data || [];
     })) as Array<Record<string, unknown>>;
 
-  const existingImportKeys = new Set(
-    existingRows.flatMap((row) => {
-      const dateKey = String(row.data_emissao || '');
-      const planoInterno = String(row.plano_interno || '').trim().toUpperCase();
-      const origemRecurso = String(row.origem_recurso || '').trim();
-      const naturezaDespesa = String(row.natureza_despesa || '').trim();
-      const valor = Number(row.valor || 0);
-      const notaCredito = String(row.nota_credito || '').trim();
-      const baseKey = `${dateKey}|${planoInterno}|${origemRecurso}|${naturezaDespesa}|${valor}`;
-      const rowKey = notaCredito ? `${baseKey}|${notaCredito}` : baseKey;
+  const existingImportKeys = new Set<string>();
+  const legacyRowsByBaseKey = new Map<string, Record<string, unknown>>();
 
-      return rowKey === baseKey ? [baseKey] : [baseKey, rowKey];
-    }),
-  );
+  existingRows.forEach((row) => {
+    const dateKey = String(row.data_emissao || '');
+    const planoInterno = String(row.plano_interno || '').trim().toUpperCase();
+    const origemRecurso = String(row.origem_recurso || '').trim();
+    const naturezaDespesa = String(row.natureza_despesa || '').trim();
+    const valor = Number(row.valor || 0);
+    const notaCredito = String(row.nota_credito || '').trim();
+    const baseKey = `${dateKey}|${planoInterno}|${origemRecurso}|${naturezaDespesa}|${valor}`;
+    const rowKey = notaCredito ? `${baseKey}|${notaCredito}` : baseKey;
+
+    existingImportKeys.add(baseKey);
+    existingImportKeys.add(rowKey);
+
+    if (!notaCredito && !legacyRowsByBaseKey.has(baseKey)) {
+      legacyRowsByBaseKey.set(baseKey, row);
+    }
+  });
 
   const importedRowKeys = new Set<string>();
-  const payload = rows
-    .filter((row) => {
-      if (
-        existingImportKeys.has(row.baseKey) ||
-        existingImportKeys.has(row.rowKey) ||
-        importedRowKeys.has(row.rowKey)
-      ) {
-        return false;
-      }
-      importedRowKeys.add(row.rowKey);
-      return true;
-    })
-    .map((row) => ({
+  const updates: Array<{ id: string; payload: Record<string, unknown> }> = [];
+  const payload: Record<string, unknown>[] = [];
+
+  rows.forEach((row) => {
+    if (existingImportKeys.has(row.rowKey) || importedRowKeys.has(row.rowKey)) {
+      return;
+    }
+
+    const rowPayload = {
       dimensao: row.dimensao,
       nota_credito: row.notaCredito || null,
       operacao_tipo: row.operacaoTipo || null,
@@ -357,7 +360,36 @@ async function applyDescentralizacoesImport(
       data_emissao: row.dataEmissao,
       descricao: row.descricao,
       valor: row.valor,
-    }));
+      updated_at: importedAt,
+    };
+
+    const legacyMatch = row.notaCredito ? legacyRowsByBaseKey.get(row.baseKey) : undefined;
+    if (legacyMatch?.id) {
+      updates.push({ id: String(legacyMatch.id), payload: rowPayload });
+      legacyRowsByBaseKey.delete(row.baseKey);
+      existingImportKeys.add(row.rowKey);
+      importedRowKeys.add(row.rowKey);
+      return;
+    }
+
+    if (existingImportKeys.has(row.baseKey)) {
+      return;
+    }
+
+    payload.push(rowPayload);
+    existingImportKeys.add(row.baseKey);
+    existingImportKeys.add(row.rowKey);
+    importedRowKeys.add(row.rowKey);
+  });
+
+  for (const chunk of chunkArray(updates, 50)) {
+    await Promise.all(
+      chunk.map(async (update) => {
+        const { error } = await supabase.from('descentralizacoes').update(update.payload).eq('id', update.id);
+        if (error) throw error;
+      }),
+    );
+  }
 
   if (payload.length > 0) {
     await insertInChunks(supabase, 'descentralizacoes', payload);
@@ -366,8 +398,8 @@ async function applyDescentralizacoesImport(
   return {
     pipeline: 'descentralizacoes' as const,
     rowsDetected: rows.length,
-    rowsWritten: payload.length,
-    tableStats: [{ table: 'descentralizacoes', rows: payload.length }],
+    rowsWritten: updates.length + payload.length,
+    tableStats: [{ table: 'descentralizacoes', rows: updates.length + payload.length }],
   };
 }
 

@@ -89,6 +89,10 @@ Consumido por:
 - [descentralizacoes.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/descentralizacoes.ts)
 - [Descentralizacoes.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Descentralizacoes.tsx)
 
+Observacoes operacionais:
+
+- reimportacoes com NC devem reconciliar registros legados sem `nota_credito` pela chave `data_emissao`, `plano_interno`, `origem_recurso`, `natureza_despesa` e `valor`, evitando duplicar a mesma descentralizacao
+
 ### `descentralizacoes_conta_saldos`
 
 Finalidade:

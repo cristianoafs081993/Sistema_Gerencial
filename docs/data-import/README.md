@@ -45,6 +45,7 @@ Arquivos reais de operacao presentes em [docs](/C:/Users/crist/OneDrive/Desktop/
 - quando `NC - Operacao (Tipo)` indicar `ANULACAO DE DESCENTRALIZACAO DE CREDITO`, o valor de `NC Celula - Valor` deve entrar como negativo no upload principal
 - o `NC Celula - Plano Interno` continua fazendo parte da identidade de cada linha importada; a mesma NC pode gerar mais de um registro quando vier quebrada em planos internos diferentes
 - o upload principal persiste `nota_credito` e `operacao_tipo` para reconciliar reimportacoes sem perder a distincao entre linhas com o mesmo valor
+- se uma reimportacao nova encontrar um lancamento legado com a mesma data, PTRES, natureza, PI e valor, mas ainda sem `nota_credito`, o import deve atualizar esse registro legado com a NC em vez de criar uma segunda linha
 - o botao `Importar Devolucoes` da mesma pagina continua sendo um fluxo separado e nao deve ser alterado em conjunto com o upload principal
 - esse segundo fluxo grava uma nova linha negativa em `descentralizacoes`, com `operacao_tipo = DEVOLUCAO`, em vez de recalcular ou sobrescrever um lancamento anterior
 - esse segundo fluxo pode continuar recebendo valores negativos diretamente no CSV, mas o service normaliza o valor para negativo antes de persistir

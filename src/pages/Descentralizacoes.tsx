@@ -100,7 +100,14 @@ function parseValorBR(valorStr: string): number {
 
 export default function Descentralizacoes() {
     const { isSuperAdmin } = useAuth();
-    const { descentralizacoes, contaDescentralizacoes, isLoading, addDescentralizacao, refreshData } = useData();
+    const {
+        descentralizacoes,
+        contaDescentralizacoes,
+        isLoading,
+        addDescentralizacao,
+        updateDescentralizacao,
+        refreshData,
+    } = useData();
     const [searchTerm, setSearchTerm] = useState('');
     const [filterDimensao, setFilterDimensao] = useState('all');
     const [filterOrigem, setFilterOrigem] = useState('all');
@@ -188,26 +195,33 @@ export default function Descentralizacoes() {
             filterDimensao,
             filterOrigem,
         });
-    const handleCsvImport = (data: Record<string, string>[]) => {
+    const handleCsvImport = async (data: Record<string, string>[]) => {
         // Build deduplication set from existing persisted records.
-        const existingImportKeys = new Set(
-            descentralizacoes.flatMap((d) => {
-                const dateStr = d.dataEmissao ? d.dataEmissao.toISOString().split('T')[0] : '';
-                const { baseKey, rowKey } = createDescentralizacaoImportIdentity({
-                    dateKey: dateStr,
-                    planoInterno: (d.planoInterno || '').trim().toUpperCase(),
-                    origemRecurso: (d.origemRecurso || '').trim(),
-                    naturezaDespesa: (d.naturezaDespesa || '').trim(),
-                    valor: d.valor,
-                    notaCredito: d.notaCredito,
-                });
+        const existingImportKeys = new Set<string>();
+        const legacyRowsByBaseKey = new Map<string, Descentralizacao>();
 
-                return rowKey === baseKey ? [baseKey] : [baseKey, rowKey];
-            }),
-        );
+        descentralizacoes.forEach((d) => {
+            const dateStr = d.dataEmissao ? d.dataEmissao.toISOString().split('T')[0] : '';
+            const { baseKey, rowKey } = createDescentralizacaoImportIdentity({
+                dateKey: dateStr,
+                planoInterno: (d.planoInterno || '').trim().toUpperCase(),
+                origemRecurso: (d.origemRecurso || '').trim(),
+                naturezaDespesa: (d.naturezaDespesa || '').trim(),
+                valor: d.valor,
+                notaCredito: d.notaCredito,
+            });
+
+            existingImportKeys.add(baseKey);
+            existingImportKeys.add(rowKey);
+
+            if (!d.notaCredito && !legacyRowsByBaseKey.has(baseKey)) {
+                legacyRowsByBaseKey.set(baseKey, d);
+            }
+        });
         const importedRowKeys = new Set<string>();
 
         let importCount = 0;
+        let updateCount = 0;
         let skipCount = 0;
 
         const findValue = (row: Record<string, string>, patterns: RegExp[], fallbacks: string[] = []) => {
@@ -224,7 +238,7 @@ export default function Descentralizacoes() {
             return '';
         };
 
-        data.forEach((row) => {
+        for (const row of data) {
             // O JsonImportDialog normaliza headers removendo acentos e tudo que nao e [a-z0-9].
             // Para os arquivos novos, as chaves mais comuns ficam como: nc, ncoperacaotipo,
             // ncdiaemissao, ncdescricao, nccelulaptres, nccelulanaturezadespesa,
@@ -263,9 +277,9 @@ export default function Descentralizacoes() {
                 valor,
                 notaCredito,
             });
-            if (existingImportKeys.has(baseKey) || existingImportKeys.has(rowKey) || importedRowKeys.has(rowKey)) {
+            if (existingImportKeys.has(rowKey) || importedRowKeys.has(rowKey)) {
                 skipCount++;
-                return;
+                continue;
             }
 
             const dimensao = deriveDimensaoFromPI(planoInterno);
@@ -285,20 +299,42 @@ export default function Descentralizacoes() {
                 descentralizacao.dataEmissao = dataEmissao;
             }
 
+            const legacyMatch = notaCredito ? legacyRowsByBaseKey.get(baseKey) : undefined;
+            if (legacyMatch && valor !== 0) {
+                await updateDescentralizacao(legacyMatch.id, descentralizacao);
+                legacyRowsByBaseKey.delete(baseKey);
+                existingImportKeys.add(rowKey);
+                importedRowKeys.add(rowKey);
+                updateCount++;
+                continue;
+            }
+
+            if (existingImportKeys.has(baseKey)) {
+                skipCount++;
+                continue;
+            }
+
             if (valor !== 0) {
-                addDescentralizacao(descentralizacao);
+                await addDescentralizacao(descentralizacao);
+                existingImportKeys.add(baseKey);
+                existingImportKeys.add(rowKey);
                 importedRowKeys.add(rowKey);
                 importCount++;
             }
-        });
-
-        if (importCount > 0 && skipCount > 0) {
-            toast.success(`${importCount} nova(s) importada(s), ${skipCount} já existente(s) ignorada(s).`);
-        } else if (importCount > 0) {
-            toast.success(`${importCount} descentralização(ões) importada(s) com sucesso!`);
-        } else {
-            toast.info(`Nenhum registro novo encontrado. ${skipCount} já existente(s) ignorada(s).`);
         }
+
+        const summaryParts = [
+            importCount > 0 ? `${importCount} nova(s) importada(s)` : '',
+            updateCount > 0 ? `${updateCount} legado(s) reconciliado(s)` : '',
+            skipCount > 0 ? `${skipCount} ja existente(s) ignorada(s)` : '',
+        ].filter(Boolean);
+
+        if (importCount > 0 || updateCount > 0) {
+            toast.success(`${summaryParts.join(', ')}.`);
+            return;
+        }
+
+        toast.info(`Nenhum registro novo encontrado. ${skipCount} ja existente(s) ignorada(s).`);
     };
 
     const handleDevolucoesImport = async (data: Record<string, string>[]) => {
