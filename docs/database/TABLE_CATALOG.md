@@ -218,6 +218,57 @@ Views relacionadas:
 
 - `vw_documentos_pendentes_pagamento`
 
+## Cache Comprasnet para liquidações no modal de empenho
+
+### `contratos_api_empenho_liquidacoes_cache_status`
+
+Finalidade:
+
+- controla frescor do cache de liquidações por empenho consultado no Comprasnet
+
+Campos-chave:
+
+- `empenho_lookup_key`
+- `empenho_numero`
+- `status`: `found`, `not_found` ou `error`
+- `rows_count`
+- `fetched_at`
+- `expires_at`
+
+Observacoes operacionais:
+
+- resultados encontrados vencem em 12 horas
+- resultados `not_found` vencem em 1 hora
+- a leitura publica usa policy curta `liq_cache_status_select_public`, mantida separada dos nomes longos originais para evitar truncamento de identificadores no Postgres
+- a Edge Function `refresh-comprasnet-liquidacoes-cache` atualiza registros vencidos pelo cron horario
+
+### `contratos_api_empenho_liquidacoes_cache`
+
+Finalidade:
+
+- indice materializado de faturas do Comprasnet vinculadas a empenhos para leitura rapida no modal de empenho
+
+Campos-chave:
+
+- `empenho_lookup_key`
+- `empenho_numero`
+- `empenho_numero_api`
+- `unidade_contrato`
+- `contrato_api_id`
+- `contrato_numero`
+- `fatura_id`
+- `numero_instrumento_cobranca`
+- valores, datas e processo da fatura
+
+Consumido por:
+
+- [contratosApi.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/contratosApi.ts)
+- [EmpenhoDialog.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/modals/EmpenhoDialog.tsx)
+
+Observacoes operacionais:
+
+- a leitura publica usa policy curta `liq_cache_rows_select_public`, aplicada depois da migration inicial para corrigir leitura vazia no REST anonimo
+
 ## PFs e conciliacao
 
 ### `pf_fonte_recurso`

@@ -226,6 +226,29 @@ Observacoes operacionais:
 - `supabase/config.toml` deve manter `verify_jwt = false` para `sync-contratos-comprasnet`, pois a chamada periodica vem do cron
 - a migration agenda chamada a cada 6 horas para a UG `158366`
 
+### `refresh-comprasnet-liquidacoes-cache`
+
+Necessarias no ambiente do Supabase:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Opcional:
+
+- `CONTRATOS_LIQUIDACOES_CACHE_SECRET`
+  - se configurada, chamadas HTTP precisam enviar o header `x-contratos-sync-secret`
+  - se nao configurada, o cron criado pela migration e o frontend conseguem chamar a function sem header adicional
+
+Pre-requisitos no banco:
+
+- Supabase Cron (`pg_cron`)
+- `pg_net`
+
+Observacoes operacionais:
+
+- `supabase/config.toml` deve manter `verify_jwt = false` para `refresh-comprasnet-liquidacoes-cache`, pois a chamada periodica vem do cron
+- a migration agenda chamada a cada hora para revalidar cache vencido
+- o TTL fica em 12 horas quando há liquidações encontradas e 1 hora para `not_found`
+
 ### Consultor
 
 O frontend chama a function `consultor`, mas a implementacao nao foi localizada neste repo nesta rodada.

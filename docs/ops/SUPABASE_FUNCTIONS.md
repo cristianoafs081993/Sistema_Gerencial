@@ -294,6 +294,33 @@ Observacao:
 - a migration agenda `sync-contratos-comprasnet-6h` com Supabase Cron/pg_net para executar a cada 6 horas
 - a primeira versao aceita apenas a UG `158366`
 
+### `refresh-comprasnet-liquidacoes-cache`
+
+Local:
+
+- [refresh-comprasnet-liquidacoes-cache/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/refresh-comprasnet-liquidacoes-cache/index.ts)
+
+Uso:
+
+- atualiza o cache de liquidações/faturas do Comprasnet por empenho para o modal de detalhes do empenho
+- aceita empenhos especificos enviados pelo frontend
+- em modo `refreshDue`, reprocessa entradas vencidas do cache
+- em modo `readCacheOnly` com `returnRows`, devolve as linhas ja materializadas no cache sem varrer novamente a API publica
+- consulta contratos publicos das UGs `158366` e `158155`
+
+Dependencias:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- opcional `CONTRATOS_LIQUIDACOES_CACHE_SECRET` para exigir o header `x-contratos-sync-secret`
+
+Observacao:
+
+- publicada com `verify_jwt = false`, pois pode ser chamada pelo cron e pelo frontend
+- responde preflight CORS com `POST, OPTIONS`; se a function ainda nao estiver publicada, o navegador pode registrar falha de CORS ao tentar chamada direta
+- a migration agenda `refresh-comprasnet-liquidacoes-cache-hourly` com Supabase Cron/pg_net para executar a cada hora
+- resultados encontrados recebem TTL de 12 horas
+- resultados `not_found` recebem TTL de 1 hora
+
 ## Functions chamadas pelo frontend, mas nao localizadas neste repo
 
 ### `consultor`

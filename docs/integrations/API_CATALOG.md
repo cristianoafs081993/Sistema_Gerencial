@@ -142,6 +142,28 @@ Endpoints observados:
 - `/contrato/{api_contrato_id}/itens`
 - `/contrato/{api_contrato_id}/historico`
 
+Descoberta publica em tempo real no modal de empenho:
+
+- o modal de [EmpenhoDialog.tsx](/C:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/components/modals/EmpenhoDialog.tsx) consulta a API publica via `contratosApiService.getLiquidacoesPublicasPorEmpenho`
+- o fluxo nao usa `contratos_api*` como fonte
+- a leitura do modal usa primeiro o cache Supabase em `contratos_api_empenho_liquidacoes_cache_status` e `contratos_api_empenho_liquidacoes_cache`
+- enquanto as tabelas de cache ainda nao existirem em um ambiente, o frontend nao aciona a Edge Function a partir do modal; isso evita erros 404/CORS durante bootstrap antes da migration e do deploy da function
+- se o status publico indicar linhas mas a leitura publica das linhas voltar vazia por problema de policy/RLS, o service usa a Edge Function em modo `readCacheOnly` como fallback de leitura com service role
+- a Edge Function `refresh-comprasnet-liquidacoes-cache` faz a descoberta dinamica em segundo plano, buscando contratos publicos ativos e inativos das UGs `158366` e `158155`, cobrindo empenhos emitidos pelo campus que estejam vinculados a contratos gerenciados pela Reitoria; depois filtra os contratos cujo endpoint `/empenhos` contenha o empenho alvo e so entao consulta `/faturas`
+- a vinculacao final usa `dados_empenho[]` dentro da fatura para decidir quais liquidações apareceram no modal
+- `data_liquidacao` pode aparecer em payloads reais de `faturas`, mas nao esta garantida pelo schema OpenAPI; a UI deve tratá-la como opcional
+- o cache usa TTL de 12 horas para resultados encontrados e 1 hora para `not_found`; o cron horario reprocessa entradas vencidas
+
+Endpoints v1 avaliados nesta rodada:
+
+- `/api/v1/contrato/faturas`
+- `/api/v1/contrato/empenhoporuasg/{codigo_unidade_emitente}/{numero_empenho}`
+
+Observacao operacional:
+
+- os endpoints `v1` acima exigem `bearerAuth` no Swagger e responderam `401` nas chamadas diretas validadas em 23 de abril de 2026
+- por isso, a descoberta de liquidações no modal ficou restrita aos endpoints publicos sob `/api/contrato/*`
+
 Persistencia local:
 
 - `contratos_api`
@@ -159,7 +181,7 @@ Observacao:
 - o historico de contrato deve mostrar os valores originais da API; variacoes derivadas entre termos nao sao valor oficial de aditivo
 - o Valor Total da lista deve usar `contratos_api_historico` como fonte principal, somando `valor_inicial` de cada termo. `valor_global` da API nao entra nessa metrica porque pode representar outro consolidado/periodo e distorcer a leitura. Sem historico com `valor_inicial`, usar `contratos.valor` como fallback
 - em contratos com `codigo_unidade_origem = 158155`, a UI deve sinalizar origem Reitoria e diferenciar valores globais do contrato da execucao do campus `158366`
-- empenhos da API alimentam o Valor Empenhado pelo campo `empenhado` na lista principal; o drawer nao exibe uma secao propria de empenhos para evitar misturar saldos da API com a regra local de `empenhos`
+- empenhos da API alimentam apenas o agregado de Valor Empenhado pelo campo `empenhado` na lista principal; os badges/popovers de empenhos continuam vindo de `empenhos` + `contratos_empenhos` para preservar os saldos CSV/SIAFI. O drawer nao exibe uma secao propria de empenhos para evitar misturar saldos da API com a regra local de `empenhos`
 - nos itens do drawer, o contratado deve somar `historico_item[].valor_total` quando a API trouxer historico por item; `valor_total` do item e fallback sem historico
 - quando a API trouxer o `historico_item`, o drawer deve exibir tambem seus campos operacionais por termo: `tipo_historico`, `data_termo`, `quantidade`, `valor_unitario` e `valor_total`
 - no resumo de itens do drawer, `Contratado` e `Executado` tambem devem mostrar quantidade agregada: contratado pela soma de `historico_item[].quantidade` quando houver historico, e executado pela soma de `quantidade_faturado` nas faturas `Pago` ou `Siafi Apropriado`

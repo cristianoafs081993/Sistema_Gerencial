@@ -48,6 +48,8 @@ Para mudancas sensiveis, confirme sempre nas migrations em [supabase/migrations]
 - `contratos_api_itens`
 - `contratos_api_fatura_itens`
 - `contratos_api_fatura_empenhos`
+- `contratos_api_empenho_liquidacoes_cache_status`
+- `contratos_api_empenho_liquidacoes_cache`
 - `contratos_api_sync_runs`
 
 ### Importacoes auxiliares
@@ -98,6 +100,7 @@ Esta view aparece no frontend em [rastreabilidadePFs.ts](/C:/Users/crist/OneDriv
 - `gerar-contrato-licitacao`
 - `gerar-termo-referencia-compras`
 - `record-automation-savings-event`
+- `refresh-comprasnet-liquidacoes-cache`
 
 ## Functions invocadas no frontend que exigem confirmacao
 

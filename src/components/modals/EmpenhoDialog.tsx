@@ -22,8 +22,8 @@ import {
 } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Pencil, History, DollarSign, Receipt, CheckCircle2, Landmark, Info, Loader2 } from 'lucide-react';
-import { formatCurrency, formatDocumentoId } from '@/lib/utils';
-import { transparenciaService } from '@/services/transparencia';
+import { formatCurrency } from '@/lib/utils';
+import { contratosApiService, type ContratoApiPublicLiquidacaoRow } from '@/services/contratosApi';
 import { format } from 'date-fns';
 import {
   getRapBaseVigente,
@@ -59,6 +59,7 @@ const buildFormData = (empenho: Empenho | null): Partial<Empenho> => {
 
   return {
     ...empenho,
+    dimensao: empenho.dimensao || '',
     planoInterno: empenho.planoInterno || '',
     processo: empenho.processo || '',
     origemRecurso: empenho.origemRecurso || '',
@@ -86,24 +87,16 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
     )];
   }, [atividades, formData.dimensao]);
 
-  const { data: documentosEmpenho = [], isLoading: isLoadingDocumentos } = useQuery({
-    queryKey: ['documentos-habeis-empenho', empenho?.numero],
+  const { data: liquidacoesApi = [], isLoading: isLoadingLiquidacoesApi } = useQuery({
+    queryKey: ['liquidacoes-api-contratos-empenho', empenho?.numero],
     queryFn: () =>
       empenho?.numero
-        ? transparenciaService.getDocumentosPorEmpenho(empenho.numero)
-        : Promise.resolve([]),
+        ? contratosApiService.getLiquidacoesPublicasPorEmpenho(empenho.numero)
+        : Promise.resolve([] as ContratoApiPublicLiquidacaoRow[]),
     enabled: open && !!empenho?.numero,
+    retry: false,
+    staleTime: 60 * 1000,
   });
-
-  const documentosQueDiminuemSaldo = useMemo(
-    () =>
-      documentosEmpenho.filter(
-        (documento) =>
-          Number(documento.valor_original || 0) > 0 &&
-          documento.estado?.toUpperCase() !== 'CANCELADO',
-      ),
-    [documentosEmpenho],
-  );
 
   if (!empenho) return null;
 
@@ -129,8 +122,8 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-4xl lg:max-w-5xl max-h-[calc(100dvh-2rem)] flex flex-col p-0 overflow-hidden border-none shadow-2xl bg-white text-slate-900">
-        <DialogHeader className="p-6 bg-slate-50/80 border-b border-slate-100 space-y-1 relative">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-4xl lg:max-w-5xl h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] flex flex-col p-0 overflow-hidden border-none shadow-2xl bg-white text-slate-900">
+        <DialogHeader className="shrink-0 p-6 bg-slate-50/80 border-b border-slate-100 space-y-1 relative">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-purple-100 rounded-lg text-purple-600">
               <Landmark className="w-5 h-5" />
@@ -145,7 +138,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
           <div className="absolute top-0 left-0 w-full h-1 bg-purple-500" />
         </DialogHeader>
 
-        <ScrollArea className="flex-1 bg-white">
+        <ScrollArea className="min-h-0 flex-1 bg-white">
           <div className="p-6 space-y-6">
             {/* Resumo de Valores */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -280,63 +273,79 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
               </div>
             )}
 
-            {/* Documentos hábeis vinculados */}
+            {/* Formulário de Edição */}
+            {false && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
               <div className="px-5 py-3 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
                 <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
                   <Receipt className="w-3 h-3" />
-                  Documentos hábeis que diminuíram o saldo
+                  LiquidaÃ§Ãµes da API de Contratos
                 </h3>
-                {isLoadingDocumentos && <Loader2 className="w-3 h-3 animate-spin text-slate-400" />}
+                {isLoadingLiquidacoesApi && <Loader2 className="w-3 h-3 animate-spin text-slate-400" />}
               </div>
               <div className="p-0 overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50/30 text-[9px] uppercase font-bold text-slate-400">
                     <tr>
-                      <th className="px-5 py-2">Data</th>
-                      <th className="px-5 py-2">Documento</th>
-                      <th className="px-5 py-2">Estado</th>
+                      <th className="px-5 py-2">EmissÃ£o</th>
+                      <th className="px-5 py-2">Fatura</th>
+                      <th className="px-5 py-2">Contrato</th>
+                      <th className="px-5 py-2">SituaÃ§Ã£o</th>
                       <th className="px-5 py-2">Processo</th>
-                      <th className="px-5 py-2 text-right">Impacto</th>
-                      <th className="px-5 py-2 text-right">Pago</th>
+                      <th className="px-5 py-2">Vencimento</th>
+                      <th className="px-5 py-2">LiquidaÃ§Ã£o</th>
+                      <th className="px-5 py-2 text-right">Bruto</th>
+                      <th className="px-5 py-2 text-right">LÃ­quido</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {isLoadingDocumentos ? (
+                    {isLoadingLiquidacoesApi ? (
                       <tr>
-                        <td colSpan={6} className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
-                          Carregando documentos hábeis vinculados...
+                        <td colSpan={9} className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
+                          Carregando liquidaÃ§Ãµes da API de contratos...
                         </td>
                       </tr>
-                    ) : documentosQueDiminuemSaldo.length > 0 ? (
-                      documentosQueDiminuemSaldo.map((documento) => (
-                        <tr key={documento.id} className="border-t border-slate-50 hover:bg-slate-50/50 transition-colors">
+                    ) : liquidacoesApi.length > 0 ? (
+                      liquidacoesApi.map((liquidacao) => (
+                        <tr
+                          key={`${liquidacao.contrato_api_id}-${liquidacao.fatura_id}-${liquidacao.empenho_numero}`}
+                          className="border-t border-slate-50 hover:bg-slate-50/50 transition-colors"
+                        >
                           <td className="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">
-                            {formatDateCell(documento.data_emissao)}
+                            {formatDateCell(liquidacao.data_emissao ?? undefined)}
                           </td>
                           <td className="px-5 py-3 font-mono font-bold text-primary whitespace-nowrap">
-                            {formatDocumentoId(documento.id)}
+                            {liquidacao.numero_instrumento_cobranca || '-'}
+                          </td>
+                          <td className="px-5 py-3 font-mono text-slate-600 whitespace-nowrap">
+                            {liquidacao.contrato_numero || '-'}
                           </td>
                           <td className="px-5 py-3">
-                            <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-none font-black uppercase bg-amber-50 text-amber-700">
-                              {documento.estado || 'PENDENTE'}
+                            <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-none font-black uppercase bg-blue-50 text-blue-700">
+                              {liquidacao.situacao || 'N/I'}
                             </Badge>
                           </td>
                           <td className="px-5 py-3 font-mono text-slate-500 max-w-[220px] break-all">
-                            {documento.processo || 'N/I'}
+                            {liquidacao.processo || 'N/I'}
                           </td>
-                          <td className="px-5 py-3 text-right font-black text-red-500 whitespace-nowrap">
-                            -{formatCurrency(documento.valor_original || 0)}
+                          <td className="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">
+                            {formatDateCell(liquidacao.data_vencimento ?? undefined)}
+                          </td>
+                          <td className="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">
+                            {formatDateCell(liquidacao.data_liquidacao ?? undefined)}
+                          </td>
+                          <td className="px-5 py-3 text-right font-black text-slate-700 whitespace-nowrap">
+                            {formatCurrency(liquidacao.valor_bruto || 0)}
                           </td>
                           <td className="px-5 py-3 text-right font-black text-emerald-600 whitespace-nowrap">
-                            {(documento.valor_pago || 0) > 0 ? formatCurrency(documento.valor_pago || 0) : '-'}
+                            {formatCurrency(liquidacao.valor_liquido || 0)}
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={6} className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
-                          Nenhum documento hábil vinculado a este empenho reduziu o saldo.
+                        <td colSpan={9} className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
+                          O empenho nÃ£o foi localizado nos contratos pÃºblicos do Comprasnet para a UG 158366.
                         </td>
                       </tr>
                     )}
@@ -345,11 +354,94 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
               </div>
               <div className="px-5 py-3 border-t border-slate-50 bg-slate-50/40 flex gap-2 text-[10px] text-muted-foreground leading-relaxed">
                 <Info className="w-3 h-3 shrink-0 mt-0.5 text-slate-400" />
-                <span>São considerados documentos hábeis vinculados ao empenho com valor original positivo e estado diferente de cancelado.</span>
+                <span>Esta seÃ§Ã£o faz descoberta em tempo real na API pÃºblica de contratos do Comprasnet para a UG 158366. A data de liquidaÃ§Ã£o sÃ³ aparece quando vier no payload real da API.</span>
+              </div>
+            </div>
+            )}
+
+            <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
+                <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
+                  <Receipt className="w-3 h-3" />
+                  {'Liquidacoes da API de Contratos'}
+                </h3>
+                {isLoadingLiquidacoesApi && <Loader2 className="w-3 h-3 animate-spin text-slate-400" />}
+              </div>
+              <div className="p-0 overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50/30 text-[9px] uppercase font-bold text-slate-400">
+                    <tr>
+                      <th className="px-5 py-2">{'Emissao'}</th>
+                      <th className="px-5 py-2">Fatura</th>
+                      <th className="px-5 py-2">Contrato</th>
+                      <th className="px-5 py-2">{'Situacao'}</th>
+                      <th className="px-5 py-2">Processo</th>
+                      <th className="px-5 py-2">Vencimento</th>
+                      <th className="px-5 py-2">{'Liquidacao'}</th>
+                      <th className="px-5 py-2 text-right">Bruto</th>
+                      <th className="px-5 py-2 text-right">{'Liquido'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {isLoadingLiquidacoesApi ? (
+                      <tr>
+                        <td colSpan={9} className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
+                          {'Carregando liquidacoes da API de contratos...'}
+                        </td>
+                      </tr>
+                    ) : liquidacoesApi.length > 0 ? (
+                      liquidacoesApi.map((liquidacao) => (
+                        <tr
+                          key={`${liquidacao.contrato_api_id}-${liquidacao.fatura_id}-${liquidacao.empenho_numero}`}
+                          className="border-t border-slate-50 hover:bg-slate-50/50 transition-colors"
+                        >
+                          <td className="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">
+                            {formatDateCell(liquidacao.data_emissao ?? undefined)}
+                          </td>
+                          <td className="px-5 py-3 font-mono font-bold text-primary whitespace-nowrap">
+                            {liquidacao.numero_instrumento_cobranca || '-'}
+                          </td>
+                          <td className="px-5 py-3 font-mono text-slate-600 whitespace-nowrap">
+                            {liquidacao.contrato_numero || '-'}
+                          </td>
+                          <td className="px-5 py-3">
+                            <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-none font-black uppercase bg-blue-50 text-blue-700">
+                              {liquidacao.situacao || 'N/I'}
+                            </Badge>
+                          </td>
+                          <td className="px-5 py-3 font-mono text-slate-500 max-w-[220px] break-all">
+                            {liquidacao.processo || 'N/I'}
+                          </td>
+                          <td className="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">
+                            {formatDateCell(liquidacao.data_vencimento ?? undefined)}
+                          </td>
+                          <td className="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">
+                            {formatDateCell(liquidacao.data_liquidacao ?? undefined)}
+                          </td>
+                          <td className="px-5 py-3 text-right font-black text-slate-700 whitespace-nowrap">
+                            {formatCurrency(liquidacao.valor_bruto || 0)}
+                          </td>
+                          <td className="px-5 py-3 text-right font-black text-emerald-600 whitespace-nowrap">
+                            {formatCurrency(liquidacao.valor_liquido || 0)}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={9} className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
+                          {'O empenho nao foi localizado nos contratos publicos do Comprasnet para as UGs 158366 e 158155.'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div className="px-5 py-3 border-t border-slate-50 bg-slate-50/40 flex gap-2 text-[10px] text-muted-foreground leading-relaxed">
+                <Info className="w-3 h-3 shrink-0 mt-0.5 text-slate-400" />
+                <span>{'Esta secao faz descoberta em tempo real na API publica de contratos do Comprasnet para as UGs 158366 e 158155. A data de liquidacao so aparece quando vier no payload real da API.'}</span>
               </div>
             </div>
 
-            {/* Formulário de Edição */}
             <div className="space-y-4 pt-2">
               <div className="flex items-center gap-2 mb-1">
                 <Pencil className="w-3 h-3 text-blue-600" />
@@ -360,7 +452,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-bold uppercase text-slate-400">Dimensão</Label>
                   <Select
-                    value={formData.dimensao}
+                    value={formData.dimensao ?? ''}
                     onValueChange={(v) => setFormData({ ...formData, dimensao: v, componenteFuncional: '', origemRecurso: '' })}
                   >
                     <SelectTrigger className="h-9 border-slate-200 bg-slate-50/50 focus:ring-blue-500/20">
@@ -377,7 +469,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-bold uppercase text-slate-400">Componente Funcional</Label>
                   <Select
-                    value={formData.componenteFuncional}
+                    value={formData.componenteFuncional ?? ''}
                     onValueChange={(v) => setFormData({ ...formData, componenteFuncional: v })}
                     disabled={!formData.dimensao}
                   >
@@ -399,7 +491,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-bold uppercase text-slate-400">Origem de Recurso (Datalist)</Label>
                   <Input
-                    value={formData.origemRecurso}
+                    value={formData.origemRecurso ?? ''}
                     onChange={(e) => setFormData({ ...formData, origemRecurso: e.target.value })}
                     placeholder="Ex: Fonte 100"
                     list="origens-list"
@@ -426,7 +518,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
           </div>
         </ScrollArea>
 
-        <DialogFooter className="p-4 bg-slate-50/80 border-t border-slate-100 flex items-center justify-end gap-3">
+        <DialogFooter className="shrink-0 p-4 bg-slate-50/80 border-t border-slate-100 flex items-center justify-end gap-3">
             <Button 
               type="button" 
               variant="secondary" 

@@ -9,19 +9,85 @@ import {
   mapFaturaItem,
   mapHistorico,
   mapItem,
+  toDate,
+  toNumber,
   type ApiContrato,
   type ApiContratoHistorico,
   type ApiContratoItem,
   type ApiEmpenho,
   type ApiFatura,
 } from '@/services/contratosApiMappers';
+import { buildEmpenhoLookupKeys } from '@/utils/contratosSync';
 
 const CONTRATOS_API_BASE = '/api-contratos/api';
 const DEFAULT_UASG = '158366';
+const DEFAULT_PUBLIC_LIQUIDACOES_UASGS = [DEFAULT_UASG, '158155'];
 const CONTRATOS_API_SYNC_RUNS_SELECT = 'id,unidade_codigo,started_at,finished_at,status,contratos_ativos,contratos_inativos,contratos_upserted,empenhos_upserted,faturas_upserted,itens_upserted,historicos_upserted,fatura_itens_upserted,fatura_empenhos_upserted,error_message,details';
 const CONTRATOS_API_HISTORICO_SELECT = 'id, contrato_api_id, api_historico_id, numero, tipo, qualificacao_termo, observacao, ug, codigo_unidade_origem, nome_unidade_origem, data_assinatura, data_publicacao, vigencia_inicio, vigencia_fim, valor_inicial, valor_global, num_parcelas, valor_parcela, novo_valor_global, novo_num_parcelas, novo_valor_parcela, data_inicio_novo_valor, retroativo, retroativo_valor, situacao_contrato';
 const MIGRATION_REQUIRED_MESSAGE =
   'MIGRATION_REQUIRED: tabelas do módulo de contratos API ainda não existem no banco. Aplique as migrations do Supabase.';
+
+const PUBLIC_CONTRATOS_CACHE_TTL_MS = 5 * 60 * 1000;
+const PUBLIC_EMPENHOS_CACHE_TTL_MS = 5 * 60 * 1000;
+const PUBLIC_LIQUIDACOES_CACHE_TTL_MS = 2 * 60 * 1000;
+const LIQUIDACOES_CACHE_STATUS_SELECT = 'empenho_lookup_key, empenho_numero, status, rows_count, fetched_at, expires_at, error_message';
+const LIQUIDACOES_CACHE_ROWS_SELECT = 'id, empenho_lookup_key, empenho_numero, empenho_numero_api, unidade_contrato, contrato_api_id, contrato_numero, contrato_objeto, fatura_id, numero_instrumento_cobranca, situacao, valor_bruto, valor_liquido, data_emissao, data_vencimento, data_pagamento, data_liquidacao, processo, valor_empenho, subelemento, fetched_at';
+
+type CacheEntry<T> = {
+  expiresAt: number;
+  value: T;
+};
+
+type ContratoApiPublicoResumo = {
+  api_contrato_id: number;
+  numero: string | null;
+  objeto: string | null;
+  situacao: boolean;
+};
+
+type LiquidacoesCacheStatus = {
+  empenho_lookup_key: string;
+  empenho_numero: string;
+  status: 'found' | 'not_found' | 'error';
+  rows_count: number;
+  fetched_at: string;
+  expires_at: string;
+  error_message: string | null;
+};
+
+type LiquidacoesCacheRow = {
+  id: string;
+  empenho_lookup_key: string;
+  empenho_numero: string;
+  empenho_numero_api: string | null;
+  unidade_contrato: string | null;
+  contrato_api_id: number;
+  contrato_numero: string | null;
+  contrato_objeto: string | null;
+  fatura_id: number;
+  numero_instrumento_cobranca: string | null;
+  situacao: string | null;
+  valor_bruto: number | null;
+  valor_liquido: number | null;
+  data_emissao: string | null;
+  data_vencimento: string | null;
+  data_pagamento: string | null;
+  data_liquidacao: string | null;
+  processo: string | null;
+  valor_empenho: number | null;
+  subelemento: string | null;
+  fetched_at: string;
+};
+
+type LiquidacoesCacheLookup =
+  | { available: false }
+  | {
+      available: true;
+      hasStatus: boolean;
+      isFresh: boolean;
+      rowsCount: number;
+      rows: ContratoApiPublicLiquidacaoRow[];
+    };
 
 export interface ContratoApiRow {
   id: string;
@@ -165,6 +231,32 @@ export interface ContratoApiSyncRun {
   details: Record<string, unknown> | null;
 }
 
+export interface ContratoApiPublicLiquidacaoRow {
+  contrato_api_id: number;
+  contrato_numero: string | null;
+  contrato_objeto: string | null;
+  fatura_id: number;
+  numero_instrumento_cobranca: string | null;
+  situacao: string | null;
+  valor_bruto: number | null;
+  valor_liquido: number | null;
+  data_emissao: string | null;
+  data_vencimento: string | null;
+  data_pagamento: string | null;
+  data_liquidacao: string | null;
+  processo: string | null;
+  empenho_numero: string;
+  valor_empenho: number | null;
+  subelemento: string | null;
+}
+
+const contratosPublicosCache = new Map<string, CacheEntry<ContratoApiPublicoResumo[]>>();
+const contratosPublicosInFlight = new Map<string, Promise<ContratoApiPublicoResumo[]>>();
+const empenhosPublicosPorContratoCache = new Map<number, CacheEntry<ApiEmpenho[]>>();
+const empenhosPublicosPorContratoInFlight = new Map<number, Promise<ApiEmpenho[]>>();
+const liquidacoesPublicasPorEmpenhoCache = new Map<string, CacheEntry<ContratoApiPublicLiquidacaoRow[]>>();
+const liquidacoesPublicasPorEmpenhoInFlight = new Map<string, Promise<ContratoApiPublicLiquidacaoRow[]>>();
+
 async function fetchJson<T = unknown>(url: string): Promise<T> {
   const res = await fetch(url);
   if (!res.ok) {
@@ -202,10 +294,256 @@ function chunk<T>(items: T[], size: number): T[][] {
   return chunks;
 }
 
+function getCachedValue<K extends string | number, T>(cache: Map<K, CacheEntry<T>>, key: K) {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.value;
+}
+
+async function getOrLoadCached<K extends string | number, T>(
+  cache: Map<K, CacheEntry<T>>,
+  inflight: Map<K, Promise<T>>,
+  key: K,
+  ttlMs: number,
+  loader: () => Promise<T>,
+): Promise<T> {
+  const cachedValue = getCachedValue(cache, key);
+  if (cachedValue !== null) return cachedValue;
+
+  const inFlightValue = inflight.get(key);
+  if (inFlightValue) return inFlightValue;
+
+  const promise = loader()
+    .then((value) => {
+      cache.set(key, {
+        expiresAt: Date.now() + ttlMs,
+        value,
+      });
+      inflight.delete(key);
+      return value;
+    })
+    .catch((error) => {
+      inflight.delete(key);
+      throw error;
+    });
+
+  inflight.set(key, promise);
+  return promise;
+}
+
+function mapContratoPublico(raw: ApiContrato, situacao: boolean): ContratoApiPublicoResumo | null {
+  const apiContratoId = Number(raw.id);
+  if (!Number.isFinite(apiContratoId) || apiContratoId <= 0) return null;
+
+  const numero = String(raw.numero ?? '').trim();
+  const objeto = raw.objeto == null ? null : String(raw.objeto);
+
+  return {
+    api_contrato_id: apiContratoId,
+    numero: numero || null,
+    objeto,
+    situacao,
+  };
+}
+
+function buildEmpenhoKeySet(raw: unknown) {
+  return new Set(buildEmpenhoLookupKeys(raw));
+}
+
+function buildCanonicalEmpenhoLookupKey(raw: unknown) {
+  const keys = buildEmpenhoLookupKeys(raw);
+  return keys.find((key) => /^\d{4}NE\d+$/i.test(key)) ?? keys[0] ?? '';
+}
+
+function hasEmpenhoMatch(targetKeys: Set<string>, raw: unknown) {
+  return buildEmpenhoLookupKeys(raw).some((key) => targetKeys.has(key));
+}
+
+function normalizeUnidadeCodigos(raw: string | string[]) {
+  const values = Array.isArray(raw) ? raw : [raw];
+  return Array.from(
+    new Set(
+      values
+        .map((value) => String(value ?? '').trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function isDefaultPublicLiquidacoesUnidades(unidadeCodigos: string | string[]) {
+  const received = normalizeUnidadeCodigos(unidadeCodigos).sort();
+  const defaults = [...DEFAULT_PUBLIC_LIQUIDACOES_UASGS].sort();
+  return received.length === defaults.length && received.every((value, index) => value === defaults[index]);
+}
+
+function mapCacheRowToLiquidacao(row: LiquidacoesCacheRow): ContratoApiPublicLiquidacaoRow {
+  return {
+    contrato_api_id: Number(row.contrato_api_id),
+    contrato_numero: row.contrato_numero,
+    contrato_objeto: row.contrato_objeto,
+    fatura_id: Number(row.fatura_id),
+    numero_instrumento_cobranca: row.numero_instrumento_cobranca,
+    situacao: row.situacao,
+    valor_bruto: row.valor_bruto == null ? null : Number(row.valor_bruto),
+    valor_liquido: row.valor_liquido == null ? null : Number(row.valor_liquido),
+    data_emissao: row.data_emissao,
+    data_vencimento: row.data_vencimento,
+    data_pagamento: row.data_pagamento,
+    data_liquidacao: row.data_liquidacao,
+    processo: row.processo,
+    empenho_numero: row.empenho_numero_api || row.empenho_numero,
+    valor_empenho: row.valor_empenho == null ? null : Number(row.valor_empenho),
+    subelemento: row.subelemento,
+  };
+}
+
+async function getCachedLiquidacoesPublicasPorEmpenho(numeroEmpenho: string): Promise<LiquidacoesCacheLookup> {
+  const lookupKey = buildCanonicalEmpenhoLookupKey(numeroEmpenho);
+  if (!lookupKey) return { available: true, hasStatus: false, isFresh: false, rowsCount: 0, rows: [] };
+
+  const { data: status, error: statusError } = await supabase
+    .from('contratos_api_empenho_liquidacoes_cache_status')
+    .select(LIQUIDACOES_CACHE_STATUS_SELECT)
+    .eq('empenho_lookup_key', lookupKey)
+    .maybeSingle();
+
+  if (statusError) {
+    if (isMissingTableError(statusError)) return { available: false };
+    throw statusError;
+  }
+
+  if (!status) return { available: true, hasStatus: false, isFresh: false, rowsCount: 0, rows: [] };
+
+  const typedStatus = status as LiquidacoesCacheStatus;
+  const isFresh = new Date(typedStatus.expires_at).getTime() > Date.now();
+  if (typedStatus.status === 'not_found') {
+    return {
+      available: true,
+      hasStatus: true,
+      isFresh,
+      rowsCount: Number(typedStatus.rows_count ?? 0),
+      rows: [] as ContratoApiPublicLiquidacaoRow[],
+    };
+  }
+
+  if (typedStatus.status === 'error' && isFresh) {
+    return {
+      available: true,
+      hasStatus: true,
+      isFresh,
+      rowsCount: Number(typedStatus.rows_count ?? 0),
+      rows: [] as ContratoApiPublicLiquidacaoRow[],
+    };
+  }
+
+  const { data: rows, error: rowsError } = await supabase
+    .from('contratos_api_empenho_liquidacoes_cache')
+    .select(LIQUIDACOES_CACHE_ROWS_SELECT)
+    .eq('empenho_lookup_key', lookupKey)
+    .order('data_emissao', { ascending: false });
+
+  if (rowsError) {
+    if (isMissingTableError(rowsError)) return { available: false };
+    throw rowsError;
+  }
+
+  return {
+    available: true,
+    hasStatus: true,
+    isFresh,
+    rowsCount: Number(typedStatus.rows_count ?? 0),
+    rows: ((rows ?? []) as LiquidacoesCacheRow[]).map(mapCacheRowToLiquidacao),
+  };
+}
+
+async function getLiquidacoesCacheRowsViaFunction(numeroEmpenho: string) {
+  const { data, error } = await supabase.functions.invoke('refresh-comprasnet-liquidacoes-cache', {
+    body: {
+      empenhoNumero: numeroEmpenho,
+      readCacheOnly: true,
+      returnRows: true,
+      source: 'frontend-cache-read-fallback',
+    },
+  });
+
+  if (error) {
+    console.warn('Contratos API: falha ao ler cache de liquidacoes pela Edge Function', error);
+    return null;
+  }
+
+  const firstResult = (data as { results?: Array<{ rows?: LiquidacoesCacheRow[] }> } | null)?.results?.[0];
+  return (firstResult?.rows ?? []).map(mapCacheRowToLiquidacao);
+}
+
+function triggerLiquidacoesCacheRefresh(numeroEmpenho: string) {
+  void supabase.functions
+    .invoke('refresh-comprasnet-liquidacoes-cache', {
+      body: {
+        empenhoNumero: numeroEmpenho,
+        source: 'frontend-cache-miss',
+      },
+    })
+    .then(({ error }) => {
+      if (error) {
+        console.warn('Contratos API: falha ao acionar refresh do cache de liquidacoes', error);
+      }
+    })
+    .catch((error) => {
+      console.warn('Contratos API: falha ao acionar refresh do cache de liquidacoes', error);
+    });
+}
+
+async function getContratosPublicos(unidadeCodigo: string) {
+  return getOrLoadCached(
+    contratosPublicosCache,
+    contratosPublicosInFlight,
+    unidadeCodigo,
+    PUBLIC_CONTRATOS_CACHE_TTL_MS,
+    async () => {
+      const [ativos, inativos] = await Promise.all([
+        fetchJson<ApiContrato[]>(`${CONTRATOS_API_BASE}/contrato/ug/${unidadeCodigo}`),
+        fetchJson<ApiContrato[]>(`${CONTRATOS_API_BASE}/contrato/inativo/ug/${unidadeCodigo}`),
+      ]);
+
+      const contratosMap = new Map<number, ContratoApiPublicoResumo>();
+
+      for (const contrato of inativos ?? []) {
+        const mapped = mapContratoPublico(contrato, false);
+        if (mapped) contratosMap.set(mapped.api_contrato_id, mapped);
+      }
+
+      for (const contrato of ativos ?? []) {
+        const mapped = mapContratoPublico(contrato, true);
+        if (mapped) contratosMap.set(mapped.api_contrato_id, mapped);
+      }
+
+      return Array.from(contratosMap.values());
+    },
+  );
+}
+
+async function getEmpenhosPublicosPorContrato(contratoApiId: number) {
+  return getOrLoadCached(
+    empenhosPublicosPorContratoCache,
+    empenhosPublicosPorContratoInFlight,
+    contratoApiId,
+    PUBLIC_EMPENHOS_CACHE_TTL_MS,
+    async () => {
+      const data = await fetchJson<ApiEmpenho[]>(`${CONTRATOS_API_BASE}/contrato/${contratoApiId}/empenhos`);
+      return data ?? [];
+    },
+  );
+}
+
 function isMissingTableError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
-  const e = error as { code?: string; message?: string; details?: string };
+  const e = error as { code?: string; message?: string; details?: string; status?: number };
   return (
+    e.status === 404 ||
     e.code === 'PGRST205' ||
     e.message?.toLowerCase().includes('could not find the table') === true ||
     e.message?.toLowerCase().includes('relation') === true ||
@@ -344,6 +682,144 @@ export const contratosApiService = {
       faturaItens: (faturaItensResult.data ?? []) as ContratoApiFaturaItemRow[],
       faturaEmpenhos: (faturaEmpenhosResult.data ?? []) as ContratoApiFaturaEmpenhoRow[],
     };
+  },
+
+  async getLiquidacoesPublicasPorEmpenho(
+    numeroEmpenho: string,
+    unidadeCodigos: string | string[] = DEFAULT_PUBLIC_LIQUIDACOES_UASGS,
+  ): Promise<ContratoApiPublicLiquidacaoRow[]> {
+    if (isDefaultPublicLiquidacoesUnidades(unidadeCodigos)) {
+      const cached = await getCachedLiquidacoesPublicasPorEmpenho(numeroEmpenho);
+      if (!cached.available) return [];
+      if (cached.isFresh && cached.rows.length === 0 && cached.rowsCount > 0) {
+        const privilegedRows = await getLiquidacoesCacheRowsViaFunction(numeroEmpenho);
+        if (privilegedRows) return privilegedRows;
+      }
+      if (cached.isFresh) return cached.rows;
+
+      triggerLiquidacoesCacheRefresh(numeroEmpenho);
+      if (cached.rows.length > 0) return cached.rows;
+      return [];
+    }
+
+    const targetKeys = buildEmpenhoKeySet(numeroEmpenho);
+    if (targetKeys.size === 0) return [];
+
+    const unidadeLista = normalizeUnidadeCodigos(unidadeCodigos);
+    if (unidadeLista.length === 0) return [];
+
+    const cacheKey = `${[...unidadeLista].sort().join(',')}:${Array.from(targetKeys).sort().join('|')}`;
+
+    return getOrLoadCached(
+      liquidacoesPublicasPorEmpenhoCache,
+      liquidacoesPublicasPorEmpenhoInFlight,
+      cacheKey,
+      PUBLIC_LIQUIDACOES_CACHE_TTL_MS,
+      async () => {
+        const contratosPorUnidade = await mapWithConcurrency(
+          unidadeLista,
+          (unidadeCodigo) => getContratosPublicos(unidadeCodigo),
+          2,
+        );
+        const contratosMap = new Map<number, ContratoApiPublicoResumo>();
+        for (const contrato of contratosPorUnidade.flat()) {
+          contratosMap.set(contrato.api_contrato_id, contrato);
+        }
+
+        const contratos = Array.from(contratosMap.values());
+        if (contratos.length === 0) return [];
+
+        const contratosCompativeis = (
+          await mapWithConcurrency(
+            contratos,
+            async (contrato) => {
+              try {
+                const empenhos = await getEmpenhosPublicosPorContrato(contrato.api_contrato_id);
+                const found = empenhos.some((empenho) =>
+                  hasEmpenhoMatch(targetKeys, empenho.numero ?? empenho.numero_empenho),
+                );
+
+                return found ? contrato : null;
+              } catch (error) {
+                console.warn(
+                  `Contratos API: falha ao consultar empenhos publicos do contrato ${contrato.api_contrato_id}`,
+                  error,
+                );
+                return null;
+              }
+            },
+            6,
+          )
+        ).filter((contrato): contrato is ContratoApiPublicoResumo => Boolean(contrato));
+
+        if (contratosCompativeis.length === 0) return [];
+
+        const liquidacoes = (
+          await mapWithConcurrency(
+            contratosCompativeis,
+            async (contrato) => {
+              try {
+                const faturas = await fetchJson<ApiFatura[]>(`${CONTRATOS_API_BASE}/contrato/${contrato.api_contrato_id}/faturas`);
+
+                return (faturas ?? []).flatMap((rawFatura) => {
+                  const matchingEmpenhos = getFaturaEmpenhos(rawFatura).filter((rawEmpenho) =>
+                    hasEmpenhoMatch(targetKeys, rawEmpenho.numero_empenho ?? rawEmpenho.numero),
+                  );
+
+                  if (matchingEmpenhos.length === 0) return [];
+
+                  const faturaMapeada = mapFatura(String(contrato.api_contrato_id), rawFatura);
+                  const rawFaturaRecord = rawFatura as Record<string, unknown>;
+                  const processo = rawFaturaRecord.processo == null ? null : String(rawFaturaRecord.processo);
+                  // `data_liquidacao` apareceu em payloads reais, mas nao esta documentado no schema OpenAPI.
+                  const dataLiquidacao = toDate(rawFaturaRecord.data_liquidacao);
+
+                  return matchingEmpenhos.map((matchingEmpenho) => ({
+                    contrato_api_id: contrato.api_contrato_id,
+                    contrato_numero: contrato.numero,
+                    contrato_objeto: contrato.objeto,
+                    fatura_id: Number(rawFatura.id) || faturaMapeada.api_fatura_id,
+                    numero_instrumento_cobranca: faturaMapeada.numero_instrumento_cobranca,
+                    situacao: faturaMapeada.situacao,
+                    valor_bruto: faturaMapeada.valor_bruto,
+                    valor_liquido: faturaMapeada.valor_liquido,
+                    data_emissao: faturaMapeada.data_emissao,
+                    data_vencimento: faturaMapeada.data_vencimento,
+                    data_pagamento: faturaMapeada.data_pagamento,
+                    data_liquidacao: dataLiquidacao,
+                    processo,
+                    empenho_numero: String(matchingEmpenho.numero_empenho ?? matchingEmpenho.numero ?? '').trim(),
+                    valor_empenho: toNumber(matchingEmpenho.valor_empenho),
+                    subelemento: matchingEmpenho.subelemento == null ? null : String(matchingEmpenho.subelemento),
+                  }));
+                });
+              } catch (error) {
+                console.warn(
+                  `Contratos API: falha ao consultar faturas publicas do contrato ${contrato.api_contrato_id}`,
+                  error,
+                );
+                return [];
+              }
+            },
+            4,
+          )
+        ).flat();
+
+        const uniqueLiquidacoes = new Map<string, ContratoApiPublicLiquidacaoRow>();
+        for (const liquidacao of liquidacoes) {
+          const key = `${liquidacao.contrato_api_id}:${liquidacao.fatura_id}:${liquidacao.empenho_numero}`;
+          if (!uniqueLiquidacoes.has(key)) {
+            uniqueLiquidacoes.set(key, liquidacao);
+          }
+        }
+
+        return Array.from(uniqueLiquidacoes.values()).sort((a, b) => {
+          const dateA = a.data_emissao ? new Date(a.data_emissao).getTime() : 0;
+          const dateB = b.data_emissao ? new Date(b.data_emissao).getTime() : 0;
+          return dateB - dateA;
+        });
+      },
+    );
   },
 
   async getLastSyncRun(unidadeCodigo = DEFAULT_UASG): Promise<ContratoApiSyncRun | null> {

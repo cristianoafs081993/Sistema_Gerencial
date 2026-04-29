@@ -40,6 +40,7 @@ Este repositorio possui documentacao operacional obrigatoria para tarefas em are
 ## Regras de manutencao
 
 - Se a mudanca alterar comportamento real do sistema, atualize a documentacao correspondente no mesmo trabalho.
+- Sempre que criar ou depender de migrations do Supabase, aplique as migrations no ambiente remoto vinculado durante o trabalho e valide o historico com `supabase migration list`.
 - Se a mudanca corrigir bug ou acrescentar funcionalidade, adicione ou ajuste testes de regressao.
 - Mantenha testes unitarios e de integracao nos pontos mais criticos do sistema.
 - Se houver conflito entre documentacao legada em `docs/llm` e codigo atual, o codigo atual vence.

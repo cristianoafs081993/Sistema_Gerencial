@@ -71,6 +71,8 @@ Observacao:
 - a pagina [Atividades.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Atividades.tsx) agora atende a rota `/planejamento/:scope`
 - as visoes `campus`, `sistemico` e `emendas-parlamentares` filtram a tabela `atividades` pelo campo `tipo_atividade`
 - cadastro manual e importacao JSON na pagina de planejamento persistem o `tipo_atividade` correspondente a aba atual
+- o modal [EmpenhoDialog.tsx](/C:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/components/modals/EmpenhoDialog.tsx) exibe a secao de liquidações da API publica do Comprasnet via `contratosApiService.getLiquidacoesPublicasPorEmpenho`
+- essa descoberta do modal nao usa `contratos_api*`; o frontend le `contratos_api_empenho_liquidacoes_cache*` e aciona a Edge Function `refresh-comprasnet-liquidacoes-cache` quando a entrada nao existe ou venceu. Se as tabelas de cache ainda nao existirem no ambiente, o modal retorna vazio sem acionar a function para evitar erros de bootstrap. Se o status do cache indicar linhas mas a leitura publica das linhas voltar vazia por policy/RLS, o service usa a function em modo `readCacheOnly` como fallback. A function percorre contratos publicos das UGs `158366` e `158155`, filtra contratos cujo endpoint `/empenhos` contenha o numero do empenho e so entao consulta `/faturas`, exibindo apenas linhas cujo `dados_empenho[]` corresponda ao empenho aberto
 
 ### Padrao B: pagina + service proprio
 
@@ -177,13 +179,14 @@ Observacao:
 - o historico da API (`contratos_api_historico`) aparece no drawer com assinatura, aditivos, apostilamentos e rescisao
 - contratos com origem `158155` recebem sinalizacao de Reitoria; a execucao operacional deve ser lida pela UG do campus `158366`
 - Valor Total da lista usa o historico da API como fonte principal quando houver match, somando `valor_inicial` de cada termo: assinatura, aditivos, apostilamentos ou termos equivalentes. `valor_global` da API nao entra nessa metrica. Sem historico com `valor_inicial`, usa `contratos.valor` como fallback
-- Valor Empenhado usa o empenhado original da API quando existir, ou o valor original do empenho local como fallback; RAP inscrito/reinscrito fica como detalhe separado
+- Valor Empenhado usa o empenhado original da API quando existir, ou o valor original do empenho local como fallback; RAP inscrito/reinscrito fica como detalhe separado. Os badges/popovers de empenhos da lista principal sempre usam `empenhos` + `contratos_empenhos`, para preservar os saldos importados por CSV/SIAFI
 - no drawer, a secao de itens usa `contratos_api_itens.historico_item` para somar o valor contratado por item quando a API traz historico de assinatura/aditivos; `contratos_api_itens.valor_total` e apenas fallback quando nao houver historico do item
 - no drawer, cada item tambem exibe o detalhamento do `historico_item` com tipo do termo, data, quantidade, valor unitario e valor total quando a API trouxer esses campos
 - no resumo de itens do drawer, `Contratado` e `Executado` mostram tambem quantidade agregada: quantidade contratada pela soma de `historico_item[].quantidade` quando existir, e quantidade executada pela soma de `quantidade_faturado` nas faturas `Pago` ou `Siafi Apropriado`
 - nas faturas associadas com `dados_item_faturado`, o drawer exibe quantidade faturada e valor unitario faturado alem do valor total do item
 - a execucao por item soma faturas com situacao `Pago` ou `Siafi Apropriado` e vinculo `dados_item_faturado`
 - faturas sem item vinculado ficam em grupo separado e nao entram na execucao oficial por item
+- no modal de empenho, a secao `Liquidações da API de Contratos` nao depende dessa sincronizacao local; ela le o cache dedicado de faturas por empenho e aciona refresh em segundo plano quando necessario
 
 ### Editor de Documentos
 

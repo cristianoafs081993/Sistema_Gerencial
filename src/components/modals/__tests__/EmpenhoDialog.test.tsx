@@ -3,12 +3,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
 import { EmpenhoDialog } from '@/components/modals/EmpenhoDialog';
-import { transparenciaService } from '@/services/transparencia';
-import type { DocumentoDespesa, Empenho } from '@/types';
+import { contratosApiService } from '@/services/contratosApi';
+import type { Empenho } from '@/types';
 
-vi.mock('@/services/transparencia', () => ({
-  transparenciaService: {
-    getDocumentosPorEmpenho: vi.fn(),
+vi.mock('@/services/contratosApi', () => ({
+  contratosApiService: {
+    getLiquidacoesPublicasPorEmpenho: vi.fn(),
   },
 }));
 
@@ -48,7 +48,7 @@ vi.mock('@/components/ui/select', () => ({
   SelectValue: ({ placeholder }: { placeholder?: string }) => <span>{placeholder}</span>,
 }));
 
-const mockedTransparenciaService = vi.mocked(transparenciaService);
+const mockedContratosApiService = vi.mocked(contratosApiService);
 
 const empenhoBase: Empenho = {
   id: 'emp-1',
@@ -57,7 +57,7 @@ const empenhoBase: Empenho = {
   valor: 25000,
   valorLiquidado: 4713.17,
   valorPagoOficial: 4713.17,
-  dimensao: 'AD - Administração',
+  dimensao: 'AD - Administracao',
   componenteFuncional: 'Contratos',
   origemRecurso: '158366',
   naturezaDespesa: '339014',
@@ -80,8 +80,8 @@ const empenhoBase: Empenho = {
   updatedAt: new Date('2026-02-03T12:00:00'),
 };
 
-const renderDialog = (documentos: DocumentoDespesa[]) => {
-  mockedTransparenciaService.getDocumentosPorEmpenho.mockResolvedValue(documentos);
+const renderDialog = (liquidacoesApi: unknown[] = []) => {
+  mockedContratosApiService.getLiquidacoesPublicasPorEmpenho.mockResolvedValue(liquidacoesApi);
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -105,52 +105,49 @@ const renderDialog = (documentos: DocumentoDespesa[]) => {
 
 describe('EmpenhoDialog', () => {
   beforeEach(() => {
-    mockedTransparenciaService.getDocumentosPorEmpenho.mockReset();
+    mockedContratosApiService.getLiquidacoesPublicasPorEmpenho.mockReset();
   });
 
-  it('renderiza historico de operacoes e documentos habeis que diminuem o saldo', async () => {
+  it('renderiza historico de operacoes e liquidacoes da API de contratos', async () => {
     renderDialog([
       {
-        id: '2026NP000001',
-        valor_original: 4713.17,
-        valor_pago: 1200,
-        estado: 'REALIZADO',
-        processo: '23035.000147.2026-45',
-        favorecido_nome: 'Fornecedor',
-        favorecido_documento: '12345678000199',
-        data_emissao: '2026-03-05',
+        contrato_api_id: 22024,
+        contrato_numero: '00062/2018',
+        contrato_objeto: 'Contrato teste',
+        fatura_id: 188319,
+        numero_instrumento_cobranca: '48161',
+        situacao: 'Pago',
+        valor_bruto: 12368.06,
+        valor_liquido: 12000,
+        data_emissao: '2023-05-08',
+        data_vencimento: '2023-06-26',
+        data_pagamento: '2023-06-20',
+        data_liquidacao: '2023-05-10',
+        processo: '23035.001299/2021-51',
         empenho_numero: '2026NE000002',
-      },
-      {
-        id: '2026NP000002',
-        valor_original: 999,
-        valor_pago: 0,
-        estado: 'CANCELADO',
-        processo: 'cancelado',
-        favorecido_nome: 'Fornecedor',
-        favorecido_documento: '12345678000199',
-        data_emissao: '2026-03-06',
-        empenho_numero: '2026NE000002',
+        valor_empenho: 12368.06,
+        subelemento: '01',
       },
     ]);
 
-    expect(screen.getByText('Inclusão')).toBeInTheDocument();
+    expect(screen.getByText((content) => content.includes('Inclus'))).toBeInTheDocument();
     expect(screen.getByText('+R$ 14.200,00')).toBeInTheDocument();
-
-    expect(await screen.findByText('2026NP000001')).toBeInTheDocument();
-    expect(screen.getByText('-R$ 4.713,17')).toBeInTheDocument();
-    expect(screen.getByText('R$ 1.200,00')).toBeInTheDocument();
-    expect(screen.queryByText('2026NP000002')).not.toBeInTheDocument();
+    expect(screen.queryByText((content) => content.includes('Documentos h'))).not.toBeInTheDocument();
 
     await waitFor(() => {
-      expect(mockedTransparenciaService.getDocumentosPorEmpenho).toHaveBeenCalledWith('2026NE000002');
+      expect(mockedContratosApiService.getLiquidacoesPublicasPorEmpenho).toHaveBeenCalledWith('2026NE000002');
     });
+
+    expect(await screen.findByText('48161')).toBeInTheDocument();
+    expect(screen.getByText('00062/2018')).toBeInTheDocument();
+    expect(screen.getByText('R$ 12.000,00')).toBeInTheDocument();
   });
 
-  it('mantem o modal estavel quando nao ha documentos habeis que reduzam saldo', async () => {
-    renderDialog([]);
+  it('mantem o modal estavel e exibe o vazio da API publica sem a secao de documentos habeis', async () => {
+    renderDialog();
 
-    expect(await screen.findByText('Nenhum documento hábil vinculado a este empenho reduziu o saldo.')).toBeInTheDocument();
+    expect(await screen.findByText('O empenho nao foi localizado nos contratos publicos do Comprasnet para as UGs 158366 e 158155.')).toBeInTheDocument();
+    expect(screen.queryByText((content) => content.includes('Nenhum documento'))).not.toBeInTheDocument();
     expect(screen.getByTestId('dialog-content')).toHaveClass('sm:max-w-4xl');
     expect(screen.getByTestId('dialog-content')).toHaveClass('lg:max-w-5xl');
   });

@@ -85,7 +85,18 @@ Mostrar a linhagem operacional dos dados de forma curta:
     - `contratos_api_fatura_empenhos`
     - `contratos_api_sync_runs`
   - pagina: [Contratos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Contratos.tsx)
-- observacao: a tela local continua vindo de `contratos` e `contratos_empenhos`; os dados da API enriquecem a linha quando o numero normalizado casa. Valor Total usa `contratos_api_historico` como fonte principal quando houver API, somando `valor_inicial` de cada termo; `valor_global` da API nao entra nessa metrica. Sem historico com `valor_inicial`, usa `contratos.valor` como fallback. A execucao por item soma faturas com situacao `Pago` ou `Siafi Apropriado` que tenham `dados_item_faturado`. O valor contratado por item no drawer soma `contratos_api_itens.historico_item[].valor_total` quando existir e cai para `contratos_api_itens.valor_total` sem historico do item. O historico da API exibe assinatura, aditivos e apostilamentos; `codigo_unidade_origem = 158155` deve ser sinalizado como origem Reitoria. Em contratos, Valor Empenhado usa `contratos_api_empenhos.valor_empenhado` quando houver API, com fallback para o valor original do empenho local.
+- observacao: a tela local continua vindo de `contratos` e `contratos_empenhos`; os dados da API enriquecem a linha quando o numero normalizado casa. Valor Total usa `contratos_api_historico` como fonte principal quando houver API, somando `valor_inicial` de cada termo; `valor_global` da API nao entra nessa metrica. Sem historico com `valor_inicial`, usa `contratos.valor` como fallback. A execucao por item soma faturas com situacao `Pago` ou `Siafi Apropriado` que tenham `dados_item_faturado`. O valor contratado por item no drawer soma `contratos_api_itens.historico_item[].valor_total` quando existir e cai para `contratos_api_itens.valor_total` sem historico do item. O historico da API exibe assinatura, aditivos e apostilamentos; `codigo_unidade_origem = 158155` deve ser sinalizado como origem Reitoria. Em contratos, Valor Empenhado usa `contratos_api_empenhos.valor_empenhado` quando houver API, com fallback para o valor original do empenho local; os badges/popovers de empenhos da lista principal continuam usando `empenhos` + `contratos_empenhos` para preservar os saldos CSV/SIAFI.
+
+### Cache de liquidações Comprasnet por empenho
+
+- API `https://contratos.comprasnet.gov.br/api`
+  - atualizacao: [refresh-comprasnet-liquidacoes-cache/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/refresh-comprasnet-liquidacoes-cache/index.ts)
+  - service de leitura no frontend: [contratosApi.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/contratosApi.ts)
+  - tabelas:
+    - `contratos_api_empenho_liquidacoes_cache_status`
+    - `contratos_api_empenho_liquidacoes_cache`
+  - consumidor: [EmpenhoDialog.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/modals/EmpenhoDialog.tsx)
+- observacao: o modal nao varre a API publica em tempo real quando usa as UGs padrao `158366` e `158155`; ele le o cache e aciona a function para preencher ou revalidar entradas. Resultados encontrados vencem em 12 horas, e `not_found` vence em 1 hora.
 
 ### Documentos habeis
 
