@@ -360,6 +360,12 @@ const pickFirstString = (...values: Array<string | undefined | null>) => {
   return undefined;
 };
 
+const pickExplicitProjectReference = (...values: Array<string | undefined | null>) => {
+  const value = pickFirstString(...values);
+  if (!value) return undefined;
+  return /\bprojet[oa]s?\b/i.test(value) ? value : undefined;
+};
+
 const pickFirstNumber = (...values: Array<number | undefined | null>) => {
   for (const value of values) {
     if (typeof value === 'number' && !Number.isNaN(value) && value > 0) return value;
@@ -650,7 +656,7 @@ const buildContextFromDocumento = (
     related.empenhoLocal?.descricao,
     related.suap?.assunto,
   );
-  const projeto = pickFirstString(related.suap?.assunto, related.contratoApi?.objeto || undefined);
+  const projeto = pickExplicitProjectReference(related.suap?.assunto, related.contratoApi?.objeto || undefined);
   const sourceMap: Partial<Record<ContextFieldKey, { source: string; status: ContextFieldStatus }>> = {
     documento: { source: toSourceLabel('documentos_habeis'), status: 'confirmed' },
     processo: {
@@ -721,15 +727,17 @@ const buildContextFromDocumento = (
             : 'Nao localizado',
       status: related.contratoApi?.objeto || related.empenhoLocal?.descricao ? 'confirmed' : related.suap?.assunto ? 'inferred' : 'missing',
     },
-    projeto: {
-      source: related.suap?.assunto ? toSourceLabel('processos') : 'Nao localizado',
-      status: related.suap?.assunto ? 'inferred' : 'missing',
-    },
     edital: {
       source: 'Nao localizado',
       status: 'missing',
     },
   };
+  if (projeto) {
+    sourceMap.projeto = {
+      source: related.suap?.assunto ? toSourceLabel('processos') : toSourceLabel('contratos_api'),
+      status: 'inferred',
+    };
+  }
   const fields = buildFieldStates({
     documentoHabilId: documento.id,
     processo,
@@ -808,6 +816,7 @@ const buildContextFromSuap = (
     related.contratoApi?.valor_global || undefined,
   );
   const objeto = pickFirstString(related.contratoApi?.objeto || undefined, processo.assunto, related.empenhoLocal?.descricao);
+  const projeto = pickExplicitProjectReference(processo.assunto, related.contratoApi?.objeto || undefined, related.empenhoLocal?.descricao);
   const sourceMap: Partial<Record<ContextFieldKey, { source: string; status: ContextFieldStatus }>> = {
     processo: { source: toSourceLabel('processos'), status: processo.numProcesso ? 'confirmed' : 'missing' },
     favorecido: { source: toSourceLabel('processos'), status: processo.beneficiario ? 'confirmed' : 'missing' },
@@ -852,12 +861,18 @@ const buildContextFromSuap = (
             : 'Nao localizado',
       status: related.contratoApi?.objeto || processo.assunto ? 'confirmed' : related.empenhoLocal?.descricao ? 'inferred' : 'missing',
     },
-    projeto: {
-      source: processo.assunto ? toSourceLabel('processos') : 'Nao localizado',
-      status: processo.assunto ? 'inferred' : 'missing',
-    },
     edital: { source: 'Nao localizado', status: 'missing' },
   };
+  if (projeto) {
+    sourceMap.projeto = {
+      source: processo.assunto && /\bprojet[oa]s?\b/i.test(processo.assunto)
+        ? toSourceLabel('processos')
+        : related.contratoApi?.objeto && /\bprojet[oa]s?\b/i.test(related.contratoApi.objeto)
+          ? toSourceLabel('contratos_api')
+          : toSourceLabel('empenhos'),
+      status: 'inferred',
+    };
+  }
   const fields = buildFieldStates({
     processo: processo.numProcesso,
     favorecido: processo.beneficiario,
@@ -866,7 +881,7 @@ const buildContextFromSuap = (
     empenho,
     valor,
     objeto,
-    projeto: processo.assunto,
+    projeto,
     sourceMap,
   });
 
@@ -888,7 +903,7 @@ const buildContextFromSuap = (
     empenho,
     valor,
     objeto,
-    projeto: processo.assunto,
+    projeto,
     fields,
     missingRequiredFields: buildMissingFields(fields),
     warnings: [],
@@ -915,6 +930,7 @@ const buildContextFromContrato = (
   const documentoFavorecido = pickFirstString(contratoApi.fornecedor_documento || undefined, related.empenhoLocal?.favorecidoDocumento);
   const tipoPessoa = inferTipoPessoa(documentoFavorecido);
   const empenho = pickFirstString(related.contratoApiEmpenho?.numero, related.empenhoLocal?.numero);
+  const projeto = pickExplicitProjectReference(contratoApi.objeto || undefined, related.empenhoLocal?.descricao);
   const valor = pickFirstNumber(
     related.contratoApiEmpenho?.valor_a_liquidar || undefined,
     related.empenhoLocal?.valorLiquidadoAPagar,
@@ -930,6 +946,12 @@ const buildContextFromContrato = (
     valor: { source: related.contratoApiEmpenho?.valor_a_liquidar ? toSourceLabel('contratos_api') : contratoApi.valor_global ? toSourceLabel('contratos_api') : 'Nao localizado', status: related.contratoApiEmpenho?.valor_a_liquidar || contratoApi.valor_global ? 'inferred' : 'missing' },
     objeto: { source: contratoApi.objeto ? toSourceLabel('contratos_api') : 'Nao localizado', status: contratoApi.objeto ? 'confirmed' : 'missing' },
   };
+  if (projeto) {
+    sourceMap.projeto = {
+      source: contratoApi.objeto ? toSourceLabel('contratos_api') : toSourceLabel('empenhos'),
+      status: 'inferred',
+    };
+  }
   const fields = buildFieldStates({
     processo: contratoApi.processo || undefined,
     favorecido: contratoApi.fornecedor_nome || undefined,
@@ -938,6 +960,7 @@ const buildContextFromContrato = (
     empenho,
     valor,
     objeto: contratoApi.objeto || undefined,
+    projeto,
     sourceMap,
   });
 
@@ -959,6 +982,7 @@ const buildContextFromContrato = (
     empenho,
     valor,
     objeto: contratoApi.objeto || undefined,
+    projeto,
     fields,
     missingRequiredFields: buildMissingFields(fields),
     warnings: ['Minuta montada sem documento habil localizado. Revise com mais cuidado antes de finalizar.'],
@@ -1346,9 +1370,13 @@ export function buildDespachoLiquidacaoHtml(context: ResolvedDocumentContext) {
   let htmlTexto = '';
 
   if (categoria === 'bolsa') {
-    const projetoHtml = htmlQuoted(context.projeto || objetoLimpo || context.objeto, 'nome do projeto');
-    const editalHtml = htmlValue(context.edital, 'numero do edital', { bold: true });
-    htmlTexto = `Considerando a regularidade da documenta&ccedil;&atilde;o apresentada e o ateste da execu&ccedil;&atilde;o das atividades pelo(s) bolsista(s) ${favorecidoHtml}, no &acirc;mbito do projeto ${projetoHtml}, aprovado no Edital n&ordm; ${editalHtml} (Processo n&ordm; ${processoHtml}), <b>AUTORIZO</b> a liquida&ccedil;&atilde;o da despesa no valor de ${valorHtml}, referente ao empenho ${empenhoHtml}.`;
+    if (context.projeto) {
+      const projetoHtml = htmlQuoted(context.projeto, 'nome do projeto');
+      const editalHtml = htmlValue(context.edital, 'numero do edital', { bold: true });
+      htmlTexto = `Considerando a regularidade da documenta&ccedil;&atilde;o apresentada e o ateste da execu&ccedil;&atilde;o das atividades pelo(s) bolsista(s) ${favorecidoHtml}, no &acirc;mbito do projeto ${projetoHtml}, aprovado no Edital n&ordm; ${editalHtml} (Processo n&ordm; ${processoHtml}), <b>AUTORIZO</b> a liquida&ccedil;&atilde;o da despesa no valor de ${valorHtml}, referente ao empenho ${empenhoHtml}.`;
+    } else {
+      htmlTexto = `Considerando a regularidade da documenta&ccedil;&atilde;o apresentada e o ateste da execu&ccedil;&atilde;o das atividades pelo(s) bolsista(s) ${favorecidoHtml} (Processo n&ordm; ${processoHtml}), <b>AUTORIZO</b> a liquida&ccedil;&atilde;o da despesa no valor de ${valorHtml}, referente ao empenho ${empenhoHtml}.`;
+    }
   } else {
     const trechoObjeto =
       categoria === 'aquisicao'

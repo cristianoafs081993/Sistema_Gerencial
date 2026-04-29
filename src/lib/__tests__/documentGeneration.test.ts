@@ -119,5 +119,29 @@ describe('buildDespachoLiquidacaoHtml', () => {
 
     expect(html).toContain('ateste da execu&ccedil;&atilde;o das atividades');
     expect(html).toContain('referente ao empenho');
+    expect(html).toContain('no &acirc;mbito do projeto');
+    expect(html).toContain('Edital n&ordm; <b>12/2025</b>');
+  });
+
+  it('usa modelo de bolsa sem projeto quando nao ha projeto', () => {
+    const html = buildDespachoLiquidacaoHtml({
+      ...baseContext,
+      tipoPessoa: 'PF',
+      favorecido: 'Maria da Silva',
+      documentoFavorecido: '12345678900',
+      objeto: 'Bolsa estudantil',
+      projeto: undefined,
+      edital: undefined,
+    });
+
+    expect(html).toContain('ateste da execu&ccedil;&atilde;o das atividades');
+    expect(html).toContain('MARIA DA SILVA');
+    expect(html).toContain('23035.000123/2026-11');
+    expect(html).toContain('15.234,56');
+    expect(html).toContain('2026NE000123');
+    expect(html).not.toContain('no &acirc;mbito do projeto');
+    expect(html).not.toContain('Edital');
+    expect(html).not.toContain('[nome do projeto]');
+    expect(html).not.toContain('[numero do edital]');
   });
 });

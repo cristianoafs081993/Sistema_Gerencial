@@ -25,6 +25,8 @@ interface Natureza {
   valor: number;
 }
 
+type DespachoFinalidade = 'contrato' | 'projeto' | 'bolsa-sem-projeto';
+
 const macroprocessoData: Record<string, string[]> = {
   "AD - Administração": ["8 - Orçamento", "9 - Contabilidade e Finanças", "10 - Compras e Licitações", "11 - Contratos", "12 - Material", "13 - Patrimônio", "5 - Contratos"],
   "AE - Atividades Estudantis": ["1 - Política de Atividades Estudantis", "2 - Serviço Social", "3 - Saúde Estudantil", "4 - Psicologia Escolar", "5 - Alimentação e Nutrição"],
@@ -50,7 +52,7 @@ export default function GeradorDocumentos() {
   const [showModal, setShowModal] = useState(false);
   
   // Despacho State
-  const [finalidade, setFinalidade] = useState('contrato');
+  const [finalidade, setFinalidade] = useState<DespachoFinalidade>('contrato');
   const [anoProjeto, setAnoProjeto] = useState('2026');
   const [editalProjeto, setEditalProjeto] = useState('10/2026-PROEX/IFRN');
   const [nomeProjeto, setNomeProjeto] = useState('');
@@ -123,10 +125,12 @@ export default function GeradorDocumentos() {
         : `e a atestação da aquisição de <b>${descricao.toUpperCase()}</b>`;
 
       htmlTexto = `Considerando a plena regularidade dos documentos apresentados ${textoTipo} para este <i>campus</i> Currais Novos, (Processo nº <b>${processo}</b>), <b>AUTORIZO</b> a liquidação da despesa no valor de <b>R$ ${valor}</b> referente ao empenho <b>${empenhoUpper}</b>, em favor da empresa <b>${favorecidoUpper}</b>`;
-    } else {
+    } else if (finalidade === 'projeto') {
       const editalUpper = editalProjeto.toUpperCase();
       htmlTexto = `Considerando a regularidade da documentação e a comprovação da execução das atividades pelo(s) bolsista(s) <b>${favorecidoUpper}</b> do projeto <b>"${nomeProjeto}"</b>, aprovado no Edital nº <b>${editalUpper}</b> (Processo nº <b>${processo}</b>), <b>AUTORIZO</b> a liquidação da despesa no valor de <b>R$ ${valor}</b>.`;
       htmlItens = `<div style="margin-bottom: 12px;"><b>Empenho(s):</b> <span style="color: #d9534f; text-decoration: underline; font-weight: bold; text-transform: uppercase;">${empenhoUpper}</span></div>`;
+    } else {
+      htmlTexto = `Considerando a regularidade da documenta&ccedil;&atilde;o apresentada e o ateste da execu&ccedil;&atilde;o das atividades pelo(s) bolsista(s) <b>${favorecidoUpper}</b> (Processo n&ordm; <b>${processo}</b>), <b>AUTORIZO</b> a liquida&ccedil;&atilde;o da despesa no valor de <b>R$ ${valor}</b>, referente ao empenho <b>${empenhoUpper}</b>.`;
     }
 
     return `
@@ -280,11 +284,12 @@ export default function GeradorDocumentos() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Finalidade</Label>
-                  <Select value={finalidade} onValueChange={v => { setFinalidade(v); setStep(1); setHasGenerated(false); }}>
+                  <Select value={finalidade} onValueChange={v => { setFinalidade(v as DespachoFinalidade); setStep(1); setHasGenerated(false); }}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="contrato">Contrato ou Aquisição Comum</SelectItem>
                       <SelectItem value="projeto">Projeto de Pesquisa / Extensão (Alunos)</SelectItem>
+                      <SelectItem value="bolsa-sem-projeto">Bolsa sem projeto</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -307,7 +312,7 @@ export default function GeradorDocumentos() {
                         <Input value={editalProjeto} onChange={e => { setEditalProjeto(e.target.value); setStep(1); setHasGenerated(false); }} />
                       </div>
                     </motion.div>
-                  ) : (
+                  ) : finalidade === 'contrato' ? (
                     <motion.div 
                       key="cont-field"
                       initial={{ opacity: 0, x: 10 }}
@@ -324,7 +329,7 @@ export default function GeradorDocumentos() {
                         </SelectContent>
                       </Select>
                     </motion.div>
-                  )}
+                  ) : null}
                 </AnimatePresence>
               </div>
 
@@ -337,7 +342,7 @@ export default function GeradorDocumentos() {
                     onChange={e => { setNomeProjeto(e.target.value); setStep(1); setHasGenerated(false); }} 
                   />
                 </div>
-              ) : (
+              ) : finalidade === 'contrato' ? (
                 <div className="space-y-2">
                   <Label>Descrição Detalhada</Label>
                   <Textarea 
@@ -347,10 +352,10 @@ export default function GeradorDocumentos() {
                     placeholder="Ex: SERVIÇOS DE MANUTENÇÃO PREVENTIVA..."
                   />
                 </div>
-              )}
+              ) : null}
 
               <div className="space-y-2">
-                <Label>{finalidade === 'projeto' ? 'Favorecido (Alunos)' : 'Favorecido (Empresa)'}</Label>
+                <Label>{finalidade === 'contrato' ? 'Favorecido (Empresa)' : 'Favorecido (Bolsistas)'}</Label>
                 <Input value={favorecido} onChange={e => { setFavorecido(e.target.value); setStep(1); setHasGenerated(false); }} className="uppercase" />
               </div>
 
