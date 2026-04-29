@@ -367,8 +367,6 @@ export default function Contratos() {
             ) : (
               filteredContratos.map((c) => {
                 const apiContrato = apiContratoByNumero.get(normalizeContratoNumero(c.numero));
-                const empenhosApi = apiContrato ? (apiEmpenhosByContratoApiId.get(apiContrato.id) ?? []) : [];
-                const useApiEmpenhos = empenhosApi.length > 0;
                 const hasReitoriaOrigin = apiContrato?.unidade_origem_codigo === REITORIA_UG;
                 const empenhosVinculados = getEmpenhosDoContrato(c.id);
                 const historicoApi = apiContrato ? (apiHistoricosByContratoApiId.get(apiContrato.id) ?? []) : [];
@@ -424,43 +422,7 @@ export default function Contratos() {
                         )}
 
                         <div className="flex flex-wrap gap-1">
-                          {useApiEmpenhos ? (
-                            empenhosApi.map((e) => (
-                              <Popover key={e.id}>
-                                <PopoverTrigger asChild>
-                                  <Badge variant="secondary" className="text-[10px] font-mono py-0 h-5 cursor-pointer hover:bg-muted-foreground/20 transition-colors">
-                                    {e.numero}
-                                  </Badge>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-72 border-border-default/60 p-3 shadow-lifted">
-                                  <div className="space-y-2">
-                                    <div className="mr-1 flex items-center justify-between border-b border-border-default/50 pb-1">
-                                      <span className="font-data text-xs font-bold text-action-primary">{e.numero}</span>
-                                      <Badge variant="outline" className="text-[9px] uppercase px-1 h-4">
-                                        API UG {e.unidade_gestora || '-'}
-                                      </Badge>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-y-1.5 text-xs py-1">
-                                      <span className="text-text-secondary">Emissão:</span>
-                                      <span className="text-right font-medium">{safeFormatDate(e.data_emissao)}</span>
-                                      <span className="text-text-secondary">Empenhado:</span>
-                                      <span className="text-right font-semibold">{formatCurrency(e.valor_empenhado || 0)}</span>
-                                      <span className="text-text-secondary">A liquidar:</span>
-                                      <span className="text-right font-medium">{formatCurrency(e.valor_a_liquidar || 0)}</span>
-                                      <span className="text-text-secondary">Liquidado:</span>
-                                      <span className="text-right font-medium">{formatCurrency(e.valor_liquidado || 0)}</span>
-                                      <span className="text-text-secondary">Pago:</span>
-                                      <span className="text-right font-medium">{formatCurrency(e.valor_pago || 0)}</span>
-                                      <span className="text-text-secondary">RP inscrito:</span>
-                                      <span className="text-right font-medium">{formatCurrency(e.rp_inscrito || 0)}</span>
-                                      <span className="text-text-secondary">RP a pagar:</span>
-                                      <span className="text-right font-medium">{formatCurrency(e.rp_a_pagar || 0)}</span>
-                                    </div>
-                                  </div>
-                                </PopoverContent>
-                              </Popover>
-                            ))
-                          ) : empenhosVinculados.length > 0 ? (
+                          {empenhosVinculados.length > 0 ? (
                             empenhosVinculados.map((e) => {
                               const balance = e.tipo === 'rap' ? getRapSaldoAtual(e, rapReferenceYear) : Math.max(0, e.valor - ((e.valorLiquidadoAPagar || 0) + (e.valorPagoOficial || 0)));
                               const rapBase = e.tipo === 'rap' ? getRapBaseVigente(e, rapReferenceYear) : 0;
@@ -481,7 +443,7 @@ export default function Contratos() {
                                         </Badge>
                                       </div>
                                       <div className="grid grid-cols-2 gap-y-1.5 text-xs py-1">
-                                        <span className="text-text-secondary">{e.tipo === 'rap' ? 'Base Vigente:' : 'Valor Total:'}</span>
+                                        <span className="text-text-secondary">{e.tipo === 'rap' ? 'Empenhado:' : 'Valor Total:'}</span>
                                         <span className="text-right font-medium">{formatCurrency(e.tipo === 'rap' ? rapBase : e.valor || 0)}</span>
                                         <span className="font-semibold text-text-secondary">{e.tipo === 'rap' ? 'Saldo Atual:' : 'Saldo a Liquidar:'}</span>
                                         <span className={cn('text-right font-bold underline decoration-dotted', balance > 0 ? 'text-status-warning' : 'text-status-success')}>{formatCurrency(balance)}</span>

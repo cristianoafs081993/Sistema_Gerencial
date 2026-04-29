@@ -106,6 +106,12 @@ describe('Contratos regressions', () => {
       ],
       contratosEmpenhos: [
         {
+          id: 'link-local-api-match',
+          contrato_id: 'contrato-local-1',
+          empenho_id: 'empenho-local-rap',
+          created_at: new Date('2024-01-01'),
+        },
+        {
           id: 'link-local-1',
           contrato_id: 'contrato-local-2',
           empenho_id: 'empenho-local-rap',
@@ -314,6 +320,8 @@ describe('Contratos regressions', () => {
     expect(screen.queryByText('R$ 250.000,00')).not.toBeInTheDocument();
     expect(await screen.findByText('R$ 12.732,40')).toBeInTheDocument();
     expect(screen.getByText('0.8%')).toBeInTheDocument();
+    expect(screen.getAllByText('2023NE000777').length).toBeGreaterThan(0);
+    expect(screen.queryByText('2024NE000319')).not.toBeInTheDocument();
     expect(screen.getAllByText('R$ 40,00').length).toBeGreaterThan(0);
     expect(screen.getByText('Origem Reitoria')).toBeInTheDocument();
   });
