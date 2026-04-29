@@ -702,8 +702,121 @@ describe('EditorDocumentos', () => {
               questionId: 'exclusive-entrega',
               selectedOptionId: 'entrega-unica',
               optionValues: {
-                'option-block-1::0::[indicar o prazo]': '30',
-                'option-block-1::0::[indicar o termo inicial da vigencia]': 'recebimento da nota de empenho',
+                'block-entrega-unica::0::[indicar o prazo]': '30',
+                'block-entrega-unica::0::[indicar o termo inicial da vigencia]': 'recebimento da nota de empenho',
+              },
+            }),
+          ],
+        }),
+      );
+    });
+  }, 15000);
+
+  it('abre campo para prazos e condicoes ao escolher entrega parcelada', async () => {
+    mockedReferenceTermsService.generateDraft.mockClear();
+    mockedReferenceTermsService.getActiveTemplate.mockResolvedValueOnce({
+      id: 'template-1',
+      code: 'termo-referencia-compras',
+      name: 'TR Compras',
+      description: 'Modelo vigente',
+      versionLabel: 'Dez/2025',
+      fileName: 'tr-compras.docx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      templateBase64: 'dGVzdGU=',
+      templateText: 'MODELO DE TERMO DE REFERENCIA',
+      editableBlocks: [
+        {
+          id: 'block-entrega-unica',
+          kind: 'paragraph',
+          blockIndex: 1,
+          text: 'O prazo de entrega dos bens e de [indicar o prazo] dias, contados do(a) [indicar o termo inicial da vigencia], em remessa unica.',
+          excerpt: 'O prazo de entrega dos bens e de [indicar o prazo] dias, contados do(a) [indicar o termo inicial da vigencia], em remessa unica.',
+          isInstructional: true,
+          hasPlaceholder: true,
+        },
+        {
+          id: 'block-entrega-parcelada',
+          kind: 'paragraph',
+          blockIndex: 2,
+          text: 'As parcelas serao entregues nos seguintes prazos e condicoes.',
+          excerpt: 'As parcelas serao entregues nos seguintes prazos e condicoes.',
+          isInstructional: true,
+          hasPlaceholder: false,
+        },
+      ],
+      questionnaireSchema: {
+        version: 1,
+        generatedAt: new Date().toISOString(),
+        questions: [
+          {
+            id: 'exclusive-entrega',
+            kind: 'exclusive',
+            title: 'Escolha exclusiva',
+            prompt: 'Escolha qual clausula deve permanecer ativa neste ponto do Termo de Referencia.',
+            blockIds: ['block-entrega-unica', 'block-entrega-parcelada'],
+            blockIndexes: [1, 2],
+            options: [
+              {
+                id: 'entrega-unica',
+                label: 'Entrega unica',
+                text: 'O prazo de entrega dos bens e de [indicar o prazo] dias, contados do(a) [indicar o termo inicial da vigencia], em remessa unica.',
+                blockId: 'block-entrega-unica',
+                blockIndex: 1,
+              },
+              {
+                id: 'entrega-parcelada',
+                label: 'Entrega parcelada',
+                text: 'As parcelas serao entregues nos seguintes prazos e condicoes.',
+                blockId: 'block-entrega-parcelada',
+                blockIndex: 2,
+              },
+            ],
+          },
+        ],
+      },
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    mockedReferenceTermsService.suggestQuestionnaireAnswers.mockResolvedValueOnce({
+      status: 'generated',
+      suggestions: [],
+      warnings: [],
+      model: 'gemini-2.5-flash-lite',
+    });
+
+    renderEditor('/editor-documentos/termo-referencia-compras');
+
+    expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
+    selectSyncedProcess();
+    fireEvent.click(screen.getByRole('button', { name: /Gerar Termo de Referencia/i }));
+
+    expect(await screen.findByText('Escolha qual clausula deve permanecer ativa neste ponto do Termo de Referencia.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', {
+      name: /As parcelas serao entregues nos seguintes prazos e condicoes\./i,
+    }));
+
+    expect(screen.getByText('Prazos e condicoes das parcelas')).toBeInTheDocument();
+    expect(mockedReferenceTermsService.generateDraft).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByPlaceholderText(/primeira parcela em ate 30 dias corridos/i), {
+      target: { value: 'duas parcelas, em 30 e 60 dias corridos apos a nota de empenho' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Salvar resposta/i }));
+
+    expect(await screen.findByText('Questionario pronto para geracao')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Continuar geracao/i }));
+
+    await waitFor(() => {
+      expect(mockedReferenceTermsService.generateDraft).toHaveBeenCalledWith(
+        expect.objectContaining({
+          questionnaireAnswers: [
+            expect.objectContaining({
+              questionId: 'exclusive-entrega',
+              selectedOptionId: 'entrega-parcelada',
+              optionValues: {
+                'block-entrega-parcelada::supplemental::prazos-condicoes-parcelas':
+                  'duas parcelas, em 30 e 60 dias corridos apos a nota de empenho',
               },
             }),
           ],
@@ -801,13 +914,13 @@ describe('EditorDocumentos', () => {
     expect(screen.getByRole('button', { name: 'os termos da Nota Tecnica' })).toBeInTheDocument();
 
     const textareas = screen.getAllByRole('textbox');
-    fireEvent.change(textareas[textareas.length - 2], {
+    fireEvent.change(textareas[textareas.length - 1], {
       target: { value: 'ha necessidade continuada do fornecimento' },
     });
-    fireEvent.change(textareas[textareas.length - 1], {
-      target: { value: 'ha previsao de consumo permanente' },
+    fireEvent.click(screen.getByRole('button', { name: 'os termos da Nota Tecnica' }));
+    fireEvent.change(screen.getByPlaceholderText('Ex.: 12/2026.'), {
+      target: { value: '12/2026' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'o Estudo Tecnico Preliminar' }));
     fireEvent.click(screen.getByRole('button', { name: /Salvar resposta/i }));
     expect(await screen.findByText('Questionario pronto para geracao')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Continuar geracao/i }));
@@ -820,10 +933,10 @@ describe('EditorDocumentos', () => {
               questionId: 'exclusive-continuado',
               selectedOptionId: 'clausula-continuado',
               optionValues: expect.objectContaining({
-                'option-block-1::0::[...]': 'ha necessidade continuada do fornecimento',
-                'option-block-1::1::[...]': 'ha previsao de consumo permanente',
-                'option-block-1::0::[o Estudo Tecnico Preliminar]': 'o Estudo Tecnico Preliminar',
-                'option-block-1::1::[os termos da Nota Tecnica]': '',
+                'block-continuado::0::[...]': 'ha necessidade continuada do fornecimento',
+                'block-continuado::1::[...]': '',
+                'block-continuado::0::[o Estudo Tecnico Preliminar]': '',
+                'block-continuado::0::[os termos da Nota Tecnica]': 'os termos da Nota Tecnica 12/2026',
               }),
             }),
           ],

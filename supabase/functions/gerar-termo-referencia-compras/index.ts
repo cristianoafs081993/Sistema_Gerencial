@@ -421,28 +421,16 @@ function replaceQuestionPlaceholder(text: string, placeholder: string | undefine
   return text.replace(/\[[^\]]+\]/g, value);
 }
 
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function replacePlaceholderOccurrence(text: string, placeholder: string, occurrenceIndex: number, value: string) {
-  let currentOccurrence = 0;
-  const expression = new RegExp(escapeRegExp(placeholder), 'g');
-
-  return text.replace(expression, (match) => {
-    if (currentOccurrence === occurrenceIndex) {
-      currentOccurrence += 1;
-      return value;
-    }
-
-    currentOccurrence += 1;
-    return match;
-  });
-}
-
 function buildOptionValueKey(blockId: string | undefined, placeholder: string, occurrenceIndex: number) {
   const normalizedBlockId = (blockId || 'option').trim() || 'option';
   return `${normalizedBlockId}::${occurrenceIndex}::${placeholder.trim()}`;
+}
+
+const PARCEL_DELIVERY_SCHEDULE_FIELD_ID = 'prazos-condicoes-parcelas';
+
+function buildSupplementalOptionValueKey(blockId: string | undefined, fieldId: string) {
+  const normalizedBlockId = (blockId || 'option').trim() || 'option';
+  return `${normalizedBlockId}::supplemental::${fieldId}`;
 }
 
 function normalizeAnswerOptionValues(answer?: QuestionnaireAnswer) {
@@ -458,9 +446,75 @@ function normalizeAnswerOptionValues(answer?: QuestionnaireAnswer) {
   }, {});
 }
 
+function normalizeReferenceText(value: string) {
+  return value
+    .replace(/\s+/g, ' ')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+}
+
+function cleanModelField(value?: string) {
+  return (value || '')
+    .replace(/^\s*\[/, '')
+    .replace(/\]\s*$/, '')
+    .replace(/[.;:,]+$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isLiteralInlineChoicePlaceholder(value: string) {
+  const cleaned = cleanModelField(value);
+  if (!cleaned) return false;
+
+  const normalized = normalizeReferenceText(cleaned);
+  if (normalized.length < 10) return false;
+
+  return /(?:ESTUDO TECNICO PRELIMINAR|NOTA TECNICA|TERMO DE REFERENCIA|PARECER|JUSTIFICATIVA|MEMORIAL|RELATORIO)/.test(normalized);
+}
+
+function isGenericInlineChoicePlaceholder(value: string) {
+  return normalizeReferenceText(cleanModelField(value)) === '...';
+}
+
+function isInlineChoiceSeparatorText(value: string) {
+  const normalized = normalizeReferenceText(value).replace(/^[,.;:]+|[,.;:]+$/g, '').trim();
+  return normalized === 'OU';
+}
+
+function getSupplementalParcelDeliveryField(optionText: string, blockId: string | undefined) {
+  const normalizedText = normalizeReferenceText(optionText);
+  if (
+    !normalizedText.includes('PARCELAS') ||
+    !normalizedText.includes('PRAZOS') ||
+    !normalizedText.includes('CONDICOES')
+  ) {
+    return null;
+  }
+
+  return {
+    key: buildSupplementalOptionValueKey(blockId, PARCEL_DELIVERY_SCHEDULE_FIELD_ID),
+    fallbackKey: PARCEL_DELIVERY_SCHEDULE_FIELD_ID,
+    label: 'Prazos e condicoes das parcelas',
+  };
+}
+
+function appendClauseComplement(optionText: string, value: string) {
+  const cleanText = optionText.trim();
+  const cleanValue = value.trim();
+  if (!cleanText || !cleanValue) return cleanText || cleanValue;
+
+  const textWithoutTrailingPunctuation = cleanText.replace(/[\s.;:]+$/g, '');
+  const valueWithPunctuation = /[.!?]$/.test(cleanValue) ? cleanValue : `${cleanValue}.`;
+  return `${textWithoutTrailingPunctuation}: ${valueWithPunctuation}`;
+}
+
 function cleanupInlineOptionText(value: string) {
   return value
     .replace(/\s+OU\s+OU\s+/gi, ' OU ')
+    .replace(/\s{2,}OU\s+/gi, ' ')
+    .replace(/\s+OU\s{2,}/gi, ' ')
     .replace(/\s+OU\s*(?=[,.;:]|$)/gi, '')
     .replace(/^\s*OU\s+/gi, '')
     .replace(/([([])\s*OU\s+/gi, '$1')
@@ -547,47 +601,166 @@ function applyOptionValuesToText(
   recordedPlaceholders?: Set<string>,
   blockId?: string,
 ) {
-  let nextText = optionText;
   const optionValues = normalizeAnswerOptionValues(answer);
-  const placeholderOccurrences = new Map<string, number>();
-  const placeholderMatches = Array.from(optionText.matchAll(/\[[^\]]+\]/g));
-
-  for (const match of placeholderMatches) {
+  const resolvedBlockId = blockId || option.blockId;
+  const occurrenceCounts = new Map<string, number>();
+  const occurrences = Array.from(optionText.matchAll(/\[[^\]]+\]/g)).map((match, index) => {
     const placeholder = match[0]?.trim() || '';
-    if (!placeholder) continue;
+    const occurrenceIndex = occurrenceCounts.get(placeholder) || 0;
+    occurrenceCounts.set(placeholder, occurrenceIndex + 1);
 
-    const occurrenceIndex = placeholderOccurrences.get(placeholder) || 0;
-    placeholderOccurrences.set(placeholder, occurrenceIndex + 1);
-    const optionValueKey = buildOptionValueKey(blockId || option.blockId, placeholder, occurrenceIndex);
-    const value = optionValues[optionValueKey] || optionValues[placeholder] || '';
-    if (value) {
-      nextText = replacePlaceholderOccurrence(nextText, placeholder, occurrenceIndex, value);
-      if (!recordedPlaceholders?.has(optionValueKey)) {
+    return {
+      index,
+      placeholder,
+      occurrenceIndex,
+      optionValueKey: buildOptionValueKey(resolvedBlockId, placeholder, occurrenceIndex),
+      startIndex: match.index || 0,
+      raw: match[0],
+    };
+  });
+
+  if (occurrences.length === 0) {
+    const supplementalField = getSupplementalParcelDeliveryField(optionText, resolvedBlockId);
+    if (!supplementalField) {
+      return optionText;
+    }
+
+    const value = optionValues[supplementalField.key] || optionValues[supplementalField.fallbackKey] || '';
+    if (value.trim()) {
+      if (!recordedPlaceholders?.has(supplementalField.key)) {
         fields.push({
-          key: `${question.id || option.id || option.blockId || 'option'}:${optionValueKey}`,
-          label: placeholder,
+          key: `${question.id || option.id || option.blockId || 'option'}:${supplementalField.key}`,
+          label: supplementalField.label,
+          value: value.trim(),
+          status: 'confirmed',
+          source: answerSourceLabel(answer),
+        });
+        recordedPlaceholders?.add(supplementalField.key);
+      }
+      return appendClauseComplement(optionText, value.trim());
+    }
+
+    if (!recordedPlaceholders?.has(supplementalField.key)) {
+      warnings.push(`Campo pendente na clausula escolhida: ${supplementalField.label}`);
+      missingRequiredFields.push(supplementalField.label);
+      fields.push({
+        key: `${question.id || option.id || option.blockId || 'option'}:${supplementalField.key}`,
+        label: supplementalField.label,
+        status: 'missing',
+        source: 'questionario do modelo',
+      });
+      recordedPlaceholders?.add(supplementalField.key);
+    }
+
+    return appendClauseComplement(optionText, '[CAMPO PENDENTE]');
+  }
+
+  const inlineChoiceReplacements = new Map<string, string>();
+
+  for (let index = 0; index < occurrences.length; index += 1) {
+    const occurrence = occurrences[index];
+    if (
+      !occurrence?.placeholder ||
+      (!isLiteralInlineChoicePlaceholder(occurrence.placeholder) && !isGenericInlineChoicePlaceholder(occurrence.placeholder))
+    ) {
+      continue;
+    }
+
+    const choiceIndexes = [index];
+    for (let nextIndex = index + 1; nextIndex < occurrences.length; nextIndex += 1) {
+      const previousOccurrence = occurrences[nextIndex - 1];
+      const nextOccurrence = occurrences[nextIndex];
+      const betweenText = optionText.slice(
+        previousOccurrence.startIndex + previousOccurrence.raw.length,
+        nextOccurrence.startIndex,
+      );
+
+      if (
+        !isInlineChoiceSeparatorText(betweenText) ||
+        (!isLiteralInlineChoicePlaceholder(nextOccurrence.placeholder) && !isGenericInlineChoicePlaceholder(nextOccurrence.placeholder))
+      ) {
+        break;
+      }
+
+      choiceIndexes.push(nextIndex);
+    }
+
+    if (
+      choiceIndexes.length <= 1 ||
+      !choiceIndexes.some((choiceIndex) => isLiteralInlineChoicePlaceholder(occurrences[choiceIndex].placeholder))
+    ) {
+      continue;
+    }
+
+    const selectedChoice = choiceIndexes
+      .map((choiceIndex) => occurrences[choiceIndex])
+      .find((choice) => {
+        const value = optionValues[choice.optionValueKey] || optionValues[choice.placeholder] || '';
+        return Boolean(value.trim());
+      });
+
+    if (selectedChoice) {
+      for (const choiceIndex of choiceIndexes) {
+        const choice = occurrences[choiceIndex];
+        const value = optionValues[choice.optionValueKey] || optionValues[choice.placeholder] || '';
+        inlineChoiceReplacements.set(choice.optionValueKey, choice.optionValueKey === selectedChoice.optionValueKey ? value.trim() : '');
+      }
+    }
+
+    index = choiceIndexes[choiceIndexes.length - 1];
+  }
+
+  let replacementIndex = 0;
+  const nextText = optionText.replace(/\[[^\]]+\]/g, (rawMatch) => {
+    const occurrence = occurrences[replacementIndex];
+    replacementIndex += 1;
+
+    if (!occurrence?.placeholder) return rawMatch;
+
+    const inlineReplacement = inlineChoiceReplacements.get(occurrence.optionValueKey);
+    if (inlineReplacement !== undefined) {
+      if (inlineReplacement && !recordedPlaceholders?.has(occurrence.optionValueKey)) {
+        fields.push({
+          key: `${question.id || option.id || option.blockId || 'option'}:${occurrence.optionValueKey}`,
+          label: occurrence.placeholder,
+          value: inlineReplacement,
+          status: 'confirmed',
+          source: answerSourceLabel(answer),
+        });
+        recordedPlaceholders?.add(occurrence.optionValueKey);
+      }
+      return inlineReplacement;
+    }
+
+    const value = optionValues[occurrence.optionValueKey] || optionValues[occurrence.placeholder] || '';
+    if (value) {
+      if (!recordedPlaceholders?.has(occurrence.optionValueKey)) {
+        fields.push({
+          key: `${question.id || option.id || option.blockId || 'option'}:${occurrence.optionValueKey}`,
+          label: occurrence.placeholder,
           value,
           status: 'confirmed',
           source: answerSourceLabel(answer),
         });
-        recordedPlaceholders?.add(optionValueKey);
+        recordedPlaceholders?.add(occurrence.optionValueKey);
       }
-      continue;
+      return value;
     }
 
-    nextText = replacePlaceholderOccurrence(nextText, placeholder, occurrenceIndex, '[CAMPO PENDENTE]');
-    if (!recordedPlaceholders?.has(optionValueKey)) {
-      warnings.push(`Campo pendente na clausula escolhida: ${placeholder}`);
-      missingRequiredFields.push(placeholder);
+    if (!recordedPlaceholders?.has(occurrence.optionValueKey)) {
+      warnings.push(`Campo pendente na clausula escolhida: ${occurrence.placeholder}`);
+      missingRequiredFields.push(occurrence.placeholder);
       fields.push({
-        key: `${question.id || option.id || option.blockId || 'option'}:${optionValueKey}`,
-        label: placeholder,
+        key: `${question.id || option.id || option.blockId || 'option'}:${occurrence.optionValueKey}`,
+        label: occurrence.placeholder,
         status: 'missing',
         source: 'questionario do modelo',
       });
-      recordedPlaceholders?.add(optionValueKey);
+      recordedPlaceholders?.add(occurrence.optionValueKey);
     }
-  }
+
+    return '[CAMPO PENDENTE]';
+  });
 
   return cleanupInlineOptionText(nextText);
 }

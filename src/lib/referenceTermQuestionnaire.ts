@@ -35,6 +35,9 @@ export type ReferenceTermOptionChoiceField = {
     placeholder: string;
     label: string;
     value: string;
+    inputPlaceholder?: string;
+    inputValuePrefix?: string;
+    requiresInput?: boolean;
   }>;
 };
 
@@ -42,6 +45,7 @@ export type ReferenceTermOptionField = ReferenceTermOptionInputField | Reference
 
 const GENERIC_FIELD_TITLE = 'CAMPO PREVISTO NO MODELO';
 const PLACEHOLDER_REGEX = /\[[^\]]+\]/g;
+const PARCEL_DELIVERY_SCHEDULE_FIELD_ID = 'prazos-condicoes-parcelas';
 
 const contextDependentTokens = new Set([
   'ANO',
@@ -61,7 +65,7 @@ const contextualRules: Array<{
   inputPlaceholder: string;
 }> = [
   {
-    match: (sourceText, modelField) => sourceText.includes('PLANO DE CONTRATACOES ANUAL') && (modelField === 'ANO' || modelField === '...'),
+    match: (sourceText, modelField) => sourceText.includes('PLANO DE CONTRATACOES ANUAL') && modelField === 'ANO',
     label: 'Ano do Plano de Contratacoes Anual',
     instruction: 'Informe o ano do Plano de Contratacoes Anual que ampara esta contratacao.',
     inputPlaceholder: 'Ex.: 2026.',
@@ -97,7 +101,7 @@ const contextualRules: Array<{
     inputPlaceholder: 'Ex.: FC-2026-001.',
   },
   {
-    match: (sourceText) => sourceText.includes('NOTA TECNICA'),
+    match: (_, modelField) => modelField.includes('NUMERO') && modelField.includes('NOTA TECNICA'),
     label: 'Numero da nota tecnica',
     instruction: 'Informe o numero da nota tecnica citada neste ponto do modelo.',
     inputPlaceholder: 'Ex.: 12/2026.',
@@ -232,24 +236,35 @@ export function cleanReferenceTermModelField(value?: string) {
   return 'campo previsto no modelo';
 }
 
-function isGenericPlaceholderText(value: string) {
-  const normalized = normalizeReferenceTermText(value);
-  if (!normalized) return true;
-  if (normalized === '...') return true;
-  if (normalized.includes('INSERIR') || normalized.includes('INDICAR') || normalized.includes('PREENCHER') || normalized.includes('INFORMAR') || normalized.includes('INCLUIR')) {
-    return true;
-  }
-  return value.includes('...');
-}
-
 function isLiteralChoicePlaceholder(value: string) {
   const cleaned = cleanReferenceTermModelField(value);
-  if (!cleaned || isGenericPlaceholderText(cleaned)) return false;
+  if (!cleaned) return false;
 
   const normalized = normalizeReferenceTermText(cleaned);
   if (normalized.length < 10) return false;
-
   return /(?:ESTUDO TECNICO PRELIMINAR|NOTA TECNICA|TERMO DE REFERENCIA|PARECER|JUSTIFICATIVA|MEMORIAL|RELATORIO)/.test(normalized);
+}
+
+function buildTechnicalNoteInputPrefix(value: string) {
+  const cleaned = cleanReferenceTermModelField(value);
+  const normalized = normalizeReferenceTermText(cleaned);
+  if (!normalized.includes('NOTA TECNICA')) return '';
+
+  const prefix = cleaned
+    .replace(/\s*\.\.\.\/?\s*/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return prefix ? `${prefix} ` : '';
+}
+
+function isGenericInlineChoicePlaceholder(value: string) {
+  return normalizeReferenceTermText(cleanReferenceTermModelField(value)) === '...';
+}
+
+function isInlineChoiceSeparator(value: string) {
+  const normalized = normalizeReferenceTermText(value).replace(/^[,.;:]+|[,.;:]+$/g, '').trim();
+  return normalized === 'OU';
 }
 
 function buildInlineChoiceLabel(choices: string[]) {
@@ -310,18 +325,139 @@ function cleanupDerivedLabel(value: string) {
   return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 }
 
-function deriveLabelFromSourceText(sourceText: string, placeholder: string, normalizedSourceText: string) {
+function splitReferenceTermContextSegments(value: string) {
+  return value
+    .split(/(?:;|\n|\r|•|\u2022)/g)
+    .map((segment) => collapseWhitespace(segment))
+    .filter(Boolean);
+}
+
+function findPlaceholderOccurrenceIndex(sourceText: string, placeholder: string, occurrenceIndex: number) {
+  if (!placeholder) return -1;
+
+  let startAt = 0;
+  for (let currentOccurrence = 0; currentOccurrence <= occurrenceIndex; currentOccurrence += 1) {
+    const foundIndex = sourceText.indexOf(placeholder, startAt);
+    if (foundIndex < 0) return -1;
+    if (currentOccurrence === occurrenceIndex) return foundIndex;
+    startAt = foundIndex + placeholder.length;
+  }
+
+  return -1;
+}
+
+function extractPlaceholderContext(sourceText: string, placeholder: string, occurrenceIndex: number) {
+  const collapsedSourceText = collapseWhitespace(sourceText);
+  const placeholderIndex = findPlaceholderOccurrenceIndex(collapsedSourceText, placeholder, occurrenceIndex);
+  if (placeholderIndex < 0) {
+    return {
+      beforeText: collapsedSourceText,
+      afterText: '',
+      excerpt: truncateReferenceTermDisplayText(collapsedSourceText, 160),
+    };
+  }
+
+  const beforeText = collapsedSourceText.slice(0, placeholderIndex).trim();
+  const afterText = collapsedSourceText.slice(placeholderIndex + placeholder.length).trim();
+  const excerptStart = Math.max(0, placeholderIndex - 95);
+  const excerptEnd = Math.min(collapsedSourceText.length, placeholderIndex + placeholder.length + 95);
+  const rawExcerpt = collapsedSourceText.slice(excerptStart, excerptEnd);
+  const excerptPrefix = excerptStart > 0 ? '...' : '';
+  const excerptSuffix = excerptEnd < collapsedSourceText.length ? '...' : '';
+
+  return {
+    beforeText,
+    afterText,
+    excerpt: truncateReferenceTermDisplayText(`${excerptPrefix}${rawExcerpt}${excerptSuffix}`, 170),
+  };
+}
+
+function buildContextualFallbackInstruction(sourceText: string, placeholder: string, occurrenceIndex: number) {
+  const { beforeText, excerpt } = extractPlaceholderContext(sourceText, placeholder, occurrenceIndex);
+  const normalizedExcerpt = normalizeReferenceTermText(excerpt);
+
+  if (
+    !normalizedExcerpt ||
+    normalizedExcerpt === normalizeReferenceTermText(placeholder) ||
+    normalizePunctuationOnly(excerpt.replace(placeholder, '')).length === 0
+  ) {
+    return null;
+  }
+
+  const lastSegment = splitReferenceTermContextSegments(beforeText).pop() || beforeText;
+  const labelSource = cleanupDerivedLabel(
+    lastSegment
+      .replace(/\[[^\]]+\]/g, '')
+      .replace(/\b(?:conforme|nos termos|na forma)\b.*$/i, '')
+      .trim(),
+  );
+  const summary = summarizeReferenceTermDisplayText(excerpt.replace(placeholder, '[...]'), 95);
+  const label = labelSource && normalizeReferenceTermText(labelSource) !== 'OU'
+    ? labelSource
+    : `Lacuna no trecho: ${summary}`;
+
+  if (!label || normalizeReferenceTermText(label) === normalizeReferenceTermText(cleanReferenceTermModelField(placeholder))) {
+    return null;
+  }
+
+  return {
+    label,
+    instruction: `Preencha a lacuna marcada neste trecho do modelo: "${summary}".`,
+    inputPlaceholder: 'Preencha esta lacuna com base no processo.',
+  };
+}
+
+function deriveLabelFromSourceText(sourceText: string, placeholder: string, normalizedSourceText: string, occurrenceIndex = 0) {
   const normalizedPlaceholder = normalizeReferenceTermText(cleanReferenceTermModelField(placeholder));
-  const contextualRule = contextualRules.find((rule) => rule.match(normalizedSourceText, normalizedPlaceholder));
+  const { beforeText } = extractPlaceholderContext(sourceText, placeholder, occurrenceIndex);
+  const localBeforeText = (splitReferenceTermContextSegments(beforeText).pop() || beforeText).slice(-180);
+  const normalizedLocalBeforeText = normalizeReferenceTermText(localBeforeText);
+
+  if (
+    normalizedPlaceholder === '...' &&
+    normalizedSourceText.includes('FORNECIMENTO DE BENS') &&
+    normalizedSourceText.includes('ENQUADRADO COMO CONTINUADO') &&
+    normalizedLocalBeforeText.endsWith('TENDO EM VISTA QUE')
+  ) {
+    return {
+      label: 'Justificativa do fornecimento continuado',
+      instruction: 'Informe a razao objetiva para enquadrar o fornecimento como continuado neste processo.',
+      inputPlaceholder: 'Ex.: necessidade permanente de reposicao do estoque institucional.',
+    };
+  }
+
+  if (
+    normalizedPlaceholder === '...' &&
+    normalizedSourceText.includes('VIGENCIA PLURIANUAL') &&
+    normalizedLocalBeforeText.endsWith('CONSIDERANDO')
+  ) {
+    return {
+      label: 'Justificativa da vigencia plurianual',
+      instruction: 'Informe por que a vigencia plurianual e mais vantajosa para esta contratacao.',
+      inputPlaceholder: 'Ex.: previsao de consumo continuo e ganho operacional com fornecimento regular.',
+    };
+  }
+
+  if (
+    normalizedPlaceholder === '...' &&
+    normalizedLocalBeforeText.includes('NOTA TECNICA') &&
+    !normalizedLocalBeforeText.includes(' OU ')
+  ) {
+    return {
+      label: 'Numero da nota tecnica',
+      instruction: 'Informe o numero da nota tecnica citada neste ponto do modelo.',
+      inputPlaceholder: 'Ex.: 12/2026.',
+    };
+  }
+
+  const contextualScope = normalizedPlaceholder === '...' ? normalizedLocalBeforeText : normalizedSourceText;
+  const contextualRule = contextualRules.find((rule) => rule.match(contextualScope, normalizedPlaceholder));
   if (contextualRule) {
     return contextualRule;
   }
 
   if (!placeholder) return null;
 
-  const collapsedSourceText = collapseWhitespace(sourceText);
-  const placeholderIndex = collapsedSourceText.indexOf(placeholder);
-  const beforeText = placeholderIndex >= 0 ? collapsedSourceText.slice(0, placeholderIndex).trim() : collapsedSourceText;
   const colonMatch = beforeText.match(/([^:.;]{3,120}):\s*$/);
   if (colonMatch) {
     const label = cleanupDerivedLabel(colonMatch[1]);
@@ -414,8 +550,39 @@ export function buildReferenceTermOptionValueKey(blockId: string | undefined, pl
   return `${normalizedBlockId}::${occurrenceIndex}::${placeholder.trim()}`;
 }
 
+export function buildReferenceTermSupplementalOptionValueKey(blockId: string | undefined, fieldId: string) {
+  const normalizedBlockId = (blockId || 'option').trim() || 'option';
+  return `${normalizedBlockId}::supplemental::${fieldId}`;
+}
+
+function buildSupplementalOptionFields(sourceText: string, blockId: string | undefined): ReferenceTermOptionInputField[] {
+  const normalizedSourceText = normalizeReferenceTermText(sourceText);
+
+  if (
+    normalizedSourceText.includes('PARCELAS') &&
+    normalizedSourceText.includes('PRAZOS') &&
+    normalizedSourceText.includes('CONDICOES')
+  ) {
+    return [{
+      kind: 'input',
+      key: buildReferenceTermSupplementalOptionValueKey(blockId, PARCEL_DELIVERY_SCHEDULE_FIELD_ID),
+      placeholder: PARCEL_DELIVERY_SCHEDULE_FIELD_ID,
+      instruction: {
+        label: 'Prazos e condicoes das parcelas',
+        instruction:
+          'Informe os prazos de entrega de cada parcela, a forma de contagem e as condicoes especiais aplicaveis.',
+        inputPlaceholder:
+          'Ex.: primeira parcela em ate 30 dias corridos apos a nota de empenho e demais parcelas conforme cronograma aprovado pela fiscalizacao.',
+        modelField: 'prazos e condicoes das parcelas',
+      },
+    }];
+  }
+
+  return [];
+}
+
 export function buildReferenceTermOptionFields(
-  option: Pick<DocumentTemplateQuestionOption, 'text' | 'blockIds' | 'blockTexts'>,
+  option: Pick<DocumentTemplateQuestionOption, 'text' | 'blockId' | 'blockIds' | 'blockTexts'>,
 ): ReferenceTermOptionField[] {
   const fields: ReferenceTermOptionField[] = [];
   const blockTexts = Array.isArray(option.blockTexts) && option.blockTexts.length > 0
@@ -423,13 +590,18 @@ export function buildReferenceTermOptionFields(
     : [option.text || ''];
   const blockIds = Array.isArray(option.blockIds) && option.blockIds.length > 0
     ? option.blockIds
-    : blockTexts.map((_, index) => `option-block-${index + 1}`);
+    : blockTexts.map((_, index) => (index === 0 && option.blockId ? option.blockId : `option-block-${index + 1}`));
 
   blockTexts.forEach((rawBlockText, blockIndex) => {
     const sourceText = collapseWhitespace(rawBlockText || '');
     if (!sourceText) return;
 
     const placeholderMatches = Array.from(sourceText.matchAll(PLACEHOLDER_REGEX));
+    if (placeholderMatches.length === 0) {
+      fields.push(...buildSupplementalOptionFields(sourceText, blockIds[blockIndex]));
+      return;
+    }
+
     const consumedIndexes = new Set<number>();
     const occurrenceByPlaceholder = new Map<string, number>();
     const blockId = blockIds[blockIndex];
@@ -445,7 +617,7 @@ export function buildReferenceTermOptionFields(
       occurrenceByPlaceholder.set(currentPlaceholder, occurrenceIndex + 1);
       const currentKey = buildReferenceTermOptionValueKey(blockId, currentPlaceholder, occurrenceIndex);
 
-      if (isLiteralChoicePlaceholder(currentPlaceholder)) {
+      if (isLiteralChoicePlaceholder(currentPlaceholder) || isGenericInlineChoicePlaceholder(currentPlaceholder)) {
         const choiceIndexes = [index];
 
         for (let nextIndex = index + 1; nextIndex < placeholderMatches.length; nextIndex += 1) {
@@ -457,26 +629,60 @@ export function buildReferenceTermOptionFields(
           ));
           const nextPlaceholder = nextMatch?.[0]?.trim() || '';
 
-          if (betweenText !== 'OU' || !isLiteralChoicePlaceholder(nextPlaceholder)) {
+          if (
+            !isInlineChoiceSeparator(betweenText) ||
+            (!isLiteralChoicePlaceholder(nextPlaceholder) && !isGenericInlineChoicePlaceholder(nextPlaceholder))
+          ) {
             break;
           }
 
           choiceIndexes.push(nextIndex);
         }
 
-        if (choiceIndexes.length > 1) {
-          const choices = choiceIndexes.map((choiceIndex, choiceOccurrenceIndex) => {
+        if (choiceIndexes.length > 1 && choiceIndexes.some((choiceIndex) => isLiteralChoicePlaceholder(placeholderMatches[choiceIndex][0].trim()))) {
+          const choices = choiceIndexes.map((choiceIndex) => {
             consumedIndexes.add(choiceIndex);
             const placeholder = placeholderMatches[choiceIndex][0].trim();
+            const placeholderOccurrenceIndex = choiceIndex === index
+              ? occurrenceIndex
+              : occurrenceByPlaceholder.get(placeholder) || 0;
+            if (choiceIndex !== index) {
+              occurrenceByPlaceholder.set(placeholder, placeholderOccurrenceIndex + 1);
+            }
+            if (isGenericInlineChoicePlaceholder(placeholder)) {
+              const instruction = buildReferenceTermFieldInstruction(
+                {
+                  title: placeholder,
+                  prompt: `Preencha ${placeholder}.`,
+                  placeholder,
+                },
+                sourceText,
+                placeholderOccurrenceIndex,
+              );
+
+              return {
+                key: buildReferenceTermOptionValueKey(blockId, placeholder, placeholderOccurrenceIndex),
+                placeholder,
+                label: instruction?.label || 'Texto proprio da clausula',
+                value: '',
+                inputPlaceholder: instruction?.inputPlaceholder || 'Preencha este trecho com base no processo.',
+                requiresInput: true,
+              };
+            }
+
             const value = cleanReferenceTermModelField(placeholder);
+            const technicalNotePrefix = buildTechnicalNoteInputPrefix(value);
             return {
-              key: buildReferenceTermOptionValueKey(blockId, placeholder, choiceOccurrenceIndex),
+              key: buildReferenceTermOptionValueKey(blockId, placeholder, placeholderOccurrenceIndex),
               placeholder,
               label: value,
-              value,
+              value: technicalNotePrefix ? '' : value,
+              inputPlaceholder: technicalNotePrefix ? 'Ex.: 12/2026.' : undefined,
+              inputValuePrefix: technicalNotePrefix || undefined,
+              requiresInput: Boolean(technicalNotePrefix),
             };
           });
-          const choiceCopy = buildInlineChoiceLabel(choices.map((choice) => choice.value));
+          const choiceCopy = buildInlineChoiceLabel(choices.map((choice) => choice.value || choice.label));
 
           fields.push({
             kind: 'choice',
@@ -496,6 +702,7 @@ export function buildReferenceTermOptionFields(
           placeholder: currentPlaceholder,
         },
         sourceText,
+        occurrenceIndex,
       );
 
       fields.push({
@@ -546,12 +753,13 @@ function isUsableQuestionTitle(title: string) {
 export function buildReferenceTermFieldInstruction(
   question: Pick<DocumentTemplateQuestion, 'placeholder' | 'prompt' | 'title'>,
   sourceText?: string,
+  placeholderOccurrenceIndex = 0,
 ): ReferenceTermFieldInstruction | null {
   const rawPlaceholder = extractQuestionPlaceholder(question);
   const modelField = cleanReferenceTermModelField(rawPlaceholder || question.title || question.prompt);
   const normalizedModelField = normalizeReferenceTermText(modelField);
   const normalizedSourceText = normalizeReferenceTermText(sourceText || '');
-  const contextualRule = deriveLabelFromSourceText(sourceText || '', rawPlaceholder, normalizedSourceText);
+  const contextualRule = deriveLabelFromSourceText(sourceText || '', rawPlaceholder, normalizedSourceText, placeholderOccurrenceIndex);
 
   if (contextualRule) {
     return {
@@ -582,6 +790,13 @@ export function buildReferenceTermFieldInstruction(
   }
 
   if (isTrivialModelField(modelField)) {
+    const fallbackInstruction = buildContextualFallbackInstruction(sourceText || '', rawPlaceholder, placeholderOccurrenceIndex);
+    if (fallbackInstruction) {
+      return {
+        ...fallbackInstruction,
+        modelField,
+      };
+    }
     return null;
   }
 

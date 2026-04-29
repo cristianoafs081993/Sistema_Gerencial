@@ -612,20 +612,37 @@ function ReferenceTermQuestionCard({
   onAnswer: (answer: ReferenceTermQuestionAnswer) => void;
   onSkip: () => void;
 }) {
+  const getInlineChoiceInputValue = (choice: { inputValuePrefix?: string }, storedValue?: string) => {
+    const value = storedValue || '';
+    if (!choice.inputValuePrefix) return value;
+    return value.startsWith(choice.inputValuePrefix) ? value.slice(choice.inputValuePrefix.length) : value;
+  };
+
+  const buildInlineChoiceStoredValue = (choice: { inputValuePrefix?: string }, inputValue: string) =>
+    `${choice.inputValuePrefix || ''}${inputValue}`.trim();
+
   const isSkipped = answer?.skipped === true;
   const [fieldValue, setFieldValue] = useState(isSkipped ? '' : answer?.value || '');
   const [selectedOptionId, setSelectedOptionId] = useState(answer?.selectedOptionId || '');
   const [optionValues, setOptionValues] = useState<Record<string, string>>(answer?.optionValues || {});
+  const [inlineChoiceSelections, setInlineChoiceSelections] = useState<Record<string, string>>({});
   const fieldInstruction = question.kind === 'field' ? buildReferenceTermFieldInstruction(question, sourceText) : null;
   const selectedOption = getQuestionOptionById(question, selectedOptionId);
   const selectedOptionFields = selectedOption ? buildReferenceTermOptionFields(selectedOption) : [];
   const canSubmitOptionAnswer =
     Boolean(selectedOptionId) &&
-    selectedOptionFields.every((field) =>
-      field.kind === 'choice'
-        ? field.choices.some((choice) => (optionValues[choice.key] || '').trim())
-        : (optionValues[field.key] || '').trim(),
-    );
+    selectedOptionFields.every((field) => {
+      if (field.kind !== 'choice') {
+        return (optionValues[field.key] || '').trim();
+      }
+
+      const selectedChoiceKey = inlineChoiceSelections[field.key];
+      const selectedChoice = field.choices.find((choice) => choice.key === selectedChoiceKey);
+      if (!selectedChoice) return false;
+      return selectedChoice.requiresInput
+        ? Boolean(getInlineChoiceInputValue(selectedChoice, optionValues[selectedChoice.key]).trim())
+        : true;
+    });
   const questionTitle = fieldInstruction?.label || question.title;
   const normalizedQuestionTitle = questionTitle.trim().toLocaleLowerCase('pt-BR');
   const isGenericKindTitle =
@@ -645,6 +662,24 @@ function ReferenceTermQuestionCard({
   useEffect(() => {
     setOptionValues(isSkipped ? {} : answer?.optionValues || {});
   }, [answer?.optionValues, isSkipped, question.id]);
+
+  useEffect(() => {
+    if (isSkipped || !selectedOptionFields.length) {
+      setInlineChoiceSelections({});
+      return;
+    }
+
+    setInlineChoiceSelections(
+      selectedOptionFields.reduce<Record<string, string>>((current, field) => {
+        if (field.kind !== 'choice') return current;
+        const selectedChoice = field.choices.find((choice) => (answer?.optionValues?.[choice.key] || '').trim());
+        if (selectedChoice) {
+          current[field.key] = selectedChoice.key;
+        }
+        return current;
+      }, {}),
+    );
+  }, [answer?.optionValues, isSkipped, question.id, selectedOptionId]);
 
   const submitFieldAnswer = () => {
     const value = fieldValue.trim();
@@ -694,6 +729,16 @@ function ReferenceTermQuestionCard({
       return current;
     }, {});
     setOptionValues(nextOptionValues);
+    setInlineChoiceSelections(
+      nextOptionFields.reduce<Record<string, string>>((current, field) => {
+        if (field.kind !== 'choice') return current;
+        const selectedChoice = field.choices.find((choice) => (nextOptionValues[choice.key] || '').trim());
+        if (selectedChoice) {
+          current[field.key] = selectedChoice.key;
+        }
+        return current;
+      }, {}),
+    );
   };
 
   const submitOptionAnswer = () => {
@@ -803,7 +848,7 @@ function ReferenceTermQuestionCard({
                     <span className="font-ui text-xs leading-5 text-text-secondary">{field.instruction}</span>
                     <div className="grid gap-2">
                       {field.choices.map((choice) => {
-                        const isChoiceSelected = Boolean(optionValues[choice.key]?.trim());
+                        const isChoiceSelected = inlineChoiceSelections[field.key] === choice.key;
 
                         return (
                           <button
@@ -815,21 +860,41 @@ function ReferenceTermQuestionCard({
                                 ? 'border-primary/35 bg-primary/[0.08] text-text-primary shadow-soft'
                                 : 'border-border-default bg-white text-text-secondary hover:border-primary/20 hover:bg-primary/[0.04]',
                             )}
-                            onClick={() =>
+                            onClick={() => {
                               setOptionValues((current) => {
                                 const next = { ...current };
                                 for (const item of field.choices) {
-                                  next[item.key] = item.key === choice.key ? item.value : '';
+                                  next[item.key] = item.key === choice.key && !item.requiresInput ? item.value || current[item.key] || '' : '';
                                 }
                                 return next;
-                              })
-                            }
+                              });
+                              setInlineChoiceSelections((selections) => ({
+                                ...selections,
+                                [field.key]: choice.key,
+                              }));
+                            }}
                           >
                             {choice.label}
                           </button>
                         );
                       })}
                     </div>
+                    {field.choices
+                      .filter((choice) => choice.requiresInput && inlineChoiceSelections[field.key] === choice.key)
+                      .map((choice) => (
+                        <Textarea
+                          key={`${choice.key}-input`}
+                          value={getInlineChoiceInputValue(choice, optionValues[choice.key])}
+                          onChange={(event) =>
+                            setOptionValues((current) => ({
+                              ...current,
+                              [choice.key]: buildInlineChoiceStoredValue(choice, event.target.value),
+                            }))
+                          }
+                          placeholder={choice.inputPlaceholder || 'Preencha este trecho com base no processo.'}
+                          className="min-h-[76px] rounded-radius-lg border-border-default bg-white text-sm"
+                        />
+                      ))}
                   </div>
                 ) : (
                   <label key={field.key} className="grid gap-1.5">

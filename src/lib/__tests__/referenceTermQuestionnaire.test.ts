@@ -163,27 +163,60 @@ describe('referenceTermQuestionnaire', () => {
     ]);
   });
 
-  it('transforma alternativas documentais inline em escolha, sem abrir dois campos de texto', () => {
+  it('abre campo de prazos e condicoes quando a alternativa de entrega parcelada nao tem placeholder', () => {
     expect(
       buildReferenceTermOptionFields({
-        text: 'O fornecimento de bens e enquadrado como continuado, considerando [...] OU [o Estudo Tecnico Preliminar] OU [os termos da Nota Tecnica].',
+        text: 'As parcelas serao entregues nos seguintes prazos e condicoes.',
+        blockIds: ['block-entrega-parcelada'],
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        kind: 'input',
+        key: 'block-entrega-parcelada::supplemental::prazos-condicoes-parcelas',
+        placeholder: 'prazos-condicoes-parcelas',
+        instruction: expect.objectContaining({
+          label: 'Prazos e condicoes das parcelas',
+          modelField: 'prazos e condicoes das parcelas',
+        }),
+      }),
+    ]);
+  });
+
+  it('transforma alternativas documentais inline em escolha, sem abrir campos de nota tecnica', () => {
+    expect(
+      buildReferenceTermOptionFields({
+        text: 'O fornecimento de bens e enquadrado como continuado tendo em vista que [...], sendo a vigencia plurianual mais vantajosa considerando [...] OU [o Estudo Tecnico Preliminar]; OU [os termos da Nota Tecnica .../].',
       }),
     ).toEqual([
       expect.objectContaining({
         kind: 'input',
         placeholder: '[...]',
+        instruction: expect.objectContaining({
+          label: 'Justificativa do fornecimento continuado',
+        }),
       }),
       expect.objectContaining({
         kind: 'choice',
         label: 'Documento de referencia',
         choices: [
           expect.objectContaining({
+            placeholder: '[...]',
+            key: 'option-block-1::1::[...]',
+            label: 'Justificativa da vigencia plurianual',
+            requiresInput: true,
+          }),
+          expect.objectContaining({
             placeholder: '[o Estudo Tecnico Preliminar]',
+            key: 'option-block-1::0::[o Estudo Tecnico Preliminar]',
             label: 'o Estudo Tecnico Preliminar',
           }),
           expect.objectContaining({
-            placeholder: '[os termos da Nota Tecnica]',
-            label: 'os termos da Nota Tecnica',
+            placeholder: '[os termos da Nota Tecnica .../]',
+            key: 'option-block-1::0::[os termos da Nota Tecnica .../]',
+            label: 'os termos da Nota Tecnica .../',
+            inputPlaceholder: 'Ex.: 12/2026.',
+            inputValuePrefix: 'os termos da Nota Tecnica ',
+            requiresInput: true,
           }),
         ],
       }),
@@ -248,5 +281,31 @@ describe('referenceTermQuestionnaire', () => {
         }),
       }),
     ]);
+  });
+
+  it('usa o contexto local para lacunas repetidas quando a clausula vem em um unico bloco longo', () => {
+    const fields = buildReferenceTermOptionFields({
+      text: '2.2. O objeto da contratacao esta previsto no Plano de Contratacoes Anual [ANO], conforme consta das informacoes basicas desse Termo de Referencia.\nI) ID PCA no PNCP: [...];\nII) Data de publicacao no PNCP: [...];\nIII) Id do item no PCA: [...];\nIV) Classe/Grupo: [...];\nV) Identificador da Futura Contratacao: [...].',
+    });
+
+    expect(fields).toHaveLength(6);
+    expect(fields.map((field) => field.kind === 'input' ? field.instruction.label : field.label)).toEqual([
+      'Ano do Plano de Contratacoes Anual',
+      'ID PCA no PNCP',
+      'Data de publicacao no PNCP',
+      'ID do item no PCA',
+      'Classe ou grupo do PCA',
+      'Identificador da futura contratacao',
+    ]);
+    expect(fields).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'input',
+          instruction: expect.objectContaining({
+            label: 'Trecho complementar da clausula',
+          }),
+        }),
+      ]),
+    );
   });
 });
