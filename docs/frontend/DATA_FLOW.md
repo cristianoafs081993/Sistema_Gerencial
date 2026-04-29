@@ -196,7 +196,7 @@ Observacoes:
 
 - a grade de processos sincronizados do editor tenta leitura publica via `supabase-js` e cai para REST anonimo quando necessario
 - a escolha entre `Despacho de Liquidacao`, `ETP - Servicos Continuos`, `Termo de Referencia - Compras` e `Contrato de Servico IFRN` vem da sidebar global, usando as rotas `/editor-documentos/:modelId`; a tela do editor nao replica essa navegacao no conteudo
-- na grade do Editor, o clique no corpo do card abre os detalhes e o icone lateral alterna a selecao; despachos aceitam multiplos processos selecionados, Contrato/Termo exigem exatamente um, e o ETP aceita um processo ou objeto manual
+- na grade do Editor, o clique no corpo do card abre os detalhes e o checkbox lateral alterna a selecao; despachos aceitam multiplos processos selecionados, Contrato/Termo exigem exatamente um, e o ETP aceita um processo ou objeto manual
 - o detalhe do processo no Editor pode abrir o PDF sincronizado pelo bucket `suap-pdfs` usando URL assinada via `suapProcessosService.getPdfSignedUrl`
 - a opcao `Despacho de Liquidacao` continua usando `documentGeneration.ts` com dados de `processos`, `empenhos`, `contratos` e `contratos_api`; para bolsa/PF, a minuta usa redacao com projeto apenas quando houver referencia explicita a projeto, e usa modelo sem projeto/edital quando essa referencia nao existir
 - o `GeradorDocumentos.tsx` manual possui finalidade propria `Bolsa sem projeto`, sem campos de projeto ou edital, alinhada ao mesmo modelo de despacho sem projeto usado pelo editor

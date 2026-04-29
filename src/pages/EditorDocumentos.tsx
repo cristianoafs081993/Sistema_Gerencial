@@ -27,6 +27,7 @@ import { HeaderActions } from '@/components/HeaderParts';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -534,18 +535,16 @@ function ExampleProcessRow({
         </span>
       </button>
 
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="h-9 w-9 shrink-0 rounded-radius-md border-border-default bg-surface-card p-0 text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
-        onClick={onSelect}
-        aria-label={isSelected ? `Processo ${processo} selecionado` : selectTitle}
-        title={isSelected ? 'Processo selecionado' : selectTitle}
-        disabled={selectDisabled}
-      >
-        {isSelected ? <Check className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-      </Button>
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+        <Checkbox
+          checked={isSelected}
+          onCheckedChange={() => onSelect()}
+          aria-label={isSelected ? `Remover processo ${processo} da selecao` : selectTitle}
+          title={isSelected ? `Remover processo ${processo} da selecao` : selectTitle}
+          disabled={selectDisabled}
+          className="h-5 w-5 rounded-[4px] border-border-default bg-surface-card shadow-xs transition-colors data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+        />
+      </div>
     </div>
   );
 }

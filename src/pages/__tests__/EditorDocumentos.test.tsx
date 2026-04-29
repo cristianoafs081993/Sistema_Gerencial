@@ -104,7 +104,7 @@ function renderEditor(route = '/editor-documentos/despacho-liquidacao') {
 }
 
 const selectSyncedProcess = (processNumber = '23035.000123/2026-11') => {
-  fireEvent.click(screen.getByRole('button', { name: `Selecionar processo ${processNumber}` }));
+  fireEvent.click(screen.getByRole('checkbox', { name: `Selecionar processo ${processNumber}` }));
 };
 
 describe('EditorDocumentos', () => {
