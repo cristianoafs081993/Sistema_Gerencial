@@ -12,7 +12,6 @@ import {
   Landmark,
   Loader2,
   PanelRightOpen,
-  Pencil,
   ReceiptText,
   ShieldCheck,
   Sparkles,
@@ -498,18 +497,18 @@ function ExampleProcessRow({
   processo,
   beneficiario,
   onPreview,
-  onAppend,
+  onSelect,
   isSelected,
-  appendDisabled = false,
-  appendTitle = 'Adicionar ao lote',
+  selectDisabled = false,
+  selectTitle = 'Selecionar processo',
 }: {
   processo: string;
   beneficiario?: string;
   onPreview: () => void;
-  onAppend: () => void;
+  onSelect: () => void;
   isSelected: boolean;
-  appendDisabled?: boolean;
-  appendTitle?: string;
+  selectDisabled?: boolean;
+  selectTitle?: string;
 }) {
   return (
     <div
@@ -540,12 +539,12 @@ function ExampleProcessRow({
         variant="outline"
         size="sm"
         className="h-9 w-9 shrink-0 rounded-radius-md border-border-default bg-surface-card p-0 text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
-        onClick={onAppend}
-        aria-label={appendTitle}
-        title={appendTitle}
-        disabled={appendDisabled}
+        onClick={onSelect}
+        aria-label={isSelected ? `Processo ${processo} selecionado` : selectTitle}
+        title={isSelected ? 'Processo selecionado' : selectTitle}
+        disabled={selectDisabled}
       >
-        <Pencil className="h-3.5 w-3.5" />
+        {isSelected ? <Check className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
       </Button>
     </div>
   );
@@ -1316,6 +1315,7 @@ export default function EditorDocumentos() {
   const [clonedDispatchIds, setClonedDispatchIds] = useState<string[]>([]);
   const [downloadedDocxIds, setDownloadedDocxIds] = useState<string[]>([]);
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
+  const [generationProcessIds, setGenerationProcessIds] = useState<string[]>([]);
   const [openingPdfId, setOpeningPdfId] = useState<string | null>(null);
   const [preliminaryStudySupplementalAnalyses, setPreliminaryStudySupplementalAnalyses] = useState<PreliminaryStudySupplementalPdfAnalysis[]>([]);
   const [isAnalyzingPreliminaryStudySupplementalPdf, setIsAnalyzingPreliminaryStudySupplementalPdf] = useState(false);
@@ -1369,10 +1369,16 @@ export default function EditorDocumentos() {
     [syncedProcesses],
   );
 
-  const detectedProcesses = useMemo(() => extractProcessNumbers(processInput), [processInput]);
   const selectedProcess = useMemo(
     () => exampleProcesses.find((processo) => processo.id === selectedProcessId)?.processoCompleto || null,
     [exampleProcesses, selectedProcessId],
+  );
+  const generationProcesses = useMemo(
+    () =>
+      generationProcessIds
+        .map((id) => exampleProcesses.find((processo) => processo.id === id)?.processoCompleto || null)
+        .filter((processo): processo is SuapProcesso => Boolean(processo)),
+    [exampleProcesses, generationProcessIds],
   );
   const findSyncedProcessByNumber = (processNumber: string) =>
     syncedProcesses.find((processo) => normalizeProcessNumber(processo.numProcesso) === normalizeProcessNumber(processNumber));
@@ -1885,20 +1891,16 @@ export default function EditorDocumentos() {
     );
   };
 
-  const handleAppendProcess = (processo: SuapProcesso) => {
-    const processValue = processo.numProcesso?.trim();
+  const handleSelectGenerationProcess = (processo: SuapProcesso) => {
+    setGenerationProcessIds((current) =>
+      current.includes(processo.id) ? current.filter((id) => id !== processo.id) : [...current, processo.id],
+    );
+    setFeedback('');
+    setScreenState('idle');
 
-    if (!processValue) {
-      setSelectedProcessId(processo.id);
-      toast.info('Este processo ainda nao possui numero sincronizado para entrar no lote. Gere a minuta individualmente pelos detalhes.');
-      return;
+    if (isContractDocument || isReferenceTermDocument || isPreliminaryStudyDocument) {
+      setProcessInput('');
     }
-
-    setProcessInput((current) => {
-      const existing = extractProcessNumbers(current);
-      if (existing.includes(processValue)) return current;
-      return current.trim() ? `${current.trim()}\n${processValue}` : processValue;
-    });
   };
 
   const handleGenerateContractDraft = async (
@@ -2790,6 +2792,120 @@ export default function EditorDocumentos() {
     }
   };
 
+  const handleGenerateSelectedDespachos = async () => {
+    if (generationProcesses.length === 0) {
+      const message = 'Selecione pelo menos um processo sincronizado para gerar a minuta.';
+      setFeedback(message);
+      setFeedbackTone('warning');
+      resetPendingStates();
+      setScreenState('not_found');
+      toast.error(message);
+      return;
+    }
+
+    resetPendingStates();
+    setFeedback('');
+    setScreenState('resolving');
+
+    try {
+      const results = await Promise.allSettled(
+        generationProcesses.map((processo) => buildResolvedContextFromSuapProcess(processo, resources)),
+      );
+      const resolvedContexts = results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []));
+      const failedCount = results.length - resolvedContexts.length;
+
+      if (resolvedContexts.length === 0) {
+        const message = 'Nao encontrei dados suficientes para os processos selecionados.';
+        setFeedback(message);
+        setFeedbackTone('warning');
+        setScreenState('not_found');
+        toast.error(message);
+        return;
+      }
+
+      const combinedHtml = resolvedContexts.map((context) => buildDespachoLiquidacaoHtml(context)).join(dividerHtml);
+      const dispatches = resolvedContexts.map((context) => ({
+        id: context.candidateId,
+        title: context.title || activeDocument.name,
+        subtitle: context.subtitle,
+        processo: context.processo,
+        html: buildDespachoLiquidacaoHtml(context),
+        documentType: 'despacho-liquidacao' as const,
+        allowClone: true,
+      }));
+
+      setSelectedTitle(
+        resolvedContexts.length === 1 ? resolvedContexts[0].title || activeDocument.name : 'Lote de Despachos de Liquidacao',
+      );
+      setEditorContent(combinedHtml);
+      setGeneratedDispatches(dispatches);
+      setCopiedDispatchIds([]);
+      setCopiedSectionIds([]);
+      setClonedDispatchIds([]);
+      setDownloadedDocxIds([]);
+      resetPendingStates();
+      setScreenState('idle');
+      setFeedback(
+        failedCount > 0
+          ? `${resolvedContexts.length} minuta${resolvedContexts.length > 1 ? 's' : ''} gerada${resolvedContexts.length > 1 ? 's' : ''}. ${failedCount} processo${failedCount > 1 ? 's' : ''} sem dados suficientes.`
+          : `${resolvedContexts.length} minuta${resolvedContexts.length > 1 ? 's' : ''} gerada${resolvedContexts.length > 1 ? 's' : ''}.`,
+      );
+      setFeedbackTone(failedCount > 0 ? 'neutral' : 'success');
+      focusEditor();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro inesperado ao gerar as minutas.';
+      setFeedback(message);
+      setFeedbackTone('warning');
+      setScreenState('not_found');
+      toast.error(message);
+    }
+  };
+
+  const handlePrimaryGenerate = async () => {
+    if (isContractDocument || isReferenceTermDocument) {
+      if (generationProcesses.length !== 1) {
+        const message = isReferenceTermDocument
+          ? 'Selecione exatamente um processo sincronizado para gerar o Termo de Referencia.'
+          : 'Selecione exatamente um processo sincronizado para gerar contrato.';
+        setFeedback(message);
+        setFeedbackTone('warning');
+        resetPendingStates();
+        setScreenState('not_found');
+        toast.error(message);
+        return;
+      }
+
+      if (isReferenceTermDocument) {
+        await handleGenerateReferenceTerm(generationProcesses[0]);
+      } else {
+        await handleGenerateContract(generationProcesses[0]);
+      }
+      return;
+    }
+
+    if (isPreliminaryStudyDocument) {
+      if (generationProcesses.length > 1) {
+        const message = 'A geracao do ETP funciona com um processo por vez.';
+        setFeedback(message);
+        setFeedbackTone('warning');
+        resetPendingStates();
+        setScreenState('not_found');
+        toast.error(message);
+        return;
+      }
+
+      if (generationProcesses.length === 1) {
+        await handleGeneratePreliminaryStudy({ processo: generationProcesses[0] });
+        return;
+      }
+
+      await handleBatchResolve(processInput);
+      return;
+    }
+
+    await handleGenerateSelectedDespachos();
+  };
+
   const handleOpenPdf = async (processo: SuapProcesso) => {
     if (!processo.pdfUrl) {
       toast.info('Este processo ainda nao possui PDF sincronizado.');
@@ -2898,6 +3014,13 @@ export default function EditorDocumentos() {
     toast.success(`Clonagem aberta para ${dispatch.processo || dispatch.title}.`);
   };
 
+  const showManualObjectTextarea = isPreliminaryStudyDocument && generationProcesses.length === 0;
+  const processCounterLabel = generationProcesses.length > 0
+    ? `${generationProcesses.length} processo${generationProcesses.length !== 1 ? 's' : ''} selecionado${generationProcesses.length !== 1 ? 's' : ''}`
+    : isPreliminaryStudyDocument
+      ? 'Objeto manual'
+      : '0 processos selecionados';
+
   return (
     <div className="-m-4 min-h-[calc(100vh-4rem)] w-[calc(100%+2rem)] bg-surface-page lg:-m-8 lg:w-[calc(100%+4rem)]">
       <HeaderActions>
@@ -2935,17 +3058,10 @@ export default function EditorDocumentos() {
                               key={example.id}
                               processo={example.processo}
                               beneficiario={example.beneficiario}
-                              isSelected={selectedProcessId === example.id}
+                              isSelected={generationProcessIds.includes(example.id)}
                               onPreview={() => setSelectedProcessId(example.id)}
-                              onAppend={() => handleAppendProcess(example.processoCompleto)}
-                              appendDisabled={!example.processoCompleto.numProcesso?.trim()}
-                              appendTitle={
-                                example.processoCompleto.numProcesso?.trim()
-                                  ? isContractDocument || isReferenceTermDocument || isPreliminaryStudyDocument
-                                    ? 'Usar este processo'
-                                    : 'Adicionar ao lote'
-                                  : 'Numero de processo indisponivel para lote'
-                              }
+                              onSelect={() => handleSelectGenerationProcess(example.processoCompleto)}
+                              selectTitle={`Selecionar processo ${example.processo}`}
                             />
                           ))}
                           </div>
@@ -2963,7 +3079,7 @@ export default function EditorDocumentos() {
                   {!isLoadingSyncedProcesses && !isSyncedProcessesError && exampleProcesses.length === 0 ? (
                     <div className="rounded-radius-xl border border-dashed border-border-default/70 bg-surface-subtle/35 px-4 py-3">
                       <p className="font-ui text-sm text-text-secondary">
-                        Nenhum processo sincronizado disponivel para atalho no modo publico. Use o botao Baixar extensão no cabecalho ou continue colando os numeros de processo manualmente.
+                        Nenhum processo sincronizado disponivel para selecao no modo publico. Use o botao Baixar extensao no cabecalho ou continue pelo preenchimento manual quando o modelo permitir.
                       </p>
                     </div>
                   ) : null}
@@ -2977,18 +3093,14 @@ export default function EditorDocumentos() {
                   ) : null}
 
                   <div className="space-y-3 rounded-radius-xl border border-border-default/70 bg-surface-subtle/40 p-3">
-                    <Textarea
-                      value={processInput}
-                      onChange={(event) => setProcessInput(event.target.value)}
-                      placeholder={
-                        isPreliminaryStudyDocument
-                          ? 'Cole um numero de processo sincronizado no SUAP ou descreva o objeto da licitacao.'
-                          : isContractDocument || isReferenceTermDocument
-                          ? 'Cole um numero de processo sincronizado no SUAP.'
-                          : 'Cole um ou mais numeros de processo, um por linha.'
-                      }
-                      className="min-h-[116px] resize-none rounded-radius-lg border-border-default bg-surface-card font-mono text-sm text-text-primary shadow-xs placeholder:font-ui placeholder:text-text-muted"
-                    />
+                    {showManualObjectTextarea ? (
+                      <Textarea
+                        value={processInput}
+                        onChange={(event) => setProcessInput(event.target.value)}
+                        placeholder="Descreva o objeto da licitacao."
+                        className="min-h-[116px] resize-none rounded-radius-lg border-border-default bg-surface-card font-mono text-sm text-text-primary shadow-xs placeholder:font-ui placeholder:text-text-muted"
+                      />
+                    ) : null}
 
                     {isPreliminaryStudyDocument ? (
                       <div className="rounded-radius-lg border border-dashed border-border-default/80 bg-surface-card px-3 py-3">
@@ -3061,14 +3173,14 @@ export default function EditorDocumentos() {
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div className="flex items-center gap-2 font-ui text-xs text-text-secondary">
                         <Badge variant="outline" className="border-border-default bg-surface-card text-text-secondary">
-                          {detectedProcesses.length} processo{detectedProcesses.length !== 1 ? 's' : ''}
+                          {processCounterLabel}
                         </Badge>
                       </div>
 
                       <div className="flex gap-2">
                         <Button
                           className="h-10 gap-2"
-                          onClick={() => void handleBatchResolve()}
+                          onClick={() => void handlePrimaryGenerate()}
                           disabled={screenState === 'resolving'}
                         >
                           {screenState === 'resolving' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}

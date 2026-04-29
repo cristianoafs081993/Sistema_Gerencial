@@ -103,6 +103,10 @@ function renderEditor(route = '/editor-documentos/despacho-liquidacao') {
   );
 }
 
+const selectSyncedProcess = (processNumber = '23035.000123/2026-11') => {
+  fireEvent.click(screen.getByRole('button', { name: `Selecionar processo ${processNumber}` }));
+};
+
 describe('EditorDocumentos', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -147,6 +151,17 @@ describe('EditorDocumentos', () => {
         dadosCompletos: {
           contrato_numero: '15/2026',
         },
+      },
+      {
+        id: 'proc-2',
+        suapId: '124',
+        url: 'https://suap.local/processo/2',
+        status: 'sincronizado',
+        numProcesso: '23035.000124/2026-12',
+        beneficiario: 'Fornecedor Apoio Ltda',
+        cpfCnpj: '12345678000191',
+        assunto: 'Servico continuado complementar',
+        pdfUrl: 'proc-2.pdf',
       },
     ] as never);
 
@@ -339,9 +354,7 @@ describe('EditorDocumentos', () => {
     renderEditor('/editor-documentos/contrato-servico-ifrn');
 
     expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
-    fireEvent.change(screen.getByPlaceholderText('Cole um numero de processo sincronizado no SUAP.'), {
-      target: { value: '23035.000123/2026-11' },
-    });
+    selectSyncedProcess();
     fireEvent.click(screen.getByRole('button', { name: /Gerar contrato/i }));
 
     await waitFor(() => {
@@ -356,13 +369,33 @@ describe('EditorDocumentos', () => {
     expect(screen.getByTestId('editor-content')).toHaveTextContent('<p>Contrato gerado</p>');
   });
 
+  it('permite selecionar multiplos processos sem exibir area de colagem', async () => {
+    renderEditor();
+
+    expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
+    selectSyncedProcess();
+    selectSyncedProcess('23035.000124/2026-12');
+
+    expect(screen.getByText('2 processos selecionados')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/Cole um ou mais numeros de processo/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Processo selecionado')).not.toBeInTheDocument();
+  });
+
+  it('bloqueia contrato quando nenhum processo foi selecionado', async () => {
+    renderEditor('/editor-documentos/contrato-servico-ifrn');
+
+    expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Gerar contrato/i }));
+
+    expect(await screen.findByText('Selecione exatamente um processo sincronizado para gerar contrato.')).toBeInTheDocument();
+    expect(mockedContractDraftsService.analyzeProcessPdf).not.toHaveBeenCalled();
+  });
+
   it('gera termo de referencia e habilita download em DOCX', async () => {
     renderEditor('/editor-documentos/termo-referencia-compras');
 
     expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
-    fireEvent.change(screen.getByPlaceholderText('Cole um numero de processo sincronizado no SUAP.'), {
-      target: { value: '23035.000123/2026-11' },
-    });
+    selectSyncedProcess();
     fireEvent.click(screen.getByRole('button', { name: /Gerar Termo de Referencia/i }));
 
     await waitFor(() => {
@@ -380,6 +413,16 @@ describe('EditorDocumentos', () => {
     expect(await screen.findByText('Termo de Referencia gerado.')).toBeInTheDocument();
     expect(screen.getByTestId('editor-content')).toHaveTextContent('<p>TR gerado</p>');
     expect(screen.getByRole('button', { name: /Baixar DOCX/i })).toBeInTheDocument();
+  });
+
+  it('bloqueia termo de referencia quando nenhum processo foi selecionado', async () => {
+    renderEditor('/editor-documentos/termo-referencia-compras');
+
+    expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Gerar Termo de Referencia/i }));
+
+    expect(await screen.findByText('Selecione exatamente um processo sincronizado para gerar o Termo de Referencia.')).toBeInTheDocument();
+    expect(mockedReferenceTermsService.getActiveTemplate).not.toHaveBeenCalled();
   });
 
   it('exibe questionario do termo de referencia antes da geracao final', async () => {
@@ -484,9 +527,7 @@ describe('EditorDocumentos', () => {
     renderEditor('/editor-documentos/termo-referencia-compras');
 
     expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
-    fireEvent.change(screen.getByPlaceholderText('Cole um numero de processo sincronizado no SUAP.'), {
-      target: { value: '23035.000123/2026-11' },
-    });
+    selectSyncedProcess();
     fireEvent.click(screen.getByRole('button', { name: /Gerar Termo de Referencia/i }));
 
     expect(await screen.findByText('Sugestoes da IA para o Termo de Referencia')).toBeInTheDocument();
@@ -627,9 +668,7 @@ describe('EditorDocumentos', () => {
     renderEditor('/editor-documentos/termo-referencia-compras');
 
     expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
-    fireEvent.change(screen.getByPlaceholderText('Cole um numero de processo sincronizado no SUAP.'), {
-      target: { value: '23035.000123/2026-11' },
-    });
+    selectSyncedProcess();
     fireEvent.click(screen.getByRole('button', { name: /Gerar Termo de Referencia/i }));
 
     expect(await screen.findByText('Escolha qual clausula deve permanecer ativa neste ponto do Termo de Referencia.')).toBeInTheDocument();
@@ -747,9 +786,7 @@ describe('EditorDocumentos', () => {
     renderEditor('/editor-documentos/termo-referencia-compras');
 
     expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
-    fireEvent.change(screen.getByPlaceholderText('Cole um numero de processo sincronizado no SUAP.'), {
-      target: { value: '23035.000123/2026-11' },
-    });
+    selectSyncedProcess();
     fireEvent.click(screen.getByRole('button', { name: /Gerar Termo de Referencia/i }));
 
     expect(await screen.findByText('Escolha qual clausula deve permanecer ativa neste ponto do Termo de Referencia.')).toBeInTheDocument();
@@ -966,9 +1003,7 @@ describe('EditorDocumentos', () => {
     renderEditor('/editor-documentos/estudo-tecnico-preliminar-servicos-continuos');
 
     expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
-    fireEvent.change(screen.getByPlaceholderText(/descreva o objeto da licitacao/i), {
-      target: { value: '23035.000123/2026-11' },
-    });
+    selectSyncedProcess();
     fireEvent.click(screen.getByRole('button', { name: /Gerar ETP/i }));
 
     expect(await screen.findByText('Sugestoes da IA para o ETP')).toBeInTheDocument();
@@ -1024,9 +1059,7 @@ describe('EditorDocumentos', () => {
     renderEditor('/editor-documentos/estudo-tecnico-preliminar-servicos-continuos');
 
     expect(await screen.findByText('23035.000456/2026-22')).toBeInTheDocument();
-    fireEvent.change(screen.getByPlaceholderText(/descreva o objeto da licitacao/i), {
-      target: { value: '23035.000456/2026-22' },
-    });
+    selectSyncedProcess('23035.000456/2026-22');
     fireEvent.click(screen.getByRole('button', { name: /Gerar ETP/i }));
 
     expect(await screen.findByText('Questionario do ETP')).toBeInTheDocument();
@@ -1051,9 +1084,7 @@ describe('EditorDocumentos', () => {
     renderEditor('/editor-documentos/estudo-tecnico-preliminar-servicos-continuos');
 
     expect(await screen.findByText('23035.000123/2026-11')).toBeInTheDocument();
-    fireEvent.change(screen.getByPlaceholderText(/descreva o objeto da licitacao/i), {
-      target: { value: '23035.000123/2026-11' },
-    });
+    selectSyncedProcess();
     fireEvent.click(screen.getByRole('button', { name: /Gerar ETP/i }));
 
     expect(await screen.findByText('Sugestoes da IA para o ETP')).toBeInTheDocument();
