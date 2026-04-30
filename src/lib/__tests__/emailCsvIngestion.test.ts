@@ -65,12 +65,12 @@ describe('emailCsvIngestion', () => {
     });
   });
 
-  it('interpreta anulacao de descentralizacao como valor negativo', () => {
+  it('mantem DESTINO positivo mesmo quando a descentralizacao for anulacao', () => {
     const parsed = parseEmailCsvImport({
       fileName: 'descentralizacoes.csv',
       text: [
-        'NC\tNC - Operacao (Tipo)\tNC - Dia Emissao\tNC - Descricao\tNC Celula - PTRES\tNC Celula - Natureza Despesa\tNC Celula - Plano Interno\tNC Celula - Valor',
-        '2026NC000001\tANULACAO DE DESCENTRALIZACAO DE CREDITO\t08/04/2026\tAnulacao de credito\t123456\t339030\tPI123ADN\t500,00',
+        'NC\tNC Celula - Tipo\tNC - Operacao (Tipo)\tNC - Dia Emissao\tNC - Descricao\tNC Celula - PTRES\tNC Celula - Natureza Despesa\tNC Celula - Plano Interno\tNC Celula - Valor',
+        '2026NC000001\tDESTINO\tANULACAO DE DESCENTRALIZACAO DE CREDITO\t08/04/2026\tAnulacao de credito\t123456\t339030\tPI123ADN\t500,00',
       ].join('\n'),
     });
 
@@ -87,7 +87,56 @@ describe('emailCsvIngestion', () => {
       naturezaDespesa: '339030',
       planoInterno: 'PI123ADN',
       dataEmissao: '2026-04-08',
+      valor: 500,
+    });
+  });
+
+  it('importa ORIGEM negativo apenas em anulacao e ignora ORIGEM sem anulacao', () => {
+    const parsed = parseEmailCsvImport({
+      fileName: 'descentralizacoes.csv',
+      text: [
+        'NC\tNC Celula - Tipo\tNC - Operacao (Tipo)\tNC - Dia Emissao\tNC - Descricao\tNC Celula - PTRES\tNC Celula - Natureza Despesa\tNC Celula - Plano Interno\tNC Celula - Valor',
+        '2026NC000002\tORIGEM\tANULACAO DE DESCENTRALIZACAO DE CREDITO\t08/04/2026\tAnulacao de credito\t123456\t339030\tPI123ADN\t500,00',
+        '2026NC000003\tORIGEM\tDESCENTRALIZACAO DE CREDITO\t09/04/2026\tCredito regular\t123456\t339037\tPI123ADN\t600,00',
+      ].join('\n'),
+    });
+
+    expect(parsed.pipeline).toBe('descentralizacoes');
+    if (parsed.pipeline !== 'descentralizacoes') {
+      throw new Error('pipeline inesperado');
+    }
+
+    expect(parsed.rows).toHaveLength(1);
+    expect(parsed.rows[0]).toMatchObject({
+      notaCredito: '2026NC000002',
+      origemRecurso: '123456',
+      naturezaDespesa: '339030',
       valor: -500,
+    });
+  });
+
+  it('ignora a natureza origem inferida quando o CSV vier sem NC Celula - Tipo', () => {
+    const parsed = parseEmailCsvImport({
+      fileName: 'descentralizacoes.csv',
+      text: [
+        'NC\tNC - Operacao (Tipo)\tNC - Dia Emissao\tNC - Descricao\tNC Celula - PTRES\tNC Celula - Natureza Despesa\tNC Celula - Plano Interno\tNC Celula - Valor',
+        '158155264352026NC000283\tDESCENTRALIZACAO DE CREDITO\t16/04/2026\tPROCESSO 23421.001340.2026-40\t260296\t339000\tL21IHP19ENN\t25.600,00',
+        '158155264352026NC000283\tDESCENTRALIZACAO DE CREDITO\t16/04/2026\tPROCESSO 23421.001340.2026-40\t260296\t339037\tL21IHP19ENN\t25.600,00',
+      ].join('\n'),
+    });
+
+    expect(parsed.pipeline).toBe('descentralizacoes');
+    if (parsed.pipeline !== 'descentralizacoes') {
+      throw new Error('pipeline inesperado');
+    }
+
+    expect(parsed.rows).toHaveLength(1);
+    expect(parsed.rows[0]).toMatchObject({
+      notaCredito: '2026NC000283',
+      origemRecurso: '260296',
+      naturezaDespesa: '339000',
+      planoInterno: 'L21IHP19ENN',
+      valor: 25600,
     });
   });
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createDescentralizacaoImportIdentity,
+  normalizeDescentralizacaoImportValue,
   shouldImportDescentralizacaoAsNegative,
   summarizeNotaCredito,
 } from '../descentralizacoesImport';
@@ -10,7 +11,57 @@ describe('descentralizacoesImport', () => {
     expect(summarizeNotaCredito('158155264352026NC000179')).toBe('2026NC000179');
   });
 
-  it('marks an anulation operation as negative even when the value is positive in the CSV', () => {
+  it('keeps DESTINO positive even when the operation is an anulation', () => {
+    expect(
+      normalizeDescentralizacaoImportValue({
+        cellType: 'DESTINO',
+        operationType: 'ANULACAO DE DESCENTRALIZACAO DE CREDITO',
+        rawValue: 500,
+      }),
+    ).toEqual({ shouldImport: true, valor: 500 });
+  });
+
+  it('keeps DESTINO positive for regular descentralizacao', () => {
+    expect(
+      normalizeDescentralizacaoImportValue({
+        cellType: 'DESTINO',
+        operationType: 'DESCENTRALIZACAO DE CREDITO',
+        rawValue: -500,
+      }),
+    ).toEqual({ shouldImport: true, valor: 500 });
+  });
+
+  it('imports ORIGEM as negative only for anulation', () => {
+    expect(
+      normalizeDescentralizacaoImportValue({
+        cellType: 'ORIGEM',
+        operationType: 'ANULACAO DE DESCENTRALIZACAO DE CREDITO',
+        rawValue: 500,
+      }),
+    ).toEqual({ shouldImport: true, valor: -500 });
+  });
+
+  it('ignores ORIGEM when it is not an anulation', () => {
+    expect(
+      normalizeDescentralizacaoImportValue({
+        cellType: 'ORIGEM',
+        operationType: 'DESCENTRALIZACAO DE CREDITO',
+        rawValue: 500,
+      }),
+    ).toEqual({ shouldImport: false, valor: 0 });
+  });
+
+  it('ignores inferred origem rows in files without NC Celula - Tipo', () => {
+    expect(
+      normalizeDescentralizacaoImportValue({
+        operationType: 'DESCENTRALIZACAO DE CREDITO',
+        rawValue: 500,
+        inferredOrigem: true,
+      }),
+    ).toEqual({ shouldImport: false, valor: 0 });
+  });
+
+  it('keeps the legacy anulation rule when NC Celula - Tipo is absent', () => {
     expect(
       shouldImportDescentralizacaoAsNegative({
         operationType: 'ANULACAO DE DESCENTRALIZACAO DE CREDITO',

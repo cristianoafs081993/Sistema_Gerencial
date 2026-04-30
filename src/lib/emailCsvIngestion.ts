@@ -255,6 +255,8 @@ const PI_DIMENSAO_MAP: Record<string, string> = {
 const NC_RESUMIDA_REGEX = /(\d{4}NC\d+)/i;
 const ANULACAO_DESCENTRALIZACAO = 'ANULACAO DE DESCENTRALIZACAO DE CREDITO';
 const DEVOLUCAO = 'DEVOLUCAO';
+const NC_CELULA_ORIGEM = 'ORIGEM';
+const NC_CELULA_DESTINO = 'DESTINO';
 
 function splitCsvLine(line: string, separator: string): string[] {
   const result: string[] = [];
@@ -311,19 +313,45 @@ function summarizeNotaCredito(value?: string) {
   return match?.[1] ?? normalizedValue;
 }
 
-function shouldImportDescentralizacaoAsNegative({
+function isAnulacaoDescentralizacao(operationType?: string) {
+  return normalizeImportText(operationType).includes(ANULACAO_DESCENTRALIZACAO);
+}
+
+function normalizeDescentralizacaoImportValue({
+  cellType,
   operationType,
   description,
+  rawValue,
+  inferredOrigem = false,
 }: {
+  cellType?: string;
   operationType?: string;
   description?: string;
+  rawValue: number;
+  inferredOrigem?: boolean;
 }) {
-  const normalizedOperationType = normalizeImportText(operationType);
-  if (normalizedOperationType.includes(ANULACAO_DESCENTRALIZACAO)) {
-    return true;
+  const normalizedCellType = normalizeImportText(cellType);
+  const absValue = Math.abs(rawValue);
+
+  if (normalizedCellType === NC_CELULA_DESTINO) {
+    return { shouldImport: true, valor: absValue };
   }
 
-  return normalizeImportText(description).includes(DEVOLUCAO);
+  if (normalizedCellType === NC_CELULA_ORIGEM) {
+    return isAnulacaoDescentralizacao(operationType)
+      ? { shouldImport: true, valor: -absValue }
+      : { shouldImport: false, valor: 0 };
+  }
+
+  if (inferredOrigem) {
+    return { shouldImport: false, valor: 0 };
+  }
+
+  if (isAnulacaoDescentralizacao(operationType) || normalizeImportText(description).includes(DEVOLUCAO)) {
+    return { shouldImport: true, valor: -absValue };
+  }
+
+  return { shouldImport: true, valor: rawValue };
 }
 
 function createDescentralizacaoImportIdentity({
@@ -821,6 +849,7 @@ function parseRetencoesEfdReinf(text: string): ParsedEmailCsvImport {
 function parseDescentralizacoes(text: string): ParsedEmailCsvImport {
   const parsed = parseNormalizedCsv(text, [
     'NC',
+    'NC Celula - Tipo',
     'NC - Operacao (Tipo)',
     'NC - Dia Emissao',
     'NC - Descricao',
@@ -830,16 +859,35 @@ function parseDescentralizacoes(text: string): ParsedEmailCsvImport {
     'NC Celula - Valor',
   ]);
 
-  const rows = parsed.rows
-    .map((row): DescentralizacaoImportRow | null => {
+  const buildPairKey = (info: {
+    notaCredito: string;
+    operacaoTipo: string;
+    dataEmissao: string | null;
+    descricao: string;
+    planoInterno: string;
+    origemRecurso: string;
+    valorBruto: number;
+  }) =>
+    [
+      info.notaCredito,
+      info.operacaoTipo.trim().toUpperCase(),
+      info.dataEmissao || '',
+      info.descricao.trim().toUpperCase(),
+      info.planoInterno,
+      info.origemRecurso,
+      Math.abs(info.valorBruto),
+    ].join('|');
+
+  const importRows = parsed.rows.map((row) => {
       const notaCredito = summarizeNotaCredito(
         findValue(row, [/^nc$/i, /notacredito/i, /notadecredito/i], ['nc', 'notacredito', 'notadecredito']),
       );
       const operacaoTipo = findValue(
         row,
-        [/operacaotip/i, /tipooperacao/i, /operacao/i],
-        ['ncoperacaotipo', 'operacaotipo', 'tipooperacao'],
+        [/operacaotip/i, /opera.*tip/i, /tipooperacao/i, /operacao/i],
+        ['ncoperacaotipo', 'ncoperaotip', 'operacaotipo', 'operaotip', 'tipooperacao'],
       );
+      const cellType = findValue(row, [/celulatipo/i], ['nccelulatipo', 'celulatipo']);
       const planoInterno = findValue(
         row,
         [/planointern/i, /plano/i],
@@ -861,37 +909,88 @@ function parseDescentralizacoes(text: string): ParsedEmailCsvImport {
       const dataEmissao = toIsoDate(
         findValue(row, [/diaemiss/i, /dataemiss/i, /data/i], ['ncdiaemissao', 'dataemissao', 'data_emissao']),
       );
+      const valorBruto = parseCurrency(findValue(row, [/valor/i], ['nccelulavalor', 'valor']));
 
-      let valor = parseCurrency(findValue(row, [/valor/i], ['nccelulavalor', 'valor']));
+      const info = {
+        notaCredito,
+        operacaoTipo,
+        cellType,
+        planoInterno,
+        origemRecurso,
+        naturezaDespesa,
+        dataEmissao,
+        descricao,
+        valorBruto,
+      };
 
-      if (shouldImportDescentralizacaoAsNegative({ operationType: operacaoTipo, description: descricao })) {
-        valor = -Math.abs(valor);
+      return {
+        ...info,
+        pairKey: buildPairKey(info),
+        fullKey: `${buildPairKey(info)}|${naturezaDespesa}`,
+      };
+    });
+
+  const destinationPairKeys = new Set(
+    importRows
+      .filter(
+        (row) =>
+          !row.cellType.trim() &&
+          !isAnulacaoDescentralizacao(row.operacaoTipo) &&
+          row.naturezaDespesa === '339000',
+      )
+      .map((row) => row.pairKey),
+  );
+
+  const inferredOrigemKeys = new Set(
+    importRows
+      .filter(
+        (row) =>
+          !row.cellType.trim() &&
+          !isAnulacaoDescentralizacao(row.operacaoTipo) &&
+          row.naturezaDespesa !== '339000' &&
+          destinationPairKeys.has(row.pairKey),
+      )
+      .map((row) => row.fullKey),
+  );
+
+  const rows = importRows
+    .map((row): DescentralizacaoImportRow | null => {
+      const { shouldImport, valor } = normalizeDescentralizacaoImportValue({
+        cellType: row.cellType,
+        operationType: row.operacaoTipo,
+        description: row.descricao,
+        rawValue: row.valorBruto,
+        inferredOrigem: inferredOrigemKeys.has(row.fullKey),
+      });
+
+      if (!shouldImport) {
+        return null;
       }
 
-      if (!planoInterno || !origemRecurso || !naturezaDespesa || valor === 0) {
+      if (!row.planoInterno || !row.origemRecurso || !row.naturezaDespesa || valor === 0) {
         return null;
       }
 
       const { baseKey, rowKey } = createDescentralizacaoImportIdentity({
-        dateKey: dataEmissao || '',
-        planoInterno,
-        origemRecurso,
-        naturezaDespesa,
+        dateKey: row.dataEmissao || '',
+        planoInterno: row.planoInterno,
+        origemRecurso: row.origemRecurso,
+        naturezaDespesa: row.naturezaDespesa,
         valor,
-        notaCredito,
+        notaCredito: row.notaCredito,
       });
 
       return {
         baseKey,
         rowKey,
-        notaCredito,
-        operacaoTipo: operacaoTipo.trim(),
-        dimensao: deriveDimensaoFromPI(planoInterno),
-        origemRecurso,
-        naturezaDespesa,
-        planoInterno,
-        dataEmissao,
-        descricao,
+        notaCredito: row.notaCredito,
+        operacaoTipo: row.operacaoTipo.trim(),
+        dimensao: deriveDimensaoFromPI(row.planoInterno),
+        origemRecurso: row.origemRecurso,
+        naturezaDespesa: row.naturezaDespesa,
+        planoInterno: row.planoInterno,
+        dataEmissao: row.dataEmissao,
+        descricao: row.descricao,
         valor,
       };
     })

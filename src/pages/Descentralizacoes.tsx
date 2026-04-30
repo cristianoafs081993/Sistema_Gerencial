@@ -41,7 +41,8 @@ import {
 } from '@/utils/descentralizacoesContaSaldos';
 import {
     createDescentralizacaoImportIdentity,
-    shouldImportDescentralizacaoAsNegative,
+    isAnulacaoDescentralizacao,
+    normalizeDescentralizacaoImportValue,
     summarizeNotaCredito,
 } from '@/utils/descentralizacoesImport';
 
@@ -238,9 +239,28 @@ export default function Descentralizacoes() {
             return '';
         };
 
-        for (const row of data) {
+        const buildPairKey = (info: {
+            notaCredito: string;
+            operacaoTipo: string;
+            dateKey: string;
+            descricao: string;
+            planoInterno: string;
+            origemRecurso: string;
+            valorBruto: number;
+        }) =>
+            [
+                info.notaCredito,
+                info.operacaoTipo.trim().toUpperCase(),
+                info.dateKey,
+                info.descricao.trim().toUpperCase(),
+                info.planoInterno,
+                info.origemRecurso,
+                Math.abs(info.valorBruto),
+            ].join('|');
+
+        const importRows = data.map((row) => {
             // O JsonImportDialog normaliza headers removendo acentos e tudo que nao e [a-z0-9].
-            // Para os arquivos novos, as chaves mais comuns ficam como: nc, ncoperacaotipo,
+            // Para os arquivos novos, as chaves mais comuns ficam como: nc, nccelulatipo, ncoperacaotipo,
             // ncdiaemissao, ncdescricao, nccelulaptres, nccelulanaturezadespesa,
             // nccelulaplanointerno, nccelulavalor.
             const notaCredito = summarizeNotaCredito(
@@ -248,27 +268,94 @@ export default function Descentralizacoes() {
             );
             const operacaoTipo = findValue(
                 row,
-                [/operacaotip/i, /tipooperacao/i, /operacao/i],
-                ['ncoperacaotipo', 'operacaotipo', 'tipooperacao'],
+                [/operacaotip/i, /opera.*tip/i, /tipooperacao/i, /operacao/i],
+                ['ncoperacaotipo', 'ncoperaotip', 'operacaotipo', 'operaotip', 'tipooperacao'],
             );
+            const celulaTipo = findValue(row, [/celulatipo/i], ['nccelulatipo', 'celulatipo']);
             const planoInterno = findValue(row, [/planointern/i, /plano/i], ['nccelulaplanointerno', 'planointerno', 'plano_interno', 'plano']);
             const origemRecurso = findValue(row, [/ptres/i, /origemrecurso/i, /origem/i], ['nccelulaptres', 'origemrecurso', 'origem_recurso', 'ptres']);
             const naturezaDespesa = findValue(row, [/naturezadesp/i, /natureza/i], ['nccelulanaturezadespesa', 'naturezadespesa', 'natureza_despesa', 'natureza']);
             const valorStr = findValue(row, [/valor/i], ['nccelulavalor', 'valor']);
             const dataEmissaoStr = findValue(row, [/diaemiss/i, /dataemiss/i, /data/i], ['ncdiaemissao', 'dataemissao', 'data_emissao']);
             const descricao = findValue(row, [/descr/i], ['ncdescricao', 'descricao', 'ncdrescricao']);
+            const dataEmissao = parseDateBR(dataEmissaoStr);
+            const dateKey = dataEmissao ? dataEmissao.toISOString().split('T')[0] : '';
 
             const piNorm = planoInterno.trim().toUpperCase();
             const orNorm = origemRecurso.trim();
             const ndNorm = naturezaDespesa.trim();
-            let valor = parseValorBR(valorStr || '0');
+            const valorBruto = parseValorBR(valorStr || '0');
 
-            if (shouldImportDescentralizacaoAsNegative({ operationType: operacaoTipo, description: descricao })) {
-                valor = -Math.abs(valor);
+            const info = {
+                row,
+                notaCredito,
+                operacaoTipo,
+                celulaTipo,
+                planoInterno: piNorm,
+                origemRecurso: orNorm,
+                naturezaDespesa: ndNorm,
+                valorBruto,
+                dataEmissao,
+                dateKey,
+                descricao,
+            };
+
+            return {
+                ...info,
+                pairKey: buildPairKey(info),
+                fullKey: `${buildPairKey(info)}|${ndNorm}`,
+            };
+        });
+
+        const destinationPairKeys = new Set(
+            importRows
+                .filter(
+                    (row) =>
+                        !row.celulaTipo.trim() &&
+                        !isAnulacaoDescentralizacao(row.operacaoTipo) &&
+                        row.naturezaDespesa === '339000',
+                )
+                .map((row) => row.pairKey),
+        );
+        const inferredOrigemKeys = new Set(
+            importRows
+                .filter(
+                    (row) =>
+                        !row.celulaTipo.trim() &&
+                        !isAnulacaoDescentralizacao(row.operacaoTipo) &&
+                        row.naturezaDespesa !== '339000' &&
+                        destinationPairKeys.has(row.pairKey),
+                )
+                .map((row) => row.fullKey),
+        );
+
+        for (const row of importRows) {
+            const {
+                notaCredito,
+                operacaoTipo,
+                celulaTipo,
+                planoInterno: piNorm,
+                origemRecurso: orNorm,
+                naturezaDespesa: ndNorm,
+                valorBruto,
+                dataEmissao,
+                dateKey,
+                descricao,
+            } = row;
+
+            const { shouldImport, valor } = normalizeDescentralizacaoImportValue({
+                cellType: celulaTipo,
+                operationType: operacaoTipo,
+                description: descricao,
+                rawValue: valorBruto,
+                inferredOrigem: inferredOrigemKeys.has(row.fullKey),
+            });
+
+            if (!shouldImport) {
+                skipCount++;
+                continue;
             }
 
-            const dataEmissao = parseDateBR(dataEmissaoStr);
-            const dateKey = dataEmissao ? dataEmissao.toISOString().split('T')[0] : '';
             const { baseKey, rowKey } = createDescentralizacaoImportIdentity({
                 dateKey,
                 planoInterno: piNorm,
@@ -282,7 +369,7 @@ export default function Descentralizacoes() {
                 continue;
             }
 
-            const dimensao = deriveDimensaoFromPI(planoInterno);
+            const dimensao = deriveDimensaoFromPI(piNorm);
 
             const descentralizacao: Omit<Descentralizacao, 'id' | 'createdAt' | 'updatedAt'> = {
                 dimensao,

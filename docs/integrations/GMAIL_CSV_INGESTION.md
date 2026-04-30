@@ -43,6 +43,7 @@ Se a deteccao automatica falhar, a function retorna erro e o e-mail deve ficar c
 
 - PFs continuam fora desse fluxo porque o processo atual depende de dois arquivos correlacionados.
 - Devolucoes de descentralizacoes continuam exigindo validacao operacional separada; o fluxo de e-mail automatiza o CSV principal de descentralizacoes.
+- No pipeline `descentralizacoes`, a ingestao por e-mail aplica a mesma regra do upload principal: `NC Celula - Tipo = DESTINO` entra positivo; `ORIGEM` so entra negativo em anulacao; `ORIGEM` sem anulacao e ignorado; quando a coluna de tipo nao existir, a ingestao conserva a regra historica e ignora origens inferidas em pares `339000` mais outra natureza da mesma NC/data/descricao/PTRES/PI/valor.
 
 ## Script do Gmail
 

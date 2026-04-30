@@ -40,9 +40,10 @@ Arquivos reais de operacao presentes em [docs](/C:/Users/crist/OneDrive/Desktop/
 
 ## Observacoes importantes do dominio de descentralizacoes
 
-- o upload principal de `Descentralizacoes.tsx` agora pode receber as colunas `NC` e `NC - Operacao (Tipo)` alem das colunas historicas
+- o upload principal de `Descentralizacoes.tsx` agora pode receber as colunas `NC`, `NC Celula - Tipo` e `NC - Operacao (Tipo)` alem das colunas historicas
 - quando a coluna `NC` vier completa, o parser consome a forma resumida no padrao `2026NC000001`
-- quando `NC - Operacao (Tipo)` indicar `ANULACAO DE DESCENTRALIZACAO DE CREDITO`, o valor de `NC Celula - Valor` deve entrar como negativo no upload principal
+- quando `NC Celula - Tipo` existir, ela tem precedencia sobre descricao e operacao: `DESTINO` sempre entra positivo; `ORIGEM` so entra negativo quando `NC - Operacao (Tipo)` indicar `ANULACAO DE DESCENTRALIZACAO DE CREDITO`; `ORIGEM` sem anulacao e ignorado
+- quando `NC Celula - Tipo` nao existir, o parser preserva a regra historica de anulacao/devolucao negativa; em exports sem tipo que tragam o mesmo par de NC/data/descricao/PTRES/PI/valor em `339000` e outra natureza numa descentralizacao normal, a linha `339000` e tratada como destino e a outra natureza e ignorada como origem inferida
 - o `NC Celula - Plano Interno` continua fazendo parte da identidade de cada linha importada; a mesma NC pode gerar mais de um registro quando vier quebrada em planos internos diferentes
 - o upload principal persiste `nota_credito` e `operacao_tipo` para reconciliar reimportacoes sem perder a distincao entre linhas com o mesmo valor
 - se uma reimportacao nova encontrar um lancamento legado com a mesma data, PTRES, natureza, PI e valor, mas ainda sem `nota_credito`, o import deve atualizar esse registro legado com a NC em vez de criar uma segunda linha
