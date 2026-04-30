@@ -1,5 +1,5 @@
 ﻿import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, FileUp, RefreshCw, Search, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, CheckCircle2, FileUp, RefreshCw, Search, ShieldAlert } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -13,6 +13,7 @@ import { TablePagination } from '@/components/design-system/TablePagination';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -22,13 +23,15 @@ import {
   loadLatestRetencoesEfdReinfRowsFromDb,
   loadRetencoesEfdReinfObPaymentDates,
   parseRetencoesEfdReinfCsv,
+  type RetencaoEfdReinfObPaymentInfo,
   type RetencaoEfdReinfRegistro,
   saveRetencoesEfdReinfRows,
+  updateRetencaoEfdReinfCorrecaoRealizada,
   validateRetencaoEfdReinfRow,
 } from '@/services/retencoesEfdReinfImportService';
 
 type ViewRow = { row: RetencaoEfdReinfRegistro; validation: ReturnType<typeof validateRetencaoEfdReinfRow> };
-type AlertFilter = 'all' | 'critical' | 'warning' | 'with-alert' | 'ok';
+type AlertFilter = 'all' | 'critical' | 'warning' | 'with-alert' | 'corrected' | 'ok';
 type SortKey = 'documentoHabil' | 'dhSituacao' | 'dhUgPagadora' | 'dhDiaPagamento' | 'dhValorDocOrigem' | 'valorRetencao' | 'percentualRetencao' | 'severity';
 
 const sortLabels: Record<SortKey, string> = {
@@ -50,13 +53,23 @@ const formatDocumentoHabil = (value: string) => {
   const match = value.match(/\d{4}NP\d+$/i);
   return match ? match[0].toUpperCase() : value;
 };
+const formatOrdemBancaria = (value?: string | null) => {
+  const match = String(value || '').match(/\d{4}OB\d+$/i);
+  return match ? match[0].toUpperCase() : value || '-';
+};
 
 const severityWeight = { critical: 3, warning: 2, ok: 1 } satisfies Record<'critical' | 'warning' | 'ok', number>;
+
+const hasOpenPending = (item: ViewRow) => item.validation.issues.length > 0 && !item.row.correcaoRealizada;
+
+const getEffectiveSeverity = (item: ViewRow) => (
+  item.row.correcaoRealizada ? 'ok' : item.validation.severity
+);
 
 export default function RetencoesFdReinfDesign() {
   const { isSuperAdmin } = useAuth();
   const [rows, setRows] = useState<RetencaoEfdReinfRegistro[]>([]);
-  const [obPaymentDates, setObPaymentDates] = useState<Map<string, string>>(new Map());
+  const [obPaymentDates, setObPaymentDates] = useState<Map<string, RetencaoEfdReinfObPaymentInfo>>(new Map());
   const [fileName, setFileName] = useState('');
   const [importedAt, setImportedAt] = useState<string | null>(null);
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
@@ -69,6 +82,7 @@ export default function RetencoesFdReinfDesign() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(100);
+  const [updatingCorrectionIds, setUpdatingCorrectionIds] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const deferredQuery = useDeferredValue(query);
 
@@ -104,11 +118,12 @@ export default function RetencoesFdReinfDesign() {
       setIsUploading(true);
       const parsed = await parseRetencoesEfdReinfCsv(file);
       await saveRetencoesEfdReinfRows(parsed, file.name);
-      const paymentDates = await loadRetencoesEfdReinfObPaymentDates(parsed);
-      setRows(parsed);
+      const latest = await loadLatestRetencoesEfdReinfRowsFromDb();
+      const paymentDates = await loadRetencoesEfdReinfObPaymentDates(latest.rows);
+      setRows(latest.rows);
       setObPaymentDates(paymentDates);
-      setFileName(file.name);
-      setImportedAt(new Date().toISOString());
+      setFileName(latest.sourceFile || file.name);
+      setImportedAt(latest.importedAt || new Date().toISOString());
       setPage(1);
       toast.success(`${parsed.length} linha(s) de retencao importadas com sucesso.`);
     } catch (error) {
@@ -127,9 +142,10 @@ export default function RetencoesFdReinfDesign() {
 
   const resumo = useMemo(() => ({
     total: rows.length,
-    criticos: rowsWithValidation.filter((item) => item.validation.hasCriticalUgPagadora).length,
-    alertasPrazo: rowsWithValidation.filter((item) => item.validation.hasWarningPrazo).length,
-    comAlerta: rowsWithValidation.filter((item) => item.validation.issues.length > 0).length,
+    criticos: rowsWithValidation.filter((item) => hasOpenPending(item) && item.validation.hasCriticalUgPagadora).length,
+    alertasPrazo: rowsWithValidation.filter((item) => hasOpenPending(item) && item.validation.hasWarningPrazo).length,
+    comAlerta: rowsWithValidation.filter(hasOpenPending).length,
+    corrigidos: rowsWithValidation.filter((item) => item.row.correcaoRealizada && item.validation.issues.length > 0).length,
     liquidados: rows.filter((row) => row.dhItemLiquidado === true).length,
     valorTotalRetencao: rows.reduce((sum, row) => sum + row.valorRetencao, 0),
   }), [rows, rowsWithValidation]);
@@ -149,9 +165,10 @@ export default function RetencoesFdReinfDesign() {
             .some((value) => value.toLowerCase().includes(q));
         const matchAlert =
           alertFilter === 'all' ||
-          (alertFilter === 'critical' && validation.hasCriticalUgPagadora) ||
-          (alertFilter === 'warning' && validation.hasWarningPrazo) ||
-          (alertFilter === 'with-alert' && validation.issues.length > 0) ||
+          (alertFilter === 'critical' && !row.correcaoRealizada && validation.hasCriticalUgPagadora) ||
+          (alertFilter === 'warning' && !row.correcaoRealizada && validation.hasWarningPrazo) ||
+          (alertFilter === 'with-alert' && validation.issues.length > 0 && !row.correcaoRealizada) ||
+          (alertFilter === 'corrected' && row.correcaoRealizada) ||
           (alertFilter === 'ok' && validation.issues.length === 0);
         const matchSituacao = situacaoFilter === 'all' || row.dhSituacao === situacaoFilter;
         return matchQuery && matchAlert && matchSituacao;
@@ -167,7 +184,7 @@ export default function RetencoesFdReinfDesign() {
             case 'dhValorDocOrigem': return item.row.dhValorDocOrigem;
             case 'valorRetencao': return item.row.valorRetencao;
             case 'percentualRetencao': return item.validation.percentualRetencao ?? -1;
-            case 'severity': return severityWeight[item.validation.severity];
+            case 'severity': return severityWeight[getEffectiveSeverity(item)];
           }
         };
         const a = getValue(left);
@@ -206,6 +223,40 @@ export default function RetencoesFdReinfDesign() {
       ? <ArrowUp className="h-3.5 w-3.5 text-primary" />
       : <ArrowDown className="h-3.5 w-3.5 text-primary" />;
 
+  const handleToggleCorrecao = async (row: RetencaoEfdReinfRegistro, checked: boolean) => {
+    if (!row.id) {
+      toast.error('Recarregue a base antes de marcar a correcao desta linha.');
+      return;
+    }
+
+    const nextValue = checked === true;
+    setUpdatingCorrectionIds((current) => new Set(current).add(row.id!));
+    setRows((current) => current.map((item) => (
+      item.id === row.id ? { ...item, correcaoRealizada: nextValue } : item
+    )));
+
+    try {
+      const persistence = await updateRetencaoEfdReinfCorrecaoRealizada(row.id, nextValue);
+      toast.success(
+        persistence === 'local'
+          ? 'Correcao salva neste navegador ate a migration do banco ser aplicada.'
+          : nextValue ? 'Correcao marcada como feita.' : 'Correcao reaberta.',
+      );
+    } catch (error) {
+      console.error('Erro ao atualizar correcao da retencao EFD-Reinf:', error);
+      setRows((current) => current.map((item) => (
+        item.id === row.id ? { ...item, correcaoRealizada: row.correcaoRealizada } : item
+      )));
+      toast.error('Nao foi possivel atualizar a correcao desta linha.');
+    } finally {
+      setUpdatingCorrectionIds((current) => {
+        const next = new Set(current);
+        next.delete(row.id!);
+        return next;
+      });
+    }
+  };
+
   return (
     <div className="space-y-6 pb-10">
       <HeaderSubtitle>Auditoria das retencoes FDReinf com foco em UG pagadora, prazo esperado e percentual retido.</HeaderSubtitle>
@@ -230,9 +281,9 @@ export default function RetencoesFdReinfDesign() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard title="Registros auditados" value={resumo.total} subtitle={fileName ? `Base atual: ${fileName}` : 'Aguardando importacao da base'} icon={FileUp} stitchColor="vibrant-blue" isLoading={isLoadingInitial} />
-        <StatCard title="Criticos de UG" value={resumo.criticos} subtitle="Itens com UG pagadora diferente de 158155, exceto DDR001 e DGR001" icon={ShieldAlert} stitchColor="red-500" progress={resumo.total ? (resumo.criticos / resumo.total) * 100 : 0} isLoading={isLoadingInitial} />
+        <StatCard title="Pendencias abertas" value={resumo.comAlerta} subtitle={`${resumo.corrigidos} item(ns) ja marcados como corrigidos`} icon={ShieldAlert} stitchColor="red-500" progress={resumo.total ? (resumo.comAlerta / resumo.total) * 100 : 0} isLoading={isLoadingInitial} />
         <StatCard title="Alertas de prazo" value={resumo.alertasPrazo} subtitle="DDF025 usa a OB de pagamento; DDF021 usa a emissao" icon={AlertTriangle} stitchColor="amber" progress={resumo.total ? (resumo.alertasPrazo / resumo.total) * 100 : 0} isLoading={isLoadingInitial} />
-        <StatCard title="Retencao total" value={formatCurrency(resumo.valorTotalRetencao)} subtitle={`${resumo.liquidados} item(ns) marcados como liquidados`} icon={ShieldAlert} stitchColor="emerald-green" isLoading={isLoadingInitial} />
+        <StatCard title="Retencao total" value={formatCurrency(resumo.valorTotalRetencao)} subtitle={`${resumo.liquidados} item(ns) liquidados; ${resumo.criticos} UG critica(s) abertas`} icon={ShieldAlert} stitchColor="emerald-green" isLoading={isLoadingInitial} />
       </div>
 
       <FilterPanel className="shadow-sm" title="Filtros da auditoria" actions={<Button type="button" variant="ghost" size="sm" onClick={resetFilters} disabled={sortKey === 'severity' && sortDirection === 'desc' && !query && alertFilter === 'all' && situacaoFilter === 'all'}>Limpar filtros</Button>}>
@@ -248,7 +299,8 @@ export default function RetencoesFdReinfDesign() {
                 <SelectItem value="all">Todas as severidades</SelectItem>
                 <SelectItem value="critical">Somente criticos</SelectItem>
                 <SelectItem value="warning">Somente prazo</SelectItem>
-                <SelectItem value="with-alert">Com qualquer alerta</SelectItem>
+                <SelectItem value="with-alert">Pendencias abertas</SelectItem>
+                <SelectItem value="corrected">Correcoes feitas</SelectItem>
                 <SelectItem value="ok">Somente OK</SelectItem>
               </SelectContent>
             </Select>
@@ -283,8 +335,13 @@ export default function RetencoesFdReinfDesign() {
             ) : filteredRows.length === 0 ? (
               <TableRow><TableCell colSpan={8} className="h-28 text-center text-muted-foreground italic">Nenhum registro encontrado para os filtros aplicados.</TableCell></TableRow>
             ) : (
-              rowsPage.map(({ row, validation }) => (
-                <TableRow key={`${row.documentoHabil}-${row.sourceIndex}-${row.dhSituacao}-${row.valorRetencao}`} className={cn('border-b border-border-default/30 last:border-0 transition-colors', validation.severity === 'critical' ? 'bg-red-50/80 hover:bg-red-50' : validation.severity === 'warning' ? 'bg-amber-50/80 hover:bg-amber-50' : 'bg-white hover:bg-slate-50/70')}>
+              rowsPage.map(({ row, validation }) => {
+                const effectiveSeverity = getEffectiveSeverity({ row, validation });
+                const hasIssues = validation.issues.length > 0;
+                const isUpdatingCorrection = Boolean(row.id && updatingCorrectionIds.has(row.id));
+
+                return (
+                <TableRow key={row.id || `${row.documentoHabil}-${row.sourceIndex}-${row.dhSituacao}-${row.valorRetencao}`} className={cn('border-b border-border-default/30 last:border-0 transition-colors', effectiveSeverity === 'critical' ? 'bg-red-50/80 hover:bg-red-50' : effectiveSeverity === 'warning' ? 'bg-amber-50/80 hover:bg-amber-50' : 'bg-white hover:bg-slate-50/70')}>
                   <TableCell className="px-4 py-3 align-top">
                     <div className="font-data text-xs font-semibold text-text-primary">{formatDocumentoHabil(row.documentoHabil)}</div>
                     <div className="mt-1 text-xs text-muted-foreground">{row.dhProcesso || '-'}</div>
@@ -312,7 +369,7 @@ export default function RetencoesFdReinfDesign() {
                     <div className="mt-1 text-xs">DH pgto: {formatRetencaoEfdReinfDate(row.dhDiaPagamento)}</div>
                     {row.dhSituacao === 'DDF025' ? (
                       <div className={cn('mt-1 text-xs', validation.paymentDateSource === 'missing-ob' && 'text-red-700')}>
-                        OB pgto: {validation.paymentDateSource === 'missing-ob' ? 'nao localizada' : formatRetencaoEfdReinfDate(validation.paymentDateUsed)}
+                        OB pgto: {validation.paymentDateSource === 'missing-ob' ? 'nao localizada' : `${formatOrdemBancaria(validation.paymentObNumber)} em ${formatRetencaoEfdReinfDate(validation.paymentDateUsed)}`}
                       </div>
                     ) : null}
                     <div className="mt-1 text-xs">Item vencto: {formatRetencaoEfdReinfDate(row.dhItemDiaVencimento)}</div>
@@ -324,14 +381,30 @@ export default function RetencoesFdReinfDesign() {
                   <TableCell className="px-4 py-3 align-top text-right text-xs font-semibold text-text-primary">{formatPercent(validation.percentualRetencao)}</TableCell>
                   <TableCell className="px-4 py-3 align-top">
                     <div className="flex flex-wrap gap-2">
-                      {validation.hasCriticalUgPagadora ? <Badge variant="secondary" className="border border-red-200 bg-red-100 text-red-700">UG critica</Badge> : null}
-                      {validation.hasWarningPrazo ? <Badge variant="secondary" className="border border-amber-200 bg-amber-100 text-amber-700">Prazo inconsistente</Badge> : null}
-                      {validation.issues.length === 0 ? <Badge variant="secondary" className="border border-emerald-200 bg-emerald-50 text-emerald-700">OK</Badge> : null}
+                      {row.correcaoRealizada ? <Badge variant="secondary" className="border border-emerald-200 bg-emerald-50 text-emerald-700">Corrigida</Badge> : null}
+                      {!row.correcaoRealizada && validation.hasCriticalUgPagadora ? <Badge variant="secondary" className="border border-red-200 bg-red-100 text-red-700">UG critica</Badge> : null}
+                      {!row.correcaoRealizada && validation.hasWarningPrazo ? <Badge variant="secondary" className="border border-amber-200 bg-amber-100 text-amber-700">Prazo inconsistente</Badge> : null}
+                      {!hasIssues ? <Badge variant="secondary" className="border border-emerald-200 bg-emerald-50 text-emerald-700">OK</Badge> : null}
                     </div>
-                    {validation.issues.length > 0 ? <div className="mt-2 space-y-1 text-[11px] leading-5 text-muted-foreground">{validation.issues.map((issue) => <div key={issue}>{issue}</div>)}</div> : null}
+                    {hasIssues ? <div className="mt-2 space-y-1 text-[11px] leading-5 text-muted-foreground">{validation.issues.map((issue) => <div key={issue}>{issue}</div>)}</div> : null}
+                    {hasIssues ? (
+                      <label className="mt-3 flex items-center gap-2 text-[11px] font-medium text-text-primary">
+                        <Checkbox
+                          checked={row.correcaoRealizada}
+                          disabled={isUpdatingCorrection}
+                          onCheckedChange={(checked) => void handleToggleCorrecao(row, checked === true)}
+                          aria-label="Marcar correcao como feita"
+                        />
+                        <span className="flex items-center gap-1">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                          Correcao feita
+                        </span>
+                      </label>
+                    ) : null}
                   </TableCell>
                 </TableRow>
-              ))
+                );
+              })
             )}
           </TableBody>
         </Table>

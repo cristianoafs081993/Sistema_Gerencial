@@ -147,6 +147,7 @@ Mostrar a linhagem operacional dos dados de forma curta:
   - parser: [retencoesEfdReinfImportService.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/retencoesEfdReinfImportService.ts)
   - tabela: `retencoes_efd_reinf`
   - pagina: [RetencoesFdReinfDesign.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/RetencoesFdReinfDesign.tsx)
+  - observacao: a tela busca a OB de pagamento vinculada em `documentos_habeis_itens`, exibe o numero da OB usada no calculo e permite marcar `correcao_realizada` para retirar o item das pendencias abertas.
 
 ### Ingestao automatica por Gmail
 

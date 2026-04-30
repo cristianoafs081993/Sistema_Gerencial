@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { splitCsvLine } from '@/utils/csvParser';
 
 export interface RetencaoEfdReinfRegistro {
+  id?: string;
   sourceIndex: number;
   documentoHabil: string;
   dhProcesso: string;
@@ -22,11 +23,13 @@ export interface RetencaoEfdReinfRegistro {
   dhValorDocOrigem: number;
   metrica: string;
   valorRetencao: number;
+  correcaoRealizada: boolean;
 }
 
 export type RetencaoEfdReinfPaymentDateSource = 'ob' | 'dh' | 'missing-ob';
 
 type RetencaoEfdReinfDbRow = {
+  id: string;
   source_index: number;
   documento_habil: string;
   dh_processo: string | null;
@@ -46,6 +49,7 @@ type RetencaoEfdReinfDbRow = {
   valor_retencao: number | null;
   source_file: string | null;
   imported_at: string;
+  correcao_realizada?: boolean | null;
 };
 
 type RetencaoEfdReinfObRow = {
@@ -56,6 +60,7 @@ type RetencaoEfdReinfObRow = {
 };
 
 const SITUACOES_IGNORADAS_REGRA_UG_CRITICA = new Set(['DDR001', 'DGR001']);
+const LOCAL_CORRECTION_STORAGE_KEY = 'retencoes-efd-reinf:correcoes-realizadas';
 
 export type RetencaoEfdReinfValidation = {
   severity: 'ok' | 'warning' | 'critical';
@@ -65,12 +70,18 @@ export type RetencaoEfdReinfValidation = {
   expectedRule: 'DDF025' | 'DDF021' | null;
   paymentDateSource: RetencaoEfdReinfPaymentDateSource;
   paymentDateUsed: string | null;
+  paymentObNumber: string | null;
   percentualRetencao: number | null;
   issues: string[];
 };
 
+export type RetencaoEfdReinfObPaymentInfo = {
+  date: string;
+  obNumber: string;
+};
+
 export type RetencaoEfdReinfValidationOptions = {
-  obPaymentDates?: Map<string, string> | Record<string, string>;
+  obPaymentDates?: Map<string, string | RetencaoEfdReinfObPaymentInfo> | Record<string, string | RetencaoEfdReinfObPaymentInfo>;
 };
 
 function parseCurrencyBR(value: unknown): number {
@@ -205,6 +216,44 @@ function normalizeText(value?: string | null) {
     .toUpperCase();
 }
 
+function isMissingCorrectionColumnError(error: unknown) {
+  const maybeError = error as { message?: string; details?: string; hint?: string; code?: string } | null | undefined;
+  const text = [
+    maybeError?.message,
+    maybeError?.details,
+    maybeError?.hint,
+    maybeError?.code,
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  return text.includes('correcao_realizada') || text.includes('schema cache') || text.includes('pgrst204') || text.includes('42703');
+}
+
+function readLocalCorrections(): Record<string, boolean> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(LOCAL_CORRECTION_STORAGE_KEY);
+    return raw ? JSON.parse(raw) as Record<string, boolean> : {};
+  } catch {
+    return {};
+  }
+}
+
+function getLocalCorrection(id?: string | null) {
+  if (!id) return false;
+  return readLocalCorrections()[id] === true;
+}
+
+function setLocalCorrection(id: string, correcaoRealizada: boolean) {
+  if (typeof window === 'undefined') return;
+  const corrections = readLocalCorrections();
+  if (correcaoRealizada) {
+    corrections[id] = true;
+  } else {
+    delete corrections[id];
+  }
+  window.localStorage.setItem(LOCAL_CORRECTION_STORAGE_KEY, JSON.stringify(corrections));
+}
+
 function isObPagamentoPrincipal(row: RetencaoEfdReinfObRow) {
   const observacao = normalizeText(row.observacao);
   const indicaPagamento = /\b(PGTO|PAGAMENTO)\b/.test(observacao);
@@ -220,11 +269,12 @@ function getPaymentDateFromOptions(
   if (!dates) return undefined;
 
   const normalized = normalizeDocumentoHabilId(documentoHabil);
-  if (dates instanceof Map) {
-    return dates.get(documentoHabil) || dates.get(normalized);
-  }
+  const value = dates instanceof Map
+    ? dates.get(documentoHabil) || dates.get(normalized)
+    : dates[documentoHabil] || dates[normalized];
 
-  return dates[documentoHabil] || dates[normalized];
+  if (!value) return undefined;
+  return typeof value === 'string' ? { date: value, obNumber: '' } : value;
 }
 
 export async function parseRetencoesEfdReinfCsv(file: File): Promise<RetencaoEfdReinfRegistro[]> {
@@ -268,6 +318,7 @@ export async function parseRetencoesEfdReinfCsv(file: File): Promise<RetencaoEfd
         dhValorDocOrigem: parseCurrencyBR(row[13]),
         metrica: String(row[14] || '').trim(),
         valorRetencao: parseCurrencyBR(row[15]),
+        correcaoRealizada: false,
       };
     })
     .filter((item): item is RetencaoEfdReinfRegistro => item !== null);
@@ -292,13 +343,13 @@ export function validateRetencaoEfdReinfRow(
   if (row.dhSituacao === 'DDF025') {
     expectedRule = 'DDF025';
     const hasObPaymentDateMap = Boolean(options?.obPaymentDates);
-    const obPaymentDate = getPaymentDateFromOptions(row.documentoHabil, options);
+    const obPaymentInfo = getPaymentDateFromOptions(row.documentoHabil, options);
 
-    paymentDateSource = hasObPaymentDateMap ? (obPaymentDate ? 'ob' : 'missing-ob') : 'dh';
-    paymentDateUsed = hasObPaymentDateMap ? (obPaymentDate || null) : row.dhDiaPagamento;
+    paymentDateSource = hasObPaymentDateMap ? (obPaymentInfo ? 'ob' : 'missing-ob') : 'dh';
+    paymentDateUsed = hasObPaymentDateMap ? (obPaymentInfo?.date || null) : row.dhDiaPagamento;
     expectedDate = getExpectedNextMonthDay20(paymentDateUsed);
 
-    if (hasObPaymentDateMap && !obPaymentDate) {
+    if (hasObPaymentDateMap && !obPaymentInfo) {
       hasWarningPrazo = true;
       issues.push('DDF025 sem OB de pagamento localizada para calcular o vencimento esperado.');
     } else {
@@ -345,6 +396,7 @@ export function validateRetencaoEfdReinfRow(
     expectedRule,
     paymentDateSource,
     paymentDateUsed,
+    paymentObNumber: getPaymentDateFromOptions(row.documentoHabil, options)?.obNumber || null,
     percentualRetencao,
     issues,
   };
@@ -373,6 +425,7 @@ function aggregateForUpsert(rows: RetencaoEfdReinfRegistro[]) {
 
 function dbRowToRegistro(row: RetencaoEfdReinfDbRow): RetencaoEfdReinfRegistro {
   return {
+    id: row.id,
     sourceIndex: row.source_index,
     documentoHabil: row.documento_habil,
     dhProcesso: row.dh_processo || '',
@@ -390,6 +443,7 @@ function dbRowToRegistro(row: RetencaoEfdReinfDbRow): RetencaoEfdReinfRegistro {
     dhValorDocOrigem: Number(row.dh_valor_doc_origem || 0),
     metrica: row.metrica || '',
     valorRetencao: Number(row.valor_retencao || 0),
+    correcaoRealizada: row.correcao_realizada === undefined ? getLocalCorrection(row.id) : row.correcao_realizada === true,
   };
 }
 
@@ -446,31 +500,41 @@ export async function loadLatestRetencoesEfdReinfRowsFromDb(): Promise<{
     return { rows: [], sourceFile: '', importedAt: null };
   }
 
-  const { data: rows, error: rowsError } = await supabase
+  const baseColumns = `
+    source_index,
+    id,
+    documento_habil,
+    dh_processo,
+    dh_estado,
+    dh_ug_pagadora,
+    dh_item_ug_pagadora,
+    dh_credor_documento,
+    dh_credor_nome,
+    dh_situacao,
+    dh_data_emissao_doc_origem,
+    dh_dia_pagamento,
+    dh_item_dia_vencimento,
+    dh_item_dia_pagamento,
+    dh_item_liquidado,
+    dh_valor_doc_origem,
+    metrica,
+    valor_retencao,
+    source_file,
+    imported_at
+  `;
+
+  const loadRows = (columns: string) => supabase
     .from('retencoes_efd_reinf')
-    .select(`
-      source_index,
-      documento_habil,
-      dh_processo,
-      dh_estado,
-      dh_ug_pagadora,
-      dh_item_ug_pagadora,
-      dh_credor_documento,
-      dh_credor_nome,
-      dh_situacao,
-      dh_data_emissao_doc_origem,
-      dh_dia_pagamento,
-      dh_item_dia_vencimento,
-      dh_item_dia_pagamento,
-      dh_item_liquidado,
-      dh_valor_doc_origem,
-      metrica,
-      valor_retencao,
-      source_file,
-      imported_at
-    `)
+    .select(columns)
     .eq('imported_at', latest.imported_at)
     .order('source_index', { ascending: true });
+
+  let { data: rows, error: rowsError } = await loadRows(`${baseColumns}, correcao_realizada`);
+  if (rowsError && isMissingCorrectionColumnError(rowsError)) {
+    const fallback = await loadRows(baseColumns);
+    rows = fallback.data;
+    rowsError = fallback.error;
+  }
 
   if (rowsError) throw rowsError;
 
@@ -483,7 +547,7 @@ export async function loadLatestRetencoesEfdReinfRowsFromDb(): Promise<{
 
 export async function loadRetencoesEfdReinfObPaymentDates(
   rows: RetencaoEfdReinfRegistro[],
-): Promise<Map<string, string>> {
+): Promise<Map<string, RetencaoEfdReinfObPaymentInfo>> {
   const documentoIds = Array.from(new Set(rows.map((row) => normalizeDocumentoHabilId(row.documentoHabil)).filter(Boolean)));
   if (!documentoIds.length) return new Map();
 
@@ -505,7 +569,7 @@ export async function loadRetencoesEfdReinfObPaymentDates(
     grouped.set(documentoId, existing);
   }
 
-  const paymentDates = new Map<string, string>();
+  const paymentDates = new Map<string, RetencaoEfdReinfObPaymentInfo>();
   for (const [documentoId, obRows] of grouped.entries()) {
     const sortedRows = [...obRows].sort((left, right) => {
       const leftDate = toIsoDate(left.data_emissao) || '';
@@ -515,10 +579,30 @@ export async function loadRetencoesEfdReinfObPaymentDates(
     });
     const selected = sortedRows.find(isObPagamentoPrincipal) || sortedRows[0];
     const paymentDate = toIsoDate(selected.data_emissao);
-    if (paymentDate) paymentDates.set(documentoId, paymentDate);
+    if (paymentDate) paymentDates.set(documentoId, { date: paymentDate, obNumber: selected.id });
   }
 
   return paymentDates;
+}
+
+export async function updateRetencaoEfdReinfCorrecaoRealizada(
+  id: string,
+  correcaoRealizada: boolean,
+): Promise<'remote' | 'local'> {
+  const { error } = await supabase
+    .from('retencoes_efd_reinf')
+    .update({ correcao_realizada: correcaoRealizada, updated_at: new Date().toISOString() })
+    .eq('id', id);
+
+  if (error) {
+    if (isMissingCorrectionColumnError(error)) {
+      setLocalCorrection(id, correcaoRealizada);
+      return 'local';
+    }
+    throw error;
+  }
+
+  return 'remote';
 }
 
 export function formatRetencaoEfdReinfDate(value?: string | null) {

@@ -164,6 +164,16 @@ Observacao para a aba RAP do dashboard:
 
 `LiquidacoesPagamentos.tsx` -> `JsonImportDialog` -> `transparenciaService.import*` -> `documentos_habeis*`
 
+### Retencoes FD-Reinf
+
+`RetencoesFdReinfDesign.tsx` -> `retencoesEfdReinfImportService` -> `retencoes_efd_reinf` + `documentos_habeis_itens`
+
+Observacoes:
+
+- a tela carrega a ultima base importada de `retencoes_efd_reinf`
+- para situacoes `DDF025`, o service localiza a OB de pagamento em `documentos_habeis_itens`, exibe o numero da OB vinculada e usa sua data para calcular o vencimento esperado
+- o checkbox de correcao atualiza `retencoes_efd_reinf.correcao_realizada`; registros marcados deixam os filtros e contadores de pendencias abertas, mas seguem visiveis na auditoria geral
+
 ### Contratos
 
 `Contratos.tsx` -> `useData()` -> `contratos` / `contratos_empenhos`

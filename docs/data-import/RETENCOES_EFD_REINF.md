@@ -33,6 +33,7 @@ Este ponto deve ser tratado como debito de documentacao e de UX.
 
 ## Campos produzidos
 
+- `id` quando carregado do banco
 - `documentoHabil`
 - `dhProcesso`
 - `dhEstado`
@@ -49,6 +50,7 @@ Este ponto deve ser tratado como debito de documentacao e de UX.
 - `dhValorDocOrigem`
 - `metrica`
 - `valorRetencao`
+- `correcaoRealizada` quando carregado do banco
 
 ## Validacoes de negocio
 
@@ -61,12 +63,22 @@ Este ponto deve ser tratado como debito de documentacao e de UX.
 
 - `DDF025`: vencimento e pagamento devem ocorrer no dia 20 do mes seguinte ao `Dia Lancamento` da OB de pagamento vinculada a NP em `documentos_habeis_itens`
   - a OB de pagamento e a primeira OB cuja observacao indique pagamento principal, como `PGTO` ou `PAGAMENTO`, ignorando retencoes quando identificaveis
+  - a tela exibe o numero da OB escolhida junto da data usada no calculo
   - se nao houver OB de pagamento vinculada a NP, a linha fica em alerta porque nao ha data-base confiavel para calcular o vencimento esperado
 - `DDF021`: vencimento e pagamento devem ocorrer no dia 20 do mes seguinte a `DH - Data Emissao Doc.Origem`
+
+## Tratamento de pendencias
+
+- a coluna `correcao_realizada` permite marcar uma linha com alerta como corrigida
+- itens corrigidos deixam de contar nas pendencias abertas e saem dos filtros de critica/prazo pendentes
+- o alerta original continua visivel no registro para preservar a trilha de auditoria
+- enquanto a migration da coluna ainda nao estiver aplicada no ambiente remoto, o frontend usa fallback em `localStorage` para nao quebrar a tela; essa marcacao local nao substitui a persistencia definitiva no banco
 
 ## Destino no banco
 
 - tabela: `retencoes_efd_reinf`
+- coluna operacional manual:
+  - `correcao_realizada`
 - chave de upsert:
   - `documento_habil,dh_processo,dh_situacao,dh_credor_documento,dh_dia_pagamento,valor_retencao`
 

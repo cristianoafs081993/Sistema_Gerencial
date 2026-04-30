@@ -3,6 +3,7 @@ import {
   loadRetencoesEfdReinfObPaymentDates,
   parseRetencoesEfdReinfCsv,
   type RetencaoEfdReinfRegistro,
+  updateRetencaoEfdReinfCorrecaoRealizada,
   validateRetencaoEfdReinfRow,
 } from '@/services/retencoesEfdReinfImportService';
 
@@ -42,6 +43,7 @@ function createRegistro(overrides: Partial<RetencaoEfdReinfRegistro> = {}): Rete
     dhValorDocOrigem: 1000,
     metrica: 'INSS',
     valorRetencao: 110,
+    correcaoRealizada: false,
     ...overrides,
   };
 }
@@ -79,6 +81,7 @@ describe('retencoesEfdReinfImportService', () => {
         dhValorDocOrigem: 1000,
         metrica: 'INSS',
         valorRetencao: 110,
+        correcaoRealizada: false,
       },
     ]);
   });
@@ -217,11 +220,34 @@ describe('retencoesEfdReinfImportService', () => {
       createRegistro({ documentoHabil: '158366264352026NP000422' }),
     ]);
 
-    expect(paymentDates.get('2026NP000421')).toBe('2026-01-08');
-    expect(paymentDates.get('2026NP000422')).toBe('2026-01-09');
+    expect(paymentDates.get('2026NP000421')).toEqual({ date: '2026-01-08', obNumber: '2026OB000001' });
+    expect(paymentDates.get('2026NP000422')).toEqual({ date: '2026-01-09', obNumber: '2026OB000003' });
     expect(supabaseMock.from).toHaveBeenCalledWith('documentos_habeis_itens');
     expect(inMock).toHaveBeenCalledWith('documento_habil_id', ['2026NP000421', '2026NP000422']);
     expect(eqMock).toHaveBeenCalledWith('doc_tipo', 'OB');
+  });
+
+  it('marca a correcao de uma retencao como realizada', async () => {
+    const eqMock = vi.fn().mockResolvedValue({ error: null });
+    const updateMock = vi.fn(() => ({ eq: eqMock }));
+    supabaseMock.from.mockReturnValue({ update: updateMock });
+
+    await expect(updateRetencaoEfdReinfCorrecaoRealizada('row-id', true)).resolves.toBe('remote');
+
+    expect(supabaseMock.from).toHaveBeenCalledWith('retencoes_efd_reinf');
+    expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({ correcao_realizada: true }));
+    expect(eqMock).toHaveBeenCalledWith('id', 'row-id');
+  });
+
+  it('usa fallback local quando o banco remoto ainda nao possui correcao_realizada', async () => {
+    const eqMock = vi.fn().mockResolvedValue({
+      error: { message: "Could not find the 'correcao_realizada' column of 'retencoes_efd_reinf' in the schema cache" },
+    });
+    const updateMock = vi.fn(() => ({ eq: eqMock }));
+    supabaseMock.from.mockReturnValue({ update: updateMock });
+
+    await expect(updateRetencaoEfdReinfCorrecaoRealizada('row-id-local', true)).resolves.toBe('local');
+    expect(window.localStorage.getItem('retencoes-efd-reinf:correcoes-realizadas')).toContain('row-id-local');
   });
 
   it('formata datas ISO para exibicao brasileira', () => {

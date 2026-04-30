@@ -385,6 +385,7 @@ Consumido por:
 ### `retencoes_efd_reinf`
 
 - base dedicada de auditoria FD-Reinf
+- inclui `correcao_realizada` para retirar alertas ja tratados da lista de pendencias abertas sem apagar a inconsistencia original importada
 
 ### `email_csv_ingestion_runs`
 
