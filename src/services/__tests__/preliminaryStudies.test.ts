@@ -4,6 +4,10 @@ import {
   normalizePreliminaryStudyQuestionSuggestionResult,
   preliminaryStudiesService,
 } from '@/services/preliminaryStudies';
+import {
+  buildEtpInstitutionalContextSnippet,
+  etpInstitutionalContexts,
+} from '@/lib/etpInstitutionalContexts';
 import { supabase } from '@/lib/supabase';
 
 vi.mock('@/lib/supabase', () => ({
@@ -198,6 +202,65 @@ describe('normalizePreliminaryStudyQuestionSuggestionResult', () => {
               sourceLabel: 'planilha-custos.xlsx, aba Custos, linhas 2-30',
             }),
           ]),
+        }),
+      }),
+    );
+  });
+
+  it('envia contexto institucional no rascunho, mas filtra das sugestoes com fonte explicita', async () => {
+    const institutionalSnippet = buildEtpInstitutionalContextSnippet(etpInstitutionalContexts[0]);
+
+    mockedInvoke.mockResolvedValueOnce({
+      data: {
+        status: 'generated',
+        title: 'ETP',
+        warnings: [],
+        missingRequiredFields: [],
+        fields: [],
+      },
+      error: null,
+    });
+
+    await preliminaryStudiesService.generateDraft({
+      manualObject: 'Contratacao de servicos continuos de limpeza',
+      supplementalSnippets: [institutionalSnippet],
+    });
+
+    expect(mockedInvoke).toHaveBeenCalledWith(
+      'gerar-etp-servicos-continuos',
+      expect.objectContaining({
+        body: expect.objectContaining({
+          contextSnippets: expect.arrayContaining([
+            expect.objectContaining({
+              id: 'contexto-institucional-ifrn-currais-novos',
+              kind: 'institucional',
+              sourceType: 'institucional',
+            }),
+          ]),
+        }),
+      }),
+    );
+
+    mockedInvoke.mockClear();
+    mockedInvoke.mockResolvedValueOnce({
+      data: {
+        status: 'generated',
+        suggestions: [],
+        warnings: [],
+      },
+      error: null,
+    });
+
+    await preliminaryStudiesService.suggestQuestionnaireAnswers({
+      manualObject: 'Contratacao de servicos continuos de limpeza',
+      supplementalSnippets: [institutionalSnippet],
+    });
+
+    expect(mockedInvoke).toHaveBeenCalledWith(
+      'sugerir-respostas-etp-servicos-continuos',
+      expect.objectContaining({
+        body: expect.objectContaining({
+          contextSnippets: [],
         }),
       }),
     );

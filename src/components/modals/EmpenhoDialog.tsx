@@ -279,7 +279,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
               <div className="px-5 py-3 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
                 <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
                   <Receipt className="w-3 h-3" />
-                  LiquidaÃ§Ãµes da API de Contratos
+                  Liquidacoes da API de Contratos
                 </h3>
                 {isLoadingLiquidacoesApi && <Loader2 className="w-3 h-3 animate-spin text-slate-400" />}
               </div>
@@ -287,22 +287,22 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50/30 text-[9px] uppercase font-bold text-slate-400">
                     <tr>
-                      <th className="px-5 py-2">EmissÃ£o</th>
+                      <th className="px-5 py-2">Emissao</th>
                       <th className="px-5 py-2">Fatura</th>
                       <th className="px-5 py-2">Contrato</th>
-                      <th className="px-5 py-2">SituaÃ§Ã£o</th>
+                      <th className="px-5 py-2">Situacao</th>
                       <th className="px-5 py-2">Processo</th>
                       <th className="px-5 py-2">Vencimento</th>
-                      <th className="px-5 py-2">LiquidaÃ§Ã£o</th>
+                      <th className="px-5 py-2">Liquidacao</th>
                       <th className="px-5 py-2 text-right">Bruto</th>
-                      <th className="px-5 py-2 text-right">LÃ­quido</th>
+                      <th className="px-5 py-2 text-right">Liquido</th>
                     </tr>
                   </thead>
                   <tbody>
                     {isLoadingLiquidacoesApi ? (
                       <tr>
                         <td colSpan={9} className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
-                          Carregando liquidaÃ§Ãµes da API de contratos...
+                          Carregando liquidacoes da API de contratos...
                         </td>
                       </tr>
                     ) : liquidacoesApi.length > 0 ? (
@@ -345,7 +345,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                     ) : (
                       <tr>
                         <td colSpan={9} className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
-                          O empenho nÃ£o foi localizado nos contratos pÃºblicos do Comprasnet para a UG 158366.
+                          O empenho nao foi localizado nos contratos publicos do Comprasnet para a UG 158366.
                         </td>
                       </tr>
                     )}
@@ -354,7 +354,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
               </div>
               <div className="px-5 py-3 border-t border-slate-50 bg-slate-50/40 flex gap-2 text-[10px] text-muted-foreground leading-relaxed">
                 <Info className="w-3 h-3 shrink-0 mt-0.5 text-slate-400" />
-                <span>Esta seÃ§Ã£o faz descoberta em tempo real na API pÃºblica de contratos do Comprasnet para a UG 158366. A data de liquidaÃ§Ã£o sÃ³ aparece quando vier no payload real da API.</span>
+                <span>Esta secao faz descoberta em tempo real na API publica de contratos do Comprasnet para a UG 158366. A data de liquidacao so aparece quando vier no payload real da API.</span>
               </div>
             </div>
             )}

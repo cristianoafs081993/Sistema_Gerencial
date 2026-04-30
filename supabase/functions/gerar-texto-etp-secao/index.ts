@@ -45,7 +45,7 @@ type EtpSectionTextRequest = {
     label: string;
     pageNumber?: number;
     excerpt: string;
-    sourceType?: 'processo' | 'anexo' | 'etp';
+    sourceType?: 'processo' | 'anexo' | 'etp' | 'institucional';
     sourceName?: string;
     sourceLabel?: string;
   }>;
@@ -60,6 +60,25 @@ const jsonResponse = (body: unknown, status = 200) =>
 
 function collapseSpaces(value?: string | null) {
   return (value || '').replace(/\s+/g, ' ').trim();
+}
+
+type ContextSnippet = NonNullable<EtpSectionTextRequest['contextSnippets']>[number];
+
+function isInstitutionalSnippet(snippet: ContextSnippet) {
+  return snippet.kind === 'institucional' || snippet.sourceType === 'institucional';
+}
+
+function splitContextSnippets(request: EtpSectionTextRequest) {
+  const snippets = request.contextSnippets || [];
+  return {
+    institutionalSnippets: snippets.filter(isInstitutionalSnippet),
+    evidenceSnippets: snippets.filter((snippet) => !isInstitutionalSnippet(snippet)),
+  };
+}
+
+function limitContextText(value: string, maxLength = 650) {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength).replace(/\s+\S*$/, '').trim()}...`;
 }
 
 function stripJsonFence(value: string) {
@@ -122,12 +141,15 @@ function fallbackText(request: EtpSectionTextRequest) {
   const objectValue = collapseSpaces(request.manualObject || request.processo?.assunto) ||
     'objeto da contratacao a ser detalhado';
   const notes = collapseSpaces(request.userNotes);
-  const firstSnippet = collapseSpaces(request.contextSnippets?.[0]?.excerpt);
-  const context = notes || firstSnippet || objectValue;
+  const { institutionalSnippets, evidenceSnippets } = splitContextSnippets(request);
+  const firstTechnicalSnippet = collapseSpaces(evidenceSnippets[0]?.excerpt);
+  const institutionalContext = limitContextText(collapseSpaces(institutionalSnippets[0]?.excerpt));
+  const context = notes || firstTechnicalSnippet || objectValue;
 
   return [
     `Texto preliminar para "${questionTitle}".`,
     `Considerando ${objectValue}, a secao deve registrar as informacoes relevantes para demonstrar a adequacao da contratacao ao interesse publico.`,
+    institutionalContext ? `Como pano de fundo da unidade demandante, considere o contexto institucional do campus: ${institutionalContext}.` : '',
     context ? `Informacao inicial considerada: ${context}.` : '',
     `Revisar e complementar antes da aprovacao final. [CAMPO PENDENTE: ${questionTitle}]`,
   ].filter(Boolean).join(' ');
@@ -148,20 +170,26 @@ function normalizeAiResult(raw: Record<string, unknown>, request: EtpSectionText
 }
 
 function buildPrompt(request: EtpSectionTextRequest) {
+  const { institutionalSnippets, evidenceSnippets } = splitContextSnippets(request);
+
   return [
     'Voce e um assistente especializado em contratacoes publicas brasileiras.',
     'Gere texto para uma unica secao de Estudo Tecnico Preliminar de servicos continuos, com base na Lei 14.133/2021 e na IN SEGES 58/2022.',
     'O texto deve ser formal, objetivo, editavel e adequado a minuta de apoio.',
     'Se o usuario nao informou nada, gere mesmo assim um texto preliminar util, mas use marcadores [CAMPO PENDENTE: ...] para dados concretos ausentes.',
     'Nao invente numeros, datas, valores, locais, nomes de unidades ou fatos especificos sem fonte.',
-    'Os trechos de apoio podem vir do processo ou de anexos opcionais. Quando usar anexo, preserve a referencia do arquivo/pagina indicada.',
+    'Os trechos institucionais descrevem a unidade demandante. Use-os apenas como pano de fundo natural quando ajudarem a explicar escala, logistica regional, continuidade dos servicos, publico atendido ou impacto local.',
+    'O contexto institucional nao e fonte principal para requisitos tecnicos, quantitativos, estimativa de valor, parcelamento ou conclusao. Nesses pontos, use notas do usuario, respostas, processo, anexos tecnicos ou marque pendencia quando faltar dado.',
+    'Nunca cite contexto institucional como anexo, fonte, referencia, trecho, texto fornecido ou texto entre colchetes. Nao escreva "Conforme anexo" nem "Conforme detalhado no anexo" para esse contexto.',
+    'Quando usar anexo tecnico nao institucional, preserve a referencia do arquivo/pagina indicada.',
     'Responda apenas JSON valido no formato: {"status":"generated","value":"texto da secao","warnings":["..."]}.',
     `Pergunta atual: ${JSON.stringify(request.question || {})}`,
     `Notas digitadas pelo usuario: ${request.userNotes || ''}`,
     `Processo: ${JSON.stringify(request.processo || {})}`,
     `Objeto manual: ${request.manualObject || ''}`,
     `Respostas ja registradas: ${JSON.stringify(request.questionnaireAnswers || [])}`,
-    `Trechos de apoio: ${JSON.stringify(request.contextSnippets || [])}`,
+    `Contexto institucional de apoio: ${JSON.stringify(institutionalSnippets)}`,
+    `Trechos tecnicos do processo/anexos: ${JSON.stringify(evidenceSnippets)}`,
   ].join('\n\n');
 }
 

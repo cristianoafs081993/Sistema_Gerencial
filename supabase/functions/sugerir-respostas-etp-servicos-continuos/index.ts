@@ -25,7 +25,7 @@ type EtpSuggestionRequest = {
     label: string;
     pageNumber?: number;
     excerpt: string;
-    sourceType?: 'processo' | 'anexo' | 'etp';
+    sourceType?: 'processo' | 'anexo' | 'etp' | 'institucional';
     sourceName?: string;
     sourceLabel?: string;
   }>;
@@ -112,13 +112,20 @@ function normalizeQuestions(request: EtpSuggestionRequest) {
     : [];
 }
 
+type ContextSnippet = NonNullable<EtpSuggestionRequest['contextSnippets']>[number];
+
+function isInstitutionalSnippet(snippet: ContextSnippet) {
+  return snippet.kind === 'institucional' || snippet.sourceType === 'institucional';
+}
+
 function buildPrompt(request: EtpSuggestionRequest, questions: EtpQuestion[]) {
-  const snippets = request.contextSnippets || [];
+  const snippets = (request.contextSnippets || []).filter((snippet) => !isInstitutionalSnippet(snippet));
 
   return [
     'Voce e um assistente especializado em contratacoes publicas brasileiras.',
     'Sugira respostas para o questionario de Estudo Tecnico Preliminar de servicos continuos.',
-    'Use somente os trechos-fonte fornecidos. Eles podem vir do processo ou de anexos opcionais ja convertidos em texto. Nao invente informacao ausente.',
+    'Use somente os trechos-fonte fornecidos. Eles podem vir do processo ou de anexos tecnicos opcionais ja convertidos em texto. Nao invente informacao ausente.',
+    'Contexto institucional da unidade demandante nao deve ser usado para sugerir respostas com fonte explicita.',
     'Se nao houver fonte suficiente para uma pergunta, retorne status "unanswered".',
     'Quando a fonte for anexo sem pagina, retorne sourceType "anexo" e preserve sourceLabel.',
     'Responda apenas JSON valido no formato:',
@@ -126,7 +133,7 @@ function buildPrompt(request: EtpSuggestionRequest, questions: EtpQuestion[]) {
     `Processo: ${JSON.stringify(request.processo || {})}`,
     `Objeto informado manualmente: ${request.manualObject || ''}`,
     `Perguntas: ${JSON.stringify(questions)}`,
-    `Trechos de apoio: ${JSON.stringify(snippets)}`,
+    `Trechos tecnicos do processo/anexos: ${JSON.stringify(snippets)}`,
   ].join('\n\n');
 }
 
@@ -270,10 +277,12 @@ Deno.serve(async (request) => {
       });
     }
 
-    if (!body.contextSnippets?.length) {
+    const evidenceSnippets = (body.contextSnippets || []).filter((snippet) => !isInstitutionalSnippet(snippet));
+
+    if (!evidenceSnippets.length) {
       return jsonResponse({
         status: 'generated',
-        warnings: ['Nao ha trechos de apoio para sugerir respostas com fonte explicita.'],
+        warnings: ['Nao ha trechos tecnicos de processo ou anexo para sugerir respostas com fonte explicita.'],
         suggestions: questions.map((question) => ({ questionId: question.id, status: 'unanswered' })),
       });
     }
@@ -289,7 +298,7 @@ Deno.serve(async (request) => {
       );
     }
 
-    const prompt = buildPrompt(body, questions);
+    const prompt = buildPrompt({ ...body, contextSnippets: evidenceSnippets }, questions);
     const { content, model } = await callGeminiWithFallback(prompt, geminiApiKey, getModelCandidates());
     const parsed = parseGeminiJson(content);
     return jsonResponse(normalizeSuggestionResult(parsed, questions, model));

@@ -1,4 +1,4 @@
-export type DocumentContextSourceType = 'processo' | 'anexo' | 'etp';
+export type DocumentContextSourceType = 'processo' | 'anexo' | 'etp' | 'institucional';
 
 export type DocumentContextSnippet = {
   id: string;
@@ -14,6 +14,7 @@ export type DocumentContextSnippet = {
 export function contextSnippetSourceLabel(snippet: Pick<DocumentContextSnippet, 'label' | 'sourceName' | 'sourceLabel' | 'sourceType'>) {
   if (snippet.sourceLabel?.trim()) return snippet.sourceLabel.trim();
   if (snippet.sourceName?.trim()) return snippet.sourceName.trim();
+  if (snippet.sourceType === 'institucional') return 'Contexto institucional';
   if (snippet.sourceType === 'etp') return 'ETP editado no editor';
   if (snippet.sourceType === 'anexo') return 'Anexo do ETP';
   return snippet.label || 'Trecho de apoio';

@@ -59,6 +59,12 @@ import {
 } from '@/lib/referenceTermQuestionnaire';
 import { type ReferenceTermPdfAnalysis } from '@/lib/referenceTermProcessPdf';
 import type { DocumentContextSnippet } from '@/lib/documentContextSnippets';
+import {
+  buildEtpInstitutionalContextSnippet,
+  defaultEtpInstitutionalContextId,
+  getEtpInstitutionalContextById,
+  isEtpInstitutionalContextSnippet,
+} from '@/lib/etpInstitutionalContexts';
 import { type PreliminaryStudyPdfAnalysis } from '@/lib/preliminaryStudyProcessPdf';
 import {
   analyzePreliminaryStudySupplementalAttachmentFile,
@@ -1394,9 +1400,20 @@ export default function EditorDocumentos() {
   const isContractDocument = activeDocumentId === 'contrato-servico-ifrn';
   const isReferenceTermDocument = activeDocumentId === 'termo-referencia-compras';
   const isPreliminaryStudyDocument = activeDocumentId === 'estudo-tecnico-preliminar-servicos-continuos';
+  const etpInstitutionalContext = useMemo(
+    () => getEtpInstitutionalContextById(defaultEtpInstitutionalContextId),
+    [],
+  );
+  const etpInstitutionalSnippet = useMemo(
+    () => (etpInstitutionalContext ? buildEtpInstitutionalContextSnippet(etpInstitutionalContext) : null),
+    [etpInstitutionalContext],
+  );
   const preliminaryStudySupplementalSnippets = useMemo(
-    () => preliminaryStudySupplementalAnalyses.flatMap((analysis) => analysis.snippets),
-    [preliminaryStudySupplementalAnalyses],
+    () => [
+      ...preliminaryStudySupplementalAnalyses.flatMap((analysis) => analysis.snippets),
+      ...(etpInstitutionalSnippet ? [etpInstitutionalSnippet] : []),
+    ],
+    [etpInstitutionalSnippet, preliminaryStudySupplementalAnalyses],
   );
 
   const {
@@ -2498,7 +2515,11 @@ export default function EditorDocumentos() {
       setFeedbackTone(options.tone || 'neutral');
     }
 
-    if (options?.trySuggestions && ((pending.analysis?.snippets.length || 0) + (pending.supplementalSnippets?.length || 0)) > 0) {
+    const suggestionSnippetCount =
+      (pending.analysis?.snippets.length || 0) +
+      (pending.supplementalSnippets?.filter((snippet) => !isEtpInstitutionalContextSnippet(snippet)).length || 0);
+
+    if (options?.trySuggestions && suggestionSnippetCount > 0) {
       setScreenState('resolving');
       try {
         const suggestionResult = await preliminaryStudiesService.suggestQuestionnaireAnswers({
@@ -2572,7 +2593,7 @@ export default function EditorDocumentos() {
             ? 'Este processo ainda nao possui PDF sincronizado. O ETP sera montado pelo questionario manual.'
             : 'Preencha o questionario do ETP com base no objeto informado.',
           tone: processo ? 'warning' : 'neutral',
-          trySuggestions: supplementalSnippets.length > 0,
+          trySuggestions: supplementalSnippets.some((snippet) => !isEtpInstitutionalContextSnippet(snippet)),
         },
       );
       return;
@@ -2591,7 +2612,7 @@ export default function EditorDocumentos() {
           {
             notice: analysis.warnings[0] || 'O PDF do processo nao trouxe texto pesquisavel. O ETP sera montado pelo questionario manual.',
             tone: 'warning',
-            trySuggestions: supplementalSnippets.length > 0,
+            trySuggestions: supplementalSnippets.some((snippet) => !isEtpInstitutionalContextSnippet(snippet)),
           },
         );
         return;
@@ -2618,7 +2639,7 @@ export default function EditorDocumentos() {
         {
           notice: `${message} O questionario manual do ETP continua disponivel.`,
           tone: 'warning',
-          trySuggestions: supplementalSnippets.length > 0,
+          trySuggestions: supplementalSnippets.some((snippet) => !isEtpInstitutionalContextSnippet(snippet)),
         },
       );
     }
@@ -3181,7 +3202,7 @@ export default function EditorDocumentos() {
                           <div>
                             <p className="font-ui text-xs font-semibold text-text-primary">Anexos auxiliares opcionais</p>
                             <p className="mt-1 font-ui text-xs leading-5 text-text-secondary">
-                              PDF, planilhas, CSV, TXT, MD e DOCX sao lidos localmente; apenas trechos extraidos vao para a IA.
+                              Insira PDFs, planilhas, CSV, TXT, ou DOCX
                             </p>
                           </div>
                           <Button

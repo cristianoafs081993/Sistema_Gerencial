@@ -329,7 +329,7 @@ Observacao:
 Uso:
 
 - geracao assistida do Estudo Tecnico Preliminar para servicos continuos no Editor de Documentos
-- recebe metadados do processo SUAP quando disponiveis, objeto digitado manualmente, questionario fixo do ETP, respostas ou pulos do usuario, trechos relevantes do PDF sincronizado e snippets auxiliares extraidos localmente de anexos opcionais PDF, XLSX, XLS, ODS, CSV, TXT, MD e DOCX
+- recebe metadados do processo SUAP quando disponiveis, objeto digitado manualmente, questionario fixo do ETP, respostas ou pulos do usuario, trechos relevantes do PDF sincronizado, snippets auxiliares extraidos localmente de anexos opcionais PDF, XLSX, XLS, ODS, CSV, TXT, MD e DOCX e contexto institucional do campus com `sourceType: "institucional"`
 
 Chamador:
 
@@ -350,14 +350,14 @@ Observacao:
 - a function devolve HTML editavel, secoes copiaveis, campos, alertas e pendencias; se nao houver chave Gemini, monta um fallback local com as respostas e pendencias recebidas
 - se a chamada a function falhar no frontend por indisponibilidade, CORS ou function ainda nao publicada, `preliminaryStudiesService` monta o mesmo tipo de rascunho por fallback local para nao bloquear o usuario
 - a versao atual nao usa modelo DOCX para o ETP, nao grava rascunhos no banco, nao persiste anexos auxiliares e nao faz OCR de PDF escaneado
-- snippets auxiliares chegam com `sourceType: "anexo"` e podem trazer `sourceName`, `sourceLabel`, `pageNumber` opcional, `kind` e `excerpt`; arquivos brutos nunca sao enviados para a function
+- snippets auxiliares chegam com `sourceType: "anexo"` e podem trazer `sourceName`, `sourceLabel`, `pageNumber` opcional, `kind` e `excerpt`; arquivos brutos nunca sao enviados para a function; contexto institucional chega separado como apoio de redacao e nunca deve ser citado como anexo, fonte, referencia ou trecho textual
 
 ## 7F. Edge Function `sugerir-respostas-etp-servicos-continuos`
 
 Uso:
 
 - pre-preenchimento assistido do questionario fixo do ETP de servicos continuos
-- chama Gemini antes da etapa manual para sugerir respostas com fonte explicita no PDF do processo ou em snippets auxiliares extraidos localmente
+- chama Gemini antes da etapa manual para sugerir respostas com fonte explicita no PDF do processo ou em snippets auxiliares tecnicos extraidos localmente
 
 Chamador:
 
@@ -377,7 +377,7 @@ Dependencias externas:
 Observacao:
 
 - sugestoes sem `sourceExcerpt`, `justification` e `value` sao descartadas e tratadas como pendentes; fontes de processo devem trazer `sourcePage`, enquanto anexos sem pagina podem usar `sourceType: "anexo"` com `sourceLabel`
-- snippets auxiliares podem apoiar respostas, mas entram apenas como texto extraido pelo frontend; anexos locais nao sao persistidos nem enviados brutos
+- snippets auxiliares podem apoiar respostas, mas entram apenas como texto extraido pelo frontend; anexos locais nao sao persistidos nem enviados brutos; contexto institucional e filtrado deste fluxo porque nao deve virar resposta com fonte explicita
 - quando nao houver trechos do PDF ou quando a function nao responder, o fluxo segue pelo questionario manual
 
 ## 7G. Edge Function `gerar-texto-etp-secao`
@@ -385,7 +385,7 @@ Observacao:
 Uso:
 
 - geracao assistida de texto para uma secao individual do questionario fixo do ETP de servicos continuos
-- recebe a pergunta atual, notas digitadas pelo usuario quando houver, objeto manual, metadados do processo, respostas ja registradas, trechos do PDF sincronizado e snippets auxiliares de anexos locais opcionais
+- recebe a pergunta atual, notas digitadas pelo usuario quando houver, objeto manual, metadados do processo, respostas ja registradas, trechos do PDF sincronizado, snippets auxiliares de anexos locais opcionais e contexto institucional do campus para pano de fundo
 - pode gerar texto mesmo quando `userNotes` vier vazio; dados concretos ausentes devem ser marcados como pendencia, sem inventar numeros, datas, valores ou fatos
 
 Chamador:

@@ -961,10 +961,18 @@ describe('EditorDocumentos', () => {
       expect(mockedPreliminaryStudiesService.generateDraft).toHaveBeenCalledWith(
         expect.objectContaining({
           manualObject: 'Contratacao de servicos continuos de limpeza predial',
+          supplementalSnippets: expect.arrayContaining([
+            expect.objectContaining({
+              kind: 'institucional',
+              sourceType: 'institucional',
+              label: 'Contexto institucional - Campus Currais Novos',
+            }),
+          ]),
         }),
       );
     });
 
+    expect(mockedPreliminaryStudiesService.suggestQuestionnaireAnswers).not.toHaveBeenCalled();
     expect(await screen.findByText('ETP gerado.')).toBeInTheDocument();
     expect(screen.getByTestId('editor-content')).toHaveTextContent('<h1>ETP gerado</h1>');
     expect(screen.getByRole('button', { name: /Prosseguir para Termo de Referencia/i })).toBeInTheDocument();

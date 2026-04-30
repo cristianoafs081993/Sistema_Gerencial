@@ -42,7 +42,7 @@ type EtpRequest = {
     label: string;
     pageNumber?: number;
     excerpt: string;
-    sourceType?: 'processo' | 'anexo' | 'etp';
+    sourceType?: 'processo' | 'anexo' | 'etp' | 'institucional';
     sourceName?: string;
     sourceLabel?: string;
   }>;
@@ -127,6 +127,20 @@ function escapeHtml(value: string) {
 
 function collapseSpaces(value?: string | null) {
   return (value || '').replace(/\s+/g, ' ').trim();
+}
+
+type ContextSnippet = NonNullable<EtpRequest['contextSnippets']>[number];
+
+function isInstitutionalSnippet(snippet: ContextSnippet) {
+  return snippet.kind === 'institucional' || snippet.sourceType === 'institucional';
+}
+
+function splitContextSnippets(request: EtpRequest) {
+  const snippets = request.contextSnippets || [];
+  return {
+    institutionalSnippets: snippets.filter(isInstitutionalSnippet),
+    evidenceSnippets: snippets.filter((snippet) => !isInstitutionalSnippet(snippet)),
+  };
 }
 
 function normalizeQuestions(request: EtpRequest) {
@@ -248,11 +262,16 @@ function normalizeAiResult(raw: Record<string, unknown>, fallbackSections: EtpSe
 }
 
 function buildPrompt(request: EtpRequest, questions: EtpQuestion[], fallbackSections: EtpSection[]) {
+  const { institutionalSnippets, evidenceSnippets } = splitContextSnippets(request);
+
   return [
     'Voce e um assistente especializado em contratacoes publicas brasileiras.',
     'Gere um rascunho de Estudo Tecnico Preliminar para servicos continuos sob a Lei 14.133/2021 e IN SEGES 58/2022.',
-    'Use somente respostas do questionario, objeto manual e trechos fornecidos. Os trechos podem vir do processo ou de anexos opcionais ja convertidos em texto pelo frontend. Nao invente dados ausentes.',
-    'Quando usar anexo, preserve a referencia do arquivo/pagina indicada em sourceName, sourceLabel ou pageNumber.',
+    'Use respostas do questionario, objeto manual, trechos tecnicos do processo/anexos e contexto institucional de apoio. Nao invente dados ausentes.',
+    'Os trechos institucionais descrevem a unidade demandante. Use-os apenas como pano de fundo natural quando ajudarem a explicar escala, logistica regional, continuidade dos servicos, publico atendido ou impacto local.',
+    'O contexto institucional nao e fonte principal para requisitos tecnicos, quantitativos, estimativa de valor, parcelamento ou conclusao. Nesses pontos, use respostas do questionario, processo, anexos tecnicos ou marque pendencia quando faltar dado.',
+    'Nunca cite contexto institucional como anexo, fonte, referencia, trecho, texto fornecido ou texto entre colchetes. Nao escreva "Conforme anexo" nem "Conforme detalhado no anexo" para esse contexto.',
+    'Quando usar anexo tecnico nao institucional, preserve a referencia do arquivo/pagina indicada em sourceName, sourceLabel ou pageNumber.',
     'Quando faltar informacao, escreva [CAMPO PENDENTE: ...].',
     'Preserve linguagem formal, objetiva e adequada a ETP. A saida sera revisada por servidor.',
     'Responda apenas JSON valido no formato:',
@@ -261,7 +280,8 @@ function buildPrompt(request: EtpRequest, questions: EtpQuestion[], fallbackSect
     `Objeto manual: ${request.manualObject || ''}`,
     `Perguntas: ${JSON.stringify(questions)}`,
     `Respostas: ${JSON.stringify(request.questionnaireAnswers || [])}`,
-    `Trechos de apoio: ${JSON.stringify(request.contextSnippets || [])}`,
+    `Contexto institucional de apoio: ${JSON.stringify(institutionalSnippets)}`,
+    `Trechos tecnicos do processo/anexos: ${JSON.stringify(evidenceSnippets)}`,
     `Estrutura minima esperada: ${JSON.stringify(fallbackSections.map(({ id, title }) => ({ id, title })))}`,
   ].join('\n\n');
 }

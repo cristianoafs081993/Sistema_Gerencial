@@ -1,5 +1,6 @@
 import { analyzePreliminaryStudyPdfFromArrayBuffer, type PreliminaryStudyPdfAnalysis } from '@/lib/preliminaryStudyProcessPdf';
 import type { DocumentContextSnippet } from '@/lib/documentContextSnippets';
+import { isEtpInstitutionalContextSnippet } from '@/lib/etpInstitutionalContexts';
 import {
   getPreliminaryStudyMissingRequiredFields,
   normalizePreliminaryStudyAnswerValue,
@@ -91,10 +92,22 @@ function answerValue(answer?: PreliminaryStudyQuestionAnswer) {
   return normalizePreliminaryStudyAnswerValue(answer.value);
 }
 
+function limitContextText(value: string, maxLength = 650) {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength).replace(/\s+\S*$/, '').trim()}...`;
+}
+
+function isInstitutionalSnippet(snippet: DocumentContextSnippet) {
+  return isEtpInstitutionalContextSnippet(snippet) || snippet.sourceType === 'institucional';
+}
+
 function findRelevantContextExcerpt(params: GeneratePreliminaryStudyQuestionTextParams) {
   const questionId = params.question.id.toLowerCase();
   const title = params.question.title.toLowerCase();
-  const snippets = [...(params.analysis?.snippets || []), ...(params.supplementalSnippets || [])];
+  const snippets = [
+    ...(params.analysis?.snippets || []),
+    ...(params.supplementalSnippets || []).filter((snippet) => !isInstitutionalSnippet(snippet)),
+  ];
   const matchingSnippet = snippets.find((snippet) => {
     const kind = snippet.kind.toLowerCase();
     const label = snippet.label.toLowerCase();
@@ -104,33 +117,42 @@ function findRelevantContextExcerpt(params: GeneratePreliminaryStudyQuestionText
   return matchingSnippet?.excerpt ? normalizePreliminaryStudyAnswerValue(matchingSnippet.excerpt) : '';
 }
 
+function findInstitutionalContextExcerpt(params: Pick<GeneratePreliminaryStudyParams, 'supplementalSnippets'>) {
+  const snippet = params.supplementalSnippets?.find(isInstitutionalSnippet);
+  return snippet?.excerpt ? limitContextText(normalizePreliminaryStudyAnswerValue(snippet.excerpt)) : '';
+}
+
 function buildLocalQuestionText(params: GeneratePreliminaryStudyQuestionTextParams, warning?: string): PreliminaryStudyQuestionTextResult {
   const objectValue = normalizePreliminaryStudyAnswerValue(
     params.manualObject || params.processo?.assunto || 'objeto da contratacao a ser detalhado',
   );
   const notes = normalizePreliminaryStudyAnswerValue(params.userNotes || '');
   const contextExcerpt = findRelevantContextExcerpt(params);
+  const institutionalContext = findInstitutionalContextExcerpt(params);
   const baseContext = notes || contextExcerpt || objectValue;
+  const institutionalSupport = institutionalContext
+    ? `Como pano de fundo da unidade demandante, considere o contexto institucional do campus: ${institutionalContext}.`
+    : '';
   const pendingMarker = `[CAMPO PENDENTE: ${params.question.title}]`;
 
   const sectionTemplates: Record<string, string> = {
-    necessidade: `A necessidade da contratacao deve ser registrada a partir do atendimento continuo da demanda administrativa relacionada a ${objectValue}. ${baseContext ? `Como ponto de partida para revisao, considera-se: ${baseContext}.` : ''} ${pendingMarker}`,
-    alinhamento: `A contratacao deve ser vinculada ao planejamento institucional aplicavel e aos instrumentos de governanca de contratacoes. ${baseContext ? `Informacao inicial considerada: ${baseContext}.` : ''} ${pendingMarker}`,
-    requisitos: `Os requisitos da solucao devem observar a natureza continua do servico, os padroes minimos de qualidade, as condicoes de execucao, a fiscalizacao contratual e as obrigacoes da contratada. ${baseContext ? `Referencia inicial: ${baseContext}.` : ''}`,
-    quantitativos: `Os quantitativos devem ser definidos com base na demanda estimada, historico de consumo, locais de execucao, frequencia dos servicos e parametros tecnicos aplicaveis. ${baseContext ? `Informacao inicial considerada: ${baseContext}.` : ''} ${pendingMarker}`,
-    mercado: `O levantamento de mercado deve comparar alternativas capazes de atender a necessidade administrativa, incluindo modelos de execucao, praticas usuais para servicos continuos e eventuais ganhos de eficiencia. ${baseContext ? `Ponto de partida: ${baseContext}.` : ''}`,
-    estimativa: `A estimativa de valor deve ser demonstrada por pesquisa de precos idonea e memoria de calculo compativel com os quantitativos e requisitos da contratacao. ${baseContext ? `Informacao inicial considerada: ${baseContext}.` : ''} ${pendingMarker}`,
-    solucao: `A solucao proposta deve descrever, de forma integrada, como a contratacao atendera a necessidade identificada para ${objectValue}, considerando escopo, forma de execucao, vigencia e mecanismos de acompanhamento. ${baseContext ? `Referencia inicial: ${baseContext}.` : ''}`,
-    parcelamento: `A analise de parcelamento deve avaliar a viabilidade tecnica e economica da divisao do objeto, indicando se o parcelamento amplia a competitividade sem prejudicar a eficiencia, a padronizacao e a gestao contratual. ${baseContext ? `Informacao inicial considerada: ${baseContext}.` : ''} ${pendingMarker}`,
-    resultados: `Os resultados pretendidos devem indicar os beneficios esperados com a contratacao, como continuidade operacional, melhoria da qualidade do servico, reducao de riscos administrativos e atendimento adequado ao interesse publico. ${baseContext ? `Ponto de partida: ${baseContext}.` : ''}`,
-    providencias: `As providencias previas devem registrar medidas necessarias antes da contratacao, como ajustes de fiscalizacao, definicao de rotinas, verificacao de disponibilidade orcamentaria e preparacao da equipe responsavel. ${baseContext ? `Informacao inicial considerada: ${baseContext}.` : ''}`,
-    correlatas: `Devem ser verificadas contratacoes correlatas ou interdependentes que possam influenciar o escopo, a execucao, os quantitativos ou a estrategia de contratacao. ${baseContext ? `Referencia inicial: ${baseContext}.` : ''}`,
-    ambientais: `Os impactos ambientais e criterios de sustentabilidade devem ser avaliados conforme a natureza do servico, incluindo uso racional de recursos, reducao de residuos, exigencias de materiais adequados e boas praticas de execucao. ${baseContext ? `Informacao inicial considerada: ${baseContext}.` : ''}`,
-    conclusao: `Com base nas informacoes preliminares, a viabilidade da contratacao deve ser concluida apos confirmacao da necessidade, dos quantitativos, da estimativa de valor, da estrategia de parcelamento e dos demais requisitos legais. ${baseContext ? `Ponto de partida: ${baseContext}.` : ''} ${pendingMarker}`,
+    necessidade: `A necessidade da contratacao deve ser registrada a partir do atendimento continuo da demanda administrativa relacionada a ${objectValue}. ${institutionalSupport} ${baseContext ? `Como ponto de partida para revisao, considera-se: ${baseContext}.` : ''} ${pendingMarker}`,
+    alinhamento: `A contratacao deve ser vinculada ao planejamento institucional aplicavel e aos instrumentos de governanca de contratacoes. ${institutionalSupport} ${baseContext ? `Informacao inicial considerada: ${baseContext}.` : ''} ${pendingMarker}`,
+    requisitos: `Os requisitos da solucao devem observar a natureza continua do servico, os padroes minimos de qualidade, as condicoes de execucao, a fiscalizacao contratual e as obrigacoes da contratada. ${institutionalSupport} ${baseContext ? `Informacao inicial considerada: ${baseContext}.` : ''}`,
+    quantitativos: `Os quantitativos devem ser definidos com base na demanda estimada, historico de consumo, locais de execucao, frequencia dos servicos e parametros tecnicos aplicaveis. ${institutionalSupport} ${baseContext ? `Informacao inicial considerada: ${baseContext}.` : ''} ${pendingMarker}`,
+    mercado: `O levantamento de mercado deve comparar alternativas capazes de atender a necessidade administrativa, incluindo modelos de execucao, praticas usuais para servicos continuos e eventuais ganhos de eficiencia. ${institutionalSupport} ${baseContext ? `Ponto de partida: ${baseContext}.` : ''}`,
+    estimativa: `A estimativa de valor deve ser demonstrada por pesquisa de precos idonea e memoria de calculo compativel com os quantitativos e requisitos da contratacao. ${institutionalSupport} ${baseContext ? `Informacao inicial considerada: ${baseContext}.` : ''} ${pendingMarker}`,
+    solucao: `A solucao proposta deve descrever, de forma integrada, como a contratacao atendera a necessidade identificada para ${objectValue}, considerando escopo, forma de execucao, vigencia e mecanismos de acompanhamento. ${institutionalSupport} ${baseContext ? `Informacao inicial considerada: ${baseContext}.` : ''}`,
+    parcelamento: `A analise de parcelamento deve avaliar a viabilidade tecnica e economica da divisao do objeto, indicando se o parcelamento amplia a competitividade sem prejudicar a eficiencia, a padronizacao e a gestao contratual. ${institutionalSupport} ${baseContext ? `Informacao inicial considerada: ${baseContext}.` : ''} ${pendingMarker}`,
+    resultados: `Os resultados pretendidos devem indicar os beneficios esperados com a contratacao, como continuidade operacional, melhoria da qualidade do servico, reducao de riscos administrativos e atendimento adequado ao interesse publico. ${institutionalSupport} ${baseContext ? `Ponto de partida: ${baseContext}.` : ''}`,
+    providencias: `As providencias previas devem registrar medidas necessarias antes da contratacao, como ajustes de fiscalizacao, definicao de rotinas, verificacao de disponibilidade orcamentaria e preparacao da equipe responsavel. ${institutionalSupport} ${baseContext ? `Informacao inicial considerada: ${baseContext}.` : ''}`,
+    correlatas: `Devem ser verificadas contratacoes correlatas ou interdependentes que possam influenciar o escopo, a execucao, os quantitativos ou a estrategia de contratacao. ${institutionalSupport} ${baseContext ? `Informacao inicial considerada: ${baseContext}.` : ''}`,
+    ambientais: `Os impactos ambientais e criterios de sustentabilidade devem ser avaliados conforme a natureza do servico, incluindo uso racional de recursos, reducao de residuos, exigencias de materiais adequados e boas praticas de execucao. ${institutionalSupport} ${baseContext ? `Informacao inicial considerada: ${baseContext}.` : ''}`,
+    conclusao: `Com base nas informacoes preliminares, a viabilidade da contratacao deve ser concluida apos confirmacao da necessidade, dos quantitativos, da estimativa de valor, da estrategia de parcelamento e dos demais requisitos legais. ${institutionalSupport} ${baseContext ? `Ponto de partida: ${baseContext}.` : ''} ${pendingMarker}`,
   };
 
   const value = sectionTemplates[params.question.id] ||
-    `Texto preliminar para a secao "${params.question.title}". ${baseContext ? `Informacao inicial considerada: ${baseContext}.` : ''} ${pendingMarker}`;
+    `Texto preliminar para a secao "${params.question.title}". ${institutionalSupport} ${baseContext ? `Informacao inicial considerada: ${baseContext}.` : ''} ${pendingMarker}`;
 
   return {
     status: 'generated',
@@ -362,7 +384,10 @@ export const preliminaryStudiesService = {
   async suggestQuestionnaireAnswers(
     params: SuggestPreliminaryStudyQuestionnaireParams,
   ): Promise<PreliminaryStudyQuestionSuggestionResult> {
-    const payload = buildPreliminaryStudyPayload(params);
+    const payload = buildPreliminaryStudyPayload({
+      ...params,
+      supplementalSnippets: params.supplementalSnippets?.filter((snippet) => !isInstitutionalSnippet(snippet)),
+    });
 
     try {
       const { data, error } = await supabase.functions.invoke('sugerir-respostas-etp-servicos-continuos', {
