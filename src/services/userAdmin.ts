@@ -70,18 +70,36 @@ type AdminUsersAction =
 async function getAdminAccessToken() {
   const {
     data: { session },
-    error,
+    error: sessionError,
   } = await supabase.auth.getSession();
 
-  if (error) {
-    throw error;
+  if (sessionError) {
+    throw sessionError;
   }
 
   if (!session?.access_token) {
     throw new Error('Sessão ausente. Faça login novamente para administrar usuários.');
   }
 
-  return session.access_token;
+  const { error: userError } = await supabase.auth.getUser();
+  if (!userError) {
+    const {
+      data: { session: refreshedSession },
+    } = await supabase.auth.getSession();
+
+    return refreshedSession?.access_token || session.access_token;
+  }
+
+  const {
+    data: { session: nextSession },
+    error: refreshError,
+  } = await supabase.auth.refreshSession();
+
+  if (refreshError || !nextSession?.access_token) {
+    throw new Error('Sua sessao expirou. Entre novamente para administrar usuarios.');
+  }
+
+  return nextSession.access_token;
 }
 
 async function invokeAdminUsers<T>(body: AdminUsersAction) {

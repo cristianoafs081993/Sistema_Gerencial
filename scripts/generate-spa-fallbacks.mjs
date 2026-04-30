@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -48,6 +48,6 @@ for (const routePath of staticRoutes) {
   ensureStaticFallback(routePath, indexHtml);
 }
 
-cpSync(indexFile, fallback404File);
+writeFileSync(fallback404File, indexHtml);
 
 console.log(`Generated SPA fallbacks for ${staticRoutes.length} routes and dist/404.html`);

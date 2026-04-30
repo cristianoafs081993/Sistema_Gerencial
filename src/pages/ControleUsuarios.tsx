@@ -71,6 +71,7 @@ export default function ControleUsuarios() {
       const directorGroup = nextState.groups.find((group) => group.slug === 'diretores') || nextState.groups[0];
       setSelectedCreateGroupId((current) => current || directorGroup?.id || '');
       setSelectedInviteGroupId((current) => current || directorGroup?.id || '');
+      setEditingGroupId((current) => (current === 'new' && directorGroup ? directorGroup.id : current));
     } catch (error) {
       console.error(error);
       toast.error(error instanceof Error ? error.message : 'Falha ao carregar usuários e grupos.');
@@ -203,6 +204,11 @@ export default function ControleUsuarios() {
     setSelectedScreenIds((current) =>
       checked ? Array.from(new Set([...current, screenId])) : current.filter((id) => id !== screenId),
     );
+  };
+
+  const handleToggleScreen = (screen: AdminScreen) => {
+    if (selectedGroup?.isSystem && screen.isAdminOnly) return;
+    toggleScreen(screen.id, !selectedScreenIds.includes(screen.id));
   };
 
   return (
@@ -379,23 +385,33 @@ export default function ControleUsuarios() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {sortedScreens.map((screen) => (
-                        <TableRow key={screen.id}>
-                          <TableCell>
-                            <div className="font-medium text-slate-800">{screen.name}</div>
-                            <div className="text-xs text-slate-500">{screen.path}</div>
-                          </TableCell>
-                          <TableCell>{screenGroupName(state.screenGroups, screen.groupId)}</TableCell>
-                          <TableCell>
-                            <Checkbox
-                              checked={selectedScreenIds.includes(screen.id)}
-                              onCheckedChange={(checked) => toggleScreen(screen.id, checked === true)}
-                              aria-label={`screen-${screen.id}`}
-                              disabled={selectedGroup?.isSystem && screen.isAdminOnly}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {sortedScreens.map((screen) => {
+                        const isScreenDisabled = Boolean(selectedGroup?.isSystem && screen.isAdminOnly);
+                        const isScreenSelected = selectedScreenIds.includes(screen.id);
+
+                        return (
+                          <TableRow
+                            key={screen.id}
+                            className={isScreenDisabled ? 'opacity-60' : 'cursor-pointer'}
+                            onClick={() => handleToggleScreen(screen)}
+                          >
+                            <TableCell>
+                              <div className="font-medium text-slate-800">{screen.name}</div>
+                              <div className="text-xs text-slate-500">{screen.path}</div>
+                            </TableCell>
+                            <TableCell>{screenGroupName(state.screenGroups, screen.groupId)}</TableCell>
+                            <TableCell>
+                              <Checkbox
+                                checked={isScreenSelected}
+                                onCheckedChange={(checked) => toggleScreen(screen.id, checked === true)}
+                                aria-label={`screen-${screen.id}`}
+                                disabled={isScreenDisabled}
+                                onClick={(event) => event.stopPropagation()}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
