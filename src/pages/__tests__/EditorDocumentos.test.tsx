@@ -1075,6 +1075,12 @@ describe('EditorDocumentos', () => {
     fireEvent.click(screen.getByRole('button', { name: /Gerar ETP/i }));
 
     expect(await screen.findByText('Questionario do ETP')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Explique a necessidade administrativa que justifica a contratacao do servico continuo.'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Use o DFD, a justificativa do processo ou a descricao do problema a resolver. Nao descreva apenas o objeto.'),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Gerar texto com IA/i }));
 
     expect(

@@ -1199,7 +1199,7 @@ function PreliminaryStudyQuestionCard({
 
   return (
     <div className="space-y-4 rounded-radius-xl border border-border-default bg-surface-card p-4">
-      <div className="space-y-2">
+      <div>
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-ui text-sm font-semibold text-text-primary">{question.title}</p>
           {question.required ? (
@@ -1208,15 +1208,13 @@ function PreliminaryStudyQuestionCard({
             </Badge>
           ) : null}
         </div>
-        <p className="font-ui text-sm leading-6 text-text-secondary">{question.prompt}</p>
-        <p className="font-ui text-xs leading-5 text-text-muted">{question.guidance}</p>
       </div>
 
       <Textarea
         value={value}
         onChange={(event) => setValue(event.target.value)}
         placeholder={question.placeholder}
-        className="min-h-[132px] resize-none rounded-radius-lg border-border-default bg-surface-subtle/35 text-sm text-text-primary"
+        className="min-h-[240px] resize-y rounded-radius-lg border-border-default bg-surface-subtle/35 text-sm text-text-primary"
       />
       {generationError ? (
         <p className="font-ui text-xs leading-5 text-warning">{generationError}</p>
@@ -3513,7 +3511,7 @@ export default function EditorDocumentos() {
         }}
       >
         <DialogContent
-          className="grid max-h-[calc(100dvh-2rem)] w-[min(94vw,760px)] max-w-none grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden border-border-default bg-surface-card p-0 shadow-xl"
+          className="grid max-h-[calc(100dvh-1rem)] w-[min(96vw,980px)] max-w-none grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden border-border-default bg-surface-card p-0 shadow-xl"
           onInteractOutside={(event) => event.preventDefault()}
           onEscapeKeyDown={(event) => event.preventDefault()}
         >
