@@ -1,5 +1,5 @@
 ﻿import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Pencil, Search, Filter, Calendar, Upload, FileSpreadsheet, Loader2, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, Layers, X } from 'lucide-react';
+import { Plus, Pencil, Search, Filter, Calendar, Upload, FileSpreadsheet, Loader2, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, Layers, X, Star } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Empenho, DIMENSOES, COMPONENTES_POR_DIMENSAO } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { splitCsvLine } from '@/utils/csvParser';
 import { getRapReferenceYear, isRapReinscrito } from '@/utils/rapMetrics';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserFavorites } from '@/services/userFavorites';
 import { filterEmpenhos, getRapBase, getRapLiquidado, getRapSaldo } from './empenhosFilters';
 
 type SiafiImportMode = 'empenhos' | 'rap-saldo';
@@ -75,6 +76,8 @@ export default function Empenhos() {
   const [dataFim, setDataFim] = useState('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [activeTab, setActiveTab] = useState('execucao');
+  const [favoritesFilter, setFavoritesFilter] = useState<'all' | 'favorites'>('all');
+  const { favoriteIdsByType, isFavorite, toggleFavorite, isPending: isFavoritePending } = useUserFavorites();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
@@ -92,8 +95,12 @@ export default function Empenhos() {
   const origensUnicas = Array.from(new Set(empenhos.map(e => e.origemRecurso?.trim()).filter(Boolean))).sort();
   const planosUnicos = Array.from(new Set(empenhos.map(e => e.planoInterno?.trim()).filter(Boolean))).sort();
   const filteredEmpenhos = useMemo(
-    () =>
-      filterEmpenhos(empenhos, {
+    () => {
+      const baseEmpenhos = favoritesFilter === 'favorites'
+        ? empenhos.filter((empenho) => favoriteIdsByType.empenho.has(empenho.id))
+        : empenhos;
+
+      return filterEmpenhos(baseEmpenhos, {
         searchTerm,
         filterStatus,
         filterDimensao,
@@ -102,9 +109,12 @@ export default function Empenhos() {
         filterPlanoInterno,
         dataInicio,
         dataFim,
-      }),
+      });
+    },
     [
       empenhos,
+      favoriteIdsByType,
+      favoritesFilter,
       searchTerm,
       filterStatus,
       filterDimensao,
@@ -553,6 +563,25 @@ export default function Empenhos() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="inline-flex h-10 overflow-hidden rounded-xl border border-border-default bg-white shadow-sm">
+              <Button
+                type="button"
+                variant={favoritesFilter === 'all' ? 'default' : 'ghost'}
+                className="h-10 rounded-none px-4 text-xs font-semibold"
+                onClick={() => setFavoritesFilter('all')}
+              >
+                Todos
+              </Button>
+              <Button
+                type="button"
+                variant={favoritesFilter === 'favorites' ? 'default' : 'ghost'}
+                className="h-10 rounded-none px-4 text-xs font-semibold"
+                onClick={() => setFavoritesFilter('favorites')}
+              >
+                <Star className="h-3.5 w-3.5" />
+                Favoritos
+              </Button>
+            </div>
             <Button
               variant={showAdvancedFilters ? "secondary" : "outline"}
               onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
@@ -642,6 +671,7 @@ export default function Empenhos() {
                       setDataInicio('');
                       setDataFim('');
                       setSearchTerm('');
+                      setFavoritesFilter('all');
                     }}
                     className="h-10 w-10 hover:bg-red-50 hover:text-red-500 transition-colors"
                   >
@@ -665,6 +695,9 @@ export default function Empenhos() {
             empenhos={filteredEmpenhos.filter(e => e.tipo === 'exercicio' || (!e.tipo && e.numero.includes(String(new Date().getFullYear()))))}
             type="execucao"
             handleOpenDialog={handleOpenDialog}
+            isFavorite={isFavorite}
+            toggleFavorite={toggleFavorite}
+            isFavoritePending={isFavoritePending}
             isLoading={isLoading}
           />
         </TabsContent>
@@ -674,6 +707,9 @@ export default function Empenhos() {
             empenhos={filteredEmpenhos.filter(e => e.tipo === 'rap' || (!e.tipo && !e.numero.includes(String(new Date().getFullYear()))))}
             type="restos"
             handleOpenDialog={handleOpenDialog}
+            isFavorite={isFavorite}
+            toggleFavorite={toggleFavorite}
+            isFavoritePending={isFavoritePending}
             isLoading={isLoading}
           />
         </TabsContent>
@@ -694,12 +730,18 @@ function EmpenhoRow({
   empenho,
   type,
   handleOpenDialog,
+  isFavorite,
+  toggleFavorite,
+  isFavoritePending,
   rapReferenceYear,
   isChild = false
 }: {
   empenho: Empenho;
   type: 'execucao' | 'restos';
   handleOpenDialog: (e: Empenho) => void;
+  isFavorite: (entityType: 'empenho', entityId: string) => boolean;
+  toggleFavorite: (entityType: 'empenho', entityId: string) => Promise<unknown>;
+  isFavoritePending?: boolean;
   rapReferenceYear: number;
   isChild?: boolean;
 }) {
@@ -707,6 +749,7 @@ function EmpenhoRow({
   const rapSaldoAtual = type === 'restos' ? getRapSaldo(empenho, rapReferenceYear) : 0;
   const rapLiquidadoNoAno = type === 'restos' ? getRapLiquidado(empenho) : 0;
   const rapBaseLabel = isRapReinscrito(empenho, rapReferenceYear) ? 'Reinscrito' : 'Inscrito';
+  const favorite = isFavorite('empenho', empenho.id);
 
   return (
     <TableRow className={`hover:bg-slate-50/80 transition-colors border-b border-border-default/50 ${isChild ? 'bg-slate-50/30' : ''}`}>
@@ -804,6 +847,24 @@ function EmpenhoRow({
 
       <TableCell className="py-4 px-6 align-top whitespace-nowrap">
         <div className="flex items-center justify-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={favorite ? `Remover empenho ${empenho.numero} dos favoritos` : `Favoritar empenho ${empenho.numero}`}
+                className={`h-8 w-8 ${favorite ? 'text-amber-500 hover:text-amber-600' : 'text-muted-foreground hover:text-amber-500'} hover:bg-amber-50`}
+                disabled={isFavoritePending}
+                onClick={() => {
+                  void toggleFavorite('empenho', empenho.id);
+                }}
+              >
+                <Star className={`h-4 w-4 ${favorite ? 'fill-current' : ''}`} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{favorite ? 'Remover dos favoritos' : 'Favoritar empenho'}</TooltipContent>
+          </Tooltip>
           <Button
             variant="ghost"
             size="icon"
@@ -819,10 +880,13 @@ function EmpenhoRow({
 }
 
 // Extracted Component for Table Reuse inside Tabs
-function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
+function EmpenhosTable({ empenhos, type, handleOpenDialog, isFavorite, toggleFavorite, isFavoritePending, isLoading }: {
   empenhos: Empenho[],
   type: 'execucao' | 'restos',
   handleOpenDialog: (e: Empenho) => void,
+  isFavorite: (entityType: 'empenho', entityId: string) => boolean,
+  toggleFavorite: (entityType: 'empenho', entityId: string) => Promise<unknown>,
+  isFavoritePending?: boolean,
   isLoading?: boolean
 }) {
   const [sortKey, setSortKey] = useState<string>('numero');
@@ -912,7 +976,7 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
       return sortDir === 'asc' ? (valA as number) - (valB as number) : (valB as number) - (valA as number);
     });
     return sorted;
-  }, [processData, sortKey, sortDir, type]);
+  }, [processData, rapReferenceYear, sortKey, sortDir, type]);
 
   const totalRecords = sortedData.length;
   const totalPages = Math.ceil(totalRecords / perPage);
@@ -1048,13 +1112,34 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isLoading }: {
                           <TableCell className="py-4 px-6 text-center"></TableCell>
                         </TableRow>
                         {isExpanded && row.items.map(empenho => (
-                          <EmpenhoRow key={empenho.id} empenho={empenho} type={type} handleOpenDialog={handleOpenDialog} rapReferenceYear={rapReferenceYear} isChild />
+                          <EmpenhoRow
+                            key={empenho.id}
+                            empenho={empenho}
+                            type={type}
+                            handleOpenDialog={handleOpenDialog}
+                            isFavorite={isFavorite}
+                            toggleFavorite={toggleFavorite}
+                            isFavoritePending={isFavoritePending}
+                            rapReferenceYear={rapReferenceYear}
+                            isChild
+                          />
                         ))}
                       </Fragment>
                     );
                   } else {
                     const singleRow = row as { isGroup: false; item: Empenho };
-                    return <EmpenhoRow key={singleRow.item.id} empenho={singleRow.item} type={type} handleOpenDialog={handleOpenDialog} rapReferenceYear={rapReferenceYear} />;
+                    return (
+                      <EmpenhoRow
+                        key={singleRow.item.id}
+                        empenho={singleRow.item}
+                        type={type}
+                        handleOpenDialog={handleOpenDialog}
+                        isFavorite={isFavorite}
+                        toggleFavorite={toggleFavorite}
+                        isFavoritePending={isFavoritePending}
+                        rapReferenceYear={rapReferenceYear}
+                      />
+                    );
                   }
                 })
               )}

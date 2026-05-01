@@ -81,6 +81,10 @@ Observacao: esses objetos sao criados pelo SQL embutido em [normativos-pipeline/
 - `user_group_screen_permissions`
 - `user_group_memberships`
 
+### Preferencias de usuario
+
+- `user_favorites`
+
 ## Views identificadas nas migrations
 
 - `vw_conciliacao_documento_pf`

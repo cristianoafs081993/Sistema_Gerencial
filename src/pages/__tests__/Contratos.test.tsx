@@ -4,7 +4,9 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import Contratos from '@/pages/Contratos';
 import { useData } from '@/contexts/DataContext';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { contratosApiService } from '@/services/contratosApi';
+import { useUserFavorites } from '@/services/userFavorites';
 
 vi.mock('@/contexts/DataContext', () => ({
   useData: vi.fn(),
@@ -12,6 +14,10 @@ vi.mock('@/contexts/DataContext', () => ({
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ isSuperAdmin: false }),
+}));
+
+vi.mock('@/services/userFavorites', () => ({
+  useUserFavorites: vi.fn(),
 }));
 
 vi.mock('@/components/HeaderParts', () => ({
@@ -38,6 +44,14 @@ vi.mock('@/services/contratosApi', async (importOriginal) => {
 
 const mockedUseData = vi.mocked(useData);
 const mockedContratosApiService = vi.mocked(contratosApiService);
+const mockedUseUserFavorites = vi.mocked(useUserFavorites);
+
+const renderContratos = () =>
+  render(
+    <TooltipProvider>
+      <Contratos />
+    </TooltipProvider>,
+  );
 
 describe('Contratos', () => {
   beforeEach(() => {
@@ -57,6 +71,16 @@ describe('Contratos', () => {
           data_termino: new Date('2023-12-31'),
           created_at: new Date('2023-01-01'),
           updated_at: new Date('2023-01-01'),
+        },
+        {
+          id: 'contrato-local-2',
+          numero: '15/2026',
+          contratada: 'Fornecedor Comum',
+          valor: 50000,
+          data_inicio: new Date('2026-01-01'),
+          data_termino: new Date('2026-12-31'),
+          created_at: new Date('2026-01-01'),
+          updated_at: new Date('2026-01-01'),
         },
       ],
       contratosEmpenhos: [],
@@ -174,10 +198,22 @@ describe('Contratos', () => {
       ],
       faturaEmpenhos: [],
     });
+
+    mockedUseUserFavorites.mockReturnValue({
+      favorites: [],
+      favoriteIdsByType: {
+        empenho: new Set(),
+        contrato: new Set(['contrato-local-1']),
+      },
+      isLoading: false,
+      isPending: false,
+      isFavorite: (entityType, entityId) => entityType === 'contrato' && entityId === 'contrato-local-1',
+      toggleFavorite: vi.fn(),
+    });
   });
 
   it('exibe detalhes da API quando o contrato local casa por numero normalizado', async () => {
-    render(<Contratos />);
+    renderContratos();
 
     const detailsButton = await screen.findByRole('button', { name: /Detalhes/i });
     fireEvent.click(detailsButton);
@@ -188,5 +224,18 @@ describe('Contratos', () => {
 
     expect(await screen.findByText('Contrato 00062/2018')).toBeInTheDocument();
     expect(screen.getAllByText('PRESTAÇÃO DE SERVIÇOS DE APOIO ADMINISTRATIVO').length).toBeGreaterThan(0);
+  });
+
+  it('filtra contratos favoritos sem remover o acesso aos detalhes da API', async () => {
+    renderContratos();
+
+    expect(await screen.findByText('62/2018')).toBeInTheDocument();
+    expect(screen.getByText('15/2026')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Favoritos$/i }));
+
+    expect(screen.getByText('62/2018')).toBeInTheDocument();
+    expect(screen.queryByText('15/2026')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Detalhes/i })).toBeInTheDocument();
   });
 });

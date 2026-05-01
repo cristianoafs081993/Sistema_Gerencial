@@ -198,6 +198,16 @@ Observacao:
 - faturas sem item vinculado ficam em grupo separado e nao entram na execucao oficial por item
 - no modal de empenho, a secao `Liquidações da API de Contratos` nao depende dessa sincronizacao local; ela le o cache dedicado de faturas por empenho e aciona refresh em segundo plano quando necessario
 
+### Favoritos
+
+`Empenhos.tsx` / `Contratos.tsx` -> `useUserFavorites()` -> `user_favorites`
+
+Observacoes:
+
+- favoritos sao pessoais por usuario autenticado do Supabase
+- as telas exibem uma estrela por linha e um filtro `Todos/Favoritos`
+- favoritos de contratos se referem aos contratos locais em `contratos`; os dados da API de contratos continuam sendo apenas enriquecimento visual da linha
+
 ### Editor de Documentos
 
 `EditorDocumentos.tsx` -> `suapProcessosService.getAll` -> `processos`

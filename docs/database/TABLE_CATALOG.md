@@ -503,6 +503,36 @@ Observacoes operacionais:
 - a migration inicial associa usuarios existentes, exceto o superadministrador, ao grupo `Diretores`
 - escritas administrativas passam pela Edge Function `admin-users` com `SUPABASE_SERVICE_ROLE_KEY`
 
+## Preferencias de usuario
+
+### `user_favorites`
+
+Finalidade:
+
+- favoritos pessoais de empenhos e contratos por usuario autenticado
+
+Campos-chave:
+
+- `id`
+- `user_id`
+- `entity_type`: `empenho` ou `contrato`
+- `empenho_id`
+- `contrato_id`
+- `created_at`
+
+Consumido por:
+
+- [userFavorites.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/userFavorites.ts)
+- [Empenhos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Empenhos.tsx)
+- [Contratos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Contratos.tsx)
+
+Observacoes operacionais:
+
+- a RLS permite que cada usuario leia, insira e remova apenas os proprios favoritos
+- o `CHECK` da tabela garante que favoritos de empenho usem somente `empenho_id` e favoritos de contrato usem somente `contrato_id`
+- FKs com `ON DELETE CASCADE` removem favoritos quando o empenho ou contrato local deixa de existir
+- contratos favoritos sempre se referem a `contratos`; dados de `contratos_api*` apenas enriquecem a linha exibida
+
 ## Automacoes e economia de tempo
 
 ### `automation_savings_scenarios`

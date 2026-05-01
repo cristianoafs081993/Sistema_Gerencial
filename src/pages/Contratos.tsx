@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { Search, FileText, Calendar, DollarSign, ExternalLink, ArrowUpDown, ChevronUp, ChevronDown, RefreshCw, Eye } from 'lucide-react';
+import { Search, FileText, Calendar, DollarSign, ExternalLink, ArrowUpDown, ChevronUp, ChevronDown, RefreshCw, Eye, Star } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { StatCard } from '@/components/StatCard';
 import { Input } from '@/components/ui/input';
@@ -16,11 +16,13 @@ import { ContratosSyncDialog } from '@/components/modals/ContratosSyncDialog';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
 import { useAuth } from '@/contexts/AuthContext';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { getRapBaseVigente, getRapReferenceYear, getRapSaldoAtual } from '@/utils/rapMetrics';
 import { normalizeContratoNumero, shouldIgnoreContratoNumero } from '@/utils/contratosSync';
 import { getValorTotalFromHistorico } from '@/utils/contratosApiHistorico';
 import { contratosApiService, type ContratoApiDetails, type ContratoApiEmpenhoRow, type ContratoApiHistoricoRow, type ContratoApiRow, type ContratoApiSyncRun } from '@/services/contratosApi';
 import { ContratoApiDetailsSheet } from '@/components/contratos/ContratoApiDetailsSheet';
+import { useUserFavorites } from '@/services/userFavorites';
 
 const REITORIA_UG = '158155';
 
@@ -28,6 +30,8 @@ export default function Contratos() {
   const { isSuperAdmin } = useAuth();
   const { contratos, empenhos, contratosEmpenhos, isLoading, refreshData } = useData();
   const [searchTerm, setSearchTerm] = useState('');
+  const [favoritesFilter, setFavoritesFilter] = useState<'all' | 'favorites'>('all');
+  const { favoriteIdsByType, isFavorite, toggleFavorite, isPending: isFavoritePending } = useUserFavorites();
   const [sortConfig, setSortConfig] = useState<{
     key: string;
     direction: 'asc' | 'desc';
@@ -133,7 +137,11 @@ export default function Contratos() {
 
   const filteredContratos = useMemo(() => {
     const searchNormalized = normalizeString(searchTerm);
-    let result = visibleContratos.filter((c) => {
+    const baseContratos = favoritesFilter === 'favorites'
+      ? visibleContratos.filter((contrato) => favoriteIdsByType.contrato.has(contrato.id))
+      : visibleContratos;
+
+    let result = baseContratos.filter((c) => {
       return normalizeString(c.numero).includes(searchNormalized) || normalizeString(c.contratada).includes(searchNormalized) || normalizeString(c.cnpj || '').includes(searchNormalized);
     });
 
@@ -157,7 +165,7 @@ export default function Contratos() {
     }
 
     return result;
-  }, [visibleContratos, searchTerm, normalizeString, sortConfig]);
+  }, [visibleContratos, favoritesFilter, favoriteIdsByType, searchTerm, normalizeString, sortConfig]);
 
   const safeFormatDate = (dateVal: Date | string | null | undefined) => {
     if (!dateVal) return '-';
@@ -331,6 +339,25 @@ export default function Contratos() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
             <Input placeholder="Buscar por número ou contratada..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-system h-10 pl-9 text-sm" />
           </div>
+          <div className="inline-flex h-10 overflow-hidden rounded-xl border border-border-default bg-white shadow-sm">
+            <Button
+              type="button"
+              variant={favoritesFilter === 'all' ? 'default' : 'ghost'}
+              className="h-10 rounded-none px-4 text-xs font-semibold"
+              onClick={() => setFavoritesFilter('all')}
+            >
+              Todos
+            </Button>
+            <Button
+              type="button"
+              variant={favoritesFilter === 'favorites' ? 'default' : 'ghost'}
+              className="h-10 rounded-none px-4 text-xs font-semibold"
+              onClick={() => setFavoritesFilter('favorites')}
+            >
+              <Star className="h-3.5 w-3.5" />
+              Favoritos
+            </Button>
+          </div>
         </div>
       </FilterPanel>
 
@@ -383,7 +410,32 @@ export default function Contratos() {
                 return (
                   <TableRow key={c.id} className="border-b border-border-default/40 transition-colors last:border-0 hover:bg-surface-subtle/60">
                     <TableCell className="py-4 px-6">
-                      <span className="font-data text-sm font-medium text-text-primary">{c.numero}</span>
+                      <div className="flex items-center gap-2">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              aria-label={isFavorite('contrato', c.id) ? `Remover contrato ${c.numero} dos favoritos` : `Favoritar contrato ${c.numero}`}
+                              className={cn(
+                                'h-8 w-8 hover:bg-amber-50',
+                                isFavorite('contrato', c.id)
+                                  ? 'text-amber-500 hover:text-amber-600'
+                                  : 'text-muted-foreground hover:text-amber-500',
+                              )}
+                              disabled={isFavoritePending}
+                              onClick={() => {
+                                void toggleFavorite('contrato', c.id);
+                              }}
+                            >
+                              <Star className={cn('h-4 w-4', isFavorite('contrato', c.id) ? 'fill-current' : '')} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>{isFavorite('contrato', c.id) ? 'Remover dos favoritos' : 'Favoritar contrato'}</TooltipContent>
+                        </Tooltip>
+                        <span className="font-data text-sm font-medium text-text-primary">{c.numero}</span>
+                      </div>
                       {hasReitoriaOrigin ? (
                         <Badge variant="secondary" className="ml-2 rounded-md text-[10px]" title="Contrato com unidade de origem 158155. O contrato global pode ser da Reitoria; leia a execução pelos empenhos/faturas da UG 158366.">
                           Origem Reitoria

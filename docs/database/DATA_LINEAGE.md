@@ -98,6 +98,18 @@ Mostrar a linhagem operacional dos dados de forma curta:
   - consumidor: [EmpenhoDialog.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/modals/EmpenhoDialog.tsx)
 - observacao: o modal nao varre a API publica em tempo real quando usa as UGs padrao `158366` e `158155`; ele le o cache e aciona a function para preencher ou revalidar entradas. Resultados encontrados vencem em 12 horas, e `not_found` vence em 1 hora.
 
+### Favoritos de empenhos e contratos
+
+- acao do usuario nas telas:
+  - [Empenhos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Empenhos.tsx)
+  - [Contratos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Contratos.tsx)
+- persistencia: [userFavorites.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/userFavorites.ts)
+- tabela: `user_favorites`
+- cruza com:
+  - `empenhos`
+  - `contratos`
+- observacao: favoritos sao pessoais por `user_id`; o filtro `Favoritos` nas telas usa apenas os IDs do usuario autenticado e nao altera os dados originais de empenhos ou contratos.
+
 ### Documentos habeis
 
 - arquivo de documentos/situacoes/itens

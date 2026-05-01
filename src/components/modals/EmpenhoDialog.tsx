@@ -100,6 +100,8 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
 
   if (!empenho) return null;
 
+  const showLegacyLiquidacoesApiSection = false;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(empenho.id, formData);
@@ -274,7 +276,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
             )}
 
             {/* Formulário de Edição */}
-            {false && (
+            {showLegacyLiquidacoesApiSection && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
               <div className="px-5 py-3 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
                 <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">

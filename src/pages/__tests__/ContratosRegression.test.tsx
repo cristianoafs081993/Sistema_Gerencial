@@ -3,8 +3,10 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useData } from '@/contexts/DataContext';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import Contratos from '@/pages/Contratos';
 import { contratosApiService } from '@/services/contratosApi';
+import { useUserFavorites } from '@/services/userFavorites';
 import type { Empenho } from '@/types';
 
 vi.mock('@/contexts/DataContext', () => ({
@@ -13,6 +15,10 @@ vi.mock('@/contexts/DataContext', () => ({
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ isSuperAdmin: false }),
+}));
+
+vi.mock('@/services/userFavorites', () => ({
+  useUserFavorites: vi.fn(),
 }));
 
 vi.mock('@/components/HeaderParts', () => ({
@@ -39,6 +45,14 @@ vi.mock('@/services/contratosApi', async (importOriginal) => {
 
 const mockedUseData = vi.mocked(useData);
 const mockedContratosApiService = vi.mocked(contratosApiService);
+const mockedUseUserFavorites = vi.mocked(useUserFavorites);
+
+const renderContratos = () =>
+  render(
+    <TooltipProvider>
+      <Contratos />
+    </TooltipProvider>,
+  );
 
 const makeEmpenho = (overrides: Partial<Empenho>): Empenho => ({
   id: 'empenho-local-rap',
@@ -291,10 +305,22 @@ describe('Contratos regressions', () => {
       ],
       faturaEmpenhos: [],
     });
+
+    mockedUseUserFavorites.mockReturnValue({
+      favorites: [],
+      favoriteIdsByType: {
+        empenho: new Set(),
+        contrato: new Set(),
+      },
+      isLoading: false,
+      isPending: false,
+      isFavorite: () => false,
+      toggleFavorite: vi.fn(),
+    });
   });
 
   it('mantem lista local, busca, ordenacao, legado ignorado e detalhe somente com match API', async () => {
-    render(<Contratos />);
+    renderContratos();
 
     expect(await screen.findByText('62/2018')).toBeInTheDocument();
     expect(screen.getByText('123/2024')).toBeInTheDocument();
@@ -314,7 +340,7 @@ describe('Contratos regressions', () => {
   });
 
   it('usa empenhado original da API e fallback local sem trocar saldo RAP', async () => {
-    render(<Contratos />);
+    renderContratos();
 
     expect(await screen.findByText('R$ 1.528.056,00')).toBeInTheDocument();
     expect(screen.queryByText('R$ 250.000,00')).not.toBeInTheDocument();
@@ -327,7 +353,7 @@ describe('Contratos regressions', () => {
   });
 
   it('abre drawer com historico, itens e faturas mantendo grupo sem item', async () => {
-    render(<Contratos />);
+    renderContratos();
 
     fireEvent.click(await screen.findByRole('button', { name: /Detalhes/i }));
 
