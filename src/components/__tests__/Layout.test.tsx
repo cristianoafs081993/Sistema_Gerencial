@@ -145,6 +145,7 @@ describe('Layout', () => {
           [
             'Despacho de Liquidação',
             'ETP — Serviços Contínuos',
+            'Mapa de Risco',
             'Termo de Referência',
             'Contrato de Serviço IFRN',
           ].includes(text || ''),
@@ -152,6 +153,7 @@ describe('Layout', () => {
     ).toEqual([
       'Despacho de Liquidação',
       'ETP — Serviços Contínuos',
+      'Mapa de Risco',
       'Termo de Referência',
       'Contrato de Serviço IFRN',
     ]);
