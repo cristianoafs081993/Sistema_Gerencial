@@ -481,10 +481,28 @@ describe('contratosApiService.getLiquidacoesPublicasPorEmpenho', () => {
           valorliquido: '2.000,00',
           situacao: 'Pago',
           processo: '23035.000010/2026-01',
+          contratante: '158366 - IFRN/CAMPUS C.NOVOS',
           dados_empenho: [
             {
               numero_empenho: '2026NE000010',
               valor_empenho: '2.000,00',
+            },
+          ],
+        },
+        {
+          id: 1551002,
+          numero: 'NF-OUTRO-CAMPUS',
+          emissao: '2026-04-11',
+          vencimento: '2026-04-30',
+          valor: '3.000,00',
+          valorliquido: '3.000,00',
+          situacao: 'Pago',
+          processo: '23035.000011/2026-01',
+          contratante: '158999 - IFRN/OUTRO CAMPUS',
+          dados_empenho: [
+            {
+              numero_empenho: '2026NE000010',
+              valor_empenho: '3.000,00',
             },
           ],
         },
@@ -501,6 +519,8 @@ describe('contratosApiService.getLiquidacoesPublicasPorEmpenho', () => {
         empenho_numero: '2026NE000010',
       }),
     ]);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.numero_instrumento_cobranca).not.toBe('NF-OUTRO-CAMPUS');
     expect(fetchMock).toHaveBeenCalledWith('/api-contratos/api/contrato/ug/158155');
     expect(fetchMock).toHaveBeenCalledWith('/api-contratos/api/contrato/15510/faturas');
   });

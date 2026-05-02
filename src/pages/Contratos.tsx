@@ -18,7 +18,7 @@ import { DataTablePanel } from '@/components/design-system/DataTablePanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { getRapBaseVigente, getRapReferenceYear, getRapSaldoAtual } from '@/utils/rapMetrics';
-import { normalizeContratoNumero, shouldIgnoreContratoNumero } from '@/utils/contratosSync';
+import { buildEmpenhoLookupKeys, normalizeContratoNumero, shouldIgnoreContratoNumero } from '@/utils/contratosSync';
 import { getValorTotalFromHistorico } from '@/utils/contratosApiHistorico';
 import { contratosApiService, type ContratoApiDetails, type ContratoApiEmpenhoRow, type ContratoApiHistoricoRow, type ContratoApiRow, type ContratoApiSyncRun } from '@/services/contratosApi';
 import { ContratoApiDetailsSheet } from '@/components/contratos/ContratoApiDetailsSheet';
@@ -31,6 +31,33 @@ const normalizeEmpenhoRef = (value: string) =>
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, '');
+
+const buildEmpenhoRefKeys = (value: unknown) => {
+  const keys = new Set(buildEmpenhoLookupKeys(value));
+  const normalized = normalizeEmpenhoRef(String(value ?? ''));
+  if (normalized) keys.add(normalized);
+  if (normalized.length >= 12) keys.add(normalized.slice(-12));
+  return keys;
+};
+
+const getEmpenhoSortParts = (value: unknown) => {
+  const normalized = normalizeEmpenhoRef(String(value ?? ''));
+  const match = normalized.match(/(\d{4})NE(\d+)/);
+  return {
+    year: match ? Number(match[1]) : Number.MAX_SAFE_INTEGER,
+    sequence: match ? Number(match[2]) : Number.MAX_SAFE_INTEGER,
+    normalized,
+  };
+};
+
+const compareEmpenhoRefs = (a: unknown, b: unknown) => {
+  const left = getEmpenhoSortParts(a);
+  const right = getEmpenhoSortParts(b);
+
+  if (left.year !== right.year) return left.year - right.year;
+  if (left.sequence !== right.sequence) return left.sequence - right.sequence;
+  return left.normalized.localeCompare(right.normalized);
+};
 
 const toApiCurrencyNumber = (value: unknown) => {
   if (value == null || value === '') return undefined;
@@ -65,6 +92,47 @@ const getApiEmpenhoYear = (empenho: ContratoApiEmpenhoRow) => {
   const parsed = new Date(empenho.data_emissao);
   return Number.isNaN(parsed.getTime()) ? new Date().getFullYear() : parsed.getFullYear();
 };
+
+const getApiRapLiquidadoPago = (empenho: ContratoApiEmpenhoRow) => {
+  const rpLiquidadoApi = getApiEmpenhoNumber(empenho, 'rp_liquidado', 'rpliquidado') ?? 0;
+  const rpPagoApi = getApiEmpenhoNumber(empenho, 'rp_pago', 'rppago') ?? 0;
+  return rpLiquidadoApi + rpPagoApi;
+};
+
+const getApiRapBase = (empenho: ContratoApiEmpenhoRow) => {
+  const rpInscritoApi = getApiEmpenhoNumber(empenho, 'rp_inscrito', 'rpinscrito') ?? 0;
+  const rpALiquidarApi = getApiEmpenhoNumber(empenho, 'rp_a_liquidar', 'rpaliquidar') ?? 0;
+  const rpAPagarApi = getApiEmpenhoNumber(empenho, 'rp_a_pagar', 'rpapagar') ?? 0;
+  const rpLiquidadoPagoApi = getApiRapLiquidadoPago(empenho);
+
+  if (rpInscritoApi > 0) return rpInscritoApi;
+  if (rpALiquidarApi > 0) return rpALiquidarApi;
+  return rpLiquidadoPagoApi + rpAPagarApi;
+};
+
+const isApiRapEmpenho = (empenho: ContratoApiEmpenhoRow) =>
+  getApiEmpenhoYear(empenho) < new Date().getFullYear() ||
+  getApiRapBase(empenho) > 0 ||
+  getApiRapLiquidadoPago(empenho) > 0;
+
+const getApiRapSaldoAtual = (empenho: ContratoApiEmpenhoRow) => {
+  const rpAPagarDbApi = getApiEmpenhoNumber(empenho, 'rp_a_pagar', 'rpapagar');
+  if (rpAPagarDbApi !== undefined) return rpAPagarDbApi;
+  return Math.max(0, getApiRapBase(empenho) - getApiRapLiquidadoPago(empenho));
+};
+
+const getSaldoEmpenhoApi = (empenho: ContratoApiEmpenhoRow) => {
+  if (isApiRapEmpenho(empenho)) return getApiRapSaldoAtual(empenho);
+  return getApiEmpenhoNumber(empenho, 'valor_a_liquidar', 'valoraliquidar') ?? 0;
+};
+
+const getEmpenhoSaldoBadgeClass = (saldo: number) =>
+  cn(
+    'text-[10px] font-mono py-0 h-5 cursor-pointer transition-colors',
+    saldo > 0
+      ? 'border-emerald-green/25 bg-emerald-green/[0.06] text-emerald-green shadow-[0_0_0_1px_rgba(34,197,94,0.08)] hover:bg-emerald-green/10'
+      : 'hover:bg-muted-foreground/20',
+  );
 
 export default function Contratos() {
   const { isSuperAdmin } = useAuth();
@@ -152,6 +220,16 @@ export default function Contratos() {
     return map;
   }, [apiHistoricos]);
 
+  const localEmpenhoByLookupKey = useMemo(() => {
+    const map = new Map<string, (typeof empenhos)[number]>();
+    for (const empenho of empenhos) {
+      for (const key of buildEmpenhoRefKeys(empenho.numero)) {
+        if (!map.has(key)) map.set(key, empenho);
+      }
+    }
+    return map;
+  }, [empenhos]);
+
   const openApiDetails = useCallback(async (contrato: ContratoApiRow) => {
     setSelectedApiContrato(contrato);
     setSelectedApiDetails(null);
@@ -220,6 +298,34 @@ export default function Contratos() {
 
   const rapReferenceYear = useMemo(() => getRapReferenceYear(empenhos), [empenhos]);
 
+  const getSaldoEmpenhoLocal = useCallback(
+    (empenho: (typeof empenhos)[number]) => {
+      if (empenho.tipo === 'rap') return getRapSaldoAtual(empenho, rapReferenceYear);
+      const liquidado = (empenho.valorLiquidadoAPagar || 0) + (empenho.valorPagoOficial || 0);
+      return Math.max(0, empenho.valor - liquidado);
+    },
+    [rapReferenceYear],
+  );
+
+  const getLocalEmpenhoForApi = useCallback(
+    (empenhoApi: ContratoApiEmpenhoRow) => {
+      for (const key of buildEmpenhoRefKeys(empenhoApi.numero)) {
+        const local = localEmpenhoByLookupKey.get(key);
+        if (local) return local;
+      }
+      return undefined;
+    },
+    [localEmpenhoByLookupKey],
+  );
+
+  const getSaldoEmpenhoApiPreferLocal = useCallback(
+    (empenhoApi: ContratoApiEmpenhoRow) => {
+      const local = getLocalEmpenhoForApi(empenhoApi);
+      return local ? getSaldoEmpenhoLocal(local) : getSaldoEmpenhoApi(empenhoApi);
+    },
+    [getLocalEmpenhoForApi, getSaldoEmpenhoLocal],
+  );
+
   const getEmpenhosDoContrato = useCallback(
     (contratoId: string) => {
       const linkIds = contratosEmpenhos.filter((l) => l.contrato_id === contratoId).map((l) => l.empenho_id);
@@ -229,16 +335,16 @@ export default function Contratos() {
       // Para não "sumir" vínculos na UI, resolvemos por ambos.
       const byId = new Map(empenhos.map((e) => [e.id, e] as const));
       const byNumero = new Map(empenhos.map((e) => [e.numero, e] as const));
-      const byNumeroNorm = new Map(empenhos.map((e) => [normalizeEmpenhoRef(e.numero), e] as const));
-      // Alguns vínculos antigos guardam só o final do número
-      const byNumeroSuffix12 = new Map(empenhos.map((e) => [normalizeEmpenhoRef(e.numero).slice(-12), e] as const));
-
       const resolved: typeof empenhos = [];
       const seen = new Set<string>();
       for (const ref of linkIds) {
         const refStr = (ref || '').toString().trim();
-        const refNorm = normalizeEmpenhoRef(refStr);
-        const emp = byId.get(refStr) || byNumero.get(refStr) || byNumeroNorm.get(refNorm) || (refNorm.length >= 12 ? byNumeroSuffix12.get(refNorm.slice(-12)) : undefined);
+        const emp =
+          byId.get(refStr) ||
+          byNumero.get(refStr) ||
+          Array.from(buildEmpenhoRefKeys(refStr))
+            .map((key) => localEmpenhoByLookupKey.get(key))
+            .find(Boolean);
         if (!emp) continue;
         if (seen.has(emp.id)) continue;
         seen.add(emp.id);
@@ -246,7 +352,7 @@ export default function Contratos() {
       }
       return resolved;
     },
-    [empenhos, contratosEmpenhos],
+    [empenhos, contratosEmpenhos, localEmpenhoByLookupKey],
   );
 
   const getValorEmpenhadoLocal = useCallback(
@@ -282,19 +388,29 @@ export default function Contratos() {
     return contrato.valor || 0;
   }, []);
 
+  const getEmpenhosApiSomente = useCallback(
+    (empenhosVinculados: Array<{ numero: string }>, apiContrato?: ContratoApiRow) => {
+      if (!apiContrato) return [];
+      const localEmpenhosKeys = new Set(empenhosVinculados.flatMap((e) => Array.from(buildEmpenhoRefKeys(e.numero))));
+      const empenhosApiVinculados = apiEmpenhosByContratoApiId.get(apiContrato.id) ?? [];
+      return empenhosApiVinculados.filter((empenhoApi) => {
+        const apiKeys = Array.from(buildEmpenhoRefKeys(empenhoApi.numero));
+        return apiKeys.length > 0 && !apiKeys.some((key) => localEmpenhosKeys.has(key));
+      });
+    },
+    [apiEmpenhosByContratoApiId],
+  );
+
   const totalALiquidarGlobal = useMemo(() => {
     return visibleContratos.reduce((sumContrato, c) => {
       const emps = getEmpenhosDoContrato(c.id);
-      return (
-        sumContrato +
-        emps.reduce((sumEmp, e) => {
-          if (e.tipo === 'rap') return sumEmp + getRapSaldoAtual(e, rapReferenceYear);
-          const liquidado = (e.valorLiquidadoAPagar || 0) + (e.valorPagoOficial || 0);
-          return sumEmp + Math.max(0, e.valor - liquidado);
-        }, 0)
-      );
+      const apiContrato = apiContratoByNumero.get(normalizeContratoNumero(c.numero));
+      const empenhosApiSomente = getEmpenhosApiSomente(emps, apiContrato);
+      const saldoLocal = emps.reduce((sumEmp, e) => sumEmp + getSaldoEmpenhoLocal(e), 0);
+      const saldoApiSomente = empenhosApiSomente.reduce((sumEmp, e) => sumEmp + getSaldoEmpenhoApiPreferLocal(e), 0);
+      return sumContrato + saldoLocal + saldoApiSomente;
     }, 0);
-  }, [visibleContratos, getEmpenhosDoContrato, rapReferenceYear]);
+  }, [visibleContratos, getEmpenhosDoContrato, apiContratoByNumero, getEmpenhosApiSomente, getSaldoEmpenhoLocal, getSaldoEmpenhoApiPreferLocal]);
 
   const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
@@ -345,7 +461,7 @@ export default function Contratos() {
         />
 
         <StatCard
-          title="Saldo Atual"
+          title="Saldo dos empenhos"
           value={formatCurrency(totalALiquidarGlobal)}
           icon={Calendar}
           stitchColor="amber"
@@ -413,7 +529,7 @@ export default function Contratos() {
               </TableHead>
               <TableHead className="h-11 px-4 text-right">Valor Total</TableHead>
               <TableHead className="h-11 px-6">Empenhado</TableHead>
-              <TableHead className="h-11 px-4 text-right">Saldo Atual</TableHead>
+              <TableHead className="h-11 px-4 text-right">Saldo dos empenhos</TableHead>
               <TableHead className="h-11 px-6 text-right">API</TableHead>
             </TableRow>
           </TableHeader>
@@ -429,22 +545,27 @@ export default function Contratos() {
                 const apiContrato = apiContratoByNumero.get(normalizeContratoNumero(c.numero));
                 const hasReitoriaOrigin = apiContrato?.unidade_origem_codigo === REITORIA_UG;
                 const empenhosVinculados = getEmpenhosDoContrato(c.id);
-                const localEmpenhosNorm = new Set(empenhosVinculados.map((e) => normalizeEmpenhoRef(e.numero)).filter(Boolean));
-                const empenhosApiVinculados = apiContrato ? (apiEmpenhosByContratoApiId.get(apiContrato.id) ?? []) : [];
-                const empenhosApiSomente = empenhosApiVinculados.filter((empenhoApi) => {
-                  const numeroNorm = normalizeEmpenhoRef(empenhoApi.numero);
-                  return numeroNorm && !localEmpenhosNorm.has(numeroNorm);
-                });
+                const empenhosApiSomente = getEmpenhosApiSomente(empenhosVinculados, apiContrato);
+                const empenhoBadgeItems = [
+                  ...empenhosVinculados.map((empenho) => ({
+                    type: 'local' as const,
+                    numero: empenho.numero,
+                    empenho,
+                  })),
+                  ...empenhosApiSomente.map((empenho) => ({
+                    type: 'api' as const,
+                    numero: empenho.numero,
+                    empenho,
+                  })),
+                ].sort((a, b) => compareEmpenhoRefs(a.numero, b.numero));
                 const historicoApi = apiContrato ? (apiHistoricosByContratoApiId.get(apiContrato.id) ?? []) : [];
                 const valorTotalContrato = getValorTotalContrato(c, apiContrato, historicoApi);
                 const totalEmpenhado = getValorEmpenhadoContrato(c.id, apiContrato);
                 const percentualEmpenhado = valorTotalContrato > 0 ? Math.min(100, (totalEmpenhado / valorTotalContrato) * 100) : 0;
 
-                const totalALiquidar = empenhosVinculados.reduce((sum, e) => {
-                  if (e.tipo === 'rap') return sum + getRapSaldoAtual(e, rapReferenceYear);
-                  const liquidado = (e.valorLiquidadoAPagar || 0) + (e.valorPagoOficial || 0);
-                  return sum + Math.max(0, e.valor - liquidado);
-                }, 0);
+                const totalALiquidar =
+                  empenhosVinculados.reduce((sum, e) => sum + getSaldoEmpenhoLocal(e), 0) +
+                  empenhosApiSomente.reduce((sum, e) => sum + getSaldoEmpenhoApiPreferLocal(e), 0);
 
                 return (
                   <TableRow key={c.id} className="border-b border-border-default/40 transition-colors last:border-0 hover:bg-surface-subtle/60">
@@ -515,14 +636,16 @@ export default function Contratos() {
                         <div className="flex flex-wrap gap-1">
                           {empenhosVinculados.length > 0 || empenhosApiSomente.length > 0 ? (
                             <>
-                            {empenhosVinculados.map((e) => {
-                              const balance = e.tipo === 'rap' ? getRapSaldoAtual(e, rapReferenceYear) : Math.max(0, e.valor - ((e.valorLiquidadoAPagar || 0) + (e.valorPagoOficial || 0)));
-                              const rapBase = e.tipo === 'rap' ? getRapBaseVigente(e, rapReferenceYear) : 0;
+                            {empenhoBadgeItems.map((item) => {
+                              if (item.type === 'local') {
+                                const e = item.empenho;
+                                const balance = getSaldoEmpenhoLocal(e);
+                                const rapBase = e.tipo === 'rap' ? getRapBaseVigente(e, rapReferenceYear) : 0;
 
                               return (
                                 <Popover key={e.id}>
                                   <PopoverTrigger asChild>
-                                    <Badge variant="secondary" className="text-[10px] font-mono py-0 h-5 cursor-pointer hover:bg-muted-foreground/20 transition-colors">
+                                    <Badge variant="secondary" className={getEmpenhoSaldoBadgeClass(balance)}>
                                       {e.numero}
                                     </Badge>
                                   </PopoverTrigger>
@@ -551,35 +674,64 @@ export default function Contratos() {
                                     </div>
                                   </PopoverContent>
                                 </Popover>
-                              );
-                            })}
-                            {empenhosApiSomente.map((e) => {
+                                );
+                              }
+
+                              const e = item.empenho;
+                              const localOverride = getLocalEmpenhoForApi(e);
+                              if (localOverride) {
+                                const balance = getSaldoEmpenhoLocal(localOverride);
+                                const isRapLocal = localOverride.tipo === 'rap';
+                                const baseValue = isRapLocal ? getRapBaseVigente(localOverride, rapReferenceYear) : localOverride.valor || 0;
+
+                                return (
+                                  <Popover key={`api-${e.id}`}>
+                                    <PopoverTrigger asChild>
+                                      <Badge variant="secondary" className={getEmpenhoSaldoBadgeClass(balance)}>
+                                        {e.numero}
+                                      </Badge>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-64 border-border-default/60 p-3 shadow-lifted">
+                                      <div className="space-y-2">
+                                        <div className="mr-1 flex items-center justify-between border-b border-border-default/50 pb-1">
+                                          <span className="font-data text-xs font-bold text-action-primary">{e.numero}</span>
+                                          <Badge variant="outline" className="text-[9px] uppercase px-1 h-4">
+                                            SIAFI
+                                          </Badge>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-y-1.5 text-xs py-1">
+                                          <span className="text-text-secondary">{isRapLocal ? 'Base RAP:' : 'Valor Total:'}</span>
+                                          <span className="text-right font-medium">{formatCurrency(baseValue)}</span>
+                                          <span className="font-semibold text-text-secondary">{isRapLocal ? 'Saldo Atual:' : 'Saldo a Liquidar:'}</span>
+                                          <span className={cn('text-right font-bold underline decoration-dotted', balance > 0 ? 'text-status-warning' : 'text-status-success')}>
+                                            {formatCurrency(balance)}
+                                          </span>
+                                        </div>
+                                        <div className="border-t border-border-default/40 pt-1.5 text-[9px] font-medium text-text-secondary">
+                                          Fonte: SIAFI local + vínculo API Comprasnet
+                                        </div>
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                );
+                              }
+
                               const valorEmpenhadoApi = Number(e.valor_empenhado) || 0;
-                              const valorALiquidarApi = Number(e.valor_a_liquidar) || 0;
                               const valorLiquidadoApi = Number(e.valor_liquidado) || 0;
                               const valorPagoApi = Number(e.valor_pago) || 0;
-                              const rpInscritoApi = getApiEmpenhoNumber(e, 'rp_inscrito', 'rpinscrito') ?? 0;
-                              const rpALiquidarApi = getApiEmpenhoNumber(e, 'rp_a_liquidar', 'rpaliquidar') ?? 0;
-                              const rpLiquidadoApi = getApiEmpenhoNumber(e, 'rp_liquidado', 'rpliquidado') ?? 0;
-                              const rpPagoApi = getApiEmpenhoNumber(e, 'rp_pago', 'rppago') ?? 0;
-                              const rpAPagarDbApi = getApiEmpenhoNumber(e, 'rp_a_pagar', 'rpapagar');
-                              const rpLiquidadoPagoApi = rpLiquidadoApi + rpPagoApi;
-                              const rpBaseApi =
-                                rpInscritoApi > 0
-                                  ? rpInscritoApi
-                                  : rpALiquidarApi > 0
-                                    ? rpALiquidarApi
-                                    : rpLiquidadoPagoApi + (rpAPagarDbApi ?? 0);
-                              const rpAPagarApi = rpAPagarDbApi ?? Math.max(0, rpBaseApi - rpLiquidadoPagoApi);
+                              const rpBaseApi = getApiRapBase(e);
+                              const rpLiquidadoPagoApi = getApiRapLiquidadoPago(e);
+                              const rpAPagarApi = getApiRapSaldoAtual(e);
                               const totalLiquidadoApi = valorLiquidadoApi + valorPagoApi;
-                              const isRapApi = rpBaseApi > 0 || rpAPagarApi > 0 || rpLiquidadoPagoApi > 0;
+                              const isRapApi = isApiRapEmpenho(e);
+                              const saldoApi = getSaldoEmpenhoApi(e);
                               const apiEmpenhoYear = getApiEmpenhoYear(e);
                               const rapBaseLabel = apiEmpenhoYear <= new Date().getFullYear() - 2 ? 'RP reinscrito:' : 'RP inscrito:';
 
                               return (
                                 <Popover key={`api-${e.id}`}>
                                   <PopoverTrigger asChild>
-                                    <Badge variant="secondary" className="text-[10px] font-mono py-0 h-5 cursor-pointer hover:bg-muted-foreground/20 transition-colors">
+                                    <Badge variant="secondary" className={getEmpenhoSaldoBadgeClass(saldoApi)}>
                                       {e.numero}
                                     </Badge>
                                   </PopoverTrigger>
@@ -595,8 +747,8 @@ export default function Contratos() {
                                         <span className="text-text-secondary">{isRapApi ? rapBaseLabel : 'Valor Total:'}</span>
                                         <span className="text-right font-medium">{formatCurrency(isRapApi ? rpBaseApi : valorEmpenhadoApi)}</span>
                                         <span className="font-semibold text-text-secondary">{isRapApi ? 'Saldo Atual:' : 'Saldo a Liquidar:'}</span>
-                                        <span className={cn('text-right font-bold underline decoration-dotted', (isRapApi ? rpAPagarApi : valorALiquidarApi) > 0 ? 'text-status-warning' : 'text-status-success')}>
-                                          {formatCurrency(isRapApi ? rpAPagarApi : valorALiquidarApi)}
+                                        <span className={cn('text-right font-bold underline decoration-dotted', saldoApi > 0 ? 'text-status-warning' : 'text-status-success')}>
+                                          {formatCurrency(saldoApi)}
                                         </span>
                                       </div>
                                       <div className="mt-1 border-t border-dashed border-border-default/50 pt-1.5">

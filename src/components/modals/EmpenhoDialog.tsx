@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Pencil, History, DollarSign, Receipt, CheckCircle2, Landmark, Info, Loader2 } from 'lucide-react';
+import { Pencil, History, DollarSign, Receipt, CheckCircle2, Landmark, Loader2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { contratosApiService, type ContratoApiPublicLiquidacaoRow } from '@/services/contratosApi';
 import { format } from 'date-fns';
@@ -69,6 +69,7 @@ const buildFormData = (empenho: Empenho | null): Partial<Empenho> => {
 
 export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave }: EmpenhoDialogProps) {
   const [formData, setFormData] = useState<Partial<Empenho>>(() => buildFormData(empenho));
+  const showLegacyLiquidacoesApiSection = Boolean(import.meta.env.VITE_SHOW_LEGACY_LIQUIDACOES_API_SECTION);
 
   useEffect(() => {
     if (open && empenho) {
@@ -99,8 +100,6 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
   });
 
   if (!empenho) return null;
-
-  const showLegacyLiquidacoesApiSection = false;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -281,7 +280,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
               <div className="px-5 py-3 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
                 <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
                   <Receipt className="w-3 h-3" />
-                  Liquidacoes da API de Contratos
+                  Liquidações
                 </h3>
                 {isLoadingLiquidacoesApi && <Loader2 className="w-3 h-3 animate-spin text-slate-400" />}
               </div>
@@ -296,14 +295,13 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                       <th className="px-5 py-2">Processo</th>
                       <th className="px-5 py-2">Vencimento</th>
                       <th className="px-5 py-2">Liquidacao</th>
-                      <th className="px-5 py-2 text-right">Bruto</th>
-                      <th className="px-5 py-2 text-right">Liquido</th>
+                      <th className="px-5 py-2 text-right">Valor</th>
                     </tr>
                   </thead>
                   <tbody>
                     {isLoadingLiquidacoesApi ? (
                       <tr>
-                        <td colSpan={9} className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
+                        <td colSpan={8} className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
                           Carregando liquidacoes da API de contratos...
                         </td>
                       </tr>
@@ -339,24 +337,17 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                           <td className="px-5 py-3 text-right font-black text-slate-700 whitespace-nowrap">
                             {formatCurrency(liquidacao.valor_bruto || 0)}
                           </td>
-                          <td className="px-5 py-3 text-right font-black text-emerald-600 whitespace-nowrap">
-                            {formatCurrency(liquidacao.valor_liquido || 0)}
-                          </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={9} className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
+                        <td colSpan={8} className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
                           O empenho nao foi localizado nos contratos publicos do Comprasnet para a UG 158366.
                         </td>
                       </tr>
                     )}
                   </tbody>
                 </table>
-              </div>
-              <div className="px-5 py-3 border-t border-slate-50 bg-slate-50/40 flex gap-2 text-[10px] text-muted-foreground leading-relaxed">
-                <Info className="w-3 h-3 shrink-0 mt-0.5 text-slate-400" />
-                <span>Esta secao faz descoberta em tempo real na API publica de contratos do Comprasnet para a UG 158366. A data de liquidacao so aparece quando vier no payload real da API.</span>
               </div>
             </div>
             )}
@@ -365,7 +356,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
               <div className="px-5 py-3 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
                 <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
                   <Receipt className="w-3 h-3" />
-                  {'Liquidacoes da API de Contratos'}
+                  Liquidações
                 </h3>
                 {isLoadingLiquidacoesApi && <Loader2 className="w-3 h-3 animate-spin text-slate-400" />}
               </div>
@@ -373,22 +364,21 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50/30 text-[9px] uppercase font-bold text-slate-400">
                     <tr>
-                      <th className="px-5 py-2">{'Emissao'}</th>
+                      <th className="px-5 py-2">Emissão</th>
                       <th className="px-5 py-2">Fatura</th>
                       <th className="px-5 py-2">Contrato</th>
-                      <th className="px-5 py-2">{'Situacao'}</th>
+                      <th className="px-5 py-2">Situação</th>
                       <th className="px-5 py-2">Processo</th>
                       <th className="px-5 py-2">Vencimento</th>
-                      <th className="px-5 py-2">{'Liquidacao'}</th>
-                      <th className="px-5 py-2 text-right">Bruto</th>
-                      <th className="px-5 py-2 text-right">{'Liquido'}</th>
+                      <th className="px-5 py-2">Liquidação</th>
+                      <th className="px-5 py-2 text-right">Valor</th>
                     </tr>
                   </thead>
                   <tbody>
                     {isLoadingLiquidacoesApi ? (
                       <tr>
-                        <td colSpan={9} className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
-                          {'Carregando liquidacoes da API de contratos...'}
+                        <td colSpan={8} className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
+                          Carregando liquidações...
                         </td>
                       </tr>
                     ) : liquidacoesApi.length > 0 ? (
@@ -423,24 +413,17 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                           <td className="px-5 py-3 text-right font-black text-slate-700 whitespace-nowrap">
                             {formatCurrency(liquidacao.valor_bruto || 0)}
                           </td>
-                          <td className="px-5 py-3 text-right font-black text-emerald-600 whitespace-nowrap">
-                            {formatCurrency(liquidacao.valor_liquido || 0)}
-                          </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={9} className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
+                        <td colSpan={8} className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
                           {'O empenho nao foi localizado nos contratos publicos do Comprasnet para as UGs 158366 e 158155.'}
                         </td>
                       </tr>
                     )}
                   </tbody>
                 </table>
-              </div>
-              <div className="px-5 py-3 border-t border-slate-50 bg-slate-50/40 flex gap-2 text-[10px] text-muted-foreground leading-relaxed">
-                <Info className="w-3 h-3 shrink-0 mt-0.5 text-slate-400" />
-                <span>{'Esta secao faz descoberta em tempo real na API publica de contratos do Comprasnet para as UGs 158366 e 158155. A data de liquidacao so aparece quando vier no payload real da API.'}</span>
               </div>
             </div>
 

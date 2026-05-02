@@ -46,9 +46,22 @@ const normalizeStatus = (value: string | null | undefined) =>
 
 const EXECUTED_ITEM_STATUSES = new Set(['pago', 'siafi apropriado']);
 const REITORIA_UG = '158155';
+const DISPLAY_UNIDADE_CODIGO = '158366';
 
 const isFaturaExecutada = (fatura?: ContratoApiFaturaRow) =>
   EXECUTED_ITEM_STATUSES.has(normalizeStatus(fatura?.situacao));
+
+const getFaturaContratanteCodigo = (fatura: ContratoApiFaturaRow) => {
+  const rawData = (fatura.raw_data && typeof fatura.raw_data === 'object' ? fatura.raw_data : {}) as Record<string, unknown>;
+  const value = rawData.contratante ?? rawData.contratante_codigo ?? rawData.unidade_contrato;
+  const match = String(value ?? '').match(/\b\d{6}\b/);
+  return match?.[0] ?? null;
+};
+
+const isFaturaVisibleForDisplayUnidade = (fatura: ContratoApiFaturaRow) => {
+  const codigoContratante = getFaturaContratanteCodigo(fatura);
+  return !codigoContratante || codigoContratante === DISPLAY_UNIDADE_CODIGO;
+};
 
 const formatDate = (value: string | null | undefined) => {
   if (!value) return '-';
@@ -199,12 +212,14 @@ export function ContratoApiDetailsSheet({
   lastSyncRun,
   loading = false,
 }: ContratoApiDetailsSheetProps) {
-  const faturas = details?.faturas ?? [];
-  const faturaItens = details?.faturaItens ?? [];
+  const faturas = (details?.faturas ?? []).filter(isFaturaVisibleForDisplayUnidade);
+  const visibleFaturaIds = new Set(faturas.map((fatura) => fatura.id));
+  const faturaItens = (details?.faturaItens ?? []).filter((item) => visibleFaturaIds.has(item.contrato_api_fatura_id));
+  const faturaEmpenhos = (details?.faturaEmpenhos ?? []).filter((item) => visibleFaturaIds.has(item.contrato_api_fatura_id));
   const historico = details?.historico ?? [];
   const itemById = new Map((details?.itens ?? []).map((item) => [item.id, item]));
   const faturaById = new Map(faturas.map((fatura) => [fatura.id, fatura]));
-  const empenhosByFatura = buildFaturaEmpenhosMap(details?.faturaEmpenhos ?? []);
+  const empenhosByFatura = buildFaturaEmpenhosMap(faturaEmpenhos);
   const linkedFaturaIds = new Set(faturaItens.map((item) => item.contrato_api_fatura_id));
   const faturasSemItem = faturas.filter((fatura) => !linkedFaturaIds.has(fatura.id));
 
@@ -284,7 +299,7 @@ export function ContratoApiDetailsSheet({
             {hasReitoriaOrigin ? (
               <div className="flex gap-2 rounded-md border border-border/70 bg-muted/40 p-3 text-sm text-foreground">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>Contrato com origem na Reitoria. Valores globais do histórico podem representar o contrato central; empenhos e faturas indicam a execução da UG do campus quando constarem com UG 158366.</span>
+                <span>Contrato com origem na Reitoria. Valores globais do histórico podem representar o contrato central; a tela exibe somente faturas da UG {DISPLAY_UNIDADE_CODIGO} quando a API informa o contratante.</span>
               </div>
             ) : null}
 

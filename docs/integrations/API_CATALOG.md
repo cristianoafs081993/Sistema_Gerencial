@@ -151,7 +151,7 @@ Descoberta publica em tempo real no modal de empenho:
 - enquanto as tabelas de cache ainda nao existirem em um ambiente, o frontend nao aciona a Edge Function a partir do modal; isso evita erros 404/CORS durante bootstrap antes da migration e do deploy da function
 - se o status publico indicar linhas mas a leitura publica das linhas voltar vazia por problema de policy/RLS, o service usa a Edge Function em modo `readCacheOnly` como fallback de leitura com service role
 - a Edge Function `refresh-comprasnet-liquidacoes-cache` faz a descoberta dinamica quando chamada pelo frontend ou cron, buscando contratos publicos ativos e inativos das UGs `158366` e `158155`, cobrindo empenhos emitidos pelo campus que estejam vinculados a contratos gerenciados pela Reitoria; depois filtra os contratos cujo endpoint `/empenhos` contenha o empenho alvo e so entao consulta `/faturas`
-- a vinculacao final usa `dados_empenho[]` dentro da fatura para decidir quais liquidações apareceram no modal
+- a vinculacao final usa `dados_empenho[]` dentro da fatura para decidir quais liquidações apareceram no modal, e usa `contratante` da fatura para esconder faturas de outros campi quando a API informa esse campo
 - `data_liquidacao` pode aparecer em payloads reais de `faturas`, mas nao esta garantida pelo schema OpenAPI; a UI deve tratá-la como opcional
 - o cache usa TTL de 12 horas para resultados encontrados e 1 hora para `not_found`; o cron horario reprocessa entradas vencidas
 
@@ -183,12 +183,15 @@ Observacao:
 - o Valor Total da lista deve usar `contratos_api_historico` como fonte principal, somando `valor_inicial` de cada termo. `valor_global` da API nao entra nessa metrica porque pode representar outro consolidado/periodo e distorcer a leitura. Sem historico com `valor_inicial`, usar `contratos.valor` como fallback
 - em contratos com `codigo_unidade_origem = 158155`, a UI deve sinalizar origem Reitoria e diferenciar valores globais do contrato da execucao do campus `158366`
 - empenhos da API alimentam o agregado de Valor Empenhado pelo campo `empenhado` na lista principal e tambem aparecem como badges/popovers quando ainda nao existem em `empenhos` + `contratos_empenhos`; quando o mesmo numero existir nas duas fontes, o badge local prevalece para preservar os saldos CSV/SIAFI. O drawer nao exibe uma secao propria de empenhos para evitar misturar saldos da API com a regra local de `empenhos`
+- `Saldo dos empenhos` soma saldos locais e saldos de empenhos que existem apenas em `contratos_api_empenhos`; isso evita ocultar saldo de empenhos novos da API, como empenhos de exercicio ainda nao vinculados localmente, e evita usar campos de exercicio como saldo RAP
+- a conciliacao entre `contratos_api_empenhos.numero` e `empenhos.numero` deve usar chaves equivalentes do empenho, incluindo o sufixo `AAAA NEXXXXXX` quando a API vier com prefixo de UG/gestao. Se houver empenho local correspondente, o saldo do SIAFI local prevalece sobre `valor_a_liquidar` da API
 - Em RAP vindo apenas da API, o popover usa `rp_inscrito`, `rp_a_pagar` e os campos especificos preservados em `raw_data` (`rpaliquidar`, `rpliquidado`, `rppago`, `rpapagar` quando presente), evitando usar `aliquidar`/`pago` do exercicio como saldo de RAP
+- para empenho antigo vindo apenas da API, `rp_a_pagar = 0` e saldo zero valido e nao deve cair para `valor_a_liquidar`; esse campo de exercicio pode ficar defasado em restos a pagar ja quitados
 - nos itens do drawer, o contratado deve somar `historico_item[].valor_total` quando a API trouxer historico por item; `valor_total` do item e fallback sem historico
 - quando a API trouxer o `historico_item`, o drawer deve exibir tambem seus campos operacionais por termo: `tipo_historico`, `data_termo`, `quantidade`, `valor_unitario` e `valor_total`
 - no resumo de itens do drawer, `Contratado` e `Executado` tambem devem mostrar quantidade agregada: contratado pela soma de `historico_item[].quantidade` quando houver historico, e executado pela soma de `quantidade_faturado` nas faturas `Pago` ou `Siafi Apropriado`
 - quando houver `dados_item_faturado`, o drawer deve exibir tambem `quantidade_faturado` e `valor_unitario_faturado` na linha da fatura
-- a tela de contratos cruza a base local com a API por numero normalizado e abre os dados externos em drawer lateral
+- a tela de contratos cruza a base local com a API por numero normalizado e abre os dados externos em drawer lateral. As faturas continuam podendo ser sincronizadas amplamente, mas a exibicao do drawer e do modal de empenho filtra por `raw_data.contratante` para mostrar somente o campus `158366` quando a API trouxer esse identificador
 
 ## 5. Edge Function `analisar-liquidacao-siafi`
 

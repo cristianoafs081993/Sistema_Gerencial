@@ -13,6 +13,7 @@ import { buildEmpenhoLookupKeys } from '../../../src/utils/contratosSync.ts';
 
 const CONTRATOS_API_BASE = 'https://contratos.comprasnet.gov.br/api';
 const DEFAULT_UNIDADES = ['158366', '158155'];
+const DEFAULT_DISPLAY_UNIDADE = '158366';
 const FOUND_TTL_MS = 12 * 60 * 60 * 1000;
 const NOT_FOUND_TTL_MS = 60 * 60 * 1000;
 const ERROR_TTL_MS = 15 * 60 * 1000;
@@ -37,6 +38,7 @@ const CACHE_ROWS_SELECT = [
   'processo',
   'valor_empenho',
   'subelemento',
+  'raw_data',
   'fetched_at',
 ].join(',');
 
@@ -177,6 +179,25 @@ function normalizeUnidades(raw: unknown) {
   return Array.from(new Set(values.map((value) => String(value ?? '').trim()).filter(Boolean)));
 }
 
+function getFaturaContratanteCodigo(rawFatura: unknown) {
+  if (!rawFatura || typeof rawFatura !== 'object') return null;
+  const record = rawFatura as Record<string, unknown>;
+  const value = record.contratante ?? record.contratante_codigo ?? record.unidade_contrato;
+  const match = String(value ?? '').match(/\b\d{6}\b/);
+  return match?.[0] ?? null;
+}
+
+function isFaturaVisibleForDisplayUnidade(rawFatura: unknown) {
+  const codigoContratante = getFaturaContratanteCodigo(rawFatura);
+  return !codigoContratante || codigoContratante === DEFAULT_DISPLAY_UNIDADE;
+}
+
+function isCacheRowVisibleForDisplayUnidade(row: unknown) {
+  if (!row || typeof row !== 'object') return true;
+  const rawData = (row as { raw_data?: Record<string, unknown> | null }).raw_data;
+  return isFaturaVisibleForDisplayUnidade(rawData?.fatura);
+}
+
 function addMilliseconds(date: Date, amount: number) {
   return new Date(date.getTime() + amount).toISOString();
 }
@@ -248,6 +269,8 @@ async function discoverLiquidacoes(
         try {
           const faturas = await fetchJson<ApiFatura[]>(`${CONTRATOS_API_BASE}/contrato/${contrato.api_contrato_id}/faturas`);
           return (faturas ?? []).flatMap((rawFatura) => {
+            if (!isFaturaVisibleForDisplayUnidade(rawFatura)) return [];
+
             const matchingEmpenhos = getFaturaEmpenhos(rawFatura).filter((rawEmpenho) =>
               hasEmpenhoMatch(targetKeys, rawEmpenho.numero_empenho ?? rawEmpenho.numero),
             );
@@ -397,15 +420,17 @@ async function readCacheRows(
     .order('data_emissao', { ascending: false });
   if (rowsError) throw rowsError;
 
+  const visibleRows = (rows ?? []).filter(isCacheRowVisibleForDisplayUnidade);
+
   return {
     empenhoNumero,
     lookupKey,
     status: statusRow.status,
-    rowsCount: Number(statusRow.rows_count ?? 0),
+    rowsCount: rows && rows.length > 0 ? visibleRows.length : Number(statusRow.rows_count ?? 0),
     fetchedAt: statusRow.fetched_at,
     expiresAt: statusRow.expires_at,
     error: statusRow.error_message,
-    ...(returnRows ? { rows: rows ?? [] } : {}),
+    ...(returnRows ? { rows: visibleRows } : {}),
   };
 }
 

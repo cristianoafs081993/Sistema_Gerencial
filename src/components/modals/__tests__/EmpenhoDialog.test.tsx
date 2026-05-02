@@ -140,7 +140,12 @@ describe('EmpenhoDialog', () => {
 
     expect(await screen.findByText('48161')).toBeInTheDocument();
     expect(screen.getByText('00062/2018')).toBeInTheDocument();
-    expect(screen.getByText('R$ 12.000,00')).toBeInTheDocument();
+    expect(screen.getByText('Liquidações')).toBeInTheDocument();
+    expect(screen.getAllByText('Valor').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Bruto')).not.toBeInTheDocument();
+    expect(screen.queryByText('Liquido')).not.toBeInTheDocument();
+    expect(screen.getByText('R$ 12.368,06')).toBeInTheDocument();
+    expect(screen.queryByText('R$ 12.000,00')).not.toBeInTheDocument();
   });
 
   it('mantem o modal estavel e exibe o vazio da API publica sem a secao de documentos habeis', async () => {

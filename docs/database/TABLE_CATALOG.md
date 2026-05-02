@@ -263,6 +263,7 @@ Campos-chave:
 - `fatura_id`
 - `numero_instrumento_cobranca`
 - valores, datas e processo da fatura
+- `raw_data` preserva o payload da fatura/empenho e e usado para filtrar exibicao por campus via `raw_data.fatura.contratante`
 
 Consumido por:
 
@@ -344,11 +345,12 @@ Observacoes operacionais:
 - `valor_empenhado` representa o empenhado original e nao deve ser substituido por base RAP
 - `rp_inscrito` e `rp_a_pagar` ficam em colunas dedicadas; outros campos RAP da API (`rpaliquidar`, `rpliquidado`, `rppago`) permanecem em `raw_data`
 - em RAP antigo, a UI usa `raw_data.rppago`/`raw_data.rpliquidado` para liquidado/pago de RAP e deriva saldo atual quando `rp_a_pagar` nao vier na resposta
-- na lista de contratos, empenhos desta tabela aparecem como badges complementares quando ainda nao existem no vinculo local `contratos_empenhos`; se o mesmo numero existir localmente, a exibicao local prevalece
+- na lista de contratos, empenhos desta tabela aparecem como badges complementares quando ainda nao existem no vinculo local `contratos_empenhos`; se o mesmo numero existir localmente, a exibicao local prevalece. O saldo desses empenhos complementares tambem entra na coluna `Saldo dos empenhos`
 
 ### `contratos_api_faturas`
 
 - faturas vinculadas a cada contrato vindo da API externa
+- `raw_data.contratante` identifica a UG/campus da fatura quando a API informa esse campo; a UI usa essa informacao para exibir ao usuario apenas faturas do campus atual sem apagar faturas de outros campi da base sincronizada
 
 ### `contratos_api_itens`
 

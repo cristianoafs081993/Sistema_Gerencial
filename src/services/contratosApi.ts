@@ -22,6 +22,7 @@ import { buildEmpenhoLookupKeys } from '@/utils/contratosSync';
 const CONTRATOS_API_BASE = '/api-contratos/api';
 const DEFAULT_UASG = '158366';
 const DEFAULT_PUBLIC_LIQUIDACOES_UASGS = [DEFAULT_UASG, '158155'];
+const DEFAULT_DISPLAY_UNIDADE_CODIGO = DEFAULT_UASG;
 const CONTRATOS_API_SYNC_RUNS_SELECT = 'id,unidade_codigo,started_at,finished_at,status,contratos_ativos,contratos_inativos,contratos_upserted,empenhos_upserted,faturas_upserted,itens_upserted,historicos_upserted,fatura_itens_upserted,fatura_empenhos_upserted,error_message,details';
 const CONTRATOS_API_HISTORICO_SELECT = 'id, contrato_api_id, api_historico_id, numero, tipo, qualificacao_termo, observacao, ug, codigo_unidade_origem, nome_unidade_origem, data_assinatura, data_publicacao, vigencia_inicio, vigencia_fim, valor_inicial, valor_global, num_parcelas, valor_parcela, novo_valor_global, novo_num_parcelas, novo_valor_parcela, data_inicio_novo_valor, retroativo, retroativo_valor, situacao_contrato';
 const MIGRATION_REQUIRED_MESSAGE =
@@ -31,7 +32,7 @@ const PUBLIC_CONTRATOS_CACHE_TTL_MS = 5 * 60 * 1000;
 const PUBLIC_EMPENHOS_CACHE_TTL_MS = 5 * 60 * 1000;
 const PUBLIC_LIQUIDACOES_CACHE_TTL_MS = 2 * 60 * 1000;
 const LIQUIDACOES_CACHE_STATUS_SELECT = 'empenho_lookup_key, empenho_numero, status, rows_count, fetched_at, expires_at, error_message';
-const LIQUIDACOES_CACHE_ROWS_SELECT = 'id, empenho_lookup_key, empenho_numero, empenho_numero_api, unidade_contrato, contrato_api_id, contrato_numero, contrato_objeto, fatura_id, numero_instrumento_cobranca, situacao, valor_bruto, valor_liquido, data_emissao, data_vencimento, data_pagamento, data_liquidacao, processo, valor_empenho, subelemento, fetched_at';
+const LIQUIDACOES_CACHE_ROWS_SELECT = 'id, empenho_lookup_key, empenho_numero, empenho_numero_api, unidade_contrato, contrato_api_id, contrato_numero, contrato_objeto, fatura_id, numero_instrumento_cobranca, situacao, valor_bruto, valor_liquido, data_emissao, data_vencimento, data_pagamento, data_liquidacao, processo, valor_empenho, subelemento, raw_data, fetched_at';
 
 type CacheEntry<T> = {
   expiresAt: number;
@@ -76,6 +77,7 @@ type LiquidacoesCacheRow = {
   processo: string | null;
   valor_empenho: number | null;
   subelemento: string | null;
+  raw_data?: Record<string, unknown> | null;
   fetched_at: string;
 };
 
@@ -142,6 +144,7 @@ export interface ContratoApiFaturaRow {
   valor_liquido: number | null;
   data_emissao: string | null;
   data_pagamento: string | null;
+  raw_data?: Record<string, unknown> | null;
 }
 
 export interface ContratoApiItemRow {
@@ -378,6 +381,24 @@ function normalizeUnidadeCodigos(raw: string | string[]) {
   );
 }
 
+function getFaturaContratanteCodigo(rawFatura: unknown) {
+  if (!rawFatura || typeof rawFatura !== 'object') return null;
+  const record = rawFatura as Record<string, unknown>;
+  const value = record.contratante ?? record.contratante_codigo ?? record.unidade_contrato;
+  const match = String(value ?? '').match(/\b\d{6}\b/);
+  return match?.[0] ?? null;
+}
+
+function isFaturaVisibleForDisplayUnidade(rawFatura: unknown, unidadeCodigo = DEFAULT_DISPLAY_UNIDADE_CODIGO) {
+  const codigoContratante = getFaturaContratanteCodigo(rawFatura);
+  return !codigoContratante || codigoContratante === unidadeCodigo;
+}
+
+function isLiquidacaoCacheRowVisible(row: LiquidacoesCacheRow) {
+  const rawData = row.raw_data && typeof row.raw_data === 'object' ? row.raw_data : {};
+  return isFaturaVisibleForDisplayUnidade((rawData as Record<string, unknown>).fatura);
+}
+
 function isDefaultPublicLiquidacoesUnidades(unidadeCodigos: string | string[]) {
   const received = normalizeUnidadeCodigos(unidadeCodigos).sort();
   const defaults = [...DEFAULT_PUBLIC_LIQUIDACOES_UASGS].sort();
@@ -455,12 +476,16 @@ async function getCachedLiquidacoesPublicasPorEmpenho(numeroEmpenho: string): Pr
     throw rowsError;
   }
 
+  const rawRows = (rows ?? []) as LiquidacoesCacheRow[];
+  const visibleRows = rawRows.filter(isLiquidacaoCacheRowVisible);
+  const rowsCount = rawRows.length > 0 ? visibleRows.length : Number(typedStatus.rows_count ?? 0);
+
   return {
     available: true,
     hasStatus: true,
     isFresh,
-    rowsCount: Number(typedStatus.rows_count ?? 0),
-    rows: ((rows ?? []) as LiquidacoesCacheRow[]).map(mapCacheRowToLiquidacao),
+    rowsCount,
+    rows: visibleRows.map(mapCacheRowToLiquidacao),
   };
 }
 
@@ -483,7 +508,7 @@ async function getLiquidacoesCacheRowsViaFunction(
   }
 
   const firstResult = (data as { results?: Array<{ rows?: LiquidacoesCacheRow[] }> } | null)?.results?.[0];
-  return (firstResult?.rows ?? []).map(mapCacheRowToLiquidacao);
+  return (firstResult?.rows ?? []).filter(isLiquidacaoCacheRowVisible).map(mapCacheRowToLiquidacao);
 }
 
 function triggerLiquidacoesCacheRefresh(numeroEmpenho: string) {
@@ -625,7 +650,7 @@ export const contratosApiService = {
   async getFaturasApi(contratoApiIds?: string[]): Promise<ContratoApiFaturaRow[]> {
     let query = supabase
       .from('contratos_api_faturas')
-      .select('id, contrato_api_id, api_fatura_id, numero_instrumento_cobranca, situacao, valor_bruto, valor_liquido, data_emissao, data_pagamento');
+      .select('id, contrato_api_id, api_fatura_id, numero_instrumento_cobranca, situacao, valor_bruto, valor_liquido, data_emissao, data_pagamento, raw_data');
 
     if (contratoApiIds && contratoApiIds.length > 0 && contratoApiIds.length <= 100) {
       query = query.in('contrato_api_id', contratoApiIds);
@@ -659,7 +684,7 @@ export const contratosApiService = {
         .order('numero_item_compra', { ascending: true }),
       supabase
         .from('contratos_api_faturas')
-        .select('id, contrato_api_id, api_fatura_id, numero_instrumento_cobranca, situacao, valor_bruto, valor_liquido, data_emissao, data_pagamento')
+        .select('id, contrato_api_id, api_fatura_id, numero_instrumento_cobranca, situacao, valor_bruto, valor_liquido, data_emissao, data_pagamento, raw_data')
         .eq('contrato_api_id', contratoApiId)
         .order('data_emissao', { ascending: false }),
       supabase
@@ -777,6 +802,8 @@ export const contratosApiService = {
                 const faturas = await fetchJson<ApiFatura[]>(`${CONTRATOS_API_BASE}/contrato/${contrato.api_contrato_id}/faturas`);
 
                 return (faturas ?? []).flatMap((rawFatura) => {
+                  if (!isFaturaVisibleForDisplayUnidade(rawFatura)) return [];
+
                   const matchingEmpenhos = getFaturaEmpenhos(rawFatura).filter((rawEmpenho) =>
                     hasEmpenhoMatch(targetKeys, rawEmpenho.numero_empenho ?? rawEmpenho.numero),
                   );

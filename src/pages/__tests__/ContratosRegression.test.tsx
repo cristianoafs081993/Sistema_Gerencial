@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useData } from '@/contexts/DataContext';
@@ -84,7 +84,21 @@ describe('Contratos regressions', () => {
 
     mockedUseData.mockReturnValue({
       atividades: [],
-      empenhos: [makeEmpenho({})],
+      empenhos: [
+        makeEmpenho({}),
+        makeEmpenho({
+          id: 'empenho-local-rap-zerado',
+          numero: '2024NE000118',
+          descricao: 'Empenho RAP sem saldo',
+          valor: 7330.25,
+          tipo: 'rap',
+          rapInscrito: 7330.25,
+          rapALiquidar: 0,
+          rapPago: 7330.25,
+          saldoRapOficial: 0,
+          dataEmpenho: new Date('2024-01-10'),
+        }),
+      ],
       descentralizacoes: [],
       contratos: [
         {
@@ -193,6 +207,25 @@ describe('Contratos regressions', () => {
         rp_a_pagar: 8500,
       },
       {
+        id: 'api-empenho-2024-local-zerado',
+        contrato_api_id: 'contrato-api-1',
+        api_empenho_id: 118,
+        numero: '158366264352024NE000118',
+        unidade_gestora: '158366',
+        gestao: '26435',
+        data_emissao: '2024-02-01',
+        credor: 'Fornecedor Teste',
+        fonte_recurso: '1000000000',
+        plano_interno: 'PI123',
+        natureza_despesa: '339039',
+        valor_empenhado: 0,
+        valor_a_liquidar: 7330.25,
+        valor_liquidado: 0,
+        valor_pago: 0,
+        rp_inscrito: 0,
+        rp_a_pagar: 0,
+      },
+      {
         id: 'api-empenho-2023-rap',
         contrato_api_id: 'contrato-api-1',
         api_empenho_id: 10552178,
@@ -216,6 +249,25 @@ describe('Contratos regressions', () => {
           rpliquidado: '0,00',
           rppago: '21.360,64',
         },
+      },
+      {
+        id: 'api-empenho-antigo-rp-a-pagar-zero',
+        contrato_api_id: 'contrato-api-1',
+        api_empenho_id: 118999,
+        numero: '2024NE000999',
+        unidade_gestora: '158366',
+        gestao: '26435',
+        data_emissao: '2024-02-01',
+        credor: 'Fornecedor Teste',
+        fonte_recurso: '1000000000',
+        plano_interno: 'PI123',
+        natureza_despesa: '339039',
+        valor_empenhado: 999,
+        valor_a_liquidar: 999,
+        valor_liquidado: 0,
+        valor_pago: 0,
+        rp_inscrito: 0,
+        rp_a_pagar: 0,
       },
       {
         id: 'api-empenho-2026',
@@ -383,19 +435,46 @@ describe('Contratos regressions', () => {
     });
   });
 
-  it('usa empenhado original da API e fallback local sem trocar saldo RAP', async () => {
+  it('usa empenhado original da API e soma saldo RAP local com saldo de empenhos API', async () => {
     renderContratos();
 
     expect(await screen.findByText('R$ 1.528.056,00')).toBeInTheDocument();
     expect(screen.queryByText('R$ 250.000,00')).not.toBeInTheDocument();
-    expect(await screen.findByText('R$ 67.515,04')).toBeInTheDocument();
+    expect(await screen.findByText('R$ 68.514,04')).toBeInTheDocument();
     expect(screen.getByText('4.4%')).toBeInTheDocument();
+    expect(screen.getAllByText('Saldo dos empenhos').length).toBeGreaterThan(0);
     expect(screen.getAllByText('2023NE000777').length).toBeGreaterThan(0);
     expect(screen.getByText('2023NE000050')).toBeInTheDocument();
     expect(screen.getByText('2024NE000319')).toBeInTheDocument();
+    expect(screen.getByText('2024NE000999')).toBeInTheDocument();
     expect(screen.getByText('2026NE000027')).toBeInTheDocument();
+    expect(screen.getByText('158366264352024NE000118')).toBeInTheDocument();
+    expect(screen.getByText('2026NE000027')).toHaveClass('bg-emerald-green/[0.06]');
+    expect(screen.getByText('2024NE000999')).not.toHaveClass('bg-emerald-green/[0.06]');
+    const contratoApiRow = screen.getByText('Fornecedor Teste').closest('tr');
+    expect(contratoApiRow).not.toBeNull();
+    expect(within(contratoApiRow as HTMLTableRowElement).getAllByText(/NE/).map((badge) => badge.textContent)).toEqual([
+      '2023NE000050',
+      '2023NE000777',
+      '158366264352024NE000118',
+      '2024NE000319',
+      '2024NE000999',
+      '2026NE000027',
+    ]);
+    expect(screen.getByText('R$ 24.269,00')).toBeInTheDocument();
     expect(screen.getAllByText('R$ 40,00').length).toBeGreaterThan(0);
     expect(screen.getByText('Origem Reitoria')).toBeInTheDocument();
+  });
+
+  it('faz o saldo SIAFI local prevalecer quando a API traz o mesmo empenho com prefixo completo', async () => {
+    renderContratos();
+
+    fireEvent.click(await screen.findByText('158366264352024NE000118'));
+
+    expect(await screen.findByText('Fonte: SIAFI local + vínculo API Comprasnet')).toBeInTheDocument();
+    expect(screen.getByText('Saldo Atual:')).toBeInTheDocument();
+    expect(screen.getAllByText('R$ 0,00').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Saldo a Liquidar:')).not.toBeInTheDocument();
   });
 
   it('mostra RAP antigo da API com saldo e liquidado de restos em vez de saldo de exercicio', async () => {
@@ -409,6 +488,18 @@ describe('Contratos regressions', () => {
     expect(screen.getAllByText('R$ 21.360,64').length).toBeGreaterThan(0);
     expect(screen.getByText('R$ 0,00')).toBeInTheDocument();
     expect(screen.queryByText('RP a pagar:')).not.toBeInTheDocument();
+  });
+
+  it('nao usa valor a liquidar da API como saldo quando empenho antigo tem rp a pagar zero', async () => {
+    renderContratos();
+
+    fireEvent.click(await screen.findByText('2024NE000999'));
+
+    expect(await screen.findByText('RP reinscrito:')).toBeInTheDocument();
+    expect(screen.getByText('Saldo Atual:')).toBeInTheDocument();
+    expect(screen.getAllByText('R$ 0,00').length).toBeGreaterThan(0);
+    expect(screen.getByText('R$ 24.269,00')).toBeInTheDocument();
+    expect(screen.queryByText('Saldo a Liquidar:')).not.toBeInTheDocument();
   });
 
   it('abre drawer com historico, itens e faturas mantendo grupo sem item', async () => {

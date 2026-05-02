@@ -207,6 +207,7 @@ const details: ContratoApiDetails = {
       valor_liquido: 12368.06,
       data_emissao: '2023-05-08',
       data_pagamento: null,
+      raw_data: { contratante: '158366 - IFRN/CAMPUS C.NOVOS' },
     },
     {
       id: 'fatura-sem-item',
@@ -218,6 +219,7 @@ const details: ContratoApiDetails = {
       valor_liquido: 500,
       data_emissao: '2023-06-08',
       data_pagamento: null,
+      raw_data: { contratante: '158366 - IFRN/CAMPUS C.NOVOS' },
     },
     {
       id: 'fatura-siafi',
@@ -229,6 +231,19 @@ const details: ContratoApiDetails = {
       valor_liquido: 1000,
       data_emissao: '2023-07-08',
       data_pagamento: null,
+      raw_data: { contratante: '158366 - IFRN/CAMPUS C.NOVOS' },
+    },
+    {
+      id: 'fatura-outro-campus',
+      contrato_api_id: 'contrato-api-1',
+      api_fatura_id: 188399,
+      numero_instrumento_cobranca: '48199',
+      situacao: 'Pago',
+      valor_bruto: 999,
+      valor_liquido: 999,
+      data_emissao: '2023-08-08',
+      data_pagamento: null,
+      raw_data: { contratante: '158999 - IFRN/OUTRO CAMPUS' },
     },
   ],
   faturaItens: [
@@ -251,6 +266,16 @@ const details: ContratoApiDetails = {
       quantidade_faturado: 1,
       valor_unitario_faturado: 1000,
       valor_total_faturado: 1000,
+    },
+    {
+      id: 'fatura-item-outro-campus',
+      contrato_api_id: 'contrato-api-1',
+      contrato_api_fatura_id: 'fatura-outro-campus',
+      contrato_api_item_id: 'item-1',
+      api_item_id: 325154,
+      quantidade_faturado: 1,
+      valor_unitario_faturado: 999,
+      valor_total_faturado: 999,
     },
   ],
   faturaEmpenhos: [
@@ -320,6 +345,8 @@ describe('ContratoApiDetailsSheet', () => {
     expect(screen.getByText('Siafi Apropriado')).toBeInTheDocument();
     expect(screen.getByText('Sem item vinculado')).toBeInTheDocument();
     expect(screen.getByText('48162')).toBeInTheDocument();
+    expect(screen.queryByText('48199')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Qtd\. 1 \| Unit.rio R\$ 999,00/)).not.toBeInTheDocument();
     expect(screen.getByText(/não entram na execução oficial por item/i)).toBeInTheDocument();
   });
 });
