@@ -74,7 +74,7 @@ describe('normalizePreliminaryStudyQuestionSuggestionResult', () => {
     ]);
   });
 
-  it('aceita sugestao de anexo com sourceLabel mesmo sem pagina', () => {
+  it('descarta sugestao automatica baseada em anexo auxiliar', () => {
     const result = normalizePreliminaryStudyQuestionSuggestionResult({
       suggestions: [
         {
@@ -90,14 +90,7 @@ describe('normalizePreliminaryStudyQuestionSuggestionResult', () => {
       ],
     });
 
-    expect(result.suggestions).toEqual([
-      expect.objectContaining({
-        questionId: 'estimativa_valor',
-        status: 'suggested',
-        sourceType: 'anexo',
-        sourceLabel: 'planilha-custos.xlsx, aba Custos, linhas 2-30',
-      }),
-    ]);
+    expect(result.suggestions).toEqual([]);
   });
 
   it('gera fallback local quando a function de ETP nao responde', async () => {
@@ -161,6 +154,38 @@ describe('normalizePreliminaryStudyQuestionSuggestionResult', () => {
     expect(result.warnings).toContain(
       'A Edge Function de texto por secao do ETP nao respondeu. Foi usado um texto local de apoio para revisao.',
     );
+  });
+
+  it('nao usa anexo auxiliar sem relacao clara como foco do texto local da secao', async () => {
+    mockedInvoke.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+    const result = await preliminaryStudiesService.generateQuestionText({
+      manualObject: 'Contratacao de servicos continuos de limpeza',
+      question: {
+        id: 'necessidade',
+        kind: 'field',
+        title: 'Necessidade da contratacao',
+        prompt: 'Explique a necessidade administrativa.',
+        required: true,
+      },
+      supplementalSnippets: [
+        {
+          id: 'anexo-planilha-1',
+          kind: 'estimativa',
+          label: 'Planilha de custos',
+          excerpt: 'Piso salarial da categoria e memoria de calculo da estimativa.',
+          sourceType: 'anexo',
+          sourceName: 'planilha-custos.xlsx',
+          sourceLabel: 'planilha-custos.xlsx, aba Custos, linhas 2-30',
+        },
+      ],
+    });
+
+    expect(result.status).toBe('generated');
+    expect(result.model).toBe('fallback-local');
+    expect(result.value).toContain('Contratacao de servicos continuos de limpeza');
+    expect(result.value).not.toContain('Piso salarial');
+    expect(result.value).not.toContain('memoria de calculo');
   });
 
   it('envia snippets auxiliares no payload do ETP', async () => {
@@ -254,6 +279,42 @@ describe('normalizePreliminaryStudyQuestionSuggestionResult', () => {
     await preliminaryStudiesService.suggestQuestionnaireAnswers({
       manualObject: 'Contratacao de servicos continuos de limpeza',
       supplementalSnippets: [institutionalSnippet],
+    });
+
+    expect(mockedInvoke).toHaveBeenCalledWith(
+      'sugerir-respostas-etp-servicos-continuos',
+      expect.objectContaining({
+        body: expect.objectContaining({
+          contextSnippets: [],
+        }),
+      }),
+    );
+  });
+
+  it('nao envia anexos auxiliares para sugestoes automaticas do questionario ETP', async () => {
+    mockedInvoke.mockResolvedValueOnce({
+      data: {
+        status: 'generated',
+        suggestions: [],
+        warnings: [],
+      },
+      error: null,
+    });
+
+    await preliminaryStudiesService.suggestQuestionnaireAnswers({
+      manualObject: 'Contratacao de servicos continuos de limpeza',
+      supplementalSnippets: [
+        {
+          id: 'anexo-cct-1',
+          kind: 'requisitos',
+          label: 'Convencao coletiva',
+          excerpt: 'Jornada de trabalho, adicional de insalubridade e vale transporte.',
+          sourceType: 'anexo',
+          sourceName: 'cct-limpeza.pdf',
+          sourceLabel: 'cct-limpeza.pdf, pagina 34',
+          pageNumber: 34,
+        },
+      ],
     });
 
     expect(mockedInvoke).toHaveBeenCalledWith(

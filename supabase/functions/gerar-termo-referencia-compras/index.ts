@@ -55,7 +55,7 @@ type QuestionnaireAnswer = {
   approved?: boolean;
   confidence?: 'high' | 'medium';
   sourcePage?: number;
-  sourceType?: 'processo' | 'anexo' | 'etp';
+  sourceType?: 'processo' | 'anexo' | 'etp' | 'mapa_riscos';
   sourceLabel?: string;
   sourceExcerpt?: string;
   justification?: string;
@@ -80,7 +80,7 @@ type ReferenceTermRequest = {
     kind?: string;
     pageNumber?: number;
     excerpt?: string;
-    sourceType?: 'processo' | 'anexo' | 'etp';
+    sourceType?: 'processo' | 'anexo' | 'etp' | 'mapa_riscos';
     sourceName?: string;
     sourceLabel?: string;
   }>;
@@ -348,7 +348,9 @@ function buildSources(request: ReferenceTermRequest) {
           ? snippet.label.trim()
           : snippet.sourceType === 'etp'
             ? 'ETP editado no editor'
-            : 'Trecho de apoio';
+            : snippet.sourceType === 'mapa_riscos'
+              ? 'Mapa de Risco editado no editor'
+              : 'Trecho de apoio';
     const alreadyAdded = sources.some(
       (source) => source.label === label && source.pageStart === snippet.pageNumber && source.pageEnd === snippet.pageNumber,
     );
@@ -571,7 +573,7 @@ function makePendingComment(question: QuestionnaireQuestion) {
 
 function answerSourceLabel(answer?: QuestionnaireAnswer) {
   if (answer?.origin === 'ai') {
-    if (answer.sourceType === 'etp' && answer.sourceLabel?.trim()) {
+    if ((answer.sourceType === 'etp' || answer.sourceType === 'mapa_riscos') && answer.sourceLabel?.trim()) {
       return `sugestao da IA aprovada pelo usuario, fonte ${answer.sourceLabel.trim()}`;
     }
     return answer.sourcePage ? `sugestao da IA aprovada pelo usuario, pagina ${answer.sourcePage}` : 'sugestao da IA aprovada pelo usuario';
@@ -1054,8 +1056,8 @@ function buildSectionPrompt(
     'Voce e um assistente especializado em contratacoes publicas e elabora Termos de Referencia de compras sob a Lei 14.133/2021.',
     'Gere somente os preenchimentos dos blocos editaveis informados nesta parte. Nao gere o documento inteiro.',
     'Use o modelo DOCX como base juridica e estrutural, mas responda apenas com os blocos desta parte.',
-    'Use os trechos de apoio como contexto factual. Eles podem vir do processo, de anexos opcionais ou do ETP editado no editor.',
-    'Quando houver fonte ETP, trate-a como contexto de planejamento revisado pelo usuario, mas mantenha pendencias para dados concretos ausentes.',
+    'Use os trechos de apoio como contexto factual. Eles podem vir do processo, de anexos opcionais, do ETP editado no editor ou do mapa de riscos editado.',
+    'Quando houver fonte ETP ou mapa de riscos, trate-a como contexto de planejamento revisado pelo usuario, mas mantenha pendencias para dados concretos ausentes.',
     'Nao invente dados. Quando faltar informacao obrigatoria, use [CAMPO PENDENTE] no texto final e registre o campo em missingRequiredFields.',
     'Responda somente JSON valido. Nao use markdown. Nao inclua HTML.',
     'O JSON deve seguir exatamente este formato:',

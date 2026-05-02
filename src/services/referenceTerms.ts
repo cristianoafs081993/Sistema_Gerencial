@@ -115,7 +115,11 @@ export function normalizeReferenceTermQuestionSuggestionResult(value: unknown): 
           const sourcePage = typeof record.sourcePage === 'number' && Number.isFinite(record.sourcePage)
             ? record.sourcePage
             : undefined;
-          const sourceType = record.sourceType === 'processo' || record.sourceType === 'anexo' || record.sourceType === 'etp'
+          const sourceType =
+            record.sourceType === 'processo' ||
+            record.sourceType === 'anexo' ||
+            record.sourceType === 'etp' ||
+            record.sourceType === 'mapa_riscos'
             ? record.sourceType
             : undefined;
           const sourceLabel = typeof record.sourceLabel === 'string' ? record.sourceLabel.trim() : '';
@@ -126,8 +130,10 @@ export function normalizeReferenceTermQuestionSuggestionResult(value: unknown): 
 
           if (!questionId || !kind) return null;
           const hasPageSource = Boolean(sourcePage && sourceExcerpt && justification);
-          const hasEtpSource = sourceType === 'etp' && Boolean(sourceLabel && sourceExcerpt && justification);
-          if (status === 'suggested' && !hasPageSource && !hasEtpSource) return null;
+          const hasPlanningSource =
+            (sourceType === 'etp' || sourceType === 'mapa_riscos') &&
+            Boolean(sourceLabel && sourceExcerpt && justification);
+          if (status === 'suggested' && !hasPageSource && !hasPlanningSource) return null;
 
           return {
             questionId,

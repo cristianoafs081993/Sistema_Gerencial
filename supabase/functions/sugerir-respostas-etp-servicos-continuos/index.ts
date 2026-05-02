@@ -118,22 +118,27 @@ function isInstitutionalSnippet(snippet: ContextSnippet) {
   return snippet.kind === 'institucional' || snippet.sourceType === 'institucional';
 }
 
+function isProcessSuggestionSnippet(snippet: ContextSnippet) {
+  return !isInstitutionalSnippet(snippet) && snippet.sourceType !== 'anexo';
+}
+
 function buildPrompt(request: EtpSuggestionRequest, questions: EtpQuestion[]) {
-  const snippets = (request.contextSnippets || []).filter((snippet) => !isInstitutionalSnippet(snippet));
+  const snippets = (request.contextSnippets || []).filter(isProcessSuggestionSnippet);
 
   return [
     'Voce e um assistente especializado em contratacoes publicas brasileiras.',
     'Sugira respostas para o questionario de Estudo Tecnico Preliminar de servicos continuos.',
-    'Use somente os trechos-fonte fornecidos. Eles podem vir do processo ou de anexos tecnicos opcionais ja convertidos em texto. Nao invente informacao ausente.',
+    'Use somente trechos-fonte do processo fornecido. Nao invente informacao ausente.',
+    'Nao use anexos auxiliares opcionais para sugerir respostas automaticas do questionario. Anexos como CCT, planilhas ou memorias servem apenas como apoio pontual durante a redacao/revisao, nunca como fonte de preenchimento automatico.',
+    'O foco das sugestoes e sempre o objeto da contratacao, o processo e a pergunta do questionario.',
     'Contexto institucional da unidade demandante nao deve ser usado para sugerir respostas com fonte explicita.',
     'Se nao houver fonte suficiente para uma pergunta, retorne status "unanswered".',
-    'Quando a fonte for anexo sem pagina, retorne sourceType "anexo" e preserve sourceLabel.',
     'Responda apenas JSON valido no formato:',
-    '{"status":"generated","warnings":["..."],"suggestions":[{"questionId":"...","status":"suggested|unanswered","value":"...","justification":"...","sourcePage":1,"sourceType":"processo|anexo","sourceLabel":"... opcional","sourceExcerpt":"...","confidence":"high|medium"}]}',
+    '{"status":"generated","warnings":["..."],"suggestions":[{"questionId":"...","status":"suggested|unanswered","value":"...","justification":"...","sourcePage":1,"sourceType":"processo","sourceLabel":"... opcional","sourceExcerpt":"...","confidence":"high|medium"}]}',
     `Processo: ${JSON.stringify(request.processo || {})}`,
     `Objeto informado manualmente: ${request.manualObject || ''}`,
     `Perguntas: ${JSON.stringify(questions)}`,
-    `Trechos tecnicos do processo/anexos: ${JSON.stringify(snippets)}`,
+    `Trechos tecnicos do processo para sugestoes automaticas: ${JSON.stringify(snippets)}`,
   ].join('\n\n');
 }
 
@@ -167,7 +172,11 @@ function normalizeSuggestion(raw: unknown, questionById: Map<string, EtpQuestion
     return { questionId, status: 'unanswered' };
   }
 
-  if (!sourcePage && !(sourceType === 'anexo' && sourceLabel)) {
+  if (sourceType === 'anexo') {
+    return { questionId, status: 'unanswered' };
+  }
+
+  if (!sourcePage) {
     return { questionId, status: 'unanswered' };
   }
 
@@ -277,12 +286,12 @@ Deno.serve(async (request) => {
       });
     }
 
-    const evidenceSnippets = (body.contextSnippets || []).filter((snippet) => !isInstitutionalSnippet(snippet));
+    const evidenceSnippets = (body.contextSnippets || []).filter(isProcessSuggestionSnippet);
 
     if (!evidenceSnippets.length) {
       return jsonResponse({
         status: 'generated',
-        warnings: ['Nao ha trechos tecnicos de processo ou anexo para sugerir respostas com fonte explicita.'],
+        warnings: ['Nao ha trechos tecnicos do processo para sugerir respostas com fonte explicita. Anexos auxiliares ficam apenas como apoio pontual na redacao.'],
         suggestions: questions.map((question) => ({ questionId: question.id, status: 'unanswered' })),
       });
     }

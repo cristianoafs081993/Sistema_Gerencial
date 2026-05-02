@@ -101,6 +101,10 @@ function isInstitutionalSnippet(snippet: DocumentContextSnippet) {
   return isEtpInstitutionalContextSnippet(snippet) || snippet.sourceType === 'institucional';
 }
 
+function isProcessSuggestionSnippet(snippet: DocumentContextSnippet) {
+  return !isInstitutionalSnippet(snippet) && snippet.sourceType !== 'anexo';
+}
+
 function findRelevantContextExcerpt(params: GeneratePreliminaryStudyQuestionTextParams) {
   const questionId = params.question.id.toLowerCase();
   const title = params.question.title.toLowerCase();
@@ -112,7 +116,7 @@ function findRelevantContextExcerpt(params: GeneratePreliminaryStudyQuestionText
     const kind = snippet.kind.toLowerCase();
     const label = snippet.label.toLowerCase();
     return questionId.includes(kind) || kind.includes(questionId) || title.includes(label) || label.includes(title);
-  }) || snippets[0];
+  });
 
   return matchingSnippet?.excerpt ? normalizePreliminaryStudyAnswerValue(matchingSnippet.excerpt) : '';
 }
@@ -131,7 +135,7 @@ function buildLocalQuestionText(params: GeneratePreliminaryStudyQuestionTextPara
   const institutionalContext = findInstitutionalContextExcerpt(params);
   const baseContext = notes || contextExcerpt || objectValue;
   const institutionalSupport = institutionalContext
-    ? `Como pano de fundo da unidade demandante, considere o contexto institucional do campus: ${institutionalContext}.`
+    ? `A unidade demandante e o campus descrito no contexto institucional: ${institutionalContext}. Use esse campus como dado real da contratacao, nao como exemplo.`
     : '';
   const pendingMarker = `[CAMPO PENDENTE: ${params.question.title}]`;
 
@@ -240,7 +244,8 @@ export function normalizePreliminaryStudyQuestionSuggestionResult(value: unknown
 
           if (!questionId || !knownQuestionIds.has(questionId)) return null;
           if (status === 'suggested' && (!sourceExcerpt || !justification || !answerValue)) return null;
-          if (status === 'suggested' && !sourcePage && !(sourceType === 'anexo' && sourceLabel)) return null;
+          if (status === 'suggested' && sourceType === 'anexo') return null;
+          if (status === 'suggested' && !sourcePage) return null;
 
           return {
             questionId,
@@ -386,7 +391,7 @@ export const preliminaryStudiesService = {
   ): Promise<PreliminaryStudyQuestionSuggestionResult> {
     const payload = buildPreliminaryStudyPayload({
       ...params,
-      supplementalSnippets: params.supplementalSnippets?.filter((snippet) => !isInstitutionalSnippet(snippet)),
+      supplementalSnippets: params.supplementalSnippets?.filter(isProcessSuggestionSnippet),
     });
 
     try {

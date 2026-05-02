@@ -151,18 +151,61 @@ describe('contratosApiService.getLiquidacoesPublicasPorEmpenho', () => {
     expect(functionsInvokeMock).not.toHaveBeenCalled();
   });
 
-  it('aciona refresh em segundo plano e evita varredura publica quando nao ha cache', async () => {
+  it('aciona refresh pela Edge Function e retorna linhas quando nao ha cache', async () => {
     const contratosApiService = await loadService();
 
     mockSupabaseCache(null);
+    functionsInvokeMock.mockResolvedValueOnce({
+      data: {
+        results: [
+          {
+            status: 'found',
+            rowsCount: 1,
+            rows: [
+              {
+                empenho_lookup_key: '2026NE000027',
+                empenho_numero: '2026NE000027',
+                empenho_numero_api: '2026NE000027',
+                unidade_contrato: '158366',
+                contrato_api_id: 126528,
+                contrato_numero: '00158/2021',
+                contrato_objeto: 'SERVICOS DE OUTSOURCING DE IMPRESSAO.',
+                fatura_id: 1876697,
+                numero_instrumento_cobranca: 'Z57375',
+                situacao: 'Siafi Apropriado',
+                valor_bruto: 2271,
+                valor_liquido: 2271,
+                data_emissao: '2026-04-13',
+                data_vencimento: '2026-05-06',
+                data_pagamento: null,
+                data_liquidacao: '2026-04-24',
+                processo: '23421.002243/2020-89',
+                valor_empenho: 2271,
+                subelemento: '16',
+                fetched_at: '2026-05-02T10:00:00.000Z',
+              },
+            ],
+          },
+        ],
+      },
+      error: null,
+    });
 
-    const result = await contratosApiService.getLiquidacoesPublicasPorEmpenho('2026NE000001');
+    const result = await contratosApiService.getLiquidacoesPublicasPorEmpenho('2026NE000027');
 
-    expect(result).toEqual([]);
+    expect(result).toEqual([
+      expect.objectContaining({
+        contrato_api_id: 126528,
+        contrato_numero: '00158/2021',
+        numero_instrumento_cobranca: 'Z57375',
+        empenho_numero: '2026NE000027',
+      }),
+    ]);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(functionsInvokeMock).toHaveBeenCalledWith('refresh-comprasnet-liquidacoes-cache', {
       body: {
-        empenhoNumero: '2026NE000001',
+        empenhoNumero: '2026NE000027',
+        returnRows: true,
         source: 'frontend-cache-miss',
       },
     });

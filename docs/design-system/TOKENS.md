@@ -59,4 +59,9 @@ Esta documentacao foi atualizada porque a mudanca altera comportamento visual re
 - `input-system`: campo com foco verde.
 - `stat-card`: KPI com tom opcional ou `stitchColor` legado.
 - `table-pagination`: rodape de tabela com divisor superior.
+- `pending-field-marker`: destaque inline para `[CAMPO PENDENTE]`, usando vermelho destrutivo com fundo de baixa opacidade.
 - `Layout`: sidebar branca de 248px, divisor `#dddddd`, item ativo com superficie `#f7f7f7` e barra lateral `#ff385c`.
+
+## Atualizacao de artefatos
+
+- A pagina `/artefatos-licitacao` nao introduz novos tokens; ela reutiliza `card-system`, `filter-panel`, `table-title`, `table-description`, `input-system`, badges e botoes iconicos existentes.

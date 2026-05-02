@@ -192,6 +192,50 @@ describe('Contratos regressions', () => {
         rp_inscrito: 9033.11,
         rp_a_pagar: 8500,
       },
+      {
+        id: 'api-empenho-2023-rap',
+        contrato_api_id: 'contrato-api-1',
+        api_empenho_id: 10552178,
+        numero: '2023NE000050',
+        unidade_gestora: '158366',
+        gestao: '26435',
+        data_emissao: '2023-05-30',
+        credor: 'Fornecedor Teste',
+        fonte_recurso: '1000000000',
+        plano_interno: 'L20RLP01MAN',
+        natureza_despesa: '339039',
+        valor_empenhado: 36782.64,
+        valor_a_liquidar: 21360.64,
+        valor_liquidado: 0,
+        valor_pago: 15422,
+        rp_inscrito: 21360.64,
+        rp_a_pagar: null,
+        raw_data: {
+          rpinscrito: '21.360,64',
+          rpaliquidar: '0,00',
+          rpliquidado: '0,00',
+          rppago: '21.360,64',
+        },
+      },
+      {
+        id: 'api-empenho-2026',
+        contrato_api_id: 'contrato-api-1',
+        api_empenho_id: 14504001,
+        numero: '2026NE000027',
+        unidade_gestora: '158366',
+        gestao: '26435',
+        data_emissao: '2026-04-17',
+        credor: 'Fornecedor Teste',
+        fonte_recurso: '1000000000',
+        plano_interno: 'L20RLP01ADN',
+        natureza_despesa: '339040',
+        valor_empenhado: 18000,
+        valor_a_liquidar: 15729,
+        valor_liquidado: 2271,
+        valor_pago: 0,
+        rp_inscrito: 0,
+        rp_a_pagar: 0,
+      },
     ]);
     mockedContratosApiService.getHistoricosApi.mockResolvedValue([
       {
@@ -344,12 +388,27 @@ describe('Contratos regressions', () => {
 
     expect(await screen.findByText('R$ 1.528.056,00')).toBeInTheDocument();
     expect(screen.queryByText('R$ 250.000,00')).not.toBeInTheDocument();
-    expect(await screen.findByText('R$ 12.732,40')).toBeInTheDocument();
-    expect(screen.getByText('0.8%')).toBeInTheDocument();
+    expect(await screen.findByText('R$ 67.515,04')).toBeInTheDocument();
+    expect(screen.getByText('4.4%')).toBeInTheDocument();
     expect(screen.getAllByText('2023NE000777').length).toBeGreaterThan(0);
-    expect(screen.queryByText('2024NE000319')).not.toBeInTheDocument();
+    expect(screen.getByText('2023NE000050')).toBeInTheDocument();
+    expect(screen.getByText('2024NE000319')).toBeInTheDocument();
+    expect(screen.getByText('2026NE000027')).toBeInTheDocument();
     expect(screen.getAllByText('R$ 40,00').length).toBeGreaterThan(0);
     expect(screen.getByText('Origem Reitoria')).toBeInTheDocument();
+  });
+
+  it('mostra RAP antigo da API com saldo e liquidado de restos em vez de saldo de exercicio', async () => {
+    renderContratos();
+
+    fireEvent.click(await screen.findByText('2023NE000050'));
+
+    expect(await screen.findByText('RP reinscrito:')).toBeInTheDocument();
+    expect(screen.getByText('Saldo Atual:')).toBeInTheDocument();
+    expect(screen.getByText('Liquidado/Pago RAP:')).toBeInTheDocument();
+    expect(screen.getAllByText('R$ 21.360,64').length).toBeGreaterThan(0);
+    expect(screen.getByText('R$ 0,00')).toBeInTheDocument();
+    expect(screen.queryByText('RP a pagar:')).not.toBeInTheDocument();
   });
 
   it('abre drawer com historico, itens e faturas mantendo grupo sem item', async () => {

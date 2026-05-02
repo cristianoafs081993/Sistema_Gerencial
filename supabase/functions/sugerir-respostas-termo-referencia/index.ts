@@ -38,7 +38,7 @@ type ReferenceTermSuggestionRequest = {
     kind?: string;
     pageNumber?: number;
     excerpt?: string;
-    sourceType?: 'processo' | 'anexo' | 'etp';
+    sourceType?: 'processo' | 'anexo' | 'etp' | 'mapa_riscos';
     sourceName?: string;
     sourceLabel?: string;
   }>;
@@ -53,7 +53,7 @@ type QuestionSuggestion = {
   value?: string;
   justification?: string;
   sourcePage?: number;
-  sourceType?: 'processo' | 'anexo' | 'etp';
+  sourceType?: 'processo' | 'anexo' | 'etp' | 'mapa_riscos';
   sourceLabel?: string;
   sourceExcerpt?: string;
   confidence?: 'high' | 'medium';
@@ -185,11 +185,11 @@ function buildPrompt(request: ReferenceTermSuggestionRequest, questions: Questio
     'Se nao houver fonte clara para uma pergunta, marque status "unanswered".',
     'Para perguntas exclusive ou optional, escolha apenas uma option id existente quando o texto do processo sustentar diretamente a escolha.',
     'Para perguntas field, preencha value com texto objetivo baseado no processo.',
-    'Toda sugestao precisa trazer justification, sourceExcerpt e confidence. Quando a fonte for processo/anexo, traga sourcePage se existir. Quando a fonte for ETP, traga sourceType "etp" e sourceLabel.',
+    'Toda sugestao precisa trazer justification, sourceExcerpt e confidence. Quando a fonte for processo/anexo, traga sourcePage se existir. Quando a fonte for ETP ou mapa de riscos, traga sourceType "etp" ou "mapa_riscos" e sourceLabel.',
     'sourceExcerpt deve copiar ou resumir fielmente o trecho usado como evidencia.',
     'Responda somente JSON valido, sem markdown e sem comentarios.',
     'O JSON deve seguir exatamente este formato:',
-    '{"status":"generated","warnings":["..."],"suggestions":[{"questionId":"...","kind":"exclusive|optional|field","status":"suggested|unanswered","selectedOptionId":"... opcional","value":"... opcional","justification":"...","sourcePage":1,"sourceType":"processo|anexo|etp","sourceLabel":"...","sourceExcerpt":"...","confidence":"high|medium"}]}',
+    '{"status":"generated","warnings":["..."],"suggestions":[{"questionId":"...","kind":"exclusive|optional|field","status":"suggested|unanswered","selectedOptionId":"... opcional","value":"... opcional","justification":"...","sourcePage":1,"sourceType":"processo|anexo|etp|mapa_riscos","sourceLabel":"...","sourceExcerpt":"...","confidence":"high|medium"}]}',
     '',
     `Processo: ${JSON.stringify(request.processo || {}, null, 2)}`,
     '',
@@ -226,7 +226,10 @@ function normalizeSuggestion(raw: unknown, questionById: Map<string, Questionnai
   const sourcePage = typeof record.sourcePage === 'number' && Number.isFinite(record.sourcePage)
     ? record.sourcePage
     : undefined;
-  const sourceType = record.sourceType === 'processo' || record.sourceType === 'anexo' || record.sourceType === 'etp'
+  const sourceType = record.sourceType === 'processo' ||
+    record.sourceType === 'anexo' ||
+    record.sourceType === 'etp' ||
+    record.sourceType === 'mapa_riscos'
     ? record.sourceType
     : undefined;
   const sourceLabel = typeof record.sourceLabel === 'string' ? record.sourceLabel.trim() : '';
@@ -242,8 +245,9 @@ function normalizeSuggestion(raw: unknown, questionById: Map<string, Questionnai
   }
 
   const hasPageSource = Boolean(justification && sourcePage && sourceExcerpt);
-  const hasEtpSource = sourceType === 'etp' && Boolean(justification && sourceLabel && sourceExcerpt);
-  if (!hasPageSource && !hasEtpSource) {
+  const hasLabelSource = (sourceType === 'etp' || sourceType === 'mapa_riscos') &&
+    Boolean(justification && sourceLabel && sourceExcerpt);
+  if (!hasPageSource && !hasLabelSource) {
     return {
       questionId,
       kind,

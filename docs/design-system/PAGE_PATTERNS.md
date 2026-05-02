@@ -49,6 +49,10 @@ Estrutura:
 
 KPIs podem usar `tone` novo ou `stitchColor` legado enquanto a compatibilidade existir.
 
+Aplicacao atual:
+
+- `/artefatos-licitacao` usa resumo por tipo, filtros compactos e tabela operacional para consulta de ETP, Mapa de Risco, Termo de Referencia e Minuta de Contrato. Acoes de linha devem permanecer iconicas e alinhadas a direita.
+
 ## Padrao 3: importacao de arquivo
 
 Estrutura:

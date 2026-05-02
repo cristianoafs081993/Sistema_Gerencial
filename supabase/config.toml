@@ -25,5 +25,8 @@ verify_jwt = false
 [functions.gerar-texto-etp-secao]
 verify_jwt = false
 
+[functions.gerar-mapa-riscos-licitacao]
+verify_jwt = false
+
 [functions.record-automation-savings-event]
 verify_jwt = false

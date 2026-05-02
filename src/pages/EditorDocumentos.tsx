@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Building2,
   Check,
@@ -13,6 +13,8 @@ import {
   Loader2,
   PanelRightOpen,
   ReceiptText,
+  Save,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   Trash2,
@@ -59,6 +61,7 @@ import {
 } from '@/lib/referenceTermQuestionnaire';
 import { type ReferenceTermPdfAnalysis } from '@/lib/referenceTermProcessPdf';
 import type { DocumentContextSnippet } from '@/lib/documentContextSnippets';
+import { highlightPendingFieldsInHtml } from '@/lib/pendingFieldHighlight';
 import {
   buildEtpInstitutionalContextSnippet,
   defaultEtpInstitutionalContextId,
@@ -86,6 +89,12 @@ import { cn, formatarDocumento } from '@/lib/utils';
 import { contractDraftsService } from '@/services/contractDrafts';
 import type { DocumentTemplateQuestion, DocumentTemplateRecord } from '@/services/documentTemplates';
 import {
+  licitacaoArtifactsService,
+  stripArtifactHtml,
+  type LicitacaoArtifactRecord,
+  type LicitacaoArtifactType,
+} from '@/services/licitacaoArtifacts';
+import {
   preliminaryStudiesService,
   type PreliminaryStudyDraftSection,
 } from '@/services/preliminaryStudies';
@@ -94,6 +103,7 @@ import {
   type ReferenceTermQuestionAnswer,
   type ReferenceTermQuestionSuggestion,
 } from '@/services/referenceTerms';
+import { riskMapsService } from '@/services/riskMaps';
 import { suapProcessosService } from '@/services/suapProcessos';
 import type { SuapProcesso } from '@/types';
 
@@ -120,9 +130,14 @@ type GeneratedDispatch = {
   title: string;
   subtitle?: string;
   processo?: string;
+  processId?: string;
   html: string;
   documentType: SupportedDocumentType;
   allowClone: boolean;
+  artifactId?: string;
+  artifactType?: LicitacaoArtifactType;
+  sourceArtifactIds?: string[];
+  artifactMetadata?: Record<string, unknown>;
   allowDocxDownload?: boolean;
   docxFileName?: string;
   docxTemplateBase64?: string;
@@ -131,6 +146,11 @@ type GeneratedDispatch = {
   etpContext?: {
     processo?: SuapProcesso | null;
     manualObject?: string;
+  };
+  riskMapContext?: {
+    processo?: SuapProcesso | null;
+    manualObject?: string;
+    etpContextSnippets?: DocumentContextSnippet[];
   };
 };
 
@@ -144,6 +164,7 @@ type PendingReferenceTermGeneration = {
   analysis?: ReferenceTermPdfAnalysis | null;
   template: DocumentTemplateRecord;
   etpContextSnippets?: DocumentContextSnippet[];
+  sourceArtifactIds?: string[];
 };
 
 type PendingPreliminaryStudyGeneration = {
@@ -260,6 +281,78 @@ const buildEtpContextSnippetsFromHtml = (html: string): DocumentContextSnippet[]
         sourceLabel: 'ETP editado no editor',
       }]
     : [];
+};
+
+const riskMapSnippetKindFromTitle = (title: string) => {
+  const normalized = title
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  if (normalized.includes('planejamento')) return 'risco-planejamento';
+  if (normalized.includes('selecao') || normalized.includes('fornecedor')) return 'risco-selecao';
+  if (normalized.includes('contratual') || normalized.includes('fiscal')) return 'risco-gestao';
+  return 'mapa_riscos';
+};
+
+const buildRiskMapContextSnippetsFromHtml = (html: string): DocumentContextSnippet[] => {
+  const text = normalizeContextText(stripHtml(html));
+  if (!text) return [];
+
+  if (typeof document === 'undefined') {
+    return [{
+      id: 'mapa-riscos-editado-1',
+      kind: 'mapa_riscos',
+      label: 'Mapa de Risco editado no editor',
+      excerpt: text.slice(0, 1600),
+      sourceType: 'mapa_riscos',
+      sourceLabel: 'Mapa de Risco editado no editor',
+    }];
+  }
+
+  const container = document.createElement('div');
+  container.innerHTML = html;
+  const rows = Array.from(container.querySelectorAll('tbody tr'));
+  const snippets = rows.map((row, index) => {
+    const cells = Array.from(row.querySelectorAll('td')).map((cell) => normalizeContextText(cell.textContent || ''));
+    const excerpt = cells.filter(Boolean).join(' | ');
+    const title = cells[1] || cells[2] || `Risco ${index + 1}`;
+    return excerpt.length >= 30
+      ? {
+          id: `mapa-riscos-editado-${index + 1}`,
+          kind: riskMapSnippetKindFromTitle(title),
+          label: title,
+          excerpt: excerpt.slice(0, 900),
+          sourceType: 'mapa_riscos' as const,
+          sourceLabel: 'Mapa de Risco editado no editor',
+        }
+      : null;
+  }).filter((snippet): snippet is DocumentContextSnippet => Boolean(snippet));
+
+  return snippets.length > 0
+    ? snippets.slice(0, 12)
+    : [{
+        id: 'mapa-riscos-editado-1',
+        kind: 'mapa_riscos',
+        label: 'Mapa de Risco editado no editor',
+        excerpt: text.slice(0, 1600),
+        sourceType: 'mapa_riscos',
+        sourceLabel: 'Mapa de Risco editado no editor',
+      }];
+};
+
+const documentTypeByArtifactType: Record<LicitacaoArtifactType, SupportedDocumentType> = {
+  etp: 'estudo-tecnico-preliminar-servicos-continuos',
+  mapa_riscos: 'mapa-riscos-licitacao',
+  termo_referencia: 'termo-referencia-compras',
+  minuta_contrato: 'contrato-servico-ifrn',
+};
+
+const artifactTypeLabels: Record<LicitacaoArtifactType, string> = {
+  etp: 'ETP',
+  mapa_riscos: 'Mapa de Risco',
+  termo_referencia: 'Termo de Referencia',
+  minuta_contrato: 'Minuta de Contrato',
 };
 
 const dividerHtml =
@@ -1339,6 +1432,7 @@ const VALID_MODEL_IDS: SupportedDocumentType[] = [
   'despacho-liquidacao',
   'contrato-servico-ifrn',
   'termo-referencia-compras',
+  'mapa-riscos-licitacao',
   'estudo-tecnico-preliminar-servicos-continuos',
 ];
 
@@ -1346,8 +1440,12 @@ export default function EditorDocumentos() {
   const { empenhos, contratos, contratosEmpenhos } = useData();
   const { modelId } = useParams<{ modelId?: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const editorCardRef = useRef<HTMLDivElement | null>(null);
   const preliminaryStudySupplementalInputRef = useRef<HTMLInputElement | null>(null);
+  const loadedArtifactIdRef = useRef<string | null>(null);
+  const lastSavedArtifactContentRef = useRef<Record<string, string>>({});
 
   // Deriva o modelo ativo da URL; fallback para despacho-liquidacao
   const activeDocumentId: SupportedDocumentType =
@@ -1397,6 +1495,7 @@ export default function EditorDocumentos() {
   const activeDocument = documentDefinitions.find((document) => document.id === activeDocumentId) || documentDefinitions[0];
   const isContractDocument = activeDocumentId === 'contrato-servico-ifrn';
   const isReferenceTermDocument = activeDocumentId === 'termo-referencia-compras';
+  const isRiskMapDocument = activeDocumentId === 'mapa-riscos-licitacao';
   const isPreliminaryStudyDocument = activeDocumentId === 'estudo-tecnico-preliminar-servicos-continuos';
   const etpInstitutionalContext = useMemo(
     () => getEtpInstitutionalContextById(defaultEtpInstitutionalContextId),
@@ -1453,6 +1552,15 @@ export default function EditorDocumentos() {
     () => exampleProcesses.find((processo) => processo.id === selectedProcessId)?.processoCompleto || null,
     [exampleProcesses, selectedProcessId],
   );
+  const {
+    data: selectedProcessArtifacts = [],
+    isLoading: isLoadingSelectedProcessArtifacts,
+  } = useQuery({
+    queryKey: ['licitacao-artifacts', 'process', selectedProcess?.id],
+    queryFn: () => licitacaoArtifactsService.listByProcess(selectedProcess!.id),
+    enabled: Boolean(selectedProcess?.id),
+    staleTime: 15000,
+  });
   const generationProcesses = useMemo(
     () =>
       generationProcessIds
@@ -1928,6 +2036,39 @@ export default function EditorDocumentos() {
     });
   };
 
+  const invalidateArtifactQueries = () => {
+    void queryClient.invalidateQueries({ queryKey: ['licitacao-artifacts'] });
+  };
+
+  const createArtifactForGeneratedDocument = async (document: GeneratedDispatch) => {
+    if (!document.artifactType) return null;
+
+    try {
+      const artifact = await licitacaoArtifactsService.createVersion({
+        artifactType: document.artifactType,
+        processId: document.processId || document.etpContext?.processo?.id || document.riskMapContext?.processo?.id,
+        processNumber: document.processo,
+        manualObject: document.etpContext?.manualObject || document.riskMapContext?.manualObject,
+        title: document.title,
+        subtitle: document.subtitle,
+        htmlContent: document.html,
+        plainText: stripArtifactHtml(document.html),
+        metadata: document.artifactMetadata || {},
+        sourceArtifactIds: document.sourceArtifactIds || [],
+        templateId: typeof document.artifactMetadata?.templateId === 'string' ? document.artifactMetadata.templateId : undefined,
+        docxExportPlan: document.docxExportPlan,
+        docxFileName: document.docxFileName,
+      });
+      invalidateArtifactQueries();
+      lastSavedArtifactContentRef.current[artifact.id] = artifact.htmlContent;
+      return artifact;
+    } catch (error) {
+      console.warn('Nao foi possivel salvar o artefato gerado.', error);
+      toast.warning('Documento gerado, mas nao foi possivel salvar o artefato automaticamente.');
+      return null;
+    }
+  };
+
   const openGeneratedDocument = (
     document: GeneratedDispatch,
     options?: {
@@ -1948,6 +2089,103 @@ export default function EditorDocumentos() {
     setScreenState('idle');
     focusEditor();
   };
+
+  const openArtifactRecord = (artifact: LicitacaoArtifactRecord) => {
+    const documentType = documentTypeByArtifactType[artifact.artifactType];
+    const document: GeneratedDispatch = {
+      id: artifact.id,
+      title: artifact.title,
+      subtitle: artifact.subtitle || `Versao ${artifact.version}`,
+      processo: artifact.processNumber,
+      processId: artifact.processId,
+      html: artifact.htmlContent,
+      documentType,
+      allowClone: false,
+      artifactId: artifact.id,
+      artifactType: artifact.artifactType,
+      sourceArtifactIds: artifact.sourceArtifactIds,
+      artifactMetadata: artifact.metadata,
+      allowDocxDownload: Boolean(artifact.docxExportPlan),
+      docxFileName: artifact.docxFileName,
+      docxExportPlan: artifact.docxExportPlan,
+      docxTemplateBase64: typeof artifact.metadata.templateBase64 === 'string' ? artifact.metadata.templateBase64 : undefined,
+      etpContext: artifact.artifactType === 'etp'
+        ? { processo: selectedProcess, manualObject: artifact.manualObject }
+        : undefined,
+      riskMapContext: artifact.artifactType === 'mapa_riscos'
+        ? {
+            processo: selectedProcess,
+            manualObject: artifact.manualObject,
+            etpContextSnippets: Array.isArray(artifact.metadata.etpContextSnippets)
+              ? artifact.metadata.etpContextSnippets as DocumentContextSnippet[]
+              : [],
+          }
+        : undefined,
+    };
+
+    loadedArtifactIdRef.current = artifact.id;
+    lastSavedArtifactContentRef.current[artifact.id] = artifact.htmlContent;
+    setActiveDocumentId(documentType);
+    openGeneratedDocument(document, {
+      feedbackMessage: `${artifactTypeLabels[artifact.artifactType]} v${artifact.version} aberto para revisao.`,
+      feedbackTone: 'success',
+    });
+  };
+
+  useEffect(() => {
+    const artifactId = searchParams.get('artifactId');
+    if (!artifactId || loadedArtifactIdRef.current === artifactId) return;
+
+    let cancelled = false;
+    loadedArtifactIdRef.current = artifactId;
+
+    void licitacaoArtifactsService.getById(artifactId)
+      .then((artifact) => {
+        if (cancelled) return;
+        if (!artifact) {
+          toast.warning('Artefato de licitacao nao encontrado.');
+          return;
+        }
+        openArtifactRecord(artifact);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        loadedArtifactIdRef.current = null;
+        const message = error instanceof Error ? error.message : 'Nao foi possivel abrir o artefato.';
+        setFeedback(message);
+        setFeedbackTone('warning');
+        toast.error(message);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams]);
+
+  useEffect(() => {
+    const dispatch = generatedDispatches[0];
+    if (!dispatch?.artifactId || !dispatch.artifactType || generatedDispatches.length !== 1) return;
+    if (!editorContent.trim()) return;
+    if (lastSavedArtifactContentRef.current[dispatch.artifactId] === editorContent) return;
+
+    const timeoutId = window.setTimeout(() => {
+      void licitacaoArtifactsService.updateContent({
+        id: dispatch.artifactId!,
+        htmlContent: editorContent,
+        plainText: stripArtifactHtml(editorContent),
+        metadata: dispatch.artifactMetadata,
+      })
+        .then((artifact) => {
+          lastSavedArtifactContentRef.current[artifact.id] = artifact.htmlContent;
+          invalidateArtifactQueries();
+        })
+        .catch((error) => {
+          console.warn('Nao foi possivel salvar a edicao do artefato.', error);
+        });
+    }, 1000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [editorContent, generatedDispatches]);
 
   const openContext = (
     context: ResolvedDocumentContext,
@@ -2002,15 +2240,27 @@ export default function EditorDocumentos() {
       }
 
       const warningCount = result.warnings.length + result.missingRequiredFields.length;
-      openGeneratedDocument(
-        {
+      const generatedDocument: GeneratedDispatch = {
           id: candidate.id,
           title: result.title,
           subtitle: result.subtitle || candidate.subtitle,
           processo: processo.numProcesso,
+          processId: processo.id,
           html: result.html || '<p></p>',
           documentType: 'contrato-servico-ifrn',
           allowClone: false,
+          artifactType: 'minuta_contrato',
+          artifactMetadata: {
+            model: result.model,
+            candidateId: candidate.id,
+          },
+        };
+      const artifact = await createArtifactForGeneratedDocument(generatedDocument);
+
+      openGeneratedDocument(
+        {
+          ...generatedDocument,
+          artifactId: artifact?.id,
         },
         {
           feedbackMessage: warningCount > 0 ? `Contrato gerado com ${warningCount} alerta(s) para revisao.` : 'Contrato gerado.',
@@ -2097,6 +2347,7 @@ export default function EditorDocumentos() {
     template: DocumentTemplateRecord,
     questionnaireAnswers: ReferenceTermQuestionAnswer[] = [],
     etpContextSnippets: DocumentContextSnippet[] = [],
+    sourceArtifactIds: string[] = [],
   ) => {
     const questionnaireSchema = sanitizeReferenceTermQuestionnaireSchema(
       template.questionnaireSchema,
@@ -2128,19 +2379,34 @@ export default function EditorDocumentos() {
         `Termo de Referencia - ${processo?.numProcesso || processo?.suapId || 'compras'}.docx`,
       );
 
-      openGeneratedDocument(
-        {
+      const generatedDocument: GeneratedDispatch = {
           id: `${processo?.id || 'etp-manual'}-termo-referencia-${Date.now()}`,
           title: result.title,
           subtitle: result.subtitle || template.versionLabel || template.fileName,
           processo: processo?.numProcesso,
+          processId: processo?.id,
           html: result.html || '<p></p>',
           documentType: 'termo-referencia-compras',
           allowClone: false,
+          artifactType: 'termo_referencia',
+          sourceArtifactIds,
+          artifactMetadata: {
+            model: result.model,
+            templateId: template.id,
+            templateBase64: template.templateBase64,
+            contextSnippetCount: etpContextSnippets.length,
+          },
           allowDocxDownload: Boolean(result.templatePlan),
           docxFileName: fileName,
           docxTemplateBase64: template.templateBase64,
           docxExportPlan: result.templatePlan,
+        };
+      const artifact = await createArtifactForGeneratedDocument(generatedDocument);
+
+      openGeneratedDocument(
+        {
+          ...generatedDocument,
+          artifactId: artifact?.id,
         },
         {
           feedbackMessage:
@@ -2169,6 +2435,7 @@ export default function EditorDocumentos() {
       pendingReferenceTermGeneration.template,
       answers,
       pendingReferenceTermGeneration.etpContextSnippets || [],
+      pendingReferenceTermGeneration.sourceArtifactIds || [],
     );
   };
 
@@ -2290,6 +2557,83 @@ export default function EditorDocumentos() {
     }
   };
 
+  const handleGenerateRiskMapFromPreliminaryStudy = async (dispatch: GeneratedDispatch) => {
+    const etpContextSnippets = buildEtpContextSnippetsFromHtml(editorContent);
+    if (etpContextSnippets.length === 0) {
+      const message = 'Revise o ETP no editor antes de prosseguir para o Mapa de Risco.';
+      setFeedback(message);
+      setFeedbackTone('warning');
+      setScreenState('not_found');
+      toast.error(message);
+      return;
+    }
+
+    setFeedback('');
+    resetPendingStates();
+    setActiveDocumentId('mapa-riscos-licitacao');
+    setScreenState('resolving');
+
+    try {
+      const result = await riskMapsService.generateDraft({
+        processo: dispatch.etpContext?.processo || null,
+        manualObject: dispatch.etpContext?.manualObject,
+        etpContextSnippets,
+      });
+
+      if (result.status === 'blocked') {
+        setFeedback(result.blockedReason || 'Nao foi possivel gerar o Mapa de Risco.');
+        setFeedbackTone('warning');
+        setScreenState('not_found');
+        return;
+      }
+
+      const warningCount = result.warnings.length;
+      const generatedDocument: GeneratedDispatch = {
+        id: `${dispatch.artifactId || dispatch.id}-mapa-riscos-${Date.now()}`,
+        title: result.title,
+        subtitle: result.subtitle || dispatch.subtitle,
+        processo: dispatch.processo,
+        processId: dispatch.processId || dispatch.etpContext?.processo?.id,
+        html: result.html || '<p></p>',
+        documentType: 'mapa-riscos-licitacao',
+        allowClone: false,
+        artifactType: 'mapa_riscos',
+        sourceArtifactIds: dispatch.artifactId ? [dispatch.artifactId] : [],
+        artifactMetadata: {
+          model: result.model,
+          etpContextSnippets,
+          etpArtifactId: dispatch.artifactId,
+        },
+        riskMapContext: {
+          processo: dispatch.etpContext?.processo || null,
+          manualObject: dispatch.etpContext?.manualObject,
+          etpContextSnippets,
+        },
+      };
+      const artifact = await createArtifactForGeneratedDocument(generatedDocument);
+
+      openGeneratedDocument(
+        {
+          ...generatedDocument,
+          artifactId: artifact?.id,
+        },
+        {
+          feedbackMessage:
+            warningCount > 0
+              ? `Mapa de Risco gerado com ${warningCount} alerta(s) para revisao.`
+              : 'Mapa de Risco gerado.',
+          feedbackTone: warningCount > 0 ? 'neutral' : 'success',
+        },
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro inesperado ao gerar o Mapa de Risco.';
+      setFeedback(message);
+      setFeedbackTone('warning');
+      setScreenState('not_found');
+      toast.error(message);
+    }
+  };
+
   const handleProceedFromPreliminaryStudyToReferenceTerm = async (dispatch: GeneratedDispatch) => {
     const etpContextSnippets = buildEtpContextSnippetsFromHtml(editorContent);
     if (etpContextSnippets.length === 0) {
@@ -2345,7 +2689,13 @@ export default function EditorDocumentos() {
       const questions = questionnaireSchema?.questions || [];
 
       if (questions.length > 0) {
-        setPendingReferenceTermGeneration({ processo, analysis, template, etpContextSnippets });
+        setPendingReferenceTermGeneration({
+          processo,
+          analysis,
+          template,
+          etpContextSnippets,
+          sourceArtifactIds: dispatch.artifactId ? [dispatch.artifactId] : [],
+        });
         setReferenceTermAnswers({});
         setReferenceTermSuggestionReviews([]);
         setReferenceTermManualQuestionIds(questions.map((question) => question.id));
@@ -2392,9 +2742,150 @@ export default function EditorDocumentos() {
         }
       }
 
-      await handleGenerateReferenceTermDraft(processo, analysis, template, [], etpContextSnippets);
+      await handleGenerateReferenceTermDraft(
+        processo,
+        analysis,
+        template,
+        [],
+        etpContextSnippets,
+        dispatch.artifactId ? [dispatch.artifactId] : [],
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro inesperado ao iniciar o Termo de Referencia a partir do ETP.';
+      setFeedback(message);
+      setFeedbackTone('warning');
+      setScreenState('not_found');
+      toast.error(message);
+    }
+  };
+
+  const handleProceedFromRiskMapToReferenceTerm = async (dispatch: GeneratedDispatch) => {
+    const riskMapSnippets = buildRiskMapContextSnippetsFromHtml(editorContent);
+    const etpContextSnippets = Array.isArray(dispatch.artifactMetadata?.etpContextSnippets)
+      ? dispatch.artifactMetadata.etpContextSnippets as DocumentContextSnippet[]
+      : dispatch.riskMapContext?.etpContextSnippets || [];
+    const contextSnippets = [...etpContextSnippets, ...riskMapSnippets];
+
+    if (riskMapSnippets.length === 0) {
+      const message = 'Revise o Mapa de Risco no editor antes de prosseguir para o Termo de Referencia.';
+      setFeedback(message);
+      setFeedbackTone('warning');
+      setScreenState('not_found');
+      toast.error(message);
+      return;
+    }
+
+    setFeedback('');
+    resetPendingStates();
+    setActiveDocumentId('termo-referencia-compras');
+    setScreenState('resolving');
+
+    const processo = dispatch.riskMapContext?.processo || null;
+    const sourceArtifactIds = Array.from(new Set([
+      ...(dispatch.sourceArtifactIds || []),
+      ...(dispatch.artifactId ? [dispatch.artifactId] : []),
+    ]));
+
+    try {
+      const template = await referenceTermsService.getActiveTemplate();
+      if (!template) {
+        const message = 'Nao existe modelo ativo para Termo de Referencia - Compras. Publique o DOCX em Modelos de documentos.';
+        setFeedback(message);
+        setFeedbackTone('warning');
+        setScreenState('not_found');
+        toast.error(message);
+        return;
+      }
+
+      if (template.editableBlocks.length === 0) {
+        const message = 'O modelo ativo nao possui blocos editaveis reconhecidos. Reenvie o DOCX atualizado em Modelos de documentos.';
+        setFeedback(message);
+        setFeedbackTone('warning');
+        setScreenState('not_found');
+        toast.error(message);
+        return;
+      }
+
+      let analysis: ReferenceTermPdfAnalysis | null = null;
+      if (processo?.pdfUrl) {
+        try {
+          analysis = await referenceTermsService.analyzeProcessPdf(processo);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Nao foi possivel analisar o PDF do processo.';
+          toast.warning(`${message} O Termo de Referencia usara o ETP e o Mapa de Risco como fontes principais.`);
+        }
+      }
+
+      const questionnaireSchema = sanitizeReferenceTermQuestionnaireSchema(
+        template.questionnaireSchema,
+        template.editableBlocks,
+      );
+      const questions = questionnaireSchema?.questions || [];
+
+      if (questions.length > 0) {
+        setPendingReferenceTermGeneration({
+          processo,
+          analysis,
+          template,
+          etpContextSnippets: contextSnippets,
+          sourceArtifactIds,
+        });
+        setReferenceTermAnswers({});
+        setReferenceTermSuggestionReviews([]);
+        setReferenceTermManualQuestionIds(questions.map((question) => question.id));
+        setReferenceTermQuestionIndex(0);
+        setFeedback(`Analisando ETP e Mapa de Risco para sugerir respostas para ${questions.length} pergunta(s) do modelo AGU.`);
+        setFeedbackTone('neutral');
+
+        try {
+          const suggestionResult = await referenceTermsService.suggestQuestionnaireAnswers({
+            processo,
+            analysis,
+            template,
+            questionnaireSchema,
+            etpContextSnippets: contextSnippets,
+          });
+          const suggestedReviews = suggestionResult.suggestions
+            .filter((suggestion) => suggestion.status === 'suggested')
+            .map((suggestion) => ({
+              ...suggestion,
+              decision: 'pending' as const,
+            }));
+
+          setReferenceTermSuggestionReviews(suggestedReviews);
+
+          if (suggestedReviews.length > 0) {
+            setFeedback(`${suggestedReviews.length} sugestao(oes) da IA encontradas com fonte no ETP ou Mapa de Risco.`);
+            setFeedbackTone('success');
+            setScreenState('ai_questionnaire_prefill');
+            return;
+          }
+
+          setFeedback('A IA nao encontrou respostas suficientes no ETP ou Mapa de Risco. Revise manualmente as perguntas pendentes.');
+          setFeedbackTone('warning');
+          setScreenState('reference_questionnaire');
+          return;
+        } catch (suggestionError) {
+          const suggestionMessage = suggestionError instanceof Error
+            ? suggestionError.message
+            : 'Nao foi possivel sugerir respostas automaticamente.';
+          setFeedback(`${suggestionMessage} O questionario manual continua disponivel com ETP e Mapa de Risco como contexto.`);
+          setFeedbackTone('warning');
+          setScreenState('reference_questionnaire');
+          return;
+        }
+      }
+
+      await handleGenerateReferenceTermDraft(
+        processo,
+        analysis,
+        template,
+        [],
+        contextSnippets,
+        sourceArtifactIds,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro inesperado ao iniciar o Termo de Referencia a partir do Mapa de Risco.';
       setFeedback(message);
       setFeedbackTone('warning');
       setScreenState('not_found');
@@ -2428,20 +2919,32 @@ export default function EditorDocumentos() {
       const warningCount = result.warnings.length + result.missingRequiredFields.length;
       const processoLabel = pending.processo?.numProcesso || pending.processo?.suapId;
 
-      openGeneratedDocument(
-        {
+      const generatedDocument: GeneratedDispatch = {
           id: `${pending.processo?.id || 'manual'}-etp-${Date.now()}`,
           title: result.title,
           subtitle: result.subtitle || (processoLabel ? `Processo ${processoLabel}` : pending.manualObject),
           processo: pending.processo?.numProcesso,
+          processId: pending.processo?.id,
           html: result.html || '<p></p>',
           documentType: 'estudo-tecnico-preliminar-servicos-continuos',
           allowClone: false,
+          artifactType: 'etp',
+          artifactMetadata: {
+            model: result.model,
+            supplementalSnippetCount: pending.supplementalSnippets?.length || 0,
+          },
           sections: result.sections || [],
           etpContext: {
             processo: pending.processo || null,
             manualObject: pending.manualObject,
           },
+        };
+      const artifact = await createArtifactForGeneratedDocument(generatedDocument);
+
+      openGeneratedDocument(
+        {
+          ...generatedDocument,
+          artifactId: artifact?.id,
         },
         {
           feedbackMessage:
@@ -2838,6 +3341,15 @@ export default function EditorDocumentos() {
       return;
     }
 
+    if (isRiskMapDocument) {
+      const message = 'O Mapa de Risco deve ser gerado a partir de um ETP aberto no editor.';
+      setFeedback(message);
+      setFeedbackTone('warning');
+      setScreenState('not_found');
+      toast.error(message);
+      return;
+    }
+
     if (isContractDocument) {
       await handleGenerateContract(processo);
       return;
@@ -2946,6 +3458,16 @@ export default function EditorDocumentos() {
   };
 
   const handlePrimaryGenerate = async () => {
+    if (isRiskMapDocument) {
+      const message = 'O Mapa de Risco deve ser gerado a partir de um ETP aberto no editor.';
+      setFeedback(message);
+      setFeedbackTone('warning');
+      resetPendingStates();
+      setScreenState('not_found');
+      toast.error(message);
+      return;
+    }
+
     if (isContractDocument || isReferenceTermDocument) {
       if (generationProcesses.length !== 1) {
         const message = isReferenceTermDocument
@@ -3043,8 +3565,9 @@ export default function EditorDocumentos() {
 
   const handleCopy = async () => {
     const html = editorContent;
+    const clipboardHtml = (isPreliminaryStudyDocument || isRiskMapDocument) ? highlightPendingFieldsInHtml(html) : html;
     try {
-      const blob = new Blob([html], { type: 'text/html' });
+      const blob = new Blob([clipboardHtml], { type: 'text/html' });
       const clipboard = new ClipboardItem({
         'text/html': blob,
         'text/plain': new Blob([stripHtml(html)], { type: 'text/plain' }),
@@ -3058,8 +3581,12 @@ export default function EditorDocumentos() {
   };
 
   const handleCopyDispatch = async (dispatch: GeneratedDispatch) => {
+    const html = dispatch.documentType === 'estudo-tecnico-preliminar-servicos-continuos' ||
+      dispatch.documentType === 'mapa-riscos-licitacao'
+      ? highlightPendingFieldsInHtml(dispatch.html)
+      : dispatch.html;
     try {
-      const blob = new Blob([dispatch.html], { type: 'text/html' });
+      const blob = new Blob([html], { type: 'text/html' });
       const clipboard = new ClipboardItem({
         'text/html': blob,
         'text/plain': new Blob([stripHtml(dispatch.html)], { type: 'text/plain' }),
@@ -3076,8 +3603,12 @@ export default function EditorDocumentos() {
 
   const handleCopySection = async (dispatch: GeneratedDispatch, section: PreliminaryStudyDraftSection) => {
     const sectionKey = `${dispatch.id}:${section.id}`;
+    const html = dispatch.documentType === 'estudo-tecnico-preliminar-servicos-continuos' ||
+      dispatch.documentType === 'mapa-riscos-licitacao'
+      ? highlightPendingFieldsInHtml(section.html)
+      : section.html;
     try {
-      const blob = new Blob([section.html], { type: 'text/html' });
+      const blob = new Blob([html], { type: 'text/html' });
       const clipboard = new ClipboardItem({
         'text/html': blob,
         'text/plain': new Blob([stripHtml(section.html)], { type: 'text/plain' }),
@@ -3101,7 +3632,9 @@ export default function EditorDocumentos() {
   const showManualObjectTextarea = isPreliminaryStudyDocument && generationProcesses.length === 0;
   const processCounterLabel = generationProcesses.length > 0
     ? `${generationProcesses.length} processo${generationProcesses.length !== 1 ? 's' : ''} selecionado${generationProcesses.length !== 1 ? 's' : ''}`
-    : isPreliminaryStudyDocument
+    : isRiskMapDocument
+      ? 'Gerar a partir do ETP'
+      : isPreliminaryStudyDocument
       ? 'Objeto manual'
       : '0 processos selecionados';
 
@@ -3272,6 +3805,8 @@ export default function EditorDocumentos() {
                             ? 'Gerar contrato'
                             : isReferenceTermDocument
                               ? 'Gerar Termo de Referencia'
+                              : isRiskMapDocument
+                                ? 'Gerar Mapa de Risco'
                               : isPreliminaryStudyDocument
                                 ? 'Gerar ETP'
                                 : 'Gerar minuta'}
@@ -3333,14 +3868,17 @@ export default function EditorDocumentos() {
             <RichTextEditor
               content={editorContent}
               onChange={setEditorContent}
+              highlightPendingFields={isPreliminaryStudyDocument || isRiskMapDocument}
               placeholder={
                 isContractDocument
                   ? 'O contrato sera montado aqui...'
                   : isReferenceTermDocument
                     ? 'O Termo de Referencia sera montado aqui...'
-                    : isPreliminaryStudyDocument
-                      ? 'O ETP sera montado aqui...'
-                      : 'A minuta sera montada aqui...'
+                    : isRiskMapDocument
+                      ? 'O Mapa de Risco sera montado aqui...'
+                      : isPreliminaryStudyDocument
+                        ? 'O ETP sera montado aqui...'
+                        : 'A minuta sera montada aqui...'
               }
               toolbarLeft={
                 <div className="flex items-center gap-2">
@@ -3352,6 +3890,12 @@ export default function EditorDocumentos() {
               }
               toolbarRight={
                 <div className="hidden items-center gap-2 sm:flex">
+                  {generatedDispatches[0]?.artifactId ? (
+                    <Badge variant="outline" className="gap-1.5 border-status-success/25 bg-status-success/10 text-status-success">
+                      <Save className="h-3 w-3" />
+                      Artefato salvo
+                    </Badge>
+                  ) : null}
                   <Badge variant="outline" className="border-border-default bg-surface-subtle text-text-secondary">
                     Editor
                   </Badge>
@@ -3432,7 +3976,23 @@ export default function EditorDocumentos() {
                             variant="outline"
                             size="sm"
                             className="h-7 bg-surface-card px-2.5 font-ui text-[11px] transition-all duration-200 hover:-translate-y-px active:scale-95"
-                            onClick={() => void handleProceedFromPreliminaryStudyToReferenceTerm(dispatch)}
+                            onClick={() => void handleGenerateRiskMapFromPreliminaryStudy(dispatch)}
+                            disabled={screenState === 'resolving'}
+                          >
+                            {screenState === 'resolving' ? (
+                              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <ShieldAlert className="mr-1.5 h-3.5 w-3.5" />
+                            )}
+                            Prosseguir para Mapa de Risco
+                          </Button>
+                        ) : dispatch.documentType === 'mapa-riscos-licitacao' ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 bg-surface-card px-2.5 font-ui text-[11px] transition-all duration-200 hover:-translate-y-px active:scale-95"
+                            onClick={() => void handleProceedFromRiskMapToReferenceTerm(dispatch)}
                             disabled={screenState === 'resolving'}
                           >
                             {screenState === 'resolving' ? (
@@ -3462,8 +4022,10 @@ export default function EditorDocumentos() {
                             {dispatch.documentType === 'termo-referencia-compras'
                               ? 'Revise e exporte em DOCX'
                               : dispatch.documentType === 'estudo-tecnico-preliminar-servicos-continuos'
-                                ? 'Copie o documento ou as secoes'
-                                : 'Edite e copie no editor'}
+                                ? 'Copie o documento ou gere o mapa'
+                                : dispatch.documentType === 'mapa-riscos-licitacao'
+                                  ? 'Revise antes do Termo de Referencia'
+                                  : 'Edite e copie no editor'}
                           </span>
                         )}
                       </div>
@@ -3950,6 +4512,59 @@ export default function EditorDocumentos() {
                       copyMessage="Assunto copiado."
                     />
                   </div>
+                </SidebarSection>
+
+                <SidebarSection
+                  icon={<FileText className="h-3.5 w-3.5" />}
+                  title="Artefatos de licitacao"
+                  contentClassName="space-y-2"
+                >
+                  {isLoadingSelectedProcessArtifacts ? (
+                    <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/70 px-3 py-2 text-[12px] text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Carregando artefatos...
+                    </div>
+                  ) : selectedProcessArtifacts.length > 0 ? (
+                    <div className="grid gap-2 md:grid-cols-2">
+                      {selectedProcessArtifacts.slice(0, 8).map((artifact) => (
+                        <div
+                          key={artifact.id}
+                          className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-border bg-white px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Badge variant="outline" className="border-border bg-muted/70 text-[10px] text-muted-foreground">
+                                {artifactTypeLabels[artifact.artifactType]}
+                              </Badge>
+                              <span className="font-mono text-[10px] font-semibold text-muted-foreground">
+                                v{artifact.version}
+                              </span>
+                            </div>
+                            <p className="mt-1 truncate text-[12px] font-semibold text-foreground">{artifact.title}</p>
+                            <p className="truncate text-[11px] text-muted-foreground">
+                              {artifact.updatedAt ? new Date(artifact.updatedAt).toLocaleString('pt-BR') : 'Sem data'}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 shrink-0 bg-white px-2.5 text-[11px]"
+                            onClick={() => {
+                              openArtifactRecord(artifact);
+                              setSelectedProcessId(null);
+                            }}
+                          >
+                            Abrir
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-border bg-muted/50 px-3 py-2 text-[12px] text-muted-foreground">
+                      Nenhum artefato salvo para este processo.
+                    </div>
+                  )}
                 </SidebarSection>
 
                 <SidebarSection

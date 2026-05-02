@@ -342,6 +342,9 @@ Observacoes operacionais:
 
 - empenhos vinculados a cada contrato vindo da API externa
 - `valor_empenhado` representa o empenhado original e nao deve ser substituido por base RAP
+- `rp_inscrito` e `rp_a_pagar` ficam em colunas dedicadas; outros campos RAP da API (`rpaliquidar`, `rpliquidado`, `rppago`) permanecem em `raw_data`
+- em RAP antigo, a UI usa `raw_data.rppago`/`raw_data.rpliquidado` para liquidado/pago de RAP e deriva saldo atual quando `rp_a_pagar` nao vier na resposta
+- na lista de contratos, empenhos desta tabela aparecem como badges complementares quando ainda nao existem no vinculo local `contratos_empenhos`; se o mesmo numero existir localmente, a exibicao local prevalece
 
 ### `contratos_api_faturas`
 
@@ -532,6 +535,47 @@ Observacoes operacionais:
 - o `CHECK` da tabela garante que favoritos de empenho usem somente `empenho_id` e favoritos de contrato usem somente `contrato_id`
 - FKs com `ON DELETE CASCADE` removem favoritos quando o empenho ou contrato local deixa de existir
 - contratos favoritos sempre se referem a `contratos`; dados de `contratos_api*` apenas enriquecem a linha exibida
+
+## Artefatos de licitacao
+
+### `licitacao_document_artifacts`
+
+Finalidade:
+
+- armazenar versoes geradas no fluxo de documentos de licitacao sem reutilizar `documentos_gerados`
+- cobrir `etp`, `mapa_riscos`, `termo_referencia` e `minuta_contrato`
+
+Campos-chave:
+
+- `artifact_type`
+- `process_id`
+- `process_number`
+- `manual_object`
+- `title`
+- `html_content`
+- `plain_text`
+- `metadata`
+- `source_artifact_ids`
+- `template_id`
+- `docx_export_plan`
+- `docx_file_name`
+- `created_by`
+- `version`
+- `created_at`
+- `updated_at`
+
+Consumido por:
+
+- [licitacaoArtifacts.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/licitacaoArtifacts.ts)
+- [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx)
+- [ArtefatosLicitacao.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/ArtefatosLicitacao.tsx)
+
+Observacoes operacionais:
+
+- cada geracao cria nova versao; edicoes no editor atualizam a versao aberta com debounce
+- `source_artifact_ids` guarda a linhagem entre ETP, Mapa de Risco, TR e Minuta
+- RLS permite leitura a usuarios autenticados, insercao pelo usuario autenticado e update/delete apenas pelo criador ou superadmin
+- anexos auxiliares do ETP continuam fora desta tabela; somente snippets e metadados derivados podem ser persistidos
 
 ## Automacoes e economia de tempo
 

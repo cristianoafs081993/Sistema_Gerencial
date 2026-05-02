@@ -21,6 +21,7 @@ Credenciais necessarias:
 Observacao:
 
 - o app usa tanto `supabase-js` quanto fallback REST.
+- artefatos gerados no fluxo de licitacao usam a tabela `licitacao_document_artifacts`, lida e escrita por `licitacaoArtifactsService`; ela nao reutiliza `documentos_gerados`.
 
 ## 1A. Supabase Auth
 
@@ -149,7 +150,7 @@ Descoberta publica em tempo real no modal de empenho:
 - a leitura do modal usa primeiro o cache Supabase em `contratos_api_empenho_liquidacoes_cache_status` e `contratos_api_empenho_liquidacoes_cache`
 - enquanto as tabelas de cache ainda nao existirem em um ambiente, o frontend nao aciona a Edge Function a partir do modal; isso evita erros 404/CORS durante bootstrap antes da migration e do deploy da function
 - se o status publico indicar linhas mas a leitura publica das linhas voltar vazia por problema de policy/RLS, o service usa a Edge Function em modo `readCacheOnly` como fallback de leitura com service role
-- a Edge Function `refresh-comprasnet-liquidacoes-cache` faz a descoberta dinamica em segundo plano, buscando contratos publicos ativos e inativos das UGs `158366` e `158155`, cobrindo empenhos emitidos pelo campus que estejam vinculados a contratos gerenciados pela Reitoria; depois filtra os contratos cujo endpoint `/empenhos` contenha o empenho alvo e so entao consulta `/faturas`
+- a Edge Function `refresh-comprasnet-liquidacoes-cache` faz a descoberta dinamica quando chamada pelo frontend ou cron, buscando contratos publicos ativos e inativos das UGs `158366` e `158155`, cobrindo empenhos emitidos pelo campus que estejam vinculados a contratos gerenciados pela Reitoria; depois filtra os contratos cujo endpoint `/empenhos` contenha o empenho alvo e so entao consulta `/faturas`
 - a vinculacao final usa `dados_empenho[]` dentro da fatura para decidir quais liquidações apareceram no modal
 - `data_liquidacao` pode aparecer em payloads reais de `faturas`, mas nao esta garantida pelo schema OpenAPI; a UI deve tratá-la como opcional
 - o cache usa TTL de 12 horas para resultados encontrados e 1 hora para `not_found`; o cron horario reprocessa entradas vencidas
@@ -181,7 +182,8 @@ Observacao:
 - o historico de contrato deve mostrar os valores originais da API; variacoes derivadas entre termos nao sao valor oficial de aditivo
 - o Valor Total da lista deve usar `contratos_api_historico` como fonte principal, somando `valor_inicial` de cada termo. `valor_global` da API nao entra nessa metrica porque pode representar outro consolidado/periodo e distorcer a leitura. Sem historico com `valor_inicial`, usar `contratos.valor` como fallback
 - em contratos com `codigo_unidade_origem = 158155`, a UI deve sinalizar origem Reitoria e diferenciar valores globais do contrato da execucao do campus `158366`
-- empenhos da API alimentam apenas o agregado de Valor Empenhado pelo campo `empenhado` na lista principal; os badges/popovers de empenhos continuam vindo de `empenhos` + `contratos_empenhos` para preservar os saldos CSV/SIAFI. O drawer nao exibe uma secao propria de empenhos para evitar misturar saldos da API com a regra local de `empenhos`
+- empenhos da API alimentam o agregado de Valor Empenhado pelo campo `empenhado` na lista principal e tambem aparecem como badges/popovers quando ainda nao existem em `empenhos` + `contratos_empenhos`; quando o mesmo numero existir nas duas fontes, o badge local prevalece para preservar os saldos CSV/SIAFI. O drawer nao exibe uma secao propria de empenhos para evitar misturar saldos da API com a regra local de `empenhos`
+- Em RAP vindo apenas da API, o popover usa `rp_inscrito`, `rp_a_pagar` e os campos especificos preservados em `raw_data` (`rpaliquidar`, `rpliquidado`, `rppago`, `rpapagar` quando presente), evitando usar `aliquidar`/`pago` do exercicio como saldo de RAP
 - nos itens do drawer, o contratado deve somar `historico_item[].valor_total` quando a API trouxer historico por item; `valor_total` do item e fallback sem historico
 - quando a API trouxer o `historico_item`, o drawer deve exibir tambem seus campos operacionais por termo: `tipo_historico`, `data_termo`, `quantidade`, `valor_unitario` e `valor_total`
 - no resumo de itens do drawer, `Contratado` e `Executado` tambem devem mostrar quantidade agregada: contratado pela soma de `historico_item[].quantidade` quando houver historico, e executado pela soma de `quantidade_faturado` nas faturas `Pago` ou `Siafi Apropriado`
@@ -295,7 +297,7 @@ Observacao:
 - respostas do questionario travam escolhas do usuario antes da IA; perguntas puladas viram pendencia e nao sao decididas pelo Gemini
 - o `templatePlan` pode incluir marcas de revisao para o exportador DOCX: destaque de IA, pendencia, tachado de trecho nao adotado e comentarios laterais
 - sem modelo ativo em `document_templates`, o bloqueio acontece no frontend
-- quando iniciado a partir de ETP manual, a chamada pode vir sem processo SUAP; nesse caso o contexto obrigatorio e o snippet `sourceType: "etp"` com `sourceLabel: "ETP editado no editor"` e `sourceExcerpt`
+- quando iniciado a partir do fluxo ETP -> Mapa de Risco, a chamada pode vir sem processo SUAP; nesse caso o contexto obrigatorio vem de snippets `sourceType: "etp"` e `sourceType: "mapa_riscos"` com `sourceLabel` e `sourceExcerpt`
 
 ## 7D. Edge Function `sugerir-respostas-termo-referencia`
 
@@ -321,10 +323,35 @@ Dependencias externas:
 
 Observacao:
 
-- sugestoes sem fonte explicita sao descartadas e tratadas como pendentes; fontes do processo precisam trazer `sourcePage`, `sourceExcerpt` e `justification`, enquanto fonte ETP pode omitir pagina se trouxer `sourceType: "etp"`, `sourceLabel`, `sourceExcerpt` e `justification`
+- sugestoes sem fonte explicita sao descartadas e tratadas como pendentes; fontes do processo precisam trazer `sourcePage`, `sourceExcerpt` e `justification`, enquanto fontes ETP ou Mapa de Risco podem omitir pagina se trouxerem `sourceType: "etp"` ou `sourceType: "mapa_riscos"`, `sourceLabel`, `sourceExcerpt` e `justification`
 - a geracao final continua em `gerar-termo-referencia-compras`
 
-## 7E. Edge Function `gerar-etp-servicos-continuos`
+## 7E. Edge Function `gerar-mapa-riscos-licitacao`
+
+Uso:
+
+- geracao assistida do Mapa de Risco da licitacao a partir do ETP editado no Editor de Documentos
+
+Chamador:
+
+- [riskMaps.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/riskMaps.ts)
+
+Implementacao no repo:
+
+- [gerar-mapa-riscos-licitacao/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/gerar-mapa-riscos-licitacao/index.ts)
+
+Dependencias externas:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional `GEMINI_RISK_MAP_MODEL`
+
+Observacao:
+
+- a function usa Gemini via REST e devolve HTML editavel com tabela de riscos contendo fase, risco, causa, dano, probabilidade, impacto, nivel, acao preventiva, acao de contingencia e responsavel
+- se a function falhar ou nao estiver publicada, `riskMapsService` monta fallback local para nao bloquear o fluxo ETP -> Mapa de Risco -> TR
+- o deploy segue o padrao do Editor com `verify_jwt = false`
+
+## 7F. Edge Function `gerar-etp-servicos-continuos`
 
 Uso:
 
@@ -351,13 +378,15 @@ Observacao:
 - se a chamada a function falhar no frontend por indisponibilidade, CORS ou function ainda nao publicada, `preliminaryStudiesService` monta o mesmo tipo de rascunho por fallback local para nao bloquear o usuario
 - a versao atual nao usa modelo DOCX para o ETP, nao grava rascunhos no banco, nao persiste anexos auxiliares e nao faz OCR de PDF escaneado
 - snippets auxiliares chegam com `sourceType: "anexo"` e podem trazer `sourceName`, `sourceLabel`, `pageNumber` opcional, `kind` e `excerpt`; arquivos brutos nunca sao enviados para a function; contexto institucional chega separado como apoio de redacao e nunca deve ser citado como anexo, fonte, referencia ou trecho textual
+- anexos auxiliares opcionais sao apoio para preencher informacoes especificas exigidas por perguntas/secoes; nao devem mudar o foco, o escopo ou a narrativa principal definidos pelo processo, objeto manual e respostas aprovadas
+- contexto institucional do `Campus Currais Novos` identifica a unidade demandante real e nao deve ser convertido em exemplo dentro de marcador pendente
 
-## 7F. Edge Function `sugerir-respostas-etp-servicos-continuos`
+## 7G. Edge Function `sugerir-respostas-etp-servicos-continuos`
 
 Uso:
 
 - pre-preenchimento assistido do questionario fixo do ETP de servicos continuos
-- chama Gemini antes da etapa manual para sugerir respostas com fonte explicita no PDF do processo ou em snippets auxiliares tecnicos extraidos localmente
+- chama Gemini antes da etapa manual para sugerir respostas com fonte explicita apenas no PDF/texto do processo; anexos auxiliares sao filtrados desse preenchimento automatico
 
 Chamador:
 
@@ -376,11 +405,12 @@ Dependencias externas:
 
 Observacao:
 
-- sugestoes sem `sourceExcerpt`, `justification` e `value` sao descartadas e tratadas como pendentes; fontes de processo devem trazer `sourcePage`, enquanto anexos sem pagina podem usar `sourceType: "anexo"` com `sourceLabel`
-- snippets auxiliares podem apoiar respostas, mas entram apenas como texto extraido pelo frontend; anexos locais nao sao persistidos nem enviados brutos; contexto institucional e filtrado deste fluxo porque nao deve virar resposta com fonte explicita
+- sugestoes sem `sourceExcerpt`, `justification` e `value` sao descartadas e tratadas como pendentes; fontes de processo devem trazer `sourcePage`
+- anexos locais nao sao persistidos nem enviados brutos; no fluxo de sugestoes automaticas, snippets auxiliares e contexto institucional sao filtrados para nao virarem resposta com fonte explicita
+- anexos auxiliares como CCT, planilhas ou memorias ficam disponiveis apenas como apoio pontual para geracao/revisao de secoes; eles nao devem preencher automaticamente perguntas do questionario
 - quando nao houver trechos do PDF ou quando a function nao responder, o fluxo segue pelo questionario manual
 
-## 7G. Edge Function `gerar-texto-etp-secao`
+## 7H. Edge Function `gerar-texto-etp-secao`
 
 Uso:
 
@@ -406,6 +436,8 @@ Observacao:
 
 - se nao houver chave Gemini, a function devolve texto local de apoio para revisao
 - se a chamada a function falhar no frontend por indisponibilidade, CORS ou function ainda nao publicada, `preliminaryStudiesService.generateQuestionText` devolve texto local de apoio para nao bloquear o preenchimento da secao
+- anexos auxiliares opcionais entram apenas como apoio pontual da pergunta atual; se nao houver relacao clara com a secao, a function deve ignorar o anexo e manter o foco no objeto, processo, notas e respostas ja registradas
+- contexto institucional do `Campus Currais Novos` identifica a unidade demandante real e nao deve ser convertido em exemplo dentro de marcador pendente
 
 ## 7A. Edge Function `invite-user`
 

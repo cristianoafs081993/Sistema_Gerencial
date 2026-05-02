@@ -94,6 +94,35 @@ describe('contratosApiMappers', () => {
     });
   });
 
+  it('mapeia RAP antigo com pago de restos retornado em rppago mesmo sem rpapagar', () => {
+    expect(
+      mapEmpenho('contrato-api-1', {
+        id: 10552178,
+        numero: '2023NE000050',
+        data_emissao: '2023-05-30',
+        empenhado: '36.782,64',
+        aliquidar: '21.360,64',
+        liquidado: '0,00',
+        pago: '15.422,00',
+        rpinscrito: '21.360,64',
+        rpaliquidar: '0,00',
+        rpliquidado: '0,00',
+        rppago: '21.360,64',
+      }),
+    ).toMatchObject({
+      numero: '2023NE000050',
+      valor_empenhado: 36782.64,
+      valor_pago: 15422,
+      rp_inscrito: 21360.64,
+      rp_a_pagar: 0,
+      raw_data: {
+        rpaliquidar: '0,00',
+        rpliquidado: '0,00',
+        rppago: '21.360,64',
+      },
+    });
+  });
+
   it('mapeia historico de contrato com termo e origem Reitoria', () => {
     expect(
       mapHistorico('contrato-api-1', {

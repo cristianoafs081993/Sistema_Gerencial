@@ -23,6 +23,7 @@ const RastreabilidadePFs = lazy(() => import('./pages/RastreabilidadePFs'));
 const ConciliacaoPfs = lazy(() => import('./pages/ConciliacaoPfs'));
 const GeradorDocumentos = lazy(() => import('./pages/GeradorDocumentos'));
 const EditorDocumentos = lazy(() => import('./pages/EditorDocumentos'));
+const ArtefatosLicitacao = lazy(() => import('./pages/ArtefatosLicitacao'));
 const Consultor = lazy(() => import('./pages/ConsultorSessions'));
 const Suap = lazy(() => import('./pages/Suap'));
 const EconomiaTempo = lazy(() => import('./pages/EconomiaTempo'));
@@ -76,6 +77,7 @@ const App = () => (
                   <Route path="/gerador-documentos" element={<GeradorDocumentos />} />
                   <Route path="/editor-documentos" element={<EditorDocumentos />} />
                   <Route path="/editor-documentos/:modelId" element={<EditorDocumentos />} />
+                  <Route path="/artefatos-licitacao" element={<ArtefatosLicitacao />} />
                   <Route path="/consultor" element={<Consultor />} />
                   <Route path="/suap" element={<Suap />} />
                   <Route path="/economia-tempo" element={<EconomiaTempo />} />

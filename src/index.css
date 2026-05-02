@@ -308,6 +308,14 @@
     color: hsl(var(--destructive));
     border: 1px solid hsl(var(--destructive) / 0.20);
   }
+  .pending-field-marker {
+    background-color: hsl(var(--destructive) / 0.14);
+    border-radius: 3px;
+    box-shadow: 0 0 0 1px hsl(var(--destructive) / 0.18);
+    color: hsl(var(--destructive));
+    font-weight: 700;
+    padding: 0 2px;
+  }
   .badge-info {
     @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold;
     background-color: hsl(var(--primary) / 0.10);

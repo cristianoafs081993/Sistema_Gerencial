@@ -114,6 +114,20 @@ describe('Layout', () => {
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
   });
 
+  it('exibe a biblioteca de artefatos no grupo de documentos', () => {
+    render(
+      <MemoryRouter>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByText('Documentos'));
+
+    expect(screen.getByText('Artefatos de Licitacao')).toBeInTheDocument();
+  });
+
   it('mantem a ordem dos tipos do editor na sidebar', () => {
     render(
       <MemoryRouter initialEntries={['/editor-documentos/termo-referencia-compras']}>

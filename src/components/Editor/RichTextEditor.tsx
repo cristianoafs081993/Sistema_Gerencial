@@ -1,8 +1,11 @@
 import { useEditor, EditorContent } from '@tiptap/react';
+import { Extension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { 
   Bold, 
   Italic, 
@@ -16,12 +19,19 @@ import {
   Redo 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, type ReactNode } from 'react';
+import {
+  findPendingFieldMarkers,
+  highlightPendingFieldsInElement,
+  PENDING_FIELD_HIGHLIGHT_CLASS,
+  PENDING_FIELD_HIGHLIGHT_STYLE,
+} from '@/lib/pendingFieldHighlight';
 
 interface RichTextEditorProps {
   content: string;
   onChange: (content: string) => void;
   placeholder?: string;
+  highlightPendingFields?: boolean;
   /** Content rendered on the left side of the toolbar (e.g. back button, template name) */
   toolbarLeft?: ReactNode;
   /** Content rendered on the right side of the toolbar (e.g. save, verify buttons) */
@@ -46,14 +56,62 @@ function ToolbarBtn({ active, onClick, children }: { active?: boolean; onClick: 
 
 const Sep = () => <div className="w-px h-4 bg-border mx-0.5" />;
 
-export default function RichTextEditor({ content, onChange, placeholder, toolbarLeft, toolbarRight }: RichTextEditorProps) {
+const PendingFieldHighlight = Extension.create<{ enabled: boolean }>({
+  name: 'pendingFieldHighlight',
+
+  addOptions() {
+    return {
+      enabled: false,
+    };
+  },
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: new PluginKey('pendingFieldHighlight'),
+        props: {
+          decorations: (state) => {
+            if (!this.options.enabled) return DecorationSet.empty;
+
+            const decorations: Decoration[] = [];
+            state.doc.descendants((node, position) => {
+              if (!node.isText || !node.text) return;
+
+              findPendingFieldMarkers(node.text).forEach((marker) => {
+                decorations.push(
+                  Decoration.inline(position + marker.start, position + marker.end, {
+                    class: PENDING_FIELD_HIGHLIGHT_CLASS,
+                    style: PENDING_FIELD_HIGHLIGHT_STYLE,
+                  }),
+                );
+              });
+            });
+
+            return DecorationSet.create(state.doc, decorations);
+          },
+        },
+      }),
+    ];
+  },
+});
+
+export default function RichTextEditor({
+  content,
+  onChange,
+  placeholder,
+  highlightPendingFields = false,
+  toolbarLeft,
+  toolbarRight,
+}: RichTextEditorProps) {
   const isSyncingExternally = useRef(false);
+  const editorShellRef = useRef<HTMLDivElement | null>(null);
   const editor = useEditor({
     extensions: [
       StarterKit,
       Underline,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Placeholder.configure({ placeholder: placeholder || 'Comece a digitar...' }),
+      PendingFieldHighlight.configure({ enabled: highlightPendingFields }),
     ],
     content,
     onUpdate: ({ editor }) => {
@@ -63,7 +121,14 @@ export default function RichTextEditor({ content, onChange, placeholder, toolbar
       }
       onChange(editor.getHTML());
     },
-  });
+  }, [highlightPendingFields]);
+
+  const applyPendingFieldDomHighlight = useCallback(() => {
+    if (!highlightPendingFields) return;
+    window.requestAnimationFrame(() => {
+      highlightPendingFieldsInElement(editorShellRef.current?.querySelector('.tiptap') || null);
+    });
+  }, [highlightPendingFields]);
 
   useEffect(() => {
     if (!editor) return;
@@ -72,12 +137,24 @@ export default function RichTextEditor({ content, onChange, placeholder, toolbar
       isSyncingExternally.current = true;
       editor.commands.setContent(content || '<p></p>', false);
     }
-  }, [content, editor]);
+    applyPendingFieldDomHighlight();
+  }, [applyPendingFieldDomHighlight, content, editor]);
+
+  useEffect(() => {
+    if (!editor || !highlightPendingFields) return;
+    applyPendingFieldDomHighlight();
+    editor.on('update', applyPendingFieldDomHighlight);
+    editor.on('selectionUpdate', applyPendingFieldDomHighlight);
+    return () => {
+      editor.off('update', applyPendingFieldDomHighlight);
+      editor.off('selectionUpdate', applyPendingFieldDomHighlight);
+    };
+  }, [applyPendingFieldDomHighlight, editor, highlightPendingFields]);
 
   if (!editor) return null;
 
   return (
-    <div className="flex flex-col w-full">
+    <div ref={editorShellRef} className="flex flex-col w-full">
       {/* Unified Toolbar Bar */}
       <div className="flex items-center gap-2 px-4 py-2 border-b bg-white shrink-0">
         {/* Left slot */}

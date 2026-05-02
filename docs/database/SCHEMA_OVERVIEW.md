@@ -27,6 +27,7 @@ Para mudancas sensiveis, confirme sempre nas migrations em [supabase/migrations]
 - `documentos_habeis_itens`
 - `documentos_habeis_situacoes`
 - `document_templates`
+- `licitacao_document_artifacts`
 - `liquidacoes`
 - `liquidacoes_empenhos`
 
@@ -102,6 +103,7 @@ Esta view aparece no frontend em [rastreabilidadePFs.ts](/C:/Users/crist/OneDriv
 
 - `analisar-liquidacao-siafi`
 - `gerar-contrato-licitacao`
+- `gerar-mapa-riscos-licitacao`
 - `gerar-termo-referencia-compras`
 - `record-automation-savings-event`
 - `refresh-comprasnet-liquidacoes-cache`

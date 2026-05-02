@@ -125,7 +125,11 @@ export interface ContratoApiEmpenhoRow {
   valor_liquidado: number | null;
   valor_pago: number | null;
   rp_inscrito: number | null;
+  rp_a_liquidar?: number | null;
+  rp_liquidado?: number | null;
+  rp_pago?: number | null;
   rp_a_pagar: number | null;
+  raw_data?: Record<string, unknown> | null;
 }
 
 export interface ContratoApiFaturaRow {
@@ -460,13 +464,16 @@ async function getCachedLiquidacoesPublicasPorEmpenho(numeroEmpenho: string): Pr
   };
 }
 
-async function getLiquidacoesCacheRowsViaFunction(numeroEmpenho: string) {
+async function getLiquidacoesCacheRowsViaFunction(
+  numeroEmpenho: string,
+  options: { readCacheOnly?: boolean; source: string },
+) {
   const { data, error } = await supabase.functions.invoke('refresh-comprasnet-liquidacoes-cache', {
     body: {
       empenhoNumero: numeroEmpenho,
-      readCacheOnly: true,
       returnRows: true,
-      source: 'frontend-cache-read-fallback',
+      ...(options.readCacheOnly ? { readCacheOnly: true } : {}),
+      source: options.source,
     },
   });
 
@@ -581,7 +588,7 @@ export const contratosApiService = {
   async getEmpenhosApi(contratoApiIds?: string[]): Promise<ContratoApiEmpenhoRow[]> {
     let query = supabase
       .from('contratos_api_empenhos')
-      .select('id, contrato_api_id, api_empenho_id, numero, unidade_gestora, gestao, data_emissao, credor, fonte_recurso, plano_interno, natureza_despesa, valor_empenhado, valor_a_liquidar, valor_liquidado, valor_pago, rp_inscrito, rp_a_pagar');
+      .select('id, contrato_api_id, api_empenho_id, numero, unidade_gestora, gestao, data_emissao, credor, fonte_recurso, plano_interno, natureza_despesa, valor_empenhado, valor_a_liquidar, valor_liquidado, valor_pago, rp_inscrito, rp_a_pagar, raw_data');
 
     if (contratoApiIds && contratoApiIds.length > 0 && contratoApiIds.length <= 100) {
       query = query.in('contrato_api_id', contratoApiIds);
@@ -642,7 +649,7 @@ export const contratosApiService = {
         .order('data_assinatura', { ascending: true, nullsFirst: false }),
       supabase
         .from('contratos_api_empenhos')
-        .select('id, contrato_api_id, api_empenho_id, numero, unidade_gestora, gestao, data_emissao, credor, fonte_recurso, plano_interno, natureza_despesa, valor_empenhado, valor_a_liquidar, valor_liquidado, valor_pago, rp_inscrito, rp_a_pagar')
+        .select('id, contrato_api_id, api_empenho_id, numero, unidade_gestora, gestao, data_emissao, credor, fonte_recurso, plano_interno, natureza_despesa, valor_empenhado, valor_a_liquidar, valor_liquidado, valor_pago, rp_inscrito, rp_a_pagar, raw_data')
         .eq('contrato_api_id', contratoApiId)
         .order('data_emissao', { ascending: false, nullsFirst: false }),
       supabase
@@ -692,13 +699,21 @@ export const contratosApiService = {
       const cached = await getCachedLiquidacoesPublicasPorEmpenho(numeroEmpenho);
       if (!cached.available) return [];
       if (cached.isFresh && cached.rows.length === 0 && cached.rowsCount > 0) {
-        const privilegedRows = await getLiquidacoesCacheRowsViaFunction(numeroEmpenho);
+        const privilegedRows = await getLiquidacoesCacheRowsViaFunction(numeroEmpenho, {
+          readCacheOnly: true,
+          source: 'frontend-cache-read-fallback',
+        });
         if (privilegedRows) return privilegedRows;
       }
       if (cached.isFresh) return cached.rows;
 
-      triggerLiquidacoesCacheRefresh(numeroEmpenho);
+      const refreshedRows = await getLiquidacoesCacheRowsViaFunction(numeroEmpenho, {
+        source: cached.hasStatus ? 'frontend-cache-stale' : 'frontend-cache-miss',
+      });
+      if (refreshedRows) return refreshedRows;
+
       if (cached.rows.length > 0) return cached.rows;
+      triggerLiquidacoesCacheRefresh(numeroEmpenho);
       return [];
     }
 

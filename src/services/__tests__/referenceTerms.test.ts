@@ -76,4 +76,32 @@ describe('normalizeReferenceTermQuestionSuggestionResult', () => {
       }),
     ]);
   });
+
+  it('aceita sugestao com fonte Mapa de Risco sem pagina', () => {
+    const result = normalizeReferenceTermQuestionSuggestionResult({
+      suggestions: [
+        {
+          questionId: 'field-riscos',
+          kind: 'field',
+          status: 'suggested',
+          value: 'A fiscalizacao deve acompanhar indicadores de execucao.',
+          justification: 'O mapa de riscos indicou falha de fiscalizacao como risco alto.',
+          sourceType: 'mapa_riscos',
+          sourceLabel: 'Mapa de Risco editado no editor',
+          sourceExcerpt: 'Falha na fiscalizacao do contrato.',
+          confidence: 'medium',
+        },
+      ],
+    });
+
+    expect(result.suggestions).toEqual([
+      expect.objectContaining({
+        questionId: 'field-riscos',
+        status: 'suggested',
+        sourceType: 'mapa_riscos',
+        sourceLabel: 'Mapa de Risco editado no editor',
+        sourcePage: undefined,
+      }),
+    ]);
+  });
 });

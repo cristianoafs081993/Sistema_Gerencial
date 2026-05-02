@@ -8,8 +8,10 @@ import { useData } from '@/contexts/DataContext';
 import { preliminaryStudyQuestions } from '@/lib/preliminaryStudyQuestionnaire';
 import { analyzePreliminaryStudySupplementalAttachmentFile } from '@/lib/preliminaryStudySupplementalAttachments';
 import { contractDraftsService } from '@/services/contractDrafts';
+import { licitacaoArtifactsService } from '@/services/licitacaoArtifacts';
 import { preliminaryStudiesService } from '@/services/preliminaryStudies';
 import { referenceTermsService } from '@/services/referenceTerms';
+import { riskMapsService } from '@/services/riskMaps';
 import { suapProcessosService } from '@/services/suapProcessos';
 
 vi.mock('@/contexts/DataContext', () => ({
@@ -75,6 +77,24 @@ vi.mock('@/services/preliminaryStudies', () => ({
   },
 }));
 
+vi.mock('@/services/riskMaps', () => ({
+  riskMapsService: {
+    generateDraft: vi.fn(),
+  },
+}));
+
+vi.mock('@/services/licitacaoArtifacts', () => ({
+  stripArtifactHtml: (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+  licitacaoArtifactsService: {
+    list: vi.fn(),
+    listByProcess: vi.fn(),
+    getById: vi.fn(),
+    createVersion: vi.fn(),
+    updateContent: vi.fn(),
+    delete: vi.fn(),
+  },
+}));
+
 vi.mock('@/lib/preliminaryStudySupplementalAttachments', () => ({
   PRELIMINARY_STUDY_SUPPLEMENTAL_ACCEPT: '.pdf,.xlsx,.xls,.ods,.csv,.txt,.md,.docx',
   PRELIMINARY_STUDY_SUPPLEMENTAL_MAX_FILES: 5,
@@ -85,8 +105,10 @@ vi.mock('@/lib/preliminaryStudySupplementalAttachments', () => ({
 const mockedUseData = vi.mocked(useData);
 const mockedSuapProcessosService = vi.mocked(suapProcessosService);
 const mockedContractDraftsService = vi.mocked(contractDraftsService);
+const mockedLicitacaoArtifactsService = vi.mocked(licitacaoArtifactsService);
 const mockedReferenceTermsService = vi.mocked(referenceTermsService);
 const mockedPreliminaryStudiesService = vi.mocked(preliminaryStudiesService);
+const mockedRiskMapsService = vi.mocked(riskMapsService);
 const mockedAnalyzePreliminaryStudySupplementalAttachmentFile = vi.mocked(analyzePreliminaryStudySupplementalAttachmentFile);
 
 function renderEditor(route = '/editor-documentos/despacho-liquidacao') {
@@ -165,6 +187,42 @@ describe('EditorDocumentos', () => {
         pdfUrl: 'proc-2.pdf',
       },
     ] as never);
+
+    mockedLicitacaoArtifactsService.list.mockResolvedValue([]);
+    mockedLicitacaoArtifactsService.listByProcess.mockResolvedValue([]);
+    mockedLicitacaoArtifactsService.getById.mockResolvedValue(null);
+    mockedLicitacaoArtifactsService.createVersion.mockImplementation(async (input) => ({
+      id: `artifact-${input.artifactType}`,
+      artifactType: input.artifactType,
+      processId: input.processId,
+      processNumber: input.processNumber,
+      manualObject: input.manualObject,
+      title: input.title,
+      subtitle: input.subtitle,
+      htmlContent: input.htmlContent,
+      plainText: input.plainText || input.htmlContent,
+      metadata: input.metadata || {},
+      sourceArtifactIds: input.sourceArtifactIds || [],
+      templateId: input.templateId,
+      docxExportPlan: input.docxExportPlan,
+      docxFileName: input.docxFileName,
+      version: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }));
+    mockedLicitacaoArtifactsService.updateContent.mockImplementation(async (input) => ({
+      id: input.id,
+      artifactType: 'etp',
+      title: 'Artefato',
+      htmlContent: input.htmlContent,
+      plainText: input.plainText || input.htmlContent,
+      metadata: input.metadata || {},
+      sourceArtifactIds: [],
+      version: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }));
+    mockedLicitacaoArtifactsService.delete.mockResolvedValue(undefined);
 
     mockedContractDraftsService.analyzeProcessPdf.mockResolvedValue({
       pageCount: 12,
@@ -332,6 +390,29 @@ describe('EditorDocumentos', () => {
       warnings: [],
       missingRequiredFields: [],
       fields: [],
+      model: 'gemini-2.5-flash-lite',
+    });
+
+    mockedRiskMapsService.generateDraft.mockResolvedValue({
+      status: 'generated',
+      title: 'Mapa de Risco da Licitacao',
+      subtitle: 'Processo 23035.000123/2026-11',
+      html: '<h1>Mapa de Risco</h1><h2>Risco operacional</h2><p>Falha na fiscalizacao do contrato.</p>',
+      risks: [
+        {
+          phase: 'Gestao contratual',
+          risk: 'Falha na fiscalizacao',
+          cause: 'Rotinas indefinidas',
+          damage: 'Execucao inadequada',
+          probability: 'Media',
+          impact: 'Alto',
+          level: 'Alto',
+          preventiveAction: 'Definir fiscalizacao',
+          contingencyAction: 'Notificar contratada',
+          owner: 'Gestor do contrato',
+        },
+      ],
+      warnings: [],
       model: 'gemini-2.5-flash-lite',
     });
   });
@@ -975,7 +1056,10 @@ describe('EditorDocumentos', () => {
     expect(mockedPreliminaryStudiesService.suggestQuestionnaireAnswers).not.toHaveBeenCalled();
     expect(await screen.findByText('ETP gerado.')).toBeInTheDocument();
     expect(screen.getByTestId('editor-content')).toHaveTextContent('<h1>ETP gerado</h1>');
-    expect(screen.getByRole('button', { name: /Prosseguir para Termo de Referencia/i })).toBeInTheDocument();
+    expect(mockedLicitacaoArtifactsService.createVersion).toHaveBeenCalledWith(
+      expect.objectContaining({ artifactType: 'etp' }),
+    );
+    expect(screen.getByRole('button', { name: /Prosseguir para Mapa de Risco/i })).toBeInTheDocument();
   }, 15000);
 
   it('gera ETP com anexo auxiliar opcional e permite remover antes da geracao', async () => {
@@ -1027,7 +1111,7 @@ describe('EditorDocumentos', () => {
 
   }, 15000);
 
-  it('prossegue do ETP manual para TR usando o texto editado como contexto', async () => {
+  it('prossegue do ETP manual para mapa e depois para TR usando os textos editados como contexto', async () => {
     mockedReferenceTermsService.generateDraft.mockClear();
     renderEditor('/editor-documentos/estudo-tecnico-preliminar-servicos-continuos');
 
@@ -1040,7 +1124,23 @@ describe('EditorDocumentos', () => {
 
     expect(await screen.findByText('ETP gerado.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Simular edicao do editor/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Prosseguir para Termo de Referencia/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Prosseguir para Mapa de Risco/i }));
+
+    await waitFor(() => {
+      expect(mockedRiskMapsService.generateDraft).toHaveBeenCalledWith(
+        expect.objectContaining({
+          etpContextSnippets: expect.arrayContaining([
+            expect.objectContaining({
+              sourceType: 'etp',
+              sourceLabel: 'ETP editado no editor',
+              excerpt: expect.stringContaining('Objeto editado pelo usuario'),
+            }),
+          ]),
+        }),
+      );
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: /Prosseguir para Termo de Referencia/i }));
 
     await waitFor(() => {
       expect(mockedReferenceTermsService.generateDraft).toHaveBeenCalledWith(
@@ -1051,6 +1151,11 @@ describe('EditorDocumentos', () => {
               sourceType: 'etp',
               sourceLabel: 'ETP editado no editor',
               excerpt: expect.stringContaining('Objeto editado pelo usuario'),
+            }),
+            expect.objectContaining({
+              sourceType: 'mapa_riscos',
+              sourceLabel: 'Mapa de Risco editado no editor',
+              excerpt: expect.stringContaining('Falha na fiscalizacao'),
             }),
           ]),
         }),
@@ -1156,6 +1261,7 @@ describe('EditorDocumentos', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: /Simular edicao do editor/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Prosseguir para Mapa de Risco/i }));
     fireEvent.click(await screen.findByRole('button', { name: /Prosseguir para Termo de Referencia/i }));
 
     await waitFor(() => {
@@ -1167,6 +1273,7 @@ describe('EditorDocumentos', () => {
           processo: expect.objectContaining({ numProcesso: '23035.000123/2026-11' }),
           etpContextSnippets: expect.arrayContaining([
             expect.objectContaining({ sourceType: 'etp' }),
+            expect.objectContaining({ sourceType: 'mapa_riscos' }),
           ]),
         }),
       );

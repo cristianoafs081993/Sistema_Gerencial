@@ -14,6 +14,7 @@ export type SupportedDocumentType =
   | 'despacho-liquidacao'
   | 'contrato-servico-ifrn'
   | 'termo-referencia-compras'
+  | 'mapa-riscos-licitacao'
   | 'estudo-tecnico-preliminar-servicos-continuos';
 export type IntentLookupType = 'processo' | 'cpf' | 'cnpj';
 export type ContextFieldStatus = 'confirmed' | 'inferred' | 'missing';
@@ -169,6 +170,14 @@ export const documentDefinitions = [
     quickPrompt: 'Gerar termo de referencia do processo ',
     batchSupported: false,
     requiresProcessPdf: true,
+  },
+  {
+    id: 'mapa-riscos-licitacao' as const,
+    name: 'Mapa de Risco da Licitacao',
+    acceptedLookups: ['processo'] as const,
+    quickPrompt: 'Gerar mapa de risco do processo ',
+    batchSupported: false,
+    requiresProcessPdf: false,
   },
   {
     id: 'estudo-tecnico-preliminar-servicos-continuos' as const,

@@ -50,6 +50,8 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 - `Badge`: pill neutro; variantes usam status semanticos e baixa opacidade.
 - `Tabs`: segmentado com ativo verde quando usado em paginas operacionais.
 - `Dialog`, `Sheet`, `Popover`, `DropdownMenu`: superficies brancas com elevacao suave.
+- `RichTextEditor`: editor TipTap do fluxo de documentos; pode destacar marcadores `[CAMPO PENDENTE]` com o token destrutivo quando a pagina habilitar revisao visual.
+- `ArtefatosLicitacao`: pagina operacional que combina `SectionPanel`, `FilterPanel`, `DataTablePanel`, badges de tipo e botoes iconicos para abrir, copiar, baixar DOCX e excluir artefatos.
 - `Layout`: sidebar global compacta com campo de busca visual, grupos expansivos, submenus expansivos, indicador ativo lateral e drawer mobile.
 
 ## Regra pratica

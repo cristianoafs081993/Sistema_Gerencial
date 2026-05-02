@@ -95,7 +95,7 @@ Dependencias:
 Observacao:
 
 - a function pressupoe que o modelo vigente ja foi publicado em `document_templates`
-- o frontend bloqueia a chamada quando nao houver modelo ativo; quando iniciado a partir de ETP manual, `processo` pode ser nulo e o contexto vem de snippets `sourceType: "etp"` sem pagina
+- o frontend bloqueia a chamada quando nao houver modelo ativo; quando iniciado a partir do fluxo ETP -> Mapa de Risco, `processo` pode ser nulo e o contexto vem de snippets `sourceType: "etp"` e `sourceType: "mapa_riscos"` sem pagina
 - o deploy atual usa `verify_jwt = false` em `supabase/config.toml`, seguindo o padrao de functions publicadas pelo frontend neste projeto
 - a geracao e dividida em partes por blocos editaveis para evitar truncamento/JSON invalido em modelos DOCX grandes
 - perguntas puladas pelo usuario ficam como `[CAMPO PENDENTE]` ou blocos pendentes; a IA nao escolhe alternativas puladas
@@ -116,8 +116,8 @@ Chamador:
 Uso:
 
 - sugere respostas para o questionario do Termo de Referencia antes da revisao manual
-- recebe dados opcionais do processo, trechos classificados do PDF, snippets do ETP editado e o `questionnaireSchema` do modelo ativo
-- devolve sugestoes por pergunta apenas quando houver fonte explicita; fonte de processo exige pagina, trecho-fonte, justificativa e confianca, e fonte ETP pode omitir pagina quando trouxer `sourceType: "etp"`, `sourceLabel`, `sourceExcerpt` e justificativa
+- recebe dados opcionais do processo, trechos classificados do PDF, snippets do ETP editado, snippets do Mapa de Risco editado e o `questionnaireSchema` do modelo ativo
+- devolve sugestoes por pergunta apenas quando houver fonte explicita; fonte de processo exige pagina, trecho-fonte, justificativa e confianca, e fontes ETP/Mapa de Risco podem omitir pagina quando trouxerem `sourceType: "etp"` ou `sourceType: "mapa_riscos"`, `sourceLabel`, `sourceExcerpt` e justificativa
 
 Dependencias:
 
@@ -130,6 +130,32 @@ Observacao:
 - perguntas sem fonte clara retornam como `unanswered` e seguem para revisao manual
 - a function e separada da geracao final para que falhas na sugestao nao bloqueiem o fluxo manual
 - o deploy atual usa `verify_jwt = false` em `supabase/config.toml`, seguindo o padrao das functions do Editor de Documentos
+
+### `gerar-mapa-riscos-licitacao`
+
+Local:
+
+- [gerar-mapa-riscos-licitacao/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/gerar-mapa-riscos-licitacao/index.ts)
+
+Chamador:
+
+- [riskMaps.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/riskMaps.ts)
+
+Uso:
+
+- gera Mapa de Risco da licitacao a partir do ETP editado no editor
+- recebe `processo`, `manualObject` e snippets do ETP
+- devolve HTML editavel e matriz de riscos com fase, risco, causa, dano, probabilidade, impacto, nivel, acoes e responsavel
+
+Variaveis:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional `GEMINI_RISK_MAP_MODEL`, com default `gemini-2.5-flash-lite`
+
+Observacoes:
+
+- se nao houver chave ou se a function falhar, o frontend usa fallback local em `riskMapsService`
+- publicada com `verify_jwt = false`, seguindo o padrao das functions do Editor de Documentos
 
 ### `gerar-etp-servicos-continuos`
 
@@ -158,6 +184,8 @@ Observacao:
 - se a function ainda nao estiver publicada ou falhar por indisponibilidade/CORS, o frontend tambem monta fallback local em `preliminaryStudiesService`
 - nao usa modelo DOCX para o ETP, nao persiste rascunho em banco, nao persiste anexos auxiliares e nao faz OCR
 - snippets auxiliares chegam como texto com `sourceType: "anexo"`, `sourceName`, `sourceLabel`, `pageNumber` opcional, `kind` e `excerpt`; arquivos brutos nunca chegam a function; contexto institucional chega como apoio de redacao, mas nao deve ser citado como anexo, fonte ou referencia no ETP
+- anexos auxiliares opcionais servem apenas para localizar dados pontuais exigidos por perguntas/secoes; eles nao devem definir o foco, o escopo ou a narrativa principal do ETP
+- contexto institucional do `Campus Currais Novos` deve ser tratado como unidade demandante real, nao como exemplo a ser preservado em marcador `[CAMPO PENDENTE]`
 - publicada com `verify_jwt = false`, seguindo o padrao das functions do Editor de Documentos
 
 ### `sugerir-respostas-etp-servicos-continuos`
@@ -173,7 +201,7 @@ Chamador:
 Uso:
 
 - sugere respostas para o questionario fixo do ETP de servicos continuos antes da revisao manual
-- recebe trechos classificados do PDF do processo e snippets auxiliares tecnicos extraidos localmente; so retorna sugestoes quando houver fonte explicita
+- recebe trechos classificados do PDF/texto do processo; anexos auxiliares sao filtrados desse fluxo para evitar preenchimento automatico focado em CCT, planilhas ou memorias
 
 Dependencias:
 
@@ -183,8 +211,9 @@ Dependencias:
 
 Observacao:
 
-- sugestoes sem trecho-fonte, justificativa e valor sao descartadas pelo frontend; fontes de processo precisam de pagina, e anexos sem pagina precisam de `sourceType: "anexo"` com `sourceLabel`
-- anexos locais do ETP nao sao persistidos nem enviados brutos; apenas snippets extraidos no navegador entram no payload; contexto institucional e filtrado deste fluxo para nao ser tratado como fonte de sugestao
+- sugestoes sem trecho-fonte, justificativa e valor sao descartadas pelo frontend; fontes de processo precisam de pagina
+- anexos locais do ETP nao sao persistidos nem enviados brutos; snippets auxiliares e contexto institucional sao filtrados neste fluxo para nao serem tratados como fonte de sugestao automatica
+- anexos auxiliares como CCT, planilhas ou memorias ficam apenas como apoio pontual para redacao/revisao de secoes e nao devem preencher automaticamente perguntas do questionario
 - quando o processo nao tem PDF pesquisavel ou a function nao responde, o frontend segue pelo questionario manual
 
 ### `gerar-texto-etp-secao`
@@ -204,6 +233,8 @@ Uso:
 - aceita notas curtas do usuario, mas tambem gera um texto preliminar quando a secao e solicitada sem digitacao previa
 - deve marcar dados concretos ausentes como pendencia, sem inventar numeros, datas, valores ou fatos especificos
 - pode usar snippets auxiliares de anexos locais como apoio, sempre identificados por nome do arquivo e pagina, aba/linhas ou bloco quando disponivel; tambem pode usar contexto institucional como pano de fundo natural, sem cita-lo como anexo, fonte ou referencia
+- anexos auxiliares opcionais devem ser usados apenas para preencher lacunas pontuais da pergunta atual; quando nao houver relacao clara, a function deve ignorar o anexo e manter o foco no objeto, processo, notas e respostas registradas
+- contexto institucional do `Campus Currais Novos` deve ser tratado como unidade demandante real, nao como exemplo a ser preservado em marcador `[CAMPO PENDENTE]`
 
 Dependencias:
 

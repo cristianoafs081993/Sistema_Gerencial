@@ -149,7 +149,7 @@ function fallbackText(request: EtpSectionTextRequest) {
   return [
     `Texto preliminar para "${questionTitle}".`,
     `Considerando ${objectValue}, a secao deve registrar as informacoes relevantes para demonstrar a adequacao da contratacao ao interesse publico.`,
-    institutionalContext ? `Como pano de fundo da unidade demandante, considere o contexto institucional do campus: ${institutionalContext}.` : '',
+    institutionalContext ? `A unidade demandante e o campus descrito no contexto institucional: ${institutionalContext}. Use esse campus como dado real da contratacao, nao como exemplo.` : '',
     context ? `Informacao inicial considerada: ${context}.` : '',
     `Revisar e complementar antes da aprovacao final. [CAMPO PENDENTE: ${questionTitle}]`,
   ].filter(Boolean).join(' ');
@@ -178,8 +178,14 @@ function buildPrompt(request: EtpSectionTextRequest) {
     'O texto deve ser formal, objetivo, editavel e adequado a minuta de apoio.',
     'Se o usuario nao informou nada, gere mesmo assim um texto preliminar util, mas use marcadores [CAMPO PENDENTE: ...] para dados concretos ausentes.',
     'Nao invente numeros, datas, valores, locais, nomes de unidades ou fatos especificos sem fonte.',
-    'Os trechos institucionais descrevem a unidade demandante. Use-os apenas como pano de fundo natural quando ajudarem a explicar escala, logistica regional, continuidade dos servicos, publico atendido ou impacto local.',
-    'O contexto institucional nao e fonte principal para requisitos tecnicos, quantitativos, estimativa de valor, parcelamento ou conclusao. Nesses pontos, use notas do usuario, respostas, processo, anexos tecnicos ou marque pendencia quando faltar dado.',
+    'O foco da secao e sempre a pergunta atual, o objeto da contratacao, o processo e as respostas ja aprovadas pelo usuario. Anexos auxiliares opcionais nunca definem o tema, o escopo ou a narrativa central da secao.',
+    'Use anexos auxiliares apenas como apoio para localizar informacoes especificas que respondam diretamente a pergunta atual, como piso salarial, quantitativo, memoria de calculo, vigencia, local de execucao ou regra tecnica pontual.',
+    'Se um anexo tratar de assunto amplo, paralelo ou diferente da pergunta/objeto/respostas/processo, ignore o conteudo que nao responde diretamente a lacuna da secao. Nao resuma anexos nem transforme a secao em explicacao sobre o anexo.',
+    'Quando houver conflito entre anexo auxiliar e objeto manual, processo ou resposta aprovada, preserve o foco definido pelo objeto/processo/resposta e marque pendencia para revisao se necessario.',
+    'Os trechos institucionais descrevem a unidade demandante real. Se o contexto institucional indicar Campus Currais Novos, trate-o como a unidade demandante da contratacao, nao como exemplo a ser mantido em placeholder.',
+    'Nao escreva placeholders como "[CAMPO PENDENTE: Nome da Unidade Demandante, ex: IFRN Campus Currais Novos]" quando o proprio contexto institucional ja identifica o campus; nesse caso, use "IFRN Campus Currais Novos" no texto.',
+    'Use os trechos institucionais apenas como pano de fundo natural quando ajudarem a explicar escala, logistica regional, continuidade dos servicos, publico atendido ou impacto local.',
+    'O contexto institucional nao e fonte principal para requisitos tecnicos, quantitativos, estimativa de valor, parcelamento ou conclusao. Nesses pontos, use notas do usuario, respostas, processo, anexos auxiliares pontuais ou marque pendencia quando faltar dado.',
     'Nunca cite contexto institucional como anexo, fonte, referencia, trecho, texto fornecido ou texto entre colchetes. Nao escreva "Conforme anexo" nem "Conforme detalhado no anexo" para esse contexto.',
     'Quando usar anexo tecnico nao institucional, preserve a referencia do arquivo/pagina indicada.',
     'Responda apenas JSON valido no formato: {"status":"generated","value":"texto da secao","warnings":["..."]}.',
@@ -189,7 +195,7 @@ function buildPrompt(request: EtpSectionTextRequest) {
     `Objeto manual: ${request.manualObject || ''}`,
     `Respostas ja registradas: ${JSON.stringify(request.questionnaireAnswers || [])}`,
     `Contexto institucional de apoio: ${JSON.stringify(institutionalSnippets)}`,
-    `Trechos tecnicos do processo/anexos: ${JSON.stringify(evidenceSnippets)}`,
+    `Trechos tecnicos do processo e anexos auxiliares, somente para preenchimento pontual: ${JSON.stringify(evidenceSnippets)}`,
   ].join('\n\n');
 }
 

@@ -85,7 +85,7 @@ Mostrar a linhagem operacional dos dados de forma curta:
     - `contratos_api_fatura_empenhos`
     - `contratos_api_sync_runs`
   - pagina: [Contratos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Contratos.tsx)
-- observacao: a tela local continua vindo de `contratos` e `contratos_empenhos`; os dados da API enriquecem a linha quando o numero normalizado casa. Valor Total usa `contratos_api_historico` como fonte principal quando houver API, somando `valor_inicial` de cada termo; `valor_global` da API nao entra nessa metrica. Sem historico com `valor_inicial`, usa `contratos.valor` como fallback. A execucao por item soma faturas com situacao `Pago` ou `Siafi Apropriado` que tenham `dados_item_faturado`. O valor contratado por item no drawer soma `contratos_api_itens.historico_item[].valor_total` quando existir e cai para `contratos_api_itens.valor_total` sem historico do item. O historico da API exibe assinatura, aditivos e apostilamentos; `codigo_unidade_origem = 158155` deve ser sinalizado como origem Reitoria. Em contratos, Valor Empenhado usa `contratos_api_empenhos.valor_empenhado` quando houver API, com fallback para o valor original do empenho local; os badges/popovers de empenhos da lista principal continuam usando `empenhos` + `contratos_empenhos` para preservar os saldos CSV/SIAFI.
+- observacao: a tela local continua vindo de `contratos` e `contratos_empenhos`; os dados da API enriquecem a linha quando o numero normalizado casa. Valor Total usa `contratos_api_historico` como fonte principal quando houver API, somando `valor_inicial` de cada termo; `valor_global` da API nao entra nessa metrica. Sem historico com `valor_inicial`, usa `contratos.valor` como fallback. A execucao por item soma faturas com situacao `Pago` ou `Siafi Apropriado` que tenham `dados_item_faturado`. O valor contratado por item no drawer soma `contratos_api_itens.historico_item[].valor_total` quando existir e cai para `contratos_api_itens.valor_total` sem historico do item. O historico da API exibe assinatura, aditivos e apostilamentos; `codigo_unidade_origem = 158155` deve ser sinalizado como origem Reitoria. Em contratos, Valor Empenhado usa `contratos_api_empenhos.valor_empenhado` quando houver API, com fallback para o valor original do empenho local; os badges/popovers da lista principal mostram empenhos locais e completam com `contratos_api_empenhos` quando a API trouxer numeros ainda ausentes no vinculo local. Para RAP da API, `raw_data.rppago` e `raw_data.rpliquidado` alimentam o liquidado/pago de RAP, e o saldo atual vem de `rp_a_pagar` ou da diferenca derivada sobre a base RAP.
 
 ### Cache de liquidações Comprasnet por empenho
 
@@ -137,6 +137,28 @@ Mostrar a linhagem operacional dos dados de forma curta:
   - geracao assistida: [gerar-termo-referencia-compras/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/gerar-termo-referencia-compras/index.ts)
   - consumidor frontend: [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx)
   - saida operacional: HTML editavel no editor e download do DOCX final montado sobre o template ativo, com destaque para IA, pendencias e trechos nao adotados
+
+### Artefatos de licitacao
+
+- ETP gerado no Editor
+  - geracao: [preliminaryStudies.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/preliminaryStudies.ts) + [gerar-etp-servicos-continuos/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/gerar-etp-servicos-continuos/index.ts)
+  - persistencia: [licitacaoArtifacts.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/licitacaoArtifacts.ts)
+  - tabela: `licitacao_document_artifacts`, `artifact_type = 'etp'`
+
+- Mapa de Risco gerado a partir do ETP editado
+  - geracao: [riskMaps.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/riskMaps.ts) + [gerar-mapa-riscos-licitacao/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/gerar-mapa-riscos-licitacao/index.ts)
+  - entrada: snippets `sourceType: "etp"` montados do HTML atual do editor
+  - persistencia: `licitacao_document_artifacts`, `artifact_type = 'mapa_riscos'`, com `source_artifact_ids` apontando para o ETP quando existir
+
+- Termo de Referencia gerado a partir de ETP + Mapa de Risco
+  - geracao: [referenceTerms.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/referenceTerms.ts) + [gerar-termo-referencia-compras/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/gerar-termo-referencia-compras/index.ts)
+  - entrada: snippets `sourceType: "etp"` e `sourceType: "mapa_riscos"` montados dos HTMLs revisados
+  - persistencia: `licitacao_document_artifacts`, `artifact_type = 'termo_referencia'`, com plano DOCX quando houver template ativo
+
+- Consulta e reabertura
+  - pagina: [ArtefatosLicitacao.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/ArtefatosLicitacao.tsx)
+  - rota de reabertura: `/editor-documentos/:modelId?artifactId=<id>`
+  - observacao: edicoes posteriores atualizam a versao aberta; uma nova geracao cria nova versao
 
 ### Liquidacoes e fonte SOF
 

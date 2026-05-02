@@ -25,6 +25,46 @@ import { ContratoApiDetailsSheet } from '@/components/contratos/ContratoApiDetai
 import { useUserFavorites } from '@/services/userFavorites';
 
 const REITORIA_UG = '158155';
+const normalizeEmpenhoRef = (value: string) =>
+  (value || '')
+    .toString()
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+
+const toApiCurrencyNumber = (value: unknown) => {
+  if (value == null || value === '') return undefined;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  const parsed = Number(
+    String(value)
+      .trim()
+      .replace(/\./g, '')
+      .replace(',', '.')
+      .replace(/[^\d.-]/g, ''),
+  );
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const getApiEmpenhoNumber = (
+  empenho: ContratoApiEmpenhoRow,
+  dbKey: keyof ContratoApiEmpenhoRow,
+  rawKey: string,
+) => {
+  const fromDb = toApiCurrencyNumber(empenho[dbKey]);
+  if (fromDb !== undefined) return Math.max(0, fromDb);
+
+  const raw = empenho.raw_data && typeof empenho.raw_data === 'object' ? empenho.raw_data : {};
+  const fromRaw = toApiCurrencyNumber((raw as Record<string, unknown>)[rawKey]);
+  return fromRaw === undefined ? undefined : Math.max(0, fromRaw);
+};
+
+const getApiEmpenhoYear = (empenho: ContratoApiEmpenhoRow) => {
+  const match = empenho.numero.match(/^(\d{4})NE/i);
+  if (match) return Number(match[1]);
+  if (!empenho.data_emissao) return new Date().getFullYear();
+  const parsed = new Date(empenho.data_emissao);
+  return Number.isNaN(parsed.getTime()) ? new Date().getFullYear() : parsed.getFullYear();
+};
 
 export default function Contratos() {
   const { isSuperAdmin } = useAuth();
@@ -187,24 +227,17 @@ export default function Contratos() {
       // Compatibilidade: dependendo do histórico/imports, `contratos_empenhos.empenho_id`
       // pode estar armazenando o UUID do empenho OU o número do empenho.
       // Para não "sumir" vínculos na UI, resolvemos por ambos.
-      const normalizeRef = (s: string) =>
-        (s || '')
-          .toString()
-          .trim()
-          .toUpperCase()
-          .replace(/[^A-Z0-9]/g, '');
-
       const byId = new Map(empenhos.map((e) => [e.id, e] as const));
       const byNumero = new Map(empenhos.map((e) => [e.numero, e] as const));
-      const byNumeroNorm = new Map(empenhos.map((e) => [normalizeRef(e.numero), e] as const));
+      const byNumeroNorm = new Map(empenhos.map((e) => [normalizeEmpenhoRef(e.numero), e] as const));
       // Alguns vínculos antigos guardam só o final do número
-      const byNumeroSuffix12 = new Map(empenhos.map((e) => [normalizeRef(e.numero).slice(-12), e] as const));
+      const byNumeroSuffix12 = new Map(empenhos.map((e) => [normalizeEmpenhoRef(e.numero).slice(-12), e] as const));
 
       const resolved: typeof empenhos = [];
       const seen = new Set<string>();
       for (const ref of linkIds) {
         const refStr = (ref || '').toString().trim();
-        const refNorm = normalizeRef(refStr);
+        const refNorm = normalizeEmpenhoRef(refStr);
         const emp = byId.get(refStr) || byNumero.get(refStr) || byNumeroNorm.get(refNorm) || (refNorm.length >= 12 ? byNumeroSuffix12.get(refNorm.slice(-12)) : undefined);
         if (!emp) continue;
         if (seen.has(emp.id)) continue;
@@ -396,6 +429,12 @@ export default function Contratos() {
                 const apiContrato = apiContratoByNumero.get(normalizeContratoNumero(c.numero));
                 const hasReitoriaOrigin = apiContrato?.unidade_origem_codigo === REITORIA_UG;
                 const empenhosVinculados = getEmpenhosDoContrato(c.id);
+                const localEmpenhosNorm = new Set(empenhosVinculados.map((e) => normalizeEmpenhoRef(e.numero)).filter(Boolean));
+                const empenhosApiVinculados = apiContrato ? (apiEmpenhosByContratoApiId.get(apiContrato.id) ?? []) : [];
+                const empenhosApiSomente = empenhosApiVinculados.filter((empenhoApi) => {
+                  const numeroNorm = normalizeEmpenhoRef(empenhoApi.numero);
+                  return numeroNorm && !localEmpenhosNorm.has(numeroNorm);
+                });
                 const historicoApi = apiContrato ? (apiHistoricosByContratoApiId.get(apiContrato.id) ?? []) : [];
                 const valorTotalContrato = getValorTotalContrato(c, apiContrato, historicoApi);
                 const totalEmpenhado = getValorEmpenhadoContrato(c.id, apiContrato);
@@ -474,8 +513,9 @@ export default function Contratos() {
                         )}
 
                         <div className="flex flex-wrap gap-1">
-                          {empenhosVinculados.length > 0 ? (
-                            empenhosVinculados.map((e) => {
+                          {empenhosVinculados.length > 0 || empenhosApiSomente.length > 0 ? (
+                            <>
+                            {empenhosVinculados.map((e) => {
                               const balance = e.tipo === 'rap' ? getRapSaldoAtual(e, rapReferenceYear) : Math.max(0, e.valor - ((e.valorLiquidadoAPagar || 0) + (e.valorPagoOficial || 0)));
                               const rapBase = e.tipo === 'rap' ? getRapBaseVigente(e, rapReferenceYear) : 0;
 
@@ -512,7 +552,80 @@ export default function Contratos() {
                                   </PopoverContent>
                                 </Popover>
                               );
-                            })
+                            })}
+                            {empenhosApiSomente.map((e) => {
+                              const valorEmpenhadoApi = Number(e.valor_empenhado) || 0;
+                              const valorALiquidarApi = Number(e.valor_a_liquidar) || 0;
+                              const valorLiquidadoApi = Number(e.valor_liquidado) || 0;
+                              const valorPagoApi = Number(e.valor_pago) || 0;
+                              const rpInscritoApi = getApiEmpenhoNumber(e, 'rp_inscrito', 'rpinscrito') ?? 0;
+                              const rpALiquidarApi = getApiEmpenhoNumber(e, 'rp_a_liquidar', 'rpaliquidar') ?? 0;
+                              const rpLiquidadoApi = getApiEmpenhoNumber(e, 'rp_liquidado', 'rpliquidado') ?? 0;
+                              const rpPagoApi = getApiEmpenhoNumber(e, 'rp_pago', 'rppago') ?? 0;
+                              const rpAPagarDbApi = getApiEmpenhoNumber(e, 'rp_a_pagar', 'rpapagar');
+                              const rpLiquidadoPagoApi = rpLiquidadoApi + rpPagoApi;
+                              const rpBaseApi =
+                                rpInscritoApi > 0
+                                  ? rpInscritoApi
+                                  : rpALiquidarApi > 0
+                                    ? rpALiquidarApi
+                                    : rpLiquidadoPagoApi + (rpAPagarDbApi ?? 0);
+                              const rpAPagarApi = rpAPagarDbApi ?? Math.max(0, rpBaseApi - rpLiquidadoPagoApi);
+                              const totalLiquidadoApi = valorLiquidadoApi + valorPagoApi;
+                              const isRapApi = rpBaseApi > 0 || rpAPagarApi > 0 || rpLiquidadoPagoApi > 0;
+                              const apiEmpenhoYear = getApiEmpenhoYear(e);
+                              const rapBaseLabel = apiEmpenhoYear <= new Date().getFullYear() - 2 ? 'RP reinscrito:' : 'RP inscrito:';
+
+                              return (
+                                <Popover key={`api-${e.id}`}>
+                                  <PopoverTrigger asChild>
+                                    <Badge variant="secondary" className="text-[10px] font-mono py-0 h-5 cursor-pointer hover:bg-muted-foreground/20 transition-colors">
+                                      {e.numero}
+                                    </Badge>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-64 border-border-default/60 p-3 shadow-lifted">
+                                    <div className="space-y-2">
+                                      <div className="mr-1 flex items-center justify-between border-b border-border-default/50 pb-1">
+                                        <span className="font-data text-xs font-bold text-action-primary">{e.numero}</span>
+                                        <Badge variant="outline" className="text-[9px] uppercase px-1 h-4">
+                                          {isRapApi ? 'RAP' : 'Exercício'}
+                                        </Badge>
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-y-1.5 text-xs py-1">
+                                        <span className="text-text-secondary">{isRapApi ? rapBaseLabel : 'Valor Total:'}</span>
+                                        <span className="text-right font-medium">{formatCurrency(isRapApi ? rpBaseApi : valorEmpenhadoApi)}</span>
+                                        <span className="font-semibold text-text-secondary">{isRapApi ? 'Saldo Atual:' : 'Saldo a Liquidar:'}</span>
+                                        <span className={cn('text-right font-bold underline decoration-dotted', (isRapApi ? rpAPagarApi : valorALiquidarApi) > 0 ? 'text-status-warning' : 'text-status-success')}>
+                                          {formatCurrency(isRapApi ? rpAPagarApi : valorALiquidarApi)}
+                                        </span>
+                                      </div>
+                                      <div className="mt-1 border-t border-dashed border-border-default/50 pt-1.5">
+                                        <div className="flex justify-between text-[10px]">
+                                          <span className="text-text-secondary">{isRapApi ? 'Liquidado/Pago RAP:' : 'Total Liquidado:'}</span>
+                                          <span className="font-medium text-status-success">{formatCurrency(isRapApi ? rpLiquidadoPagoApi : totalLiquidadoApi)}</span>
+                                        </div>
+                                      </div>
+                                      {isRapApi ? (
+                                        <div className="mt-1 border-t border-dashed border-border-default/50 pt-1.5">
+                                          <div className="flex justify-between text-[10px]">
+                                            <span className="text-text-secondary">Empenhado original:</span>
+                                            <span className="font-medium">{formatCurrency(valorEmpenhadoApi)}</span>
+                                          </div>
+                                          <div className="flex justify-between text-[10px]">
+                                            <span className="text-text-secondary">Pago no exercicio:</span>
+                                            <span className="font-medium">{formatCurrency(totalLiquidadoApi)}</span>
+                                          </div>
+                                        </div>
+                                      ) : null}
+                                      <div className="border-t border-border-default/40 pt-1.5 text-[9px] font-medium text-text-secondary">
+                                        Fonte: API Comprasnet
+                                      </div>
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                              );
+                            })}
+                            </>
                           ) : (
                             <span className="text-xs italic text-text-secondary">Sem empenhos</span>
                           )}
