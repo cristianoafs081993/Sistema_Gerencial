@@ -51,6 +51,24 @@ describe('descentralizacoesImport', () => {
     ).toEqual({ shouldImport: false, valor: 0 });
   });
 
+  it('recognizes ORIGEM and DESTINO labels with extra text', () => {
+    expect(
+      normalizeDescentralizacaoImportValue({
+        cellType: 'Destino da NC',
+        operationType: 'DESCENTRALIZACAO DE CREDITO',
+        rawValue: -500,
+      }),
+    ).toEqual({ shouldImport: true, valor: 500 });
+
+    expect(
+      normalizeDescentralizacaoImportValue({
+        cellType: 'Origem da NC',
+        operationType: 'DESCENTRALIZACAO DE CREDITO',
+        rawValue: 500,
+      }),
+    ).toEqual({ shouldImport: false, valor: 0 });
+  });
+
   it('ignores inferred origem rows in files without NC Celula - Tipo', () => {
     expect(
       normalizeDescentralizacaoImportValue({

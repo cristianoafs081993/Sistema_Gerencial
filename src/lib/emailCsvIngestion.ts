@@ -333,11 +333,11 @@ function normalizeDescentralizacaoImportValue({
   const normalizedCellType = normalizeImportText(cellType);
   const absValue = Math.abs(rawValue);
 
-  if (normalizedCellType === NC_CELULA_DESTINO) {
+  if (normalizedCellType.includes(NC_CELULA_DESTINO)) {
     return { shouldImport: true, valor: absValue };
   }
 
-  if (normalizedCellType === NC_CELULA_ORIGEM) {
+  if (normalizedCellType.includes(NC_CELULA_ORIGEM)) {
     return isAnulacaoDescentralizacao(operationType)
       ? { shouldImport: true, valor: -absValue }
       : { shouldImport: false, valor: 0 };

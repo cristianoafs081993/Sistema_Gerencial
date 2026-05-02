@@ -523,6 +523,7 @@ export default function Descentralizacoes() {
 
     const descentralizacoesCsvFields = [
         'NC',
+        'NC Célula - Tipo',
         'NC - Operacao (Tipo)',
         'NC - Dia Emissão',
         'NC - Descrição',

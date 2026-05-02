@@ -330,4 +330,80 @@ describe('Descentralizacoes', () => {
     );
     expect(addDescentralizacao).not.toHaveBeenCalled();
   });
+
+  it('ignora linha de origem com rotulo complementar no upload principal', async () => {
+    testState.isSuperAdmin = true;
+    const addDescentralizacao = vi.fn();
+
+    mockedUseData.mockReturnValue({
+      atividades: [],
+      empenhos: [],
+      descentralizacoes: [],
+      contaDescentralizacoes: [],
+      contratos: [],
+      contratosEmpenhos: [],
+      creditosDisponiveis: [],
+      isLoading: false,
+      addAtividade: vi.fn(),
+      updateAtividade: vi.fn(),
+      deleteAtividade: vi.fn(),
+      addEmpenho: vi.fn(),
+      updateEmpenho: vi.fn(),
+      deleteEmpenho: vi.fn(),
+      addDescentralizacao,
+      updateDescentralizacao: vi.fn(),
+      deleteDescentralizacao: vi.fn(),
+      getResumoOrcamentario: vi.fn(),
+      getTotalPlanejado: vi.fn(),
+      getTotalEmpenhado: vi.fn(),
+      getTotalDescentralizado: vi.fn(),
+      getADescentralizar: vi.fn(),
+      getSaldoTotal: vi.fn(),
+      refreshData: vi.fn(),
+    });
+
+    render(<Descentralizacoes />);
+
+    const importHandler = Array.from(testState.importHandlers.entries()).find(([title]) =>
+      title.includes('Descentraliza'),
+    )?.[1];
+
+    expect(importHandler).toBeDefined();
+    await importHandler?.([
+      {
+        nc: '158155264352026NC000004',
+        nccelulatipo: 'Destino da NC',
+        ncoperacaotipo: 'DESCENTRALIZACAO DE CREDITO',
+        ncdiaemissao: '10/04/2026',
+        ncdescricao: 'CREDITO REGULAR',
+        nccelulaptres: '123456',
+        nccelulanaturezadespesa: '339000',
+        nccelulaplanointerno: 'PI123ADN',
+        nccelulavalor: '700,00',
+      },
+      {
+        nc: '158155264352026NC000004',
+        nccelulatipo: 'Origem da NC',
+        ncoperacaotipo: 'DESCENTRALIZACAO DE CREDITO',
+        ncdiaemissao: '10/04/2026',
+        ncdescricao: 'CREDITO REGULAR',
+        nccelulaptres: '123456',
+        nccelulanaturezadespesa: '339039',
+        nccelulaplanointerno: 'PI123ADN',
+        nccelulavalor: '700,00',
+      },
+    ]);
+
+    expect(addDescentralizacao).toHaveBeenCalledTimes(1);
+    expect(addDescentralizacao).toHaveBeenCalledWith(
+      expect.objectContaining({
+        notaCredito: '2026NC000004',
+        operacaoTipo: 'DESCENTRALIZACAO DE CREDITO',
+        origemRecurso: '123456',
+        naturezaDespesa: '339000',
+        planoInterno: 'PI123ADN',
+        valor: 700,
+      }),
+    );
+  });
 });
