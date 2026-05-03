@@ -2,146 +2,174 @@ import { useEffect, useRef } from 'react';
 import { formatCurrency } from '@/lib/utils';
 
 type GaugeChartProps = {
-  value: number;       // valor atual (numerador)
-  total: number;       // valor de referência (denominador = descentralizado)
-  label: string;       // ex: "Empenhado"
-  sublabel: string;    // ex: "sobre Descentralizado"
-  color: string;       // cor principal do arco (hex ou hsl)
-  trackColor?: string; // cor do trilho (padrão: cinza claro)
+  value: number;
+  total: number;
+  label: string;
+  sublabel: string;
   isLoading?: boolean;
 };
 
 /**
- * Velocímetro (gauge) semi-circular desenhado em SVG puro.
- * Não requer dependências externas além do React.
+ * Velocímetro semi-circular horizontal (base plana embaixo).
+ * Arco com gradação vermelho → amarelo → verde.
+ * SVG puro, sem dependências externas.
  */
-export function GaugeChart({
-  value,
-  total,
-  label,
-  sublabel,
-  color,
-  trackColor = '#e2e8f0',
-  isLoading = false,
-}: GaugeChartProps) {
-  const arcRef = useRef<SVGPathElement>(null);
-  const needleRef = useRef<SVGLineElement>(null);
+export function GaugeChart({ value, total, label, sublabel, isLoading = false }: GaugeChartProps) {
+  const filledArcRef = useRef<SVGPathElement>(null);
 
   const pct = total > 0 ? Math.min(value / total, 1) : 0;
   const pctDisplay = (pct * 100).toFixed(1);
 
-  // Geometria do gauge
-  const cx = 110;
+  // Geometria: semi-círculo, de 180° (esquerda) a 0° (direita)
+  // startAngle = 180° (esquerda), endAngle = 0° (direita)
+  const cx = 120;
   const cy = 110;
-  const r = 80;
-  const strokeWidth = 16;
-  const startAngle = -210; // graus (sentido horário a partir do eixo x)
-  const endAngle = 30;
-  const totalAngle = endAngle - startAngle; // 240°
+  const R = 85;        // raio externo
+  const r = 58;        // raio interno (espessura do arco = R - r = 27px)
+  const totalAngle = 180; // graus
 
-  function polarToCartesian(angleDeg: number) {
-    const rad = ((angleDeg - 90) * Math.PI) / 180;
+  // Converte ângulo (0° = direita, 180° = esquerda) para coordenadas SVG
+  function toXY(angleDeg: number, radius: number) {
+    const rad = (angleDeg * Math.PI) / 180;
     return {
-      x: cx + r * Math.cos(rad),
-      y: cy + r * Math.sin(rad),
+      x: cx - radius * Math.cos(rad),
+      y: cy - radius * Math.sin(rad),
     };
   }
 
-  function describeArc(from: number, to: number) {
-    const start = polarToCartesian(from);
-    const end = polarToCartesian(to);
-    const largeArc = to - from > 180 ? 1 : 0;
-    return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y}`;
+  // Gera o path de um arco em forma de "fatia" (anel)
+  function arcPath(fromDeg: number, toDeg: number, outerR: number, innerR: number) {
+    const o1 = toXY(fromDeg, outerR);
+    const o2 = toXY(toDeg, outerR);
+    const i1 = toXY(toDeg, innerR);
+    const i2 = toXY(fromDeg, innerR);
+    const large = Math.abs(toDeg - fromDeg) > 180 ? 1 : 0;
+    return [
+      `M ${o1.x} ${o1.y}`,
+      `A ${outerR} ${outerR} 0 ${large} 0 ${o2.x} ${o2.y}`,
+      `L ${i1.x} ${i1.y}`,
+      `A ${innerR} ${innerR} 0 ${large} 1 ${i2.x} ${i2.y}`,
+      'Z',
+    ].join(' ');
   }
 
-  // Comprimento total do arco (para stroke-dasharray)
-  const arcLength = (Math.abs(totalAngle) / 360) * 2 * Math.PI * r;
+  // Segmentos de cor do arco de fundo (gradação visual)
+  const segments = 60;
+  const colorStops = Array.from({ length: segments }, (_, i) => {
+    const t = i / (segments - 1); // 0 → 1
+    // Interpolação HSL: vermelho (0°) → amarelo (60°) → verde (120°)
+    const hue = Math.round(t * 120);
+    return { from: 180 - (i / segments) * 180, to: 180 - ((i + 1) / segments) * 180, hue };
+  });
 
-  // Ângulo da agulha
-  const needleAngle = startAngle + pct * totalAngle;
-  const needleTip = polarToCartesian(needleAngle);
-  const needleBase = { x: cx, y: cy };
+  // Arco preenchido (máscara animada)
+  const filledAngle = pct * totalAngle; // quantos graus preencher (de 180° para direita)
 
-  // Animação da agulha e do arco ao montar
+  // Comprimento do arco médio para animação
+  const midR = (R + r) / 2;
+  const arcLen = Math.PI * midR; // semicírculo completo
+
   useEffect(() => {
     if (isLoading) return;
-    const arc = arcRef.current;
-    const needle = needleRef.current;
-    if (!arc || !needle) return;
-
-    // Animação do arco via stroke-dashoffset
-    const filled = pct * arcLength;
-    arc.style.strokeDasharray = `${arcLength}`;
-    arc.style.strokeDashoffset = `${arcLength}`;
-    arc.style.transition = 'none';
+    const el = filledArcRef.current;
+    if (!el) return;
+    const filled = (pct * arcLen);
+    el.style.strokeDasharray = `${arcLen}`;
+    el.style.strokeDashoffset = `${arcLen}`;
+    el.style.transition = 'none';
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        arc.style.transition = 'stroke-dashoffset 1s cubic-bezier(0.34, 1.56, 0.64, 1)';
-        arc.style.strokeDashoffset = `${arcLength - filled}`;
+        el.style.transition = 'stroke-dashoffset 1.1s cubic-bezier(0.34, 1.4, 0.64, 1)';
+        el.style.strokeDashoffset = `${arcLen - filled}`;
       });
     });
-  }, [pct, arcLength, isLoading]);
+  }, [pct, arcLen, isLoading]);
 
-  // Zonas de cor para as marcações do arco
-  const zones = [
-    { from: startAngle, to: startAngle + totalAngle * 0.33, color: '#ef4444' },   // vermelho 0-33%
-    { from: startAngle + totalAngle * 0.33, to: startAngle + totalAngle * 0.66, color: '#f59e0b' }, // amarelo 33-66%
-    { from: startAngle + totalAngle * 0.66, to: endAngle, color: '#22c55e' },      // verde 66-100%
-  ];
+  // Agulha
+  const needleAngleDeg = 180 - pct * totalAngle; // 180° (esq) → 0° (dir)
+  const needleTip = toXY(needleAngleDeg, R - 6);
+  const needleBase = { x: cx, y: cy };
+
+  // Ticks e rótulos
+  const tickMarks = [0, 0.25, 0.5, 0.75, 1];
 
   if (isLoading) {
     return (
       <div className="flex flex-col items-center gap-3 p-4">
-        <div className="h-[140px] w-[220px] animate-pulse rounded-2xl bg-muted" />
-        <div className="h-4 w-32 animate-pulse rounded bg-muted" />
-        <div className="h-3 w-24 animate-pulse rounded bg-muted" />
+        <div className="h-[130px] w-full animate-pulse rounded-2xl bg-muted" />
+        <div className="h-4 w-28 animate-pulse rounded bg-muted" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center gap-1">
-      <svg viewBox="0 0 220 140" className="w-full max-w-[260px]" aria-label={`${label}: ${pctDisplay}%`}>
-        {/* Trilho (arco de fundo) */}
+    <div className="flex flex-col items-center">
+      <svg viewBox="0 20 240 120" className="w-full max-w-[320px]" aria-label={`${label}: ${pctDisplay}%`}>
+        <defs>
+          {/* Gradiente para o arco preenchido */}
+          <linearGradient id={`gaugeGrad-${label}`} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#ef4444" />
+            <stop offset="50%" stopColor="#f59e0b" />
+            <stop offset="100%" stopColor="#22c55e" />
+          </linearGradient>
+
+          {/* Máscara radial para revelar o arco preenchido */}
+          <mask id={`gaugeMask-${label}`}>
+            <path
+              ref={filledArcRef}
+              d={`M ${toXY(180, midR).x} ${toXY(180, midR).y} A ${midR} ${midR} 0 0 0 ${toXY(0, midR).x} ${toXY(0, midR).y}`}
+              fill="none"
+              stroke="white"
+              strokeWidth={R - r + 2}
+              strokeLinecap="butt"
+              style={{
+                strokeDasharray: arcLen,
+                strokeDashoffset: arcLen - pct * arcLen,
+              }}
+            />
+          </mask>
+        </defs>
+
+        {/* Arco de fundo (cinza claro) */}
         <path
-          d={describeArc(startAngle, endAngle)}
-          fill="none"
-          stroke={trackColor}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
+          d={arcPath(180, 0, R, r)}
+          fill="#e2e8f0"
         />
 
-        {/* Arco colorido animado */}
+        {/* Arco colorido gradiente, revelado pela máscara */}
         <path
-          ref={arcRef}
-          d={describeArc(startAngle, endAngle)}
-          fill="none"
-          stroke={color}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          style={{
-            strokeDasharray: arcLength,
-            strokeDashoffset: arcLength - pct * arcLength,
-          }}
+          d={arcPath(180, 0, R, r)}
+          fill={`url(#gaugeGrad-${label})`}
+          mask={`url(#gaugeMask-${label})`}
         />
 
-        {/* Marcações de zona (pequenos ticks) */}
-        {[0, 0.25, 0.5, 0.75, 1].map((t) => {
-          const tickAngle = startAngle + t * totalAngle;
-          const inner = polarToCartesian(tickAngle);
-          const outerR = r + strokeWidth / 2 + 4;
-          const rad = ((tickAngle - 90) * Math.PI) / 180;
-          const outer = {
-            x: cx + outerR * Math.cos(rad),
-            y: cy + outerR * Math.sin(rad),
-          };
+        {/* Separadores sutis entre segmentos a cada 25% */}
+        {[0.25, 0.5, 0.75].map((t) => {
+          const angleDeg = 180 - t * 180;
+          const outer = toXY(angleDeg, R + 2);
+          const inner = toXY(angleDeg, r - 2);
           return (
             <line
               key={t}
-              x1={inner.x}
-              y1={inner.y}
-              x2={outer.x}
-              y2={outer.y}
+              x1={outer.x} y1={outer.y}
+              x2={inner.x} y2={inner.y}
+              stroke="white"
+              strokeWidth={1.5}
+              opacity={0.6}
+            />
+          );
+        })}
+
+        {/* Ticks externos */}
+        {tickMarks.map((t) => {
+          const angleDeg = 180 - t * 180;
+          const outer = toXY(angleDeg, R + 4);
+          const inner = toXY(angleDeg, R + 10);
+          return (
+            <line
+              key={t}
+              x1={outer.x} y1={outer.y}
+              x2={inner.x} y2={inner.y}
               stroke="#94a3b8"
               strokeWidth={1.5}
               strokeLinecap="round"
@@ -149,21 +177,18 @@ export function GaugeChart({
           );
         })}
 
-        {/* Rótulos de escala: 0%, 50%, 100% */}
-        {[0, 0.5, 1].map((t) => {
-          const tickAngle = startAngle + t * totalAngle;
-          const labelR = r + strokeWidth / 2 + 14;
-          const rad = ((tickAngle - 90) * Math.PI) / 180;
-          const lx = cx + labelR * Math.cos(rad);
-          const ly = cy + labelR * Math.sin(rad);
+        {/* Rótulos de escala */}
+        {tickMarks.map((t) => {
+          const angleDeg = 180 - t * 180;
+          const pos = toXY(angleDeg, R + 18);
           return (
             <text
               key={t}
-              x={lx}
-              y={ly}
+              x={pos.x}
+              y={pos.y}
               textAnchor="middle"
               dominantBaseline="middle"
-              fontSize="8"
+              fontSize="7.5"
               fontWeight="600"
               fill="#94a3b8"
             >
@@ -174,29 +199,21 @@ export function GaugeChart({
 
         {/* Agulha */}
         <line
-          ref={needleRef}
-          x1={needleBase.x}
-          y1={needleBase.y}
-          x2={needleTip.x}
-          y2={needleTip.y}
+          x1={needleBase.x} y1={needleBase.y}
+          x2={needleTip.x} y2={needleTip.y}
           stroke="#1e293b"
           strokeWidth={2.5}
           strokeLinecap="round"
-          style={{
-            transformOrigin: `${cx}px ${cy}px`,
-          }}
         />
+        <circle cx={cx} cy={cy} r={6} fill="#1e293b" />
+        <circle cx={cx} cy={cy} r={3} fill="white" />
 
-        {/* Pivô da agulha */}
-        <circle cx={cx} cy={cy} r={5} fill="#1e293b" />
-        <circle cx={cx} cy={cy} r={2.5} fill="white" />
-
-        {/* Percentual central */}
+        {/* Percentual */}
         <text
           x={cx}
-          y={cy + 22}
+          y={cy - 18}
           textAnchor="middle"
-          fontSize="18"
+          fontSize="20"
           fontWeight="800"
           fill="#0f172a"
           letterSpacing="-0.5"
@@ -205,14 +222,12 @@ export function GaugeChart({
         </text>
       </svg>
 
-      {/* Legenda abaixo do gauge */}
-      <div className="text-center">
+      {/* Legenda */}
+      <div className="-mt-2 text-center">
         <p className="text-sm font-bold text-text-primary">{label}</p>
         <p className="text-xs text-text-muted">{sublabel}</p>
-        <div className="mt-1.5 flex items-center justify-center gap-1.5">
-          <span className="text-xs font-semibold" style={{ color }}>
-            {formatCurrency(value)}
-          </span>
+        <div className="mt-1 flex items-center justify-center gap-1.5">
+          <span className="text-xs font-semibold text-text-secondary">{formatCurrency(value)}</span>
           <span className="text-xs text-text-muted">/</span>
           <span className="text-xs text-text-muted">{formatCurrency(total)}</span>
         </div>
