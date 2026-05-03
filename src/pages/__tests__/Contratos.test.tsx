@@ -8,12 +8,14 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { contratosApiService } from '@/services/contratosApi';
 import { useUserFavorites } from '@/services/userFavorites';
 
+const authState = vi.hoisted(() => ({ isSuperAdmin: false }));
+
 vi.mock('@/contexts/DataContext', () => ({
   useData: vi.fn(),
 }));
 
 vi.mock('@/contexts/AuthContext', () => ({
-  useAuth: () => ({ isSuperAdmin: false }),
+  useAuth: () => ({ isSuperAdmin: authState.isSuperAdmin }),
 }));
 
 vi.mock('@/services/userFavorites', () => ({
@@ -56,6 +58,7 @@ const renderContratos = () =>
 describe('Contratos', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    authState.isSuperAdmin = false;
 
     mockedUseData.mockReturnValue({
       atividades: [],
@@ -121,6 +124,30 @@ describe('Contratos', () => {
         valor_global: 201994.8,
         valor_acumulado: 201994.8,
         situacao: true,
+        situacao_derivada: true,
+        vigencia_inicio_derivada: '2023-01-01',
+        vigencia_fim_derivada: '2026-12-31',
+        updated_at: '2026-04-14T00:00:00Z',
+      },
+      {
+        id: 'contrato-api-2',
+        api_contrato_id: 22025,
+        numero: '00015/2026',
+        fornecedor_nome: 'Fornecedor Comum',
+        unidade_codigo: '158366',
+        unidade_nome: 'INST.FED. DO RN/CAMPUS CURRAIS NOVOS',
+        unidade_origem_codigo: '158366',
+        unidade_origem_nome: 'INST.FED. DO RN/CAMPUS CURRAIS NOVOS',
+        objeto: 'Objeto',
+        processo: '23000.000001/2026-00',
+        vigencia_inicio: '2026-01-01',
+        vigencia_fim: '2026-12-31',
+        valor_global: 50000,
+        valor_acumulado: 50000,
+        situacao: true,
+        situacao_derivada: true,
+        vigencia_inicio_derivada: '2026-01-01',
+        vigencia_fim_derivada: '2026-12-31',
         updated_at: '2026-04-14T00:00:00Z',
       },
     ]);
@@ -215,7 +242,7 @@ describe('Contratos', () => {
   it('exibe detalhes da API quando o contrato local casa por numero normalizado', async () => {
     renderContratos();
 
-    const detailsButton = await screen.findByRole('button', { name: /Detalhes/i });
+    const detailsButton = (await screen.findAllByRole('button', { name: /Detalhes/i }))[0];
     fireEvent.click(detailsButton);
 
     await waitFor(() => {
@@ -237,5 +264,28 @@ describe('Contratos', () => {
     expect(screen.getByText('62/2018')).toBeInTheDocument();
     expect(screen.queryByText('15/2026')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Detalhes/i })).toBeInTheDocument();
+  });
+
+  it('exibe status da ultima sincronizacao para superadmin', async () => {
+    authState.isSuperAdmin = true;
+    mockedContratosApiService.getLastSyncRun.mockResolvedValue({
+      id: 'sync-run-1',
+      unidade_codigo: '158366',
+      started_at: '2026-05-02T06:00:00Z',
+      finished_at: '2026-05-02T06:03:00Z',
+      status: 'success',
+      contratos_ativos: 6,
+      contratos_inativos: 4,
+      contratos_upserted: 10,
+      empenhos_upserted: 2,
+      faturas_upserted: 1,
+      error_message: null,
+      details: null,
+    });
+
+    renderContratos();
+
+    expect(await screen.findByText(/Ultima sincronizacao:/i)).toHaveTextContent('sucesso');
+    expect(screen.getByRole('button', { name: /Atualizar Comprasnet/i })).toBeInTheDocument();
   });
 });

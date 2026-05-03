@@ -176,16 +176,22 @@ Observacoes:
 
 ### Contratos
 
-`Contratos.tsx` -> `useData()` -> `contratos` / `contratos_empenhos`
+`Contratos.tsx` -> `contratosApiService.getContratosApi(true)` -> `contratos_api`
 
-Enriquecimento por API:
+Complemento local:
 
-`sync-contratos-comprasnet` -> `contratos_api*` -> `contratosApiService` -> drawer de detalhes em `Contratos.tsx`
+`useData()` -> `contratos` / `contratos_empenhos` quando houver match por numero normalizado
+
+Sincronizacao:
+
+`sync-contratos-comprasnet` -> `contratos_api*` -> `contratosApiService` -> lista e drawer de detalhes em `Contratos.tsx`
 
 Observacao:
 
-- a lista principal continua usando a base local de contratos
-- dados do Comprasnet aparecem apenas quando o numero normalizado do contrato local casa com `contratos_api.numero`
+- a lista principal usa contratos sincronizados da API com `situacao_derivada = true`; o endpoint de "ativos" do Comprasnet nao e confiavel sozinho porque pode retornar contratos com vigencia vencida
+- o upload manual XLSX foi removido da tela; superadmin ve a ultima sincronizacao e pode acionar "Atualizar Comprasnet" para antecipar o cron diario
+- `situacao_derivada`, `vigencia_inicio_derivada`, `vigencia_fim_derivada` e `situacao_derivada_motivo` sao calculados na sincronizacao pela maior vigencia valida do historico; rescisao/cancelamento inativa o contrato; sem historico, usa `vigencia_fim` da listagem como fallback registrado
+- contratos da UG `158366` entram se ativos pela regra derivada; contratos da UG `158155` so entram se houver evidencia operacional estruturada do campus, como empenho ou fatura com UG/contratante `158366`, registrada em `campus_scope_reason`
 - o historico da API (`contratos_api_historico`) aparece no drawer com assinatura, aditivos, apostilamentos e rescisao
 - contratos com origem `158155` recebem sinalizacao de Reitoria; a execucao operacional deve ser lida pela UG do campus `158366`
 - Valor Total da lista usa o historico da API como fonte principal quando houver match, somando `valor_inicial` de cada termo: assinatura, aditivos, apostilamentos ou termos equivalentes. `valor_global` da API nao entra nessa metrica. Sem historico com `valor_inicial`, usa `contratos.valor` como fallback
@@ -211,7 +217,7 @@ Observacoes:
 
 - favoritos sao pessoais por usuario autenticado do Supabase
 - as telas exibem uma estrela por linha e um filtro `Todos/Favoritos`
-- favoritos de contratos se referem aos contratos locais em `contratos`; os dados da API de contratos continuam sendo apenas enriquecimento visual da linha
+- favoritos de contratos se referem aos contratos locais em `contratos`; linhas vindas apenas de `contratos_api` aparecem sem acao de favorito ate existir contrato local correspondente
 
 ### Editor de Documentos
 

@@ -244,7 +244,9 @@ Pre-requisitos no banco:
 Observacoes operacionais:
 
 - `supabase/config.toml` deve manter `verify_jwt = false` para `sync-contratos-comprasnet`, pois a chamada periodica vem do cron
-- a migration agenda chamada a cada 6 horas para a UG `158366`
+- a migration agenda `sync-contratos-comprasnet-daily` chamada diariamente as `03:00` no horario de Brasilia para as UGs `158366` e `158155`
+- nao ha nova variavel obrigatoria para a regra derivada; a function calcula a vigencia real a partir do historico do Comprasnet e grava os motivos em `contratos_api`
+- se `CONTRATOS_SYNC_SECRET` for configurada, o cron criado pela migration precisa ser ajustado para enviar o header `x-contratos-sync-secret`; sem esse segredo, a chamada diaria funciona apenas com service role interna da function
 
 ### `refresh-comprasnet-liquidacoes-cache`
 

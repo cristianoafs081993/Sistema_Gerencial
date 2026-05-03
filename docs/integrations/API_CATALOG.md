@@ -128,7 +128,8 @@ Service:
 Sincronizacao automatica:
 
 - [sync-contratos-comprasnet/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-contratos-comprasnet/index.ts)
-- cron a cada 6 horas para a UG `158366`
+- cron diario `sync-contratos-comprasnet-daily`, as `03:00` no horario de Brasilia, para as UGs `158366` e `158155`
+- o botao administrativo "Atualizar Comprasnet" apenas antecipa a mesma sincronizacao automatica
 
 Base usada:
 
@@ -178,11 +179,18 @@ Persistencia local:
 
 Observacao:
 
+- o endpoint `/contrato/ug/{unidadeCodigo}` nao e fonte confiavel de vigencia ativa sozinho; em maio/2026 ele ainda retornava como ativos contratos com `vigencia_fim` vencida
+- a fonte de verdade operacional para exibicao de ativos e `contratos_api.situacao_derivada = true`, calculada pela maior `vigencia_fim` valida do historico; termos de rescisao/cancelamento tornam o contrato inativo
+- quando nao ha historico, a sincronizacao usa `vigencia_fim` da listagem como fallback e registra o motivo em `situacao_derivada_motivo`
+- contratos da UG `158366` entram no escopo se estiverem ativos pela regra derivada; contratos da UG `158155` entram somente com evidencia operacional estruturada do campus, como empenho ou fatura com UG/contratante `158366`, registrada em `campus_scope_reason`
+- contratos em que a UASG `158366` aparece apenas como unidade de compra/origem, mas o objeto indica atendimento a outro campus avancado, como Parelhas ou Jucurutu, ficam fora do escopo com `campus_scope_reason = ug_campus_objeto_fora_currais_novos`
+- para evitar limite de worker ao sincronizar a UG `158155`, a Edge Function busca primeiro historico e empenhos; faturas e itens so sao buscados para contratos ativos e dentro do escopo, ou quando a fatura ainda pode comprovar o escopo do campus
+- a exibicao e os agregados operacionais usam somente empenhos da UG `158366`; empenhos de outros campi podem existir no contrato global da Reitoria, mas nao devem ser persistidos para a tela nem somados em valor empenhado ou saldo do campus
 - execucao por item so deve ser exibida como oficial quando a fatura trouxer `dados_item_faturado[].id_item_contrato`; o total executado considera situacoes `Pago` e `Siafi Apropriado`
 - o historico de contrato deve mostrar os valores originais da API; variacoes derivadas entre termos nao sao valor oficial de aditivo
 - o Valor Total da lista deve usar `contratos_api_historico` como fonte principal, somando `valor_inicial` de cada termo. `valor_global` da API nao entra nessa metrica porque pode representar outro consolidado/periodo e distorcer a leitura. Sem historico com `valor_inicial`, usar `contratos.valor` como fallback
 - em contratos com `codigo_unidade_origem = 158155`, a UI deve sinalizar origem Reitoria e diferenciar valores globais do contrato da execucao do campus `158366`
-- empenhos da API alimentam o agregado de Valor Empenhado pelo campo `empenhado` na lista principal e tambem aparecem como badges/popovers quando ainda nao existem em `empenhos` + `contratos_empenhos`; quando o mesmo numero existir nas duas fontes, o badge local prevalece para preservar os saldos CSV/SIAFI. O drawer nao exibe uma secao propria de empenhos para evitar misturar saldos da API com a regra local de `empenhos`
+- empenhos da API da UG `158366` alimentam o agregado de Valor Empenhado pelo campo `empenhado` na lista principal e tambem aparecem como badges/popovers quando ainda nao existem em `empenhos` + `contratos_empenhos`; quando o mesmo numero existir nas duas fontes, o badge local prevalece para preservar os saldos CSV/SIAFI. O drawer nao exibe uma secao propria de empenhos para evitar misturar saldos da API com a regra local de `empenhos`
 - `Saldo dos empenhos` soma saldos locais e saldos de empenhos que existem apenas em `contratos_api_empenhos`; isso evita ocultar saldo de empenhos novos da API, como empenhos de exercicio ainda nao vinculados localmente, e evita usar campos de exercicio como saldo RAP
 - a conciliacao entre `contratos_api_empenhos.numero` e `empenhos.numero` deve usar chaves equivalentes do empenho, incluindo o sufixo `AAAA NEXXXXXX` quando a API vier com prefixo de UG/gestao. Se houver empenho local correspondente, o saldo do SIAFI local prevalece sobre `valor_a_liquidar` da API
 - Em RAP vindo apenas da API, o popover usa `rp_inscrito`, `rp_a_pagar` e os campos especificos preservados em `raw_data` (`rpaliquidar`, `rpliquidado`, `rppago`, `rpapagar` quando presente), evitando usar `aliquidar`/`pago` do exercicio como saldo de RAP
@@ -191,7 +199,7 @@ Observacao:
 - quando a API trouxer o `historico_item`, o drawer deve exibir tambem seus campos operacionais por termo: `tipo_historico`, `data_termo`, `quantidade`, `valor_unitario` e `valor_total`
 - no resumo de itens do drawer, `Contratado` e `Executado` tambem devem mostrar quantidade agregada: contratado pela soma de `historico_item[].quantidade` quando houver historico, e executado pela soma de `quantidade_faturado` nas faturas `Pago` ou `Siafi Apropriado`
 - quando houver `dados_item_faturado`, o drawer deve exibir tambem `quantidade_faturado` e `valor_unitario_faturado` na linha da fatura
-- a tela de contratos cruza a base local com a API por numero normalizado e abre os dados externos em drawer lateral. As faturas continuam podendo ser sincronizadas amplamente, mas a exibicao do drawer e do modal de empenho filtra por `raw_data.contratante` para mostrar somente o campus `158366` quando a API trouxer esse identificador
+- a tela de contratos usa a lista sincronizada de `contratos_api` filtrada por `situacao_derivada`; dados locais de `contratos` e `contratos_empenhos` servem apenas como complemento para favoritos, CNPJ e saldos locais quando houver match por numero normalizado
 
 ## 5. Edge Function `analisar-liquidacao-siafi`
 

@@ -1,0 +1,5 @@
+-- Reconciliation-only migration.
+-- The remote project already has migration version 20260430100100 recorded in
+-- supabase_migrations.schema_migrations, but the corresponding local file was
+-- missing. Keep this file so future `supabase db push` runs can compare local
+-- and remote migration history without repairing the remote table.

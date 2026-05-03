@@ -308,8 +308,14 @@ Local:
 
 Uso:
 
-- sincroniza contratos da UG `158366` a partir de `https://contratos.comprasnet.gov.br/api`
+- sincroniza contratos das UGs `158366` e `158155` a partir de `https://contratos.comprasnet.gov.br/api`
 - busca contratos ativos, inativos, historico, empenhos, faturas e itens
+- deriva `situacao_derivada`, `vigencia_inicio_derivada`, `vigencia_fim_derivada`, `situacao_derivada_motivo` e `campus_scope_reason` em `contratos_api`
+- considera ativo somente contrato com vigencia derivada pelo historico ainda vigente; termos de rescisao/cancelamento tornam o contrato inativo; sem historico, usa `vigencia_fim` da listagem como fallback com motivo registrado
+- contratos da UG `158155` entram no escopo somente com evidencia operacional estruturada do campus `158366`, como empenho ou fatura com UG/contratante do campus
+- contratos com UASG/origem `158366` cujo objeto indique atendimento a outro campus avancado, como Parelhas ou Jucurutu, sao marcados fora do escopo com `ug_campus_objeto_fora_currais_novos`
+- na UG `158155`, a coleta e feita em etapas para reduzir consumo do worker: historico e empenhos primeiro; faturas e itens apenas para contratos ativos e em escopo, ou quando a fatura ainda pode comprovar escopo
+- grava em `contratos_api_empenhos` somente empenhos cuja `unidade_gestora` seja `158366`; empenhos de outras unidades do contrato global nao entram nos totais nem nos badges da tela do campus
 - deriva vinculos fatura-item de `dados_item_faturado`
 - deriva vinculos fatura-empenho de `dados_empenho`
 - grava contadores e falhas em `contratos_api_sync_runs`
@@ -322,8 +328,9 @@ Dependencias:
 Observacao:
 
 - publicada com `verify_jwt = false`, pois o cron chama a function por HTTP e a function usa service role apenas internamente
-- a migration agenda `sync-contratos-comprasnet-6h` com Supabase Cron/pg_net para executar a cada 6 horas
-- a primeira versao aceita apenas a UG `158366`
+- a migration agenda `sync-contratos-comprasnet-daily` com Supabase Cron/pg_net para executar diariamente as `03:00` no horario de Brasilia
+- a chamada sem `unidadeCodigo` sincroniza as UGs padrao `158366` e `158155`; valores fora desse conjunto sao rejeitados nesta versao
+- o endpoint de "ativos" do Comprasnet nao e fonte de verdade de vigencia; a exibicao da UI usa `situacao_derivada`, nao `situacao`
 
 ### `refresh-comprasnet-liquidacoes-cache`
 

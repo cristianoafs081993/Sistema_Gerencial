@@ -28,6 +28,13 @@ Pontos mais criticos devem ter cobertura preferencial:
 - integracoes, proxies, storage e Edge Functions
 - regras de encoding em textos de UI e documentacao
 
+Contratos via Comprasnet:
+
+- regras puras de vigencia derivada devem cobrir maior `vigencia_fim` do historico, aditivo vencido sem renovacao, rescisao/cancelamento e fallback sem historico
+- a sincronizacao deve ter regressao garantindo que contratos retornados pelo endpoint de "ativos" nao aparecem como ativos quando o historico esta vencido
+- contratos da UG `158155` devem ter teste de escopo: entram somente com evidencia operacional estruturada do campus `158366`
+- a UI de contratos deve testar que o upload manual XLSX nao aparece, que o status da ultima sincronizacao e exibido ao superadmin e que a lista usa `situacao_derivada`
+
 ## Como rodar
 
 A suite principal usa Vitest.

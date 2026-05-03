@@ -332,6 +332,15 @@ Observacoes operacionais:
 ### `contratos_api`
 
 - espelho local da API externa de contratos
+- a exibicao de ativos usa `situacao_derivada`, nao `situacao` retornada pela API
+- campos derivados principais:
+  - `situacao_derivada`
+  - `vigencia_inicio_derivada`
+  - `vigencia_fim_derivada`
+  - `situacao_derivada_motivo`
+  - `campus_scope_reason`
+- `situacao_derivada_motivo` registra se a decisao veio de historico vigente, historico vencido sem renovacao, rescisao/cancelamento ou fallback sem historico
+- `campus_scope_reason` registra se o contrato entrou por UG do campus, evidencia operacional da Reitoria ou ficou fora do escopo
 
 ### `contratos_api_historico`
 
@@ -370,7 +379,7 @@ Observacoes operacionais:
 ### `contratos_api_sync_runs`
 
 - historico das sincronizacoes da API de contratos
-- guarda tambem contadores de historico, itens, vinculos fatura-item e vinculos fatura-empenho
+- guarda tambem contadores de historico, itens, vinculos fatura-item, vinculos fatura-empenho e detalhes com totais derivados de contratos ativos/inativos
 
 Consumido por:
 

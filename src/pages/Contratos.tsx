@@ -9,7 +9,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 import { formatCurrency, formatarDocumento, cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { HeaderActions } from '@/components/HeaderParts';
 import { ContratosSyncDialog } from '@/components/modals/ContratosSyncDialog';
@@ -20,6 +19,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { getRapBaseVigente, getRapReferenceYear, getRapSaldoAtual } from '@/utils/rapMetrics';
 import { buildEmpenhoLookupKeys, normalizeContratoNumero, shouldIgnoreContratoNumero } from '@/utils/contratosSync';
 import { getValorTotalFromHistorico } from '@/utils/contratosApiHistorico';
+import { isContratoApiCampusEmpenho } from '@/utils/contratosApiStatus';
 import { contratosApiService, type ContratoApiDetails, type ContratoApiEmpenhoRow, type ContratoApiHistoricoRow, type ContratoApiRow, type ContratoApiSyncRun } from '@/services/contratosApi';
 import { ContratoApiDetailsSheet } from '@/components/contratos/ContratoApiDetailsSheet';
 import { useUserFavorites } from '@/services/userFavorites';
@@ -154,30 +154,35 @@ export default function Contratos() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isDetailsLoading, setIsDetailsLoading] = useState(false);
 
+  const loadApiContracts = useCallback(async (isCancelled: () => boolean = () => false) => {
+    try {
+      const contratosApi = await contratosApiService.getContratosApi(true);
+      const contratoApiIds = contratosApi.map((contrato) => contrato.id);
+      const [empenhosApi, historicosApi, lastSync] = await Promise.all([contratosApiService.getEmpenhosApi(contratoApiIds), contratosApiService.getHistoricosApi(contratoApiIds), contratosApiService.getLastSyncRun().catch(() => null)]);
+      if (isCancelled()) return;
+      setApiContratos(contratosApi);
+      setApiEmpenhos(empenhosApi.filter((empenho) => isContratoApiCampusEmpenho(empenho)));
+      setApiHistoricos(historicosApi);
+      setLastApiSyncRun(lastSync);
+    } catch (error) {
+      console.warn('Contratos: nao foi possivel carregar dados da API do Comprasnet', error);
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
-    async function loadApiContracts() {
-      try {
-        const contratosApi = await contratosApiService.getContratosApi(true);
-        const contratoApiIds = contratosApi.map((contrato) => contrato.id);
-        const [empenhosApi, historicosApi, lastSync] = await Promise.all([contratosApiService.getEmpenhosApi(contratoApiIds), contratosApiService.getHistoricosApi(contratoApiIds), contratosApiService.getLastSyncRun().catch(() => null)]);
-        if (cancelled) return;
-        setApiContratos(contratosApi);
-        setApiEmpenhos(empenhosApi);
-        setApiHistoricos(historicosApi);
-        setLastApiSyncRun(lastSync);
-      } catch (error) {
-        console.warn('Contratos: nao foi possivel carregar dados da API do Comprasnet', error);
-      }
-    }
-
-    loadApiContracts();
+    loadApiContracts(() => cancelled);
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadApiContracts]);
+
+  const handleSyncComplete = useCallback(() => {
+    refreshData();
+    void loadApiContracts();
+  }, [refreshData, loadApiContracts]);
 
   const normalizeString = useCallback(
     (str: string) =>
@@ -190,7 +195,29 @@ export default function Contratos() {
     [],
   );
 
-  const visibleContratos = useMemo(() => contratos.filter((c) => !shouldIgnoreContratoNumero(c.numero)), [contratos]);
+  type LocalContrato = (typeof contratos)[number];
+  type ContratoDisplay = {
+    id: string;
+    localId: string | null;
+    source: 'api' | 'local';
+    numero: string;
+    contratada: string;
+    cnpj?: string | null;
+    valor?: number | null;
+    data_inicio?: Date | string | null;
+    data_termino?: Date | string | null;
+    apiContrato?: ContratoApiRow;
+    localContrato?: LocalContrato;
+  };
+
+  const localContratoByNumero = useMemo(() => {
+    const map = new Map<string, LocalContrato>();
+    for (const contrato of contratos) {
+      if (shouldIgnoreContratoNumero(contrato.numero)) continue;
+      map.set(normalizeContratoNumero(contrato.numero), contrato);
+    }
+    return map;
+  }, [contratos]);
 
   const apiContratoByNumero = useMemo(() => {
     const map = new Map<string, ContratoApiRow>();
@@ -199,6 +226,44 @@ export default function Contratos() {
     }
     return map;
   }, [apiContratos]);
+
+  const visibleContratos = useMemo<ContratoDisplay[]>(() => {
+    if (apiContratos.length === 0) {
+      return contratos
+        .filter((contrato) => !shouldIgnoreContratoNumero(contrato.numero))
+        .map((contrato) => ({
+          id: `local-${contrato.id}`,
+          localId: contrato.id,
+          source: 'local',
+          numero: contrato.numero,
+          contratada: contrato.contratada,
+          cnpj: contrato.cnpj,
+          valor: contrato.valor,
+          data_inicio: contrato.data_inicio,
+          data_termino: contrato.data_termino,
+          localContrato: contrato,
+        }));
+    }
+
+    return apiContratos
+      .filter((contrato) => !shouldIgnoreContratoNumero(contrato.numero))
+      .map((apiContrato) => {
+        const localContrato = localContratoByNumero.get(normalizeContratoNumero(apiContrato.numero));
+        return {
+          id: localContrato ? `local-${localContrato.id}` : `api-${apiContrato.id}`,
+          localId: localContrato?.id ?? null,
+          source: 'api',
+          numero: localContrato?.numero ?? apiContrato.numero,
+          contratada: apiContrato.fornecedor_nome || localContrato?.contratada || 'Fornecedor nao informado',
+          cnpj: localContrato?.cnpj,
+          valor: localContrato?.valor ?? apiContrato.valor_acumulado ?? apiContrato.valor_global ?? 0,
+          data_inicio: apiContrato.vigencia_inicio_derivada ?? apiContrato.vigencia_inicio ?? localContrato?.data_inicio ?? null,
+          data_termino: apiContrato.vigencia_fim_derivada ?? apiContrato.vigencia_fim ?? localContrato?.data_termino ?? null,
+          apiContrato,
+          localContrato,
+        };
+      });
+  }, [apiContratos, contratos, localContratoByNumero]);
 
   const apiEmpenhosByContratoApiId = useMemo(() => {
     const map = new Map<string, ContratoApiEmpenhoRow[]>();
@@ -237,7 +302,17 @@ export default function Contratos() {
     setIsDetailsLoading(true);
     try {
       const details = await contratosApiService.getContratoApiDetails(contrato.id);
-      setSelectedApiDetails(details);
+      const campusEmpenhos = details.empenhos.filter((empenho) => isContratoApiCampusEmpenho(empenho));
+      const campusEmpenhoIds = new Set(campusEmpenhos.map((empenho) => empenho.id));
+      const campusApiEmpenhoIds = new Set(campusEmpenhos.map((empenho) => Number(empenho.api_empenho_id)));
+      setSelectedApiDetails({
+        ...details,
+        empenhos: campusEmpenhos,
+        faturaEmpenhos: details.faturaEmpenhos.filter((row) =>
+          (row.contrato_api_empenho_id != null && campusEmpenhoIds.has(row.contrato_api_empenho_id)) ||
+          (row.api_empenho_id != null && campusApiEmpenhoIds.has(Number(row.api_empenho_id))),
+        ),
+      });
     } catch (error) {
       console.error('Contratos: erro ao carregar detalhes do contrato da API', error);
       setSelectedApiDetails({
@@ -256,7 +331,7 @@ export default function Contratos() {
   const filteredContratos = useMemo(() => {
     const searchNormalized = normalizeString(searchTerm);
     const baseContratos = favoritesFilter === 'favorites'
-      ? visibleContratos.filter((contrato) => favoriteIdsByType.contrato.has(contrato.id))
+      ? visibleContratos.filter((contrato) => contrato.localId && favoriteIdsByType.contrato.has(contrato.localId))
       : visibleContratos;
 
     let result = baseContratos.filter((c) => {
@@ -327,7 +402,8 @@ export default function Contratos() {
   );
 
   const getEmpenhosDoContrato = useCallback(
-    (contratoId: string) => {
+    (contratoId: string | null | undefined) => {
+      if (!contratoId) return [];
       const linkIds = contratosEmpenhos.filter((l) => l.contrato_id === contratoId).map((l) => l.empenho_id);
 
       // Compatibilidade: dependendo do histórico/imports, `contratos_empenhos.empenho_id`
@@ -356,7 +432,7 @@ export default function Contratos() {
   );
 
   const getValorEmpenhadoLocal = useCallback(
-    (contratoId: string) => {
+    (contratoId: string | null | undefined) => {
       const emps = getEmpenhosDoContrato(contratoId);
       return emps.reduce((sum, empenho) => sum + (empenho.valor || 0), 0);
     },
@@ -371,7 +447,7 @@ export default function Contratos() {
   );
 
   const getValorEmpenhadoContrato = useCallback(
-    (contratoId: string, apiContrato?: ContratoApiRow) => {
+    (contratoId: string | null | undefined, apiContrato?: ContratoApiRow) => {
       if (apiContrato) {
         const apiTotal = getValorEmpenhadoApi(apiContrato.id);
         if (apiTotal > 0) return apiTotal;
@@ -403,8 +479,8 @@ export default function Contratos() {
 
   const totalALiquidarGlobal = useMemo(() => {
     return visibleContratos.reduce((sumContrato, c) => {
-      const emps = getEmpenhosDoContrato(c.id);
-      const apiContrato = apiContratoByNumero.get(normalizeContratoNumero(c.numero));
+      const emps = getEmpenhosDoContrato(c.localId);
+      const apiContrato = c.apiContrato ?? apiContratoByNumero.get(normalizeContratoNumero(c.numero));
       const empenhosApiSomente = getEmpenhosApiSomente(emps, apiContrato);
       const saldoLocal = emps.reduce((sumEmp, e) => sumEmp + getSaldoEmpenhoLocal(e), 0);
       const saldoApiSomente = empenhosApiSomente.reduce((sumEmp, e) => sumEmp + getSaldoEmpenhoApiPreferLocal(e), 0);
@@ -425,6 +501,15 @@ export default function Contratos() {
     return sortConfig.direction === 'asc' ? <ChevronUp className="ml-2 h-3 w-3 text-primary" /> : <ChevronDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
+  const lastSyncLabel = useMemo(() => {
+    if (!lastApiSyncRun) return 'Ultima sincronizacao: nao registrada';
+    const rawDate = lastApiSyncRun.finished_at ?? lastApiSyncRun.started_at;
+    const parsed = rawDate ? new Date(rawDate) : null;
+    const dateLabel = parsed && !Number.isNaN(parsed.getTime()) ? format(parsed, 'dd/MM/yyyy HH:mm') : '-';
+    const statusLabel = lastApiSyncRun.status === 'success' ? 'sucesso' : lastApiSyncRun.status;
+    return `Ultima sincronizacao: ${dateLabel} (${statusLabel})`;
+  }, [lastApiSyncRun]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -436,10 +521,13 @@ export default function Contratos() {
     <div className="space-y-6 pb-10">
       <HeaderActions>
         {isSuperAdmin ? (
-          <Button variant="outline" className="gap-2 h-8 text-xs sm:h-9 sm:text-sm bg-surface-card border-border-default shadow-sm transition-all" onClick={() => setIsSyncDialogOpen(true)}>
-            <RefreshCw className="h-4 w-4 text-action-primary" />
-            Sincronizar Contratos
-          </Button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <span className="text-xs text-text-secondary">{lastSyncLabel}</span>
+            <Button variant="outline" className="gap-2 h-8 text-xs sm:h-9 sm:text-sm bg-surface-card border-border-default shadow-sm transition-all" onClick={() => setIsSyncDialogOpen(true)}>
+              <RefreshCw className="h-4 w-4 text-action-primary" />
+              Atualizar Comprasnet
+            </Button>
+          </div>
         ) : null}
       </HeaderActions>
 
@@ -451,7 +539,7 @@ export default function Contratos() {
           title="Valor Total"
           value={formatCurrency(
             visibleContratos.reduce((sum, c) => {
-              const apiContrato = apiContratoByNumero.get(normalizeContratoNumero(c.numero));
+              const apiContrato = c.apiContrato ?? apiContratoByNumero.get(normalizeContratoNumero(c.numero));
               const historico = apiContrato ? (apiHistoricosByContratoApiId.get(apiContrato.id) ?? []) : [];
               return sum + getValorTotalContrato(c, apiContrato, historico);
             }, 0),
@@ -472,8 +560,8 @@ export default function Contratos() {
           title="Valor Empenhado"
           value={formatCurrency(
             visibleContratos.reduce((sum, c) => {
-              const apiContrato = apiContratoByNumero.get(normalizeContratoNumero(c.numero));
-              return sum + getValorEmpenhadoContrato(c.id, apiContrato);
+              const apiContrato = c.apiContrato ?? apiContratoByNumero.get(normalizeContratoNumero(c.numero));
+              return sum + getValorEmpenhadoContrato(c.localId, apiContrato);
             }, 0),
           )}
           icon={ExternalLink}
@@ -542,9 +630,9 @@ export default function Contratos() {
               </TableRow>
             ) : (
               filteredContratos.map((c) => {
-                const apiContrato = apiContratoByNumero.get(normalizeContratoNumero(c.numero));
-                const hasReitoriaOrigin = apiContrato?.unidade_origem_codigo === REITORIA_UG;
-                const empenhosVinculados = getEmpenhosDoContrato(c.id);
+                const apiContrato = c.apiContrato ?? apiContratoByNumero.get(normalizeContratoNumero(c.numero));
+                const hasReitoriaOrigin = apiContrato?.unidade_origem_codigo === REITORIA_UG || apiContrato?.unidade_codigo === REITORIA_UG;
+                const empenhosVinculados = getEmpenhosDoContrato(c.localId);
                 const empenhosApiSomente = getEmpenhosApiSomente(empenhosVinculados, apiContrato);
                 const empenhoBadgeItems = [
                   ...empenhosVinculados.map((empenho) => ({
@@ -560,12 +648,14 @@ export default function Contratos() {
                 ].sort((a, b) => compareEmpenhoRefs(a.numero, b.numero));
                 const historicoApi = apiContrato ? (apiHistoricosByContratoApiId.get(apiContrato.id) ?? []) : [];
                 const valorTotalContrato = getValorTotalContrato(c, apiContrato, historicoApi);
-                const totalEmpenhado = getValorEmpenhadoContrato(c.id, apiContrato);
+                const totalEmpenhado = getValorEmpenhadoContrato(c.localId, apiContrato);
                 const percentualEmpenhado = valorTotalContrato > 0 ? Math.min(100, (totalEmpenhado / valorTotalContrato) * 100) : 0;
 
                 const totalALiquidar =
                   empenhosVinculados.reduce((sum, e) => sum + getSaldoEmpenhoLocal(e), 0) +
                   empenhosApiSomente.reduce((sum, e) => sum + getSaldoEmpenhoApiPreferLocal(e), 0);
+                const favoriteLocalId = c.localId;
+                const contratoFavorite = favoriteLocalId ? isFavorite('contrato', favoriteLocalId) : false;
 
                 return (
                   <TableRow key={c.id} className="border-b border-border-default/40 transition-colors last:border-0 hover:bg-surface-subtle/60">
@@ -577,22 +667,24 @@ export default function Contratos() {
                               type="button"
                               variant="ghost"
                               size="icon"
-                              aria-label={isFavorite('contrato', c.id) ? `Remover contrato ${c.numero} dos favoritos` : `Favoritar contrato ${c.numero}`}
+                              aria-label={contratoFavorite ? `Remover contrato ${c.numero} dos favoritos` : `Favoritar contrato ${c.numero}`}
                               className={cn(
                                 'h-8 w-8 hover:bg-amber-50',
-                                isFavorite('contrato', c.id)
+                                contratoFavorite
                                   ? 'text-amber-500 hover:text-amber-600'
                                   : 'text-muted-foreground hover:text-amber-500',
                               )}
-                              disabled={isFavoritePending}
+                              disabled={isFavoritePending || !favoriteLocalId}
                               onClick={() => {
-                                void toggleFavorite('contrato', c.id);
+                                if (favoriteLocalId) void toggleFavorite('contrato', favoriteLocalId);
                               }}
                             >
-                              <Star className={cn('h-4 w-4', isFavorite('contrato', c.id) ? 'fill-current' : '')} />
+                              <Star className={cn('h-4 w-4', contratoFavorite ? 'fill-current' : '')} />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>{isFavorite('contrato', c.id) ? 'Remover dos favoritos' : 'Favoritar contrato'}</TooltipContent>
+                          <TooltipContent>
+                            {favoriteLocalId ? (contratoFavorite ? 'Remover dos favoritos' : 'Favoritar contrato') : 'Favoritos disponiveis apenas para contratos locais'}
+                          </TooltipContent>
                         </Tooltip>
                         <span className="font-data text-sm font-medium text-text-primary">{c.numero}</span>
                       </div>
@@ -807,7 +899,7 @@ export default function Contratos() {
         </Table>
       </DataTablePanel>
 
-      {isSuperAdmin ? <ContratosSyncDialog open={isSyncDialogOpen} onOpenChange={setIsSyncDialogOpen} onSyncComplete={refreshData} /> : null}
+      {isSuperAdmin ? <ContratosSyncDialog open={isSyncDialogOpen} onOpenChange={setIsSyncDialogOpen} onSyncComplete={handleSyncComplete} /> : null}
       <ContratoApiDetailsSheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen} contrato={selectedApiContrato} details={selectedApiDetails} lastSyncRun={lastApiSyncRun} loading={isDetailsLoading} />
     </div>
   );

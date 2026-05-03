@@ -2,21 +2,14 @@ import { supabase } from '@/lib/supabase';
 import {
   getFaturaEmpenhos,
   getFaturaItens,
-  mapContrato,
-  mapEmpenho,
   mapFatura,
-  mapFaturaEmpenho,
-  mapFaturaItem,
-  mapHistorico,
-  mapItem,
   toDate,
   toNumber,
   type ApiContrato,
-  type ApiContratoHistorico,
-  type ApiContratoItem,
   type ApiEmpenho,
   type ApiFatura,
 } from '@/services/contratosApiMappers';
+import { isContratoApiCampusEmpenho } from '@/utils/contratosApiStatus';
 import { buildEmpenhoLookupKeys } from '@/utils/contratosSync';
 
 const CONTRATOS_API_BASE = '/api-contratos/api';
@@ -104,9 +97,14 @@ export interface ContratoApiRow {
   processo: string | null;
   vigencia_inicio: string | null;
   vigencia_fim: string | null;
+  vigencia_inicio_derivada?: string | null;
+  vigencia_fim_derivada?: string | null;
   valor_global: number | null;
   valor_acumulado: number | null;
   situacao: boolean | null;
+  situacao_derivada?: boolean | null;
+  situacao_derivada_motivo?: string | null;
+  campus_scope_reason?: string | null;
   updated_at: string;
 }
 
@@ -291,14 +289,6 @@ async function mapWithConcurrency<T, R>(
 
   await Promise.all(runners);
   return results;
-}
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < items.length; i += size) {
-    chunks.push(items.slice(i, i + size));
-  }
-  return chunks;
 }
 
 function getCachedValue<K extends string | number, T>(cache: Map<K, CacheEntry<T>>, key: K) {
@@ -595,13 +585,13 @@ export const contratosApiService = {
     const today = new Date().toISOString().slice(0, 10);
     let query = supabase
       .from('contratos_api')
-      .select('id, api_contrato_id, numero, fornecedor_nome, unidade_codigo, unidade_nome, unidade_origem_codigo, unidade_origem_nome, objeto, processo, vigencia_inicio, vigencia_fim, valor_global, valor_acumulado, situacao, updated_at')
+      .select('id, api_contrato_id, numero, fornecedor_nome, unidade_codigo, unidade_nome, unidade_origem_codigo, unidade_origem_nome, objeto, processo, vigencia_inicio, vigencia_fim, vigencia_inicio_derivada, vigencia_fim_derivada, valor_global, valor_acumulado, situacao, situacao_derivada, situacao_derivada_motivo, campus_scope_reason, updated_at')
       .order('numero', { ascending: true });
 
     if (onlyVigentes) {
       query = query
-        .eq('situacao', true)
-        .or(`vigencia_fim.is.null,vigencia_fim.gte.${today}`);
+        .eq('situacao_derivada', true)
+        .or(`vigencia_fim_derivada.is.null,vigencia_fim_derivada.gte.${today}`);
     }
 
     const { data, error } = await query;
@@ -622,7 +612,7 @@ export const contratosApiService = {
     const { data, error } = await query;
 
     if (error) throwMigrationRequired(error);
-    const all = (data ?? []) as ContratoApiEmpenhoRow[];
+    const all = ((data ?? []) as ContratoApiEmpenhoRow[]).filter((empenho) => isContratoApiCampusEmpenho(empenho));
     if (!contratoApiIds || contratoApiIds.length === 0 || contratoApiIds.length <= 100) return all;
     const set = new Set(contratoApiIds);
     return all.filter((row) => set.has(row.contrato_api_id));
@@ -706,13 +696,28 @@ export const contratosApiService = {
       faturaEmpenhosResult.error;
     if (firstError) throwMigrationRequired(firstError);
 
+    const empenhos = ((empenhosResult.data ?? []) as ContratoApiEmpenhoRow[]).filter((empenho) => isContratoApiCampusEmpenho(empenho));
+    const empenhoIds = new Set(empenhos.map((empenho) => empenho.id));
+    const apiEmpenhoIds = new Set(empenhos.map((empenho) => Number(empenho.api_empenho_id)));
+    const faturas = ((faturasResult.data ?? []) as ContratoApiFaturaRow[]).filter((fatura) =>
+      isFaturaVisibleForDisplayUnidade(fatura.raw_data ?? fatura),
+    );
+    const faturaIds = new Set(faturas.map((fatura) => fatura.id));
+    const faturaItens = ((faturaItensResult.data ?? []) as ContratoApiFaturaItemRow[]).filter((item) =>
+      faturaIds.has(item.contrato_api_fatura_id),
+    );
+    const faturaEmpenhos = ((faturaEmpenhosResult.data ?? []) as ContratoApiFaturaEmpenhoRow[]).filter((row) =>
+      (row.contrato_api_empenho_id != null && empenhoIds.has(row.contrato_api_empenho_id)) ||
+      (row.api_empenho_id != null && apiEmpenhoIds.has(Number(row.api_empenho_id))),
+    );
+
     return {
       historico: (historicoResult.data ?? []) as ContratoApiHistoricoRow[],
-      empenhos: (empenhosResult.data ?? []) as ContratoApiEmpenhoRow[],
+      empenhos,
       itens: (itensResult.data ?? []) as ContratoApiItemRow[],
-      faturas: (faturasResult.data ?? []) as ContratoApiFaturaRow[],
-      faturaItens: (faturaItensResult.data ?? []) as ContratoApiFaturaItemRow[],
-      faturaEmpenhos: (faturaEmpenhosResult.data ?? []) as ContratoApiFaturaEmpenhoRow[],
+      faturas,
+      faturaItens,
+      faturaEmpenhos,
     };
   },
 
@@ -864,250 +869,31 @@ export const contratosApiService = {
     );
   },
 
-  async getLastSyncRun(unidadeCodigo = DEFAULT_UASG): Promise<ContratoApiSyncRun | null> {
-    const { data, error } = await supabase
+  async getLastSyncRun(unidadeCodigo?: string): Promise<ContratoApiSyncRun | null> {
+    let query = supabase
       .from('contratos_api_sync_runs')
       .select(CONTRATOS_API_SYNC_RUNS_SELECT)
-      .eq('unidade_codigo', unidadeCodigo)
       .order('started_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
+
+    if (unidadeCodigo) {
+      query = query.eq('unidade_codigo', unidadeCodigo);
+    }
+
+    const { data, error } = await query.maybeSingle();
 
     if (error) throwMigrationRequired(error);
     return (data as ContratoApiSyncRun | null) ?? null;
   },
 
-  async runSync(unidadeCodigo = DEFAULT_UASG) {
-    const { data: runInsert, error: runInsertError } = await supabase
-      .from('contratos_api_sync_runs')
-      .insert({
-        unidade_codigo: unidadeCodigo,
-        status: 'running',
-      })
-      .select('id')
-      .single();
+  async runSync() {
+    const { data, error } = await supabase.functions.invoke('sync-contratos-comprasnet', {
+      body: {
+        source: 'frontend-manual',
+      },
+    });
 
-    if (runInsertError) throwMigrationRequired(runInsertError);
-    const runId = runInsert.id as string;
-
-    try {
-      const [ativos, inativos] = await Promise.all([
-        fetchJson<ApiContrato[]>(`${CONTRATOS_API_BASE}/contrato/ug/${unidadeCodigo}`),
-        fetchJson<ApiContrato[]>(`${CONTRATOS_API_BASE}/contrato/inativo/ug/${unidadeCodigo}`),
-      ]);
-
-      const mergedMap = new Map<number, ReturnType<typeof mapContrato>>();
-      for (const c of inativos ?? []) {
-        const mapped = mapContrato(c, false);
-        if (mapped.api_contrato_id) mergedMap.set(mapped.api_contrato_id, mapped);
-      }
-      for (const c of ativos ?? []) {
-        const mapped = mapContrato(c, true);
-        if (mapped.api_contrato_id) mergedMap.set(mapped.api_contrato_id, mapped);
-      }
-      const contratosPayload = Array.from(mergedMap.values());
-
-      const { data: upserted, error: upsertError } = await supabase
-        .from('contratos_api')
-        .upsert(contratosPayload, { onConflict: 'api_contrato_id' })
-        .select('id, api_contrato_id');
-      if (upsertError) throw upsertError;
-
-      const mappedContratos = (upserted ?? []) as { id: string; api_contrato_id: number }[];
-
-      const remoteByApiId = new Map<number, ReturnType<typeof mapContrato>>();
-      for (const c of contratosPayload) remoteByApiId.set(c.api_contrato_id, c);
-
-      const contractWork = mappedContratos.filter((c) => remoteByApiId.has(c.api_contrato_id));
-
-      const contractData = await mapWithConcurrency(
-        contractWork,
-        async (contractDb) => {
-          const [apiEmpenhos, apiFaturas, apiItens, apiHistorico] = await Promise.all([
-            fetchJson<ApiEmpenho[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/empenhos`).catch(() => []),
-            fetchJson<ApiFatura[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/faturas`).catch(() => []),
-            fetchJson<ApiContratoItem[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/itens`).catch(() => []),
-            fetchJson<ApiContratoHistorico[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/historico`).catch(() => []),
-          ]);
-
-          return {
-            contratoApiId: contractDb.id,
-            rawFaturas: apiFaturas ?? [],
-            empenhos: (apiEmpenhos ?? []).map((e) => mapEmpenho(contractDb.id, e)).filter((e) => e.api_empenho_id),
-            faturas: (apiFaturas ?? []).map((f) => mapFatura(contractDb.id, f)).filter((f) => f.api_fatura_id),
-            itens: (apiItens ?? []).map((i) => mapItem(contractDb.id, i)).filter((i) => i.api_item_id),
-            historico: (apiHistorico ?? []).map((h) => mapHistorico(contractDb.id, h)).filter((h) => h.api_historico_id),
-          };
-        },
-        6
-      );
-
-      const contratoApiIds = contractWork.map((c) => c.id);
-
-      for (const idChunk of chunk(contratoApiIds, 200)) {
-        const { error: delEmpError } = await supabase
-          .from('contratos_api_empenhos')
-          .delete()
-          .in('contrato_api_id', idChunk);
-        if (delEmpError) throw delEmpError;
-
-        const { error: delFatError } = await supabase
-          .from('contratos_api_faturas')
-          .delete()
-          .in('contrato_api_id', idChunk);
-        if (delFatError) throw delFatError;
-
-        const { error: delItemError } = await supabase
-          .from('contratos_api_itens')
-          .delete()
-          .in('contrato_api_id', idChunk);
-        if (delItemError) throw delItemError;
-
-        const { error: delHistError } = await supabase
-          .from('contratos_api_historico')
-          .delete()
-          .in('contrato_api_id', idChunk);
-        if (delHistError) throw delHistError;
-      }
-
-      const empenhosPayload = contractData.flatMap((item) => item.empenhos);
-      const faturasPayload = contractData.flatMap((item) => item.faturas);
-      const itensPayload = contractData.flatMap((item) => item.itens);
-      const historicoPayload = contractData.flatMap((item) => item.historico);
-      const insertedEmpenhos: Array<{ id: string; contrato_api_id: string; api_empenho_id: number }> = [];
-      const insertedFaturas: Array<{ id: string; contrato_api_id: string; api_fatura_id: number }> = [];
-      const insertedItens: Array<{ id: string; contrato_api_id: string; api_item_id: number }> = [];
-
-      for (const empChunk of chunk(empenhosPayload, 500)) {
-        if (empChunk.length === 0) continue;
-        const { data, error } = await supabase
-          .from('contratos_api_empenhos')
-          .insert(empChunk)
-          .select('id, contrato_api_id, api_empenho_id');
-        if (error) throw error;
-        insertedEmpenhos.push(...((data ?? []) as typeof insertedEmpenhos));
-      }
-
-      for (const fatChunk of chunk(faturasPayload, 500)) {
-        if (fatChunk.length === 0) continue;
-        const { data, error } = await supabase
-          .from('contratos_api_faturas')
-          .insert(fatChunk)
-          .select('id, contrato_api_id, api_fatura_id');
-        if (error) throw error;
-        insertedFaturas.push(...((data ?? []) as typeof insertedFaturas));
-      }
-
-      for (const itemChunk of chunk(itensPayload, 500)) {
-        if (itemChunk.length === 0) continue;
-        const { data, error } = await supabase
-          .from('contratos_api_itens')
-          .insert(itemChunk)
-          .select('id, contrato_api_id, api_item_id');
-        if (error) throw error;
-        insertedItens.push(...((data ?? []) as typeof insertedItens));
-      }
-
-      for (const histChunk of chunk(historicoPayload, 500)) {
-        if (histChunk.length === 0) continue;
-        const { error } = await supabase
-          .from('contratos_api_historico')
-          .insert(histChunk);
-        if (error) throw error;
-      }
-
-      const empenhoByKey = new Map(insertedEmpenhos.map((row) => [`${row.contrato_api_id}:${row.api_empenho_id}`, row.id]));
-      const faturaByKey = new Map(insertedFaturas.map((row) => [`${row.contrato_api_id}:${row.api_fatura_id}`, row.id]));
-      const itemByKey = new Map(insertedItens.map((row) => [`${row.contrato_api_id}:${row.api_item_id}`, row.id]));
-      const faturaItensPayload = contractData.flatMap((contract) =>
-        contract.rawFaturas.flatMap((rawFatura) => {
-          const faturaId = faturaByKey.get(`${contract.contratoApiId}:${Number(rawFatura.id)}`);
-          if (!faturaId) return [];
-          return getFaturaItens(rawFatura)
-            .filter((rawItem) => Number(rawItem.id_item_contrato))
-            .map((rawItem) =>
-              mapFaturaItem(
-                contract.contratoApiId,
-                faturaId,
-                itemByKey.get(`${contract.contratoApiId}:${Number(rawItem.id_item_contrato)}`) ?? null,
-                rawItem,
-              ),
-            );
-        }),
-      );
-      const faturaEmpenhosPayload = contractData.flatMap((contract) =>
-        contract.rawFaturas.flatMap((rawFatura) => {
-          const faturaId = faturaByKey.get(`${contract.contratoApiId}:${Number(rawFatura.id)}`);
-          if (!faturaId) return [];
-          return getFaturaEmpenhos(rawFatura)
-            .filter((rawEmpenho) => Number(rawEmpenho.id_empenho))
-            .map((rawEmpenho) =>
-              mapFaturaEmpenho(
-                contract.contratoApiId,
-                faturaId,
-                empenhoByKey.get(`${contract.contratoApiId}:${Number(rawEmpenho.id_empenho)}`) ?? null,
-                rawEmpenho,
-              ),
-            );
-        }),
-      );
-
-      for (const itemChunk of chunk(faturaItensPayload, 500)) {
-        if (itemChunk.length === 0) continue;
-        const { error } = await supabase.from('contratos_api_fatura_itens').insert(itemChunk);
-        if (error) throw error;
-      }
-
-      for (const empChunk of chunk(faturaEmpenhosPayload, 500)) {
-        if (empChunk.length === 0) continue;
-        const { error } = await supabase.from('contratos_api_fatura_empenhos').insert(empChunk);
-        if (error) throw error;
-      }
-
-      const { error: doneError } = await supabase
-        .from('contratos_api_sync_runs')
-        .update({
-          finished_at: new Date().toISOString(),
-          status: 'success',
-          contratos_ativos: ativos?.length ?? 0,
-          contratos_inativos: inativos?.length ?? 0,
-          contratos_upserted: contratosPayload.length,
-          empenhos_upserted: empenhosPayload.length,
-          faturas_upserted: faturasPayload.length,
-          itens_upserted: itensPayload.length,
-          historicos_upserted: historicoPayload.length,
-          fatura_itens_upserted: faturaItensPayload.length,
-          fatura_empenhos_upserted: faturaEmpenhosPayload.length,
-          details: {
-            unidade_codigo: unidadeCodigo,
-            processed_contracts: contractWork.length,
-          },
-        })
-        .eq('id', runId);
-      if (doneError) throw doneError;
-
-      return {
-        contratos_ativos: ativos?.length ?? 0,
-        contratos_inativos: inativos?.length ?? 0,
-        contratos_upserted: contratosPayload.length,
-        empenhos_upserted: empenhosPayload.length,
-        faturas_upserted: faturasPayload.length,
-        itens_upserted: itensPayload.length,
-        historicos_upserted: historicoPayload.length,
-        fatura_itens_upserted: faturaItensPayload.length,
-        fatura_empenhos_upserted: faturaEmpenhosPayload.length,
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      await supabase
-        .from('contratos_api_sync_runs')
-        .update({
-          finished_at: new Date().toISOString(),
-          status: 'error',
-          error_message: message,
-        })
-        .eq('id', runId);
-      throw error;
-    }
+    if (error) throw error;
+    return data;
   },
 };

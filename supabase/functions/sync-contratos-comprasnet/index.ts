@@ -16,9 +16,16 @@ import {
   type ApiEmpenho,
   type ApiFatura,
 } from '../../../src/services/contratosApiMappers.ts';
+import {
+  buildContratoApiDerivedFields,
+  isContratoApiCampusEmpenho,
+  isContratoApiCampusFatura,
+  isContratoApiDisplayFatura,
+} from '../../../src/utils/contratosApiStatus.ts';
 
 const CONTRATOS_API_BASE = 'https://contratos.comprasnet.gov.br/api';
 const DEFAULT_UASG = '158366';
+const DEFAULT_SYNC_UASGS = [DEFAULT_UASG, '158155'];
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,6 +34,7 @@ const corsHeaders = {
 
 type SyncRequest = {
   unidadeCodigo?: string;
+  unidadeCodigos?: string[];
   source?: string;
 };
 
@@ -40,6 +48,16 @@ function jsonResponse(body: unknown, status = 200) {
       'Content-Type': 'application/json',
     },
   });
+}
+
+function errorToMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
 }
 
 function requireEnv(name: string) {
@@ -104,6 +122,11 @@ function chunk<T>(items: T[], size: number): T[][] {
     chunks.push(items.slice(index, index + size));
   }
   return chunks;
+}
+
+function normalizeUnidadeCodigos(body: SyncRequest) {
+  const requested = body.unidadeCodigos?.length ? body.unidadeCodigos : body.unidadeCodigo ? [body.unidadeCodigo] : DEFAULT_SYNC_UASGS;
+  return Array.from(new Set(requested.map((value) => String(value ?? '').trim()).filter(Boolean)));
 }
 
 async function insertInChunks(
@@ -198,6 +221,88 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
     const contractData = await mapWithConcurrency(
       contractWork,
       async (contractDb) => {
+        const contrato = remoteByApiId.get(contractDb.api_contrato_id);
+        if (!contrato) {
+          return {
+            contratoApiId: contractDb.id,
+            apiContratoId: contractDb.api_contrato_id,
+            rawFaturas: [],
+            empenhos: [],
+            faturas: [],
+            itens: [],
+            historico: [],
+            derived: buildContratoApiDerivedFields({}, [], [], []),
+          };
+        }
+
+        if (unidadeCodigo === '158155') {
+          const apiEmpenhos = await fetchJson<ApiEmpenho[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/empenhos`).catch(() => []);
+
+          const empenhos = (apiEmpenhos ?? [])
+            .map((empenho) => mapEmpenho(contractDb.id, empenho))
+            .filter((empenho) => empenho.api_empenho_id);
+          const campusEmpenhos = empenhos.filter((empenho) => isContratoApiCampusEmpenho(empenho));
+          const directCampusScope = contrato.unidade_codigo === DEFAULT_UASG || contrato.unidade_origem_codigo === DEFAULT_UASG;
+          if (campusEmpenhos.length === 0 && !directCampusScope) {
+            return {
+              contratoApiId: contractDb.id,
+              apiContratoId: contractDb.api_contrato_id,
+              rawFaturas: [],
+              empenhos: [],
+              faturas: [],
+              itens: [],
+              historico: [],
+              derived: buildContratoApiDerivedFields(contrato, [], campusEmpenhos, []),
+            };
+          }
+
+          const apiHistorico = await fetchJson<ApiContratoHistorico[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/historico`).catch(() => []);
+          const historico = (apiHistorico ?? [])
+            .map((item) => mapHistorico(contractDb.id, item))
+            .filter((item) => item.api_historico_id);
+
+          let rawFaturas: ApiFatura[] = [];
+          let faturas: ReturnType<typeof mapFatura>[] = [];
+          let derived = buildContratoApiDerivedFields(contrato, historico, empenhos, faturas);
+          const activeByVigencia =
+            derived.situacao_derivada_motivo === 'historico_vigente' ||
+            derived.situacao_derivada_motivo === 'fallback_sem_historico_vigente';
+
+          if (campusEmpenhos.length === 0 && !derived.situacao_derivada && activeByVigencia && derived.campus_scope_reason === 'reitoria_sem_evidencia_operacional_campus') {
+            rawFaturas = await fetchJson<ApiFatura[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/faturas`).catch(() => []);
+            faturas = rawFaturas
+              .map((fatura) => mapFatura(contractDb.id, fatura))
+              .filter((fatura) => fatura.api_fatura_id);
+            derived = buildContratoApiDerivedFields(contrato, historico, empenhos, faturas);
+          }
+
+          let apiItens: ApiContratoItem[] = [];
+          if (derived.situacao_derivada) {
+            if (rawFaturas.length === 0) {
+              rawFaturas = await fetchJson<ApiFatura[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/faturas`).catch(() => []);
+              faturas = rawFaturas
+                .map((fatura) => mapFatura(contractDb.id, fatura))
+                .filter((fatura) => fatura.api_fatura_id);
+            }
+            apiItens = await fetchJson<ApiContratoItem[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/itens`).catch(() => []);
+          }
+          const campusRawFaturas = rawFaturas.filter((fatura) => isContratoApiCampusFatura(fatura));
+          const campusFaturas = faturas.filter((fatura) => isContratoApiCampusFatura(fatura));
+
+          return {
+            contratoApiId: contractDb.id,
+            apiContratoId: contractDb.api_contrato_id,
+            rawFaturas: derived.situacao_derivada ? campusRawFaturas : [],
+            empenhos: derived.situacao_derivada ? campusEmpenhos : [],
+            faturas: derived.situacao_derivada ? campusFaturas : [],
+            itens: derived.situacao_derivada
+              ? apiItens.map((item) => mapItem(contractDb.id, item)).filter((item) => item.api_item_id)
+              : [],
+            historico,
+            derived,
+          };
+        }
+
         const [apiEmpenhos, apiFaturas, apiItens, apiHistorico] = await Promise.all([
           fetchJson<ApiEmpenho[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/empenhos`).catch(() => []),
           fetchJson<ApiFatura[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/faturas`).catch(() => []),
@@ -207,15 +312,39 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
 
         return {
           contratoApiId: contractDb.id,
-          rawFaturas: apiFaturas ?? [],
-          empenhos: (apiEmpenhos ?? []).map((empenho) => mapEmpenho(contractDb.id, empenho)).filter((empenho) => empenho.api_empenho_id),
-          faturas: (apiFaturas ?? []).map((fatura) => mapFatura(contractDb.id, fatura)).filter((fatura) => fatura.api_fatura_id),
+          apiContratoId: contractDb.api_contrato_id,
+          rawFaturas: (apiFaturas ?? []).filter((fatura) => isContratoApiDisplayFatura(fatura)),
+          empenhos: (apiEmpenhos ?? []).map((empenho) => mapEmpenho(contractDb.id, empenho)).filter((empenho) => empenho.api_empenho_id && isContratoApiCampusEmpenho(empenho)),
+          faturas: (apiFaturas ?? []).map((fatura) => mapFatura(contractDb.id, fatura)).filter((fatura) => fatura.api_fatura_id && isContratoApiDisplayFatura(fatura)),
           itens: (apiItens ?? []).map((item) => mapItem(contractDb.id, item)).filter((item) => item.api_item_id),
           historico: (apiHistorico ?? []).map((historico) => mapHistorico(contractDb.id, historico)).filter((historico) => historico.api_historico_id),
+          derived: null,
         };
       },
-      6,
+      unidadeCodigo === '158155' ? 3 : 6,
     );
+
+    const contractDataByApiId = new Map(contractData.map((item) => [item.apiContratoId, item]));
+    const contratosPayloadWithDerived = contratosPayload.map((contrato) => {
+      const data = contractDataByApiId.get(contrato.api_contrato_id);
+      const derived = buildContratoApiDerivedFields(
+        contrato,
+        data?.historico ?? [],
+        data?.empenhos ?? [],
+        data?.faturas ?? [],
+      );
+      const derivedFields = data?.derived ?? derived;
+
+      return {
+        ...contrato,
+        ...derivedFields,
+      };
+    });
+
+    const { error: derivedUpsertError } = await supabase
+      .from('contratos_api')
+      .upsert(contratosPayloadWithDerived, { onConflict: 'api_contrato_id' });
+    if (derivedUpsertError) throw derivedUpsertError;
 
     const contratoApiIds = contractWork.map((contrato) => contrato.id);
     await deleteChildrenForContracts(supabase, contratoApiIds);
@@ -271,19 +400,24 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
         if (!faturaId) return [];
         return getFaturaEmpenhos(rawFatura)
           .filter((rawEmpenho) => Number(rawEmpenho.id_empenho))
-          .map((rawEmpenho) =>
-            mapFaturaEmpenho(
+          .flatMap((rawEmpenho) => {
+            const empenhoId = empenhoByKey.get(`${contract.contratoApiId}:${Number(rawEmpenho.id_empenho)}`);
+            if (!empenhoId) return [];
+            return mapFaturaEmpenho(
               contract.contratoApiId,
               faturaId,
-              empenhoByKey.get(`${contract.contratoApiId}:${Number(rawEmpenho.id_empenho)}`) ?? null,
+              empenhoId,
               rawEmpenho,
-            ),
-          );
+            );
+          });
       }),
     );
 
     await insertInChunks(supabase, 'contratos_api_fatura_itens', faturaItensPayload);
     await insertInChunks(supabase, 'contratos_api_fatura_empenhos', faturaEmpenhosPayload);
+
+    const derivedActiveContracts = contratosPayloadWithDerived.filter((contrato) => contrato.situacao_derivada).length;
+    const derivedInactiveContracts = contratosPayloadWithDerived.length - derivedActiveContracts;
 
     const result = {
       contratos_ativos: ativos?.length ?? 0,
@@ -307,14 +441,21 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
           unidade_codigo: unidadeCodigo,
           processed_contracts: contractWork.length,
           source,
+          derived_active_contracts: derivedActiveContracts,
+          derived_inactive_contracts: derivedInactiveContracts,
         },
       })
       .eq('id', runId);
     if (doneError) throw doneError;
 
-    return { runId, ...result };
+    return {
+      runId,
+      ...result,
+      derived_active_contracts: derivedActiveContracts,
+      derived_inactive_contracts: derivedInactiveContracts,
+    };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorToMessage(error);
     await supabase
       .from('contratos_api_sync_runs')
       .update({
@@ -339,9 +480,10 @@ Deno.serve(async (request) => {
   try {
     assertOptionalSharedSecret(request);
     const body = (await request.json().catch(() => ({}))) as SyncRequest;
-    const unidadeCodigo = String(body.unidadeCodigo || DEFAULT_UASG);
-    if (unidadeCodigo !== DEFAULT_UASG) {
-      return jsonResponse({ error: `UG ${unidadeCodigo} nao habilitada nesta versao.` }, 400);
+    const unidadeCodigos = normalizeUnidadeCodigos(body);
+    const unsupported = unidadeCodigos.filter((unidadeCodigo) => !DEFAULT_SYNC_UASGS.includes(unidadeCodigo));
+    if (unsupported.length > 0) {
+      return jsonResponse({ error: `UG(s) nao habilitada(s) nesta versao: ${unsupported.join(', ')}` }, 400);
     }
 
     const supabaseUrl = requireEnv('SUPABASE_URL');
@@ -350,8 +492,41 @@ Deno.serve(async (request) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    const result = await runSync(supabase, unidadeCodigo, body.source || 'manual');
-    return jsonResponse({ status: 'processed', ...result });
+    const results = [];
+    for (const unidadeCodigo of unidadeCodigos) {
+      results.push(await runSync(supabase, unidadeCodigo, body.source || 'manual'));
+    }
+
+    const totals = results.reduce(
+      (sum, item) => ({
+        contratos_ativos: sum.contratos_ativos + item.contratos_ativos,
+        contratos_inativos: sum.contratos_inativos + item.contratos_inativos,
+        contratos_upserted: sum.contratos_upserted + item.contratos_upserted,
+        empenhos_upserted: sum.empenhos_upserted + item.empenhos_upserted,
+        faturas_upserted: sum.faturas_upserted + item.faturas_upserted,
+        itens_upserted: sum.itens_upserted + item.itens_upserted,
+        historicos_upserted: sum.historicos_upserted + item.historicos_upserted,
+        fatura_itens_upserted: sum.fatura_itens_upserted + item.fatura_itens_upserted,
+        fatura_empenhos_upserted: sum.fatura_empenhos_upserted + item.fatura_empenhos_upserted,
+        derived_active_contracts: sum.derived_active_contracts + item.derived_active_contracts,
+        derived_inactive_contracts: sum.derived_inactive_contracts + item.derived_inactive_contracts,
+      }),
+      {
+        contratos_ativos: 0,
+        contratos_inativos: 0,
+        contratos_upserted: 0,
+        empenhos_upserted: 0,
+        faturas_upserted: 0,
+        itens_upserted: 0,
+        historicos_upserted: 0,
+        fatura_itens_upserted: 0,
+        fatura_empenhos_upserted: 0,
+        derived_active_contracts: 0,
+        derived_inactive_contracts: 0,
+      },
+    );
+
+    return jsonResponse({ status: 'processed', unidadeCodigos, results, totals });
   } catch (error) {
     if (error instanceof Response) {
       return error;
@@ -360,7 +535,7 @@ Deno.serve(async (request) => {
     console.error('sync-contratos-comprasnet', error);
     return jsonResponse(
       {
-        error: error instanceof Error ? error.message : 'Falha inesperada ao sincronizar contratos do Comprasnet.',
+        error: errorToMessage(error) || 'Falha inesperada ao sincronizar contratos do Comprasnet.',
       },
       500,
     );

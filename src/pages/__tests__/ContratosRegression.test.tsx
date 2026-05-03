@@ -183,6 +183,9 @@ describe('Contratos regressions', () => {
         valor_global: 201994.8,
         valor_acumulado: 250000,
         situacao: true,
+        situacao_derivada: true,
+        vigencia_inicio_derivada: '2024-09-02',
+        vigencia_fim_derivada: '2026-09-02',
         updated_at: '2026-04-14T00:00:00Z',
       },
     ]);
@@ -284,6 +287,25 @@ describe('Contratos regressions', () => {
         valor_empenhado: 18000,
         valor_a_liquidar: 15729,
         valor_liquidado: 2271,
+        valor_pago: 0,
+        rp_inscrito: 0,
+        rp_a_pagar: 0,
+      },
+      {
+        id: 'api-empenho-fora-campus',
+        contrato_api_id: 'contrato-api-1',
+        api_empenho_id: 14504999,
+        numero: '2026NE999999',
+        unidade_gestora: '158155',
+        gestao: '26435',
+        data_emissao: '2026-04-17',
+        credor: 'Fornecedor Teste',
+        fonte_recurso: '1000000000',
+        plano_interno: 'L20RLP01ADN',
+        natureza_despesa: '339040',
+        valor_empenhado: 999999,
+        valor_a_liquidar: 999999,
+        valor_liquidado: 0,
         valor_pago: 0,
         rp_inscrito: 0,
         rp_a_pagar: 0,
@@ -415,32 +437,27 @@ describe('Contratos regressions', () => {
     });
   });
 
-  it('mantem lista local, busca, ordenacao, legado ignorado e detalhe somente com match API', async () => {
+  it('usa a lista sincronizada da API, busca nela e mantem legado ignorado fora da tela', async () => {
     renderContratos();
 
     expect(await screen.findByText('62/2018')).toBeInTheDocument();
-    expect(screen.getByText('123/2024')).toBeInTheDocument();
+    expect(screen.queryByText('123/2024')).not.toBeInTheDocument();
     expect(screen.queryByText('00089/2016')).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /Detalhes/i })).toHaveLength(1);
 
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: '11.222.333' } });
-    expect(screen.getByText('Fornecedor sem API')).toBeInTheDocument();
-    expect(screen.queryByText('Fornecedor Teste')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Fornecedor Teste' } });
+    expect(screen.getByText('Fornecedor Teste')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: '' } });
-    fireEvent.click(screen.getByText('Contrato'));
-    await waitFor(() => {
-      const numbers = screen.getAllByText(/^(62\/2018|123\/2024)$/).map((item) => item.textContent);
-      expect(numbers).toEqual(['123/2024', '62/2018']);
-    });
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Fornecedor sem API' } });
+    expect(screen.getByText('Nenhum contrato encontrado.')).toBeInTheDocument();
   });
 
   it('usa empenhado original da API e soma saldo RAP local com saldo de empenhos API', async () => {
     renderContratos();
 
-    expect(await screen.findByText('R$ 1.528.056,00')).toBeInTheDocument();
+    expect((await screen.findAllByText('R$ 1.528.056,00')).length).toBeGreaterThan(0);
     expect(screen.queryByText('R$ 250.000,00')).not.toBeInTheDocument();
-    expect(await screen.findByText('R$ 68.514,04')).toBeInTheDocument();
+    expect((await screen.findAllByText('R$ 67.514,04')).length).toBeGreaterThan(0);
     expect(screen.getByText('4.4%')).toBeInTheDocument();
     expect(screen.getAllByText('Saldo dos empenhos').length).toBeGreaterThan(0);
     expect(screen.getAllByText('2023NE000777').length).toBeGreaterThan(0);
@@ -449,6 +466,7 @@ describe('Contratos regressions', () => {
     expect(screen.getByText('2024NE000999')).toBeInTheDocument();
     expect(screen.getByText('2026NE000027')).toBeInTheDocument();
     expect(screen.getByText('158366264352024NE000118')).toBeInTheDocument();
+    expect(screen.queryByText('2026NE999999')).not.toBeInTheDocument();
     expect(screen.getByText('2026NE000027')).toHaveClass('bg-emerald-green/[0.06]');
     expect(screen.getByText('2024NE000999')).not.toHaveClass('bg-emerald-green/[0.06]');
     const contratoApiRow = screen.getByText('Fornecedor Teste').closest('tr');
@@ -461,7 +479,8 @@ describe('Contratos regressions', () => {
       '2024NE000999',
       '2026NE000027',
     ]);
-    expect(screen.getByText('R$ 24.269,00')).toBeInTheDocument();
+    expect(screen.getAllByText('R$ 24.269,00').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByText('2023NE000777')[0]);
     expect(screen.getAllByText('R$ 40,00').length).toBeGreaterThan(0);
     expect(screen.getByText('Origem Reitoria')).toBeInTheDocument();
   });
@@ -498,7 +517,7 @@ describe('Contratos regressions', () => {
     expect(await screen.findByText('RP reinscrito:')).toBeInTheDocument();
     expect(screen.getByText('Saldo Atual:')).toBeInTheDocument();
     expect(screen.getAllByText('R$ 0,00').length).toBeGreaterThan(0);
-    expect(screen.getByText('R$ 24.269,00')).toBeInTheDocument();
+    expect(screen.getAllByText('R$ 24.269,00').length).toBeGreaterThan(0);
     expect(screen.queryByText('Saldo a Liquidar:')).not.toBeInTheDocument();
   });
 
