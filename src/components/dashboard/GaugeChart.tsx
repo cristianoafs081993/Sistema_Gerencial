@@ -117,7 +117,7 @@ export function GaugeChart({ value, total, label, sublabel, isLoading = false }:
           <mask id={`gaugeMask-${label}`}>
             <path
               ref={filledArcRef}
-              d={`M ${toXY(0, midR).x} ${toXY(0, midR).y} A ${midR} ${midR} 0 0 1 ${toXY(180, midR).x} ${toXY(180, midR).y}`}
+              d={`M ${toXY(180, midR).x} ${toXY(180, midR).y} A ${midR} ${midR} 0 0 0 ${toXY(0, midR).x} ${toXY(0, midR).y}`}
               fill="none"
               stroke="white"
               strokeWidth={R - r + 2}
