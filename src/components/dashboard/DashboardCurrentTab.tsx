@@ -21,6 +21,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { formatCurrency } from '@/lib/utils';
 import type { Atividade, Descentralizacao, Empenho } from '@/types';
 import { BudgetHierarchyTooltip, BudgetTreemapContent, ExecutionTooltip } from './DashboardChartBits';
+import { GaugeChart } from './GaugeChart';
 import { formatCompactCurrency } from './utils';
 
 type DashboardFilteredData = {
@@ -249,6 +250,33 @@ export function DashboardCurrentTab({
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Velocímetros de execução */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="relative overflow-hidden rounded-2xl border border-purple-200/60 bg-gradient-to-br from-purple-50/60 via-white to-white p-5 shadow-[0_4px_20px_rgba(168,85,247,0.10)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_28px_rgba(168,85,247,0.16)]">
+          <p className="mb-1 text-center text-xs font-bold uppercase tracking-widest text-purple-400">Execução do Empenhado</p>
+          <GaugeChart
+            value={totalEmpenhado}
+            total={totalDescentralizado}
+            label="Empenhado"
+            sublabel="sobre Descentralizado"
+            color="#a855f7"
+            isLoading={isLoading}
+          />
+        </div>
+
+        <div className="relative overflow-hidden rounded-2xl border border-amber-200/60 bg-gradient-to-br from-amber-50/60 via-white to-white p-5 shadow-[0_4px_20px_rgba(245,158,11,0.10)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_28px_rgba(245,158,11,0.16)]">
+          <p className="mb-1 text-center text-xs font-bold uppercase tracking-widest text-amber-500">Execução do Liquidado</p>
+          <GaugeChart
+            value={totalLiquidado}
+            total={totalDescentralizado}
+            label="Liquidado"
+            sublabel="sobre Descentralizado"
+            color="#f59e0b"
+            isLoading={isLoading}
+          />
         </div>
       </div>
 
