@@ -108,9 +108,9 @@ export function GaugeChart({ value, total, label, sublabel, isLoading = false }:
         <defs>
           {/* Gradiente para o arco preenchido */}
           <linearGradient id={`gaugeGrad-${label}`} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#22c55e" />
+            <stop offset="0%" stopColor="#ef4444" />
             <stop offset="50%" stopColor="#f59e0b" />
-            <stop offset="100%" stopColor="#ef4444" />
+            <stop offset="100%" stopColor="#22c55e" />
           </linearGradient>
 
           {/* Máscara radial para revelar o arco preenchido */}
