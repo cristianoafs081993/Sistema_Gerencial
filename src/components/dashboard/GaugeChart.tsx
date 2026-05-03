@@ -222,16 +222,7 @@ export function GaugeChart({ value, total, label, sublabel, isLoading = false }:
         </text>
       </svg>
 
-      {/* Legenda */}
-      <div className="-mt-2 text-center">
-        <p className="text-sm font-bold text-text-primary">{label}</p>
-        <p className="text-xs text-text-muted">{sublabel}</p>
-        <div className="mt-1 flex items-center justify-center gap-1.5">
-          <span className="text-xs font-semibold text-text-secondary">{formatCurrency(value)}</span>
-          <span className="text-xs text-text-muted">/</span>
-          <span className="text-xs text-text-muted">{formatCurrency(total)}</span>
-        </div>
-      </div>
+
     </div>
   );
 }
