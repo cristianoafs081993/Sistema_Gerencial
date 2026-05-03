@@ -80,7 +80,7 @@ export function GaugeChart({ value, total, label, sublabel, isLoading = false }:
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         el.style.transition = 'stroke-dashoffset 1.1s cubic-bezier(0.34, 1.4, 0.64, 1)';
-        el.style.strokeDashoffset = `${arcLen - filled}`;
+        el.style.strokeDashoffset = `${filled}`;
       });
     });
   }, [pct, arcLen, isLoading]);
@@ -124,7 +124,7 @@ export function GaugeChart({ value, total, label, sublabel, isLoading = false }:
               strokeLinecap="butt"
               style={{
                 strokeDasharray: arcLen,
-                strokeDashoffset: arcLen - pct * arcLen,
+                strokeDashoffset: pct * arcLen,
               }}
             />
           </mask>
