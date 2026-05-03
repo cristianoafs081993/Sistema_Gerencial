@@ -60,7 +60,7 @@ Esta documentacao foi atualizada porque a mudanca altera comportamento visual re
 - `stat-card`: KPI com tom opcional ou `stitchColor` legado.
 - `table-pagination`: rodape de tabela com divisor superior.
 - `pending-field-marker`: destaque inline para `[CAMPO PENDENTE]`, usando vermelho destrutivo com fundo de baixa opacidade.
-- `Layout`: sidebar branca de 248px, divisor `#dddddd`, item ativo com superficie `#f7f7f7` e barra lateral `#ff385c`.
+- `Layout`: sidebar branca de 248px, divisor `#dddddd`, grupos sem contorno de card, item ativo com superficie `#f7f7f7` e texto reforcado.
 
 ## Atualizacao de artefatos
 

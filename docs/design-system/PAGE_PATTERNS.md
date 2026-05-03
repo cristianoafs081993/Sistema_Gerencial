@@ -9,11 +9,11 @@ O shell principal em `src/components/Layout.tsx` usa sidebar:
 1. sidebar branca com borda direita;
 2. marca GovFlow no topo com ícone oficial em `public/govflow-icon-192.png`, sem avatar de usuário na sidebar;
 3. busca visual no header principal, alinhada ao mesmo divisor horizontal da sidebar;
-4. grupos de modulos expansivos derivados de `appScreenGroups`, com icone, texto em caixa normal, borda suave, mesmo ritmo visual dos itens e transicao de altura/opacidade;
+4. grupos de modulos expansivos derivados de `appScreenGroups`, com icone, texto em caixa normal, superficie discreta quando abertos e transicao de altura/opacidade;
 5. itens derivados de `appScreens`, mantendo permissoes, rotas existentes e recuo visual em relacao ao grupo;
 6. submenus expansivos quando uma tela possui variacoes de rota, como Planejamento;
-7. item ativo com fundo neutro e barra lateral na cor primaria;
-8. subitem ativo com ponto e barra lateral menor;
+7. item ativo com fundo neutro e texto reforcado, sem barra lateral;
+8. subitem ativo com ponto discreto e texto reforcado;
 9. drawer lateral em mobile;
 10. header interno para busca, acoes de pagina e subtitulo.
 
