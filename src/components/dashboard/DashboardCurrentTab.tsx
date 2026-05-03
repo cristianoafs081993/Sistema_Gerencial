@@ -43,7 +43,7 @@ type MensalResumo = {
   name: string;
   planejado: number;
   empenhado: number;
-  pago: number;
+  liquidado: number;
 };
 
 type NaturezaResumo = {
@@ -156,7 +156,7 @@ export function DashboardCurrentTab({
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Execucao orcamentaria</span>
+                <span className="text-muted-foreground">Execução orçamentária</span>
                 <span className="font-bold text-primary">{percentualExecutado.toFixed(1)}%</span>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-primary/10">
@@ -174,7 +174,7 @@ export function DashboardCurrentTab({
           <StatCard
             title="Descentralizado"
             value={formatCurrency(totalDescentralizado)}
-            subtitle={`${filteredData.descentralizacoes.length} descentralizacoes`}
+            subtitle={`${filteredData.descentralizacoes.length} descentralizações`}
             icon={Receipt}
             stitchColor="emerald-green"
             progress={totalPlanejado > 0 ? (totalDescentralizado / totalPlanejado) * 100 : 0}
@@ -198,7 +198,7 @@ export function DashboardCurrentTab({
           <StatCard
             title="A Descentralizar"
             value={formatCurrency(aDescentralizar)}
-            subtitle={aDescentralizar >= 0 ? 'Dentro do orcamento' : 'Acima do orcamento'}
+            subtitle={aDescentralizar >= 0 ? 'Dentro do orçamento' : 'Acima do orçamento'}
             icon={PiggyBank}
             stitchColor="amber"
             progress={totalPlanejado > 0 ? (Math.max(0, aDescentralizar) / totalPlanejado) * 100 : 0}
@@ -253,38 +253,38 @@ export function DashboardCurrentTab({
         </div>
       </div>
 
-      {/* Velocímetros de execução */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="relative overflow-hidden rounded-2xl border border-purple-200/60 bg-gradient-to-br from-purple-50/60 via-white to-white p-5 shadow-[0_4px_20px_rgba(168,85,247,0.10)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_28px_rgba(168,85,247,0.16)]">
-          <p className="mb-1 text-center text-xs font-bold uppercase tracking-widest text-purple-400">Execução do Empenhado</p>
-          <GaugeChart
-            value={totalEmpenhado}
-            total={totalDescentralizado}
-            label="Empenhado"
-            sublabel="sobre Descentralizado"
-            color="#a855f7"
-            isLoading={isLoading}
-          />
+        <div className="relative flex min-h-[226px] items-stretch justify-center overflow-hidden rounded-2xl border border-border-default/80 bg-white p-5 shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card">
+          <div className="flex w-full max-w-[420px] flex-col items-center justify-between">
+            <p className="mb-1 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">Empenhado/Descentralizado</p>
+            <GaugeChart
+              value={totalEmpenhado}
+              total={totalDescentralizado}
+              label="Empenhado"
+              sublabel="sobre Descentralizado"
+              isLoading={isLoading}
+            />
+          </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-amber-200/60 bg-gradient-to-br from-amber-50/60 via-white to-white p-5 shadow-[0_4px_20px_rgba(245,158,11,0.10)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_28px_rgba(245,158,11,0.16)]">
-          <p className="mb-1 text-center text-xs font-bold uppercase tracking-widest text-amber-500">Execução do Liquidado</p>
-          <GaugeChart
-            value={totalLiquidado}
-            total={totalDescentralizado}
-            label="Liquidado"
-            sublabel="sobre Descentralizado"
-            color="#f59e0b"
-            isLoading={isLoading}
-          />
+        <div className="relative flex min-h-[226px] items-stretch justify-center overflow-hidden rounded-2xl border border-border-default/80 bg-white p-5 shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card">
+          <div className="flex w-full max-w-[420px] flex-col items-center justify-between">
+            <p className="mb-1 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">Liquidado/Descentralizado</p>
+            <GaugeChart
+              value={totalLiquidado}
+              total={totalDescentralizado}
+              label="Liquidado"
+              sublabel="sobre Descentralizado"
+              isLoading={isLoading}
+            />
+          </div>
         </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
         <ChartPanel
-          className="md:col-span-2"
-          title="Evolucao da Execucao"
-          description="Acumulado de empenhos no periodo"
+          className="h-full md:col-span-2"
+          title="Evolução da Execução"
           loading={isLoading}
         >
           <div className="mb-4 flex flex-wrap gap-2">
@@ -296,9 +296,9 @@ export function DashboardCurrentTab({
               <span className="h-2 w-2 rounded-full bg-fuchsia-500" />
               Empenhado
             </span>
-            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-500/8 px-3 py-1 text-xs font-semibold text-emerald-700">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              Pago
+            <span className="inline-flex items-center gap-2 rounded-full bg-amber-500/8 px-3 py-1 text-xs font-semibold text-amber-700">
+              <span className="h-2 w-2 rounded-full bg-amber-500" />
+              Liquidado
             </span>
           </div>
 
@@ -310,9 +310,9 @@ export function DashboardCurrentTab({
                     <stop offset="0%" stopColor="#a855f7" stopOpacity={0.28} />
                     <stop offset="100%" stopColor="#a855f7" stopOpacity={0.02} />
                   </linearGradient>
-                  <linearGradient id="colorPago" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.22} />
-                    <stop offset="100%" stopColor="#10b981" stopOpacity={0.02} />
+                  <linearGradient id="colorLiquidado" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.22} />
+                    <stop offset="100%" stopColor="#f59e0b" stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#dbe3f0" />
@@ -326,7 +326,7 @@ export function DashboardCurrentTab({
                 />
                 <Tooltip content={<ExecutionTooltip />} cursor={{ stroke: '#cbd5e1', strokeDasharray: '4 4' }} />
                 <Area type="monotone" dataKey="empenhado" stroke="#a855f7" strokeWidth={2.5} fill="url(#colorEmpenhado)" name="Empenhado" />
-                <Area type="monotone" dataKey="pago" stroke="#10b981" strokeWidth={2.5} fill="url(#colorPago)" name="Pago" />
+                <Area type="monotone" dataKey="liquidado" stroke="#f59e0b" strokeWidth={2.5} fill="url(#colorLiquidado)" name="Liquidado" />
                 <Line
                   type="monotone"
                   dataKey="planejado"
@@ -342,10 +342,9 @@ export function DashboardCurrentTab({
           </div>
         </ChartPanel>
 
-        <Card className="overflow-visible">
-          <CardHeader>
-            <CardTitle>Funil de Execucao</CardTitle>
-            <CardDescription>Eficiencia da despesa</CardDescription>
+        <Card className="card-system h-full overflow-visible border border-border-default/80 shadow-soft">
+          <CardHeader className="pb-2">
+            <CardTitle>Funil de Execução</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="relative flex min-h-[300px] flex-1 flex-col justify-center gap-4 py-4">
@@ -400,8 +399,8 @@ export function DashboardCurrentTab({
 
       <div className="grid gap-6 md:grid-cols-1">
         <ChartPanel
-          title="Distribuicao do Orcamento (Dimensao x Componentes Funcionais)"
-          description="Composicao do Planejado por area de atuacao e programas"
+          title="Distribuição do Orçamento (Dimensão x Componentes Funcionais)"
+          description="Composição do Planejado por área de atuação e programas"
           loading={isLoading}
           heightClassName="h-[468px]"
         >
@@ -454,8 +453,8 @@ export function DashboardCurrentTab({
 
       <div className="grid gap-6 md:grid-cols-2">
         <ChartPanel
-          title="Descentralizacoes"
-          description="Volume distribuido por Dimensao"
+          title="Descentralizações"
+          description="Volume distribuído por Dimensão"
           loading={isLoading}
           heightClassName="h-[350px]"
         >
@@ -508,7 +507,7 @@ export function DashboardCurrentTab({
       <Card className="card-system overflow-hidden">
         <CardHeader className="border-b border-border-default/50 px-6 py-4">
           <CardTitle className="table-title">Detalhamento por Origem</CardTitle>
-          <CardDescription>Execucao financeira por fonte de recurso</CardDescription>
+          <CardDescription>Execução financeira por fonte de recurso</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -519,7 +518,7 @@ export function DashboardCurrentTab({
                   <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Planejado</TableHead>
                   <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Empenhado</TableHead>
                   <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Saldo</TableHead>
-                  <TableHead className="h-11 px-6 text-right text-xs font-semibold uppercase tracking-wider">Execucao</TableHead>
+                  <TableHead className="h-11 px-6 text-right text-xs font-semibold uppercase tracking-wider">Execução</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
