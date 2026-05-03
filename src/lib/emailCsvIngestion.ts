@@ -148,6 +148,7 @@ export interface SiafiEmpenhoData {
   rapPago: number;
   rapAPagar: number;
   valorLiquidadoAPagar: number;
+  dataEmpenho?: string | null;
   saldoRapOficial?: number;
   rapSaldoOnly?: boolean;
 }
@@ -303,6 +304,51 @@ function normalizeImportText(value?: string) {
 
 function normalizeSiafiHeader(value: string) {
   return normalizeText(value).toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+function padDatePart(value: string) {
+  return value.padStart(2, '0');
+}
+
+function parseSiafiDate(value: string): string | null {
+  const cleanValue = String(value || '').trim();
+  if (!cleanValue) return null;
+
+  const brDate = cleanValue.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4}|\d{2})/);
+  if (brDate) {
+    const year = brDate[3].length === 2 ? `20${brDate[3]}` : brDate[3];
+    const month = padDatePart(brDate[2]);
+    const day = padDatePart(brDate[1]);
+    const parsed = new Date(`${year}-${month}-${day}T00:00:00Z`);
+    if (
+      Number.isNaN(parsed.getTime()) ||
+      parsed.getUTCFullYear() !== Number(year) ||
+      parsed.getUTCMonth() + 1 !== Number(month) ||
+      parsed.getUTCDate() !== Number(day)
+    ) {
+      return null;
+    }
+    return `${year}-${month}-${day}`;
+  }
+
+  const isoDate = cleanValue.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (isoDate) {
+    const year = isoDate[1];
+    const month = padDatePart(isoDate[2]);
+    const day = padDatePart(isoDate[3]);
+    const parsed = new Date(`${year}-${month}-${day}T00:00:00Z`);
+    if (
+      Number.isNaN(parsed.getTime()) ||
+      parsed.getUTCFullYear() !== Number(year) ||
+      parsed.getUTCMonth() + 1 !== Number(month) ||
+      parsed.getUTCDate() !== Number(day)
+    ) {
+      return null;
+    }
+    return `${year}-${month}-${day}`;
+  }
+
+  return null;
 }
 
 function summarizeNotaCredito(value?: string) {
@@ -1341,6 +1387,16 @@ function parseSiafiEmpenhos(text: string): ParsedEmailCsvImport {
   const colNatureza = findCol('Natureza Despesa');
   const colPlanoInterno = findCol('PI Codigo') !== -1 ? findCol('PI Codigo') : findCol('Plano Interno');
   const colPtres = findCol('PTRES');
+  const colDataEmpenho = findCol(
+    'NE CCor - Data Emissao',
+    'NE CCor - Data de Emissao',
+    'NE CCor - Dia Emissao',
+    'NE CCor - Dia de Emissao',
+    'Data Emissao',
+    'Data de Emissao',
+    'Dia Emissao',
+    'Dia de Emissao',
+  );
   const colEmpenhadas = findCol('DESPESAS EMPENHADAS (CONTROLE EMPENHO)');
   const colLiquidadas = findCol('DESPESAS LIQUIDADAS (CONTROLE EMPENHO)');
   const colPagas = findCol('DESPESAS PAGAS (CONTROLE EMPENHO)');
@@ -1408,6 +1464,7 @@ function parseSiafiEmpenhos(text: string): ParsedEmailCsvImport {
         planoInterno: String(safeValue(colPlanoInterno) || '').trim(),
         ptres: String(safeValue(colPtres) || '').trim(),
         isRap,
+        dataEmpenho: parseSiafiDate(safeValue(colDataEmpenho)),
         valorEmpenhado,
         valorLiquidadoOficial,
         valorPagoOficial,

@@ -128,8 +128,8 @@ export default function ConsultorSessions() {
     try {
       saveConsultorSessions(storageKey, sessions);
     } catch (error) {
-      console.warn('Falha ao salvar sessoes do Consultor', error);
-      toast.warning('Nao foi possivel persistir o historico do Consultor neste navegador.');
+      console.warn('Falha ao salvar sessões do Consultor', error);
+      toast.warning('Não foi possível persistir o histórico do Consultor neste navegador.');
     }
   }, [sessions, storageKey]);
 
@@ -173,7 +173,7 @@ export default function ConsultorSessions() {
 
   const handleClearHistory = () => {
     if (!storageKey) return;
-    if (!window.confirm('Limpar todas as conversas salvas deste usuario neste navegador?')) {
+    if (!window.confirm('Limpar todas as conversas salvas deste usuário neste navegador?')) {
       return;
     }
 
@@ -183,7 +183,7 @@ export default function ConsultorSessions() {
     setActiveSessionId(resetSessions[0].id);
     setAttachedFile(null);
     setInput('');
-    toast.success('Historico do Consultor limpo para este usuario.');
+    toast.success('Histórico do Consultor limpo para este usuário.');
   };
 
   const handleDeleteSession = (sessionId: string) => {

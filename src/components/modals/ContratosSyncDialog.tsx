@@ -90,7 +90,7 @@ export function ContratosSyncDialog({
             Atualizar contratos via Comprasnet
           </DialogTitle>
           <DialogDescription>
-            A sincronizacao automatica roda diariamente. Use esta acao apenas quando precisar antecipar a atualizacao dos contratos, historico, empenhos e faturas.
+            A sincronização automática roda diariamente. Use esta ação apenas quando precisar antecipar a atualização dos contratos, histórico, empenhos e faturas.
           </DialogDescription>
         </DialogHeader>
 
@@ -104,7 +104,7 @@ export function ContratosSyncDialog({
             <div className="space-y-2">
               <div className="flex items-center gap-2 font-medium text-status-success">
                 <CheckCircle2 className="h-4 w-4" />
-                Sincronizacao solicitada com sucesso.
+                Sincronização solicitada com sucesso.
               </div>
               {summary ? (
                 <div className="grid grid-cols-3 gap-2 text-xs">
@@ -118,7 +118,7 @@ export function ContratosSyncDialog({
             <span className="font-medium text-destructive">Erro: {error}</span>
           ) : (
             <span>
-              O sistema usa a vigencia derivada do historico contratual e ignora contratos vencidos que a API ainda retorna como ativos.
+              O sistema usa a vigência derivada do histórico contratual e ignora contratos vencidos que a API ainda retorna como ativos.
             </span>
           )}
         </div>
@@ -136,7 +136,7 @@ export function ContratosSyncDialog({
             ) : done ? (
               <>
                 <CheckCircle2 className="h-4 w-4" />
-                Concluido
+                Concluído
               </>
             ) : (
               <>

@@ -8,11 +8,11 @@ vi.mock('@/lib/supabase', () => ({
 }));
 
 const siafiCsvVigente = [
-  '"NE CCor","NE CCor - Núm. Processo","UG Responsável","Fonte Recursos Detalhada","PTRES","PI Código PI","PI Nome","Natureza Despesa","NE CCor - Favorecido Número","NE CCor - Favorecido Nome","NE CCor - Descrição","DESPESAS EMPENHADAS (CONTROLE EMPENHO)","DESPESAS EMPENHADAS A LIQUIDAR (CONTROLE EMP)","DESPESAS LIQUIDADAS (CONTROLE EMPENHO)","DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)","DESPESAS PAGAS (CONTROLE EMPENHO)","RESTOS A PAGAR NAO PROCESSADOS REINSCRITOS","RESTOS A PAGAR INSCRITOS (PROC E N PROC)","RESTOS A PAGAR PAGOS (PROC E N PROC)","RESTOS A PAGAR A PAGAR (PROC E N PROC)"',
-  '"158366264352024NE000010","23035.000105.2024-42","151606","1000000000","231796","L20RLP99CIN","DICI-COMUNIC E EVENTOS OUTRAS DESPESAS","339039","33083309000141","VITA SERVICOS DE CERIMONIAL E EVENTOS LTDA","RAP antigo","","","","","","3.570,00","3.570,00","","3.570,00"',
-  '"158366264352026NE000003","23035.000003.2026-11","151606","1000000000","231796","L20RLP99ADN","PROAD-GESTAO ADMINISTRATIVA","339039","11111111000111","Fornecedor A","Empenho existente","6.095,00","4.345,41","1.749,59","0,00","1.749,59","","","",""',
-  '"158366264352026NE000017","23035.000017.2026-11","151606","1000000000","231796","L20RLP99IEN","DIENG-CONTRATOS CONTINUADOS-INFRAESTRUTURA","339039","22222222000122","Fornecedor B","Empenho pago","105.812,82","88.177,35","17.635,47","3.606,45","14.029,02","","","",""',
-  '"158366264352026NE000024","23035.000024.2026-11","151606","1000000000","231796","L20RLP99ADN","PROAD-GESTAO ADMINISTRATIVA","339039","33333333000133","Fornecedor C","Empenho novo","3.217,50","3.217,50","0,00","0,00","0,00","","","",""',
+  '"NE CCor","NE CCor - Num. Processo","NE CCor - Data Emissao","UG Responsavel","Fonte Recursos Detalhada","PTRES","PI Codigo PI","PI Nome","Natureza Despesa","NE CCor - Favorecido Numero","NE CCor - Favorecido Nome","NE CCor - Descricao","DESPESAS EMPENHADAS (CONTROLE EMPENHO)","DESPESAS EMPENHADAS A LIQUIDAR (CONTROLE EMP)","DESPESAS LIQUIDADAS (CONTROLE EMPENHO)","DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO)","DESPESAS PAGAS (CONTROLE EMPENHO)","RESTOS A PAGAR NAO PROCESSADOS REINSCRITOS","RESTOS A PAGAR INSCRITOS (PROC E N PROC)","RESTOS A PAGAR PAGOS (PROC E N PROC)","RESTOS A PAGAR A PAGAR (PROC E N PROC)"',
+  '"158366264352024NE000010","23035.000105.2024-42","10/01/2024","151606","1000000000","231796","L20RLP99CIN","DICI-COMUNIC E EVENTOS OUTRAS DESPESAS","339039","33083309000141","VITA SERVICOS DE CERIMONIAL E EVENTOS LTDA","RAP antigo","","","","","","3.570,00","3.570,00","","3.570,00"',
+  '"158366264352026NE000003","23035.000003.2026-11","12/01/2026","151606","1000000000","231796","L20RLP99ADN","PROAD-GESTAO ADMINISTRATIVA","339039","11111111000111","Fornecedor A","Empenho existente","6.095,00","4.345,41","1.749,59","0,00","1.749,59","","","",""',
+  '"158366264352026NE000017","23035.000017.2026-11","03/02/2026","151606","1000000000","231796","L20RLP99IEN","DIENG-CONTRATOS CONTINUADOS-INFRAESTRUTURA","339039","22222222000122","Fornecedor B","Empenho pago","105.812,82","88.177,35","17.635,47","3.606,45","14.029,02","","","",""',
+  '"158366264352026NE000024","23035.000024.2026-11","2026-03-15","151606","1000000000","231796","L20RLP99ADN","PROAD-GESTAO ADMINISTRATIVA","339039","33333333000133","Fornecedor C","Empenho novo","3.217,50","3.217,50","0,00","0,00","0,00","","","",""',
 ].join('\n');
 
 describe('siafi-parser', () => {
@@ -30,10 +30,12 @@ describe('siafi-parser', () => {
     expect(exercicioRows.reduce((total, row) => total + row.valorLiquidadoOficial, 0)).toBeCloseTo(19385.06);
     expect(exercicioRows.reduce((total, row) => total + row.valorPagoOficial, 0)).toBeCloseTo(15778.61);
     expect(parsed.find((row) => row.numeroResumido === '2026NE000017')).toMatchObject({
+      dataEmpenho: '2026-02-03',
       valorPagoOficial: 14029.02,
     });
     expect(parsed.find((row) => row.numeroResumido === '2024NE000010')).toMatchObject({
       isRap: true,
+      dataEmpenho: '2024-01-10',
       rapInscrito: 3570,
       rapPago: 0,
       rapAPagar: 3570,
@@ -84,6 +86,7 @@ describe('siafi-parser', () => {
         planoInterno: 'L20RLP99ADN',
         ptres: '231796',
         isRap: false,
+        dataEmpenho: '2026-01-12',
         valorEmpenhado: 6095,
         valorLiquidadoOficial: 1749.59,
         valorPagoOficial: 1749.59,
@@ -105,6 +108,7 @@ describe('siafi-parser', () => {
         planoInterno: 'L20RLP99ADN',
         ptres: '231796',
         isRap: false,
+        dataEmpenho: '2026-03-15',
         valorEmpenhado: 3217.5,
         valorLiquidadoOficial: 0,
         valorPagoOficial: 0,
@@ -125,6 +129,7 @@ describe('siafi-parser', () => {
       id: 'existing-current',
       payload: {
         valor: 6095,
+        data_empenho: '2026-01-12',
         valor_liquidado: 1749.59,
         valor_liquidado_oficial: 1749.59,
         valor_pago_oficial: 1749.59,
@@ -135,6 +140,7 @@ describe('siafi-parser', () => {
       numero: '2026NE000024',
       tipo: 'exercicio',
       valor: 3217.5,
+      data_empenho: '2026-03-15',
       valor_liquidado: 0,
       valor_liquidado_oficial: 0,
       valor_pago_oficial: 0,

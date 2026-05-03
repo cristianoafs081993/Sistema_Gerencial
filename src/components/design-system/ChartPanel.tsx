@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 
 interface ChartPanelProps {
   title: string;
-  description: string;
+  description?: string;
   loading?: boolean;
   heightClassName?: string;
   className?: string;
@@ -24,7 +24,7 @@ export function ChartPanel({
     <Card className={cn('card-system border border-border-default/80 shadow-soft', className)}>
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold">{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
+        {description ? <CardDescription>{description}</CardDescription> : null}
       </CardHeader>
       <CardContent>
         {loading ? (

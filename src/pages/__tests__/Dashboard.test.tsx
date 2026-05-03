@@ -1,10 +1,15 @@
 import type { ReactNode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useQuery } from '@tanstack/react-query';
 import Dashboard from '@/pages/Dashboard';
 import { useData } from '@/contexts/DataContext';
 
 vi.mock('@/contexts/DataContext', () => ({
   useData: vi.fn(),
+}));
+
+vi.mock('@tanstack/react-query', () => ({
+  useQuery: vi.fn(),
 }));
 
 vi.mock('@/components/HeaderParts', () => ({
@@ -53,7 +58,7 @@ vi.mock('@/components/dashboard/DashboardCurrentTab', () => ({
     totalDescentralizado: number;
     totalLiquidado: number;
     totalPago: number;
-    dadosMensais: Array<{ name: string; pago: number }>;
+    dadosMensais: Array<{ name: string; planejado: number; empenhado: number; liquidado: number }>;
     activeBudgetDimension: string | null;
     onSelectBudgetDimension: (value?: string | null) => void;
   }) => (
@@ -62,7 +67,10 @@ vi.mock('@/components/dashboard/DashboardCurrentTab', () => ({
       <span data-testid="current-descentralizado">{totalDescentralizado}</span>
       <span data-testid="current-liquidado">{totalLiquidado}</span>
       <span data-testid="current-pago">{totalPago}</span>
-      <span data-testid="current-mensal-pago">{dadosMensais.map((item) => item.pago).join(',')}</span>
+      <span data-testid="current-mensal-labels">{dadosMensais.map((item) => item.name).join(',')}</span>
+      <span data-testid="current-mensal-planejado">{dadosMensais.map((item) => item.planejado).join(',')}</span>
+      <span data-testid="current-mensal-empenhado">{dadosMensais.map((item) => item.empenhado).join(',')}</span>
+      <span data-testid="current-mensal-liquidado">{dadosMensais.map((item) => item.liquidado).join(',')}</span>
       <span data-testid="current-empenhos-corrente">{filteredData.empenhosCorrente.length}</span>
       <span data-testid="current-empenhos-rap">{filteredData.empenhosRap.length}</span>
       <span data-testid="active-budget-dimension">{activeBudgetDimension ?? 'none'}</span>
@@ -103,6 +111,9 @@ vi.mock('@/components/dashboard/DashboardRapTab', () => ({
 }));
 
 const mockedUseData = vi.mocked(useData);
+const mockedUseQuery = vi.mocked(useQuery);
+let liquidacoesQueryData: unknown[] = [];
+let contratosApiEmpenhosQueryData: unknown[] = [];
 
 const makeAtividade = (overrides: Partial<ReturnType<typeof baseAtividade>> = {}) => ({
   ...baseAtividade(),
@@ -170,6 +181,18 @@ function baseDescentralizacao() {
 
 describe('Dashboard', () => {
   beforeEach(() => {
+    liquidacoesQueryData = [];
+    contratosApiEmpenhosQueryData = [];
+    mockedUseQuery.mockImplementation((options) => {
+      const queryKey = Array.isArray(options.queryKey) ? options.queryKey[0] : '';
+      if (queryKey === 'dashboard-liquidacoes-por-empenho') {
+        return { data: liquidacoesQueryData } as ReturnType<typeof useQuery>;
+      }
+      if (queryKey === 'dashboard-contratos-api-empenhos') {
+        return { data: contratosApiEmpenhosQueryData } as ReturnType<typeof useQuery>;
+      }
+      return { data: [] } as ReturnType<typeof useQuery>;
+    });
     mockedUseData.mockReturnValue({
       atividades: [
         makeAtividade({ id: 'atividade-en', dimensao: 'EN - Ensino', tipoAtividade: 'sistemico', valorTotal: 200 }),
@@ -378,7 +401,164 @@ describe('Dashboard', () => {
 
     expect(screen.getByTestId('current-liquidado')).toHaveTextContent('370');
     expect(screen.getByTestId('current-pago')).toHaveTextContent('250');
-    expect(screen.getByTestId('current-mensal-pago')).toHaveTextContent('200,250');
+    expect(screen.getByTestId('current-mensal-liquidado')).toHaveTextContent('300,370,370,370,370');
+  });
+
+  it('monta a evolucao mensal com empenhado pelo historico de operacoes e liquidado pelas NPs', () => {
+    liquidacoesQueryData = [
+      {
+        documentoHabil: '2026NP000001',
+        empenhoNumero: '158366264352026NE000001',
+        empenhoNumeroNormalizado: '2026NE000001',
+        dataEmissao: '2026-02-05',
+        valor: 25,
+      },
+      {
+        documentoHabil: '2026NP000002',
+        empenhoNumero: '158366264352026NE000001',
+        empenhoNumeroNormalizado: '2026NE000001',
+        dataEmissao: '2026-04-15',
+        valor: 15,
+      },
+    ];
+
+    mockedUseData.mockReturnValue({
+      atividades: [
+        makeAtividade({
+          id: 'planejamento-janeiro',
+          valorTotal: 1000,
+          createdAt: new Date('2026-01-05'),
+          updatedAt: new Date('2026-01-05'),
+        }),
+        makeAtividade({
+          id: 'planejamento-marco',
+          valorTotal: 200,
+          createdAt: new Date('2026-03-01'),
+          updatedAt: new Date('2026-03-01'),
+        }),
+      ],
+      empenhos: [
+        makeEmpenho({
+          id: 'empenho-com-historico',
+          numero: '2026NE000001',
+          tipo: 'exercicio',
+          valor: 130,
+          valorPagoOficial: 40,
+          valorLiquidadoOficial: 999,
+          ultimaAtualizacaoSiafi: new Date('2026-04-15'),
+          dataEmpenho: new Date('2026-01-10'),
+          historicoOperacoes: [
+            {
+              data: '2026-01-10',
+              operacao: 'INCLUSAO',
+              quantidade: 1,
+              valorUnitario: 100,
+              valorTotal: 100,
+            },
+            {
+              data: '2026-02-03',
+              operacao: 'REFORCO',
+              quantidade: 1,
+              valorUnitario: 50,
+              valorTotal: 50,
+            },
+            {
+              data: '2026-03-20',
+              operacao: 'ANULACAO',
+              quantidade: 1,
+              valorUnitario: 20,
+              valorTotal: 20,
+            },
+          ],
+        }),
+      ],
+      descentralizacoes: [],
+      contaDescentralizacoes: [],
+      contratos: [],
+      contratosEmpenhos: [],
+      creditosDisponiveis: [],
+      isLoading: false,
+      addAtividade: vi.fn(),
+      updateAtividade: vi.fn(),
+      deleteAtividade: vi.fn(),
+      addEmpenho: vi.fn(),
+      updateEmpenho: vi.fn(),
+      deleteEmpenho: vi.fn(),
+      addDescentralizacao: vi.fn(),
+      updateDescentralizacao: vi.fn(),
+      deleteDescentralizacao: vi.fn(),
+      getResumoOrcamentario: vi.fn(),
+      getTotalPlanejado: vi.fn(),
+      getTotalEmpenhado: vi.fn(),
+      getTotalDescentralizado: vi.fn(),
+      getADescentralizar: vi.fn(),
+      getSaldoTotal: vi.fn(),
+      refreshData: vi.fn(),
+    });
+
+    render(<Dashboard />);
+
+    expect(screen.getByTestId('current-mensal-planejado')).toHaveTextContent('1200,1200,1200,1200,1200');
+    expect(screen.getByTestId('current-mensal-empenhado')).toHaveTextContent('100,150,130,130,130');
+    expect(screen.getByTestId('current-mensal-liquidado')).toHaveTextContent('0,25,25,40,40');
+  });
+
+  it('usa data de emissao da API de contratos quando o cadastro local esta em mes errado', () => {
+    contratosApiEmpenhosQueryData = [
+      {
+        numero: '158366264352026NE000001',
+        data_emissao: '2026-04-10',
+        unidade_gestora: '158366',
+      },
+    ];
+
+    mockedUseData.mockReturnValue({
+      atividades: [
+        makeAtividade({
+          id: 'planejamento',
+          valorTotal: 1000,
+          createdAt: new Date('2026-01-05'),
+          updatedAt: new Date('2026-01-05'),
+        }),
+      ],
+      empenhos: [
+        makeEmpenho({
+          id: 'empenho-data-local-errada',
+          numero: '2026NE000001',
+          tipo: 'exercicio',
+          valor: 130,
+          valorLiquidadoOficial: 0,
+          dataEmpenho: new Date('2026-02-10'),
+        }),
+      ],
+      descentralizacoes: [],
+      contaDescentralizacoes: [],
+      contratos: [],
+      contratosEmpenhos: [],
+      creditosDisponiveis: [],
+      isLoading: false,
+      addAtividade: vi.fn(),
+      updateAtividade: vi.fn(),
+      deleteAtividade: vi.fn(),
+      addEmpenho: vi.fn(),
+      updateEmpenho: vi.fn(),
+      deleteEmpenho: vi.fn(),
+      addDescentralizacao: vi.fn(),
+      updateDescentralizacao: vi.fn(),
+      deleteDescentralizacao: vi.fn(),
+      getResumoOrcamentario: vi.fn(),
+      getTotalPlanejado: vi.fn(),
+      getTotalEmpenhado: vi.fn(),
+      getTotalDescentralizado: vi.fn(),
+      getADescentralizar: vi.fn(),
+      getSaldoTotal: vi.fn(),
+      refreshData: vi.fn(),
+    });
+
+    render(<Dashboard />);
+
+    expect(screen.getByTestId('current-mensal-planejado')).toHaveTextContent('1000,1000,1000,1000,1000');
+    expect(screen.getByTestId('current-mensal-empenhado')).toHaveTextContent('0,0,0,130,130');
   });
 
   it('separa inscritos e reinscritos e soma RAP pagos com liquidado a pagar no ano', async () => {

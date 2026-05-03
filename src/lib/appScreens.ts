@@ -66,7 +66,7 @@ export const appScreens: AppScreen[] = [
   { id: 'contratos', groupId: 'contratos', name: 'Contratos', path: '/contratos', icon: FileStack, sortOrder: 10 },
   { id: 'gerador-documentos', groupId: 'documentos', name: 'Gerador de Documentos', path: '/gerador-documentos', icon: Wand2, sortOrder: 10 },
   { id: 'editor-documentos', groupId: 'documentos', name: 'Editor de Documentos', path: '/editor-documentos', icon: Bot, sortOrder: 20 },
-  { id: 'artefatos-licitacao', groupId: 'documentos', name: 'Artefatos de Licitacao', path: '/artefatos-licitacao', icon: FileStack, sortOrder: 25 },
+  { id: 'artefatos-licitacao', groupId: 'documentos', name: 'Artefatos de Licitação', path: '/artefatos-licitacao', icon: FileStack, sortOrder: 25 },
   { id: 'consultor', groupId: 'documentos', name: 'Consultor Jurídico', path: '/consultor', icon: MessageSquare, sortOrder: 30 },
   { id: 'suap', groupId: 'documentos', name: 'SUAP', path: '/suap', icon: FileStack, sortOrder: 40 },
   { id: 'economia-tempo', groupId: 'automacoes', name: 'Economia de Tempo', path: '/economia-tempo', icon: Clock3, sortOrder: 10 },

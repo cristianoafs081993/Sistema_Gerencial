@@ -21,6 +21,7 @@ export interface SiafiEmpenhoData {
     rapPago: number;
     rapAPagar: number;
     valorLiquidadoAPagar: number;
+    dataEmpenho?: string | null;
     saldoRapOficial?: number;
     rapSaldoOnly?: boolean;
 }
@@ -119,6 +120,52 @@ function decodeCsvBytes(bytes: Uint8Array) {
 
     return utf8;
 }
+
+const padDatePart = (value: string) => value.padStart(2, '0');
+
+const parseSiafiDate = (value: string): string | null => {
+    const cleanValue = String(value || '').trim();
+    if (!cleanValue) return null;
+
+    const brDate = cleanValue.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4}|\d{2})/);
+    if (brDate) {
+        const year = brDate[3].length === 2 ? `20${brDate[3]}` : brDate[3];
+        const month = padDatePart(brDate[2]);
+        const day = padDatePart(brDate[1]);
+        const parsed = new Date(`${year}-${month}-${day}T00:00:00Z`);
+        if (
+            Number.isNaN(parsed.getTime()) ||
+            parsed.getUTCFullYear() !== Number(year) ||
+            parsed.getUTCMonth() + 1 !== Number(month) ||
+            parsed.getUTCDate() !== Number(day)
+        ) {
+            return null;
+        }
+        return `${year}-${month}-${day}`;
+    }
+
+    const isoDate = cleanValue.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (isoDate) {
+        const year = isoDate[1];
+        const month = padDatePart(isoDate[2]);
+        const day = padDatePart(isoDate[3]);
+        const parsed = new Date(`${year}-${month}-${day}T00:00:00Z`);
+        if (
+            Number.isNaN(parsed.getTime()) ||
+            parsed.getUTCFullYear() !== Number(year) ||
+            parsed.getUTCMonth() + 1 !== Number(month) ||
+            parsed.getUTCDate() !== Number(day)
+        ) {
+            return null;
+        }
+        return `${year}-${month}-${day}`;
+    }
+
+    return null;
+};
+
+const defaultEmpenhoDate = (numeroResumido: string) => `${numeroResumido.substring(0, 4)}-01-01`;
+
 const parseRapSaldoCsvText = (text: string): SiafiEmpenhoData[] => {
     const lines = text.split(/\r?\n/);
     let headerIndex = -1;
@@ -227,6 +274,17 @@ export function parseSiafiCsvText(text: string): SiafiEmpenhoData[] {
     const colNatureza = findSiafiColumn(headers, 'Natureza Despesa');
     const colPlanoInterno = findSiafiColumn(headers, 'PI Codigo', 'Plano Interno');
     const colPtres = findSiafiColumn(headers, 'PTRES');
+    const colDataEmpenho = findSiafiColumn(
+        headers,
+        'NE CCor - Data Emissao',
+        'NE CCor - Data de Emissao',
+        'NE CCor - Dia Emissao',
+        'NE CCor - Dia de Emissao',
+        'Data Emissao',
+        'Data de Emissao',
+        'Dia Emissao',
+        'Dia de Emissao',
+    );
     const colEmpenhadas = findSiafiColumn(headers, 'DESPESAS EMPENHADAS (CONTROLE EMPENHO)');
     const colLiquidadas = findSiafiColumn(headers, 'DESPESAS LIQUIDADAS (CONTROLE EMPENHO)');
     const colPagas = findSiafiColumn(headers, 'DESPESAS PAGAS (CONTROLE EMPENHO)');
@@ -323,6 +381,7 @@ export function parseSiafiCsvText(text: string): SiafiEmpenhoData[] {
             planoInterno: safeCol(colPlanoInterno),
             ptres: colPtres !== -1 ? safeCol(colPtres) : '',
             isRap,
+            dataEmpenho: parseSiafiDate(safeCol(colDataEmpenho)),
             valorLiquidadoOficial,
             valorPagoOficial,
             valorLiquidadoAPagar,
@@ -417,6 +476,7 @@ export async function syncSiafiDataToDb(
                 }
 
                 if (item.descricao) updatePayload.descricao = item.descricao;
+                if (item.dataEmpenho) updatePayload.data_empenho = item.dataEmpenho;
                 if (item.processo) updatePayload.processo = item.processo;
                 if (item.favorecidoNome) updatePayload.favorecido_nome = item.favorecidoNome;
                 if (item.favorecidoDocumento) updatePayload.favorecido_documento = item.favorecidoDocumento;
@@ -451,7 +511,7 @@ export async function syncSiafiDataToDb(
                         favorecido_nome: item.favorecidoNome || null,
                         favorecido_documento: item.favorecidoDocumento || null,
                         processo: item.processo || null,
-                        data_empenho: `${item.numeroResumido.substring(0, 4)}-01-01`,
+                        data_empenho: item.dataEmpenho || defaultEmpenhoDate(item.numeroResumido),
                         status: getRapStatus(item),
                         tipo: 'rap',
                         rap_inscrito: item.rapSaldoOnly ? saldoRapOficial : item.rapInscrito,
@@ -493,7 +553,7 @@ export async function syncSiafiDataToDb(
                         favorecido_nome: item.favorecidoNome || null,
                         favorecido_documento: item.favorecidoDocumento || null,
                         processo: item.processo || null,
-                        data_empenho: `${item.numeroResumido.substring(0, 4)}-01-01`,
+                        data_empenho: item.dataEmpenho || defaultEmpenhoDate(item.numeroResumido),
                         status,
                         tipo: 'exercicio',
                         valor_liquidado: item.valorLiquidadoOficial,

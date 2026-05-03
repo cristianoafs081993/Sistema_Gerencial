@@ -9,7 +9,6 @@ import {
   Landmark,
   LogOut,
   Menu,
-  MoreHorizontal,
   Search,
   Settings2,
   X,
@@ -99,19 +98,6 @@ function isItemActive(pathname: string, item: NavigationItem) {
   return isPathActive(pathname, item.href) || Boolean(item.children?.some((child) => isPathActive(pathname, child.href)));
 }
 
-function getUserInitials(email?: string | null) {
-  if (!email) return 'SG';
-
-  const [namePart] = email.split('@');
-  const parts = namePart
-    .split(/[._-]+/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-  return namePart.slice(0, 2).toUpperCase();
-}
-
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const { isLoading: isAuthLoading, session, signOut, canAccessScreen } = useAuth();
@@ -138,7 +124,6 @@ export function Layout({ children }: LayoutProps) {
   });
   const isConsultor = location.pathname === '/consultor';
   const userEmail = session?.user.email || null;
-  const userInitials = getUserInitials(userEmail);
 
   useEffect(() => {
     const userId = session?.user.id || null;
@@ -234,15 +219,6 @@ export function Layout({ children }: LayoutProps) {
             />
             <span className="truncate text-sm font-bold tracking-[-0.3px] text-[#222222]">{APP_BRAND.name}</span>
           </Link>
-
-          {session ? (
-            <div
-              className="hidden h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-[#dddddd] bg-[#222222] text-[10px] font-semibold text-white lg:flex"
-              title={userEmail || undefined}
-            >
-              {userInitials}
-            </div>
-          ) : null}
 
           <Button
             type="button"
@@ -379,14 +355,10 @@ export function Layout({ children }: LayoutProps) {
           ) : session ? (
             <div className="space-y-2">
               <div className="flex min-w-0 cursor-pointer items-center gap-[9px] rounded-lg px-2 py-[7px] transition-colors duration-100 hover:bg-[#f7f7f7]">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#222222] text-[10px] font-semibold text-white">
-                  {userInitials}
-                </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-xs font-semibold text-[#222222]">{userEmail || 'Sessão autenticada'}</div>
                   <div className="truncate text-[10px] text-[#6a6a6a]">Conta ativa</div>
                 </div>
-                <MoreHorizontal className="h-4 w-4 shrink-0 text-[#c1c1c1]" />
               </div>
 
               <Button

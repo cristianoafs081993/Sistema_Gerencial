@@ -77,7 +77,7 @@ export function TablePagination({
   const resolvedSummary =
     summary ??
     (typeof totalItems === 'number' && typeof pageSize === 'number' ? buildRangeLabel(safePage, pageSize, totalItems) : null);
-  const resolvedPageLabel = pageLabel ?? `Pagina ${safePage} de ${safeTotalPages}`;
+  const resolvedPageLabel = pageLabel ?? `Página ${safePage} de ${safeTotalPages}`;
 
   return (
     <div className={cn('table-pagination', className)}>

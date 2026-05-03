@@ -148,6 +148,13 @@ Observacao para a aba RAP do dashboard:
 - a mesma regra deve valer para dashboard, tela de empenhos, agrupamentos e contratos vinculados
 - nao reutilizar `valor` ou `valorPagoOficial` como substitutos desses totais na agregacao da aba RAP
 
+Observacao para a aba de exercicio atual do dashboard:
+
+- o grafico `Evolucao da Execucao` deve mostrar `Planejado` como total acumulado desde o primeiro mes do eixo, nao pela data de cadastro das atividades
+- a linha `Empenhado` usa, nesta ordem, `contratos_api_empenhos.data_emissao` casada pelo numero da NE, `empenhos.historicoOperacoes` quando houver historico com data (tratando `ANULACAO` como valor negativo) e `empenhos.dataEmpenho` apenas como fallback; isso evita que bases antigas importadas com data de cadastro concentrem tudo no mes errado
+- a linha `Liquidado` usa NPs de `documentos_habeis` vinculadas por `empenho_numero`; o vinculo aceita o numero resumido do empenho (`AAAA NEXXXXXX`) mesmo quando `documentos_habeis.empenho_numero` guarda o numero completo do SIAFI; quando uma NE ainda nao tiver NPs carregadas, usa o liquidado oficial do empenho como fallback na data de `ultimaAtualizacaoSiafi` e cai para `dataEmpenho` apenas se nao houver atualizacao
+- sem filtro final de data, o eixo deve preencher meses vazios ate o mes atual
+
 ### Financeiro
 
 `Financeiro.tsx` -> `parseFinanceiroCsv` / `saveFinanceiroRows` -> `financeiro_fonte_vinculacao`

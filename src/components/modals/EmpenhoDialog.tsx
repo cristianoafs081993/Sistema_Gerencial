@@ -288,13 +288,13 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50/30 text-[9px] uppercase font-bold text-slate-400">
                     <tr>
-                      <th className="px-5 py-2">Emissao</th>
+                      <th className="px-5 py-2">Emissão</th>
                       <th className="px-5 py-2">Fatura</th>
                       <th className="px-5 py-2">Contrato</th>
-                      <th className="px-5 py-2">Situacao</th>
+                      <th className="px-5 py-2">Situação</th>
                       <th className="px-5 py-2">Processo</th>
                       <th className="px-5 py-2">Vencimento</th>
-                      <th className="px-5 py-2">Liquidacao</th>
+                      <th className="px-5 py-2">Liquidação</th>
                       <th className="px-5 py-2 text-right">Valor</th>
                     </tr>
                   </thead>
@@ -302,7 +302,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                     {isLoadingLiquidacoesApi ? (
                       <tr>
                         <td colSpan={8} className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
-                          Carregando liquidacoes da API de contratos...
+                          Carregando liquidações da API de contratos...
                         </td>
                       </tr>
                     ) : liquidacoesApi.length > 0 ? (
@@ -342,7 +342,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                     ) : (
                       <tr>
                         <td colSpan={8} className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
-                          O empenho nao foi localizado nos contratos publicos do Comprasnet para a UG 158366.
+                          O empenho não foi localizado nos contratos públicos do Comprasnet para a UG 158366.
                         </td>
                       </tr>
                     )}
@@ -418,7 +418,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                     ) : (
                       <tr>
                         <td colSpan={8} className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
-                          {'O empenho nao foi localizado nos contratos publicos do Comprasnet para as UGs 158366 e 158155.'}
+                          {'O empenho não foi localizado nos contratos públicos do Comprasnet para as UGs 158366 e 158155.'}
                         </td>
                       </tr>
                     )}

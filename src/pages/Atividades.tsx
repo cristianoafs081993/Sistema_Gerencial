@@ -660,8 +660,8 @@ export default function Atividades() {
         open={isConfirmDeleteDialogOpen}
         onOpenChange={setIsConfirmDeleteDialogOpen}
         onConfirm={handleBulkDelete}
-        title="Confirmar Exclusao"
-        description={`Tem certeza que deseja excluir as ${selectedIds.size} atividades selecionadas? Esta acao nao podera ser desfeita.`}
+        title="Confirmar Exclusão"
+        description={`Tem certeza que deseja excluir as ${selectedIds.size} atividades selecionadas? Esta ação não poderá ser desfeita.`}
         confirmText="Excluir atividades"
       />
 

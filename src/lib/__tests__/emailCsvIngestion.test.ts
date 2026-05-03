@@ -265,9 +265,9 @@ describe('emailCsvIngestion', () => {
     const parsed = parseEmailCsvImport({
       fileName: 'Exec_NE_Exercicio_RAP_UG_Executora.csv',
       text: [
-        'NE CCor;Num. Processo;Favorecido Nome;Favorecido Numero;Descricao;Natureza Despesa;PI Codigo;PTRES;DESPESAS EMPENHADAS (CONTROLE EMPENHO);DESPESAS LIQUIDADAS (CONTROLE EMPENHO);DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO);DESPESAS PAGAS (CONTROLE EMPENHO);RESTOS A PAGAR INSCRITOS;RESTOS A PAGAR NAO PROCESSADOS A LIQUIDAR;RESTOS A PAGAR NAO PROCES. LIQUIDADOS A PAGAR;RESTOS A PAGAR PAGOS;RESTOS A PAGAR A PAGAR',
-        '158366264352026NE000010;23001.000010/2026-11;Fornecedor B;12345678000190;Empenho exercicio;339039;PI123ADN;123456;2.000,00;1.500,00;500,00;1.000,00;0,00;0,00;0,00;0,00;0,00',
-        '158366264352025NE000011;23001.000011/2025-11;Fornecedor C;98765432000190;Empenho RAP;339030;PI456ADN;654321;0,00;0,00;0,00;0,00;3.000,00;1.000,00;300,00;500,00;2.500,00',
+        'NE CCor;Num. Processo;Data Emissao;Favorecido Nome;Favorecido Numero;Descricao;Natureza Despesa;PI Codigo;PTRES;DESPESAS EMPENHADAS (CONTROLE EMPENHO);DESPESAS LIQUIDADAS (CONTROLE EMPENHO);DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO);DESPESAS PAGAS (CONTROLE EMPENHO);RESTOS A PAGAR INSCRITOS;RESTOS A PAGAR NAO PROCESSADOS A LIQUIDAR;RESTOS A PAGAR NAO PROCES. LIQUIDADOS A PAGAR;RESTOS A PAGAR PAGOS;RESTOS A PAGAR A PAGAR',
+        '158366264352026NE000010;23001.000010/2026-11;15/03/2026;Fornecedor B;12345678000190;Empenho exercicio;339039;PI123ADN;123456;2.000,00;1.500,00;500,00;1.000,00;0,00;0,00;0,00;0,00;0,00',
+        '158366264352025NE000011;23001.000011/2025-11;2025-04-20;Fornecedor C;98765432000190;Empenho RAP;339030;PI456ADN;654321;0,00;0,00;0,00;0,00;3.000,00;1.000,00;300,00;500,00;2.500,00',
       ].join('\n'),
     });
 
@@ -280,6 +280,7 @@ describe('emailCsvIngestion', () => {
     expect(parsed.rows[0]).toMatchObject({
       numeroResumido: '2026NE000010',
       isRap: false,
+      dataEmpenho: '2026-03-15',
       valorEmpenhado: 2000,
       valorLiquidadoOficial: 1500,
       valorPagoOficial: 1000,
@@ -288,6 +289,7 @@ describe('emailCsvIngestion', () => {
     expect(parsed.rows[1]).toMatchObject({
       numeroResumido: '2025NE000011',
       isRap: true,
+      dataEmpenho: '2025-04-20',
       rapInscrito: 3000,
       rapALiquidar: 1000,
       valorLiquidadoAPagar: 300,

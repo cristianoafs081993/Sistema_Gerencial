@@ -14,6 +14,14 @@ const DOCUMENTOS_HABEIS_SELECT = 'id,valor_original,valor_pago,estado,processo,f
 const DOCUMENTOS_HABEIS_ITENS_SELECT = 'id,documento_habil_id,doc_tipo,data_emissao,valor,observacao';
 const DOCUMENTOS_HABEIS_SITUACOES_SELECT = 'id,documento_habil_id,situacao_codigo,valor,is_retencao,created_at';
 
+export type LiquidacaoPorEmpenho = {
+    documentoHabil: string;
+    empenhoNumero: string;
+    empenhoNumeroNormalizado: string;
+    dataEmissao: string;
+    valor: number;
+};
+
 // Delay para evitar Rate Limit (se necessário)
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -21,6 +29,12 @@ const normalizeDocId = (id: string | undefined): string => {
     if (!id) return '';
     const trimmed = id.trim();
     return trimmed.length > 12 ? trimmed.slice(-12) : trimmed;
+};
+
+export const normalizeEmpenhoNumero = (numero?: string | null): string => {
+    const normalized = String(numero || '').toUpperCase().replace(/[^0-9A-Z]/g, '');
+    const match = normalized.match(/(\d{4}NE\d{6})$/);
+    return match?.[1] || normalized;
 };
 
 type DocumentoImportState = {
@@ -51,6 +65,37 @@ type DocumentoImportState = {
 };
 
 export const transparenciaService = {
+    async getLiquidacoesPorEmpenhos(empenhoNumeros: string[]): Promise<LiquidacaoPorEmpenho[]> {
+        const uniqueNumeros = Array.from(new Set(empenhoNumeros.map(normalizeEmpenhoNumero).filter(Boolean)));
+        if (uniqueNumeros.length === 0) return [];
+
+        const rows: LiquidacaoPorEmpenho[] = [];
+
+        for (const numero of uniqueNumeros) {
+            const { data, error } = await supabase
+                .from('documentos_habeis')
+                .select('id, empenho_numero, data_emissao, valor_original')
+                .ilike('empenho_numero', `%${numero}%`)
+                .order('data_emissao', { ascending: true });
+
+            if (error) throw error;
+
+            rows.push(
+                ...((data || []) as Array<Record<string, unknown>>)
+                    .map((row) => ({
+                        documentoHabil: String(row.id || ''),
+                        empenhoNumero: String(row.empenho_numero || ''),
+                        empenhoNumeroNormalizado: normalizeEmpenhoNumero(String(row.empenho_numero || '')),
+                        dataEmissao: String(row.data_emissao || ''),
+                        valor: Number(row.valor_original || 0),
+                    }))
+                    .filter((row) => row.documentoHabil && row.empenhoNumeroNormalizado === numero && row.dataEmissao && row.valor > 0),
+            );
+        }
+
+        return rows;
+    },
+
     async getDocumentos(filters?: {
         startDate?: Date;
         endDate?: Date;

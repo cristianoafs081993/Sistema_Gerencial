@@ -151,7 +151,7 @@ describe('EmpenhoDialog', () => {
   it('mantem o modal estavel e exibe o vazio da API publica sem a secao de documentos habeis', async () => {
     renderDialog();
 
-    expect(await screen.findByText('O empenho nao foi localizado nos contratos publicos do Comprasnet para as UGs 158366 e 158155.')).toBeInTheDocument();
+    expect(await screen.findByText('O empenho não foi localizado nos contratos públicos do Comprasnet para as UGs 158366 e 158155.')).toBeInTheDocument();
     expect(screen.queryByText((content) => content.includes('Nenhum documento'))).not.toBeInTheDocument();
     expect(screen.getByTestId('dialog-content')).toHaveClass('sm:max-w-4xl');
     expect(screen.getByTestId('dialog-content')).toHaveClass('lg:max-w-5xl');

@@ -54,6 +54,22 @@ describe('siafi-parser', () => {
     });
   });
 
+  it('parseia a data de emissao do empenho para montar evolucao mensal', () => {
+    const rows = parseSiafiCsvText(
+      [
+        'NE CCor;Num. Processo;Data Emissao;Favorecido Nome;Favorecido Numero;Descricao;Natureza Despesa;PI Codigo;PTRES;DESPESAS EMPENHADAS (CONTROLE EMPENHO);DESPESAS LIQUIDADAS (CONTROLE EMPENHO);DESPESAS LIQUIDADAS A PAGAR(CONTROLE EMPENHO);DESPESAS PAGAS (CONTROLE EMPENHO)',
+        '158366264352026NE000010;23001.000010/2026-11;15/03/2026;Fornecedor B;12345678000190;Empenho exercicio;339039;PI123ADN;123456;2.000,00;1.500,00;500,00;1.000,00',
+      ].join('\n'),
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      numeroResumido: '2026NE000010',
+      dataEmpenho: '2026-03-15',
+      valorEmpenhado: 2000,
+    });
+  });
+
   it('parseia o CSV especifico de saldo de RAP e marca a linha como saldo direto', () => {
     const rows = parseSiafiCsvText(
       [
@@ -97,6 +113,7 @@ describe('siafi-parser', () => {
         planoInterno: 'PI456ADN',
         ptres: '654321',
         isRap: true,
+        dataEmpenho: '2025-04-20',
         valorLiquidadoOficial: 0,
         valorPagoOficial: 0,
         valorEmpenhado: 0,
@@ -112,6 +129,7 @@ describe('siafi-parser', () => {
     expect(updateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         valor_liquidado_a_pagar: 300,
+        data_empenho: '2025-04-20',
         saldo_rap_oficial: 0,
         status: 'liquidado',
         rap_pago: 0,

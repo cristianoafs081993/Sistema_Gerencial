@@ -125,7 +125,7 @@ describe('Layout', () => {
 
     fireEvent.click(screen.getByText('Documentos'));
 
-    expect(screen.getByText('Artefatos de Licitacao')).toBeInTheDocument();
+    expect(screen.getByText('Artefatos de Licitação')).toBeInTheDocument();
   });
 
   it('mantem a ordem dos tipos do editor na sidebar', () => {

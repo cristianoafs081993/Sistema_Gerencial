@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { format, isWithinInterval, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +23,203 @@ import {
   buildDescentralizacaoSummaryRows,
   getFilteredDescentralizacaoSummaryTotal,
 } from '@/utils/descentralizacoesContaSaldos';
+import { normalizeEmpenhoNumero, transparenciaService, type LiquidacaoPorEmpenho } from '@/services/transparencia';
+import { contratosApiService, type ContratoApiEmpenhoRow } from '@/services/contratosApi';
+import type { Atividade, Empenho } from '@/types';
+
+type MonthlyExecutionBucket = {
+  date: Date;
+  planejado: number;
+  empenhado: number;
+  liquidado: number;
+};
+
+const toValidDate = (value?: Date | string | null): Date | null => {
+  if (!value) return null;
+
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const toValidOperationDate = (value?: string | null): Date | null => {
+  if (!value) return null;
+
+  const trimmedValue = value.trim();
+  const brazilianDateMatch = trimmedValue.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (brazilianDateMatch) {
+    const [, day, month, year] = brazilianDateMatch;
+    return toValidDate(`${year}-${month}-${day}`);
+  }
+
+  return toValidDate(trimmedValue);
+};
+
+const getSignedOperationValue = (operacao: string | undefined, valor: number) => {
+  if (!Number.isFinite(valor)) return 0;
+
+  return operacao?.toUpperCase().includes('ANULACAO') ? -Math.abs(valor) : valor;
+};
+
+const buildApiEmpenhoDateMap = (apiEmpenhos: ContratoApiEmpenhoRow[] | unknown) => {
+  const map = new Map<string, Date>();
+
+  if (!Array.isArray(apiEmpenhos)) return map;
+
+  apiEmpenhos.forEach((apiEmpenho) => {
+    const numero = normalizeEmpenhoNumero(apiEmpenho.numero);
+    const date = toValidDate(apiEmpenho.data_emissao);
+    if (!numero || !date) return;
+
+    const existing = map.get(numero);
+    if (!existing || date.getTime() < existing.getTime()) {
+      map.set(numero, date);
+    }
+  });
+
+  return map;
+};
+
+const monthKey = (date: Date) =>
+  `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+
+const getMonthlyBucket = (buckets: Map<string, MonthlyExecutionBucket>, date: Date) => {
+  const key = monthKey(date);
+  const existing = buckets.get(key);
+
+  if (existing) return existing;
+
+  const bucket = {
+    date: new Date(date.getUTCFullYear(), date.getUTCMonth(), 1),
+    planejado: 0,
+    empenhado: 0,
+    liquidado: 0,
+  };
+  buckets.set(key, bucket);
+  return bucket;
+};
+
+const monthStart = (date: Date) => new Date(date.getUTCFullYear(), date.getUTCMonth(), 1);
+
+const addEmptyMonthlyBuckets = (
+  buckets: Map<string, MonthlyExecutionBucket>,
+  startDate: Date | null,
+  endDate: Date,
+) => {
+  const existingDates = Array.from(buckets.values()).map((bucket) => bucket.date);
+  const firstDate = startDate || existingDates.sort((left, right) => left.getTime() - right.getTime())[0] || endDate;
+  const start = monthStart(firstDate);
+  const end = monthStart(endDate);
+
+  for (
+    let cursor = start;
+    cursor.getTime() <= end.getTime();
+    cursor = new Date(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1)
+  ) {
+    getMonthlyBucket(buckets, cursor);
+  }
+};
+
+const buildDadosMensais = (
+  atividades: Atividade[],
+  empenhosCorrente: Empenho[],
+  liquidacoesPorEmpenho: LiquidacaoPorEmpenho[],
+  contratosApiEmpenhos: ContratoApiEmpenhoRow[],
+  options: {
+    startDate?: Date | null;
+    endDate: Date;
+  },
+) => {
+  const buckets = new Map<string, MonthlyExecutionBucket>();
+  const apiEmpenhoDateMap = buildApiEmpenhoDateMap(contratosApiEmpenhos);
+  const totalPlanejado = atividades.reduce((total, atividade) => total + (atividade.valorTotal || 0), 0);
+
+  atividades.forEach((atividade) => {
+    const date = toValidDate(atividade.createdAt) || toValidDate(atividade.updatedAt);
+    if (!date) return;
+
+    getMonthlyBucket(buckets, date);
+  });
+
+  empenhosCorrente.forEach((empenho) => {
+    const apiDataEmpenho = apiEmpenhoDateMap.get(normalizeEmpenhoNumero(empenho.numero));
+    if (apiDataEmpenho) {
+      getMonthlyBucket(buckets, apiDataEmpenho).empenhado += empenho.valor || 0;
+      return;
+    }
+
+    const operacoesComData = (empenho.historicoOperacoes || [])
+      .map((operacao) => ({
+        date: toValidOperationDate(operacao.data),
+        value: getSignedOperationValue(operacao.operacao, Number(operacao.valorTotal) || 0),
+      }))
+      .filter((operacao): operacao is { date: Date; value: number } => !!operacao.date && operacao.value !== 0);
+
+    if (operacoesComData.length > 0) {
+      operacoesComData.forEach((operacao) => {
+        getMonthlyBucket(buckets, operacao.date).empenhado += operacao.value;
+      });
+      return;
+    }
+
+    const dataEmpenho = toValidDate(empenho.dataEmpenho);
+    if (!dataEmpenho) return;
+
+    getMonthlyBucket(buckets, dataEmpenho).empenhado += empenho.valor || 0;
+  });
+
+  const empenhosComLiquidacao = new Set<string>();
+
+  if (liquidacoesPorEmpenho.length > 0) {
+    const empenhoNumeros = new Set(empenhosCorrente.map((empenho) => normalizeEmpenhoNumero(empenho.numero)));
+
+    liquidacoesPorEmpenho.forEach((liquidacao) => {
+      if (!empenhoNumeros.has(liquidacao.empenhoNumeroNormalizado)) return;
+
+      const dataLiquidacao = toValidDate(liquidacao.dataEmissao);
+      if (!dataLiquidacao) return;
+
+      getMonthlyBucket(buckets, dataLiquidacao).liquidado += liquidacao.valor || 0;
+      empenhosComLiquidacao.add(liquidacao.empenhoNumeroNormalizado);
+    });
+  }
+
+  empenhosCorrente.forEach((empenho) => {
+    const empenhoNumero = normalizeEmpenhoNumero(empenho.numero);
+    if (empenhosComLiquidacao.has(empenhoNumero)) return;
+
+    const valorLiquidado = empenho.valorLiquidadoOficial ?? empenho.valorLiquidado ?? 0;
+    if (!valorLiquidado) return;
+
+    const dataLiquidacaoFallback = toValidDate(empenho.ultimaAtualizacaoSiafi) || toValidDate(empenho.dataEmpenho);
+    if (!dataLiquidacaoFallback) return;
+
+    getMonthlyBucket(buckets, dataLiquidacaoFallback).liquidado += valorLiquidado;
+  });
+
+  addEmptyMonthlyBuckets(buckets, options.startDate || null, options.endDate);
+
+  const sortedBuckets = Array.from(buckets.values()).sort((left, right) => left.date.getTime() - right.date.getTime());
+  if (sortedBuckets.length > 0 && totalPlanejado > 0) {
+    sortedBuckets[0].planejado = totalPlanejado;
+  }
+
+  let accPlanejado = 0;
+  let accEmpenhado = 0;
+  let accLiquidado = 0;
+
+  return sortedBuckets.map((bucket) => {
+      accPlanejado += bucket.planejado;
+      accEmpenhado += bucket.empenhado;
+      accLiquidado += bucket.liquidado;
+
+      return {
+        name: format(bucket.date, 'MMM/yy', { locale: ptBR }),
+        planejado: accPlanejado,
+        empenhado: accEmpenhado,
+        liquidado: accLiquidado,
+      };
+    });
+};
 
 export default function Dashboard() {
   const { atividades, empenhos, descentralizacoes, contaDescentralizacoes, isLoading } = useData();
@@ -215,34 +413,38 @@ export default function Dashboard() {
       .slice(0, 7);
   }, [filteredData]);
 
-  const dadosMensais = useMemo(() => {
-    const mapEmpenhado = new Map<string, number>();
-    const mapPago = new Map<string, number>();
-    const sortedEmpenhos = [...filteredData.empenhosCorrente].sort(
-      (left, right) => new Date(left.dataEmpenho).getTime() - new Date(right.dataEmpenho).getTime(),
-    );
+  const empenhoNumerosCorrente = useMemo(
+    () => Array.from(new Set(filteredData.empenhosCorrente.map((empenho) => normalizeEmpenhoNumero(empenho.numero)).filter(Boolean))).sort(),
+    [filteredData.empenhosCorrente],
+  );
 
-    sortedEmpenhos.forEach((empenho) => {
-      const mes = format(new Date(empenho.dataEmpenho), 'MMM/yy', { locale: ptBR });
-      mapEmpenhado.set(mes, (mapEmpenhado.get(mes) || 0) + empenho.valor);
-      mapPago.set(mes, (mapPago.get(mes) || 0) + (empenho.valorPagoOficial ?? empenho.valorPago ?? 0));
-    });
+  const { data: liquidacoesPorEmpenho = [] } = useQuery({
+    queryKey: ['dashboard-liquidacoes-por-empenho', empenhoNumerosCorrente],
+    queryFn: () => transparenciaService.getLiquidacoesPorEmpenhos(empenhoNumerosCorrente),
+    enabled: empenhoNumerosCorrente.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
 
-    let accEmpenhado = 0;
-    let accPago = 0;
+  const { data: contratosApiEmpenhos = [] } = useQuery({
+    queryKey: ['dashboard-contratos-api-empenhos'],
+    queryFn: async () => {
+      try {
+        return await contratosApiService.getEmpenhosApi();
+      } catch {
+        return [];
+      }
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
-    return Array.from(mapEmpenhado.entries()).map(([mes, valorEmpenhado]) => {
-      accEmpenhado += valorEmpenhado;
-      accPago += mapPago.get(mes) || 0;
-
-      return {
-        name: mes,
-        planejado: totalPlanejado > 0 ? totalPlanejado : accEmpenhado * 1.2,
-        empenhado: accEmpenhado,
-        pago: accPago,
-      };
-    });
-  }, [filteredData, totalPlanejado]);
+  const dadosMensais = useMemo(
+    () =>
+      buildDadosMensais(filteredData.atividades, filteredData.empenhosCorrente, liquidacoesPorEmpenho, contratosApiEmpenhos, {
+        startDate: dateStart ? parseISO(dateStart) : null,
+        endDate: dateEnd ? parseISO(dateEnd) : new Date(),
+      }),
+    [filteredData.atividades, filteredData.empenhosCorrente, liquidacoesPorEmpenho, contratosApiEmpenhos, dateStart, dateEnd],
+  );
 
   const budgetTreemapData = useMemo(() => {
     const dimensionPalette = ['#2563eb', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', '#14b8a6', '#6366f1', '#f43f5e'];

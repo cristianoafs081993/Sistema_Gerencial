@@ -76,7 +76,7 @@ export function DashboardRapTab({
       <Card className="card-system overflow-hidden">
         <CardHeader className="border-b border-border-default/50 px-6 py-4">
           <CardTitle className="table-title">Resumo de RAPs por Origem</CardTitle>
-          <CardDescription>Base vigente do ano, liquidado no exercicio e saldo remanescente</CardDescription>
+          <CardDescription>Base vigente do ano, liquidado no exercício e saldo remanescente</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -87,7 +87,7 @@ export function DashboardRapTab({
                   <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Inscrito / Reinscrito</TableHead>
                   <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Liquidado no Ano</TableHead>
                   <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Saldo Atual</TableHead>
-                  <TableHead className="h-11 px-6 text-right text-xs font-semibold uppercase tracking-wider">Taxa de Liquidacao</TableHead>
+                  <TableHead className="h-11 px-6 text-right text-xs font-semibold uppercase tracking-wider">Taxa de Liquidação</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

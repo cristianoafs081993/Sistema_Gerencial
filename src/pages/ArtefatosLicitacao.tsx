@@ -24,7 +24,7 @@ import {
 const artifactTypeLabels: Record<LicitacaoArtifactType, string> = {
   etp: 'ETP',
   mapa_riscos: 'Mapa de Risco',
-  termo_referencia: 'Termo de Referencia',
+  termo_referencia: 'Termo de Referência',
   minuta_contrato: 'Minuta de Contrato',
 };
 
@@ -39,7 +39,7 @@ const artifactTypeOptions: Array<{ value: 'todos' | LicitacaoArtifactType; label
   { value: 'todos', label: 'Todos os tipos' },
   { value: 'etp', label: 'ETP' },
   { value: 'mapa_riscos', label: 'Mapa de Risco' },
-  { value: 'termo_referencia', label: 'Termo de Referencia' },
+  { value: 'termo_referencia', label: 'Termo de Referência' },
   { value: 'minuta_contrato', label: 'Minuta de Contrato' },
 ];
 
@@ -98,7 +98,7 @@ export default function ArtefatosLicitacao() {
       : undefined;
 
     if (!templateBase64 || !artifact.docxExportPlan) {
-      toast.error('Este artefato nao possui plano de exportacao DOCX.');
+      toast.error('Este artefato não possui plano de exportação DOCX.');
       return;
     }
 
@@ -118,7 +118,7 @@ export default function ArtefatosLicitacao() {
       window.URL.revokeObjectURL(url);
       toast.success('DOCX gerado.');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Nao foi possivel gerar o DOCX.');
+      toast.error(error instanceof Error ? error.message : 'Não foi possível gerar o DOCX.');
     } finally {
       setDownloadingId(null);
     }
@@ -131,9 +131,9 @@ export default function ArtefatosLicitacao() {
     try {
       await licitacaoArtifactsService.delete(artifact.id);
       await queryClient.invalidateQueries({ queryKey: ['licitacao-artifacts'] });
-      toast.success('Artefato excluido.');
+      toast.success('Artefato excluído.');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Nao foi possivel excluir o artefato.');
+      toast.error(error instanceof Error ? error.message : 'Não foi possível excluir o artefato.');
     } finally {
       setDeletingId(null);
     }
@@ -149,8 +149,8 @@ export default function ArtefatosLicitacao() {
       </HeaderActions>
 
       <SectionPanel
-        title="Artefatos de Licitacao"
-        description="Repositorio das versoes geradas no fluxo ETP, Mapa de Risco, Termo de Referencia e Minuta de Contrato."
+        title="Artefatos de Licitação"
+        description="Repositório das versões geradas no fluxo ETP, Mapa de Risco, Termo de Referência e Minuta de Contrato."
       >
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <div className="rounded-radius-lg border border-border-default bg-surface-subtle/70 p-3">
@@ -173,7 +173,7 @@ export default function ArtefatosLicitacao() {
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar por processo, objeto, titulo ou conteudo"
+            placeholder="Buscar por processo, objeto, título ou conteúdo"
           />
           <Select value={artifactType} onValueChange={(value) => setArtifactType(value as typeof artifactType)}>
             <SelectTrigger>
@@ -193,11 +193,11 @@ export default function ArtefatosLicitacao() {
           <TableHeader>
             <TableRow>
               <TableHead>Tipo</TableHead>
-              <TableHead>Titulo</TableHead>
+              <TableHead>Título</TableHead>
               <TableHead>Processo / Objeto</TableHead>
-              <TableHead>Versao</TableHead>
+              <TableHead>Versão</TableHead>
               <TableHead>Atualizado</TableHead>
-              <TableHead className="text-right">Acoes</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
