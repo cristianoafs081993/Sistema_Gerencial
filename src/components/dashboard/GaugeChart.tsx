@@ -108,9 +108,9 @@ export function GaugeChart({ value, total, label, sublabel, isLoading = false }:
         <defs>
           {/* Gradiente para o arco preenchido */}
           <linearGradient id={`gaugeGrad-${label}`} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#ef4444" />
+            <stop offset="0%" stopColor="#22c55e" />
             <stop offset="50%" stopColor="#f59e0b" />
-            <stop offset="100%" stopColor="#22c55e" />
+            <stop offset="100%" stopColor="#ef4444" />
           </linearGradient>
 
           {/* Máscara radial para revelar o arco preenchido */}
@@ -192,7 +192,7 @@ export function GaugeChart({ value, total, label, sublabel, isLoading = false }:
               fontWeight="600"
               fill="#94a3b8"
             >
-              {`${(t * 100).toFixed(0)}%`}
+              {`${((1 - t) * 100).toFixed(0)}%`}
             </text>
           );
         })}
