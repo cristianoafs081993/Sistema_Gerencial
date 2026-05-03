@@ -114,6 +114,7 @@ const mockedUseData = vi.mocked(useData);
 const mockedUseQuery = vi.mocked(useQuery);
 let liquidacoesQueryData: unknown[] = [];
 let contratosApiEmpenhosQueryData: unknown[] = [];
+let contratosApiLiquidacoesQueryData: unknown[] = [];
 
 const makeAtividade = (overrides: Partial<ReturnType<typeof baseAtividade>> = {}) => ({
   ...baseAtividade(),
@@ -183,6 +184,7 @@ describe('Dashboard', () => {
   beforeEach(() => {
     liquidacoesQueryData = [];
     contratosApiEmpenhosQueryData = [];
+    contratosApiLiquidacoesQueryData = [];
     mockedUseQuery.mockImplementation((options) => {
       const queryKey = Array.isArray(options.queryKey) ? options.queryKey[0] : '';
       if (queryKey === 'dashboard-liquidacoes-por-empenho') {
@@ -190,6 +192,9 @@ describe('Dashboard', () => {
       }
       if (queryKey === 'dashboard-contratos-api-empenhos') {
         return { data: contratosApiEmpenhosQueryData } as ReturnType<typeof useQuery>;
+      }
+      if (queryKey === 'dashboard-contratos-api-liquidacoes') {
+        return { data: contratosApiLiquidacoesQueryData } as ReturnType<typeof useQuery>;
       }
       return { data: [] } as ReturnType<typeof useQuery>;
     });
@@ -401,7 +406,7 @@ describe('Dashboard', () => {
 
     expect(screen.getByTestId('current-liquidado')).toHaveTextContent('370');
     expect(screen.getByTestId('current-pago')).toHaveTextContent('250');
-    expect(screen.getByTestId('current-mensal-liquidado')).toHaveTextContent('300,370,370,370,370');
+    expect(screen.getByTestId('current-mensal-liquidado')).toHaveTextContent('0,0,0,0,0');
   });
 
   it('monta a evolucao mensal com empenhado pelo historico de operacoes e liquidado pelas NPs', () => {
@@ -444,7 +449,7 @@ describe('Dashboard', () => {
           tipo: 'exercicio',
           valor: 130,
           valorPagoOficial: 40,
-          valorLiquidadoOficial: 999,
+          valorLiquidadoOficial: 40,
           ultimaAtualizacaoSiafi: new Date('2026-04-15'),
           dataEmpenho: new Date('2026-01-10'),
           historicoOperacoes: [
@@ -501,6 +506,117 @@ describe('Dashboard', () => {
     expect(screen.getByTestId('current-mensal-planejado')).toHaveTextContent('1200,1200,1200,1200,1200');
     expect(screen.getByTestId('current-mensal-empenhado')).toHaveTextContent('100,150,130,130,130');
     expect(screen.getByTestId('current-mensal-liquidado')).toHaveTextContent('0,25,25,40,40');
+  });
+
+  it('usa liquidacoes da API de contratos quando nao ha NP vinculada e fecha no total oficial', () => {
+    contratosApiLiquidacoesQueryData = [
+      {
+        empenho_numero: '158366264352026NE000001',
+        data_liquidacao: '2026-03-05',
+        data_emissao: '2026-03-01',
+        valor_liquido: 30,
+        valor_bruto: 30,
+      },
+      {
+        empenho_numero: '2026NE000001',
+        data_liquidacao: null,
+        data_emissao: '2026-04-15',
+        valor_liquido: 20,
+        valor_bruto: 20,
+      },
+    ];
+
+    mockedUseData.mockReturnValue({
+      atividades: [],
+      empenhos: [
+        makeEmpenho({
+          id: 'empenho-com-liquidacao-api',
+          numero: '2026NE000001',
+          tipo: 'exercicio',
+          valor: 100,
+          valorLiquidadoOficial: 100,
+          dataEmpenho: new Date('2026-02-10'),
+        }),
+      ],
+      descentralizacoes: [],
+      contaDescentralizacoes: [],
+      contratos: [],
+      contratosEmpenhos: [],
+      creditosDisponiveis: [],
+      isLoading: false,
+      addAtividade: vi.fn(),
+      updateAtividade: vi.fn(),
+      deleteAtividade: vi.fn(),
+      addEmpenho: vi.fn(),
+      updateEmpenho: vi.fn(),
+      deleteEmpenho: vi.fn(),
+      addDescentralizacao: vi.fn(),
+      updateDescentralizacao: vi.fn(),
+      deleteDescentralizacao: vi.fn(),
+      getResumoOrcamentario: vi.fn(),
+      getTotalPlanejado: vi.fn(),
+      getTotalEmpenhado: vi.fn(),
+      getTotalDescentralizado: vi.fn(),
+      getADescentralizar: vi.fn(),
+      getSaldoTotal: vi.fn(),
+      refreshData: vi.fn(),
+    });
+
+    render(<Dashboard />);
+
+    expect(screen.getByTestId('current-liquidado')).toHaveTextContent('100');
+    expect(screen.getByTestId('current-mensal-liquidado')).toHaveTextContent('0,60,100,100');
+  });
+
+  it('ignora historico de operacoes quando ele nao fecha com o total empenhado do funil', () => {
+    mockedUseData.mockReturnValue({
+      atividades: [],
+      empenhos: [
+        makeEmpenho({
+          id: 'empenho-historico-incompleto',
+          numero: '2026NE000001',
+          tipo: 'exercicio',
+          valor: 130,
+          dataEmpenho: new Date('2026-02-10'),
+          historicoOperacoes: [
+            {
+              data: '2026-01-10',
+              operacao: 'INCLUSAO',
+              quantidade: 1,
+              valorUnitario: 100,
+              valorTotal: 100,
+            },
+          ],
+        }),
+      ],
+      descentralizacoes: [],
+      contaDescentralizacoes: [],
+      contratos: [],
+      contratosEmpenhos: [],
+      creditosDisponiveis: [],
+      isLoading: false,
+      addAtividade: vi.fn(),
+      updateAtividade: vi.fn(),
+      deleteAtividade: vi.fn(),
+      addEmpenho: vi.fn(),
+      updateEmpenho: vi.fn(),
+      deleteEmpenho: vi.fn(),
+      addDescentralizacao: vi.fn(),
+      updateDescentralizacao: vi.fn(),
+      deleteDescentralizacao: vi.fn(),
+      getResumoOrcamentario: vi.fn(),
+      getTotalPlanejado: vi.fn(),
+      getTotalEmpenhado: vi.fn(),
+      getTotalDescentralizado: vi.fn(),
+      getADescentralizar: vi.fn(),
+      getSaldoTotal: vi.fn(),
+      refreshData: vi.fn(),
+    });
+
+    render(<Dashboard />);
+
+    expect(screen.getByTestId('current-planejado')).toHaveTextContent('0');
+    expect(screen.getByTestId('current-mensal-empenhado')).toHaveTextContent('130,130,130,130');
   });
 
   it('usa data de emissao da API de contratos quando o cadastro local esta em mes errado', () => {

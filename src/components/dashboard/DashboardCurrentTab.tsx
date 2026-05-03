@@ -71,6 +71,12 @@ type BudgetTreemapNode = {
   children: BudgetTreemapChild[];
 };
 
+const EXECUTION_CHART_COLORS = {
+  planejado: '#2563eb',
+  empenhado: '#a855f7',
+  liquidado: '#f59e0b',
+} as const;
+
 type DashboardCurrentTabProps = {
   isLoading: boolean;
   filteredData: DashboardFilteredData;
@@ -288,16 +294,34 @@ export function DashboardCurrentTab({
           loading={isLoading}
         >
           <div className="mb-4 flex flex-wrap gap-2">
-            <span className="inline-flex items-center gap-2 rounded-full bg-primary/8 px-3 py-1 text-xs font-semibold text-primary">
-              <span className="h-2 w-2 rounded-full bg-primary" />
+            <span
+              className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"
+              style={{
+                backgroundColor: `${EXECUTION_CHART_COLORS.planejado}14`,
+                color: EXECUTION_CHART_COLORS.planejado,
+              }}
+            >
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: EXECUTION_CHART_COLORS.planejado }} />
               Planejado
             </span>
-            <span className="inline-flex items-center gap-2 rounded-full bg-fuchsia-500/8 px-3 py-1 text-xs font-semibold text-fuchsia-700">
-              <span className="h-2 w-2 rounded-full bg-fuchsia-500" />
+            <span
+              className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"
+              style={{
+                backgroundColor: `${EXECUTION_CHART_COLORS.empenhado}14`,
+                color: EXECUTION_CHART_COLORS.empenhado,
+              }}
+            >
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: EXECUTION_CHART_COLORS.empenhado }} />
               Empenhado
             </span>
-            <span className="inline-flex items-center gap-2 rounded-full bg-amber-500/8 px-3 py-1 text-xs font-semibold text-amber-700">
-              <span className="h-2 w-2 rounded-full bg-amber-500" />
+            <span
+              className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"
+              style={{
+                backgroundColor: `${EXECUTION_CHART_COLORS.liquidado}14`,
+                color: EXECUTION_CHART_COLORS.liquidado,
+              }}
+            >
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: EXECUTION_CHART_COLORS.liquidado }} />
               Liquidado
             </span>
           </div>
@@ -307,12 +331,12 @@ export function DashboardCurrentTab({
               <ComposedChart data={dadosMensais} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorEmpenhado" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#a855f7" stopOpacity={0.28} />
-                    <stop offset="100%" stopColor="#a855f7" stopOpacity={0.02} />
+                    <stop offset="0%" stopColor={EXECUTION_CHART_COLORS.empenhado} stopOpacity={0.28} />
+                    <stop offset="100%" stopColor={EXECUTION_CHART_COLORS.empenhado} stopOpacity={0.02} />
                   </linearGradient>
                   <linearGradient id="colorLiquidado" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.22} />
-                    <stop offset="100%" stopColor="#f59e0b" stopOpacity={0.02} />
+                    <stop offset="0%" stopColor={EXECUTION_CHART_COLORS.liquidado} stopOpacity={0.22} />
+                    <stop offset="100%" stopColor={EXECUTION_CHART_COLORS.liquidado} stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#dbe3f0" />
@@ -325,16 +349,16 @@ export function DashboardCurrentTab({
                   tickFormatter={formatCompactCurrency}
                 />
                 <Tooltip content={<ExecutionTooltip />} cursor={{ stroke: '#cbd5e1', strokeDasharray: '4 4' }} />
-                <Area type="monotone" dataKey="empenhado" stroke="#a855f7" strokeWidth={2.5} fill="url(#colorEmpenhado)" name="Empenhado" />
-                <Area type="monotone" dataKey="liquidado" stroke="#f59e0b" strokeWidth={2.5} fill="url(#colorLiquidado)" name="Liquidado" />
+                <Area type="monotone" dataKey="empenhado" stroke={EXECUTION_CHART_COLORS.empenhado} strokeWidth={2.5} fill="url(#colorEmpenhado)" name="Empenhado" />
+                <Area type="monotone" dataKey="liquidado" stroke={EXECUTION_CHART_COLORS.liquidado} strokeWidth={2.5} fill="url(#colorLiquidado)" name="Liquidado" />
                 <Line
                   type="monotone"
                   dataKey="planejado"
-                  stroke="#2563eb"
+                  stroke={EXECUTION_CHART_COLORS.planejado}
                   strokeWidth={2}
                   strokeDasharray="7 7"
                   dot={false}
-                  activeDot={{ r: 4, fill: '#2563eb', stroke: '#ffffff', strokeWidth: 2 }}
+                  activeDot={{ r: 4, fill: EXECUTION_CHART_COLORS.planejado, stroke: '#ffffff', strokeWidth: 2 }}
                   name="Planejado"
                 />
               </ComposedChart>

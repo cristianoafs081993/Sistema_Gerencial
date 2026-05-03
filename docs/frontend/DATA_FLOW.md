@@ -151,8 +151,8 @@ Observacao para a aba RAP do dashboard:
 Observacao para a aba de exercicio atual do dashboard:
 
 - o grafico `Evolucao da Execucao` deve mostrar `Planejado` como total acumulado desde o primeiro mes do eixo, nao pela data de cadastro das atividades
-- a linha `Empenhado` usa, nesta ordem, `contratos_api_empenhos.data_emissao` casada pelo numero da NE, `empenhos.historicoOperacoes` quando houver historico com data (tratando `ANULACAO` como valor negativo) e `empenhos.dataEmpenho` apenas como fallback; isso evita que bases antigas importadas com data de cadastro concentrem tudo no mes errado
-- a linha `Liquidado` usa NPs de `documentos_habeis` vinculadas por `empenho_numero`; o vinculo aceita o numero resumido do empenho (`AAAA NEXXXXXX`) mesmo quando `documentos_habeis.empenho_numero` guarda o numero completo do SIAFI; quando uma NE ainda nao tiver NPs carregadas, usa o liquidado oficial do empenho como fallback na data de `ultimaAtualizacaoSiafi` e cai para `dataEmpenho` apenas se nao houver atualizacao
+- a linha `Empenhado` usa, nesta ordem, `contratos_api_empenhos.data_emissao` casada pelo numero da NE, `empenhos.historicoOperacoes` quando houver historico com data e a soma das operacoes fechar com `empenhos.valor` (tratando `ANULACAO` como valor negativo), e `empenhos.dataEmpenho` apenas como fallback; isso evita que bases antigas importadas com data de cadastro concentrem tudo no mes errado e garante que o ultimo ponto bata com o funil
+- a linha `Liquidado` usa NPs/documentos de liquidacao de `documentos_habeis` vinculadas por `empenho_numero`; quando nao houver NP vinculada para a NE, usa liquidacoes publicas da API de contratos por empenho (`data_liquidacao` ou `data_emissao`) como fonte de data; em ambos os casos, as datas distribuem o valor no tempo e o total final e escalado para fechar com o liquidado oficial do funil; `ultimaAtualizacaoSiafi` nao deve ser usado como data mensal para evitar concentrar liquidacoes no mes da sincronizacao
 - sem filtro final de data, o eixo deve preencher meses vazios ate o mes atual
 
 ### Financeiro
