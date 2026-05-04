@@ -128,6 +128,20 @@ describe('Layout', () => {
     expect(screen.getByText('Artefatos de Licitação')).toBeInTheDocument();
   });
 
+  it('exibe pregoes IFRN no grupo de contratos', () => {
+    render(
+      <MemoryRouter>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getAllByText('Contratos')[0]);
+
+    expect(screen.getByText('Pregões IFRN')).toBeInTheDocument();
+  });
+
   it('mantem a ordem dos tipos do editor na sidebar', () => {
     render(
       <MemoryRouter initialEntries={['/editor-documentos/termo-referencia-compras']}>

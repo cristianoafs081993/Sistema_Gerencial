@@ -248,6 +248,34 @@ Observacoes operacionais:
 - nao ha nova variavel obrigatoria para a regra derivada; a function calcula a vigencia real a partir do historico do Comprasnet e grava os motivos em `contratos_api`
 - se `CONTRATOS_SYNC_SECRET` for configurada, o cron criado pela migration precisa ser ajustado para enviar o header `x-contratos-sync-secret`; sem esse segredo, a chamada diaria funciona apenas com service role interna da function
 
+### `sync-licitacoes-pncp`
+
+Necessarias no ambiente do Supabase:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Opcionais:
+
+- `LICITACOES_PNCP_SYNC_SECRET`
+  - se configurada, chamadas HTTP precisam enviar o header `x-licitacoes-pncp-sync-secret`
+- `LICITACOES_PNCP_UASGS`
+  - lista separada por virgula de UASGs sincronizadas por padrao
+  - default no codigo: `158366`
+- `LICITACOES_PNCP_CNPJ`
+  - CNPJ do orgao consultado no PNCP
+  - default no codigo: `10877412000168`
+
+Pre-requisitos no banco:
+
+- Supabase Cron (`pg_cron`)
+- `pg_net`
+
+Observacoes operacionais:
+
+- `supabase/config.toml` deve manter `verify_jwt = false` para `sync-licitacoes-pncp`, pois a chamada periodica vem do cron
+- o PNCP exige datas `yyyyMMdd` e periodo de ate 365 dias por chamada; a function divide janelas maiores automaticamente
+- a chamada manual do frontend usa a UASG selecionada no filtro, ou todas as UASGs carregadas quando o filtro estiver em `Todas`
+
 ### `refresh-comprasnet-liquidacoes-cache`
 
 Necessarias no ambiente do Supabase:

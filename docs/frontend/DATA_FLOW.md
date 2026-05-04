@@ -216,6 +216,22 @@ Observacao:
 - faturas sem item vinculado ficam em grupo separado e nao entram na execucao oficial por item
 - no modal de empenho, a secao `Liquidações` nao depende dessa sincronizacao local; ela le o cache dedicado de faturas por empenho e, quando o cache esta ausente ou vencido, chama a Edge Function aguardando as linhas atualizadas antes de cair para resultado vazio. A exibicao tambem filtra por `raw_data.fatura.contratante` para nao mostrar faturas de outros campi ao usuario do campus atual; a coluna `Valor` usa `valor_bruto` da API
 
+### Pregoes IFRN
+
+`App.tsx` -> `LicitacoesPregoes.tsx` -> `licitacoesPncpService` -> `licitacoes_pncp`
+
+Sincronizacao:
+
+`sync-licitacoes-pncp` -> PNCP `/v1/contratacoes/publicacao` e `/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}` -> `licitacoes_pncp`
+
+Observacoes:
+
+- a rota `/licitacoes-pregoes` fica no grupo Contratos e abre com a UASG `158366`
+- a tela lista pregoes materializados, filtra por UASG, periodo, situacao, SRP, prazo de propostas e texto livre
+- o drawer exibe os dados completos armazenados do PNCP, links PNCP/Compras.gov.br e informacao complementar
+- o botao `Sincronizar PNCP` aparece somente para superadministrador; usuarios autenticados apenas consultam os dados ja sincronizados
+- o service tambem le `licitacoes_pncp_sync_runs` para informar a ultima sincronizacao
+
 ### Favoritos
 
 `Empenhos.tsx` / `Contratos.tsx` -> `useUserFavorites()` -> `user_favorites`

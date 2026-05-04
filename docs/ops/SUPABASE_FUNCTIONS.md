@@ -332,6 +332,46 @@ Observacao:
 - a chamada sem `unidadeCodigo` sincroniza as UGs padrao `158366` e `158155`; valores fora desse conjunto sao rejeitados nesta versao
 - o endpoint de "ativos" do Comprasnet nao e fonte de verdade de vigencia; a exibicao da UI usa `situacao_derivada`, nao `situacao`
 
+### `sync-licitacoes-pncp`
+
+Local:
+
+- [sync-licitacoes-pncp/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-licitacoes-pncp/index.ts)
+
+Uso:
+
+- sincroniza pregoes eletronicos IFRN a partir da API de Consulta do PNCP
+- materializa compras em `licitacoes_pncp`
+- registra execucoes em `licitacoes_pncp_sync_runs`
+- atualiza o cache de UASGs em `licitacoes_pncp_uasgs` via Dados Abertos Compras.gov.br quando disponivel
+
+Entrada opcional:
+
+```json
+{
+  "cnpjOrgao": "10877412000168",
+  "unidadeCodigos": ["158366"],
+  "dataInicial": "2025-05-05",
+  "dataFinal": "2026-05-04",
+  "source": "frontend-manual"
+}
+```
+
+Dependencias:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- opcional `LICITACOES_PNCP_SYNC_SECRET`
+- opcional `LICITACOES_PNCP_UASGS`
+- opcional `LICITACOES_PNCP_CNPJ`
+
+Observacao:
+
+- publicada com `verify_jwt = false`, pois pode ser chamada pelo cron
+- se `LICITACOES_PNCP_SYNC_SECRET` for configurada, chamadas HTTP precisam enviar `x-licitacoes-pncp-sync-secret`
+- por padrao usa CNPJ IFRN `10877412000168`, UASG `158366` e janela dos ultimos 365 dias
+- a migration agenda `sync-licitacoes-pncp-daily` as `03:30` no horario de Brasilia
+- se o navegador registrar `404` seguido de falha de CORS/preflight para `/functions/v1/sync-licitacoes-pncp`, a causa esperada e function ausente no projeto remoto; publicar a function deve fazer o `OPTIONS` voltar `HTTP 200` com headers CORS
+
 ### `refresh-comprasnet-liquidacoes-cache`
 
 Local:

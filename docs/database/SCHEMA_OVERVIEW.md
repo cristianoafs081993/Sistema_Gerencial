@@ -53,6 +53,12 @@ Para mudancas sensiveis, confirme sempre nas migrations em [supabase/migrations]
 - `contratos_api_empenho_liquidacoes_cache`
 - `contratos_api_sync_runs`
 
+### Licitacoes e pregoes PNCP
+
+- `licitacoes_pncp`
+- `licitacoes_pncp_sync_runs`
+- `licitacoes_pncp_uasgs`
+
 ### Importacoes auxiliares
 
 - `financeiro_fonte_vinculacao`

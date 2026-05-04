@@ -7,6 +7,7 @@ describe('app screen registry', () => {
     expect(getScreenForPath('/economia-tempo')?.id).toBe('economia-tempo');
     expect(getScreenForPath('/modelos-documentos')?.id).toBe('modelos-documentos');
     expect(getScreenForPath('/artefatos-licitacao')?.id).toBe('artefatos-licitacao');
+    expect(getScreenForPath('/licitacoes-pregoes')?.id).toBe('licitacoes-pregoes');
   });
 
   it('mantem controle de usuarios fora das telas de producao dos diretores', () => {
@@ -15,6 +16,7 @@ describe('app screen registry', () => {
     expect(directorScreenIds).toContain('dashboard');
     expect(directorScreenIds).toContain('contratos');
     expect(directorScreenIds).toContain('artefatos-licitacao');
+    expect(directorScreenIds).toContain('licitacoes-pregoes');
     expect(directorScreenIds).toContain('economia-tempo');
     expect(directorScreenIds).not.toContain(ADMIN_USERS_SCREEN_ID);
     expect(directorScreenIds).not.toContain('modelos-documentos');

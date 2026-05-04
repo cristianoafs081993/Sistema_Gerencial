@@ -588,6 +588,73 @@ Observacoes operacionais:
 - RLS permite leitura a usuarios autenticados, insercao pelo usuario autenticado e update/delete apenas pelo criador ou superadmin
 - anexos auxiliares do ETP continuam fora desta tabela; somente snippets e metadados derivados podem ser persistidos
 
+## Licitacoes e pregoes PNCP
+
+### `licitacoes_pncp`
+
+Finalidade:
+
+- espelho materializado das contratacoes do PNCP usadas na tela de pregoes IFRN
+- fonte primaria da lista `/licitacoes-pregoes`
+
+Campos-chave:
+
+- `numero_controle_pncp`
+- `cnpj_orgao`
+- `ano_compra`
+- `sequencial_compra`
+- `numero_compra`
+- `processo`
+- `objeto_compra`
+- `uasg_codigo`
+- `situacao_compra_nome`
+- `valor_total_estimado`
+- `valor_total_homologado`
+- datas de publicacao, abertura, encerramento e atualizacao
+- `raw_data`, preservando o payload PNCP
+
+Consumido por:
+
+- [licitacoesPncp.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/licitacoesPncp.ts)
+- [LicitacoesPregoes.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/LicitacoesPregoes.tsx)
+
+Observacoes operacionais:
+
+- a chave unica e `numero_controle_pncp`
+- a v1 sincroniza pregao eletronico (`codigoModalidadeContratacao = 6`) no PNCP
+- o filtro por UASG no PNCP exige tambem o CNPJ do orgao IFRN `10877412000168`
+- `Compras.gov.br` entra apenas como enriquecimento best-effort no catalogo de UASG; a lista nao depende dele
+- leitura fica liberada para usuarios autenticados; escrita ocorre pela Edge Function com service role
+
+### `licitacoes_pncp_sync_runs`
+
+Finalidade:
+
+- trilha de execucao das sincronizacoes PNCP
+
+Campos-chave:
+
+- `started_at`
+- `finished_at`
+- `status`
+- `cnpj_orgao`
+- `unidade_codigos`
+- `data_inicial`
+- `data_final`
+- `total_fetched`
+- `total_upserted`
+- `details`
+
+### `licitacoes_pncp_uasgs`
+
+Finalidade:
+
+- cache do endpoint de UASG dos Dados Abertos Compras.gov.br para rotulo e contexto institucional
+
+Observacao:
+
+- a tabela nao e fonte de verdade da lista de pregoes; ela apenas melhora exibicao e filtros quando disponivel
+
 ## Automacoes e economia de tempo
 
 ### `automation_savings_scenarios`

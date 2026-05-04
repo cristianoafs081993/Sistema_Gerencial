@@ -52,6 +52,7 @@ KPIs podem usar `tone` novo ou `stitchColor` legado enquanto a compatibilidade e
 Aplicacao atual:
 
 - `/artefatos-licitacao` usa resumo por tipo, filtros compactos e tabela operacional para consulta de ETP, Mapa de Risco, Termo de Referencia e Minuta de Contrato. Acoes de linha devem permanecer iconicas e alinhadas a direita.
+- `/licitacoes-pregoes` usa resumo operacional, filtros compactos, tabela paginada e drawer de detalhe para consulta de pregoes PNCP por UASG. A sincronizacao manual fica no header e aparece somente para superadmin.
 
 ## Padrao 3: importacao de arquivo
 

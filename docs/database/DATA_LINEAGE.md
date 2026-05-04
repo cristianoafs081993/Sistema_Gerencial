@@ -97,6 +97,22 @@ Mostrar a linhagem operacional dos dados de forma curta:
   - consumidor: [EmpenhoDialog.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/modals/EmpenhoDialog.tsx)
 - observacao: o modal nao varre a API publica em tempo real quando usa as UGs padrao `158366` e `158155`; ele le o cache e aciona a function para preencher ou revalidar entradas. Resultados encontrados vencem em 12 horas, e `not_found` vence em 1 hora.
 
+### Pregoes PNCP
+
+- API `https://pncp.gov.br/api/consulta`
+  - sincronizacao automatica: [sync-licitacoes-pncp/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-licitacoes-pncp/index.ts)
+  - service de leitura no frontend: [licitacoesPncp.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/licitacoesPncp.ts)
+  - tabelas:
+    - `licitacoes_pncp`
+    - `licitacoes_pncp_sync_runs`
+    - `licitacoes_pncp_uasgs`
+  - pagina: [LicitacoesPregoes.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/LicitacoesPregoes.tsx)
+- observacao: o endpoint PNCP `/v1/contratacoes/publicacao` usa datas `yyyyMMdd`, limita cada consulta a ate 365 dias e exige `cnpj=10877412000168` quando a consulta filtra `codigoUnidadeAdministrativa`. A v1 busca pregao eletronico (`codigoModalidadeContratacao = 6`) e grava o payload integral em `raw_data`.
+- API `https://dadosabertos.compras.gov.br`
+  - enriquecimento best-effort: `/modulo-uasg/1_consultarUasg`
+  - tabela: `licitacoes_pncp_uasgs`
+  - observacao: os endpoints de pregoes/contratacoes dos Dados Abertos foram tratados como apoio futuro, pois responderam com instabilidade/timeout na validacao inicial.
+
 ### Favoritos de empenhos e contratos
 
 - acao do usuario nas telas:

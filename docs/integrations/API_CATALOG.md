@@ -201,6 +201,52 @@ Observacao:
 - quando houver `dados_item_faturado`, o drawer deve exibir tambem `quantidade_faturado` e `valor_unitario_faturado` na linha da fatura
 - a tela de contratos usa a lista sincronizada de `contratos_api` filtrada por `situacao_derivada`; dados locais de `contratos` e `contratos_empenhos` servem apenas como complemento para favoritos, CNPJ e saldos locais quando houver match por numero normalizado
 
+## 4B. PNCP e Dados Abertos Compras.gov.br para Pregoes
+
+Uso:
+
+- lista operacional de pregoes IFRN filtravel por UASG
+- base futura para preenchimento de metadados em artefatos de licitacao
+
+Fonte primaria:
+
+- `https://pncp.gov.br/api/consulta`
+
+Endpoints PNCP usados:
+
+- `/v1/contratacoes/publicacao`
+- `/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}`
+
+Parametros operacionais:
+
+- CNPJ IFRN: `10877412000168`
+- UASG padrao: `158366`
+- pregao eletronico: `codigoModalidadeContratacao = 6`
+- datas PNCP em `yyyyMMdd`
+- janela maxima de consulta: 365 dias
+- quando `codigoUnidadeAdministrativa` e enviado, o PNCP tambem exige `cnpj`
+
+Fonte secundaria best-effort:
+
+- `https://dadosabertos.compras.gov.br`
+- `/modulo-uasg/1_consultarUasg`
+
+Implementacao:
+
+- [sync-licitacoes-pncp/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-licitacoes-pncp/index.ts)
+- [licitacoesPncp.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/licitacoesPncp.ts)
+- [LicitacoesPregoes.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/LicitacoesPregoes.tsx)
+
+Persistencia local:
+
+- `licitacoes_pncp`
+- `licitacoes_pncp_sync_runs`
+- `licitacoes_pncp_uasgs`
+
+Observacao operacional:
+
+- os endpoints de pregoes e contratacoes dos Dados Abertos Compras.gov.br existem no OpenAPI, mas responderam com instabilidade/timeout na validacao inicial. Por isso, a v1 nao depende deles para listar pregoes.
+
 ## 5. Edge Function `analisar-liquidacao-siafi`
 
 Uso:

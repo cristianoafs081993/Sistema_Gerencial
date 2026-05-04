@@ -35,6 +35,13 @@ Contratos via Comprasnet:
 - contratos da UG `158155` devem ter teste de escopo: entram somente com evidencia operacional estruturada do campus `158366`
 - a UI de contratos deve testar que o upload manual XLSX nao aparece, que o status da ultima sincronizacao e exibido ao superadmin e que a lista usa `situacao_derivada`
 
+Pregoes via PNCP:
+
+- helpers devem cobrir normalizacao de `numeroControlePNCP`, UASG, datas e valores do payload PNCP
+- a divisao de periodos deve garantir janelas de ate 365 dias
+- a UI deve testar lista, drawer de detalhes e visibilidade do botao `Sincronizar PNCP` somente para superadmin
+- a navegacao deve manter `/licitacoes-pregoes` como tela de producao acessivel ao grupo `Diretores`
+
 ## Como rodar
 
 A suite principal usa Vitest.

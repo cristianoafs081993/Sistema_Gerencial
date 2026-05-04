@@ -30,3 +30,6 @@ verify_jwt = false
 
 [functions.record-automation-savings-event]
 verify_jwt = false
+
+[functions.sync-licitacoes-pncp]
+verify_jwt = false
