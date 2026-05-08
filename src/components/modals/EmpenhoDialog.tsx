@@ -24,6 +24,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Pencil, History, DollarSign, Receipt, CheckCircle2, Landmark, Loader2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { contratosApiService, type ContratoApiPublicLiquidacaoRow } from '@/services/contratosApi';
+import { transparenciaService, type PortalTransparenciaItemEmpenho } from '@/services/transparencia';
 import { format } from 'date-fns';
 import {
   getRapBaseVigente,
@@ -97,6 +98,21 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
     enabled: open && !!empenho?.numero,
     retry: false,
     staleTime: 60 * 1000,
+  });
+
+  const {
+    data: itensPortal = [],
+    isError: isItensPortalError,
+    isLoading: isLoadingItensPortal,
+  } = useQuery({
+    queryKey: ['portal-transparencia-itens-empenho', empenho?.numero],
+    queryFn: () =>
+      empenho?.numero
+        ? transparenciaService.getItensEmpenhoPortal(empenho.numero)
+        : Promise.resolve([] as PortalTransparenciaItemEmpenho[]),
+    enabled: open && !!empenho?.numero,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 
   if (!empenho) return null;
@@ -219,6 +235,50 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                   <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Descrição</span>
                   <p className="text-[11px] text-slate-600 leading-relaxed italic">{empenho.descricao}</p>
                </div>
+            </div>
+
+            {/* Subitens do Portal da Transparencia */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
+                <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
+                  <Receipt className="w-3 h-3" />
+                  Subitens do Empenho
+                </h3>
+                {isLoadingItensPortal && <Loader2 className="w-3 h-3 animate-spin text-slate-400" />}
+              </div>
+              <div className="divide-y divide-slate-50">
+                {isLoadingItensPortal ? (
+                  <div className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
+                    Carregando subitens do Portal da Transparencia...
+                  </div>
+                ) : isItensPortalError ? (
+                  <div className="px-5 py-6 text-center text-[10px] text-status-warning italic">
+                    Nao foi possivel consultar os subitens no Portal da Transparencia agora.
+                  </div>
+                ) : itensPortal.length > 0 ? (
+                  itensPortal.map((item) => (
+                    <div key={`${item.codigoItemEmpenho}-${item.sequencial}`} className="px-5 py-3">
+                      <div className="mb-1 flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-none font-black uppercase bg-slate-50 text-slate-600">
+                          Subitem {item.codigoSubelemento || item.sequencial || '-'}
+                        </Badge>
+                        {item.descricaoSubelemento ? (
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                            {item.descricaoSubelemento}
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="text-[11px] leading-relaxed text-slate-700">
+                        {item.descricao || 'Descricao nao informada no Portal da Transparencia.'}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
+                    Nenhum subitem encontrado no Portal da Transparencia para este empenho.
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Histórico de Operações */}

@@ -4,11 +4,18 @@ import type { ReactNode } from 'react';
 
 import { EmpenhoDialog } from '@/components/modals/EmpenhoDialog';
 import { contratosApiService } from '@/services/contratosApi';
+import { transparenciaService } from '@/services/transparencia';
 import type { Empenho } from '@/types';
 
 vi.mock('@/services/contratosApi', () => ({
   contratosApiService: {
     getLiquidacoesPublicasPorEmpenho: vi.fn(),
+  },
+}));
+
+vi.mock('@/services/transparencia', () => ({
+  transparenciaService: {
+    getItensEmpenhoPortal: vi.fn(),
   },
 }));
 
@@ -49,6 +56,7 @@ vi.mock('@/components/ui/select', () => ({
 }));
 
 const mockedContratosApiService = vi.mocked(contratosApiService);
+const mockedTransparenciaService = vi.mocked(transparenciaService);
 
 const empenhoBase: Empenho = {
   id: 'emp-1',
@@ -80,8 +88,9 @@ const empenhoBase: Empenho = {
   updatedAt: new Date('2026-02-03T12:00:00'),
 };
 
-const renderDialog = (liquidacoesApi: unknown[] = []) => {
+const renderDialog = (liquidacoesApi: unknown[] = [], itensPortal: unknown[] = []) => {
   mockedContratosApiService.getLiquidacoesPublicasPorEmpenho.mockResolvedValue(liquidacoesApi);
+  mockedTransparenciaService.getItensEmpenhoPortal.mockResolvedValue(itensPortal);
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -106,6 +115,7 @@ const renderDialog = (liquidacoesApi: unknown[] = []) => {
 describe('EmpenhoDialog', () => {
   beforeEach(() => {
     mockedContratosApiService.getLiquidacoesPublicasPorEmpenho.mockReset();
+    mockedTransparenciaService.getItensEmpenhoPortal.mockReset();
   });
 
   it('renderiza historico de operacoes e liquidacoes da API de contratos', async () => {
@@ -155,5 +165,37 @@ describe('EmpenhoDialog', () => {
     expect(screen.queryByText((content) => content.includes('Nenhum documento'))).not.toBeInTheDocument();
     expect(screen.getByTestId('dialog-content')).toHaveClass('sm:max-w-4xl');
     expect(screen.getByTestId('dialog-content')).toHaveClass('lg:max-w-5xl');
+  });
+
+  it('exibe somente descricao e subelemento dos subitens do Portal da Transparencia', async () => {
+    renderDialog([], [
+      {
+        codigoItemEmpenho: '158366264352026NE000002',
+        sequencial: 1,
+        descricao: 'Recurso para pagamento de auxilio transporte.',
+        codigoSubelemento: '01',
+        descricaoSubelemento: 'BOLSAS DE ESTUDO NO PAIS',
+        valorAtual: 36700,
+        historico: [
+          {
+            data: '24/02/2026',
+            operacao: 'INCLUSAO',
+            quantidade: 1,
+            valorUnitario: 14200,
+            valorTotal: 14200,
+          },
+        ],
+      },
+    ]);
+
+    await waitFor(() => {
+      expect(mockedTransparenciaService.getItensEmpenhoPortal).toHaveBeenCalledWith('2026NE000002');
+    });
+
+    expect(await screen.findByText('Subitens do Empenho')).toBeInTheDocument();
+    expect(screen.getByText('Subitem 01')).toBeInTheDocument();
+    expect(screen.getByText('BOLSAS DE ESTUDO NO PAIS')).toBeInTheDocument();
+    expect(screen.getByText('Recurso para pagamento de auxilio transporte.')).toBeInTheDocument();
+    expect(screen.queryByText('R$ 36.700,00')).not.toBeInTheDocument();
   });
 });

@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
@@ -84,39 +84,55 @@ function getManualChunk(id: string) {
   return undefined;
 }
 
+const DEFAULT_PORTAL_TRANSPARENCIA_API_KEY = "931d4d57337bef94e775337c318342e9";
+
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
-  server: {
-    host: "::",
-    port: 5173,
-    allowedHosts: true,
-    proxy: {
-      '/api-transparencia': {
-        target: 'https://api.portaldatransparencia.gov.br',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api-transparencia/, ''),
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  const portalTransparenciaApiKey =
+    env.PORTAL_TRANSPARENCIA_API_KEY ||
+    env.VITE_PORTAL_TRANSPARENCIA_API_KEY ||
+    DEFAULT_PORTAL_TRANSPARENCIA_API_KEY;
+
+  return {
+    server: {
+      host: "::",
+      port: 5173,
+      allowedHosts: true,
+      proxy: {
+        '/api-transparencia': {
+          target: 'https://api.portaldatransparencia.gov.br',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api-transparencia/, ''),
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq) => {
+              proxyReq.setHeader('accept', 'application/json');
+              proxyReq.setHeader('chave-api-dados', portalTransparenciaApiKey);
+            });
+          },
+        },
+        '/api-contratos': {
+          target: 'https://contratos.comprasnet.gov.br',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api-contratos/, ''),
+        },
       },
-      '/api-contratos': {
-        target: 'https://contratos.comprasnet.gov.br',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api-contratos/, ''),
+      hmr: {
+        overlay: false,
       },
     },
-    hmr: {
-      overlay: false,
-    },
-  },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
-  },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: getManualChunk,
+    plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
       },
     },
-  },
-}));
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: getManualChunk,
+        },
+      },
+    },
+  };
+});

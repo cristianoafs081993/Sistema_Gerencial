@@ -84,6 +84,12 @@ type LiquidacoesCacheLookup =
       rows: ContratoApiPublicLiquidacaoRow[];
     };
 
+type ContratoApiPublicoCompativel = {
+  contrato: ContratoApiPublicoResumo;
+  empenhos: ApiEmpenho[];
+  empenhoIds: Set<string>;
+};
+
 export interface ContratoApiRow {
   id: string;
   api_contrato_id: number;
@@ -384,9 +390,36 @@ function isFaturaVisibleForDisplayUnidade(rawFatura: unknown, unidadeCodigo = DE
   return !codigoContratante || codigoContratante === unidadeCodigo;
 }
 
+function getEmpenhoUnidadeGestora(rawEmpenho: unknown) {
+  if (!rawEmpenho || typeof rawEmpenho !== 'object') return null;
+  const record = rawEmpenho as Record<string, unknown>;
+  const value =
+    record.unidade_gestora ??
+    record.unidadeGestora ??
+    record.codigo_unidade_emitente ??
+    record.unidade_emitente ??
+    record.ug;
+  const match = String(value ?? '').match(/\b\d{6}\b/);
+  return match?.[0] ?? null;
+}
+
+function isEmpenhoFromDisplayUnidade(rawEmpenho: unknown) {
+  const unidadeGestora = getEmpenhoUnidadeGestora(rawEmpenho);
+  return !unidadeGestora || unidadeGestora === DEFAULT_DISPLAY_UNIDADE_CODIGO;
+}
+
+function getEmpenhoApiId(rawEmpenho: unknown) {
+  if (!rawEmpenho || typeof rawEmpenho !== 'object') return '';
+  const record = rawEmpenho as Record<string, unknown>;
+  return String(record.id_empenho ?? record.id ?? '').trim();
+}
+
 function isLiquidacaoCacheRowVisible(row: LiquidacoesCacheRow) {
   const rawData = row.raw_data && typeof row.raw_data === 'object' ? row.raw_data : {};
-  return isFaturaVisibleForDisplayUnidade((rawData as Record<string, unknown>).fatura);
+  return (
+    isFaturaVisibleForDisplayUnidade((rawData as Record<string, unknown>).fatura) ||
+    isEmpenhoFromDisplayUnidade((rawData as Record<string, unknown>).contratoEmpenho)
+  );
 }
 
 function isDefaultPublicLiquidacoesUnidades(unidadeCodigos: string | string[]) {
@@ -780,11 +813,17 @@ export const contratosApiService = {
             async (contrato) => {
               try {
                 const empenhos = await getEmpenhosPublicosPorContrato(contrato.api_contrato_id);
-                const found = empenhos.some((empenho) =>
-                  hasEmpenhoMatch(targetKeys, empenho.numero ?? empenho.numero_empenho),
+                const matchingEmpenhos = empenhos.filter((empenho) =>
+                  hasEmpenhoMatch(targetKeys, empenho.numero ?? empenho.numero_empenho) && isEmpenhoFromDisplayUnidade(empenho),
                 );
 
-                return found ? contrato : null;
+                if (matchingEmpenhos.length === 0) return null;
+
+                return {
+                  contrato,
+                  empenhos: matchingEmpenhos,
+                  empenhoIds: new Set(matchingEmpenhos.map(getEmpenhoApiId).filter(Boolean)),
+                };
               } catch (error) {
                 console.warn(
                   `Contratos API: falha ao consultar empenhos publicos do contrato ${contrato.api_contrato_id}`,
@@ -795,22 +834,21 @@ export const contratosApiService = {
             },
             6,
           )
-        ).filter((contrato): contrato is ContratoApiPublicoResumo => Boolean(contrato));
+        ).filter((contrato): contrato is ContratoApiPublicoCompativel => Boolean(contrato));
 
         if (contratosCompativeis.length === 0) return [];
 
         const liquidacoes = (
           await mapWithConcurrency(
             contratosCompativeis,
-            async (contrato) => {
+            async ({ contrato, empenhos: contratoEmpenhos, empenhoIds }) => {
               try {
                 const faturas = await fetchJson<ApiFatura[]>(`${CONTRATOS_API_BASE}/contrato/${contrato.api_contrato_id}/faturas`);
 
                 return (faturas ?? []).flatMap((rawFatura) => {
-                  if (!isFaturaVisibleForDisplayUnidade(rawFatura)) return [];
-
                   const matchingEmpenhos = getFaturaEmpenhos(rawFatura).filter((rawEmpenho) =>
-                    hasEmpenhoMatch(targetKeys, rawEmpenho.numero_empenho ?? rawEmpenho.numero),
+                    hasEmpenhoMatch(targetKeys, rawEmpenho.numero_empenho ?? rawEmpenho.numero) &&
+                    (!getEmpenhoApiId(rawEmpenho) || empenhoIds.has(getEmpenhoApiId(rawEmpenho)) || isFaturaVisibleForDisplayUnidade(rawFatura)),
                   );
 
                   if (matchingEmpenhos.length === 0) return [];

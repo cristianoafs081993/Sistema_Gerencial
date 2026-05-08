@@ -385,6 +385,7 @@ Uso:
 - em modo `refreshDue`, reprocessa entradas vencidas do cache
 - em modo `readCacheOnly` com `returnRows`, devolve as linhas ja materializadas no cache sem varrer novamente a API publica
 - consulta contratos publicos das UGs `158366` e `158155`
+- em contratos gerenciados pela Reitoria, preserva faturas com `contratante = 158155` quando o empenho correspondente no endpoint `/empenhos` pertence a UG `158366`; isso evita descartar liquidações reais do campus em contratos globais
 
 Dependencias:
 
@@ -396,6 +397,35 @@ Observacao:
 - publicada com `verify_jwt = false`, pois pode ser chamada pelo cron e pelo frontend
 - responde preflight CORS com `POST, OPTIONS`; se a function ainda nao estiver publicada, o navegador pode registrar falha de CORS ao tentar chamada direta
 - a migration agenda `refresh-comprasnet-liquidacoes-cache-hourly` com Supabase Cron/pg_net para executar a cada hora
+- resultados encontrados recebem TTL de 12 horas
+- resultados `not_found` recebem TTL de 1 hora
+
+### `refresh-portal-transparencia-itens-cache`
+
+Local:
+
+- [refresh-portal-transparencia-itens-cache/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/refresh-portal-transparencia-itens-cache/index.ts)
+
+Uso:
+
+- atualiza o cache de subitens do Portal da Transparencia por empenho para o modal de detalhes do empenho
+- aceita empenhos especificos enviados pelo frontend
+- em modo `refreshDue`, reprocessa entradas vencidas do cache
+- em modo `readCacheOnly` com `returnRows`, devolve as linhas ja materializadas no cache sem consultar novamente o Portal
+- consulta `/api-de-dados/despesas/itens-de-empenho` usando `codigoDocumento = 158366 + 26435 + numero do empenho`
+- salva dados em `portal_transparencia_empenho_itens_cache_status` e `portal_transparencia_empenho_itens_cache`
+
+Dependencias:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- opcional `PORTAL_TRANSPARENCIA_API_KEY`; se ausente, usa o fallback operacional atual do codigo
+- opcional `PORTAL_TRANSPARENCIA_CACHE_SECRET` para exigir o header `x-portal-transparencia-cache-secret`
+
+Observacao:
+
+- publicada com `verify_jwt = false`, pois pode ser chamada pelo cron e pelo frontend
+- responde preflight CORS com `POST, OPTIONS`
+- a migration agenda `refresh-portal-transparencia-itens-cache-hourly` com Supabase Cron/pg_net para executar a cada hora
 - resultados encontrados recebem TTL de 12 horas
 - resultados `not_found` recebem TTL de 1 hora
 

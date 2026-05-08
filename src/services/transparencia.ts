@@ -6,10 +6,27 @@ import { dominioService } from './dominio';
 import { creditosDisponiveisService } from './creditosDisponiveis';
 
 const API_BASE = '/api-transparencia/api-de-dados/despesas/documentos';
+const API_ITENS_EMPENHO = '/api-transparencia/api-de-dados/despesas/itens-de-empenho';
 const API_HISTORICO = '/api-transparencia/api-de-dados/despesas/itens-de-empenho/historico';
 const UNIDADE_GESTORA = '158366';
 const GESTAO = '26435';
 const API_KEY = '931d4d57337bef94e775337c318342e9';
+const PORTAL_PAGE_LIMIT = 30;
+const PORTAL_ITENS_CACHE_ROWS_SELECT = [
+    'id',
+    'empenho_lookup_key',
+    'empenho_numero',
+    'codigo_documento',
+    'codigo_item_empenho',
+    'sequencial',
+    'descricao',
+    'codigo_subelemento',
+    'descricao_subelemento',
+    'valor_atual',
+    'historico',
+    'raw_data',
+    'fetched_at',
+].join(',');
 const DOCUMENTOS_HABEIS_SELECT = 'id,valor_original,valor_pago,estado,processo,favorecido_nome,favorecido_documento,data_emissao,fonte_sof,empenho_numero';
 const DOCUMENTOS_HABEIS_ITENS_SELECT = 'id,documento_habil_id,doc_tipo,data_emissao,valor,observacao';
 const DOCUMENTOS_HABEIS_SITUACOES_SELECT = 'id,documento_habil_id,situacao_codigo,valor,is_retencao,created_at';
@@ -22,7 +39,41 @@ export type LiquidacaoPorEmpenho = {
     valor: number;
 };
 
+export type PortalTransparenciaItemEmpenhoHistorico = {
+    data: string;
+    operacao: string;
+    quantidade: number;
+    valorUnitario: number;
+    valorTotal: number;
+};
+
+export type PortalTransparenciaItemEmpenho = {
+    codigoItemEmpenho: string;
+    sequencial: number;
+    descricao: string;
+    codigoSubelemento: string;
+    descricaoSubelemento: string;
+    valorAtual: number;
+    historico: PortalTransparenciaItemEmpenhoHistorico[];
+};
+
 // Delay para evitar Rate Limit (se necessário)
+type PortalItensCacheStatus = {
+    status: 'found' | 'not_found' | 'error';
+    rows_count: number | null;
+    expires_at: string;
+};
+
+type PortalItensCacheRow = {
+    codigo_item_empenho: string | null;
+    sequencial: number | null;
+    descricao: string | null;
+    codigo_subelemento: string | null;
+    descricao_subelemento: string | null;
+    valor_atual: number | string | null;
+    historico: PortalTransparenciaItemEmpenhoHistorico[] | null;
+};
+
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const normalizeDocId = (id: string | undefined): string => {
@@ -35,6 +86,213 @@ export const normalizeEmpenhoNumero = (numero?: string | null): string => {
     const normalized = String(numero || '').toUpperCase().replace(/[^0-9A-Z]/g, '');
     const match = normalized.match(/(\d{4}NE\d{6})$/);
     return match?.[1] || normalized;
+};
+
+const buildPortalEmpenhoCodigoDocumento = (numeroEmpenho: string): string => {
+    const numeroNormalizado = normalizeEmpenhoNumero(numeroEmpenho);
+    return numeroNormalizado ? `${UNIDADE_GESTORA}${GESTAO}${numeroNormalizado}` : '';
+};
+
+const isMissingCacheTableError = (error: unknown): boolean => {
+    if (!error || typeof error !== 'object') return false;
+    const record = error as { code?: unknown; message?: unknown };
+    const code = String(record.code ?? '');
+    const message = String(record.message ?? '').toLowerCase();
+    return (
+        code === 'PGRST205' ||
+        code === '42P01' ||
+        message.includes('could not find the table') ||
+        (message.includes('relation') && message.includes('does not exist'))
+    );
+};
+
+const fetchPortalTransparenciaPage = async <T>(url: string): Promise<T[]> => {
+    const response = await fetch(url, {
+        headers: {
+            accept: 'application/json',
+            'chave-api-dados': API_KEY,
+        },
+    });
+
+    if (!response.ok) {
+        throw new Error(`Portal da Transparencia retornou HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? (data as T[]) : [];
+};
+
+const fetchPortalTransparenciaPaginated = async <T>(buildUrl: (page: number) => string): Promise<T[]> => {
+    const rows: T[] = [];
+
+    for (let page = 1; page <= PORTAL_PAGE_LIMIT; page += 1) {
+        let pageRows: T[];
+        try {
+            pageRows = await fetchPortalTransparenciaPage<T>(buildUrl(page));
+        } catch (error) {
+            if (rows.length > 0) {
+                console.warn('Portal da Transparencia: falha em pagina complementar, preservando dados ja recebidos.', error);
+                break;
+            }
+            throw error;
+        }
+        rows.push(...pageRows);
+        if (pageRows.length === 0) break;
+    }
+
+    return rows;
+};
+
+const mapPortalItemEmpenhoHistorico = (
+    row: Record<string, unknown>,
+): PortalTransparenciaItemEmpenhoHistorico => ({
+    data: String(row.data || ''),
+    operacao: String(row.operacao || ''),
+    quantidade: parseCurrency(String(row.quantidade || '0')),
+    valorUnitario: parseCurrency(String(row.valorUnitario || '0')),
+    valorTotal: parseCurrency(String(row.valorTotal || '0')),
+});
+
+const mapPortalItemEmpenho = (
+    row: Record<string, unknown>,
+    historico: PortalTransparenciaItemEmpenhoHistorico[] = [],
+): PortalTransparenciaItemEmpenho => ({
+    codigoItemEmpenho: String(row.codigoItemEmpenho || ''),
+    sequencial: Number(row.sequencial || 0),
+    descricao: String(row.descricao || '').trim(),
+    codigoSubelemento: String(row.codigoSubelemento || '').trim(),
+    descricaoSubelemento: String(row.descricaoSubelemento || '').trim(),
+    valorAtual: parseCurrency(String(row.valorAtual || '0')),
+    historico,
+});
+
+const mapPortalCacheRowToItem = (row: PortalItensCacheRow): PortalTransparenciaItemEmpenho => ({
+    codigoItemEmpenho: String(row.codigo_item_empenho || ''),
+    sequencial: Number(row.sequencial || 0),
+    descricao: String(row.descricao || '').trim(),
+    codigoSubelemento: String(row.codigo_subelemento || '').trim(),
+    descricaoSubelemento: String(row.descricao_subelemento || '').trim(),
+    valorAtual: parseCurrency(String(row.valor_atual || '0')),
+    historico: Array.isArray(row.historico) ? row.historico : [],
+});
+
+const getItensEmpenhoPortalDireto = async (
+    numeroEmpenho: string,
+    options: { includeHistorico?: boolean } = {},
+): Promise<PortalTransparenciaItemEmpenho[]> => {
+    const codigoDocumento = buildPortalEmpenhoCodigoDocumento(numeroEmpenho);
+    if (!codigoDocumento) return [];
+
+    const itens = await fetchPortalTransparenciaPaginated<Record<string, unknown>>(
+        (page) => `${API_ITENS_EMPENHO}?codigoDocumento=${encodeURIComponent(codigoDocumento)}&pagina=${page}`,
+    );
+
+    const mappedItens = itens.map((item) => mapPortalItemEmpenho(item));
+    if (!options.includeHistorico) return mappedItens;
+
+    return Promise.all(
+        mappedItens.map(async (item) => {
+            if (!item.sequencial) return item;
+
+            const historicoRows = await fetchPortalTransparenciaPaginated<Record<string, unknown>>(
+                (page) =>
+                    `${API_HISTORICO}?codigoDocumento=${encodeURIComponent(codigoDocumento)}&sequencial=${item.sequencial}&pagina=${page}`,
+            );
+
+            return {
+                ...item,
+                historico: historicoRows.map(mapPortalItemEmpenhoHistorico),
+            };
+        }),
+    );
+};
+
+const getCachedItensEmpenhoPortal = async (numeroEmpenho: string): Promise<{
+    available: boolean;
+    hasStatus?: boolean;
+    isFresh?: boolean;
+    rowsCount?: number;
+    rows?: PortalTransparenciaItemEmpenho[];
+}> => {
+    const lookupKey = normalizeEmpenhoNumero(numeroEmpenho);
+    if (!lookupKey) return { available: true, hasStatus: false, isFresh: true, rowsCount: 0, rows: [] };
+
+    const { data: status, error: statusError } = await supabase
+        .from('portal_transparencia_empenho_itens_cache_status')
+        .select('status, rows_count, expires_at')
+        .eq('empenho_lookup_key', lookupKey)
+        .maybeSingle();
+
+    if (statusError) {
+        if (isMissingCacheTableError(statusError)) return { available: false };
+        throw statusError;
+    }
+
+    if (!status) return { available: true, hasStatus: false, isFresh: false, rowsCount: 0, rows: [] };
+
+    const typedStatus = status as PortalItensCacheStatus;
+    const isFresh = new Date(typedStatus.expires_at).getTime() > Date.now();
+    if (typedStatus.status === 'not_found') {
+        return {
+            available: true,
+            hasStatus: true,
+            isFresh,
+            rowsCount: Number(typedStatus.rows_count ?? 0),
+            rows: [],
+        };
+    }
+
+    if (typedStatus.status === 'error' && isFresh) {
+        return {
+            available: true,
+            hasStatus: true,
+            isFresh,
+            rowsCount: Number(typedStatus.rows_count ?? 0),
+            rows: [],
+        };
+    }
+
+    const { data: rows, error: rowsError } = await supabase
+        .from('portal_transparencia_empenho_itens_cache')
+        .select(PORTAL_ITENS_CACHE_ROWS_SELECT)
+        .eq('empenho_lookup_key', lookupKey)
+        .order('sequencial', { ascending: true });
+
+    if (rowsError) {
+        if (isMissingCacheTableError(rowsError)) return { available: false };
+        throw rowsError;
+    }
+
+    const mappedRows = ((rows ?? []) as PortalItensCacheRow[]).map(mapPortalCacheRowToItem);
+    return {
+        available: true,
+        hasStatus: true,
+        isFresh,
+        rowsCount: mappedRows.length > 0 ? mappedRows.length : Number(typedStatus.rows_count ?? 0),
+        rows: mappedRows,
+    };
+};
+
+const getItensCacheRowsViaFunction = async (
+    numeroEmpenho: string,
+    options: { readCacheOnly?: boolean; source: string },
+): Promise<PortalTransparenciaItemEmpenho[] | null> => {
+    const { data, error } = await supabase.functions.invoke('refresh-portal-transparencia-itens-cache', {
+        body: {
+            empenhoNumero: numeroEmpenho,
+            returnRows: true,
+            ...(options.readCacheOnly ? { readCacheOnly: true } : {}),
+            source: options.source,
+        },
+    });
+
+    if (error) {
+        console.warn('Portal da Transparencia: falha ao atualizar cache de subitens pela Edge Function', error);
+        return null;
+    }
+
+    const firstResult = (data as { results?: Array<{ rows?: PortalItensCacheRow[] }> } | null)?.results?.[0];
+    return (firstResult?.rows ?? []).map(mapPortalCacheRowToItem);
 };
 
 type DocumentoImportState = {
@@ -65,6 +323,32 @@ type DocumentoImportState = {
 };
 
 export const transparenciaService = {
+    async getItensEmpenhoPortal(
+        numeroEmpenho: string,
+        options: { includeHistorico?: boolean } = {},
+    ): Promise<PortalTransparenciaItemEmpenho[]> {
+        if (options.includeHistorico) {
+            return getItensEmpenhoPortalDireto(numeroEmpenho, options);
+        }
+
+        try {
+            const cached = await getCachedItensEmpenhoPortal(numeroEmpenho);
+            if (cached.available) {
+                if (cached.isFresh) return cached.rows ?? [];
+
+                const refreshedRows = await getItensCacheRowsViaFunction(numeroEmpenho, {
+                    source: cached.hasStatus ? 'frontend-cache-stale' : 'frontend-cache-miss',
+                });
+                if (refreshedRows) return refreshedRows;
+                return cached.rows ?? [];
+            }
+        } catch (error) {
+            console.warn('Portal da Transparencia: falha ao consultar cache de subitens, tentando consulta direta.', error);
+        }
+
+        return getItensEmpenhoPortalDireto(numeroEmpenho, options);
+    },
+
     async getLiquidacoesPorEmpenhos(empenhoNumeros: string[]): Promise<LiquidacaoPorEmpenho[]> {
         const uniqueNumeros = Array.from(new Set(empenhoNumeros.map(normalizeEmpenhoNumero).filter(Boolean)));
         if (uniqueNumeros.length === 0) return [];

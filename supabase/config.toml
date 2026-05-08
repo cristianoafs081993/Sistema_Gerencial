@@ -10,6 +10,9 @@ verify_jwt = false
 [functions.refresh-comprasnet-liquidacoes-cache]
 verify_jwt = false
 
+[functions.refresh-portal-transparencia-itens-cache]
+verify_jwt = false
+
 [functions.gerar-termo-referencia-compras]
 verify_jwt = false
 

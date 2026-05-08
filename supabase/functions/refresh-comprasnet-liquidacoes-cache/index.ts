@@ -68,6 +68,12 @@ type ContratoResumo = {
   unidade_contrato: string;
 };
 
+type ContratoCompativel = {
+  contrato: ContratoResumo;
+  empenhos: ApiEmpenho[];
+  empenhoIds: Set<string>;
+};
+
 type LiquidacaoCacheRow = {
   empenho_lookup_key: string;
   empenho_numero: string;
@@ -192,10 +198,34 @@ function isFaturaVisibleForDisplayUnidade(rawFatura: unknown) {
   return !codigoContratante || codigoContratante === DEFAULT_DISPLAY_UNIDADE;
 }
 
+function getEmpenhoUnidadeGestora(rawEmpenho: unknown) {
+  if (!rawEmpenho || typeof rawEmpenho !== 'object') return null;
+  const record = rawEmpenho as Record<string, unknown>;
+  const value =
+    record.unidade_gestora ??
+    record.unidadeGestora ??
+    record.codigo_unidade_emitente ??
+    record.unidade_emitente ??
+    record.ug;
+  const match = String(value ?? '').match(/\b\d{6}\b/);
+  return match?.[0] ?? null;
+}
+
+function isEmpenhoFromDisplayUnidade(rawEmpenho: unknown) {
+  const unidadeGestora = getEmpenhoUnidadeGestora(rawEmpenho);
+  return !unidadeGestora || unidadeGestora === DEFAULT_DISPLAY_UNIDADE;
+}
+
+function getEmpenhoApiId(rawEmpenho: unknown) {
+  if (!rawEmpenho || typeof rawEmpenho !== 'object') return '';
+  const record = rawEmpenho as Record<string, unknown>;
+  return String(record.id_empenho ?? record.id ?? '').trim();
+}
+
 function isCacheRowVisibleForDisplayUnidade(row: unknown) {
   if (!row || typeof row !== 'object') return true;
   const rawData = (row as { raw_data?: Record<string, unknown> | null }).raw_data;
-  return isFaturaVisibleForDisplayUnidade(rawData?.fatura);
+  return isFaturaVisibleForDisplayUnidade(rawData?.fatura) || isEmpenhoFromDisplayUnidade(rawData?.contratoEmpenho);
 }
 
 function addMilliseconds(date: Date, amount: number) {
@@ -248,10 +278,15 @@ async function discoverLiquidacoes(
       async (contrato) => {
         try {
           const empenhos = await fetchJson<ApiEmpenho[]>(`${CONTRATOS_API_BASE}/contrato/${contrato.api_contrato_id}/empenhos`);
-          const found = (empenhos ?? []).some((empenho) =>
-            hasEmpenhoMatch(targetKeys, empenho.numero ?? empenho.numero_empenho),
+          const matchingEmpenhos = (empenhos ?? []).filter((empenho) =>
+            hasEmpenhoMatch(targetKeys, empenho.numero ?? empenho.numero_empenho) && isEmpenhoFromDisplayUnidade(empenho),
           );
-          return found ? contrato : null;
+          if (matchingEmpenhos.length === 0) return null;
+          return {
+            contrato,
+            empenhos: matchingEmpenhos,
+            empenhoIds: new Set(matchingEmpenhos.map(getEmpenhoApiId).filter(Boolean)),
+          };
         } catch (error) {
           console.warn(`Falha ao consultar empenhos do contrato ${contrato.api_contrato_id}`, error);
           return null;
@@ -259,20 +294,19 @@ async function discoverLiquidacoes(
       },
       8,
     )
-  ).filter((contrato): contrato is ContratoResumo => Boolean(contrato));
+  ).filter((contrato): contrato is ContratoCompativel => Boolean(contrato));
 
   const fetchedAt = new Date().toISOString();
   const rows = (
     await mapWithConcurrency(
       contratosCompativeis,
-      async (contrato) => {
+      async ({ contrato, empenhos: contratoEmpenhos, empenhoIds }) => {
         try {
           const faturas = await fetchJson<ApiFatura[]>(`${CONTRATOS_API_BASE}/contrato/${contrato.api_contrato_id}/faturas`);
           return (faturas ?? []).flatMap((rawFatura) => {
-            if (!isFaturaVisibleForDisplayUnidade(rawFatura)) return [];
-
             const matchingEmpenhos = getFaturaEmpenhos(rawFatura).filter((rawEmpenho) =>
-              hasEmpenhoMatch(targetKeys, rawEmpenho.numero_empenho ?? rawEmpenho.numero),
+              hasEmpenhoMatch(targetKeys, rawEmpenho.numero_empenho ?? rawEmpenho.numero) &&
+              (!getEmpenhoApiId(rawEmpenho) || empenhoIds.has(getEmpenhoApiId(rawEmpenho)) || isFaturaVisibleForDisplayUnidade(rawFatura)),
             );
 
             if (matchingEmpenhos.length === 0) return [];
@@ -283,32 +317,38 @@ async function discoverLiquidacoes(
             const dataLiquidacao = toDate(rawFaturaRecord.data_liquidacao);
             const faturaId = Number(rawFatura.id) || mappedFatura.api_fatura_id;
 
-            return matchingEmpenhos.map((matchingEmpenho) => ({
-              empenho_lookup_key: lookupKey,
-              empenho_numero: empenhoNumero,
-              empenho_numero_api: String(matchingEmpenho.numero_empenho ?? matchingEmpenho.numero ?? '').trim(),
-              unidade_contrato: contrato.unidade_contrato,
-              contrato_api_id: contrato.api_contrato_id,
-              contrato_numero: contrato.numero,
-              contrato_objeto: contrato.objeto,
-              fatura_id: faturaId,
-              numero_instrumento_cobranca: mappedFatura.numero_instrumento_cobranca || null,
-              situacao: mappedFatura.situacao || null,
-              valor_bruto: mappedFatura.valor_bruto,
-              valor_liquido: mappedFatura.valor_liquido,
-              data_emissao: mappedFatura.data_emissao,
-              data_vencimento: mappedFatura.data_vencimento,
-              data_pagamento: mappedFatura.data_pagamento,
-              data_liquidacao: dataLiquidacao,
-              processo,
-              valor_empenho: toNumber(matchingEmpenho.valor_empenho),
-              subelemento: matchingEmpenho.subelemento == null ? null : String(matchingEmpenho.subelemento),
-              raw_data: {
-                fatura: rawFatura,
-                empenho: matchingEmpenho,
-              },
-              fetched_at: fetchedAt,
-            }));
+            return matchingEmpenhos.map((matchingEmpenho) => {
+              const contratoEmpenho =
+                contratoEmpenhos.find((empenho) => getEmpenhoApiId(empenho) === getEmpenhoApiId(matchingEmpenho)) ?? null;
+
+              return {
+                empenho_lookup_key: lookupKey,
+                empenho_numero: empenhoNumero,
+                empenho_numero_api: String(matchingEmpenho.numero_empenho ?? matchingEmpenho.numero ?? '').trim(),
+                unidade_contrato: contrato.unidade_contrato,
+                contrato_api_id: contrato.api_contrato_id,
+                contrato_numero: contrato.numero,
+                contrato_objeto: contrato.objeto,
+                fatura_id: faturaId,
+                numero_instrumento_cobranca: mappedFatura.numero_instrumento_cobranca || null,
+                situacao: mappedFatura.situacao || null,
+                valor_bruto: mappedFatura.valor_bruto,
+                valor_liquido: mappedFatura.valor_liquido,
+                data_emissao: mappedFatura.data_emissao,
+                data_vencimento: mappedFatura.data_vencimento,
+                data_pagamento: mappedFatura.data_pagamento,
+                data_liquidacao: dataLiquidacao,
+                processo,
+                valor_empenho: toNumber(matchingEmpenho.valor_empenho),
+                subelemento: matchingEmpenho.subelemento == null ? null : String(matchingEmpenho.subelemento),
+                raw_data: {
+                  fatura: rawFatura,
+                  empenho: matchingEmpenho,
+                  contratoEmpenho,
+                },
+                fetched_at: fetchedAt,
+              };
+            });
           });
         } catch (error) {
           console.warn(`Falha ao consultar faturas do contrato ${contrato.api_contrato_id}`, error);

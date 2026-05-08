@@ -298,6 +298,63 @@ describe('contratosApiService.getLiquidacoesPublicasPorEmpenho', () => {
     });
   });
 
+  it('mantem visiveis faturas da Reitoria quando o empenho do contrato pertence ao campus', async () => {
+    const contratosApiService = await loadService();
+
+    mockSupabaseCache(
+      {
+        empenho_lookup_key: '2026NE000010',
+        empenho_numero: '2026NE000010',
+        status: 'found',
+        rows_count: 1,
+        fetched_at: '2026-04-28T11:50:00.000Z',
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+        error_message: null,
+      },
+      [
+        {
+          id: 'cache-reitoria-1',
+          empenho_lookup_key: '2026NE000010',
+          empenho_numero: '2026NE000010',
+          empenho_numero_api: '2026NE000010',
+          unidade_contrato: '158155',
+          contrato_api_id: 684807,
+          contrato_numero: '00285/2025',
+          contrato_objeto: 'Energia eletrica',
+          fatura_id: 1858208,
+          numero_instrumento_cobranca: '1.527',
+          situacao: 'Siafi Apropriado',
+          valor_bruto: 6150.54,
+          valor_liquido: 6150.54,
+          data_emissao: '2026-04-08',
+          data_vencimento: null,
+          data_pagamento: null,
+          data_liquidacao: null,
+          processo: null,
+          valor_empenho: 6150.54,
+          subelemento: '43',
+          raw_data: {
+            fatura: { contratante: '158155 - IF DO RN' },
+            contratoEmpenho: { id: 14321432, unidade_gestora: '158366', numero: '2026NE000010' },
+          },
+          fetched_at: '2026-04-28T11:50:00.000Z',
+        },
+      ],
+    );
+
+    const result = await contratosApiService.getLiquidacoesPublicasPorEmpenho('2026NE000010');
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        contrato_api_id: 684807,
+        contrato_numero: '00285/2025',
+        numero_instrumento_cobranca: '1.527',
+        empenho_numero: '2026NE000010',
+      }),
+    ]);
+    expect(functionsInvokeMock).not.toHaveBeenCalled();
+  });
+
   it('descobre liquidacoes publicas por empenho com match de numero curto e completo', async () => {
     const contratosApiService = await loadService();
 
@@ -469,7 +526,7 @@ describe('contratosApiService.getLiquidacoesPublicasPorEmpenho', () => {
       ],
       '/api-contratos/api/contrato/inativo/ug/158155': [],
       '/api-contratos/api/contrato/15510/empenhos': [
-        { id: 155101, numero: '2026NE000010' },
+        { id: 155101, numero: '2026NE000010', unidade_gestora: '158366' },
       ],
       '/api-contratos/api/contrato/15510/faturas': [
         {
@@ -481,9 +538,10 @@ describe('contratosApiService.getLiquidacoesPublicasPorEmpenho', () => {
           valorliquido: '2.000,00',
           situacao: 'Pago',
           processo: '23035.000010/2026-01',
-          contratante: '158366 - IFRN/CAMPUS C.NOVOS',
+          contratante: '158155 - IF DO RN',
           dados_empenho: [
             {
+              id_empenho: 155101,
               numero_empenho: '2026NE000010',
               valor_empenho: '2.000,00',
             },
@@ -501,6 +559,7 @@ describe('contratosApiService.getLiquidacoesPublicasPorEmpenho', () => {
           contratante: '158999 - IFRN/OUTRO CAMPUS',
           dados_empenho: [
             {
+              id_empenho: 999999,
               numero_empenho: '2026NE000010',
               valor_empenho: '3.000,00',
             },
