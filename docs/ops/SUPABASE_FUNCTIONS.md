@@ -13,6 +13,8 @@ Uso:
 - recebe anexos CSV vindos do Gmail via Apps Script
 - detecta o pipeline por hint, nome do arquivo ou cabecalho
 - grava o resultado em `email_csv_ingestion_runs` e na tabela final do dominio
+- tambem aceita a conta agregada de descentralizacoes como pipeline separado, gravando em `descentralizacoes_conta_saldos`
+- em credito disponivel e conta de descentralizacoes, ignora linhas sem valor preenchido ou parseavel para evitar sobrescrita indevida com zero
 
 Dependencias:
 

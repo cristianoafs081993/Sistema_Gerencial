@@ -81,4 +81,6 @@ Arquivos reais de operacao presentes em [docs](/C:/Users/crist/OneDrive/Desktop/
 - a automacao por Gmail foi centralizada na Edge Function `ingest-email-csv`
 - o roteamento do anexo depende do assunto, do nome do arquivo e do cabecalho real do CSV
 - hoje o fluxo automatizado cobre os pipelines CSV de arquivo unico
+- o CSV de conta agregada de descentralizacoes recebido por e-mail e tratado como pipeline proprio e grava `descentralizacoes_conta_saldos`; a terceira coluna de valor pode vir sem cabecalho
+- nos CSVs de credito disponivel recebidos por e-mail, linhas sem valor preenchido ou parseavel sao ignoradas para nao sobrescrever saldos com zero
 - PFs continuam fora da automacao porque exigem correlacao entre dois arquivos

@@ -205,7 +205,7 @@ Mostrar a linhagem operacional dos dados de forma curta:
   - roteamento e parse: [ingest-email-csv/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/ingest-email-csv/index.ts) + [emailCsvIngestion.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/lib/emailCsvIngestion.ts)
   - trilha operacional: `email_csv_ingestion_runs`
   - destino: tabela do pipeline detectado
-  - observacao: o pipeline siafi_empenhos aplica a mesma regra do upload manual; quando recebe o CSV dedicado de RAP, atualiza apenas saldo_rap_oficial, e quando recebe o CSV legado combinado continua usando RESTOS A PAGAR NAO PROCES. LIQUIDADOS A PAGAR para compor o saldo operacional
+  - observacao: a conta agregada de descentralizacoes recebida por e-mail grava `descentralizacoes_conta_saldos`, separada dos lancamentos detalhados; em credito disponivel e conta de descentralizacoes, linhas sem valor preenchido ou parseavel sao ignoradas para evitar sobrescrita com zero; o pipeline siafi_empenhos aplica a mesma regra do upload manual; quando recebe o CSV dedicado de RAP, atualiza apenas saldo_rap_oficial, e quando recebe o CSV legado combinado continua usando RESTOS A PAGAR NAO PROCES. LIQUIDADOS A PAGAR para compor o saldo operacional
 
 ### Economia de tempo
 

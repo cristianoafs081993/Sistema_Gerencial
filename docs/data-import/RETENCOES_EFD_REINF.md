@@ -26,10 +26,14 @@ Este ponto deve ser tratado como debito de documentacao e de UX.
 
 - tenta detectar UTF-16LE, UTF-16BE, UTF-8 e Latin-1
 - normaliza fim de linha
-- faz split por `tab`
+- no upload manual, faz split por `tab`
+- na ingestao por e-mail, aceita separadores `tab`, `;`, `,` e `|`
 - procura o cabecalho pela presenca de:
   - `documento habil`
   - `dh - situacao`
+- em exports CSV reais, o nome do credor pode vir na coluna sem cabecalho imediatamente apos `DH - Credor`; a ingestao por e-mail usa essa coluna como `dhCredorNome`
+- a coluna de liquidacao pode aparecer como `DH Item - Liquidado` ou `DH Item - Liquidado (S/N)` com variacoes de hifen/travessao; a ingestao por e-mail normaliza essa variacao
+- em exports CSV reais, a coluna de valor da retencao pode vir como a ultima coluna sem cabecalho; nesse caso, a ingestao por e-mail usa essa coluna sem nome como `valorRetencao`
 
 ## Campos produzidos
 
@@ -61,11 +65,9 @@ Este ponto deve ser tratado como debito de documentacao e de UX.
 
 ### Aviso
 
-- `DDF025`: vencimento e pagamento devem ocorrer no dia 20 do mes seguinte ao `Dia Lancamento` da OB de pagamento vinculada a NP em `documentos_habeis_itens`
-  - a OB de pagamento e a primeira OB cuja observacao indique pagamento principal, como `PGTO` ou `PAGAMENTO`, ignorando retencoes quando identificaveis
-  - a tela exibe o numero da OB escolhida junto da data usada no calculo
-  - se nao houver OB de pagamento vinculada a NP, a linha fica em alerta porque nao ha data-base confiavel para calcular o vencimento esperado
-- `DDF021`: vencimento e pagamento devem ocorrer no dia 20 do mes seguinte a `DH - Data Emissao Doc.Origem`
+- `DDF025` e `DDF055`: vencimento e pagamento devem ocorrer entre `DH - Dia Pagamento` e o dia 20 do mes seguinte a `DH - Dia Pagamento`, inclusive
+- `DDF021` e `DDF050`: vencimento e pagamento devem ocorrer entre `DH - Dia Pagamento` e o dia 20 do mes seguinte a `DH - Dia Pagamento`, inclusive
+- para essas situacoes, uma linha fica com `Prazo inconsistente` quando `DH Item - Dia Vencimento` ou `DH Item - Dia Pagamento` for anterior a `DH - Dia Pagamento` ou posterior ao dia 20 do mes seguinte
 
 ## Tratamento de pendencias
 

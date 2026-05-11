@@ -367,14 +367,14 @@ export default function RetencoesFdReinfDesign() {
                   <TableCell className="px-4 py-3 align-top">
                     <div className="text-xs">Emissao: {formatRetencaoEfdReinfDate(row.dhDataEmissaoDocOrigem)}</div>
                     <div className="mt-1 text-xs">DH pgto: {formatRetencaoEfdReinfDate(row.dhDiaPagamento)}</div>
-                    {row.dhSituacao === 'DDF025' ? (
+                    {row.dhSituacao === 'DDF025' && validation.paymentDateSource !== 'dh' ? (
                       <div className={cn('mt-1 text-xs', validation.paymentDateSource === 'missing-ob' && 'text-red-700')}>
                         OB pgto: {validation.paymentDateSource === 'missing-ob' ? 'nao localizada' : `${formatOrdemBancaria(validation.paymentObNumber)} em ${formatRetencaoEfdReinfDate(validation.paymentDateUsed)}`}
                       </div>
                     ) : null}
                     <div className="mt-1 text-xs">Item vencto: {formatRetencaoEfdReinfDate(row.dhItemDiaVencimento)}</div>
                     <div className="mt-1 text-xs">Item pgto: {formatRetencaoEfdReinfDate(row.dhItemDiaPagamento)}</div>
-                    {validation.expectedDate ? <div className="mt-2 text-[11px] font-medium text-amber-700">Esperado ({validation.expectedRule}{validation.paymentDateSource === 'ob' ? '/OB' : ''}): {formatRetencaoEfdReinfDate(validation.expectedDate)}</div> : null}
+                    {validation.expectedDate ? <div className="mt-2 text-[11px] font-medium text-amber-700">Limite ({validation.expectedRule}): {formatRetencaoEfdReinfDate(validation.expectedDate)}</div> : null}
                   </TableCell>
                   <TableCell className="px-4 py-3 align-top text-right text-xs font-semibold text-text-primary">{formatCurrency(row.dhValorDocOrigem)}</TableCell>
                   <TableCell className="px-4 py-3 align-top text-right text-xs font-semibold text-status-warning">{formatCurrency(row.valorRetencao)}</TableCell>

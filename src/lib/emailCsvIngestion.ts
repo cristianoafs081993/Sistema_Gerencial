@@ -3,6 +3,7 @@ export type SupportedEmailCsvPipeline =
   | 'lc'
   | 'retencoes_efd_reinf'
   | 'descentralizacoes'
+  | 'descentralizacoes_conta_saldos'
   | 'documentos_habeis'
   | 'liquidacoes'
   | 'ordens_bancarias'
@@ -66,6 +67,12 @@ export interface DescentralizacaoImportRow {
   planoInterno: string;
   dataEmissao: string | null;
   descricao: string;
+  valor: number;
+}
+
+export interface ContaDescentralizacaoSaldoImportRow {
+  ptres: string;
+  metrica: string;
   valor: number;
 }
 
@@ -175,6 +182,11 @@ export type ParsedEmailCsvImport =
       rows: DescentralizacaoImportRow[];
     }
   | {
+      pipeline: 'descentralizacoes_conta_saldos';
+      rowCount: number;
+      rows: ContaDescentralizacaoSaldoImportRow[];
+    }
+  | {
       pipeline: 'documentos_habeis';
       rowCount: number;
       documentos: DocumentoHabilImportDocument[];
@@ -229,6 +241,7 @@ const SUPPORTED_PIPELINES = new Set<SupportedEmailCsvPipeline>([
   'lc',
   'retencoes_efd_reinf',
   'descentralizacoes',
+  'descentralizacoes_conta_saldos',
   'documentos_habeis',
   'liquidacoes',
   'ordens_bancarias',
@@ -452,6 +465,30 @@ function parseCurrency(value: unknown): number {
   return Number.parseFloat(cleaned) || 0;
 }
 
+function parseCurrencyOrNull(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+
+  const cleaned = String(value)
+    .replace(/R\$\s*/gi, '')
+    .replace(/\s/g, '')
+    .trim();
+
+  if (!cleaned) return null;
+
+  let normalized = cleaned;
+  if (cleaned.includes(',') && cleaned.includes('.')) {
+    const lastComma = cleaned.lastIndexOf(',');
+    const lastDot = cleaned.lastIndexOf('.');
+    normalized = lastComma > lastDot ? cleaned.replace(/\./g, '').replace(',', '.') : cleaned.replace(/,/g, '');
+  } else if (cleaned.includes(',')) {
+    normalized = cleaned.replace(',', '.');
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function normalizeDocId(id: string | undefined) {
   if (!id) return '';
   const trimmed = id.trim();
@@ -582,6 +619,42 @@ function findValue(row: Record<string, string>, patterns: RegExp[], fallbacks: s
   return '';
 }
 
+function findUnnamedValueColumn(row: Record<string, string>) {
+  const unnamedEntries = Object.entries(row)
+    .filter(([key, value]) => /^empty_\d+$/i.test(key) && String(value).trim() !== '')
+    .sort(([leftKey], [rightKey]) => {
+      const leftIndex = Number(leftKey.replace('empty_', ''));
+      const rightIndex = Number(rightKey.replace('empty_', ''));
+      return rightIndex - leftIndex;
+    });
+
+  return unnamedEntries[0]?.[1] ? String(unnamedEntries[0][1]) : '';
+}
+
+function findFollowingUnnamedValue(
+  row: Record<string, string>,
+  headers: string[],
+  previousHeaderKeys: string[],
+) {
+  const previousIndex = headers.findIndex((header) => previousHeaderKeys.includes(header));
+  if (previousIndex < 0) return '';
+
+  const nextHeader = headers[previousIndex + 1];
+  if (!nextHeader || !/^empty_\d+$/i.test(nextHeader)) return '';
+
+  return row[nextHeader] || '';
+}
+
+function findSaldoValue(row: Record<string, string>) {
+  return (
+    findValue(
+      row,
+      [/^valor$/i, /^valordisponivel$/i, /valor/i, /saldo/i],
+      ['valor_disponivel', 'valor_diponivel', 'valordisponivel', 'valor', 'saldo'],
+    ) || findUnnamedValueColumn(row)
+  );
+}
+
 function deriveDimensaoFromPI(planoInterno: string) {
   const normalized = planoInterno.trim().toUpperCase();
   if (normalized.length < 3) return '';
@@ -628,6 +701,9 @@ function inferredPipelineByFileName(fileName: string): SupportedEmailCsvPipeline
   }
   if (normalized.includes('documentos') && normalized.includes('habil')) return 'documentos_habeis';
   if (normalized.includes('situac') || normalized.includes('retencoes')) return 'situacoes_documentos';
+  if (normalized.includes('conta') && normalized.includes('descentraliz')) {
+    return 'descentralizacoes_conta_saldos';
+  }
   if (normalized.includes('descentraliz')) return 'descentralizacoes';
   if (normalized.includes('exec_ne_exercicio_rap') || normalized.includes('siafi')) return 'siafi_empenhos';
 
@@ -640,6 +716,9 @@ function inferredPipelineByFileName(fileName: string): SupportedEmailCsvPipeline
 function autoDetectPipeline(text: string, fileName: string, subject?: string) {
   const subjectHint = explicitPipelineHint(subject);
   if (subjectHint) return subjectHint;
+
+  const subjectNameHint = subject ? inferredPipelineByFileName(subject) : null;
+  if (subjectNameHint) return subjectNameHint;
 
   const fileNameHint = inferredPipelineByFileName(fileName);
   if (fileNameHint) return fileNameHint;
@@ -672,7 +751,9 @@ function autoDetectPipeline(text: string, fileName: string, subject?: string) {
       (candidate) =>
         candidate.normalizedKeys.includes('documentohabil') &&
         candidate.normalizedKeys.includes('dhsituacao') &&
-        candidate.normalizedKeys.includes('valorretencao'),
+        (candidate.normalizedKeys.includes('valorretencao') ||
+          (candidate.normalizedKeys.includes('metrica') &&
+            candidate.normalizedKeys.some((key) => /^empty_\d+$/i.test(key)))),
     )
   ) {
     return 'retencoes_efd_reinf';
@@ -866,6 +947,9 @@ function parseRetencoesEfdReinf(text: string): ParsedEmailCsvImport {
     .map((row, index): RetencaoEfdReinfRegistro | null => {
       const documentoHabil = String(row.documentohabil || '').trim();
       if (!documentoHabil) return null;
+      const dhCredorNome =
+        String(row.dhcredornome || '').trim() ||
+        findFollowingUnnamedValue(row, parsed.headers, ['dhcredor', 'credor']).trim();
 
       return {
         sourceIndex: index + 1,
@@ -874,17 +958,19 @@ function parseRetencoesEfdReinf(text: string): ParsedEmailCsvImport {
         dhEstado: String(row.dhestado || '').trim(),
         dhUgPagadora: String(row.dhugpagadora || '').trim(),
         dhItemUgPagadora: String(row.dhitemugpagadora || '').trim(),
-        dhCredorDocumento: String(row.dhcredordocumento || '').trim(),
-        dhCredorNome: String(row.dhcredornome || '').trim(),
+        dhCredorDocumento: String(row.dhcredordocumento || row.dhcredor || '').trim(),
+        dhCredorNome: dhCredorNome,
         dhSituacao: String(row.dhsituacao || '').trim().toUpperCase(),
         dhDataEmissaoDocOrigem: toIsoDate(row.dhdataemissaodocorigem),
         dhDiaPagamento: toIsoDate(row.dhdiapagamento),
         dhItemDiaVencimento: toIsoDate(row.dhitemdiavencimento),
         dhItemDiaPagamento: toIsoDate(row.dhitemdiapagamento),
-        dhItemLiquidado: toBooleanLiquidado(row.dhitemliquidado),
+        dhItemLiquidado: toBooleanLiquidado(
+          findValue(row, [/liquidado/i], ['dhitemliquidado', 'dhitemliquidadosn']),
+        ),
         dhValorDocOrigem: parseCurrency(row.dhvalordocorigem),
         metrica: String(row.metrica || '').trim(),
-        valorRetencao: parseCurrency(row.valorretencao),
+        valorRetencao: parseCurrency(row.valorretencao || findUnnamedValueColumn(row)),
       };
     })
     .filter((row): row is RetencaoEfdReinfRegistro => row !== null);
@@ -907,7 +993,6 @@ function parseDescentralizacoes(text: string): ParsedEmailCsvImport {
 
   const buildPairKey = (info: {
     notaCredito: string;
-    operacaoTipo: string;
     dataEmissao: string | null;
     descricao: string;
     planoInterno: string;
@@ -916,9 +1001,8 @@ function parseDescentralizacoes(text: string): ParsedEmailCsvImport {
   }) =>
     [
       info.notaCredito,
-      info.operacaoTipo.trim().toUpperCase(),
       info.dataEmissao || '',
-      info.descricao.trim().toUpperCase(),
+      normalizeImportText(info.descricao),
       info.planoInterno,
       info.origemRecurso,
       Math.abs(info.valorBruto),
@@ -1259,10 +1343,15 @@ function parseCreditosDisponiveis(text: string): ParsedEmailCsvImport {
     if (!ptres) return;
 
     const metrica = String(row.metrica || '').trim();
-    const valor = parseCurrency(row.valor_disponivel || row.valor_diponivel || row.valor || '');
+    const valor = parseCurrencyOrNull(findSaldoValue(row));
+    if (valor == null) return;
+
     const current = updatesMap.get(ptres);
     if (current) {
       current.valor += valor;
+      if (!current.metrica && metrica) {
+        current.metrica = metrica;
+      }
       return;
     }
 
@@ -1271,6 +1360,37 @@ function parseCreditosDisponiveis(text: string): ParsedEmailCsvImport {
 
   return {
     pipeline: 'creditos_disponiveis',
+    rowCount: Array.from(updatesMap.values()).length,
+    rows: Array.from(updatesMap.values()),
+  };
+}
+
+function parseContaDescentralizacoes(text: string): ParsedEmailCsvImport {
+  const parsed = parseNormalizedCsv(text, ['PTRES', 'Metrica', 'Valor']);
+  const updatesMap = new Map<string, ContaDescentralizacaoSaldoImportRow>();
+
+  parsed.rows.forEach((row) => {
+    const ptres = String(row.ptres || '').trim();
+    if (!ptres) return;
+
+    const metrica = String(row.metrica || '').trim();
+    const valor = parseCurrencyOrNull(findSaldoValue(row));
+    if (valor == null) return;
+
+    const current = updatesMap.get(ptres);
+    if (current) {
+      current.valor += valor;
+      if (!current.metrica && metrica) {
+        current.metrica = metrica;
+      }
+      return;
+    }
+
+    updatesMap.set(ptres, { ptres, metrica, valor });
+  });
+
+  return {
+    pipeline: 'descentralizacoes_conta_saldos',
     rowCount: Array.from(updatesMap.values()).length,
     rows: Array.from(updatesMap.values()),
   };
@@ -1529,6 +1649,8 @@ export function parseEmailCsvImport({
       return parseRetencoesEfdReinf(normalizedText);
     case 'descentralizacoes':
       return parseDescentralizacoes(normalizedText);
+    case 'descentralizacoes_conta_saldos':
+      return parseContaDescentralizacoes(normalizedText);
     case 'documentos_habeis':
       return parseDocumentosHabeis(normalizedText);
     case 'liquidacoes':
