@@ -95,16 +95,19 @@ Service:
 Endpoints observados:
 
 - `/api-de-dados/despesas/documentos`
+- `/api-de-dados/despesas/itens-de-empenho`
 - `/api-de-dados/despesas/itens-de-empenho/historico`
 - `/api-de-dados/despesas/empenhos-impactados`
 
 Credenciais:
 
 - o service atual usa `chave-api-dados`
+- no desenvolvimento local, o proxy do Vite tambem injeta/sobrescreve `chave-api-dados` no servidor, usando `PORTAL_TRANSPARENCIA_API_KEY`, `VITE_PORTAL_TRANSPARENCIA_API_KEY` ou o fallback operacional atual do codigo
 
 Observacao:
 
 - existe chave de API embutida no service. Isso deve ser tratado como contrato operacional sensivel e idealmente sair do codigo.
+- o modal de empenho consulta subitens via cache Supabase em `portal_transparencia_empenho_itens_cache*`; quando o cache nao existe ou venceu, o frontend chama a Edge Function `refresh-portal-transparencia-itens-cache`, que consulta `/despesas/itens-de-empenho` pelo servidor usando `codigoDocumento = UG + gestao + numero do empenho` e salva as linhas no cache. A UI exibe apenas descricao e subelemento; o service tambem mapeia `valorAtual` e historico por sequencial para uso futuro, mas esses valores nao entram na UI porque a base do Portal pode ter atraso operacional.
 
 ## 4. API de Contratos
 
@@ -151,8 +154,8 @@ Descoberta publica em tempo real no modal de empenho:
 - a leitura do modal usa primeiro o cache Supabase em `contratos_api_empenho_liquidacoes_cache_status` e `contratos_api_empenho_liquidacoes_cache`
 - enquanto as tabelas de cache ainda nao existirem em um ambiente, o frontend nao aciona a Edge Function a partir do modal; isso evita erros 404/CORS durante bootstrap antes da migration e do deploy da function
 - se o status publico indicar linhas mas a leitura publica das linhas voltar vazia por problema de policy/RLS, o service usa a Edge Function em modo `readCacheOnly` como fallback de leitura com service role
-- a Edge Function `refresh-comprasnet-liquidacoes-cache` faz a descoberta dinamica quando chamada pelo frontend ou cron, buscando contratos publicos ativos e inativos das UGs `158366` e `158155`, cobrindo empenhos emitidos pelo campus que estejam vinculados a contratos gerenciados pela Reitoria; depois filtra os contratos cujo endpoint `/empenhos` contenha o empenho alvo e so entao consulta `/faturas`
-- a vinculacao final usa `dados_empenho[]` dentro da fatura para decidir quais liquidações apareceram no modal, e usa `contratante` da fatura para esconder faturas de outros campi quando a API informa esse campo
+- a Edge Function `refresh-comprasnet-liquidacoes-cache` faz a descoberta dinamica quando chamada pelo frontend ou cron, buscando contratos publicos ativos e inativos das UGs `158366` e `158155`, cobrindo empenhos emitidos pelo campus que estejam vinculados a contratos gerenciados pela Reitoria; depois filtra os contratos cujo endpoint `/empenhos` contenha o empenho alvo da UG `158366` e so entao consulta `/faturas`
+- a vinculacao final usa `dados_empenho[]` dentro da fatura para decidir quais liquidações apareceram no modal; faturas com `contratante = 158155` continuam validas quando o empenho correspondente no endpoint `/empenhos` pertence a UG `158366`, e faturas de outros campi sao escondidas quando a API permite identificar essa divergencia
 - `data_liquidacao` pode aparecer em payloads reais de `faturas`, mas nao esta garantida pelo schema OpenAPI; a UI deve tratá-la como opcional
 - o cache usa TTL de 12 horas para resultados encontrados e 1 hora para `not_found`; o cron horario reprocessa entradas vencidas
 

@@ -1,0 +1,372 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
+
+const PORTAL_API_BASE = 'https://api.portaldatransparencia.gov.br/api-de-dados/despesas';
+const DEFAULT_PORTAL_TRANSPARENCIA_API_KEY = '931d4d57337bef94e775337c318342e9';
+const UNIDADE_GESTORA = '158366';
+const GESTAO = '26435';
+const FOUND_TTL_MS = 12 * 60 * 60 * 1000;
+const NOT_FOUND_TTL_MS = 60 * 60 * 1000;
+const ERROR_TTL_MS = 15 * 60 * 1000;
+const PORTAL_PAGE_LIMIT = 30;
+const CACHE_ROWS_SELECT = [
+  'id',
+  'empenho_lookup_key',
+  'empenho_numero',
+  'codigo_documento',
+  'codigo_item_empenho',
+  'sequencial',
+  'descricao',
+  'codigo_subelemento',
+  'descricao_subelemento',
+  'valor_atual',
+  'historico',
+  'raw_data',
+  'fetched_at',
+].join(',');
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-portal-transparencia-cache-secret',
+};
+
+type SupabaseClient = ReturnType<typeof createClient>;
+
+type RefreshRequest = {
+  empenhoNumero?: string;
+  empenhos?: string[];
+  refreshDue?: boolean;
+  readCacheOnly?: boolean;
+  returnRows?: boolean;
+  limit?: number;
+  source?: string;
+};
+
+type PortalItemCacheRow = {
+  empenho_lookup_key: string;
+  empenho_numero: string;
+  codigo_documento: string;
+  codigo_item_empenho: string | null;
+  sequencial: number;
+  descricao: string | null;
+  codigo_subelemento: string | null;
+  descricao_subelemento: string | null;
+  valor_atual: number | null;
+  historico: unknown[];
+  raw_data: Record<string, unknown>;
+  fetched_at: string;
+};
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      ...corsHeaders,
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
+function requireEnv(name: string) {
+  const value = Deno.env.get(name);
+  if (!value) {
+    throw new Error(`A variavel ${name} precisa estar configurada no ambiente do Supabase.`);
+  }
+  return value;
+}
+
+function getPortalApiKey() {
+  return (
+    Deno.env.get('PORTAL_TRANSPARENCIA_API_KEY') ||
+    Deno.env.get('VITE_PORTAL_TRANSPARENCIA_API_KEY') ||
+    DEFAULT_PORTAL_TRANSPARENCIA_API_KEY
+  );
+}
+
+function assertOptionalSharedSecret(request: Request) {
+  const expectedSecret = Deno.env.get('PORTAL_TRANSPARENCIA_CACHE_SECRET');
+  if (!expectedSecret) return;
+
+  const providedSecret = request.headers.get('x-portal-transparencia-cache-secret');
+  if (!providedSecret || providedSecret !== expectedSecret) {
+    throw new Response(
+      JSON.stringify({ error: 'Segredo de sincronizacao ausente ou invalido.' }),
+      {
+        status: 401,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        },
+      },
+    );
+  }
+}
+
+function normalizeEmpenhoNumero(raw: unknown) {
+  const normalized = String(raw ?? '').toUpperCase().replace(/[^0-9A-Z]/g, '');
+  const match = normalized.match(/(\d{4}NE\d{6})$/);
+  return match?.[1] ?? normalized;
+}
+
+function buildCodigoDocumento(empenhoNumero: string) {
+  const normalized = normalizeEmpenhoNumero(empenhoNumero);
+  return normalized ? `${UNIDADE_GESTORA}${GESTAO}${normalized}` : '';
+}
+
+function parseCurrency(raw: unknown) {
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : 0;
+  const normalized = String(raw ?? '')
+    .replace(/[^\d,.-]/g, '')
+    .replace(/\./g, '')
+    .replace(',', '.');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function addMilliseconds(date: Date, amount: number) {
+  return new Date(date.getTime() + amount).toISOString();
+}
+
+async function fetchPortalPage<T = unknown>(url: string): Promise<T[]> {
+  const response = await fetch(url, {
+    headers: {
+      accept: 'application/json',
+      'chave-api-dados': getPortalApiKey(),
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Portal da Transparencia retornou HTTP ${response.status} em ${url}`);
+  }
+
+  const data = await response.json();
+  return Array.isArray(data) ? (data as T[]) : [];
+}
+
+async function fetchPortalPaginated<T = unknown>(buildUrl: (page: number) => string): Promise<T[]> {
+  const rows: T[] = [];
+
+  for (let page = 1; page <= PORTAL_PAGE_LIMIT; page += 1) {
+    const pageRows = await fetchPortalPage<T>(buildUrl(page));
+    rows.push(...pageRows);
+    if (pageRows.length === 0) break;
+  }
+
+  return rows;
+}
+
+function mapPortalItem(
+  empenhoNumero: string,
+  codigoDocumento: string,
+  fetchedAt: string,
+  row: Record<string, unknown>,
+): PortalItemCacheRow {
+  return {
+    empenho_lookup_key: normalizeEmpenhoNumero(empenhoNumero),
+    empenho_numero: empenhoNumero,
+    codigo_documento: codigoDocumento,
+    codigo_item_empenho: String(row.codigoItemEmpenho ?? '').trim() || null,
+    sequencial: Number(row.sequencial ?? 0) || 0,
+    descricao: String(row.descricao ?? '').trim() || null,
+    codigo_subelemento: String(row.codigoSubelemento ?? '').trim() || null,
+    descricao_subelemento: String(row.descricaoSubelemento ?? '').trim() || null,
+    valor_atual: parseCurrency(row.valorAtual),
+    historico: [],
+    raw_data: row,
+    fetched_at: fetchedAt,
+  };
+}
+
+async function discoverItens(empenhoNumero: string): Promise<PortalItemCacheRow[]> {
+  const lookupKey = normalizeEmpenhoNumero(empenhoNumero);
+  const codigoDocumento = buildCodigoDocumento(empenhoNumero);
+  if (!lookupKey || !codigoDocumento) return [];
+
+  const rows = await fetchPortalPaginated<Record<string, unknown>>(
+    (page) => `${PORTAL_API_BASE}/itens-de-empenho?codigoDocumento=${encodeURIComponent(codigoDocumento)}&pagina=${page}`,
+  );
+  const fetchedAt = new Date().toISOString();
+  return rows.map((row) => mapPortalItem(empenhoNumero, codigoDocumento, fetchedAt, row));
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
+async function replaceCacheRows(
+  supabase: SupabaseClient,
+  empenhoNumero: string,
+  returnRows = false,
+) {
+  const lookupKey = normalizeEmpenhoNumero(empenhoNumero);
+  const codigoDocumento = buildCodigoDocumento(empenhoNumero);
+  if (!lookupKey || !codigoDocumento) {
+    return { empenhoNumero, lookupKey, status: 'not_found', rowsCount: 0 };
+  }
+
+  try {
+    const rows = await discoverItens(empenhoNumero);
+    const now = new Date();
+    const status = rows.length > 0 ? 'found' : 'not_found';
+
+    const { error: statusError } = await supabase
+      .from('portal_transparencia_empenho_itens_cache_status')
+      .upsert({
+        empenho_lookup_key: lookupKey,
+        empenho_numero: empenhoNumero,
+        codigo_documento: codigoDocumento,
+        status,
+        rows_count: rows.length,
+        fetched_at: now.toISOString(),
+        expires_at: addMilliseconds(now, rows.length > 0 ? FOUND_TTL_MS : NOT_FOUND_TTL_MS),
+        error_message: null,
+      }, { onConflict: 'empenho_lookup_key' });
+    if (statusError) throw statusError;
+
+    const { error: deleteError } = await supabase
+      .from('portal_transparencia_empenho_itens_cache')
+      .delete()
+      .eq('empenho_lookup_key', lookupKey);
+    if (deleteError) throw deleteError;
+
+    for (const rowChunk of chunk(rows, 500)) {
+      if (rowChunk.length === 0) continue;
+      const { error: insertError } = await supabase
+        .from('portal_transparencia_empenho_itens_cache')
+        .insert(rowChunk);
+      if (insertError) throw insertError;
+    }
+
+    return { empenhoNumero, lookupKey, status, rowsCount: rows.length, ...(returnRows ? { rows } : {}) };
+  } catch (error) {
+    const now = new Date();
+    const message = error instanceof Error ? error.message : String(error);
+    const { error: statusError } = await supabase
+      .from('portal_transparencia_empenho_itens_cache_status')
+      .upsert({
+        empenho_lookup_key: lookupKey,
+        empenho_numero: empenhoNumero,
+        codigo_documento: codigoDocumento,
+        status: 'error',
+        rows_count: 0,
+        fetched_at: now.toISOString(),
+        expires_at: addMilliseconds(now, ERROR_TTL_MS),
+        error_message: message,
+      }, { onConflict: 'empenho_lookup_key' });
+    if (statusError) throw statusError;
+    return { empenhoNumero, lookupKey, status: 'error', rowsCount: 0, error: message };
+  }
+}
+
+async function readCacheRows(
+  supabase: SupabaseClient,
+  empenhoNumero: string,
+  returnRows = false,
+) {
+  const lookupKey = normalizeEmpenhoNumero(empenhoNumero);
+  if (!lookupKey) {
+    return { empenhoNumero, lookupKey, status: 'not_found', rowsCount: 0, rows: [] };
+  }
+
+  const { data: statusRow, error: statusError } = await supabase
+    .from('portal_transparencia_empenho_itens_cache_status')
+    .select('empenho_lookup_key, empenho_numero, codigo_documento, status, rows_count, fetched_at, expires_at, error_message')
+    .eq('empenho_lookup_key', lookupKey)
+    .maybeSingle();
+  if (statusError) throw statusError;
+
+  if (!statusRow) {
+    return { empenhoNumero, lookupKey, status: 'missing', rowsCount: 0, rows: [] };
+  }
+
+  const { data: rows, error: rowsError } = await supabase
+    .from('portal_transparencia_empenho_itens_cache')
+    .select(CACHE_ROWS_SELECT)
+    .eq('empenho_lookup_key', lookupKey)
+    .order('sequencial', { ascending: true });
+  if (rowsError) throw rowsError;
+
+  return {
+    empenhoNumero,
+    lookupKey,
+    status: statusRow.status,
+    rowsCount: rows && rows.length > 0 ? rows.length : Number(statusRow.rows_count ?? 0),
+    fetchedAt: statusRow.fetched_at,
+    expiresAt: statusRow.expires_at,
+    error: statusRow.error_message,
+    ...(returnRows ? { rows: rows ?? [] } : {}),
+  };
+}
+
+async function getDueEmpenhos(supabase: SupabaseClient, limit: number) {
+  const { data, error } = await supabase
+    .from('portal_transparencia_empenho_itens_cache_status')
+    .select('empenho_numero')
+    .lte('expires_at', new Date().toISOString())
+    .order('expires_at', { ascending: true })
+    .limit(limit);
+
+  if (error) throw error;
+  return (data ?? []).map((row: { empenho_numero: string }) => row.empenho_numero).filter(Boolean);
+}
+
+Deno.serve(async (request) => {
+  if (request.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  if (request.method !== 'POST') {
+    return jsonResponse({ error: 'Metodo nao suportado.' }, 405);
+  }
+
+  try {
+    assertOptionalSharedSecret(request);
+    const body = (await request.json().catch(() => ({}))) as RefreshRequest;
+    const limit = Math.max(1, Math.min(Number(body.limit) || 25, 200));
+
+    const supabaseUrl = requireEnv('SUPABASE_URL');
+    const serviceRoleKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    const requestedEmpenhos = new Set<string>();
+    if (body.empenhoNumero) requestedEmpenhos.add(String(body.empenhoNumero));
+    for (const empenho of body.empenhos ?? []) {
+      requestedEmpenhos.add(String(empenho));
+    }
+
+    if (body.refreshDue) {
+      for (const empenho of await getDueEmpenhos(supabase, limit)) {
+        requestedEmpenhos.add(empenho);
+      }
+    }
+
+    if (requestedEmpenhos.size === 0) {
+      return jsonResponse({ status: 'noop', results: [] });
+    }
+
+    const results = [];
+    for (const empenho of Array.from(requestedEmpenhos).slice(0, limit)) {
+      if (body.readCacheOnly) {
+        results.push(await readCacheRows(supabase, empenho, Boolean(body.returnRows)));
+      } else {
+        results.push(await replaceCacheRows(supabase, empenho, Boolean(body.returnRows)));
+      }
+    }
+
+    return jsonResponse({
+      status: 'processed',
+      source: body.source ?? null,
+      results,
+    });
+  } catch (error) {
+    if (error instanceof Response) return error;
+    const message = error instanceof Error ? error.message : String(error);
+    return jsonResponse({ error: message }, 500);
+  }
+});

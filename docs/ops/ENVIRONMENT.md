@@ -53,6 +53,9 @@ Sem isso:
 - `VITE_APP_ORIGIN`
   - sem default
   - recomendada para qualquer ambiente que possa enviar convites de usuário
+- `PORTAL_TRANSPARENCIA_API_KEY` ou `VITE_PORTAL_TRANSPARENCIA_API_KEY`
+  - chave `chave-api-dados` do Portal da Transparencia
+  - usada pelo proxy local do Vite para injetar a credencial nas chamadas `/api-transparencia`; se ausente, o proxy usa o fallback operacional atual do codigo
 
 ## Variaveis necessarias em funcoes e integracoes
 
