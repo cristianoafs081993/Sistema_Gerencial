@@ -60,6 +60,8 @@ type RetencaoEfdReinfObRow = {
 };
 
 const SITUACOES_IGNORADAS_REGRA_UG_CRITICA = new Set(['DDR001', 'DGR001']);
+const SITUACOES_PRAZO_GRUPO_DDF025 = new Set(['DDF025', 'DDF055']);
+const SITUACOES_PRAZO_GRUPO_DDF021 = new Set(['DDF021', 'DDF050']);
 const LOCAL_CORRECTION_STORAGE_KEY = 'retencoes-efd-reinf:correcoes-realizadas';
 
 export type RetencaoEfdReinfValidation = {
@@ -67,7 +69,7 @@ export type RetencaoEfdReinfValidation = {
   hasCriticalUgPagadora: boolean;
   hasWarningPrazo: boolean;
   expectedDate: string | null;
-  expectedRule: 'DDF025' | 'DDF021' | null;
+  expectedRule: 'DDF025' | 'DDF055' | 'DDF021' | 'DDF050' | null;
   paymentDateSource: RetencaoEfdReinfPaymentDateSource;
   paymentDateUsed: string | null;
   paymentObNumber: string | null;
@@ -192,8 +194,8 @@ function getExpectedNextMonthDay20(baseDate?: string | null) {
   return format(cappedDate, 'yyyy-MM-dd');
 }
 
-function sameIsoDate(first?: string | null, second?: string | null) {
-  return Boolean(first && second && first === second);
+function isDateWithinPaymentWindow(value?: string | null, startDate?: string | null, endDate?: string | null) {
+  return Boolean(value && startDate && endDate && value >= startDate && value <= endDate);
 }
 
 function toBooleanLiquidado(value: unknown): boolean | null {
@@ -334,50 +336,38 @@ export function validateRetencaoEfdReinfRow(
   const shouldIgnoreUgCritica = SITUACOES_IGNORADAS_REGRA_UG_CRITICA.has(situacao);
   const hasCriticalUgPagadora = !shouldIgnoreUgCritica && itemUgPagadora !== '158155';
 
-  let expectedRule: 'DDF025' | 'DDF021' | null = null;
+  let expectedRule: 'DDF025' | 'DDF055' | 'DDF021' | 'DDF050' | null = null;
   let expectedDate: string | null = null;
   let hasWarningPrazo = false;
   let paymentDateSource: RetencaoEfdReinfPaymentDateSource = 'dh';
   let paymentDateUsed: string | null = null;
 
-  if (row.dhSituacao === 'DDF025') {
-    expectedRule = 'DDF025';
-    const hasObPaymentDateMap = Boolean(options?.obPaymentDates);
-    const obPaymentInfo = getPaymentDateFromOptions(row.documentoHabil, options);
-
-    paymentDateSource = hasObPaymentDateMap ? (obPaymentInfo ? 'ob' : 'missing-ob') : 'dh';
-    paymentDateUsed = hasObPaymentDateMap ? (obPaymentInfo?.date || null) : row.dhDiaPagamento;
+  if (SITUACOES_PRAZO_GRUPO_DDF025.has(situacao)) {
+    expectedRule = situacao as 'DDF025' | 'DDF055';
+    paymentDateSource = 'dh';
+    paymentDateUsed = row.dhDiaPagamento;
     expectedDate = getExpectedNextMonthDay20(paymentDateUsed);
 
-    if (hasObPaymentDateMap && !obPaymentInfo) {
-      hasWarningPrazo = true;
-      issues.push('DDF025 sem OB de pagamento localizada para calcular o vencimento esperado.');
-    } else {
-      hasWarningPrazo =
-        !expectedDate ||
-        !sameIsoDate(row.dhItemDiaVencimento, expectedDate) ||
-        !sameIsoDate(row.dhItemDiaPagamento, expectedDate);
-      if (hasWarningPrazo) {
-        issues.push(
-          paymentDateSource === 'ob'
-            ? 'DDF025 deve vencer e pagar no dia 20 do mes seguinte a OB de pagamento da NP.'
-            : 'DDF025 deve vencer e pagar no dia 20 do mes seguinte ao DH - Dia Pagamento.',
-        );
-      }
+    hasWarningPrazo =
+      !expectedDate ||
+      !isDateWithinPaymentWindow(row.dhItemDiaVencimento, paymentDateUsed, expectedDate) ||
+      !isDateWithinPaymentWindow(row.dhItemDiaPagamento, paymentDateUsed, expectedDate);
+    if (hasWarningPrazo) {
+      issues.push(`${expectedRule} deve vencer e pagar entre DH - Dia Pagamento e o dia 20 do mes seguinte.`);
     }
   }
 
-  if (row.dhSituacao === 'DDF021') {
-    expectedRule = 'DDF021';
+  if (SITUACOES_PRAZO_GRUPO_DDF021.has(situacao)) {
+    expectedRule = situacao as 'DDF021' | 'DDF050';
     paymentDateSource = 'dh';
-    paymentDateUsed = row.dhDataEmissaoDocOrigem;
-    expectedDate = getExpectedNextMonthDay20(row.dhDataEmissaoDocOrigem);
+    paymentDateUsed = row.dhDiaPagamento;
+    expectedDate = getExpectedNextMonthDay20(paymentDateUsed);
     hasWarningPrazo =
       !expectedDate ||
-      !sameIsoDate(row.dhItemDiaVencimento, expectedDate) ||
-      !sameIsoDate(row.dhItemDiaPagamento, expectedDate);
+      !isDateWithinPaymentWindow(row.dhItemDiaVencimento, paymentDateUsed, expectedDate) ||
+      !isDateWithinPaymentWindow(row.dhItemDiaPagamento, paymentDateUsed, expectedDate);
     if (hasWarningPrazo) {
-      issues.push('DDF021 deve vencer e pagar no dia 20 do mes seguinte a DH - Data Emissao Doc.Origem.');
+      issues.push(`${expectedRule} deve vencer e pagar entre DH - Dia Pagamento e o dia 20 do mes seguinte.`);
     }
   }
 

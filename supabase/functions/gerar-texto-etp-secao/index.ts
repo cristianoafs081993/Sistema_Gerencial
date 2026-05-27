@@ -179,6 +179,7 @@ function buildPrompt(request: EtpSectionTextRequest) {
     'Se o usuario nao informou nada, gere mesmo assim um texto preliminar util, mas use marcadores [CAMPO PENDENTE: ...] para dados concretos ausentes.',
     'Nao invente numeros, datas, valores, locais, nomes de unidades ou fatos especificos sem fonte.',
     'O foco da secao e sempre a pergunta atual, o objeto da contratacao, o processo e as respostas ja aprovadas pelo usuario. Anexos auxiliares opcionais nunca definem o tema, o escopo ou a narrativa central da secao.',
+    'Evite repetir muitas vezes a mesma informacao ja usada em respostas anteriores; quando um dado contextual ja estiver estabelecido, use-o apenas se ele for relevante para a secao atual.',
     'Use anexos auxiliares apenas como apoio para localizar informacoes especificas que respondam diretamente a pergunta atual, como piso salarial, quantitativo, memoria de calculo, vigencia, local de execucao ou regra tecnica pontual.',
     'Se um anexo tratar de assunto amplo, paralelo ou diferente da pergunta/objeto/respostas/processo, ignore o conteudo que nao responde diretamente a lacuna da secao. Nao resuma anexos nem transforme a secao em explicacao sobre o anexo.',
     'Quando houver conflito entre anexo auxiliar e objeto manual, processo ou resposta aprovada, preserve o foco definido pelo objeto/processo/resposta e marque pendencia para revisao se necessario.',

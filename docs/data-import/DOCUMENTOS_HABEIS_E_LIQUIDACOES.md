@@ -63,7 +63,7 @@ Campos esperados na UI:
 Regras de data:
 
 - `Dia Lancamento` e gravado em `documentos_habeis_itens.data_emissao` e representa a data de pagamento da OB vinculada a NP/RP.
-- Essa data tambem e usada pela auditoria FD-Reinf para calcular o vencimento esperado das situacoes `DDF025`.
+- A auditoria FD-Reinf de `Prazo inconsistente` usa `DH - Dia Pagamento` do arquivo de retencoes como inicio da janela e o dia 20 do mes seguinte como limite.
 
 ### 4. Situacoes / Retencoes
 

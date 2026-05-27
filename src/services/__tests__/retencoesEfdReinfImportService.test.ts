@@ -36,7 +36,7 @@ function createRegistro(overrides: Partial<RetencaoEfdReinfRegistro> = {}): Rete
     dhCredorNome: 'Fornecedor A',
     dhSituacao: 'DDF025',
     dhDataEmissaoDocOrigem: '2026-01-01',
-    dhDiaPagamento: '2026-03-15',
+    dhDiaPagamento: '2026-01-15',
     dhItemDiaVencimento: '2026-02-20',
     dhItemDiaPagamento: '2026-02-20',
     dhItemLiquidado: true,
@@ -126,7 +126,7 @@ describe('retencoesEfdReinfImportService', () => {
     },
   );
 
-  it('usa a data da OB de pagamento como base da DDF025', () => {
+  it('aceita DDF025 quando vencimento e pagamento ficam entre DH pgto e o dia 20 do mes seguinte', () => {
     const validation = validateRetencaoEfdReinfRow(createRegistro(), {
       obPaymentDates: new Map([['2026NP000421', '2026-01-08']]),
     });
@@ -136,54 +136,125 @@ describe('retencoesEfdReinfImportService', () => {
       hasWarningPrazo: false,
       expectedDate: '2026-02-20',
       expectedRule: 'DDF025',
-      paymentDateSource: 'ob',
-      paymentDateUsed: '2026-01-08',
+      paymentDateSource: 'dh',
+      paymentDateUsed: '2026-01-15',
     });
   });
 
-  it('ignora DH - Dia Pagamento para DDF025 quando ha OB vinculada', () => {
+  it('aplica a regra de prazo de DDF025 tambem para DDF055', () => {
     const validation = validateRetencaoEfdReinfRow(createRegistro({
-      dhDiaPagamento: '2026-12-31',
-      dhItemDiaVencimento: '2026-02-20',
-      dhItemDiaPagamento: '2026-02-20',
-    }), {
-      obPaymentDates: new Map([['2026NP000421', '2026-01-08']]),
-    });
-
-    expect(validation.hasWarningPrazo).toBe(false);
-    expect(validation.expectedDate).toBe('2026-02-20');
-  });
-
-  it('alerta quando vencimento ou pagamento divergir da data esperada pela OB', () => {
-    const validation = validateRetencaoEfdReinfRow(createRegistro({
+      dhSituacao: 'DDF055',
+      dhDiaPagamento: '2026-01-15',
       dhItemDiaVencimento: '2026-02-21',
       dhItemDiaPagamento: '2026-02-20',
-    }), {
-      obPaymentDates: new Map([['2026NP000421', '2026-01-08']]),
-    });
+    }));
 
     expect(validation).toMatchObject({
       severity: 'warning',
       hasWarningPrazo: true,
       expectedDate: '2026-02-20',
-      paymentDateSource: 'ob',
+      expectedRule: 'DDF055',
+      paymentDateSource: 'dh',
     });
-    expect(validation.issues).toContain('DDF025 deve vencer e pagar no dia 20 do mes seguinte a OB de pagamento da NP.');
+    expect(validation.issues).toContain('DDF055 deve vencer e pagar entre DH - Dia Pagamento e o dia 20 do mes seguinte.');
   });
 
-  it('alerta quando DDF025 nao tiver OB de pagamento localizada', () => {
+  it('ignora OB vinculada na regra de prazo e usa DH - Dia Pagamento', () => {
+    const validation = validateRetencaoEfdReinfRow(createRegistro({
+      dhDiaPagamento: '2026-03-15',
+      dhItemDiaVencimento: '2026-04-20',
+      dhItemDiaPagamento: '2026-04-20',
+    }), {
+      obPaymentDates: new Map([['2026NP000421', '2026-01-08']]),
+    });
+
+    expect(validation.hasWarningPrazo).toBe(false);
+    expect(validation.expectedDate).toBe('2026-04-20');
+    expect(validation.paymentDateUsed).toBe('2026-03-15');
+  });
+
+  it('alerta quando vencimento ou pagamento for posterior ao dia 20 do mes seguinte ao DH pgto', () => {
+    const validation = validateRetencaoEfdReinfRow(createRegistro({
+      dhDiaPagamento: '2026-01-15',
+      dhItemDiaVencimento: '2026-02-21',
+      dhItemDiaPagamento: '2026-02-20',
+    }));
+
+    expect(validation).toMatchObject({
+      severity: 'warning',
+      hasWarningPrazo: true,
+      expectedDate: '2026-02-20',
+      paymentDateSource: 'dh',
+    });
+    expect(validation.issues).toContain('DDF025 deve vencer e pagar entre DH - Dia Pagamento e o dia 20 do mes seguinte.');
+  });
+
+  it('alerta quando vencimento ou pagamento for anterior ao DH pgto', () => {
+    const validation = validateRetencaoEfdReinfRow(createRegistro({
+      dhDiaPagamento: '2026-01-15',
+      dhItemDiaVencimento: '2026-01-14',
+      dhItemDiaPagamento: '2026-02-20',
+    }));
+
+    expect(validation).toMatchObject({
+      severity: 'warning',
+      hasWarningPrazo: true,
+      expectedDate: '2026-02-20',
+      paymentDateSource: 'dh',
+    });
+    expect(validation.issues).toContain('DDF025 deve vencer e pagar entre DH - Dia Pagamento e o dia 20 do mes seguinte.');
+  });
+
+  it('nao depende de OB de pagamento localizada para validar prazo', () => {
     const validation = validateRetencaoEfdReinfRow(createRegistro(), {
       obPaymentDates: new Map(),
     });
 
     expect(validation).toMatchObject({
+      severity: 'ok',
+      hasWarningPrazo: false,
+      expectedDate: '2026-02-20',
+      paymentDateSource: 'dh',
+      paymentDateUsed: '2026-01-15',
+    });
+  });
+
+  it('aplica a mesma janela por DH pgto para DDF021', () => {
+    const validation = validateRetencaoEfdReinfRow(createRegistro({
+      dhSituacao: 'DDF021',
+      dhDiaPagamento: '2026-03-15',
+      dhItemDiaVencimento: '2026-04-20',
+      dhItemDiaPagamento: '2026-04-21',
+    }));
+
+    expect(validation).toMatchObject({
       severity: 'warning',
       hasWarningPrazo: true,
-      expectedDate: null,
-      paymentDateSource: 'missing-ob',
-      paymentDateUsed: null,
+      expectedDate: '2026-04-20',
+      expectedRule: 'DDF021',
+      paymentDateSource: 'dh',
+      paymentDateUsed: '2026-03-15',
     });
-    expect(validation.issues).toContain('DDF025 sem OB de pagamento localizada para calcular o vencimento esperado.');
+    expect(validation.issues).toContain('DDF021 deve vencer e pagar entre DH - Dia Pagamento e o dia 20 do mes seguinte.');
+  });
+
+  it('aplica a regra de prazo de DDF021 tambem para DDF050', () => {
+    const validation = validateRetencaoEfdReinfRow(createRegistro({
+      dhSituacao: 'DDF050',
+      dhDiaPagamento: '2026-03-15',
+      dhItemDiaVencimento: '2026-04-20',
+      dhItemDiaPagamento: '2026-04-21',
+    }));
+
+    expect(validation).toMatchObject({
+      severity: 'warning',
+      hasWarningPrazo: true,
+      expectedDate: '2026-04-20',
+      expectedRule: 'DDF050',
+      paymentDateSource: 'dh',
+      paymentDateUsed: '2026-03-15',
+    });
+    expect(validation.issues).toContain('DDF050 deve vencer e pagar entre DH - Dia Pagamento e o dia 20 do mes seguinte.');
   });
 
   it('carrega a primeira OB de pagamento por NP e usa retencao apenas como fallback', async () => {

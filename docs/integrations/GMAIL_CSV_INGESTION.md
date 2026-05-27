@@ -24,6 +24,7 @@ Automatizar a ingestao dos CSVs recebidos por e-mail no Gmail, sem depender do u
 - `lc`
 - `retencoes_efd_reinf`
 - `descentralizacoes`
+- `descentralizacoes_conta_saldos`
 - `documentos_habeis`
 - `liquidacoes`
 - `ordens_bancarias`
@@ -43,7 +44,10 @@ Se a deteccao automatica falhar, a function retorna erro e o e-mail deve ficar c
 
 - PFs continuam fora desse fluxo porque o processo atual depende de dois arquivos correlacionados.
 - Devolucoes de descentralizacoes continuam exigindo validacao operacional separada; o fluxo de e-mail automatiza o CSV principal de descentralizacoes.
+- A conta de descentralizacoes e aceita como fluxo agregado separado quando o arquivo/assunto indicar conta de descentralizacoes; esse pipeline grava `descentralizacoes_conta_saldos`, nao a tabela detalhada `descentralizacoes`.
 - No pipeline `descentralizacoes`, a ingestao por e-mail aplica a mesma regra do upload principal: `NC Celula - Tipo = DESTINO` entra positivo; `ORIGEM` so entra negativo em anulacao; `ORIGEM` sem anulacao e ignorado; quando a coluna de tipo nao existir, a ingestao conserva a regra historica e ignora origens inferidas em pares `339000` mais outra natureza da mesma NC/data/descricao/PTRES/PI/valor.
+- Em relatorios de credito disponivel e conta de descentralizacoes, a terceira coluna de valor pode vir sem cabecalho; a ingestao so grava linhas com valor efetivamente preenchido e parseavel para evitar sobrescrever saldos com zero por coluna nao reconhecida.
+- Em `retencoes_efd_reinf`, alguns exports reais deixam o nome do credor na coluna sem cabecalho apos `DH - Credor` e o valor da retencao na ultima coluna sem cabecalho; a ingestao por e-mail usa essas colunas sem nome como `dhCredorNome` e `valorRetencao`, e tambem normaliza variacoes de `DH Item - Liquidado (S/N)`.
 
 ## Script do Gmail
 

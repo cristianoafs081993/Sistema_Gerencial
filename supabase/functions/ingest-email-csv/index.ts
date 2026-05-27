@@ -4,6 +4,7 @@ import {
   decodeCsvBytes,
   extractEmailAddress,
   parseEmailCsvImport,
+  type ContaDescentralizacaoSaldoImportRow,
   type CreditoDisponivelImportRow,
   type DescentralizacaoImportRow,
   type EmailCsvPipelineHint,
@@ -403,6 +404,28 @@ async function applyDescentralizacoesImport(
   };
 }
 
+async function applyContaDescentralizacoesImport(
+  supabase: ReturnType<typeof createClient>,
+  rows: ContaDescentralizacaoSaldoImportRow[],
+) {
+  const timestamp = new Date().toISOString();
+  const payload = rows.map((row) => ({
+    ptres: row.ptres,
+    metrica: row.metrica,
+    valor: row.valor,
+    updated_at: timestamp,
+  }));
+
+  await upsertInChunks(supabase, 'descentralizacoes_conta_saldos', payload, 'ptres');
+
+  return {
+    pipeline: 'descentralizacoes_conta_saldos' as const,
+    rowsDetected: rows.length,
+    rowsWritten: payload.length,
+    tableStats: [{ table: 'descentralizacoes_conta_saldos', rows: payload.length }],
+  };
+}
+
 async function applyDocumentosHabeisImport(
   supabase: ReturnType<typeof createClient>,
   parsed: Extract<ParsedEmailCsvImport, { pipeline: 'documentos_habeis' }>,
@@ -767,6 +790,8 @@ async function applyParsedImport(
       return await applyRetencoesEfdReinfImport(supabase, parsed.rows, sourceFile);
     case 'descentralizacoes':
       return await applyDescentralizacoesImport(supabase, parsed.rows);
+    case 'descentralizacoes_conta_saldos':
+      return await applyContaDescentralizacoesImport(supabase, parsed.rows);
     case 'documentos_habeis':
       return await applyDocumentosHabeisImport(supabase, parsed);
     case 'liquidacoes':

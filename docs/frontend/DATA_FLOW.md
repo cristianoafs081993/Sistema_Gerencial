@@ -180,7 +180,7 @@ Observacao para a aba de exercicio atual do dashboard:
 Observacoes:
 
 - a tela carrega a ultima base importada de `retencoes_efd_reinf`
-- para situacoes `DDF025`, o service localiza a OB de pagamento em `documentos_habeis_itens`, exibe o numero da OB vinculada e usa sua data para calcular o vencimento esperado
+- para situacoes `DDF025`, `DDF055`, `DDF021` e `DDF050`, o service marca `Prazo inconsistente` quando `DH Item - Dia Vencimento` ou `DH Item - Dia Pagamento` fica antes de `DH - Dia Pagamento` ou depois do dia 20 do mes seguinte a `DH - Dia Pagamento`
 - o checkbox de correcao atualiza `retencoes_efd_reinf.correcao_realizada`; registros marcados deixam os filtros e contadores de pendencias abertas, mas seguem visiveis na auditoria geral
 
 ### Contratos

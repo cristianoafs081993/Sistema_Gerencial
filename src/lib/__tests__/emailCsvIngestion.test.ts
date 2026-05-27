@@ -165,6 +165,29 @@ describe('emailCsvIngestion', () => {
     });
   });
 
+  it('ignora origem inferida mesmo quando a coluna de operacao diverge entre as linhas pareadas', () => {
+    const parsed = parseEmailCsvImport({
+      fileName: 'descentralizacoes.csv',
+      text: [
+        'NC\tNC - Operacao (Tipo)\tNC - Dia Emissao\tNC - Descricao\tNC Celula - PTRES\tNC Celula - Natureza Despesa\tNC Celula - Plano Interno\tNC Celula - Valor',
+        '158155264352026NC000283\tDESCENTRALIZACAO DE CREDITO\t15/04/2026\tPROCESSO 23421.001340.2026-40\t260296\t339000\tL21IHP19ENN\t25.600,00',
+        '158155264352026NC000283\tCREDITO RECEBIDO\t15/04/2026\tPROCESSO 23421.001340.2026-40\t260296\t339037\tL21IHP19ENN\t25.600,00',
+      ].join('\n'),
+    });
+
+    expect(parsed.pipeline).toBe('descentralizacoes');
+    if (parsed.pipeline !== 'descentralizacoes') {
+      throw new Error('pipeline inesperado');
+    }
+
+    expect(parsed.rows).toHaveLength(1);
+    expect(parsed.rows[0]).toMatchObject({
+      notaCredito: '2026NC000283',
+      naturezaDespesa: '339000',
+      valor: 25600,
+    });
+  });
+
   it('mantem linhas distintas quando a mesma NC vier quebrada em planos internos diferentes', () => {
     const parsed = parseEmailCsvImport({
       fileName: 'descentralizacoes.csv',
@@ -209,6 +232,32 @@ describe('emailCsvIngestion', () => {
       dhSituacao: 'DDF025',
       dhItemLiquidado: true,
       valorRetencao: 110,
+    });
+  });
+
+  it('le retencoes FD-Reinf quando o valor da retencao vem em coluna sem cabecalho', () => {
+    const parsed = parseEmailCsvImport({
+      fileName: '22 - Retencoes.csv',
+      text: [
+        '"Documento Habil","DH - Processo","DH - Estado","DH - UG Pagadora","DH Item - UG Pagadora","DH - Credor",,"DH - Situacao","DH - Data Emissao Doc.Origem","DH - Dia Pagamento","DH Item - Dia Vencimento","DH Item - Dia Pagamento","DH Item - Liquidado (S/N)","DH - Valor Doc.Origem","Metrica",',
+        '"158366264352026NP000009","23035.000131/2026-32","REALIZADO","158366","158155","18891594000133","ELITE EMPRESA","DDF021","07/01/2026","30/01/2026","20/02/2026","20/02/2026","SIM","9385,19","Atual","1.032,37"',
+      ].join('\n'),
+    });
+
+    expect(parsed.pipeline).toBe('retencoes_efd_reinf');
+    if (parsed.pipeline !== 'retencoes_efd_reinf') {
+      throw new Error('pipeline inesperado');
+    }
+
+    expect(parsed.rows).toHaveLength(1);
+    expect(parsed.rows[0]).toMatchObject({
+      documentoHabil: '158366264352026NP000009',
+      dhCredorDocumento: '18891594000133',
+      dhCredorNome: 'ELITE EMPRESA',
+      dhSituacao: 'DDF021',
+      dhValorDocOrigem: 9385.19,
+      metrica: 'Atual',
+      valorRetencao: 1032.37,
     });
   });
 
@@ -257,6 +306,54 @@ describe('emailCsvIngestion', () => {
         ptres: '123456',
         metrica: 'Disponivel',
         valor: 150,
+      },
+    ]);
+  });
+
+  it('le creditos disponiveis quando a coluna de valor vem sem cabecalho', () => {
+    const parsed = parseEmailCsvImport({
+      fileName: 'credito-disponivel.csv',
+      text: [
+        '"PTRES"\t"Metrica"\t""',
+        '"230446"\t"Saldo - Moeda Origem (Conta Contabil)"\t"12.345,67"',
+        '"230446"\t"Saldo - Moeda Origem (Conta Contabil)"\t""',
+      ].join('\n'),
+    });
+
+    expect(parsed.pipeline).toBe('creditos_disponiveis');
+    if (parsed.pipeline !== 'creditos_disponiveis') {
+      throw new Error('pipeline inesperado');
+    }
+
+    expect(parsed.rows).toEqual([
+      {
+        ptres: '230446',
+        metrica: 'Saldo - Moeda Origem (Conta Contabil)',
+        valor: 12345.67,
+      },
+    ]);
+  });
+
+  it('roteia conta de descentralizacoes para a tabela de saldos agregados', () => {
+    const parsed = parseEmailCsvImport({
+      fileName: '13 - Conta descentralizacoes.csv',
+      text: [
+        '"PTRES"\t"Metrica"\t""',
+        '"231796"\t"Saldo - Moeda Origem (Conta Contabil)"\t"3.217,50"',
+        '"231796"\t"Saldo - Moeda Origem (Conta Contabil)"\t"782,50"',
+      ].join('\n'),
+    });
+
+    expect(parsed.pipeline).toBe('descentralizacoes_conta_saldos');
+    if (parsed.pipeline !== 'descentralizacoes_conta_saldos') {
+      throw new Error('pipeline inesperado');
+    }
+
+    expect(parsed.rows).toEqual([
+      {
+        ptres: '231796',
+        metrica: 'Saldo - Moeda Origem (Conta Contabil)',
+        valor: 4000,
       },
     ]);
   });

@@ -555,6 +555,7 @@ Observacao:
 - se nao houver chave Gemini, a function devolve texto local de apoio para revisao
 - se a chamada a function falhar no frontend por indisponibilidade, CORS ou function ainda nao publicada, `preliminaryStudiesService.generateQuestionText` devolve texto local de apoio para nao bloquear o preenchimento da secao
 - anexos auxiliares opcionais entram apenas como apoio pontual da pergunta atual; se nao houver relacao clara com a secao, a function deve ignorar o anexo e manter o foco no objeto, processo, notas e respostas ja registradas
+- a geracao orienta a IA a evitar repetir excessivamente dados contextuais ja estabelecidos em respostas anteriores, usando-os novamente apenas quando forem relevantes para a secao atual
 - contexto institucional do `Campus Currais Novos` identifica a unidade demandante real e nao deve ser convertido em exemplo dentro de marcador pendente
 
 ## 7A. Edge Function `invite-user`

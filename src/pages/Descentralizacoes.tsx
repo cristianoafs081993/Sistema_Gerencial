@@ -99,6 +99,15 @@ function parseValorBR(valorStr: string): number {
     return parseFloat(cleaned) || 0;
 }
 
+function normalizeImportComparison(value: string): string {
+    return String(value || '')
+        .trim()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .toUpperCase();
+}
+
 export default function Descentralizacoes() {
     const { isSuperAdmin } = useAuth();
     const {
@@ -241,7 +250,6 @@ export default function Descentralizacoes() {
 
         const buildPairKey = (info: {
             notaCredito: string;
-            operacaoTipo: string;
             dateKey: string;
             descricao: string;
             planoInterno: string;
@@ -250,9 +258,8 @@ export default function Descentralizacoes() {
         }) =>
             [
                 info.notaCredito,
-                info.operacaoTipo.trim().toUpperCase(),
                 info.dateKey,
-                info.descricao.trim().toUpperCase(),
+                normalizeImportComparison(info.descricao),
                 info.planoInterno,
                 info.origemRecurso,
                 Math.abs(info.valorBruto),
