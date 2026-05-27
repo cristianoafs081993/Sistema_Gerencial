@@ -51,6 +51,10 @@ vi.mock('@/pages/Empenhos', () => ({
   default: () => <div>empenhos-page</div>,
 }));
 
+vi.mock('@/pages/CreditoDisponivel', () => ({
+  default: () => <div>credito-disponivel-page</div>,
+}));
+
 vi.mock('@/pages/Contratos', () => ({
   default: () => <div>contratos-page</div>,
 }));
@@ -126,6 +130,14 @@ describe('App routes', () => {
     render(<App />);
 
     expect(await screen.findByText('empenhos-page')).toBeInTheDocument();
+  });
+
+  it('renderiza a rota de credito disponivel', async () => {
+    window.history.pushState({}, '', '/credito-disponivel');
+
+    render(<App />);
+
+    expect(await screen.findByText('credito-disponivel-page')).toBeInTheDocument();
   });
 
   it('renderiza a rota de planejamento', async () => {

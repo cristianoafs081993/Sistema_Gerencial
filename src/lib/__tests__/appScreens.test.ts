@@ -3,6 +3,7 @@ import { ADMIN_USERS_SCREEN_ID, appScreens, getScreenForPath, isProductionScreen
 describe('app screen registry', () => {
   it('mapeia rotas diretas e escopos de planejamento para telas cadastradas', () => {
     expect(getScreenForPath('/empenhos')?.id).toBe('empenhos');
+    expect(getScreenForPath('/credito-disponivel')?.id).toBe('credito-disponivel');
     expect(getScreenForPath('/planejamento/campus')?.id).toBe('planejamento');
     expect(getScreenForPath('/economia-tempo')?.id).toBe('economia-tempo');
     expect(getScreenForPath('/modelos-documentos')?.id).toBe('modelos-documentos');
@@ -15,6 +16,7 @@ describe('app screen registry', () => {
 
     expect(directorScreenIds).toContain('dashboard');
     expect(directorScreenIds).toContain('contratos');
+    expect(directorScreenIds).toContain('credito-disponivel');
     expect(directorScreenIds).toContain('artefatos-licitacao');
     expect(directorScreenIds).toContain('licitacoes-pregoes');
     expect(directorScreenIds).toContain('economia-tempo');

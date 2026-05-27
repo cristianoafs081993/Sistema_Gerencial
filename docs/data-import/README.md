@@ -23,6 +23,7 @@ Sem isso, uma IA tende a errar porque tenta inferir o contrato lendo somente a U
 - [PFS.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/data-import/PFS.md)
 - [RETENCOES_EFD_REINF.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/data-import/RETENCOES_EFD_REINF.md)
 - [DOCUMENTOS_HABEIS_E_LIQUIDACOES.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/data-import/DOCUMENTOS_HABEIS_E_LIQUIDACOES.md)
+- [CREDITOS_DISPONIVEIS.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/data-import/CREDITOS_DISPONIVEIS.md)
 
 ## Fixture files uteis
 
@@ -33,6 +34,7 @@ Arquivos reais de operacao presentes em [docs](/C:/Users/crist/OneDrive/Desktop/
 - `2 - Descentralizacoes.csv`
 - `NC-ATUALIZADA.csv`
 - `Exec_NE_Exercicio_RAP_UG_Executora.csv`
+- `3 - Credito Disponivel.csv`
 - `PFs.xlsx`
 - `PFs - liberacao de recurso.xlsx`
 - `Relatorio.xlsx`
@@ -83,4 +85,5 @@ Arquivos reais de operacao presentes em [docs](/C:/Users/crist/OneDrive/Desktop/
 - hoje o fluxo automatizado cobre os pipelines CSV de arquivo unico
 - o CSV de conta agregada de descentralizacoes recebido por e-mail e tratado como pipeline proprio e grava `descentralizacoes_conta_saldos`; a terceira coluna de valor pode vir sem cabecalho
 - nos CSVs de credito disponivel recebidos por e-mail, linhas sem valor preenchido ou parseavel sao ignoradas para nao sobrescrever saldos com zero
+- o upload manual em `/credito-disponivel` tambem aceita o relatorio detalhado `PTRES / PI / descricao / Metrica / Valor`, ainda que descricao e valor venham em colunas sem cabecalho; ele persiste snapshots em `creditos_disponiveis_detalhes` e mantem o agregado legado por PTRES
 - PFs continuam fora da automacao porque exigem correlacao entre dois arquivos

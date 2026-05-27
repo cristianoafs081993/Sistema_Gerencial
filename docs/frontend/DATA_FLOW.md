@@ -66,6 +66,10 @@ Paginas que dependem fortemente disso:
 - [Empenhos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Empenhos.tsx)
 - [Descentralizacoes.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Descentralizacoes.tsx)
 
+Consulta dedicada com React Query:
+
+- [CreditoDisponivel.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/CreditoDisponivel.tsx) consulta o snapshot mais recente em `creditos_disponiveis_detalhes`, com filtro e paginacao por PI; seu upload atualiza tambem o agregado `creditos_disponiveis`. A tela de Empenhos nao apresenta mais cards nem importacao de credito disponivel.
+
 Observacao:
 
 - a pagina [Atividades.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Atividades.tsx) agora atende a rota `/planejamento/:scope`
