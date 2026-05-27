@@ -588,13 +588,13 @@ Observacoes operacionais:
 - RLS permite leitura a usuarios autenticados, insercao pelo usuario autenticado e update/delete apenas pelo criador ou superadmin
 - anexos auxiliares do ETP continuam fora desta tabela; somente snippets e metadados derivados podem ser persistidos
 
-## Licitacoes e pregoes PNCP
+## Licitacoes, pregoes PNCP e ARP
 
 ### `licitacoes_pncp`
 
 Finalidade:
 
-- espelho materializado das contratacoes do PNCP usadas na tela de pregoes IFRN
+- espelho materializado das contratacoes do PNCP usadas na tela de pregoes por UASG
 - fonte primaria da lista `/licitacoes-pregoes`
 
 Campos-chave:
@@ -622,8 +622,8 @@ Observacoes operacionais:
 
 - a chave unica e `numero_controle_pncp`
 - a v1 sincroniza pregao eletronico (`codigoModalidadeContratacao = 6`) no PNCP
-- o filtro por UASG no PNCP exige tambem o CNPJ do orgao IFRN `10877412000168`
-- `Compras.gov.br` entra apenas como enriquecimento best-effort no catalogo de UASG; a lista nao depende dele
+- o filtro por UASG no PNCP exige tambem CNPJ; UASGs IFRN usam catalogo interno e UASGs externas usam resolucao best-effort via Compras.gov.br
+- `Compras.gov.br` entra como enriquecimento best-effort no catalogo de UASG; a lista de pregoes vem do PNCP
 - leitura fica liberada para usuarios autenticados; escrita ocorre pela Edge Function com service role
 
 ### `licitacoes_pncp_sync_runs`
@@ -654,6 +654,110 @@ Finalidade:
 Observacao:
 
 - a tabela nao e fonte de verdade da lista de pregoes; ela apenas melhora exibicao e filtros quando disponivel
+- a migration `20260505213000_seed_ifrn_licitacoes_pncp_uasgs.sql` materializa o cache interno IFRN com 19 UASGs unicas, todas com `cnpj_orgao = 10877412000168` e `codigo_orgao = 26435`, evitando consultar o endpoint instavel de UASG do Compras.gov.br para as unidades conhecidas
+
+### `atas_registro_precos`
+
+Finalidade:
+
+- espelho materializado das Atas de Registro de Precos/ARP retornadas pelos Dados Abertos Compras.gov.br
+- base da tela `/atas-registro-precos`
+
+Campos-chave:
+
+- `ata_key`
+- `numero_ata`
+- `numero_compra`
+- `ano_compra`
+- `unidade_gerenciadora_codigo`
+- `unidade_gerenciadora_nome`
+- `objeto`
+- `data_vigencia_inicial`
+- `data_vigencia_final`
+- `raw_data`
+
+Observacoes operacionais:
+
+- a chave unica e `ata_key`, derivada de unidade gerenciadora e numero da ata
+- leitura fica liberada para usuarios autenticados; escrita ocorre pela Edge Function com service role
+
+### `atas_registro_precos_itens`
+
+Finalidade:
+
+- itens das ARPs, com fornecedor, descricao, quantidade e valores quando retornados pela API
+
+Campos-chave:
+
+- `item_key`
+- `ata_key`
+- `numero_item`
+- `codigo_item`
+- `descricao_item`
+- `fornecedor_ni`
+- `valor_total`
+
+### `atas_registro_precos_unidades`
+
+Finalidade:
+
+- unidades participantes por item de ARP, vindas de `modulo-arp/3_consultarUnidadesItem`
+- preserva `raw_data.tipoUnidade`, usado pela view de resumo para nao tratar a unidade gerenciadora como participante
+
+Campos-chave:
+
+- `unidade_item_key`
+- `item_key`
+- `ata_key`
+- `unidade_codigo`
+- `quantidade_autorizada`
+- `saldo_quantidade`
+
+### `atas_registro_precos_adesoes`
+
+Finalidade:
+
+- adesoes por item de ARP, vindas de `modulo-arp/5_consultarAdesoesItem`
+
+Campos-chave:
+
+- `adesao_key`
+- `item_key`
+- `ata_key`
+- `unidade_codigo`
+- `quantidade_aderida`
+- `valor_aderido`
+- `data_adesao`
+
+### `atas_registro_precos_resumo`
+
+Finalidade:
+
+- view agregada para listar atas com totais de itens, participantes e adesoes por unidade
+- `unidades_participantes` exclui linhas cujo `raw_data.tipoUnidade = GERENCIADORA`, mantendo o filtro `Participante` separado do filtro `Gerenciadora`
+
+Consumido por:
+
+- [atasRegistroPrecos.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/atasRegistroPrecos.ts)
+- [AtasRegistroPrecos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/AtasRegistroPrecos.tsx)
+
+### `atas_registro_precos_sync_runs`
+
+Finalidade:
+
+- trilha de execucao das sincronizacoes de ARP
+
+Campos-chave:
+
+- `started_at`
+- `finished_at`
+- `status`
+- `unidade_codigos`
+- `data_inicial`
+- `data_final`
+- `total_fetched`
+- `total_upserted`
+- `details`
 
 ## Automacoes e economia de tempo
 

@@ -128,7 +128,7 @@ describe('Layout', () => {
     expect(screen.getByText('Artefatos de Licitação')).toBeInTheDocument();
   });
 
-  it('exibe pregoes IFRN no grupo de contratos', () => {
+  it('exibe modulos de licitacoes no grupo de licitacoes', () => {
     render(
       <MemoryRouter>
         <Layout>
@@ -137,9 +137,10 @@ describe('Layout', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getAllByText('Contratos')[0]);
+    fireEvent.click(screen.getByText('Licitações'));
 
-    expect(screen.getByText('Pregões IFRN')).toBeInTheDocument();
+    expect(screen.getByText('Pregões por UASG')).toBeInTheDocument();
+    expect(screen.getByText('Atas e ARP')).toBeInTheDocument();
   });
 
   it('mantem a ordem dos tipos do editor na sidebar', () => {

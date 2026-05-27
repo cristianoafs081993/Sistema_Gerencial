@@ -1,7 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 
 import {
+  DEFAULT_PNCP_UASGS,
   DEFAULT_PNCP_UASG,
+  IFRN_UASG_CATALOG,
   IFRN_CNPJ,
   PREGAO_ELETRONICO_MODALIDADE_ID,
   mapPncpCompra,
@@ -15,6 +17,9 @@ const PNCP_API_BASE = 'https://pncp.gov.br/api/consulta';
 const COMPRAS_DADOS_ABERTOS_BASE = 'https://dadosabertos.compras.gov.br';
 const DEFAULT_PAGE_SIZE = 50;
 const DEFAULT_LOOKBACK_DAYS = 364;
+const PNCP_PAGE_TIMEOUT_MS = 120000;
+const PNCP_DETAIL_TIMEOUT_MS = 60000;
+const INTERNAL_UASG_CATALOG = new Map(IFRN_UASG_CATALOG.map((item) => [item.codigo, item]));
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,6 +36,7 @@ type SyncRequest = {
   dataFinal?: string;
   modalidadeId?: number;
   source?: string;
+  objetoBusca?: string;
   enrichUasgs?: boolean;
 };
 
@@ -38,6 +44,30 @@ type PncpPage = {
   data?: PncpCompraRaw[];
   totalPaginas?: number;
   paginasRestantes?: number;
+};
+
+type ComprasUasgRow = {
+  codigo_uasg: string;
+  nome_uasg: string | null;
+  codigo_orgao: string | null;
+  cnpj_orgao: string | null;
+  sigla_uf: string | null;
+  codigo_municipio_ibge: string | null;
+  nome_municipio_ibge: string | null;
+  codigo_unidade_polo: string | null;
+  nome_unidade_polo: string | null;
+  raw_data: Record<string, unknown>;
+};
+
+type UnidadeContext = {
+  unidadeCodigo: string;
+  cnpj: string;
+  uasgData: ComprasUasgRow | null;
+};
+
+type CollectedPncpCompra = {
+  cnpj: string;
+  row: PncpCompraRaw;
 };
 
 function jsonResponse(body: unknown, status = 200) {
@@ -113,9 +143,27 @@ function normalizeUnidadeCodigos(body: SyncRequest) {
       ? [body.unidadeCodigo]
       : configured?.length
         ? configured
-        : [DEFAULT_PNCP_UASG];
+        : DEFAULT_PNCP_UASGS;
 
   return Array.from(new Set(requested.map((value) => String(value ?? '').trim()).filter(Boolean)));
+}
+
+function onlyDigits(value: unknown) {
+  return String(value ?? '').replace(/\D/g, '');
+}
+
+function normalizeSearchText(value: unknown) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
+function matchesObjetoBusca(row: PncpCompraRaw, objetoBusca?: string) {
+  const needle = normalizeSearchText(objetoBusca);
+  if (!needle) return true;
+  return normalizeSearchText(row.objetoCompra).includes(needle);
 }
 
 async function fetchWithTimeout(url: string, timeoutMs = 30000) {
@@ -141,19 +189,44 @@ async function fetchJson<T>(url: string, timeoutMs = 30000): Promise<T | null> {
   return response.json() as Promise<T>;
 }
 
+async function fetchJsonWithRetry<T>(url: string, timeoutMs = 30000, attempts = 2): Promise<T | null> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await fetchJson<T>(url, timeoutMs);
+    } catch (error) {
+      lastError = error;
+      const message = errorToMessage(error);
+      const retryable = /aborted|timeout|fetch failed|network/i.test(message);
+      if (!retryable || attempt === attempts) break;
+    }
+  }
+  throw lastError;
+}
+
+async function fetchText(url: string, timeoutMs = 30000): Promise<string | null> {
+  const response = await fetchWithTimeout(url, timeoutMs);
+  if (response.status === 204) return null;
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`API ${response.status} em ${url}: ${body.slice(0, 300)}`);
+  }
+  return response.text();
+}
+
 async function mapWithConcurrency<T, R>(
   items: T[],
   worker: (item: T) => Promise<R>,
   concurrency = 4,
 ): Promise<R[]> {
-  const results: R[] = [];
-  const queue = [...items];
+  const results: R[] = new Array(items.length);
+  const queue = items.map((item, index) => ({ item, index }));
 
   const runners = Array.from({ length: Math.min(concurrency, items.length) }).map(async () => {
     while (queue.length > 0) {
-      const item = queue.shift();
-      if (!item) break;
-      results.push(await worker(item));
+      const next = queue.shift();
+      if (!next) break;
+      results[next.index] = await worker(next.item);
     }
   });
 
@@ -177,12 +250,11 @@ async function upsertInChunks(
 ) {
   let count = 0;
   for (const rowChunk of chunk(rows, 500)) {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from(table)
-      .upsert(rowChunk, { onConflict })
-      .select('id');
+      .upsert(rowChunk, { onConflict });
     if (error) throw error;
-    count += data?.length ?? rowChunk.length;
+    count += rowChunk.length;
   }
   return count;
 }
@@ -205,7 +277,11 @@ async function fetchPncpPage(params: {
     tamanhoPagina: String(DEFAULT_PAGE_SIZE),
   });
 
-  return fetchJson<PncpPage>(`${PNCP_API_BASE}/v1/contratacoes/publicacao?${search.toString()}`, 45000);
+  return fetchJsonWithRetry<PncpPage>(
+    `${PNCP_API_BASE}/v1/contratacoes/publicacao?${search.toString()}`,
+    PNCP_PAGE_TIMEOUT_MS,
+    2,
+  );
 }
 
 async function fetchPncpDetail(cnpj: string, compra: PncpCompraRaw) {
@@ -216,7 +292,7 @@ async function fetchPncpDetail(cnpj: string, compra: PncpCompraRaw) {
   try {
     return await fetchJson<PncpCompraRaw>(
       `${PNCP_API_BASE}/v1/orgaos/${cnpj}/compras/${ano}/${sequencial}`,
-      30000,
+      PNCP_DETAIL_TIMEOUT_MS,
     ) ?? compra;
   } catch {
     return compra;
@@ -224,15 +300,55 @@ async function fetchPncpDetail(cnpj: string, compra: PncpCompraRaw) {
 }
 
 async function fetchComprasUasg(unidadeCodigo: string) {
-  const search = new URLSearchParams({
+  const cached = INTERNAL_UASG_CATALOG.get(unidadeCodigo);
+  if (cached) {
+    return {
+      codigo_uasg: cached.codigo,
+      nome_uasg: cached.aliases?.length ? `${cached.nome} (${cached.aliases.join(', ')})` : cached.nome,
+      codigo_orgao: cached.codigoOrgao,
+      cnpj_orgao: cached.cnpj,
+      sigla_uf: 'RN',
+      codigo_municipio_ibge: null,
+      nome_municipio_ibge: null,
+      codigo_unidade_polo: null,
+      nome_unidade_polo: null,
+      raw_data: {
+        source: 'internal-ifrn-catalog',
+        codigo_uasg: cached.codigo,
+        nome_uasg: cached.nome,
+        aliases: cached.aliases ?? [],
+        cnpj_orgao: cached.cnpj,
+        codigo_orgao: cached.codigoOrgao,
+      },
+    } satisfies ComprasUasgRow;
+  }
+
+  const csvSearch = new URLSearchParams({
     codigoUasg: unidadeCodigo,
     statusUasg: 'true',
     pagina: '1',
   });
 
   try {
+    const csv = await fetchText(
+      `${COMPRAS_DADOS_ABERTOS_BASE}/modulo-uasg/1.1_consultarUasg_CSV?${csvSearch.toString()}`,
+      15000,
+    );
+    const row = parseComprasUasgCsv(csv ?? '', unidadeCodigo);
+    if (row) return row;
+  } catch {
+    // O endpoint JSON tem oscilado com 400 para UASGs ativas; manter fallback abaixo.
+  }
+
+  const jsonSearch = new URLSearchParams({
+    codigoUasg: unidadeCodigo,
+    statusUasg: 'false',
+    pagina: '1',
+  });
+
+  try {
     const response = await fetchJson<{ resultado?: Array<Record<string, unknown>> }>(
-      `${COMPRAS_DADOS_ABERTOS_BASE}/modulo-uasg/1_consultarUasg?${search.toString()}`,
+      `${COMPRAS_DADOS_ABERTOS_BASE}/modulo-uasg/1_consultarUasg?${jsonSearch.toString()}`,
       15000,
     );
     const row = response?.resultado?.[0];
@@ -249,10 +365,68 @@ async function fetchComprasUasg(unidadeCodigo: string) {
       codigo_unidade_polo: row.codigoUnidadePolo ? String(row.codigoUnidadePolo) : null,
       nome_unidade_polo: row.nomeUnidadePolo ? String(row.nomeUnidadePolo) : null,
       raw_data: row,
-    };
+    } satisfies ComprasUasgRow;
   } catch {
     return null;
   }
+}
+
+function parseComprasUasgCsv(csv: string, unidadeCodigo: string): ComprasUasgRow | null {
+  const lines = csv
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('totalRegistros:'));
+  if (lines.length < 2) return null;
+
+  const headers = lines[0].split(';').map((header) => header.trim());
+  const values = lines[1].split(';');
+  const row = Object.fromEntries(headers.map((header, index) => [header, values[index]?.trim() ?? '']));
+
+  return {
+    codigo_uasg: row.codigo_uasg || unidadeCodigo,
+    nome_uasg: row.nome_uasg || null,
+    codigo_orgao: row.codigo_orgao || null,
+    cnpj_orgao: row.cnpj_cpf_orgao || null,
+    sigla_uf: row.sigla_uf || null,
+    codigo_municipio_ibge: row.codigo_municipio_ibge || null,
+    nome_municipio_ibge: row.nome_municipio_ibge || null,
+    codigo_unidade_polo: row.codigo_unidade_polo || null,
+    nome_unidade_polo: row.nome_unidade_polo || null,
+    raw_data: row,
+  };
+}
+
+async function resolveUnidadeContexts(params: {
+  unidadeCodigos: string[];
+  requestedCnpj?: string;
+  defaultCnpj: string;
+  errors: Array<{ scope: string; message: string }>;
+}) {
+  const uasgRows = await mapWithConcurrency(params.unidadeCodigos, fetchComprasUasg, 3);
+  const contexts: UnidadeContext[] = [];
+
+  for (let index = 0; index < params.unidadeCodigos.length; index += 1) {
+    const unidadeCodigo = params.unidadeCodigos[index];
+    const uasgData = uasgRows[index] ?? null;
+    const cached = INTERNAL_UASG_CATALOG.get(unidadeCodigo);
+    const resolvedCnpj = onlyDigits(params.requestedCnpj || cached?.cnpj || uasgData?.cnpj_orgao);
+
+    if (!resolvedCnpj) {
+      if (unidadeCodigo === DEFAULT_PNCP_UASG) {
+        contexts.push({ unidadeCodigo, cnpj: params.defaultCnpj, uasgData });
+      } else {
+        params.errors.push({
+          scope: unidadeCodigo,
+          message: 'Nao foi possivel resolver o CNPJ da UASG no Compras.gov.br.',
+        });
+      }
+      continue;
+    }
+
+    contexts.push({ unidadeCodigo, cnpj: resolvedCnpj, uasgData });
+  }
+
+  return contexts;
 }
 
 async function collectPncpCompras(params: {
@@ -278,19 +452,28 @@ async function collectPncpCompras(params: {
 }
 
 async function runSync(supabase: SupabaseClient, body: SyncRequest) {
-  const cnpj = String(body.cnpjOrgao ?? Deno.env.get('LICITACOES_PNCP_CNPJ') ?? IFRN_CNPJ).replace(/\D/g, '');
+  const requestedCnpj = body.cnpjOrgao ? onlyDigits(body.cnpjOrgao) : undefined;
+  const defaultCnpj = onlyDigits(Deno.env.get('LICITACOES_PNCP_CNPJ') ?? IFRN_CNPJ);
   const unidadeCodigos = normalizeUnidadeCodigos(body);
   const defaults = defaultDateRange();
   const dataInicial = normalizePncpDate(body.dataInicial ?? defaults.dataInicial);
   const dataFinal = normalizePncpDate(body.dataFinal ?? defaults.dataFinal);
   const modalidadeId = Number(body.modalidadeId ?? PREGAO_ELETRONICO_MODALIDADE_ID);
+  const objetoBusca = body.objetoBusca?.trim() || undefined;
   const windows = splitPncpDateRange(dataInicial, dataFinal);
   const errors: Array<{ scope: string; message: string }> = [];
+  const unidadeContexts = await resolveUnidadeContexts({
+    unidadeCodigos,
+    requestedCnpj,
+    defaultCnpj,
+    errors,
+  });
+  const runCnpj = requestedCnpj || unidadeContexts[0]?.cnpj || defaultCnpj;
 
   const { data: runInsert, error: runInsertError } = await supabase
     .from('licitacoes_pncp_sync_runs')
     .insert({
-      cnpj_orgao: cnpj,
+      cnpj_orgao: runCnpj,
       unidade_codigos: unidadeCodigos,
       data_inicial: `${dataInicial.slice(0, 4)}-${dataInicial.slice(4, 6)}-${dataInicial.slice(6, 8)}`,
       data_final: `${dataFinal.slice(0, 4)}-${dataFinal.slice(4, 6)}-${dataFinal.slice(6, 8)}`,
@@ -299,6 +482,8 @@ async function runSync(supabase: SupabaseClient, body: SyncRequest) {
       details: {
         source: body.source ?? 'manual',
         enrichUasgs: body.enrichUasgs !== false,
+        objetoBusca,
+        resolvedCnpjs: Object.fromEntries(unidadeContexts.map((context) => [context.unidadeCodigo, context.cnpj])),
       },
     })
     .select('id')
@@ -309,55 +494,59 @@ async function runSync(supabase: SupabaseClient, body: SyncRequest) {
 
   try {
     if (body.enrichUasgs !== false) {
-      const uasgRows = (await mapWithConcurrency(unidadeCodigos, fetchComprasUasg, 3)).filter(Boolean);
+      const uasgRows = unidadeContexts.map((context) => context.uasgData).filter(Boolean);
       if (uasgRows.length > 0) {
         await upsertInChunks(supabase, 'licitacoes_pncp_uasgs', uasgRows as Record<string, unknown>[], 'codigo_uasg');
       }
     }
 
-    const listRows: PncpCompraRaw[] = [];
-    for (const unidadeCodigo of unidadeCodigos) {
+    const listRows: CollectedPncpCompra[] = [];
+    for (const context of unidadeContexts) {
       for (const window of windows) {
         try {
           const rows = await collectPncpCompras({
-            cnpj,
-            unidadeCodigo,
+            cnpj: context.cnpj,
+            unidadeCodigo: context.unidadeCodigo,
             dataInicial: window.dataInicial,
             dataFinal: window.dataFinal,
             modalidadeId,
           });
-          listRows.push(...rows);
+          listRows.push(...rows.map((row) => ({ cnpj: context.cnpj, row })));
         } catch (error) {
           errors.push({
-            scope: `${unidadeCodigo}:${window.dataInicial}-${window.dataFinal}`,
+            scope: `${context.unidadeCodigo}:${window.dataInicial}-${window.dataFinal}`,
             message: errorToMessage(error),
           });
         }
       }
     }
 
-    const uniqueByNumeroControle = new Map<string, PncpCompraRaw>();
-    for (const row of listRows) {
-      const key = typeof row.numeroControlePNCP === 'string' ? row.numeroControlePNCP : null;
-      if (key) uniqueByNumeroControle.set(key, row);
+    const uniqueByNumeroControle = new Map<string, CollectedPncpCompra>();
+    for (const item of listRows) {
+      const key = typeof item.row.numeroControlePNCP === 'string' ? item.row.numeroControlePNCP : null;
+      if (key) uniqueByNumeroControle.set(key, item);
     }
 
     const detailedRows = await mapWithConcurrency(
       Array.from(uniqueByNumeroControle.values()),
-      (row) => fetchPncpDetail(cnpj, row),
+      async (item) => ({
+        cnpj: item.cnpj,
+        row: await fetchPncpDetail(item.cnpj, item.row),
+      }),
       4,
     );
+    const matchedRows = detailedRows.filter((item) => matchesObjetoBusca(item.row, objetoBusca));
 
     const payloadRows: Array<LicitacaoPncpPayload & { sync_run_id: string }> = [];
-    for (const row of detailedRows) {
+    for (const item of matchedRows) {
       try {
         payloadRows.push({
-          ...mapPncpCompra(row),
+          ...mapPncpCompra(item.row),
           sync_run_id: runId,
         });
       } catch (error) {
         errors.push({
-          scope: String(row.numeroControlePNCP ?? 'unknown'),
+          scope: String(item.row.numeroControlePNCP ?? 'unknown'),
           message: errorToMessage(error),
         });
       }
@@ -385,7 +574,10 @@ async function runSync(supabase: SupabaseClient, body: SyncRequest) {
           source: body.source ?? 'manual',
           errors,
           uniqueRows: uniqueByNumeroControle.size,
+          matchedRows: matchedRows.length,
+          objetoBusca,
           unidadeCodigos,
+          resolvedCnpjs: Object.fromEntries(unidadeContexts.map((context) => [context.unidadeCodigo, context.cnpj])),
           windows,
         },
       })
@@ -398,6 +590,7 @@ async function runSync(supabase: SupabaseClient, body: SyncRequest) {
       status,
       fetched: listRows.length,
       uniqueRows: uniqueByNumeroControle.size,
+      matchedRows: matchedRows.length,
       upserted,
       errors,
     };

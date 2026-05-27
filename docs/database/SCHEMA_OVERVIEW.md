@@ -53,11 +53,17 @@ Para mudancas sensiveis, confirme sempre nas migrations em [supabase/migrations]
 - `contratos_api_empenho_liquidacoes_cache`
 - `contratos_api_sync_runs`
 
-### Licitacoes e pregoes PNCP
+### Licitacoes, pregoes PNCP e ARP
 
 - `licitacoes_pncp`
 - `licitacoes_pncp_sync_runs`
 - `licitacoes_pncp_uasgs`
+- `atas_registro_precos`
+- `atas_registro_precos_itens`
+- `atas_registro_precos_unidades`
+- `atas_registro_precos_adesoes`
+- `atas_registro_precos_sync_runs`
+- view `atas_registro_precos_resumo`
 
 ### Importacoes auxiliares
 
@@ -113,6 +119,8 @@ Esta view aparece no frontend em [rastreabilidadePFs.ts](/C:/Users/crist/OneDriv
 - `gerar-termo-referencia-compras`
 - `record-automation-savings-event`
 - `refresh-comprasnet-liquidacoes-cache`
+- `sync-atas-registro-precos`
+- `sync-licitacoes-pncp`
 
 ## Functions invocadas no frontend que exigem confirmacao
 

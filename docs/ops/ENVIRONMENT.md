@@ -263,9 +263,9 @@ Opcionais:
   - se configurada, chamadas HTTP precisam enviar o header `x-licitacoes-pncp-sync-secret`
 - `LICITACOES_PNCP_UASGS`
   - lista separada por virgula de UASGs sincronizadas por padrao
-  - default no codigo: `158366`
+  - default no codigo: catalogo interno IFRN com `152711`, `152756`, `152757`, `154582`, `154838`, `154839`, `154840`, `158155`, `158365`, `158366`, `158367`, `158368`, `158369`, `158370`, `158371`, `158372`, `158373`, `158374`, `158375`
 - `LICITACOES_PNCP_CNPJ`
-  - CNPJ do orgao consultado no PNCP
+  - CNPJ fallback usado apenas quando a UASG nao estiver no catalogo interno e nao puder ser resolvida no Compras.gov.br
   - default no codigo: `10877412000168`
 
 Pre-requisitos no banco:
@@ -277,7 +277,33 @@ Observacoes operacionais:
 
 - `supabase/config.toml` deve manter `verify_jwt = false` para `sync-licitacoes-pncp`, pois a chamada periodica vem do cron
 - o PNCP exige datas `yyyyMMdd` e periodo de ate 365 dias por chamada; a function divide janelas maiores automaticamente
-- a chamada manual do frontend usa a UASG selecionada no filtro, ou todas as UASGs carregadas quando o filtro estiver em `Todas`
+- a chamada manual do frontend exige a UASG digitada no filtro; a function descobre o CNPJ dessa UASG pelo catalogo interno IFRN ou via Compras.gov.br antes de consultar o PNCP
+- `objetoBusca` pode reduzir a materializacao ao objeto informado
+
+### `sync-atas-registro-precos`
+
+Necessarias no ambiente do Supabase:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Opcionais:
+
+- `ATAS_RP_SYNC_SECRET`
+  - se configurada, chamadas HTTP precisam enviar o header `x-atas-rp-sync-secret`
+- `ATAS_RP_UASGS`
+  - lista separada por virgula de UASGs sincronizadas por padrao
+  - default no codigo: catalogo interno IFRN usado tambem em pregoes PNCP
+
+Pre-requisitos no banco:
+
+- tabelas `atas_registro_precos*`
+- view `atas_registro_precos_resumo`
+
+Observacoes operacionais:
+
+- `supabase/config.toml` deve manter `verify_jwt = false` para `sync-atas-registro-precos`
+- a chamada manual do frontend aceita UASG digitada, periodo e busca textual
+- os endpoints `modulo-arp/*` do Compras.gov.br podem oscilar; falhas parciais ficam registradas no sync run
 
 ### `refresh-comprasnet-liquidacoes-cache`
 

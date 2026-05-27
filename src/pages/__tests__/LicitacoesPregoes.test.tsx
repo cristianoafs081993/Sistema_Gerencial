@@ -4,17 +4,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useAuth } from '@/contexts/AuthContext';
 import LicitacoesPregoes from '@/pages/LicitacoesPregoes';
 import { licitacoesPncpService } from '@/services/licitacoesPncp';
 
 vi.mock('@/components/HeaderParts', () => ({
   HeaderActions: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   HeaderSubtitle: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-}));
-
-vi.mock('@/contexts/AuthContext', () => ({
-  useAuth: vi.fn(),
 }));
 
 vi.mock('@/services/licitacoesPncp', async () => {
@@ -27,6 +22,7 @@ vi.mock('@/services/licitacoesPncp', async () => {
       listSituacoes: vi.fn(),
       getLastSyncRun: vi.fn(),
       sync: vi.fn(),
+      syncInternalUasgs: vi.fn(),
     },
   };
 });
@@ -39,7 +35,6 @@ vi.mock('sonner', () => ({
   },
 }));
 
-const mockedUseAuth = vi.mocked(useAuth);
 const mockedService = vi.mocked(licitacoesPncpService);
 
 function renderPage() {
@@ -105,9 +100,6 @@ const licitacao = {
 describe('LicitacoesPregoes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockedUseAuth.mockReturnValue({
-      isSuperAdmin: true,
-    } as never);
     mockedService.list.mockResolvedValue({ rows: [licitacao], count: 1 });
     mockedService.listUasgs.mockResolvedValue([{ codigo: '158366', nome: 'CAMPUS CURRAIS NOVOS' }]);
     mockedService.listSituacoes.mockResolvedValue(['Divulgada no PNCP']);
@@ -134,6 +126,13 @@ describe('LicitacoesPregoes', () => {
       uniqueRows: 1,
       upserted: 1,
     });
+    mockedService.syncInternalUasgs.mockResolvedValue({
+      runId: 'run-3',
+      status: 'success',
+      fetched: 2,
+      uniqueRows: 2,
+      upserted: 2,
+    });
   });
 
   it('lista pregoes e abre drawer de detalhes', async () => {
@@ -148,28 +147,48 @@ describe('LicitacoesPregoes', () => {
     expect(screen.getByText('Lei 14.133/2021, Art. 28, I')).toBeInTheDocument();
   });
 
-  it('exibe sincronizacao manual apenas para superadmin', async () => {
+  it('busca no PNCP pela UASG e periodo informados', async () => {
     renderPage();
 
-    expect(await screen.findByRole('button', { name: /Sincronizar PNCP/i })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Sincronizar PNCP/i }));
+    expect(await screen.findByRole('button', { name: /Buscar PNCP/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Buscar PNCP/i }));
 
     await waitFor(() => {
       expect(mockedService.sync).toHaveBeenCalledWith(expect.objectContaining({
         unidadeCodigos: ['158366'],
-        source: 'frontend-manual',
+        source: 'frontend-search',
       }));
     });
   });
 
-  it('oculta sincronizacao manual para usuario comum', async () => {
-    mockedUseAuth.mockReturnValue({
-      isSuperAdmin: false,
-    } as never);
-
+  it('permite sincronizar UASG digitada com filtro de objeto', async () => {
     renderPage();
 
-    expect(await screen.findByText('Servicos de combustiveis para o campus')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Sincronizar PNCP/i })).not.toBeInTheDocument();
+    fireEvent.change(await screen.findByLabelText('UASG'), {
+      target: { value: '158155' },
+    });
+    fireEvent.change(screen.getByLabelText('Objeto especifico'), {
+      target: { value: 'energia eletrica' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Buscar PNCP/i }));
+
+    await waitFor(() => {
+      expect(mockedService.sync).toHaveBeenCalledWith(expect.objectContaining({
+        unidadeCodigos: ['158155'],
+        objetoBusca: 'energia eletrica',
+      }));
+    });
+  });
+
+  it('sincroniza catalogo interno de UASGs IFRN no periodo atual', async () => {
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: /Sincronizar UASGs IFRN/i }));
+
+    await waitFor(() => {
+      expect(mockedService.syncInternalUasgs).toHaveBeenCalledWith(expect.objectContaining({
+        source: 'frontend-ifrn-cache',
+      }));
+    });
   });
 });

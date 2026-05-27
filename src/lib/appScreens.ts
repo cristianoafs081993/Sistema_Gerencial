@@ -21,6 +21,7 @@ export type AppScreenGroupId =
   | 'orcamentario'
   | 'financeiro'
   | 'contratos'
+  | 'licitacoes'
   | 'documentos'
   | 'automacoes'
   | 'administracao';
@@ -48,6 +49,7 @@ export const appScreenGroups: AppScreenGroup[] = [
   { id: 'orcamentario', name: 'Orçamentário', sortOrder: 10 },
   { id: 'financeiro', name: 'Financeiro', sortOrder: 20 },
   { id: 'contratos', name: 'Contratos', sortOrder: 30 },
+  { id: 'licitacoes', name: 'Licitações', sortOrder: 35 },
   { id: 'documentos', name: 'Documentos', sortOrder: 40 },
   { id: 'automacoes', name: 'Automações', sortOrder: 50 },
   { id: 'administracao', name: 'Administração', sortOrder: 90 },
@@ -65,7 +67,8 @@ export const appScreens: AppScreen[] = [
   { id: 'rastreabilidade-pfs', groupId: 'financeiro', name: 'Rastreabilidade de PFs', path: '/rastreabilidade-pfs', icon: ClipboardList, sortOrder: 50 },
   { id: 'conciliacao-pfs', groupId: 'financeiro', name: 'Conciliação de PFs', path: '/conciliacao-pfs', icon: ScanSearch, sortOrder: 60 },
   { id: 'contratos', groupId: 'contratos', name: 'Contratos', path: '/contratos', icon: FileStack, sortOrder: 10 },
-  { id: 'licitacoes-pregoes', groupId: 'contratos', name: 'Pregões IFRN', path: '/licitacoes-pregoes', icon: ScrollText, sortOrder: 20 },
+  { id: 'licitacoes-pregoes', groupId: 'licitacoes', name: 'Pregões por UASG', path: '/licitacoes-pregoes', icon: ScrollText, sortOrder: 10 },
+  { id: 'atas-registro-precos', groupId: 'licitacoes', name: 'Atas e ARP', path: '/atas-registro-precos', icon: ClipboardList, sortOrder: 20 },
   { id: 'gerador-documentos', groupId: 'documentos', name: 'Gerador de Documentos', path: '/gerador-documentos', icon: Wand2, sortOrder: 10 },
   { id: 'editor-documentos', groupId: 'documentos', name: 'Editor de Documentos', path: '/editor-documentos', icon: Bot, sortOrder: 20 },
   { id: 'artefatos-licitacao', groupId: 'documentos', name: 'Artefatos de Licitação', path: '/artefatos-licitacao', icon: FileStack, sortOrder: 25 },

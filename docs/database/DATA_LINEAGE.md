@@ -111,7 +111,28 @@ Mostrar a linhagem operacional dos dados de forma curta:
 - API `https://dadosabertos.compras.gov.br`
   - enriquecimento best-effort: `/modulo-uasg/1_consultarUasg`
   - tabela: `licitacoes_pncp_uasgs`
-  - observacao: os endpoints de pregoes/contratacoes dos Dados Abertos foram tratados como apoio futuro, pois responderam com instabilidade/timeout na validacao inicial.
+  - observacao: os endpoints de pregoes/contratacoes dos Dados Abertos foram tratados como apoio futuro, pois responderam com instabilidade/timeout na validacao inicial. Para UASGs IFRN, a tabela `licitacoes_pncp_uasgs` tambem recebe seed local com CNPJ e codigo do orgao pela migration `20260505213000_seed_ifrn_licitacoes_pncp_uasgs.sql`; assim a resolucao de CNPJ das unidades conhecidas nao depende do endpoint de UASG do Compras.gov.br.
+
+### Atas de Registro de Precos / ARP
+
+- API `https://dadosabertos.compras.gov.br`
+  - sincronizacao: [sync-atas-registro-precos/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-atas-registro-precos/index.ts)
+  - service de leitura no frontend: [atasRegistroPrecos.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/atasRegistroPrecos.ts)
+  - endpoints:
+    - `/modulo-arp/1_consultarARP`
+    - `/modulo-arp/2_consultarARPItem`
+    - `/modulo-arp/3_consultarUnidadesItem`
+    - `/modulo-arp/5_consultarAdesoesItem`
+  - tabelas:
+    - `atas_registro_precos`
+    - `atas_registro_precos_itens`
+    - `atas_registro_precos_unidades`
+    - `atas_registro_precos_adesoes`
+    - `atas_registro_precos_sync_runs`
+  - view de consumo: `atas_registro_precos_resumo`
+  - pagina: [AtasRegistroPrecos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/AtasRegistroPrecos.tsx)
+- observacao: a tela filtra por UASG e tipo de vinculo (`gerenciadora`, `participante`, `aderente` ou qualquer vinculo). O endpoint de ARP do Compras.gov.br pode oscilar; a Edge Function registra falhas por escopo em `details.errors` e preserva o payload bruto em `raw_data`.
+- observacao: para filtro `participante`, a API nao possui parametro direto por UASG participante; o frontend materializa o cache das atas gerenciadas pelas UASGs IFRN com `includeParticipantes=true` e filtra localmente a view `atas_registro_precos_resumo`. Para filtro `aderente`, a API exige ata, gerenciadora e item antes de consultar adesoes; por isso o frontend varre gerenciadoras IFRN e envia a UASG alvo em `adesaoUnidadeCodigos`. A view exclui `raw_data.tipoUnidade = GERENCIADORA` do agregado `unidades_participantes`.
 
 ### Favoritos de empenhos e contratos
 

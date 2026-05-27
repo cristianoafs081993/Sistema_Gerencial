@@ -1,5 +1,12 @@
 import { supabase } from '@/lib/supabase';
-import { buildComprasGovCompraKey, buildPncpCompraUrl, DEFAULT_PNCP_UASG, IFRN_CNPJ } from '@/lib/licitacoesPncp';
+import {
+  DEFAULT_PNCP_UASG,
+  DEFAULT_PNCP_UASGS,
+  IFRN_CNPJ,
+  IFRN_UASG_CATALOG,
+  buildComprasGovCompraKey,
+  buildPncpCompraUrl,
+} from '@/lib/licitacoesPncp';
 
 const SYNC_FUNCTION_UNAVAILABLE_MESSAGE = [
   'Nao foi possivel acessar a Edge Function sync-licitacoes-pncp.',
@@ -59,6 +66,7 @@ export type LicitacoesPncpListParams = {
   page?: number;
   pageSize?: number;
   search?: string;
+  objetoBusca?: string;
   uasgCodigo?: string;
   situacao?: string;
   srp?: LicitacaoPncpSrpFilter;
@@ -155,6 +163,15 @@ function stringOrNull(value: unknown): string | null {
 
 function recordOrEmpty(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function escapeIlike(value: string) {
+  return value.replace(/[%_]/g, (match) => `\\${match}`);
+}
+
+function normalizeUasgCodigo(value?: string) {
+  const normalized = value?.replace(/\D/g, '') ?? '';
+  return normalized || null;
 }
 
 function getUnknownRecord(value: unknown): Record<string, unknown> | null {
@@ -276,8 +293,9 @@ export const licitacoesPncpService = {
       .from('licitacoes_pncp')
       .select(LICITACOES_SELECT, { count: 'exact' });
 
-    if (params.uasgCodigo && params.uasgCodigo !== 'todos') {
-      query = query.eq('uasg_codigo', params.uasgCodigo);
+    const uasgCodigo = normalizeUasgCodigo(params.uasgCodigo);
+    if (uasgCodigo) {
+      query = query.eq('uasg_codigo', uasgCodigo);
     }
 
     if (params.situacao && params.situacao !== 'todos') {
@@ -303,14 +321,18 @@ export const licitacoesPncpService = {
       query = query.gt('data_abertura_proposta', now);
     }
 
+    const objetoBusca = params.objetoBusca?.trim();
+    if (objetoBusca) {
+      query = query.ilike('objeto_compra', `%${escapeIlike(objetoBusca)}%`);
+    }
+
     const search = params.search?.trim();
     if (search) {
-      const escaped = search.replace(/[%_]/g, (match) => `\\${match}`);
+      const escaped = escapeIlike(search);
       query = query.or([
         `numero_controle_pncp.ilike.%${escaped}%`,
         `numero_compra.ilike.%${escaped}%`,
         `processo.ilike.%${escaped}%`,
-        `objeto_compra.ilike.%${escaped}%`,
         `uasg_nome.ilike.%${escaped}%`,
       ].join(','));
     }
@@ -354,6 +376,15 @@ export const licitacoesPncpService = {
       });
     }
 
+    for (const item of IFRN_UASG_CATALOG) {
+      if (!options.has(item.codigo)) {
+        options.set(item.codigo, {
+          codigo: item.codigo,
+          nome: item.aliases?.length ? `${item.nome} (${item.aliases.join(', ')})` : item.nome,
+        });
+      }
+    }
+
     return Array.from(options.values()).sort((a, b) => a.codigo.localeCompare(b.codigo));
   },
 
@@ -385,14 +416,19 @@ export const licitacoesPncpService = {
 
   async sync(input: {
     unidadeCodigos?: string[];
+    objetoBusca?: string;
     dataInicial?: string;
     dataFinal?: string;
     source?: string;
   } = {}) {
+    const unidadeCodigos = input.unidadeCodigos
+      ?.map((codigo) => normalizeUasgCodigo(codigo))
+      .filter(Boolean) as string[] | undefined;
+
     const { data, error } = await supabase.functions.invoke('sync-licitacoes-pncp', {
       body: {
-        cnpjOrgao: IFRN_CNPJ,
-        unidadeCodigos: input.unidadeCodigos?.length ? input.unidadeCodigos : undefined,
+        unidadeCodigos: unidadeCodigos?.length ? unidadeCodigos : undefined,
+        objetoBusca: input.objetoBusca?.trim() || undefined,
         dataInicial: input.dataInicial,
         dataFinal: input.dataFinal,
         source: input.source ?? 'frontend-manual',
@@ -400,13 +436,49 @@ export const licitacoesPncpService = {
     });
 
     if (error) throw normalizeLicitacoesPncpSyncError(error);
-    return data as {
+    const result = data as {
       runId: string;
       status: string;
       fetched: number;
       uniqueRows: number;
+      matchedRows?: number;
       upserted: number;
       errors?: Array<{ scope: string; message: string }>;
+    };
+    if (result.status === 'error') {
+      const firstError = result.errors?.[0];
+      throw new Error(firstError
+        ? `Falha ao buscar no PNCP (${firstError.scope}): ${firstError.message}`
+        : 'Falha ao buscar no PNCP.');
+    }
+    return result;
+  },
+
+  async syncInternalUasgs(input: {
+    dataInicial?: string;
+    dataFinal?: string;
+    source?: string;
+  } = {}) {
+    const results = [];
+    for (const unidadeCodigo of DEFAULT_PNCP_UASGS) {
+      results.push(await this.sync({
+        unidadeCodigos: [unidadeCodigo],
+        dataInicial: input.dataInicial,
+        dataFinal: input.dataFinal,
+        source: input.source ?? 'frontend-ifrn-cache',
+      }));
+    }
+
+    const errors = results.flatMap((result) => result.errors ?? []);
+    const hasPartial = results.some((result) => result.status === 'partial_success');
+    return {
+      runId: results.at(-1)?.runId ?? '',
+      status: errors.length || hasPartial ? 'partial_success' : 'success',
+      fetched: results.reduce((sum, result) => sum + result.fetched, 0),
+      uniqueRows: results.reduce((sum, result) => sum + result.uniqueRows, 0),
+      matchedRows: results.reduce((sum, result) => sum + (result.matchedRows ?? 0), 0),
+      upserted: results.reduce((sum, result) => sum + result.upserted, 0),
+      errors,
     };
   },
 };

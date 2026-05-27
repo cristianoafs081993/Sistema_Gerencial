@@ -218,7 +218,7 @@ Observacao:
 - faturas sem item vinculado ficam em grupo separado e nao entram na execucao oficial por item
 - no modal de empenho, a secao `Liquidações` nao depende dessa sincronizacao local; ela le o cache dedicado de faturas por empenho e, quando o cache esta ausente ou vencido, chama a Edge Function aguardando as linhas atualizadas antes de cair para resultado vazio. A exibicao usa `raw_data.contratoEmpenho.unidade_gestora` para manter faturas de contratos da Reitoria quando o empenho e da UG `158366`, e usa `raw_data.fatura.contratante` apenas para esconder faturas claramente pertencentes a outro campus; a coluna `Valor` usa `valor_bruto` da API
 
-### Pregoes IFRN
+### Pregoes por UASG
 
 `App.tsx` -> `LicitacoesPregoes.tsx` -> `licitacoesPncpService` -> `licitacoes_pncp`
 
@@ -228,11 +228,33 @@ Sincronizacao:
 
 Observacoes:
 
-- a rota `/licitacoes-pregoes` fica no grupo Contratos e abre com a UASG `158366`
-- a tela lista pregoes materializados, filtra por UASG, periodo, situacao, SRP, prazo de propostas e texto livre
+- a rota `/licitacoes-pregoes` fica no grupo Contratos e abre com a UASG `158366` apenas como valor inicial
+- a tela lista pregoes materializados, filtra por UASG digitada, objeto especifico, periodo, situacao, SRP, prazo de propostas e texto livre
+- a UASG aceita qualquer codigo manual; a function resolve o CNPJ primeiro pelo catalogo interno IFRN e, se a UASG nao estiver no catalogo, pelo Compras.gov.br antes de consultar o PNCP
+- o botao `Sincronizar UASGs IFRN` usa o catalogo interno com as UASGs `152711`, `152756`, `152757`, `154582`, `154838`, `154839`, `154840`, `158155`, `158365`, `158366`, `158367`, `158368`, `158369`, `158370`, `158371`, `158372`, `158373`, `158374`, `158375`; no frontend, a chamada e feita em lotes por UASG para evitar timeout de uma chamada unica
 - o drawer exibe os dados completos armazenados do PNCP, links PNCP/Compras.gov.br e informacao complementar
-- o botao `Sincronizar PNCP` aparece somente para superadministrador; usuarios autenticados apenas consultam os dados ja sincronizados
+- o botao `Buscar PNCP` consulta/materializa a UASG e o periodo informados e recarrega a lista filtrada
 - o service tambem le `licitacoes_pncp_sync_runs` para informar a ultima sincronizacao
+
+### Atas e ARP
+
+`App.tsx` -> `AtasRegistroPrecos.tsx` -> `atasRegistroPrecosService` -> `atas_registro_precos_resumo`
+
+Sincronizacao:
+
+`sync-atas-registro-precos` -> Compras.gov.br `modulo-arp/*` -> `atas_registro_precos`, `atas_registro_precos_itens`, `atas_registro_precos_unidades`, `atas_registro_precos_adesoes`
+
+Observacoes:
+
+- a rota `/atas-registro-precos` fica no grupo Licitacoes
+- a tela lista atas materializadas e filtra por UASG, vinculo (`gerenciadora`, `participante`, `aderente` ou qualquer vinculo), periodo e texto
+- o botao `Buscar ARP` consulta/materializa a UASG e o periodo informados
+- quando o vinculo selecionado e `Participante` e a UASG pertence ao catalogo IFRN, `Buscar ARP` sincroniza o catalogo IFRN em lotes com `includeParticipantes=true`; a API dos Dados Abertos nao permite buscar participantes diretamente por UASG, entao o filtro funciona sobre o cache local de unidades participantes
+- quando o vinculo selecionado e `Aderente` e a UASG pertence ao catalogo IFRN, `Buscar ARP` tambem sincroniza o catalogo IFRN em lotes, mas envia a UASG digitada como `adesaoUnidadeCodigos`; assim a busca encontra adesoes do campus a atas gerenciadas por outras UASGs IFRN
+- o botao `Sincronizar UASGs IFRN` usa o catalogo interno compartilhado com pregoes PNCP e chama a Edge Function em lotes por UASG para evitar timeout de uma chamada unica; falhas de uma UASG sao agregadas como sucesso parcial e nao interrompem as demais UASGs do lote
+- o drawer exibe metadados da ata e itens materializados; participantes e adesoes sao agregados pela view `atas_registro_precos_resumo`
+- a API do Compras.gov.br pode retornar falhas pontuais; nesses casos, a Edge Function preserva sucesso parcial e registra detalhes em `atas_registro_precos_sync_runs`
+- quando o Compras.gov.br falha durante `Buscar ARP`, a tela recarrega mesmo assim a view local `atas_registro_precos_resumo`, para exibir atas ja materializadas no cache em vez de deixar a lista vazia por indisponibilidade externa
 
 ### Favoritos
 

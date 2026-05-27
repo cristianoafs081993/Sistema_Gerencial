@@ -208,7 +208,7 @@ Observacao:
 
 Uso:
 
-- lista operacional de pregoes IFRN filtravel por UASG
+- lista operacional de pregoes por qualquer UASG, periodo e objeto especifico
 - base futura para preenchimento de metadados em artefatos de licitacao
 
 Fonte primaria:
@@ -222,21 +222,26 @@ Endpoints PNCP usados:
 
 Parametros operacionais:
 
-- CNPJ IFRN: `10877412000168`
-- UASG padrao: `158366`
+- UASG inicial da tela: `158366`
+- CNPJ da consulta PNCP: resolvido primeiro pelo catalogo interno IFRN em `IFRN_UASG_CATALOG`; para UASGs fora do catalogo, a function usa Dados Abertos Compras.gov.br; `LICITACOES_PNCP_CNPJ=10877412000168` fica apenas como default operacional
+- UASGs IFRN em cache interno: `152711`, `152756`, `152757`, `154582`, `154838`, `154839`, `154840`, `158155`, `158365`, `158366`, `158367`, `158368`, `158369`, `158370`, `158371`, `158372`, `158373`, `158374`, `158375`
 - pregao eletronico: `codigoModalidadeContratacao = 6`
 - datas PNCP em `yyyyMMdd`
 - janela maxima de consulta: 365 dias
-- quando `codigoUnidadeAdministrativa` e enviado, o PNCP tambem exige `cnpj`
+- quando `codigoUnidadeAdministrativa` e enviado, o PNCP tambem exige `cnpj`; por isso a function usa o catalogo interno ou chama `/modulo-uasg/1_consultarUasg` para descobrir o CNPJ da UASG antes da consulta PNCP
+- o endpoint PNCP de publicacao e usado para UASG/data/modalidade; busca textual por objeto fica como filtro local sobre os dados retornados/materializados
 
 Fonte secundaria best-effort:
 
 - `https://dadosabertos.compras.gov.br`
 - `/modulo-uasg/1_consultarUasg`
+- `/modulo-uasg/1.1_consultarUasg_CSV`
+- a function usa o CSV como fonte primaria para resolver CNPJ da UASG porque o endpoint JSON de UASG pode responder `400` para `statusUasg=true`
 
 Implementacao:
 
 - [sync-licitacoes-pncp/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-licitacoes-pncp/index.ts)
+- [licitacoesPncp.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/lib/licitacoesPncp.ts)
 - [licitacoesPncp.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/licitacoesPncp.ts)
 - [LicitacoesPregoes.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/LicitacoesPregoes.tsx)
 
@@ -249,6 +254,59 @@ Persistencia local:
 Observacao operacional:
 
 - os endpoints de pregoes e contratacoes dos Dados Abertos Compras.gov.br existem no OpenAPI, mas responderam com instabilidade/timeout na validacao inicial. Por isso, a v1 nao depende deles para listar pregoes.
+
+## 4C. Dados Abertos Compras.gov.br para Atas/ARP
+
+Uso:
+
+- lista operacional de Atas de Registro de Precos por UASG e tipo de vinculo
+- identificacao de atas gerenciadas, unidades participantes e adesoes por item
+
+Fonte primaria:
+
+- `https://dadosabertos.compras.gov.br`
+
+Endpoints usados:
+
+- `/modulo-arp/1_consultarARP`
+- `/modulo-arp/2_consultarARPItem`
+- `/modulo-arp/3_consultarUnidadesItem`
+- `/modulo-arp/5_consultarAdesoesItem`
+
+Parametros operacionais:
+
+- `codigoUnidadeGerenciadora` para atas gerenciadas
+- `dataVigenciaInicialMin` e `dataVigenciaInicialMax` em `YYYY-MM-DD`
+- `numeroAta`, `unidadeGerenciadora` e `numeroItem` para detalhar participantes e adesoes por item
+- `unidade` em `/modulo-arp/5_consultarAdesoesItem` para filtrar adesoes da UASG alvo
+- o OpenAPI dos Dados Abertos nao oferece filtro direto de `/modulo-arp/3_consultarUnidadesItem` por UASG participante nem listagem direta de todas as adesoes por UASG aderente; para encontrar atas em que um campus IFRN e participante ou aderente, a aplicacao materializa o cache das atas gerenciadas pelas UASGs IFRN e depois filtra localmente a view `atas_registro_precos_resumo`
+
+Implementacao:
+
+- [sync-atas-registro-precos/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-atas-registro-precos/index.ts)
+- [atasRegistroPrecos.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/atasRegistroPrecos.ts)
+- [AtasRegistroPrecos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/AtasRegistroPrecos.tsx)
+
+Persistencia local:
+
+- `atas_registro_precos`
+- `atas_registro_precos_itens`
+- `atas_registro_precos_unidades`
+- `atas_registro_precos_adesoes`
+- `atas_registro_precos_sync_runs`
+- view `atas_registro_precos_resumo`
+
+Observacao operacional:
+
+- os endpoints de ARP podem responder com timeout/erro interno. A Edge Function registra falhas por escopo e mantem sucesso parcial quando alguma parte foi materializada.
+- em maio/2026, `/modulo-arp/1_consultarARP` tambem retornou `400` com erro interno `Could not open JPA EntityManager for transaction` mesmo com parametros validos do OpenAPI; nesses casos a UI deve exibir aviso operacional e manter a lista com dados ja materializados, sem mostrar a URL tecnica da API ao usuario.
+- a busca principal da tela chama a Edge Function com `includeDetalhes=false` para evitar timeout HTTP: primeiro materializa somente as atas retornadas por `/modulo-arp/1_consultarARP`; itens, participantes e adesoes ficam para enriquecimento posterior.
+- quando a chamada ao Compras.gov.br falha, o frontend deve recarregar a lista a partir do cache Supabase ja materializado e exibir aviso operacional, sem transformar indisponibilidade externa em lista vazia.
+- quando o filtro da tela e `Participante` para uma UASG IFRN conhecida, o frontend aciona a sincronizacao em lotes do catalogo IFRN com `includeParticipantes=true`; isso materializa itens e unidades participantes sem consultar adesoes, reduzindo risco de timeout e permitindo listar atas em que o campus nao e gerenciador.
+- quando o filtro da tela e `Aderente` para uma UASG IFRN conhecida, o frontend tambem varre o catalogo IFRN como conjunto de gerenciadoras, mas envia `adesaoUnidadeCodigos` com a UASG alvo; isso evita confundir a gerenciadora varrida com a unidade que aderiu.
+- a Edge Function usa timeout curto ao chamar Dados Abertos para devolver erro operacional antes do limite de gateway da Supabase quando o Compras.gov.br fica sem resposta.
+- o drawer de detalhes exibe metadados preservados em `raw_data` da ata e permite enriquecer uma ata especifica sob demanda com `includeDetalhes=true` e `numeroAta`, limitando a consulta para reduzir risco de timeout.
+- no enriquecimento sob demanda, a function evita chamar `/modulo-arp/1_consultarARP` novamente porque esse endpoint pode falhar com `numeroAtaRegistroPreco`; ela consulta diretamente os endpoints de itens e vinculos usando a ata ja materializada.
 
 ## 5. Edge Function `analisar-liquidacao-siafi`
 

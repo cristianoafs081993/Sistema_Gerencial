@@ -36,3 +36,6 @@ verify_jwt = false
 
 [functions.sync-licitacoes-pncp]
 verify_jwt = false
+
+[functions.sync-atas-registro-precos]
+verify_jwt = false

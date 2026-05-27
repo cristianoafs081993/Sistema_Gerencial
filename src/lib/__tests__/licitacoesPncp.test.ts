@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DEFAULT_PNCP_UASGS,
+  IFRN_CNPJ,
+  IFRN_UASG_CATALOG,
   buildComprasGovCompraKey,
   buildPncpCompraUrl,
   mapPncpCompra,
@@ -67,5 +70,34 @@ describe('licitacoesPncp helpers', () => {
       'https://pncp.gov.br/app/editais/10877412000168/2025/198',
     );
     expect(buildComprasGovCompraKey('158366', 6, '90001', 2025)).toBe('15836605900012025');
+  });
+
+  it('mantem catalogo interno de UASGs IFRN com CNPJ para sincronizacao', () => {
+    expect(DEFAULT_PNCP_UASGS).toEqual([
+      '152711',
+      '152756',
+      '152757',
+      '154582',
+      '154838',
+      '154839',
+      '154840',
+      '158155',
+      '158365',
+      '158366',
+      '158367',
+      '158368',
+      '158369',
+      '158370',
+      '158371',
+      '158372',
+      '158373',
+      '158374',
+      '158375',
+    ]);
+    expect(new Set(DEFAULT_PNCP_UASGS).size).toBe(DEFAULT_PNCP_UASGS.length);
+    expect(IFRN_UASG_CATALOG.every((item) => item.cnpj === IFRN_CNPJ)).toBe(true);
+    expect(IFRN_UASG_CATALOG.every((item) => item.codigoOrgao === '26435')).toBe(true);
+    expect(IFRN_UASG_CATALOG.find((item) => item.codigo === '158366')?.aliases).toEqual(['Jucurutu', 'Parelhas']);
+    expect(IFRN_UASG_CATALOG.find((item) => item.codigo === '158155')?.aliases).toEqual(['Lajes', 'Natal - Zona Leste (EAD)']);
   });
 });

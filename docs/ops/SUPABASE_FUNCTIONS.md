@@ -340,17 +340,17 @@ Local:
 
 Uso:
 
-- sincroniza pregoes eletronicos IFRN a partir da API de Consulta do PNCP
+- sincroniza pregoes eletronicos por UASG a partir da API de Consulta do PNCP
 - materializa compras em `licitacoes_pncp`
 - registra execucoes em `licitacoes_pncp_sync_runs`
-- atualiza o cache de UASGs em `licitacoes_pncp_uasgs` via Dados Abertos Compras.gov.br quando disponivel
+- atualiza o cache de UASGs em `licitacoes_pncp_uasgs` usando primeiro o catalogo interno IFRN e, para UASGs externas, Dados Abertos Compras.gov.br quando disponivel
 
 Entrada opcional:
 
 ```json
 {
-  "cnpjOrgao": "10877412000168",
   "unidadeCodigos": ["158366"],
+  "objetoBusca": "combustivel",
   "dataInicial": "2025-05-05",
   "dataFinal": "2026-05-04",
   "source": "frontend-manual"
@@ -368,9 +368,65 @@ Observacao:
 
 - publicada com `verify_jwt = false`, pois pode ser chamada pelo cron
 - se `LICITACOES_PNCP_SYNC_SECRET` for configurada, chamadas HTTP precisam enviar `x-licitacoes-pncp-sync-secret`
-- por padrao usa CNPJ IFRN `10877412000168`, UASG `158366` e janela dos ultimos 365 dias
+- quando `cnpjOrgao` nao e enviado, resolve o CNPJ de cada UASG primeiro pelo catalogo interno `IFRN_UASG_CATALOG`; UASGs fora desse catalogo continuam sendo resolvidas via Dados Abertos Compras.gov.br antes de chamar o PNCP
+- a resolucao da UASG usa preferencialmente `/modulo-uasg/1.1_consultarUasg_CSV`, pois o endpoint JSON correspondente pode falhar com `400` para `statusUasg=true`
+- por padrao usa a lista interna IFRN (`152711`, `152756`, `152757`, `154582`, `154838`, `154839`, `154840`, `158155`, `158365`, `158366`, `158367`, `158368`, `158369`, `158370`, `158371`, `158372`, `158373`, `158374`, `158375`), CNPJ fallback `10877412000168` e janela dos ultimos 365 dias apenas para chamadas sem UASG explicita
+- o frontend chama a sincronizacao do catalogo interno em lotes por UASG; uma chamada HTTP unica com todas as UASGs pode exceder o limite da Edge Function quando o PNCP demora
+- `objetoBusca` e aplicado como pos-filtro textual sem acentos sobre `objetoCompra`, depois da consulta PNCP por UASG/data/modalidade
+- chamadas ao PNCP usam timeout maior e retry curto porque algumas UASGs podem responder lentamente mesmo em intervalos pequenos
 - a migration agenda `sync-licitacoes-pncp-daily` as `03:30` no horario de Brasilia
 - se o navegador registrar `404` seguido de falha de CORS/preflight para `/functions/v1/sync-licitacoes-pncp`, a causa esperada e function ausente no projeto remoto; publicar a function deve fazer o `OPTIONS` voltar `HTTP 200` com headers CORS
+
+### `sync-atas-registro-precos`
+
+Local:
+
+- [sync-atas-registro-precos/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-atas-registro-precos/index.ts)
+
+Uso:
+
+- sincroniza Atas de Registro de Precos/ARP por UASG a partir dos Dados Abertos Compras.gov.br
+- materializa atas em `atas_registro_precos`
+- materializa itens, unidades participantes e adesoes em tabelas filhas
+- registra execucoes em `atas_registro_precos_sync_runs`
+
+Entrada opcional:
+
+```json
+{
+  "unidadeCodigos": ["158366"],
+  "objetoBusca": "combustivel",
+  "dataInicial": "2025-05-06",
+  "dataFinal": "2026-05-05",
+  "includeDetalhes": true,
+  "includeParticipantes": true,
+  "includeAdesoes": false,
+  "adesaoUnidadeCodigos": ["158366"],
+  "source": "frontend-manual"
+}
+```
+
+Dependencias:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- opcional `ATAS_RP_SYNC_SECRET`
+- opcional `ATAS_RP_UASGS`
+
+Observacao:
+
+- publicada com `verify_jwt = false`, seguindo o padrao das functions chamadas pelo frontend e por cron
+- se `ATAS_RP_SYNC_SECRET` for configurada, chamadas HTTP precisam enviar `x-atas-rp-sync-secret`
+- por padrao usa o catalogo interno IFRN de UASGs
+- o frontend chama a sincronizacao do catalogo interno em lotes por UASG; uma chamada HTTP unica com todas as UASGs pode exceder o limite da Edge Function quando o Compras.gov.br demora
+- `objetoBusca` e aplicado sobre os dados da ata antes da materializacao
+- os endpoints `modulo-arp/*` podem oscilar; a function registra falhas por escopo em `details.errors` e retorna `partial_success` quando alguma parte foi materializada
+- para evitar `504 Gateway Timeout` na Edge Function, a sincronizacao chamada pela tela usa `includeDetalhes=false` e materializa primeiro somente a lista de atas; itens, participantes e adesoes devem ser enriquecidos em chamadas especificas/posteriores quando necessario
+- `includeParticipantes=true` materializa itens e unidades de `/modulo-arp/3_consultarUnidadesItem` sem obrigar a consulta de adesoes; a tela usa esse modo ao buscar `Participante` para uma UASG IFRN, varrendo o catalogo interno em lotes porque a API nao filtra participantes diretamente por UASG
+- `includeAdesoes=true` materializa adesoes de `/modulo-arp/5_consultarAdesoesItem`; esse modo e separado de participantes para evitar custo desnecessario na consulta de atas participantes
+- `adesaoUnidadeCodigos` separa a UASG que aderiu das UASGs gerenciadoras varridas; sem esse campo, a function usa `unidadeCodigos` como fallback para manter compatibilidade com chamadas antigas
+- chamadas aos Dados Abertos dentro dessa function usam timeout curto; quando o Compras.gov.br fica pendurado, a function deve encerrar com `status=error` registrado em `atas_registro_precos_sync_runs`, sem esperar o limite do gateway da Supabase
+- o enriquecimento sob demanda no drawer envia `numeroAta` e `includeDetalhes=true` para restringir a chamada aos itens/participantes/adesoes da ata aberta
+- quando `numeroAta` e enviado com `includeDetalhes=true`, a function nao chama novamente `/modulo-arp/1_consultarARP`; ela usa a ata ja materializada no drawer como contexto e consulta diretamente os endpoints de itens/detalhes para evitar falhas JPA no endpoint de listagem
 
 ### `refresh-comprasnet-liquidacoes-cache`
 

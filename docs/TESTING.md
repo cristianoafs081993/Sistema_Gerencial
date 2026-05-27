@@ -38,9 +38,16 @@ Contratos via Comprasnet:
 Pregoes via PNCP:
 
 - helpers devem cobrir normalizacao de `numeroControlePNCP`, UASG, datas e valores do payload PNCP
+- helpers devem cobrir o catalogo interno de UASGs IFRN com CNPJ e aliases compartilhados por uma mesma UASG
 - a divisao de periodos deve garantir janelas de ate 365 dias
-- a UI deve testar lista, drawer de detalhes e visibilidade do botao `Sincronizar PNCP` somente para superadmin
+- a UI deve testar lista, drawer de detalhes, UASG digitada, filtro de objeto, botao `Buscar PNCP` e botao `Sincronizar UASGs IFRN`
 - a navegacao deve manter `/licitacoes-pregoes` como tela de producao acessivel ao grupo `Diretores`
+
+Atas e ARP:
+
+- helpers devem cobrir normalizacao de ata, item, unidade participante e adesao
+- a UI deve testar lista, drawer de detalhes, UASG digitada, botao `Buscar ARP`, recarregamento do cache local mesmo quando a API externa falhar, busca de vinculo `Participante` via cache IFRN, busca de vinculo `Aderente` com UASG alvo separada, botao `Sincronizar UASGs IFRN` e continuidade do lote quando uma UASG falhar
+- a navegacao deve manter `/atas-registro-precos` como tela de producao acessivel ao grupo `Diretores`
 
 ## Como rodar
 

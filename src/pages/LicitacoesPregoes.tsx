@@ -15,8 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useAuth } from '@/contexts/AuthContext';
-import { DEFAULT_PNCP_UASG, IFRN_CNPJ } from '@/lib/licitacoesPncp';
+import { DEFAULT_PNCP_UASG } from '@/lib/licitacoesPncp';
 import {
   getLicitacaoLinks,
   getProposalStatus,
@@ -77,6 +76,15 @@ function proposalBadgeClass(status: string) {
   if (status === 'Futura') return 'border-blue-500/20 bg-blue-500/[0.08] text-blue-700';
   if (status === 'Encerrada') return 'border-slate-300 bg-slate-50 text-slate-600';
   return 'border-amber-500/20 bg-amber-500/[0.08] text-amber-700';
+}
+
+function FilterField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <span className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">{label}</span>
+      {children}
+    </div>
+  );
 }
 
 function DetailItem({ label, value }: { label: string; value: ReactNode }) {
@@ -177,10 +185,10 @@ function LicitacaoDetailsSheet({
 
 export default function LicitacoesPregoes() {
   const queryClient = useQueryClient();
-  const { isSuperAdmin } = useAuth();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState('');
+  const [objetoBusca, setObjetoBusca] = useState('');
   const [uasgCodigo, setUasgCodigo] = useState(DEFAULT_PNCP_UASG);
   const [situacao, setSituacao] = useState('todos');
   const [srp, setSrp] = useState<LicitacaoPncpSrpFilter>('todos');
@@ -194,13 +202,14 @@ export default function LicitacoesPregoes() {
     page,
     pageSize,
     search,
-    uasgCodigo,
+    objetoBusca,
+    uasgCodigo: uasgCodigo || undefined,
     situacao,
     srp,
     proposalStatus,
     dataInicial,
     dataFinal,
-  }), [dataFinal, dataInicial, page, pageSize, proposalStatus, search, situacao, srp, uasgCodigo]);
+  }), [dataFinal, dataInicial, objetoBusca, page, pageSize, proposalStatus, search, situacao, srp, uasgCodigo]);
 
   const { data: listResult = { rows: [], count: 0 }, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['licitacoes-pncp', queryParams],
@@ -236,15 +245,21 @@ export default function LicitacoesPregoes() {
   const handleManualSync = async () => {
     setIsSyncing(true);
     try {
-      const selectedUasgs = uasgCodigo === 'todos'
-        ? uasgOptions.map((option) => option.codigo)
-        : [uasgCodigo || DEFAULT_PNCP_UASG];
+      const typedUasg = uasgCodigo.replace(/\D/g, '');
+      if (!typedUasg) {
+        toast.error('Informe uma UASG para buscar no PNCP.');
+        return;
+      }
+      const selectedUasgs = typedUasg
+        ? [typedUasg]
+        : [];
 
       const result = await licitacoesPncpService.sync({
         unidadeCodigos: selectedUasgs.length ? selectedUasgs : [DEFAULT_PNCP_UASG],
+        objetoBusca,
         dataInicial,
         dataFinal,
-        source: 'frontend-manual',
+        source: 'frontend-search',
       });
 
       await Promise.all([
@@ -255,12 +270,40 @@ export default function LicitacoesPregoes() {
       ]);
 
       if (result.status === 'partial_success') {
-        toast.warning(`Sincronização parcial: ${result.upserted} pregão(ões) atualizado(s).`);
+        toast.warning(`Busca parcial: ${result.upserted} pregão(ões) encontrado(s).`);
       } else {
-        toast.success(`${result.upserted} pregão(ões) atualizado(s) via PNCP.`);
+        toast.success(`${result.upserted} pregão(ões) encontrado(s) via PNCP.`);
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Não foi possível sincronizar os pregões do PNCP.');
+      toast.error(error instanceof Error ? error.message : 'Não foi possível buscar os pregões no PNCP.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleInternalUasgsSync = async () => {
+    setIsSyncing(true);
+    try {
+      const result = await licitacoesPncpService.syncInternalUasgs({
+        dataInicial,
+        dataFinal,
+        source: 'frontend-ifrn-cache',
+      });
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['licitacoes-pncp'] }),
+        queryClient.invalidateQueries({ queryKey: ['licitacoes-pncp-uasgs'] }),
+        queryClient.invalidateQueries({ queryKey: ['licitacoes-pncp-situacoes'] }),
+        queryClient.invalidateQueries({ queryKey: ['licitacoes-pncp-last-sync'] }),
+      ]);
+
+      if (result.status === 'partial_success') {
+        toast.warning(`Sincronizacao parcial das UASGs IFRN: ${result.upserted} pregao(oes) encontrado(s).`);
+      } else {
+        toast.success(`${result.upserted} pregao(oes) encontrado(s) nas UASGs IFRN.`);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Nao foi possivel sincronizar as UASGs IFRN.');
     } finally {
       setIsSyncing(false);
     }
@@ -269,7 +312,7 @@ export default function LicitacoesPregoes() {
   return (
     <div className="space-y-6 pb-10">
       <HeaderSubtitle>
-        <span>PNCP / Pregões IFRN</span>
+        <span>PNCP / Pregões por UASG</span>
       </HeaderSubtitle>
       <HeaderActions>
         <div className="flex flex-wrap items-center gap-2">
@@ -277,18 +320,16 @@ export default function LicitacoesPregoes() {
             {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             Atualizar lista
           </Button>
-          {isSuperAdmin ? (
-            <Button type="button" className="gap-2" onClick={() => void handleManualSync()} disabled={isSyncing}>
-              {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
-              Sincronizar PNCP
-            </Button>
-          ) : null}
+          <Button type="button" variant="outline" className="gap-2" onClick={() => void handleInternalUasgsSync()} disabled={isSyncing}>
+            {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
+            Sincronizar UASGs IFRN
+          </Button>
         </div>
       </HeaderActions>
 
       <SectionPanel
-        title="Pregões IFRN"
-        description={`Consulta materializada do PNCP para o CNPJ ${IFRN_CNPJ}, com filtro operacional por UASG.`}
+        title="Pregões por UASG"
+        description="Consulta materializada do PNCP por UASG, período e objeto."
       >
         <div className="grid gap-3 md:grid-cols-4">
           <div className="rounded-radius-lg border border-border-default bg-surface-subtle/70 p-3">
@@ -312,7 +353,44 @@ export default function LicitacoesPregoes() {
       </SectionPanel>
 
       <FilterPanel>
-        <div className="grid gap-3 xl:grid-cols-[minmax(220px,1fr)_190px_170px_170px_170px_150px_150px]">
+        <div className="grid gap-3 xl:grid-cols-[140px_minmax(240px,1fr)_minmax(200px,0.8fr)_170px_170px_150px_150px_150px_150px]">
+          <FilterField label="UASG">
+            <Input
+              value={uasgCodigo}
+              onChange={(event) => {
+                setUasgCodigo(event.target.value.replace(/\D/g, '').slice(0, 6));
+                resetPage();
+              }}
+              list="licitacoes-pncp-uasgs"
+              inputMode="numeric"
+              aria-label="UASG"
+              placeholder="158366"
+            />
+            <datalist id="licitacoes-pncp-uasgs">
+              {uasgOptions.map((option) => (
+                <option key={option.codigo} value={option.codigo}>
+                  {option.nome || option.codigo}
+                </option>
+              ))}
+            </datalist>
+          </FilterField>
+
+          <FilterField label="Objeto no PNCP">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+              <Input
+                value={objetoBusca}
+                onChange={(event) => {
+                  setObjetoBusca(event.target.value);
+                  resetPage();
+                }}
+                className="pl-9"
+                aria-label="Objeto especifico"
+                placeholder="energia eletrica, combustivel..."
+              />
+            </div>
+          </FilterField>
+
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
             <Input
@@ -322,29 +400,10 @@ export default function LicitacoesPregoes() {
                 resetPage();
               }}
               className="pl-9"
-              placeholder="Buscar por objeto, processo, número ou UASG"
+              aria-label="Busca geral"
+              placeholder="Nº, processo ou unidade"
             />
           </div>
-
-          <Select
-            value={uasgCodigo}
-            onValueChange={(value) => {
-              setUasgCodigo(value);
-              resetPage();
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="UASG" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todas as UASGs</SelectItem>
-              {uasgOptions.map((option) => (
-                <SelectItem key={option.codigo} value={option.codigo}>
-                  {option.codigo} {option.nome ? `- ${option.nome}` : ''}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
 
           <Select
             value={situacao}
@@ -398,24 +457,34 @@ export default function LicitacoesPregoes() {
             </SelectContent>
           </Select>
 
-          <Input
-            type="date"
-            value={dataInicial}
-            onChange={(event) => {
-              setDataInicial(event.target.value);
-              resetPage();
-            }}
-            aria-label="Data inicial"
-          />
-          <Input
-            type="date"
-            value={dataFinal}
-            onChange={(event) => {
-              setDataFinal(event.target.value);
-              resetPage();
-            }}
-            aria-label="Data final"
-          />
+          <FilterField label="Data inicial">
+            <Input
+              type="date"
+              value={dataInicial}
+              onChange={(event) => {
+                setDataInicial(event.target.value);
+                resetPage();
+              }}
+              aria-label="Data inicial"
+            />
+          </FilterField>
+          <FilterField label="Data final">
+            <Input
+              type="date"
+              value={dataFinal}
+              onChange={(event) => {
+                setDataFinal(event.target.value);
+                resetPage();
+              }}
+              aria-label="Data final"
+            />
+          </FilterField>
+          <div className="flex items-end">
+            <Button type="button" className="w-full gap-2" onClick={() => void handleManualSync()} disabled={isSyncing}>
+              {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
+              Buscar PNCP
+            </Button>
+          </div>
         </div>
       </FilterPanel>
 

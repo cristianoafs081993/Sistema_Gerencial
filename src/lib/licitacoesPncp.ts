@@ -3,6 +3,38 @@ export const DEFAULT_PNCP_UASG = '158366';
 export const PREGAO_ELETRONICO_MODALIDADE_ID = 6;
 export const PNCP_MAX_WINDOW_DAYS = 365;
 
+export type PncpUasgCatalogItem = {
+  codigo: string;
+  nome: string;
+  cnpj: string;
+  codigoOrgao: string;
+  aliases?: string[];
+};
+
+export const IFRN_UASG_CATALOG: PncpUasgCatalogItem[] = [
+  { codigo: '152711', nome: 'Natal - Cidade Alta', cnpj: IFRN_CNPJ, codigoOrgao: '26435' },
+  { codigo: '152756', nome: 'Parnamirim', cnpj: IFRN_CNPJ, codigoOrgao: '26435' },
+  { codigo: '152757', nome: 'Nova Cruz', cnpj: IFRN_CNPJ, codigoOrgao: '26435' },
+  { codigo: '154582', nome: 'São Gonçalo do Amarante', cnpj: IFRN_CNPJ, codigoOrgao: '26435' },
+  { codigo: '154838', nome: 'Ceará-Mirim', cnpj: IFRN_CNPJ, codigoOrgao: '26435' },
+  { codigo: '154839', nome: 'Canguaretama', cnpj: IFRN_CNPJ, codigoOrgao: '26435' },
+  { codigo: '154840', nome: 'São Paulo do Potengi', cnpj: IFRN_CNPJ, codigoOrgao: '26435' },
+  { codigo: '158155', nome: 'Reitoria', cnpj: IFRN_CNPJ, codigoOrgao: '26435', aliases: ['Lajes', 'Natal - Zona Leste (EAD)'] },
+  { codigo: '158365', nome: 'Mossoró', cnpj: IFRN_CNPJ, codigoOrgao: '26435' },
+  { codigo: '158366', nome: 'Currais Novos', cnpj: IFRN_CNPJ, codigoOrgao: '26435', aliases: ['Jucurutu', 'Parelhas'] },
+  { codigo: '158367', nome: 'Ipanguaçu', cnpj: IFRN_CNPJ, codigoOrgao: '26435' },
+  { codigo: '158368', nome: 'Natal - Zona Norte', cnpj: IFRN_CNPJ, codigoOrgao: '26435' },
+  { codigo: '158369', nome: 'Natal - Central', cnpj: IFRN_CNPJ, codigoOrgao: '26435' },
+  { codigo: '158370', nome: 'Caicó', cnpj: IFRN_CNPJ, codigoOrgao: '26435' },
+  { codigo: '158371', nome: 'Apodi', cnpj: IFRN_CNPJ, codigoOrgao: '26435' },
+  { codigo: '158372', nome: 'Santa Cruz', cnpj: IFRN_CNPJ, codigoOrgao: '26435' },
+  { codigo: '158373', nome: 'João Câmara', cnpj: IFRN_CNPJ, codigoOrgao: '26435' },
+  { codigo: '158374', nome: 'Pau dos Ferros', cnpj: IFRN_CNPJ, codigoOrgao: '26435' },
+  { codigo: '158375', nome: 'Macau', cnpj: IFRN_CNPJ, codigoOrgao: '26435' },
+];
+
+export const DEFAULT_PNCP_UASGS = IFRN_UASG_CATALOG.map((item) => item.codigo);
+
 export type PncpCompraRaw = Record<string, unknown>;
 
 type UnidadeOrgao = {
