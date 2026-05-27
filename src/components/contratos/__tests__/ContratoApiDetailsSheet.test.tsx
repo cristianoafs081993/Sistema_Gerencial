@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ContratoApiDetailsSheet } from '@/components/contratos/ContratoApiDetailsSheet';
@@ -315,6 +315,10 @@ describe('ContratoApiDetailsSheet', () => {
     );
 
     expect(screen.getByText('Contrato 00062/2018')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Histórico do contrato/i })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: /Itens/i })).toHaveAttribute('aria-expanded', 'true');
+    const faturasSection = screen.getByRole('button', { name: /Faturas associadas/i });
+    expect(faturasSection).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getAllByText('Origem Reitoria').length).toBeGreaterThan(0);
     expect(screen.getByText('Histórico do contrato')).toBeInTheDocument();
     expect(screen.getByText(/Assinatura - 00158\/2021/i)).toBeInTheDocument();
@@ -348,5 +352,7 @@ describe('ContratoApiDetailsSheet', () => {
     expect(screen.queryByText('48199')).not.toBeInTheDocument();
     expect(screen.queryByText(/Qtd\. 1 \| Unit.rio R\$ 999,00/)).not.toBeInTheDocument();
     expect(screen.getByText(/não entram na execução oficial por item/i)).toBeInTheDocument();
+    fireEvent.click(faturasSection);
+    expect(faturasSection).toHaveAttribute('aria-expanded', 'false');
   });
 });

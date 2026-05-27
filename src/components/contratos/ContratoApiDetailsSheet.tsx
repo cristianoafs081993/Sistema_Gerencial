@@ -1,5 +1,20 @@
-﻿import { AlertTriangle, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertTriangle,
+  Building2,
+  CalendarClock,
+  CircleDollarSign,
+  FileText,
+  History,
+  Package,
+  ReceiptText,
+} from 'lucide-react';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import {
   Sheet,
   SheetContent,
@@ -164,6 +179,60 @@ function buildFaturaEmpenhosMap(faturaEmpenhos: ContratoApiFaturaEmpenhoRow[]) {
   }, new Map<string, ContratoApiFaturaEmpenhoRow[]>());
 }
 
+function SummaryMetric({
+  icon,
+  label,
+  value,
+  helper,
+}: {
+  icon: JSX.Element;
+  label: string;
+  value: string | number;
+  helper?: string;
+}) {
+  return (
+    <div className="rounded-md border border-border/70 bg-card p-3 shadow-sm">
+      <div className="flex items-start gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-action-primary/10 text-action-primary">
+          {icon}
+        </span>
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase text-muted-foreground">{label}</p>
+          <p className="mt-1 truncate text-sm font-bold text-foreground">{value}</p>
+          {helper ? <p className="mt-1 text-xs text-muted-foreground">{helper}</p> : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AccordionSectionTitle({
+  icon,
+  title,
+  description,
+  count,
+}: {
+  icon: JSX.Element;
+  title: string;
+  description: string;
+  count: string;
+}) {
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-3 text-left">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted text-action-primary">
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-bold text-foreground">{title}</span>
+        <span className="mt-0.5 block text-xs font-normal text-muted-foreground">{description}</span>
+      </span>
+      <Badge variant="secondary" className="ml-auto mr-3 shrink-0 rounded-md">
+        {count}
+      </Badge>
+    </div>
+  );
+}
+
 function FaturaLine({
   fatura,
   faturaItem,
@@ -252,13 +321,20 @@ export function ContratoApiDetailsSheet({
   const valorAcumulado = Number(contrato?.valor_acumulado) || 0;
   const valorTotalApi = valorHistorico || valorAcumulado;
   const valorTotalLabel = valorHistorico > 0 ? 'Valor total histórico' : 'Valor acumulado';
+  const valorExecutadoItens = itemSummaries.reduce((sum, item) => sum + item.valorExecutado, 0);
+  const faturasExecutadas = faturas.filter(isFaturaExecutada).length;
+  const lastSyncLabel = lastSyncRun?.finished_at
+    ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(lastSyncRun.finished_at))
+    : '-';
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-3xl">
+      <SheetContent className="w-full overflow-y-auto bg-background sm:max-w-4xl">
         <SheetHeader className="pr-8">
-          <SheetTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-action-primary" />
-            Contrato {contrato?.numero ?? '-'}
+          <SheetTitle className="flex flex-wrap items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-md bg-action-primary/10 text-action-primary">
+              <FileText className="h-5 w-5" />
+            </span>
+            <span>Contrato {contrato?.numero ?? '-'}</span>
             {hasReitoriaOrigin ? <Badge variant="secondary" className="rounded-md">Origem Reitoria</Badge> : null}
           </SheetTitle>
           <SheetDescription>
@@ -271,22 +347,51 @@ export function ContratoApiDetailsSheet({
         ) : !details ? (
           <div className="py-10 text-center text-sm text-muted-foreground">Nenhum detalhe da API carregado.</div>
         ) : (
-          <div className="mt-6 space-y-6">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="rounded-md border border-border/70 p-3">
-                <p className="text-xs text-muted-foreground">{valorTotalLabel}</p>
-                <p className="mt-1 font-semibold">{formatCurrency(valorTotalApi)}</p>
+          <div className="mt-6 space-y-5">
+            <div className="rounded-md border border-border/70 bg-card p-4 shadow-sm">
+              <div className="flex flex-col gap-4">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase text-muted-foreground">Objeto</p>
+                  <p className="mt-1 text-sm font-medium leading-6 text-foreground">
+                    {contrato?.objeto || 'Objeto não informado'}
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 gap-3 text-xs text-muted-foreground sm:grid-cols-2">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-action-primary" />
+                    <span>{contrato?.unidade_nome || contrato?.unidade_codigo || 'Unidade não informada'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-action-primary" />
+                    <span>Processo {contrato?.processo || '-'}</span>
+                  </div>
+                </div>
               </div>
-              <div className="rounded-md border border-border/70 p-3">
-                <p className="text-xs text-muted-foreground">Itens</p>
-                <p className="mt-1 font-semibold">{details.itens.length}</p>
-              </div>
-              <div className="rounded-md border border-border/70 p-3">
-                <p className="text-xs text-muted-foreground">Última sincronização</p>
-                <p className="mt-1 text-sm font-semibold">
-                  {lastSyncRun?.finished_at ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(lastSyncRun.finished_at)) : '-'}
-                </p>
-              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <SummaryMetric
+                icon={<CircleDollarSign className="h-4 w-4" />}
+                label={valorTotalLabel}
+                value={formatCurrency(valorTotalApi)}
+              />
+              <SummaryMetric
+                icon={<Package className="h-4 w-4" />}
+                label="Itens"
+                value={details.itens.length}
+                helper={`${formatCurrency(valorExecutadoItens)} executado`}
+              />
+              <SummaryMetric
+                icon={<ReceiptText className="h-4 w-4" />}
+                label="Faturas"
+                value={faturas.length}
+                helper={`${faturasExecutadas} executadas`}
+              />
+              <SummaryMetric
+                icon={<CalendarClock className="h-4 w-4" />}
+                label="Última sincronização"
+                value={lastSyncLabel}
+              />
             </div>
 
             {hasUnlinkedFaturas ? (
@@ -303,188 +408,213 @@ export function ContratoApiDetailsSheet({
               </div>
             ) : null}
 
-            <section className="space-y-3">
-              <div>
-                <h3 className="text-sm font-bold text-foreground">Histórico do contrato</h3>
-                <p className="text-xs text-muted-foreground">Assinatura, aditivos, apostilamentos e demais termos conforme a API.</p>
-              </div>
-              <div className="overflow-x-auto rounded-md border border-border/70">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Termo</TableHead>
-                      <TableHead>UG</TableHead>
-                      <TableHead className="text-right">Valor do termo</TableHead>
-                      <TableHead className="text-right">Novo valor</TableHead>
-                      <TableHead className="text-right">Retroativo</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {historico.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="h-20 text-center text-sm text-muted-foreground">
-                          Nenhum histórico sincronizado.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      historico.map((row) => (
-                        <TableRow key={row.id}>
-                          <TableCell>
-                            <div className="min-w-[13rem]">
-                              <p className="font-medium">{getHistoricoTipoLabel(row)} {row.numero ? `- ${row.numero}` : ''}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {formatDate(row.data_assinatura)}
-                                {getQualificacaoLabel(row) ? ` | ${getQualificacaoLabel(row)}` : ''}
-                              </p>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-xs">
-                              <p>{row.ug || '-'}</p>
-                              {row.codigo_unidade_origem ? (
-                                <p className="text-muted-foreground">Origem {row.codigo_unidade_origem}</p>
-                              ) : null}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">{formatCurrency(row.valor_inicial ?? 0)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(row.novo_valor_global ?? 0)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(row.retroativo_valor ?? 0)}</TableCell>
+            <Accordion type="multiple" defaultValue={['historico', 'itens', 'faturas']} className="space-y-3">
+              <AccordionItem value="historico" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+                <AccordionTrigger className="gap-3 py-4 hover:no-underline">
+                  <AccordionSectionTitle
+                    icon={<History className="h-4 w-4" />}
+                    title="Histórico do contrato"
+                    description="Assinatura, aditivos, apostilamentos e demais termos conforme a API."
+                    count={`${historico.length} registros`}
+                  />
+                </AccordionTrigger>
+                <AccordionContent className="pb-4 pt-0">
+                  <div className="overflow-x-auto rounded-md border border-border/70">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Termo</TableHead>
+                          <TableHead>UG</TableHead>
+                          <TableHead className="text-right">Valor do termo</TableHead>
+                          <TableHead className="text-right">Novo valor</TableHead>
+                          <TableHead className="text-right">Retroativo</TableHead>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </section>
-
-            <section className="space-y-3">
-              <div>
-                <h3 className="text-sm font-bold text-foreground">Itens</h3>
-                <p className="text-xs text-muted-foreground">Execução soma faturas Pago ou Siafi Apropriado com item vinculado.</p>
-              </div>
-              <div className="overflow-x-auto rounded-md border border-border/70">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Item</TableHead>
-                      <TableHead className="text-right">Contratado</TableHead>
-                      <TableHead className="text-right">Executado</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {itemSummaries.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={3} className="h-20 text-center text-sm text-muted-foreground">
-                          Nenhum item sincronizado.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      itemSummaries.map(({ item, valorContratado, quantidadeContratada, valorExecutado, quantidadeExecutada }) => {
-                        const historicoItem = getItemHistoricoEntries(item);
-                        return (
-                        <TableRow key={item.id}>
-                          <TableCell>
-                            <div className="max-w-[34rem]">
-                              <p className="font-medium">{getItemDescription(item)}</p>
-                              <p className="text-xs text-muted-foreground">
-                                Item {item.numero_item_compra || item.api_item_id} | Qtd. {item.quantidade ?? 0}
-                              </p>
-                              {historicoItem.length > 0 ? (
-                                <div className="mt-3 border-l-2 border-border/60 pl-3">
-                                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                    Histórico do item
+                      </TableHeader>
+                      <TableBody>
+                        {historico.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="h-20 text-center text-sm text-muted-foreground">
+                              Nenhum histórico sincronizado.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          historico.map((row) => (
+                            <TableRow key={row.id}>
+                              <TableCell>
+                                <div className="min-w-[13rem]">
+                                  <p className="font-medium">{getHistoricoTipoLabel(row)} {row.numero ? `- ${row.numero}` : ''}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {formatDate(row.data_assinatura)}
+                                    {getQualificacaoLabel(row) ? ` | ${getQualificacaoLabel(row)}` : ''}
                                   </p>
-                                  <div className="mt-2 space-y-2">
-                                    {historicoItem.map((entry, index) => (
-                                      <div key={`${item.id}-historico-${index}`} className="text-xs">
-                                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                          <span className="font-medium text-foreground">{entry.tipo}</span>
-                                          <span className="text-muted-foreground">{formatDate(entry.dataTermo)}</span>
-                                        </div>
-                                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
-                                          <span>Qtd. {formatNumber(entry.quantidade)}</span>
-                                          <span>Unitário {formatCurrency(entry.valorUnitario ?? 0)}</span>
-                                          <span>Total {formatCurrency(entry.valorTotal ?? 0)}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="text-xs">
+                                  <p>{row.ug || '-'}</p>
+                                  {row.codigo_unidade_origem ? (
+                                    <p className="text-muted-foreground">Origem {row.codigo_unidade_origem}</p>
+                                  ) : null}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">{formatCurrency(row.valor_inicial ?? 0)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(row.novo_valor_global ?? 0)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(row.retroativo_valor ?? 0)}</TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="itens" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+                <AccordionTrigger className="gap-3 py-4 hover:no-underline">
+                  <AccordionSectionTitle
+                    icon={<Package className="h-4 w-4" />}
+                    title="Itens"
+                    description="Execução soma faturas Pago ou Siafi Apropriado com item vinculado."
+                    count={`${itemSummaries.length} itens`}
+                  />
+                </AccordionTrigger>
+                <AccordionContent className="pb-4 pt-0">
+                  <div className="overflow-x-auto rounded-md border border-border/70">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Item</TableHead>
+                          <TableHead className="text-right">Contratado</TableHead>
+                          <TableHead className="text-right">Executado</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {itemSummaries.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={3} className="h-20 text-center text-sm text-muted-foreground">
+                              Nenhum item sincronizado.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          itemSummaries.map(({ item, valorContratado, quantidadeContratada, valorExecutado, quantidadeExecutada }) => {
+                            const historicoItem = getItemHistoricoEntries(item);
+                            return (
+                              <TableRow key={item.id}>
+                                <TableCell>
+                                  <div className="max-w-[34rem]">
+                                    <p className="font-medium">{getItemDescription(item)}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Item {item.numero_item_compra || item.api_item_id} | Qtd. {item.quantidade ?? 0}
+                                    </p>
+                                    {historicoItem.length > 0 ? (
+                                      <div className="mt-3 border-l-2 border-border/60 pl-3">
+                                        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                          Histórico do item
+                                        </p>
+                                        <div className="mt-2 space-y-2">
+                                          {historicoItem.map((entry, index) => (
+                                            <div key={`${item.id}-historico-${index}`} className="text-xs">
+                                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                                <span className="font-medium text-foreground">{entry.tipo}</span>
+                                                <span className="text-muted-foreground">{formatDate(entry.dataTermo)}</span>
+                                              </div>
+                                              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
+                                                <span>Qtd. {formatNumber(entry.quantidade)}</span>
+                                                <span>Unitário {formatCurrency(entry.valorUnitario ?? 0)}</span>
+                                                <span>Total {formatCurrency(entry.valorTotal ?? 0)}</span>
+                                              </div>
+                                            </div>
+                                          ))}
                                         </div>
                                       </div>
-                                    ))}
+                                    ) : null}
                                   </div>
-                                </div>
-                              ) : null}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <p className="font-medium">{formatCurrency(valorContratado)}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              Qtd. contratada {formatNumber(quantidadeContratada)}
-                            </p>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <p className="font-semibold text-status-success">{formatCurrency(valorExecutado)}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              Qtd. executada {formatNumber(quantidadeExecutada)}
-                            </p>
-                          </TableCell>
-                        </TableRow>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <p className="font-medium">{formatCurrency(valorContratado)}</p>
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    Qtd. contratada {formatNumber(quantidadeContratada)}
+                                  </p>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <p className="font-semibold text-status-success">{formatCurrency(valorExecutado)}</p>
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    Qtd. executada {formatNumber(quantidadeExecutada)}
+                                  </p>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="faturas" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+                <AccordionTrigger className="gap-3 py-4 hover:no-underline">
+                  <AccordionSectionTitle
+                    icon={<ReceiptText className="h-4 w-4" />}
+                    title="Faturas associadas"
+                    description="Agrupadas pelo item informado pela API do Comprasnet."
+                    count={`${faturas.length} faturas`}
+                  />
+                </AccordionTrigger>
+                <AccordionContent className="space-y-4 pb-4 pt-0">
+                  {itemSummaries
+                    .filter(({ links }) => links.length > 0)
+                    .map(({ item, links }) => (
+                      <div key={item.id} className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-3">
+                        <p className="text-xs font-bold uppercase text-muted-foreground">{getItemDescription(item)}</p>
+                        {links.map((link) => {
+                          const fatura = faturaById.get(link.contrato_api_fatura_id);
+                          if (!fatura) return null;
+                          return (
+                            <FaturaLine
+                              key={link.id}
+                              fatura={fatura}
+                              faturaItem={link}
+                              empenhos={empenhosByFatura.get(fatura.id) ?? []}
+                            />
+                          );
+                        })}
+                      </div>
+                    ))}
+
+                  {hasUnlinkedFaturas ? (
+                    <div className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-3">
+                      <p className="text-xs font-bold uppercase text-muted-foreground">Sem item vinculado</p>
+                      {unknownItemLinks.map((link) => {
+                        const fatura = faturaById.get(link.contrato_api_fatura_id);
+                        if (!fatura) return null;
+                        return (
+                          <FaturaLine
+                            key={link.id}
+                            fatura={fatura}
+                            faturaItem={link}
+                            empenhos={empenhosByFatura.get(fatura.id) ?? []}
+                          />
                         );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </section>
-
-            <section className="space-y-3">
-              <div>
-                <h3 className="text-sm font-bold text-foreground">Faturas associadas</h3>
-                <p className="text-xs text-muted-foreground">Agrupadas pelo item informado pela API do Comprasnet.</p>
-              </div>
-
-              {itemSummaries
-                .filter(({ links }) => links.length > 0)
-                .map(({ item, links }) => (
-                  <div key={item.id} className="space-y-2">
-                    <p className="text-xs font-bold uppercase text-muted-foreground">{getItemDescription(item)}</p>
-                    {links.map((link) => {
-                      const fatura = faturaById.get(link.contrato_api_fatura_id);
-                      if (!fatura) return null;
-                      return (
+                      })}
+                      {faturasSemItem.map((fatura) => (
                         <FaturaLine
-                          key={link.id}
+                          key={fatura.id}
                           fatura={fatura}
-                          faturaItem={link}
                           empenhos={empenhosByFatura.get(fatura.id) ?? []}
                         />
-                      );
-                    })}
-                  </div>
-                ))}
+                      ))}
+                    </div>
+                  ) : null}
 
-              {hasUnlinkedFaturas ? (
-                <div className="space-y-2">
-                  <p className="text-xs font-bold uppercase text-muted-foreground">Sem item vinculado</p>
-                  {unknownItemLinks.map((link) => {
-                    const fatura = faturaById.get(link.contrato_api_fatura_id);
-                    if (!fatura) return null;
-                    return (
-                      <FaturaLine
-                        key={link.id}
-                        fatura={fatura}
-                        faturaItem={link}
-                        empenhos={empenhosByFatura.get(fatura.id) ?? []}
-                      />
-                    );
-                  })}
-                  {faturasSemItem.map((fatura) => (
-                    <FaturaLine
-                      key={fatura.id}
-                      fatura={fatura}
-                      empenhos={empenhosByFatura.get(fatura.id) ?? []}
-                    />
-                  ))}
-                </div>
-              ) : null}
-            </section>
+                  {faturas.length === 0 ? (
+                    <div className="rounded-md border border-dashed border-border/70 py-8 text-center text-sm text-muted-foreground">
+                      Nenhuma fatura sincronizada.
+                    </div>
+                  ) : null}
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </div>
         )}
       </SheetContent>
