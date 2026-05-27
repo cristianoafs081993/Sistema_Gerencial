@@ -1,3 +1,9 @@
+import { vi } from 'vitest';
+
+vi.mock('@/lib/supabase', () => ({
+  supabase: {},
+}));
+
 import { parseCreditoDisponivelFile } from '@/services/creditosDisponiveisDetalhes';
 
 describe('parseCreditoDisponivelFile', () => {
