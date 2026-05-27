@@ -143,6 +143,20 @@ describe('Layout', () => {
     expect(screen.getByText('Atas e ARP')).toBeInTheDocument();
   });
 
+  it('exibe credito disponivel no grupo orcamentario', () => {
+    render(
+      <MemoryRouter>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByText('Orçamentário'));
+
+    expect(screen.getByText('Crédito disponível')).toBeInTheDocument();
+  });
+
   it('mantem a ordem dos tipos do editor na sidebar', () => {
     render(
       <MemoryRouter initialEntries={['/editor-documentos/termo-referencia-compras']}>

@@ -32,6 +32,16 @@ Mostrar a linhagem operacional dos dados de forma curta:
   - tabela: `financeiro_fonte_vinculacao`
   - pagina: [Financeiro.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Financeiro.tsx)
 
+### Credito disponivel
+
+- arquivo `3 - Credito Disponivel.csv`
+  - parser e persistencia: [creditosDisponiveisDetalhes.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/creditosDisponiveisDetalhes.ts)
+  - tabelas:
+    - `creditos_disponiveis_detalhes`, snapshot por PTRES/PI para consulta
+    - `creditos_disponiveis`, agregado por PTRES para compatibilidade
+  - pagina: [CreditoDisponivel.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/CreditoDisponivel.tsx)
+  - observacao: aceita o layout tabulado com descricao e valor sem cabecalho, alem do formato agregado legado
+
 ### LC
 
 - arquivo `7 - LC.csv`

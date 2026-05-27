@@ -136,6 +136,38 @@ Consumido por:
 - [creditosDisponiveis.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/creditosDisponiveis.ts)
 - [transparencia.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/transparencia.ts)
 
+Observacoes operacionais:
+
+- permanece como agregado de compatibilidade por `ptres`
+- o upload da pagina dedicada atualiza esse agregado na mesma operacao de importacao do snapshot detalhado
+
+### `creditos_disponiveis_detalhes`
+
+Finalidade:
+
+- snapshots do relatorio de credito disponivel com detalhamento por PI
+
+Campos-chave:
+
+- `ptres`
+- `plano_interno`
+- `descricao`
+- `metrica`
+- `valor`
+- `import_batch_id`
+- `source_file`
+- `imported_at`
+
+Observacoes operacionais:
+
+- cada upload cria um lote; a pagina mostra o lote com `imported_at` mais recente
+- a granularidade desta tabela preserva as linhas do CSV, inclusive saldos zero
+
+Consumido por:
+
+- [creditosDisponiveisDetalhes.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/creditosDisponiveisDetalhes.ts)
+- [CreditoDisponivel.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/CreditoDisponivel.tsx)
+
 ## Dominios auxiliares
 
 ### `dimensoes`

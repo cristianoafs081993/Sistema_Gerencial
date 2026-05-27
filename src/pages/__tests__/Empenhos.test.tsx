@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import Empenhos from '@/pages/Empenhos';
 import { useData } from '@/contexts/DataContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useUserFavorites } from '@/services/userFavorites';
 import type { Empenho } from '@/types';
@@ -13,7 +14,7 @@ vi.mock('@/contexts/DataContext', () => ({
 }));
 
 vi.mock('@/contexts/AuthContext', () => ({
-  useAuth: () => ({ isSuperAdmin: false }),
+  useAuth: vi.fn(),
 }));
 
 vi.mock('@/services/userFavorites', () => ({
@@ -33,6 +34,7 @@ vi.mock('@/components/modals/EmpenhoDialog', () => ({
 }));
 
 const mockedUseData = vi.mocked(useData);
+const mockedUseAuth = vi.mocked(useAuth);
 const mockedUseUserFavorites = vi.mocked(useUserFavorites);
 
 const renderEmpenhos = () =>
@@ -65,6 +67,7 @@ const createEmpenho = (overrides: Partial<Empenho>): Empenho => ({
 describe('Empenhos', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedUseAuth.mockReturnValue({ isSuperAdmin: false } as never);
 
     mockedUseData.mockReturnValue({
       atividades: [],
@@ -76,7 +79,15 @@ describe('Empenhos', () => {
       contaDescentralizacoes: [],
       contratos: [],
       contratosEmpenhos: [],
-      creditosDisponiveis: [],
+      creditosDisponiveis: [
+        {
+          id: 'credito-legado',
+          ptres: '230446',
+          metrica: 'Saldo',
+          valor: 75867,
+          updated_at: '2026-05-27T10:00:00.000Z',
+        },
+      ],
       isLoading: false,
       addAtividade: vi.fn(),
       updateAtividade: vi.fn(),
@@ -119,5 +130,16 @@ describe('Empenhos', () => {
 
     expect(screen.getByText('2026NE000001')).toBeInTheDocument();
     expect(screen.queryByText('2026NE000002')).not.toBeInTheDocument();
+  });
+
+  it('nao exibe credito disponivel nem importacao legada na tela de empenhos', () => {
+    mockedUseAuth.mockReturnValue({ isSuperAdmin: true } as never);
+    renderEmpenhos();
+
+    expect(screen.queryByText('Crédito Disponível')).not.toBeInTheDocument();
+    expect(screen.queryByText('R$ 75.867,00')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Importar Crédito/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Importar Empenhos/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Importar Saldo RAP/i })).toBeInTheDocument();
   });
 });

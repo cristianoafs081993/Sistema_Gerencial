@@ -13,6 +13,7 @@ Para mudancas sensiveis, confirme sempre nas migrations em [supabase/migrations]
 - `empenhos`
 - `descentralizacoes`
 - `creditos_disponiveis`
+- `creditos_disponiveis_detalhes`
 
 ### Dominios auxiliares
 

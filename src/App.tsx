@@ -13,6 +13,7 @@ const AuthPage = lazy(() => import('./pages/Auth'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Atividades = lazy(() => import('./pages/Atividades'));
 const Descentralizacoes = lazy(() => import('./pages/Descentralizacoes'));
+const CreditoDisponivel = lazy(() => import('./pages/CreditoDisponivel'));
 const Empenhos = lazy(() => import('./pages/Empenhos'));
 const Contratos = lazy(() => import('./pages/Contratos'));
 const LiquidacoesPagamentos = lazy(() => import('./pages/LiquidacoesPagamentos'));
@@ -68,6 +69,7 @@ const App = () => (
                   <Route path="/planejamento" element={<Navigate replace to="/planejamento/campus" />} />
                   <Route path="/planejamento/:scope" element={<Atividades />} />
                   <Route path="/descentralizacoes" element={<Descentralizacoes />} />
+                  <Route path="/credito-disponivel" element={<CreditoDisponivel />} />
                   <Route path="/empenhos" element={<Empenhos />} />
                   <Route path="/contratos" element={<Contratos />} />
                   <Route path="/liquidacoes-pagamentos" element={<LiquidacoesPagamentos />} />
