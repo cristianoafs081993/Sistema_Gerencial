@@ -49,6 +49,7 @@ describe('AIAssistantWidget', () => {
       suggestions: ['Detalhar por PTRES'],
       model: 'gemini-2.5-flash-lite',
       warnings: [],
+      sources: [{ label: 'creditos_disponiveis', totalAmostra: 4, totalDisponivel: 4 }],
     });
 
     render(<AIAssistantWidget />);
@@ -62,6 +63,7 @@ describe('AIAssistantWidget', () => {
     await waitFor(() => {
       expect(screen.getByText('O saldo disponivel esta concentrado em PTRES especificos.')).toBeInTheDocument();
     });
+    expect(screen.getByText(/Fontes: creditos_disponiveis \(4\)/)).toBeInTheDocument();
 
     expect(mockedAsk).toHaveBeenCalledWith(
       expect.objectContaining({

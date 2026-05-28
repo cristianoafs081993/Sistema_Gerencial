@@ -164,7 +164,8 @@ Observacoes:
 
 - o widget aparece nas rotas protegidas porque e montado dentro do `Layout`; a rota publica `/auth` nao passa por esse shell
 - o historico do widget fica em `localStorage` com chave derivada do usuario autenticado
-- a function valida o JWT recebido, consulta tabelas/views allowlisted com o mesmo token do usuario e envia ao Gemini apenas um contexto resumido
+- a function valida o JWT recebido, consulta tabelas/views allowlisted com o mesmo token do usuario e calcula agregacoes deterministicas antes de chamar o Gemini
+- o widget pode exibir `warnings` e `sources` retornados pela function para indicar fontes consultadas e limitacoes discretamente junto da resposta
 - a v1 responde sobre dados; geracao de imagem fica reservada para uma function futura com `OPENAI_API_KEY`
 
 Observacao para a aba RAP do dashboard:

@@ -1,5 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import {
+  buildGerencialAnalysis,
+  normalizeSectionSources,
+  type ContextSection,
+} from './domain.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,13 +20,6 @@ type HistoryMessage = {
 type AssistantBody = {
   message?: string;
   history?: HistoryMessage[];
-};
-
-type ContextSection = {
-  label: string;
-  rows: unknown[];
-  count: number | null;
-  warning?: string;
 };
 
 function json(data: unknown, status = 200) {
@@ -95,27 +93,13 @@ async function readSection(
   }
 }
 
-function compactContext(sections: ContextSection[]) {
-  return sections.reduce<Record<string, unknown>>((acc, section) => {
-    acc[section.label] = {
-      totalAmostra: section.rows.length,
-      totalDisponivel: section.count,
-      aviso: section.warning,
-      linhas: section.rows,
-    };
-    return acc;
-  }, {});
-}
-
 function buildPrompt(params: {
   message: string;
   history: HistoryMessage[];
-  sections: ContextSection[];
+  analysis: ReturnType<typeof buildGerencialAnalysis>;
+  sources: ReturnType<typeof normalizeSectionSources>;
   userEmail: string | null;
 }) {
-  const warnings = params.sections
-    .map((section) => section.warning)
-    .filter((warning): warning is string => Boolean(warning));
   const history = params.history
     .slice(-8)
     .map((item) => `${item.role === 'user' ? 'Usuario' : 'Assistente'}: ${cleanText(item.content, 1200)}`)
@@ -124,20 +108,30 @@ function buildPrompt(params: {
   return [
     'Voce e o Assistente Gerencial IA do GovFlow/Sistema Gerencial do IFRN Campus Currais Novos.',
     'Responda em Portugues do Brasil, com Markdown simples, no maximo 5 bullets ou 3 paragrafos curtos.',
-    'Use somente os dados fornecidos no contexto para falar de numeros, saldos, empenhos, contratos, PFs, liquidacoes ou financeiro.',
-    'Se a pergunta exigir uma tabela/fonte nao disponivel no contexto, diga claramente qual dado nao foi consultado.',
-    'Nao invente valores, datas, contratos, processos, credores nem conclusoes operacionais sem base nos dados.',
-    'Quando citar valores monetarios, use formato brasileiro e explique se o dado veio de amostra limitada.',
+    'Use somente o Resumo calculado e as Evidencias principais para falar de numeros, saldos, empenhos, contratos, PFs, liquidacoes ou financeiro.',
+    'Nao recalcule totais por conta propria; os numeros ja foram calculados pelo sistema antes de chegar ate voce.',
+    'Se a pergunta exigir uma fonte indisponivel ou uma coluna que nao existe, diga claramente a limitacao registrada.',
+    'Quando citar valores monetarios, use formato brasileiro e mencione quando o dado vier de amostra limitada.',
     'No final, se fizer sentido, inclua exatamente este bloco com 2 ou 3 proximas perguntas:',
     '||SUGESTOES||',
     '- pergunta sugerida',
     '- pergunta sugerida',
     '',
     `Usuario autenticado: ${params.userEmail || 'nao informado'}`,
-    warnings.length ? `Avisos de fontes indisponiveis:\n${warnings.join('\n')}` : '',
     history ? `Historico recente:\n${history}` : '',
-    `Contexto gerencial consultado:\n${JSON.stringify(compactContext(params.sections), null, 2)}`,
-    `Pergunta do usuario: ${params.message}`,
+    `Pergunta:\n${params.message}`,
+    `Intencao detectada:\n${params.analysis.intent}`,
+    `Resumo calculado:\n${JSON.stringify(params.analysis.summary, null, 2)}`,
+    `Evidencias principais:\n${JSON.stringify(params.analysis.evidence, null, 2)}`,
+    `Limitacoes dos dados:\n${JSON.stringify(params.analysis.limitations, null, 2)}`,
+    `Fontes consultadas:\n${JSON.stringify(params.sources, null, 2)}`,
+    [
+      'Instrucoes de resposta:',
+      '- responda diretamente a pergunta antes de contextualizar',
+      '- para descentralizacoes, trate Campus Currais Novos como o escopo natural dos dados do sistema, nao como coluna literal',
+      '- para contratos, diferencie Campus 158366 e Reitoria 158155 quando essa origem aparecer nas evidencias',
+      '- cite PTRES, PI, contrato, fornecedor, vigencia ou processo quando esses campos forem relevantes',
+    ].join('\n'),
   ].filter(Boolean).join('\n\n');
 }
 
@@ -260,7 +254,7 @@ Deno.serve(async (req) => {
           .from('descentralizacoes')
           .select('dimensao,nota_credito,operacao_tipo,origem_recurso,natureza_despesa,plano_interno,data_emissao,descricao,valor', { count: 'exact' })
           .order('data_emissao', { ascending: false, nullsFirst: false })
-          .limit(250),
+          .limit(1500),
       ),
       readSection(
         'creditos_disponiveis',
@@ -268,7 +262,7 @@ Deno.serve(async (req) => {
           .from('creditos_disponiveis')
           .select('ptres,metrica,valor,updated_at', { count: 'exact' })
           .order('updated_at', { ascending: false })
-          .limit(200),
+          .limit(800),
       ),
       readSection(
         'empenhos',
@@ -276,7 +270,7 @@ Deno.serve(async (req) => {
           .from('empenhos')
           .select('numero,descricao,valor,status,tipo,plano_interno,origem_recurso,natureza_despesa,favorecido_nome,valor_liquidado,valor_liquidado_oficial,valor_pago_oficial,saldo_rap_oficial,valor_liquidado_a_pagar,rap_inscrito,rap_a_liquidar,rap_liquidado,rap_pago,data_empenho,processo', { count: 'exact' })
           .order('created_at', { ascending: false })
-          .limit(300),
+          .limit(1000),
       ),
       readSection(
         'documentos_habeis',
@@ -298,16 +292,24 @@ Deno.serve(async (req) => {
         'contratos_api',
         supabase
           .from('contratos_api')
-          .select('numero,fornecedor_nome,unidade_codigo,unidade_origem_codigo,objeto,processo,vigencia_inicio_derivada,vigencia_fim_derivada,valor_global,valor_acumulado,situacao_derivada,campus_scope_reason,updated_at', { count: 'exact' })
+          .select('id,numero,fornecedor_nome,unidade_codigo,unidade_origem_codigo,objeto,processo,vigencia_inicio_derivada,vigencia_fim_derivada,valor_global,valor_acumulado,situacao_derivada,campus_scope_reason,updated_at', { count: 'exact' })
           .order('updated_at', { ascending: false })
-          .limit(160),
+          .limit(1000),
       ),
       readSection(
         'contratos_api_empenhos',
         supabase
           .from('contratos_api_empenhos')
-          .select('numero,unidade_gestora,valor_empenhado,valor_a_liquidar,valor_liquidado,valor_pago,rp_inscrito,rp_a_liquidar,rp_liquidado,rp_pago,rp_a_pagar', { count: 'exact' })
-          .limit(220),
+          .select('contrato_api_id,numero,unidade_gestora,valor_empenhado,valor_a_liquidar,valor_liquidado,valor_pago,rp_inscrito,rp_a_liquidar,rp_liquidado,rp_pago,rp_a_pagar', { count: 'exact' })
+          .limit(2000),
+      ),
+      readSection(
+        'contratos_api_faturas',
+        supabase
+          .from('contratos_api_faturas')
+          .select('contrato_api_id,situacao,valor_bruto,valor_liquido,data_emissao,data_pagamento', { count: 'exact' })
+          .order('data_emissao', { ascending: false, nullsFirst: false })
+          .limit(2000),
       ),
       readSection(
         'vw_rastreabilidade_pf',
@@ -327,10 +329,13 @@ Deno.serve(async (req) => {
       ),
     ]);
 
+    const analysis = buildGerencialAnalysis(message, sections);
+    const sources = normalizeSectionSources(sections);
     const prompt = buildPrompt({
       message,
       history,
-      sections,
+      analysis,
+      sources,
       userEmail: user.email || null,
     });
     const { model, text } = await callGeminiWithFallback(prompt, apiKey);
@@ -343,6 +348,7 @@ Deno.serve(async (req) => {
       response: parsed.response,
       suggestions: parsed.suggestions,
       warnings,
+      sources,
       model,
     });
   } catch (error) {

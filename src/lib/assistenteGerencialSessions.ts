@@ -8,12 +8,21 @@ export type AssistenteGerencialArtifact = {
   prompt?: string;
 };
 
+export type AssistenteGerencialSource = {
+  label: string;
+  totalAmostra?: number;
+  totalDisponivel?: number | null;
+  warning?: string;
+};
+
 export type AssistenteGerencialMessage = {
   id: string;
   role: AssistenteGerencialRole;
   content: string;
   suggestions?: string[];
   artifacts?: AssistenteGerencialArtifact[];
+  warnings?: string[];
+  sources?: AssistenteGerencialSource[];
 };
 
 export type AssistenteGerencialSession = {

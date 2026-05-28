@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { AssistenteGerencialMessage } from '@/lib/assistenteGerencialSessions';
+import type { AssistenteGerencialMessage, AssistenteGerencialSource } from '@/lib/assistenteGerencialSessions';
 
 export type AssistenteGerencialHistoryMessage = {
   role: 'user' | 'assistant';
@@ -16,6 +16,7 @@ export type AssistenteGerencialResponse = {
   suggestions: string[];
   model?: string | null;
   warnings: string[];
+  sources: AssistenteGerencialSource[];
 };
 
 const MAX_HISTORY_MESSAGES = 8;
@@ -113,12 +114,24 @@ export const assistenteGerencialService = {
     const warnings = Array.isArray(responseData?.warnings)
       ? responseData.warnings.filter((item: unknown): item is string => typeof item === 'string')
       : [];
+    const sources = Array.isArray(responseData?.sources)
+      ? responseData.sources
+        .filter((item: unknown): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
+        .map((item) => ({
+          label: String(item.label || ''),
+          totalAmostra: typeof item.totalAmostra === 'number' ? item.totalAmostra : undefined,
+          totalDisponivel: typeof item.totalDisponivel === 'number' ? item.totalDisponivel : null,
+          warning: typeof item.warning === 'string' ? item.warning : undefined,
+        }))
+        .filter((item) => item.label)
+      : [];
 
     return {
       response: parsed.response,
       suggestions: serverSuggestions.length ? serverSuggestions : parsed.suggestions,
       model: typeof responseData?.model === 'string' ? responseData.model : null,
       warnings,
+      sources,
     };
   },
 };

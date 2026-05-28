@@ -142,6 +142,8 @@ export function AIAssistantWidget() {
       const assistantMessage: AssistenteGerencialMessage = {
         ...createMessage('assistant', result.response),
         suggestions: result.suggestions,
+        warnings: result.warnings,
+        sources: result.sources,
       };
 
       updateMessages((currentMessages) => [...currentMessages, assistantMessage]);
@@ -270,8 +272,23 @@ export function AIAssistantWidget() {
                     )}
                   >
                     {message.role === 'assistant' ? (
-                      <div className="prose prose-sm max-w-none prose-slate prose-p:my-1 prose-p:text-slate-900 prose-ul:my-2 prose-li:my-1 prose-li:text-slate-900 prose-strong:text-slate-950 prose-strong:font-bold prose-a:text-emerald-800">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                      <div>
+                        <div className="prose prose-sm max-w-none prose-slate prose-p:my-1 prose-p:text-slate-900 prose-ul:my-2 prose-li:my-1 prose-li:text-slate-900 prose-strong:text-slate-950 prose-strong:font-bold prose-a:text-emerald-800">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                        </div>
+                        {message.warnings?.length ? (
+                          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+                            {message.warnings[0]}
+                          </div>
+                        ) : null}
+                        {message.sources?.length ? (
+                          <p className="mt-3 border-t border-slate-200 pt-2 text-[11px] font-medium text-slate-600">
+                            Fontes: {message.sources.slice(0, 4).map((source) => {
+                              const total = source.totalDisponivel ?? source.totalAmostra;
+                              return total !== null && total !== undefined ? `${source.label} (${total})` : source.label;
+                            }).join(', ')}
+                          </p>
+                        ) : null}
                       </div>
                     ) : (
                       <p className="whitespace-pre-wrap text-white">{message.content}</p>

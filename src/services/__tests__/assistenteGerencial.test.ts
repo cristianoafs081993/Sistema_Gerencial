@@ -56,10 +56,11 @@ describe('assistenteGerencialService', () => {
   it('chama a Edge Function e normaliza resposta', async () => {
     mockedInvoke.mockResolvedValueOnce({
       data: {
-        response: 'Saldo total: **R$ 10,00**',
-        suggestions: ['Detalhar por PTRES'],
-        model: 'gemini-2.5-flash-lite',
-      },
+      response: 'Saldo total: **R$ 10,00**',
+      suggestions: ['Detalhar por PTRES'],
+      model: 'gemini-2.5-flash-lite',
+      sources: [{ label: 'creditos_disponiveis', totalAmostra: 1, totalDisponivel: 1 }],
+    },
       error: null,
     });
 
@@ -79,6 +80,7 @@ describe('assistenteGerencialService', () => {
       suggestions: ['Detalhar por PTRES'],
       model: 'gemini-2.5-flash-lite',
       warnings: [],
+      sources: [{ label: 'creditos_disponiveis', totalAmostra: 1, totalDisponivel: 1 }],
     });
   });
 
@@ -93,6 +95,7 @@ describe('assistenteGerencialService', () => {
         data: {
           response: 'Consulta recuperada.',
           suggestions: [],
+          sources: [],
         },
         error: null,
       });
@@ -106,6 +109,7 @@ describe('assistenteGerencialService', () => {
       suggestions: [],
       model: null,
       warnings: [],
+      sources: [],
     });
     expect(mockedInvoke).toHaveBeenCalledTimes(2);
     vi.useRealTimers();

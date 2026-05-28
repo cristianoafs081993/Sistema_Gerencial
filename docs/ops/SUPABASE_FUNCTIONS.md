@@ -61,8 +61,11 @@ Chamador:
 Uso:
 
 - responde perguntas gerenciais sobre dados do sistema em linguagem natural
-- consulta um contexto resumido e allowlisted de orcamento, empenhos, creditos disponiveis, documentos habeis, financeiro, contratos API, PFs e conciliacao
+- consulta fontes allowlisted e calcula agregacoes deterministicas antes de chamar o Gemini
+- cobre orcamento, empenhos, creditos disponiveis, documentos habeis, financeiro, contratos API, PFs e conciliacao
 - valida o usuario autenticado pelo JWT recebido e usa o cliente Supabase com esse mesmo token, respeitando RLS
+- para descentralizacoes, detalha total liquido por PTRES e PI e trata Campus Currais Novos como o escopo natural dos dados do sistema
+- para contratos, usa `contratos_api.situacao_derivada = true`, separa Campus `158366` e Reitoria `158155` com evidencia operacional do campus, e calcula rankings por empenhado/saldo
 
 Entrada esperada:
 
@@ -80,6 +83,7 @@ Saida:
   "response": "Resposta em Markdown simples.",
   "suggestions": ["Proxima pergunta"],
   "warnings": [],
+  "sources": [{ "label": "descentralizacoes", "totalAmostra": 36, "totalDisponivel": 36 }],
   "model": "gemini-2.5-flash-lite"
 }
 ```
@@ -93,6 +97,7 @@ Observacao:
 
 - publicada com `verify_jwt = false`, pois a validacao do token acontece dentro da propria function
 - nao usa service role na v1
+- o LLM nao recebe tabelas cruas como fonte primaria de calculo; ele recebe blocos de `Resumo calculado`, `Evidencias principais`, `Limitacoes dos dados` e `Fontes consultadas`
 - a geracao de imagens deve ficar em function separada usando `OPENAI_API_KEY`
 
 ### `gerar-contrato-licitacao`
