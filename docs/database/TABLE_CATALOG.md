@@ -791,6 +791,104 @@ Campos-chave:
 - `total_upserted`
 - `details`
 
+## Energia Campus
+
+### `energia_import_runs`
+
+Finalidade:
+
+- trilha das cargas XLSX do painel de energia.
+
+Campos-chave:
+
+- `id`
+- `source_file`
+- `imported_by`
+- `imported_by_email`
+- `totals`
+- `imported_at`
+
+### `energia_consumo_faturas`
+
+Finalidade:
+
+- faturas/previsões de energia por fonte, competência, subestação e valor.
+
+Campos-chave:
+
+- `fonte`: `cosern` ou `mercatto`
+- `competencia`
+- `leitura_inicio`
+- `leitura_fim`
+- `consumo_ativo_fp_kwh`
+- `consumo_ativo_np_kwh`
+- `consumo_total_kwh`
+- `valor_faturado`
+- `fatura_numero`
+- `parcela`
+- `processo`
+
+Observacoes operacionais:
+
+- Mercatto usa kWh real quando a base importada traz essa informação; quando só houver previsão/fatura sem kWh direto, esses campos ficam nulos e a UI exibe `N/D` nas abas específicas.
+
+### `energia_solar_geracao`
+
+Finalidade:
+
+- geração anual ou mensal das UFVs do campus.
+
+Campos-chave:
+
+- `ufv_nome`
+- `data_referencia`
+- `ano`
+- `mes`
+- `granularidade`: `anual` ou `mensal`
+- `energia_gerada_kwh`
+- `observacao`
+
+### `energia_contratos`
+
+Finalidade:
+
+- resumo das fontes/contratos de energia derivados da planilha importada.
+
+Campos-chave:
+
+- `fonte`
+- `modalidade`
+- `fornecedor`
+- `contrato_numero`
+- `volume_contratado_kwh`
+- `valor_contratado`
+- `situacao`
+
+### `energia_contrato_execucoes`
+
+Finalidade:
+
+- execução financeira por parcela quando disponível na planilha.
+
+Campos-chave:
+
+- `fonte`
+- `contrato_numero`
+- `parcela`
+- `valor_executado`
+- `valor_previsto`
+- `percentual_execucao`
+
+Consumido por:
+
+- [energiaCampusService.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/energiaCampusService.ts)
+- [EnergiaCampus.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/energia/EnergiaCampus.tsx)
+
+Observacoes operacionais:
+
+- leitura liberada para usuarios autenticados; escrita restrita ao superadministrador por RLS.
+- métricas ambientais são calculadas no frontend em `energyMetrics.ts`.
+
 ## Automacoes e economia de tempo
 
 ### `automation_savings_scenarios`

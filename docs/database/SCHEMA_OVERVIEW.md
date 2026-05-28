@@ -73,6 +73,14 @@ Para mudancas sensiveis, confirme sempre nas migrations em [supabase/migrations]
 - `retencoes_efd_reinf`
 - `email_csv_ingestion_runs`
 
+### Energia Campus
+
+- `energia_import_runs`
+- `energia_consumo_faturas`
+- `energia_solar_geracao`
+- `energia_contratos`
+- `energia_contrato_execucoes`
+
 ### Automacoes e economia de tempo
 
 - `automation_savings_scenarios`

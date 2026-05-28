@@ -89,6 +89,7 @@ Usado quando a pagina tem pipeline proprio de importacao ou consulta:
 - [RetencoesFdReinfDesign.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/RetencoesFdReinfDesign.tsx)
 - [LiquidacoesPagamentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/LiquidacoesPagamentos.tsx)
 - [RastreabilidadePFs/index.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/RastreabilidadePFs/index.tsx)
+- [EnergiaCampus.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/energia/EnergiaCampus.tsx)
 
 ### Padrao C: pagina + Edge Function ou API externa
 
@@ -134,6 +135,21 @@ Observacoes:
 - quando um cenario nao possui evento real no periodo, a estimativa mensal do catalogo e usada como fallback daquele cenario
 - extensoes e automacoes externas registram eventos pela Edge Function `record-automation-savings-event`
 - a extensao local `suap-atividades-extension` envia evento `atividades_sincronizadas` para o cenario `suap-processos` quando novas atividades sao inseridas
+
+### Energia Campus
+
+`App.tsx` -> `EnergiaCampus.tsx` -> `energiaCampusService` -> `energia_import_runs` / `energia_consumo_faturas` / `energia_solar_geracao` / `energia_contratos` / `energia_contrato_execucoes`
+
+Complemento por contratos:
+
+`contratos_api*` -> `energiaCampusService.loadMercattoContratosApiData()` -> KPIs, graficos e paineis de Mercatto
+
+Observacoes:
+
+- a tela importa XLSX pelo browser, faz parse local das abas `Consumo`, `Previsao - Mercatto`, `UFV's`, `Valor Executado` e abas anuais, e persiste um novo `energia_import_runs`
+- a leitura sempre carrega a ultima importacao de energia e tambem consulta contratos/faturas/liquidacoes Mercatto ja sincronizados no modulo de contratos
+- a Visao Geral usa kWh real de Mercatto quando existir na base; se houver apenas valor financeiro de contratos API, pode estimar kWh por tarifa media conhecida somente para KPIs e graficos agregados
+- as abas especificas mantem valores sem dado-fonte direto como `N/D` e nao persistem estimativas derivadas
 
 ### Dashboard
 

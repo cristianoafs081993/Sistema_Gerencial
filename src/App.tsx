@@ -27,6 +27,7 @@ const EditorDocumentos = lazy(() => import('./pages/EditorDocumentos'));
 const ArtefatosLicitacao = lazy(() => import('./pages/ArtefatosLicitacao'));
 const LicitacoesPregoes = lazy(() => import('./pages/LicitacoesPregoes'));
 const AtasRegistroPrecos = lazy(() => import('./pages/AtasRegistroPrecos'));
+const EnergiaCampus = lazy(() => import('./pages/energia/EnergiaCampus'));
 const Consultor = lazy(() => import('./pages/ConsultorSessions'));
 const Suap = lazy(() => import('./pages/Suap'));
 const EconomiaTempo = lazy(() => import('./pages/EconomiaTempo'));
@@ -84,6 +85,13 @@ const App = () => (
                   <Route path="/artefatos-licitacao" element={<ArtefatosLicitacao />} />
                   <Route path="/licitacoes-pregoes" element={<LicitacoesPregoes />} />
                   <Route path="/atas-registro-precos" element={<AtasRegistroPrecos />} />
+                  <Route path="/energia" element={<EnergiaCampus />} />
+                  <Route path="/energia/cosern" element={<EnergiaCampus />} />
+                  <Route path="/energia/mercatto" element={<EnergiaCampus />} />
+                  <Route path="/energia/geracao-solar" element={<EnergiaCampus />} />
+                  <Route path="/energia/contratos" element={<EnergiaCampus />} />
+                  <Route path="/energia/financeiro" element={<EnergiaCampus />} />
+                  <Route path="/energia/esg" element={<EnergiaCampus />} />
                   <Route path="/consultor" element={<Consultor />} />
                   <Route path="/suap" element={<Suap />} />
                   <Route path="/economia-tempo" element={<EconomiaTempo />} />
