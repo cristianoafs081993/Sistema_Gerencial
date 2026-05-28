@@ -280,6 +280,7 @@ Sincronizacao:
 Observacoes:
 
 - a rota `/atas-registro-precos` fica no grupo Licitacoes
+- a pagina prioriza filtros e tabela operacional; o card de resumo e ultima sincronizacao nao e exibido
 - a tela lista atas materializadas e filtra por UASG, vinculo (`gerenciadora`, `participante`, `aderente` ou qualquer vinculo), periodo e texto
 - a pesquisa textual inclui item e fornecedor ja materializados; quando a correspondencia vem de um item, a lista identifica o item/fornecedor e sinaliza atas sem itens carregados para deixar clara a cobertura do cache local
 - a coluna `Vinculos` mostra a contagem como `participante(s)` e exibe, no hover, as UASGs participantes materializadas pela view

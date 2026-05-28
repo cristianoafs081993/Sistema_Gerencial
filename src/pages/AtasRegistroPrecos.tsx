@@ -7,7 +7,6 @@ import { toast } from 'sonner';
 import { HeaderActions, HeaderSubtitle } from '@/components/HeaderParts';
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
-import { SectionPanel } from '@/components/design-system/SectionPanel';
 import { TablePagination } from '@/components/design-system/TablePagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -208,7 +207,6 @@ function AtasDetailsSheet({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['atas-registro-precos-itens', ata.ataKey] }),
         queryClient.invalidateQueries({ queryKey: ['atas-registro-precos'] }),
-        queryClient.invalidateQueries({ queryKey: ['atas-registro-precos-last-sync'] }),
       ]);
       if (result.status === 'partial_success' || result.status === 'error') {
         toast.warning(getSyncWarningMessage(result));
@@ -358,22 +356,12 @@ export default function AtasRegistroPrecos() {
     staleTime: 30000,
   });
 
-  const { data: lastSync } = useQuery({
-    queryKey: ['atas-registro-precos-last-sync'],
-    queryFn: () => atasRegistroPrecosService.getLastSyncRun(),
-    staleTime: 30000,
-  });
-
   const totalPages = Math.max(1, Math.ceil(listResult.count / pageSize));
   const currentRows = listResult.rows;
-  const totalParticipantes = currentRows.reduce((sum, row) => sum + row.totalUnidadesParticipantes, 0);
   const totalAdesoes = currentRows.reduce((sum, row) => sum + row.totalAdesoes, 0);
 
   const invalidate = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['atas-registro-precos'] }),
-      queryClient.invalidateQueries({ queryKey: ['atas-registro-precos-last-sync'] }),
-    ]);
+    await queryClient.invalidateQueries({ queryKey: ['atas-registro-precos'] });
   };
 
   const reloadCachedRows = async () => {
@@ -447,28 +435,6 @@ export default function AtasRegistroPrecos() {
           </Button>
         </div>
       </HeaderActions>
-
-      <SectionPanel title="Atas de Registro de Preços" description="ARP materializadas com vínculos por unidade gerenciadora, participante e aderente.">
-        <div className="grid gap-3 md:grid-cols-4">
-          <div className="rounded-radius-lg border border-border-default bg-surface-subtle/70 p-3">
-            <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Atas</p>
-            <p className="mt-1 font-ui text-2xl font-semibold text-text-primary">{listResult.count}</p>
-          </div>
-          <div className="rounded-radius-lg border border-border-default bg-surface-subtle/70 p-3">
-            <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Itens na página</p>
-            <p className="mt-1 font-ui text-2xl font-semibold text-text-primary">{currentRows.reduce((sum, row) => sum + row.totalItens, 0)}</p>
-          </div>
-          <div className="rounded-radius-lg border border-border-default bg-surface-subtle/70 p-3">
-            <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Participantes</p>
-            <p className="mt-1 font-ui text-2xl font-semibold text-primary">{totalParticipantes}</p>
-          </div>
-          <div className="rounded-radius-lg border border-border-default bg-surface-subtle/70 p-3">
-            <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Última sincronização</p>
-            <p className="mt-1 font-ui text-sm font-semibold text-text-primary">{lastSync ? formatDate(lastSync.finishedAt || lastSync.startedAt) : '-'}</p>
-            {lastSync?.status ? <p className="mt-0.5 font-ui text-xs text-text-secondary">{lastSync.status}</p> : null}
-          </div>
-        </div>
-      </SectionPanel>
 
       <FilterPanel>
         <div className="grid gap-3 xl:grid-cols-[140px_180px_150px_150px_minmax(220px,1fr)_160px]">
