@@ -194,21 +194,21 @@ export function AIAssistantWidget() {
         <section
           aria-label="Assistente Gerencial IA"
           className={cn(
-            'pointer-events-auto mb-3 flex origin-bottom-right flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl transition-all duration-200',
+            'pointer-events-auto mb-3 flex origin-bottom-right flex-col overflow-hidden rounded-xl border border-slate-300 bg-white shadow-xl transition-all duration-200',
             isOpen ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none',
             isExpanded
               ? 'h-full w-full'
               : 'h-[min(660px,calc(100dvh-7rem))] w-[calc(100vw-2rem)] sm:w-[440px]',
           )}
         >
-          <header className="flex min-h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
+          <header className="flex min-h-16 items-center justify-between gap-3 border-b border-slate-300 bg-white px-4 py-3">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-white">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-700 text-white">
                 <Bot className="h-5 w-5" />
               </span>
               <div className="min-w-0">
                 <h2 className="truncate text-sm font-semibold text-slate-950">Assistente Gerencial IA</h2>
-                <p className="truncate text-xs font-medium text-slate-500">Dados do GovFlow em linguagem natural</p>
+                <p className="truncate text-xs font-medium text-slate-700">Dados do GovFlow em linguagem natural</p>
               </div>
             </div>
 
@@ -218,7 +218,7 @@ export function AIAssistantWidget() {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-10 w-10 rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600"
+                  className="h-10 w-10 rounded-lg text-slate-700 hover:bg-red-50 hover:text-red-700"
                   onClick={handleClear}
                   title="Limpar conversa"
                   aria-label="Limpar conversa"
@@ -230,7 +230,7 @@ export function AIAssistantWidget() {
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-10 w-10 rounded-lg text-slate-500"
+                className="h-10 w-10 rounded-lg text-slate-700 hover:bg-slate-100 hover:text-slate-950"
                 onClick={() => setIsExpanded((current) => !current)}
                 title={isExpanded ? 'Restaurar tamanho' : 'Expandir'}
                 aria-label={isExpanded ? 'Restaurar tamanho' : 'Expandir assistente'}
@@ -241,7 +241,7 @@ export function AIAssistantWidget() {
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-10 w-10 rounded-lg text-slate-500"
+                className="h-10 w-10 rounded-lg text-slate-700 hover:bg-slate-100 hover:text-slate-950"
                 onClick={() => {
                   setIsExpanded(false);
                   setIsOpen(false);
@@ -254,7 +254,7 @@ export function AIAssistantWidget() {
             </div>
           </header>
 
-          <div className="flex-1 overflow-y-auto bg-slate-50/80 px-4 py-4">
+          <div className="flex-1 overflow-y-auto bg-slate-100 px-4 py-4">
             <div className="space-y-4">
               {messages.map((message) => (
                 <div
@@ -265,12 +265,12 @@ export function AIAssistantWidget() {
                     className={cn(
                       'max-w-[92%] rounded-xl px-4 py-3 text-sm leading-relaxed shadow-sm',
                       message.role === 'user'
-                        ? 'bg-primary text-white'
-                        : 'border border-slate-200 bg-white text-slate-800',
+                        ? 'bg-emerald-700 font-semibold text-white shadow-md'
+                        : 'border border-slate-300 bg-white text-slate-950',
                     )}
                   >
                     {message.role === 'assistant' ? (
-                      <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-2 prose-li:my-1 prose-strong:text-slate-950">
+                      <div className="prose prose-sm max-w-none prose-slate prose-p:my-1 prose-p:text-slate-900 prose-ul:my-2 prose-li:my-1 prose-li:text-slate-900 prose-strong:text-slate-950 prose-strong:font-bold prose-a:text-emerald-800">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
                       </div>
                     ) : (
@@ -282,7 +282,7 @@ export function AIAssistantWidget() {
 
               {!hasConversation && !isLoading ? (
                 <div className="grid gap-2 pt-1">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Sugestoes para comecar</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-700">Sugestoes para comecar</p>
                   {startSuggestions.map((suggestion) => {
                     const Icon = suggestion.icon;
 
@@ -290,10 +290,10 @@ export function AIAssistantWidget() {
                       <button
                         key={suggestion.prompt}
                         type="button"
-                        className="flex min-h-12 items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-semibold text-slate-700 shadow-sm transition hover:border-primary/30 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                        className="flex min-h-12 items-center gap-3 rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm font-semibold text-slate-900 shadow-sm transition hover:border-emerald-700 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
                         onClick={() => void askAssistant(suggestion.prompt)}
                       >
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-emerald-100 text-emerald-800">
                           <Icon className="h-4 w-4" />
                         </span>
                         <span>{suggestion.label}</span>
@@ -305,16 +305,16 @@ export function AIAssistantWidget() {
 
               {messages.length > 1 && !isLoading && latestSuggestions.length ? (
                 <div className="space-y-2 pt-1">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Proximas perguntas</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-700">Proximas perguntas</p>
                   {latestSuggestions.map((suggestion) => (
                     <button
                       key={suggestion}
                       type="button"
-                      className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-semibold text-slate-700 shadow-sm transition hover:border-primary/30 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                      className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm font-semibold text-slate-900 shadow-sm transition hover:border-emerald-700 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/30"
                       onClick={() => void askAssistant(suggestion)}
                     >
                       <span>{suggestion}</span>
-                      <ChevronDown className="h-4 w-4 rotate-[-90deg] text-slate-400" />
+                      <ChevronDown className="h-4 w-4 rotate-[-90deg] text-slate-600" />
                     </button>
                   ))}
                 </div>
@@ -322,7 +322,7 @@ export function AIAssistantWidget() {
 
               {isLoading ? (
                 <div className="flex justify-start">
-                  <div className="flex min-h-12 items-center gap-3 rounded-xl border border-primary/10 bg-white px-4 py-3 text-sm font-semibold text-primary shadow-sm">
+                  <div className="flex min-h-12 items-center gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold text-emerald-800 shadow-sm">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     <span>{loadingTexts[loadingTextIndex]}</span>
                   </div>
@@ -333,7 +333,7 @@ export function AIAssistantWidget() {
             </div>
           </div>
 
-          <form className="border-t border-slate-200 bg-white p-3" onSubmit={handleSubmit}>
+          <form className="border-t border-slate-300 bg-white p-3" onSubmit={handleSubmit}>
             <div className="flex items-end gap-2">
               <label className="sr-only" htmlFor="assistente-gerencial-input">
                 Pergunta para o Assistente Gerencial
@@ -351,12 +351,12 @@ export function AIAssistantWidget() {
                 placeholder="Pergunte sobre saldos, empenhos, contratos ou execucao..."
                 rows={1}
                 disabled={isLoading}
-                className="max-h-28 min-h-11 flex-1 resize-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+                className="max-h-28 min-h-11 flex-1 resize-none rounded-lg border border-slate-400 bg-white px-3 py-2 text-sm font-medium text-slate-950 outline-none placeholder:text-slate-600 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 disabled:opacity-60"
               />
               <Button
                 type="submit"
                 size="icon"
-                className="h-11 w-11 shrink-0 rounded-lg bg-primary text-white hover:bg-primary/90"
+                className="h-11 w-11 shrink-0 rounded-lg bg-emerald-700 text-white hover:bg-emerald-800"
                 disabled={!input.trim() || isLoading}
                 aria-label="Enviar pergunta"
                 title="Enviar"
@@ -364,7 +364,7 @@ export function AIAssistantWidget() {
                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
             </div>
-            <p className="mt-2 text-center text-[11px] font-medium text-slate-400">
+            <p className="mt-2 text-center text-[11px] font-medium text-slate-600">
               As respostas usam somente dados disponiveis para o usuario autenticado.
             </p>
           </form>
@@ -373,7 +373,7 @@ export function AIAssistantWidget() {
         <button
           type="button"
           className={cn(
-            'pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg transition duration-200 hover:scale-105 hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2',
+            'pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-700 text-white shadow-lg transition duration-200 hover:scale-105 hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700/40 focus-visible:ring-offset-2',
             isOpen && 'scale-95 opacity-0 pointer-events-none',
           )}
           onClick={() => setIsOpen(true)}
