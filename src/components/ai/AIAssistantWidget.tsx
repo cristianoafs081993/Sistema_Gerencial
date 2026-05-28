@@ -265,7 +265,7 @@ export function AIAssistantWidget() {
                     className={cn(
                       'max-w-[92%] rounded-xl px-4 py-3 text-sm leading-relaxed shadow-sm',
                       message.role === 'user'
-                        ? 'bg-emerald-700 font-semibold text-white shadow-md'
+                        ? 'border border-slate-800 bg-slate-900 font-semibold text-white shadow-md'
                         : 'border border-slate-300 bg-white text-slate-950',
                     )}
                   >
@@ -274,7 +274,7 @@ export function AIAssistantWidget() {
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
                       </div>
                     ) : (
-                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      <p className="whitespace-pre-wrap text-white">{message.content}</p>
                     )}
                   </div>
                 </div>
