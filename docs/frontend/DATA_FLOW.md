@@ -253,6 +253,8 @@ Observacoes:
 
 - a rota `/atas-registro-precos` fica no grupo Licitacoes
 - a tela lista atas materializadas e filtra por UASG, vinculo (`gerenciadora`, `participante`, `aderente` ou qualquer vinculo), periodo e texto
+- a pesquisa textual inclui item e fornecedor ja materializados; quando a correspondencia vem de um item, a lista identifica o item/fornecedor e sinaliza atas sem itens carregados para deixar clara a cobertura do cache local
+- a coluna `Vinculos` mostra a contagem como `participante(s)` e exibe, no hover, as UASGs participantes materializadas pela view
 - o botao `Buscar ARP` consulta/materializa a UASG e o periodo informados
 - quando o vinculo selecionado e `Participante` e a UASG pertence ao catalogo IFRN, `Buscar ARP` sincroniza o catalogo IFRN em lotes com `includeParticipantes=true`; a API dos Dados Abertos nao permite buscar participantes diretamente por UASG, entao o filtro funciona sobre o cache local de unidades participantes
 - quando o vinculo selecionado e `Aderente` e a UASG pertence ao catalogo IFRN, `Buscar ARP` tambem sincroniza o catalogo IFRN em lotes, mas envia a UASG digitada como `adesaoUnidadeCodigos`; assim a busca encontra adesoes do campus a atas gerenciadas por outras UASGs IFRN

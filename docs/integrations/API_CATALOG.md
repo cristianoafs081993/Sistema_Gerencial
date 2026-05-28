@@ -311,6 +311,7 @@ Observacao operacional:
 - a Edge Function usa timeout curto ao chamar Dados Abertos para devolver erro operacional antes do limite de gateway da Supabase quando o Compras.gov.br fica sem resposta.
 - o drawer de detalhes exibe metadados preservados em `raw_data` da ata e permite enriquecer uma ata especifica sob demanda com `includeDetalhes=true` e `numeroAta`, limitando a consulta para reduzir risco de timeout.
 - no enriquecimento sob demanda, a function evita chamar `/modulo-arp/1_consultarARP` novamente porque esse endpoint pode falhar com `numeroAtaRegistroPreco`; ela consulta diretamente os endpoints de itens e vinculos usando a ata ja materializada.
+- a busca textual local tambem cobre numero/codigo/descricao do item e fornecedor quando os itens ja foram materializados; ela usa o texto agregado da view `atas_registro_precos_resumo` e nao chama os endpoints externos a cada digitacao.
 
 ## 5. Edge Function `analisar-liquidacao-siafi`
 

@@ -49,6 +49,8 @@ Atas e ARP:
 
 - helpers devem cobrir normalizacao de ata, item, unidade participante e adesao
 - a UI deve testar lista, drawer de detalhes, UASG digitada, botao `Buscar ARP`, recarregamento do cache local mesmo quando a API externa falhar, busca de vinculo `Participante` via cache IFRN, busca de vinculo `Aderente` com UASG alvo separada, botao `Sincronizar UASGs IFRN` e continuidade do lote quando uma UASG falhar
+- a busca local deve cobrir descricao/codigo do item e fornecedor materializados, exibindo a correspondencia e indicando atas ainda sem itens carregados
+- a contagem de participantes deve usar texto claro (`participante(s)`) e manter hover com as UASGs participantes materializadas
 - a navegacao deve manter `/atas-registro-precos` como tela de producao acessivel ao grupo `Diretores`
 
 ## Como rodar

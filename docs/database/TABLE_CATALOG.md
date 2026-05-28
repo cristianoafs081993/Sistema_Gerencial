@@ -769,6 +769,7 @@ Finalidade:
 
 - view agregada para listar atas com totais de itens, participantes e adesoes por unidade
 - `unidades_participantes` exclui linhas cujo `raw_data.tipoUnidade = GERENCIADORA`, mantendo o filtro `Participante` separado do filtro `Gerenciadora`
+- expoe `itens_texto_pesquisa`, agregado de numero/codigo/descricao do item e fornecedor, para pesquisa local da lista sem consulta externa em tempo real
 
 Consumido por:
 
