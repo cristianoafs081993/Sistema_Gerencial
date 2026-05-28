@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Check, Info, TrendingUp } from 'lucide-react';
 import {
   CartesianGrid,
@@ -28,8 +29,12 @@ type DashboardContractExecutionTabProps = {
   contractExpenseSeries: ContractExpenseSeries[];
   selectedContractExpenseIds: string[];
   contractProjectionBullets: ContractProjectionBulletItem[];
+  allContractProjectionBullets?: ContractProjectionBulletItem[];
   isContractExpenseLoading: boolean;
   onToggleContractExpense: (contratoId: string) => void;
+  projectionTargetMonths?: number;
+  onProjectionTargetMonthsChange?: (months: number) => void;
+  contractExpensePeriod?: { startDate: string; endDate: string };
 };
 
 function ContractExpenseTooltip({
@@ -47,7 +52,7 @@ function ContractExpenseTooltip({
 
   const rows = payload
     .map((item) => {
-      const serie = series.find((entry) => entry.executadoKey === item.dataKey || entry.pendenteKey === item.dataKey);
+      const serie = series.find((entry) => entry.dataKey === item.dataKey);
       if (!serie) return null;
 
       const value = Number(item.value || 0);
@@ -55,12 +60,11 @@ function ContractExpenseTooltip({
 
       return {
         label: serie.label,
-        status: item.dataKey === serie.executadoKey ? 'Executado' : 'Pendente',
         value,
         color: serie.color,
       };
     })
-    .filter((item): item is { label: string; status: string; value: number; color: string } => Boolean(item));
+    .filter((item): item is { label: string; value: number; color: string } => Boolean(item));
 
   if (rows.length === 0) return null;
 
@@ -71,19 +75,17 @@ function ContractExpenseTooltip({
       <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">{label}</p>
       <div className="mt-2 space-y-2">
         {rows.map((item) => (
-          <div key={`${item.label}-${item.status}`} className="flex items-center justify-between gap-4">
+          <div key={item.label} className="flex items-center justify-between gap-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span
                   className="h-2.5 w-2.5 shrink-0 rounded-full"
                   style={{
                     backgroundColor: item.color,
-                    opacity: item.status === 'Pendente' ? CONTRACT_EXPENSE_PENDING_OPACITY : 1,
                   }}
                 />
                 <span className="truncate font-ui text-sm font-medium text-text-secondary">{item.label}</span>
               </div>
-              <p className="ml-4 mt-0.5 font-ui text-[11px] font-semibold text-text-muted">{item.status}</p>
             </div>
             <span className="shrink-0 font-ui text-sm font-semibold text-text-primary">{formatCurrency(item.value)}</span>
           </div>
@@ -109,7 +111,7 @@ function formatTraceDate(value: string | null) {
 function getProjectionStatus(item: ContractProjectionBulletItem) {
   if (item.percentualProjetado > 100) {
     return {
-      label: 'Acima do empenhado',
+      label: 'Acima do saldo',
       className: 'border-red-200 bg-red-50 text-red-700',
     };
   }
@@ -240,12 +242,64 @@ export function DashboardContractExecutionTab({
   contractExpenseSeries,
   selectedContractExpenseIds,
   contractProjectionBullets,
+  allContractProjectionBullets = [],
   isContractExpenseLoading,
   onToggleContractExpense,
+  projectionTargetMonths = 12,
+  onProjectionTargetMonthsChange,
+  contractExpensePeriod,
 }: DashboardContractExecutionTabProps) {
   const selectedContractExpenseSet = new Set(selectedContractExpenseIds);
   const hasContractExpenseOptions = contractExpenseOptions.length > 0;
   const hasContractExpenseData = contractExpenseData.length > 0 && contractExpenseSeries.length > 0;
+
+  const projectionOptions = useMemo(() => {
+    let filterYear = new Date().getFullYear();
+    if (contractExpensePeriod?.startDate) {
+      const parts = contractExpensePeriod.startDate.split('-');
+      if (parts[0]) {
+        filterYear = Number(parts[0]);
+      }
+    }
+      
+    const today = new Date();
+    const todayYear = today.getFullYear();
+    const todayMonth = today.getMonth(); // 0-based
+
+    const options: Array<{ months: number; label: string }> = [];
+    const startMonth = filterYear === todayYear ? todayMonth + 1 : 0;
+    const startYear = filterYear;
+
+    const monthNames = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+
+    // Current filtered year months
+    for (let m = startMonth; m < 12; m++) {
+      const isDefault = m === 11; // December is default
+      options.push({
+        months: m + 1,
+        label: `${monthNames[m]} / ${startYear}${isDefault ? ' (Padrão)' : ''}`,
+      });
+    }
+
+    // Next year months
+    const nextYear = startYear + 1;
+    for (let m = 0; m < 12; m++) {
+      options.push({
+        months: 12 + m + 1,
+        label: `${monthNames[m]} / ${nextYear}`,
+      });
+    }
+
+    return options;
+  }, [contractExpensePeriod]);
+
+  const selectedTargetLabel = useMemo(() => {
+    const selectedOpt = projectionOptions.find((opt) => opt.months === projectionTargetMonths);
+    return selectedOpt ? selectedOpt.label.replace(' (Padrão)', '') : '';
+  }, [projectionOptions, projectionTargetMonths]);
 
   return (
     <div className="space-y-6">
@@ -307,22 +361,11 @@ export function DashboardContractExecutionTab({
 
       <ChartPanel
         title="Gasto Mensal por Contrato"
-        description="Faturas emitidas no periodo, com linhas separadas por situacao"
+        description="Faturas emitidas no periodo (valor total acumulado mensal)"
         loading={isLoading || isContractExpenseLoading}
         heightClassName="h-[380px]"
       >
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-              <span className="h-2 w-2 rounded-full bg-emerald-600" />
-              Executado
-            </span>
-            <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              <span className="h-2 w-2 rounded-full bg-slate-500 opacity-50" />
-              Pendente
-            </span>
-          </div>
-
           {hasContractExpenseData ? (
             <>
               <div className="flex flex-wrap gap-2">
@@ -351,32 +394,19 @@ export function DashboardContractExecutionTab({
                       tickFormatter={formatCompactCurrency}
                     />
                     <Tooltip content={<ContractExpenseTooltip series={contractExpenseSeries} />} />
-                    {contractExpenseSeries.flatMap((serie) => [
+                    {contractExpenseSeries.map((serie) => (
                       <Line
-                        key={serie.pendenteKey}
+                        key={serie.contratoId}
                         type="monotone"
-                        dataKey={serie.pendenteKey}
-                        name={`${serie.label} pendente`}
-                        stroke={serie.color}
-                        strokeOpacity={CONTRACT_EXPENSE_PENDING_OPACITY}
-                        strokeWidth={2}
-                        strokeDasharray="5 4"
-                        dot={{ r: 2, fill: serie.color, fillOpacity: CONTRACT_EXPENSE_PENDING_OPACITY }}
-                        activeDot={{ r: 4 }}
-                        connectNulls
-                      />,
-                      <Line
-                        key={serie.executadoKey}
-                        type="monotone"
-                        dataKey={serie.executadoKey}
-                        name={`${serie.label} executado`}
+                        dataKey={serie.dataKey}
+                        name={serie.label}
                         stroke={serie.color}
                         strokeWidth={2.5}
                         dot={{ r: 2.5, fill: serie.color }}
                         activeDot={{ r: 4 }}
                         connectNulls
-                      />,
-                    ])}
+                      />
+                    ))}
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
@@ -399,34 +429,52 @@ export function DashboardContractExecutionTab({
       </ChartPanel>
 
       <ChartPanel
-        title="Projecao Anual por Contrato"
-        description="Liquidacoes executadas projetadas para o ano frente ao total empenhado"
+        title={`Projeção de Cobertura por Contrato (até ${selectedTargetLabel})`}
+        description={`Liquidações executadas projetadas até ${selectedTargetLabel} frente ao saldo dos empenhos`}
         loading={isLoading || isContractExpenseLoading}
         heightClassName="min-h-[260px]"
       >
         {contractProjectionBullets.length > 0 ? (
           <div className="space-y-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                <span className="h-3 w-0.5 rounded-full bg-slate-700" />
-                Empenhado
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                <span className="h-2 w-2 rounded-full bg-emerald-600" />
-                Liquidado
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                <span className="h-2 w-5 rounded-full bg-blue-500/45" />
-                Projetado
-              </span>
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4 border border-slate-100">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                  <span className="h-3 w-0.5 rounded-full bg-slate-700" />
+                  Saldo dos empenhos
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                  <span className="h-2 w-2 rounded-full bg-emerald-600" />
+                  Liquidado
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                  <span className="h-2 w-5 rounded-full bg-blue-500/45" />
+                  Projetado
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-4 font-ui text-[11px] font-medium text-text-muted">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-text-secondary">Projetar cobertura até:</span>
+                  <select
+                    value={projectionTargetMonths}
+                    onChange={(e) => onProjectionTargetMonthsChange?.(Number(e.target.value))}
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-text-primary focus:border-primary/50 focus:outline-none cursor-pointer"
+                  >
+                    {projectionOptions.map((opt) => (
+                      <option key={opt.months} value={opt.months}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-3">
               {contractProjectionBullets.map((item) => {
-                const scaleMax = Math.max(item.empenhado, item.projetado, item.liquidado, 1);
+                const scaleMax = Math.max(item.liquidado + item.saldoEmpenhos, item.projetado, 1);
                 const liquidadoWidth = Math.min((item.liquidado / scaleMax) * 100, 100);
                 const projetadoWidth = Math.min((item.projetado / scaleMax) * 100, 100);
-                const empenhadoPosition = Math.min((item.empenhado / scaleMax) * 100, 100);
+                const saldoPosition = Math.min(((item.liquidado + item.saldoEmpenhos) / scaleMax) * 100, 100);
                 const status = getProjectionStatus(item);
 
                 return (
@@ -445,7 +493,7 @@ export function DashboardContractExecutionTab({
                             </span>
                           </div>
                           <p className="mt-1 font-ui text-xs text-text-muted">
-                            Projetado em {item.percentualProjetado.toFixed(0)}% do empenhado com {item.mesesConsiderados} mes(es) observado(s).
+                            Projetado em {item.percentualProjetado.toFixed(0)}% do saldo com {item.mesesConsiderados} mes(es) observado(s).
                           </p>
                         </div>
                       </div>
@@ -453,8 +501,8 @@ export function DashboardContractExecutionTab({
                       <div className="flex items-start gap-3">
                         <div className="grid min-w-[min(100%,440px)] grid-cols-3 gap-2 text-right font-ui">
                           <div className="rounded-xl bg-slate-50 px-3 py-2">
-                            <p className="text-[11px] font-semibold text-text-muted">Empenhado</p>
-                            <p className="mt-1 text-sm font-bold text-text-primary">{formatCurrency(item.empenhado)}</p>
+                            <p className="text-[11px] font-semibold text-text-muted">Saldo</p>
+                            <p className="mt-1 text-sm font-bold text-text-primary">{formatCurrency(item.saldoEmpenhos)}</p>
                           </div>
                           <div className="rounded-xl bg-emerald-50 px-3 py-2">
                             <p className="text-[11px] font-semibold text-emerald-700/80">Liquidado</p>
@@ -481,12 +529,22 @@ export function DashboardContractExecutionTab({
                         />
                         <div
                           className="absolute top-1/2 h-8 w-0.5 -translate-y-1/2 rounded-full bg-slate-900 shadow-[0_0_0_3px_rgba(15,23,42,0.08)]"
-                          style={{ left: `${empenhadoPosition}%` }}
+                          style={{ left: `${saldoPosition}%` }}
                         />
                       </div>
-                      <div className="mt-2 flex items-center justify-between font-ui text-[11px] font-semibold text-text-muted">
-                        <span>0</span>
-                        <span>Escala ate {formatCurrency(scaleMax)}</span>
+                      <div className="mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 font-ui text-[11px] font-semibold text-text-muted">
+                        <span>
+                          Provável necessidade de empenho:{' '}
+                          <span className={cn('font-bold', item.necessidadeEmpenho > 0 ? 'text-status-warning' : 'text-status-success')}>
+                            {formatCurrency(item.necessidadeEmpenho)}
+                          </span>
+                        </span>
+                        <span>
+                          Cobertura provável até:{' '}
+                          <span className="font-bold text-text-primary">
+                            {item.coberturaMes || 'N/D'}
+                          </span>
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -500,6 +558,143 @@ export function DashboardContractExecutionTab({
               <p className="font-ui text-sm font-semibold text-text-primary">Sem dados de empenho para projecao.</p>
               <p className="mt-1 font-ui text-xs text-text-muted">
                 Selecione contratos com empenhos e liquidacoes sincronizados para comparar a projecao anual.
+              </p>
+            </div>
+          </div>
+        )}
+      </ChartPanel>
+
+      {/* Heatmap de Cobertura de Empenhos */}
+      <ChartPanel
+        title="Heatmap de Cobertura de Empenhos"
+        description="Percentual de cobertura dos empenhos vigentes (Liquidado + Saldo) frente à provável necessidade anual projetada para todos os contratos ativos."
+        loading={isLoading || isContractExpenseLoading}
+      >
+        {(allContractProjectionBullets.length > 0 ? allContractProjectionBullets : contractProjectionBullets).length > 0 ? (
+          <div className="space-y-6">
+            {/* Legenda do Heatmap */}
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4 border border-slate-100">
+              <div className="flex flex-wrap items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <span className="h-3.5 w-3.5 rounded-lg bg-rose-600 ring-2 ring-rose-600/20" />
+                  <span className="font-ui text-xs font-semibold text-text-muted">Crítico (&lt; 70%)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-3.5 w-3.5 rounded-lg bg-yellow-500 ring-2 ring-yellow-500/20" />
+                  <span className="font-ui text-xs font-semibold text-text-muted">Atenção (70% - 99%)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-3.5 w-3.5 rounded-lg bg-emerald-600 ring-2 ring-emerald-600/20" />
+                  <span className="font-ui text-xs font-semibold text-text-muted">Adequado (&ge; 100%)</span>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-4 font-ui text-[11px] font-medium text-text-muted">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-text-secondary">Projetar cobertura até:</span>
+                  <select
+                    value={projectionTargetMonths}
+                    onChange={(e) => onProjectionTargetMonthsChange?.(Number(e.target.value))}
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-text-primary focus:border-primary/50 focus:outline-none cursor-pointer"
+                  >
+                    {projectionOptions.map((opt) => (
+                      <option key={opt.months} value={opt.months}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="hidden sm:block text-slate-200">|</div>
+                <div>Fórmula: (Liquidado + Saldo) / Projetado</div>
+              </div>
+            </div>
+
+            {/* Grid do Heatmap */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+              {(allContractProjectionBullets.length > 0 ? allContractProjectionBullets : contractProjectionBullets).map((item) => {
+                const totalCapacidade = item.liquidado + item.saldoEmpenhos;
+                const ratio = item.projetado > 0 ? (totalCapacidade / item.projetado) * 100 : 100;
+                
+                const getCellColorClass = (percent: number) => {
+                  if (percent < 70) return 'bg-rose-600 text-white shadow-sm hover:bg-rose-700 ring-2 ring-rose-600/20';
+                  if (percent < 100) return 'bg-yellow-500 text-slate-950 shadow-sm hover:bg-yellow-600 ring-2 ring-yellow-500/20';
+                  return 'bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 ring-2 ring-emerald-600/20';
+                };
+
+                return (
+                  <HoverCard key={item.id} openDelay={100} closeDelay={100}>
+                    <HoverCardTrigger asChild>
+                      <div
+                        className={cn(
+                          "flex flex-col justify-between rounded-2xl p-4 transition-all duration-200 cursor-pointer h-28 border border-black/5 font-ui",
+                          getCellColorClass(ratio)
+                        )}
+                      >
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-bold uppercase tracking-wider opacity-90 truncate text-current">
+                            {item.label.split(' - ').slice(-1)[0]}
+                          </p>
+                          <p className="mt-1 text-xs font-bold leading-tight line-clamp-2 text-current">
+                            {item.label.split(' - ')[0]}
+                          </p>
+                        </div>
+                        <div className="flex items-baseline justify-between mt-2">
+                          <span className="text-[10px] font-medium opacity-75">Cobertura</span>
+                          <span className="text-lg font-black tracking-tight">{ratio.toFixed(0)}%</span>
+                        </div>
+                      </div>
+                    </HoverCardTrigger>
+                    <HoverCardContent className="w-80 rounded-2xl p-4 shadow-xl border border-border-default/80 bg-white font-ui text-sm z-50">
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Contrato</p>
+                          <p className="font-bold text-text-primary mt-0.5">{item.label}</p>
+                        </div>
+
+                        <div className="h-px bg-slate-100" />
+
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-text-muted font-medium">Liquidado</span>
+                            <p className="font-bold text-text-primary mt-0.5">{formatCurrency(item.liquidado)}</p>
+                          </div>
+                          <div>
+                            <span className="text-text-muted font-medium">Saldo Empenhos</span>
+                            <p className="font-bold text-text-primary mt-0.5">{formatCurrency(item.saldoEmpenhos)}</p>
+                          </div>
+                          <div className="col-span-2 bg-slate-50 rounded-xl p-2.5 mt-1 border border-slate-100">
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="text-text-muted font-semibold">Capacidade Vigente</span>
+                              <span className="font-bold text-text-primary">{formatCurrency(totalCapacidade)}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-xs mt-1.5 pt-1.5 border-t border-slate-200/60">
+                              <span className="text-text-muted font-semibold">Projetado Anual</span>
+                              <span className="font-bold text-text-primary">{formatCurrency(item.projetado)}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 border border-slate-100 text-xs">
+                          <span className="font-semibold text-text-muted">Cobertura Realizada</span>
+                          <span className={cn(
+                            'font-black',
+                            ratio < 70 ? 'text-rose-600' : ratio < 100 ? 'text-amber-600' : 'text-emerald-600'
+                          )}>
+                            {ratio.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    </HoverCardContent>
+                  </HoverCard>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="flex h-[180px] items-center justify-center rounded-[22px] border border-dashed border-border-default/80 bg-surface-subtle/40 px-6 text-center">
+            <div>
+              <p className="font-ui text-sm font-semibold text-text-primary">Sem dados de empenho para cobertura.</p>
+              <p className="mt-1 font-ui text-xs text-text-muted">
+                Os percentuais de cobertura aparecerão quando houver faturas e empenhos sincronizados.
               </p>
             </div>
           </div>

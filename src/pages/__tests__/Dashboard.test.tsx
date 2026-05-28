@@ -102,7 +102,7 @@ vi.mock('@/components/dashboard/DashboardContractExecutionTab', () => ({
   }: {
     contractExpenseData: Array<Record<string, string | number>>;
     contractExpenseOptions: Array<{ id: string; total: number }>;
-    contractExpenseSeries: Array<{ contratoId: string; label: string; executadoKey: string; pendenteKey: string }>;
+    contractExpenseSeries: Array<{ contratoId: string; label: string; dataKey: string }>;
     contractProjectionBullets: Array<{
       id: string;
       empenhado: number;
@@ -239,6 +239,7 @@ function baseDescentralizacao() {
 
 describe('Dashboard', () => {
   beforeEach(() => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
     liquidacoesQueryData = [];
     contratosApiEmpenhosQueryData = [];
     contratosApiLiquidacoesQueryData = [];
@@ -345,6 +346,7 @@ describe('Dashboard', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('exibe o grafico de contratos em uma aba dedicada', () => {
@@ -432,13 +434,12 @@ describe('Dashboard', () => {
     expect(aggregation.data).toHaveLength(2);
     expect(aggregation.data[0]).toMatchObject({
       name: 'jan/26',
-      contract_c1_executado: 100,
-      contract_c1_pendente: 50,
+      contract_c1: 150,
       total: 150,
     });
     expect(aggregation.data[1]).toMatchObject({
       name: 'fev/26',
-      contract_c2_executado: 70,
+      contract_c2: 70,
       total: 70,
     });
   });
@@ -535,8 +536,10 @@ describe('Dashboard', () => {
       projetado: 600,
       saldoEmpenhos: 830,
       mesesConsiderados: 3,
-      percentualLiquidado: 15,
-      percentualProjetado: 60,
+      percentualLiquidado: expect.closeTo(18.07, 1),
+      percentualProjetado: expect.closeTo(72.29, 1),
+      coberturaMes: 'Julho/27',
+      necessidadeEmpenho: 0,
     });
     expect(bullets[0].liquidacoes).toEqual([
       expect.objectContaining({
@@ -579,7 +582,42 @@ describe('Dashboard', () => {
     });
   });
 
-  it('seleciona automaticamente os cinco contratos com maior gasto mensal', async () => {
+  it('aplica corretamente a quantidade personalizada de meses de projecao', () => {
+    const bullets = buildContractProjectionBullets(
+      [
+        {
+          id: 'c1',
+          numero: '00123/2026',
+          fornecedor_nome: 'Fornecedor A',
+          objeto: 'Servico A',
+        },
+      ] as never,
+      [
+        {
+          id: 'f1',
+          contrato_api_id: 'c1',
+          situacao: 'Pago',
+          valor_liquido: 100,
+          valor_bruto: 100,
+          data_emissao: '2026-01-10',
+          raw_data: { contratante: '158366' },
+        },
+      ] as never,
+      [] as never,
+      ['c1'],
+      {
+        startDate: new Date('2026-01-01'),
+        endDate: new Date('2026-12-31'),
+        today: new Date('2026-03-15'),
+        projectionTargetMonths: 15,
+      },
+    );
+
+    expect(bullets).toHaveLength(1);
+    expect(bullets[0].projetado).toBeCloseTo(500, 1);
+  });
+
+  it('seleciona automaticamente o contrato com maior gasto mensal', async () => {
     const currentYear = new Date().getFullYear();
     contratosApiAtivosQueryData = [1, 2, 3, 4, 5, 6].map((index) => ({
       id: `c${index}`,
@@ -606,13 +644,13 @@ describe('Dashboard', () => {
     render(<Dashboard />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('contract-expense-selected')).toHaveTextContent('c6,c5,c4,c3,c2');
+      expect(screen.getByTestId('contract-expense-selected')).toHaveTextContent('c6');
     });
 
     expect(screen.getByTestId('contract-expense-options')).toHaveTextContent('c6:60,c5:50,c4:40,c3:30,c2:20,c1:10');
     expect(screen.getByTestId('contract-expense-series')).toHaveTextContent(`c6:Fornecedor 6 - 006/${currentYear}`);
-    expect(screen.getByTestId('contract-expense-data')).toHaveTextContent('contract_c6_executado');
-    expect(screen.getByTestId('contract-expense-data')).not.toHaveTextContent('contract_c1_pendente');
+    expect(screen.getByTestId('contract-expense-data')).toHaveTextContent('contract_c6');
+    expect(screen.getByTestId('contract-expense-data')).not.toHaveTextContent('contract_c1');
     expect(screen.getByTestId('contract-projection-bullets')).toHaveTextContent('c6:600:60');
   });
 
@@ -637,16 +675,15 @@ describe('Dashboard', () => {
     render(<Dashboard />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('contract-expense-selected')).toHaveTextContent('c6,c5,c4,c3,c2');
+      expect(screen.getByTestId('contract-expense-selected')).toHaveTextContent('c6');
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'toggle-first-contract' }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('contract-expense-selected')).toHaveTextContent('c5,c4,c3,c2');
+      expect(screen.getByTestId('contract-expense-selected')).toHaveTextContent('');
     });
     expect(screen.getByTestId('contract-expense-series')).not.toHaveTextContent('c6:');
-    expect(screen.getByTestId('contract-expense-series')).toHaveTextContent('c5:Fornecedor 5');
   });
 
   it('inicia o gasto por contrato limitado ao ano atual e usa o periodo do filtro global', async () => {

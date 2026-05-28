@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { format, isWithinInterval, parseISO, startOfDay, endOfDay } from 'date-fns';
+import { format, isWithinInterval, parseISO, startOfDay, endOfDay, addMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -33,7 +33,14 @@ import {
   type ContratoApiRow,
 } from '@/services/contratosApi';
 import { isContratoApiDisplayFatura } from '@/utils/contratosApiStatus';
-import type { Atividade, Empenho } from '@/types';
+import type { Atividade, Empenho, Contrato, ContratoEmpenho } from '@/types';
+import {
+  buildEmpenhoLookupKeys,
+  normalizeContratoNumero,
+  shouldIgnoreContratoNumero,
+} from '@/utils/contratosSync';
+
+
 
 type MonthlyExecutionBucket = {
   date: Date;
@@ -65,8 +72,7 @@ export type ContractExpenseSeries = {
   contratoId: string;
   label: string;
   color: string;
-  executadoKey: string;
-  pendenteKey: string;
+  dataKey: string;
 };
 
 export type ContractProjectionBulletItem = {
@@ -82,6 +88,8 @@ export type ContractProjectionBulletItem = {
   percentualProjetado: number;
   liquidacoes: ContractProjectionLiquidacaoTrace[];
   empenhos: ContractProjectionEmpenhoTrace[];
+  coberturaMes: string | null;
+  necessidadeEmpenho: number;
 };
 
 export type ContractProjectionLiquidacaoTrace = {
@@ -144,9 +152,78 @@ const getContractExpenseValue = (fatura: Pick<ContratoApiFaturaRow, 'valor_liqui
 const getContractCommitmentValue = (empenho: Pick<ContratoApiEmpenhoRow, 'valor_empenhado'>) =>
   Math.max(0, Number(empenho.valor_empenhado) || 0);
 
+const getApiEmpenhoYear = (empenho: ContratoApiEmpenhoRow) => {
+  const match = (empenho.numero || '').match(/^(\d{4})NE/i);
+  if (match) return Number(match[1]);
+  if (!empenho.data_emissao) return new Date().getFullYear();
+  const parsed = new Date(empenho.data_emissao);
+  return Number.isNaN(parsed.getTime()) ? new Date().getFullYear() : parsed.getFullYear();
+};
+
+const toApiCurrencyNumber = (value: unknown) => {
+  if (value == null || value === '') return undefined;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  const parsed = Number(
+    String(value)
+      .trim()
+      .replace(/\./g, '')
+      .replace(',', '.')
+      .replace(/[^\d.-]/g, ''),
+  );
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const getApiEmpenhoNumber = (
+  empenho: ContratoApiEmpenhoRow,
+  dbKey: keyof ContratoApiEmpenhoRow,
+  rawKey: string,
+) => {
+  const fromDb = toApiCurrencyNumber(empenho[dbKey]);
+  if (fromDb !== undefined) return Math.max(0, fromDb);
+
+  const raw = empenho.raw_data && typeof empenho.raw_data === 'object' ? empenho.raw_data : {};
+  const fromRaw = toApiCurrencyNumber((raw as Record<string, unknown>)[rawKey]);
+  return fromRaw === undefined ? undefined : Math.max(0, fromRaw);
+};
+
+const getApiRapLiquidadoPago = (empenho: ContratoApiEmpenhoRow) => {
+  const rpLiquidadoApi = getApiEmpenhoNumber(empenho, 'rp_liquidado', 'rpliquidado') ?? 0;
+  const rpPagoApi = getApiEmpenhoNumber(empenho, 'rp_pago', 'rppago') ?? 0;
+  return rpLiquidadoApi + rpPagoApi;
+};
+
+const getApiRapBase = (empenho: ContratoApiEmpenhoRow) => {
+  const rpInscritoApi = getApiEmpenhoNumber(empenho, 'rp_inscrito', 'rpinscrito') ?? 0;
+  const rpALiquidarApi = getApiEmpenhoNumber(empenho, 'rp_a_liquidar', 'rpaliquidar') ?? 0;
+  const rpAPagarApi = getApiEmpenhoNumber(empenho, 'rp_a_pagar', 'rpapagar') ?? 0;
+  const rpLiquidadoPagoApi = getApiRapLiquidadoPago(empenho);
+
+  if (rpInscritoApi > 0) return rpInscritoApi;
+  if (rpALiquidarApi > 0) return rpALiquidarApi;
+  return rpLiquidadoPagoApi + rpAPagarApi;
+};
+
+const isApiRapEmpenho = (empenho: ContratoApiEmpenhoRow) =>
+  getApiEmpenhoYear(empenho) < new Date().getFullYear() ||
+  getApiRapBase(empenho) > 0 ||
+  getApiRapLiquidadoPago(empenho) > 0;
+
+const getApiRapSaldoAtual = (empenho: ContratoApiEmpenhoRow) => {
+  const rpAPagarDbApi = getApiEmpenhoNumber(empenho, 'rp_a_pagar', 'rpapagar');
+  if (rpAPagarDbApi !== undefined) return rpAPagarDbApi;
+  return Math.max(0, getApiRapBase(empenho) - getApiRapLiquidadoPago(empenho));
+};
+
 const getContractCommitmentBalanceTrace = (
-  empenho: Pick<ContratoApiEmpenhoRow, 'valor_empenhado' | 'valor_a_liquidar' | 'valor_liquidado' | 'valor_pago'>,
+  empenho: ContratoApiEmpenhoRow,
 ): Pick<ContractProjectionEmpenhoTrace, 'saldo' | 'saldoFonte'> => {
+  if (isApiRapEmpenho(empenho)) {
+    return {
+      saldo: getApiRapSaldoAtual(empenho),
+      saldoFonte: 'api',
+    };
+  }
+
   const apiBalance = Number(empenho.valor_a_liquidar);
   if (Number.isFinite(apiBalance) && empenho.valor_a_liquidar !== null && empenho.valor_a_liquidar !== undefined) {
     return {
@@ -164,8 +241,8 @@ const getContractCommitmentBalanceTrace = (
   };
 };
 
-const getContractExpenseFieldKey = (contratoId: string, status: ContractExpenseStatus) =>
-  `contract_${contratoId.replace(/[^a-zA-Z0-9]/g, '_')}_${status}`;
+const getContractExpenseFieldKey = (contratoId: string) =>
+  `contract_${contratoId.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
 const getContractExpenseLabel = (contrato: Pick<ContratoApiRow, 'numero' | 'fornecedor_nome' | 'objeto'>) => {
   const fornecedor = contrato.fornecedor_nome?.trim();
@@ -416,8 +493,7 @@ export const buildContractExpenseAggregation = (
     const value = getContractExpenseValue(fatura);
     if (!date || value <= 0 || !isDateInsideOptionalRange(date, options.startDate, options.endDate)) return;
 
-    const status = getContractExpenseStatus(fatura.situacao);
-    const key = getContractExpenseFieldKey(contrato.id, status);
+    const key = getContractExpenseFieldKey(contrato.id);
     const bucketKey = monthKey(date);
     const bucket =
       buckets.get(bucketKey) ||
@@ -455,8 +531,7 @@ export const buildContractExpenseAggregation = (
     contratoId: option.id,
     label: option.label,
     color: option.color,
-    executadoKey: getContractExpenseFieldKey(option.id, 'executado'),
-    pendenteKey: getContractExpenseFieldKey(option.id, 'pendente'),
+    dataKey: getContractExpenseFieldKey(option.id),
   }));
 
   return {
@@ -464,6 +539,31 @@ export const buildContractExpenseAggregation = (
     data: Array.from(buckets.values()).sort((left, right) => left.monthKey.localeCompare(right.monthKey)),
     series,
   };
+};
+
+const normalizeEmpenhoRef = (value: string) =>
+  (value || '')
+    .toString()
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+
+const buildEmpenhoRefKeys = (value: unknown) => {
+  const keys = new Set(buildEmpenhoLookupKeys(value));
+  const normalized = normalizeEmpenhoRef(String(value ?? ''));
+  if (normalized) keys.add(normalized);
+  if (normalized.length >= 12) keys.add(normalized.slice(-12));
+  return keys;
+};
+
+const getSaldoEmpenhoApi = (empenho: ContratoApiEmpenhoRow) => {
+  if (isApiRapEmpenho(empenho)) return getApiRapSaldoAtual(empenho);
+  const apiBalance = getApiEmpenhoNumber(empenho, 'valor_a_liquidar', 'valoraliquidar');
+  if (apiBalance !== undefined) return apiBalance;
+
+  const valorEmpenhado = getContractCommitmentValue(empenho);
+  const valorExecutado = Math.max(Number(empenho.valor_liquidado ?? empenho.valor_pago ?? 0) || 0, 0);
+  return Math.max(0, valorEmpenhado - valorExecutado);
 };
 
 export const buildContractProjectionBullets = (
@@ -475,6 +575,12 @@ export const buildContractProjectionBullets = (
     startDate: Date;
     endDate: Date;
     today?: Date;
+    projectionTargetMonths?: number;
+  },
+  localData?: {
+    empenhos: Empenho[];
+    contratos: Contrato[];
+    contratosEmpenhos: ContratoEmpenho[];
   },
 ): ContractProjectionBulletItem[] => {
   const selectedIds = new Set(selectedContratoIds);
@@ -515,9 +621,6 @@ export const buildContractProjectionBullets = (
   empenhos.forEach((empenho) => {
     if (!selectedIds.has(empenho.contrato_api_id)) return;
 
-    const date = toValidDate(empenho.data_emissao);
-    if (date && date.getUTCFullYear() !== options.startDate.getUTCFullYear()) return;
-
     const value = getContractCommitmentValue(empenho);
     if (value <= 0) return;
 
@@ -543,16 +646,167 @@ export const buildContractProjectionBullets = (
       if (!contrato) return null;
 
       const liquidado = liquidadoByContrato.get(contratoId) || 0;
-      const empenhado = empenhadoByContrato.get(contratoId) || 0;
-      const projetado = elapsedMonths > 0 ? (liquidado / elapsedMonths) * 12 : liquidado;
       const liquidacoes = (liquidacoesByContrato.get(contratoId) || []).sort((left, right) =>
         String(right.dataEmissao || '').localeCompare(String(left.dataEmissao || '')),
       );
-      const empenhosTrace = (empenhosByContrato.get(contratoId) || []).sort((left, right) =>
-        String(right.dataEmissao || '').localeCompare(String(left.dataEmissao || '')),
-      );
-      const saldoApi = empenhosTrace.reduce((sum, empenho) => sum + empenho.saldo, 0);
-      const saldoEmpenhos = empenhosTrace.length > 0 ? saldoApi : Math.max(0, empenhado - liquidado);
+
+      let valorTotal = 0;
+      if (localData) {
+        // Find corresponding local contract
+        const localContrato = localData.contratos.find((c) => {
+          if (shouldIgnoreContratoNumero(c.numero)) return false;
+          return normalizeContratoNumero(c.numero) === normalizeContratoNumero(contrato.numero);
+        });
+        valorTotal = localContrato?.valor ?? contrato.valor_acumulado ?? contrato.valor_global ?? 0;
+      } else {
+        valorTotal = contrato.valor_acumulado ?? contrato.valor_global ?? 0;
+      }
+
+      const targetMonths = options.projectionTargetMonths ?? 12;
+      let projetado = elapsedMonths > 0 ? (liquidado / elapsedMonths) * targetMonths : liquidado;
+      if (valorTotal > 0) {
+        projetado = Math.min(projetado, valorTotal);
+      }
+
+      let empenhosTrace: ContractProjectionEmpenhoTrace[] = [];
+      let empenhado = 0;
+      let saldoEmpenhos = 0;
+
+      if (localData) {
+        // Find corresponding local contract
+        const localContrato = localData.contratos.find((c) => {
+          if (shouldIgnoreContratoNumero(c.numero)) return false;
+          return normalizeContratoNumero(c.numero) === normalizeContratoNumero(contrato.numero);
+        });
+
+        // 1. Build localEmpenhoByLookupKey
+        const localEmpenhoByLookupKey = new Map<string, Empenho>();
+        for (const empenho of localData.empenhos) {
+          for (const key of buildEmpenhoRefKeys(empenho.numero)) {
+            if (!localEmpenhoByLookupKey.has(key)) {
+              localEmpenhoByLookupKey.set(key, empenho);
+            }
+          }
+        }
+
+        // 2. Find linked local empenhos
+        let empenhosVinculados: Empenho[] = [];
+        if (localContrato) {
+          const linkIds = localData.contratosEmpenhos
+            .filter((l) => l.contrato_id === localContrato.id)
+            .map((l) => l.empenho_id);
+
+          const byId = new Map(localData.empenhos.map((e) => [e.id, e] as const));
+          const byNumero = new Map(localData.empenhos.map((e) => [e.numero, e] as const));
+          const seen = new Set<string>();
+
+          for (const ref of linkIds) {
+            const refStr = (ref || '').toString().trim();
+            const emp =
+              byId.get(refStr) ||
+              byNumero.get(refStr) ||
+              Array.from(buildEmpenhoRefKeys(refStr))
+                .map((key) => localEmpenhoByLookupKey.get(key))
+                .find(Boolean);
+            if (!emp) continue;
+            if (seen.has(emp.id)) continue;
+            seen.add(emp.id);
+            empenhosVinculados.push(emp);
+          }
+        }
+
+        // 3. Find API empenhos that are only API
+        const localEmpenhosKeys = new Set(empenhosVinculados.flatMap((e) => Array.from(buildEmpenhoRefKeys(e.numero))));
+        const apiEmpenhosForThisContrato = empenhos.filter(e => e.contrato_api_id === contratoId);
+
+        const empenhosApiSomente = apiEmpenhosForThisContrato.filter((empenhoApi) => {
+          if (!empenhoApi.numero) return true;
+          const apiKeys = Array.from(buildEmpenhoRefKeys(empenhoApi.numero));
+          return apiKeys.length === 0 || !apiKeys.some((key) => localEmpenhosKeys.has(key));
+        });
+
+        // 4. Define local calculations helpers
+        const rapReferenceYear = getRapReferenceYear(localData.empenhos);
+
+        const getSaldoEmpenhoLocal = (emp: Empenho) => {
+          if (emp.tipo === 'rap') return getRapSaldoAtual(emp, rapReferenceYear);
+          const liquidadoVal = (emp.valorLiquidadoAPagar || 0) + (emp.valorPagoOficial || 0);
+          return Math.max(0, emp.valor - liquidadoVal);
+        };
+
+        const getLocalEmpenhoForApi = (empApi: ContratoApiEmpenhoRow) => {
+          for (const key of buildEmpenhoRefKeys(empApi.numero)) {
+            const local = localEmpenhoByLookupKey.get(key);
+            if (local) return local;
+          }
+          return undefined;
+        };
+
+        const getSaldoEmpenhoApiPreferLocal = (empApi: ContratoApiEmpenhoRow) => {
+          const local = getLocalEmpenhoForApi(empApi);
+          return local ? getSaldoEmpenhoLocal(local) : getSaldoEmpenhoApi(empApi);
+        };
+
+        // 5. Build empenhosTrace
+        const mappedVinculados: ContractProjectionEmpenhoTrace[] = empenhosVinculados.map((e) => ({
+          id: e.id,
+          numero: e.numero,
+          dataEmissao: e.dataEmpenho ? new Date(e.dataEmpenho).toISOString() : null,
+          valorEmpenhado: e.valor,
+          valorPago: e.valorPagoOficial ?? 0,
+          valorLiquidado: e.valorLiquidadoAPagar ?? 0,
+          saldo: getSaldoEmpenhoLocal(e),
+          saldoFonte: 'calculado',
+        }));
+
+        const mappedApiSomente: ContractProjectionEmpenhoTrace[] = empenhosApiSomente.map((empenhoApi) => {
+          const val = getContractCommitmentValue(empenhoApi);
+          const hasLocal = getLocalEmpenhoForApi(empenhoApi);
+          return {
+            id: empenhoApi.id,
+            numero: empenhoApi.numero || 'Sem numero',
+            dataEmissao: empenhoApi.data_emissao,
+            valorEmpenhado: val,
+            valorPago: Math.max(Number(empenhoApi.valor_pago) || 0, 0),
+            valorLiquidado: Math.max(Number(empenhoApi.valor_liquidado) || 0, 0),
+            saldo: getSaldoEmpenhoApiPreferLocal(empenhoApi),
+            saldoFonte: hasLocal ? 'calculado' : 'api',
+          };
+        });
+
+        empenhosTrace = [...mappedVinculados, ...mappedApiSomente].sort((left, right) =>
+          String(right.dataEmissao || '').localeCompare(String(left.dataEmissao || '')),
+        );
+
+        empenhado =
+          empenhosVinculados.reduce((sum, e) => sum + (e.valor || 0), 0) +
+          empenhosApiSomente.reduce((sum, e) => sum + getContractCommitmentValue(e), 0);
+
+        saldoEmpenhos =
+          empenhosVinculados.reduce((sum, e) => sum + getSaldoEmpenhoLocal(e), 0) +
+          empenhosApiSomente.reduce((sum, e) => sum + getSaldoEmpenhoApiPreferLocal(e), 0);
+      } else {
+        empenhosTrace = (empenhosByContrato.get(contratoId) || []).sort((left, right) =>
+          String(right.dataEmissao || '').localeCompare(String(left.dataEmissao || '')),
+        );
+        empenhado = empenhadoByContrato.get(contratoId) || 0;
+        const saldoApi = empenhosTrace.reduce((sum, empenho) => sum + empenho.saldo, 0);
+        saldoEmpenhos = empenhosTrace.length > 0 ? saldoApi : Math.max(0, empenhado - liquidado);
+      }
+
+      const gastoMensalMedio = elapsedMonths > 0 ? liquidado / elapsedMonths : 0;
+      let coberturaMes: string | null = null;
+      if (gastoMensalMedio > 0) {
+        const totalMeses = (liquidado + saldoEmpenhos) / gastoMensalMedio;
+        const targetDate = addMonths(options.startDate, Math.max(0, totalMeses - 0.001));
+        const mes = format(targetDate, 'MMMM', { locale: ptBR });
+        const ano = format(targetDate, 'yy', { locale: ptBR });
+        coberturaMes = `${mes.charAt(0).toUpperCase() + mes.slice(1)}/${ano}`;
+      } else {
+        coberturaMes = saldoEmpenhos > 0 ? 'Ilimitada' : 'Nenhuma';
+      }
+
+      const necessidadeEmpenho = Math.max(0, projetado - (liquidado + saldoEmpenhos));
 
       return {
         id: contratoId,
@@ -563,18 +817,20 @@ export const buildContractProjectionBullets = (
         projetado,
         saldoEmpenhos,
         mesesConsiderados: elapsedMonths,
-        percentualLiquidado: empenhado > 0 ? (liquidado / empenhado) * 100 : 0,
-        percentualProjetado: empenhado > 0 ? (projetado / empenhado) * 100 : 0,
+        percentualLiquidado: saldoEmpenhos > 0 ? (liquidado / saldoEmpenhos) * 100 : 0,
+        percentualProjetado: saldoEmpenhos > 0 ? (projetado / saldoEmpenhos) * 100 : 0,
         liquidacoes,
         empenhos: empenhosTrace,
+        coberturaMes,
+        necessidadeEmpenho,
       };
     })
     .filter((item): item is ContractProjectionBulletItem => Boolean(item))
-    .filter((item) => item.empenhado > 0 || item.liquidado > 0 || item.projetado > 0);
+    .filter((item) => item.saldoEmpenhos > 0 || item.liquidado > 0 || item.projetado > 0);
 };
 
 export default function Dashboard() {
-  const { atividades, empenhos, descentralizacoes, contaDescentralizacoes, isLoading } = useData();
+  const { atividades, empenhos, contratos, contratosEmpenhos, descentralizacoes, contaDescentralizacoes, isLoading } = useData();
   const [hoveredBudgetDimension, setHoveredBudgetDimension] = useState<string | null>(null);
   const [selectedBudgetDimensionCode, setSelectedBudgetDimensionCode] = useState<string | null>(null);
   const [filterDimensao, setFilterDimensao] = useState('all');
@@ -584,6 +840,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<'corrente' | 'contratos' | 'rap'>('corrente');
   const [selectedContractExpenseIds, setSelectedContractExpenseIds] = useState<string[]>([]);
   const [contractExpenseSelectionTouched, setContractExpenseSelectionTouched] = useState(false);
+  const [projectionTargetMonths, setProjectionTargetMonths] = useState(12);
   const isContractExecutionTabActive = activeTab === 'contratos';
 
   const effectiveFilterDimensao = useMemo(() => {
@@ -863,10 +1120,12 @@ export default function Dashboard() {
     [contratosApiAtivos, contratosApiFaturas, contractExpensePeriod],
   );
 
-  const contractExpenseTopIds = useMemo(
-    () => contractExpenseAggregation.options.filter((option) => option.total > 0).slice(0, 5).map((option) => option.id),
-    [contractExpenseAggregation.options],
-  );
+  const contractExpenseTopIds = useMemo(() => {
+    const activeOptions = contractExpenseAggregation.options.filter((option) => option.total > 0);
+    if (activeOptions.length === 0) return [];
+    const randomIndex = Math.floor(Math.random() * activeOptions.length);
+    return [activeOptions[randomIndex].id];
+  }, [contractExpenseAggregation.options]);
 
   useEffect(() => {
     const availableIds = new Set(contractExpenseAggregation.options.map((option) => option.id));
@@ -895,7 +1154,7 @@ export default function Dashboard() {
     if (selectedContractExpenseSeries.length === 0) return [];
 
     const selectedKeys = new Set(
-      selectedContractExpenseSeries.flatMap((serie) => [serie.executadoKey, serie.pendenteKey]),
+      selectedContractExpenseSeries.map((serie) => serie.dataKey),
     );
 
     return contractExpenseAggregation.data
@@ -927,9 +1186,56 @@ export default function Dashboard() {
         {
           startDate: parseISO(contractExpensePeriod.startDate),
           endDate: parseISO(contractExpensePeriod.endDate),
+          projectionTargetMonths,
+        },
+        {
+          empenhos,
+          contratos,
+          contratosEmpenhos,
         },
       ),
-    [contratosApiAtivos, contratosApiFaturas, contratosApiEmpenhos, selectedContractExpenseIds, contractExpensePeriod],
+    [
+      contratosApiAtivos,
+      contratosApiFaturas,
+      contratosApiEmpenhos,
+      selectedContractExpenseIds,
+      contractExpensePeriod,
+      empenhos,
+      contratos,
+      contratosEmpenhos,
+      projectionTargetMonths,
+    ],
+  );
+
+  const allContractProjectionBullets = useMemo(
+    () =>
+      buildContractProjectionBullets(
+        contratosApiAtivos,
+        contratosApiFaturas,
+        contratosApiEmpenhos,
+        contratosApiAtivosIds,
+        {
+          startDate: parseISO(contractExpensePeriod.startDate),
+          endDate: parseISO(contractExpensePeriod.endDate),
+          projectionTargetMonths,
+        },
+        {
+          empenhos,
+          contratos,
+          contratosEmpenhos,
+        },
+      ),
+    [
+      contratosApiAtivos,
+      contratosApiFaturas,
+      contratosApiEmpenhos,
+      contratosApiAtivosIds,
+      contractExpensePeriod,
+      empenhos,
+      contratos,
+      contratosEmpenhos,
+      projectionTargetMonths,
+    ],
   );
 
   const toggleContractExpenseSelection = (contratoId: string) => {
@@ -1262,8 +1568,12 @@ export default function Dashboard() {
             contractExpenseSeries={selectedContractExpenseSeries}
             selectedContractExpenseIds={selectedContractExpenseIds}
             contractProjectionBullets={selectedContractProjectionBullets}
+            allContractProjectionBullets={allContractProjectionBullets}
             isContractExpenseLoading={isContratosApiAtivosLoading || isContractExpenseLoading}
             onToggleContractExpense={toggleContractExpenseSelection}
+            projectionTargetMonths={projectionTargetMonths}
+            onProjectionTargetMonthsChange={setProjectionTargetMonths}
+            contractExpensePeriod={contractExpensePeriod}
           />
         </TabsContent>
       </Tabs>
