@@ -26,6 +26,7 @@ const ATAS_SELECT = [
 ].join(',');
 
 const SYNC_RUNS_SELECT = 'id,started_at,finished_at,status,unidade_codigos,data_inicial,data_final,total_fetched,total_upserted,error_message,details';
+const ITEMS_SELECT = 'id,item_key,ata_key,numero_item,codigo_item,tipo_item,descricao_item,fornecedor_nome,fornecedor_ni,quantidade_homologada,valor_unitario,valor_total';
 
 export type AtaRegistroPrecoVinculoFilter = 'todos' | 'gerenciadora' | 'participante' | 'aderente' | 'qualquer-vinculo';
 
@@ -60,6 +61,7 @@ export type AtaRegistroPrecoRow = {
   totalUnidadesParticipantes: number;
   unidadesAderentes: string[];
   totalAdesoes: number;
+  itemCorrespondente: AtaRegistroPrecoItemRow | null;
 };
 
 export type AtaRegistroPrecoItemRow = {
@@ -126,6 +128,28 @@ function escapeIlike(value: string) {
   return value.replace(/[%_]/g, (match) => `\\${match}`);
 }
 
+export function buildAtaSearchFilter(value: string) {
+  const escaped = escapeIlike(value.trim());
+  return [
+    `numero_ata.ilike.%${escaped}%`,
+    `numero_compra.ilike.%${escaped}%`,
+    `objeto.ilike.%${escaped}%`,
+    `unidade_gerenciadora_nome.ilike.%${escaped}%`,
+    `itens_texto_pesquisa.ilike.%${escaped}%`,
+  ].join(',');
+}
+
+export function buildAtaItemSearchFilter(value: string) {
+  const escaped = escapeIlike(value.trim());
+  return [
+    `numero_item.ilike.%${escaped}%`,
+    `codigo_item.ilike.%${escaped}%`,
+    `descricao_item.ilike.%${escaped}%`,
+    `fornecedor_nome.ilike.%${escaped}%`,
+    `fornecedor_ni.ilike.%${escaped}%`,
+  ].join(',');
+}
+
 function errorToMessage(error: unknown) {
   if (error instanceof Error) return error.message;
   return String(error ?? 'Erro desconhecido');
@@ -153,6 +177,7 @@ export function mapAtaRegistroPrecoRow(row: DbRow): AtaRegistroPrecoRow {
     totalUnidadesParticipantes: Number(row.total_unidades_participantes ?? 0),
     unidadesAderentes: stringArray(row.unidades_aderentes),
     totalAdesoes: Number(row.total_adesoes ?? 0),
+    itemCorrespondente: null,
   };
 }
 
@@ -222,13 +247,7 @@ export const atasRegistroPrecosService = {
 
     const search = params.search?.trim();
     if (search) {
-      const escaped = escapeIlike(search);
-      query = query.or([
-        `numero_ata.ilike.%${escaped}%`,
-        `numero_compra.ilike.%${escaped}%`,
-        `objeto.ilike.%${escaped}%`,
-        `unidade_gerenciadora_nome.ilike.%${escaped}%`,
-      ].join(','));
+      query = query.or(buildAtaSearchFilter(search));
     }
 
     const { data, error, count } = await query
@@ -236,8 +255,33 @@ export const atasRegistroPrecosService = {
       .range(from, to);
 
     if (error) throw error;
+    let rows = (data ?? []).map((row) => mapAtaRegistroPrecoRow(row as DbRow));
+    if (search && rows.length > 0) {
+      const { data: matchedItems, error: matchedItemsError } = await supabase
+        .from('atas_registro_precos_itens')
+        .select(ITEMS_SELECT)
+        .in('ata_key', rows.map((row) => row.ataKey))
+        .or(buildAtaItemSearchFilter(search))
+        .order('numero_item');
+
+      if (matchedItemsError) throw matchedItemsError;
+
+      const firstMatchByAta = new Map<string, AtaRegistroPrecoItemRow>();
+      for (const rawItem of matchedItems ?? []) {
+        const item = mapAtaRegistroPrecoItemRow(rawItem as DbRow);
+        if (!firstMatchByAta.has(item.ataKey)) {
+          firstMatchByAta.set(item.ataKey, item);
+        }
+      }
+
+      rows = rows.map((row) => ({
+        ...row,
+        itemCorrespondente: firstMatchByAta.get(row.ataKey) ?? null,
+      }));
+    }
+
     return {
-      rows: (data ?? []).map((row) => mapAtaRegistroPrecoRow(row as DbRow)),
+      rows,
       count: count ?? 0,
     };
   },
@@ -245,7 +289,7 @@ export const atasRegistroPrecosService = {
   async listItems(ataKey: string): Promise<AtaRegistroPrecoItemRow[]> {
     const { data, error } = await supabase
       .from('atas_registro_precos_itens')
-      .select('id,item_key,ata_key,numero_item,codigo_item,tipo_item,descricao_item,fornecedor_nome,fornecedor_ni,quantidade_homologada,valor_unitario,valor_total')
+      .select(ITEMS_SELECT)
       .eq('ata_key', ataKey)
       .order('numero_item');
 

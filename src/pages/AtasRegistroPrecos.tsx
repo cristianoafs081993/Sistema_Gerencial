@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DEFAULT_PNCP_UASG, DEFAULT_PNCP_UASGS } from '@/lib/licitacoesPncp';
 import {
   atasRegistroPrecosService,
@@ -86,6 +87,39 @@ function FilterField({ label, children }: { label: string; children: ReactNode }
   );
 }
 
+function participantesLabel(count: number) {
+  return `${count} ${count === 1 ? 'participante' : 'participantes'}`;
+}
+
+function ParticipantesBadge({ row }: { row: AtaRegistroPrecoRow }) {
+  if (row.totalUnidadesParticipantes <= 0) return null;
+
+  const participantes = row.unidadesParticipantes;
+  const label = participantesLabel(row.totalUnidadesParticipantes);
+
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Badge variant="outline" tabIndex={0} aria-label={`Ver ${label}`} className="cursor-help">
+            {label}
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent side="top" align="start" className="max-w-sm">
+          <div className="space-y-1">
+            <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em]">Participantes</p>
+            <ul className="max-h-56 space-y-0.5 overflow-y-auto text-xs">
+              {participantes.map((participante) => (
+                <li key={participante}>UASG {participante}</li>
+              ))}
+            </ul>
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 function vinculoBadges(row: AtaRegistroPrecoRow, uasgCodigo: string) {
   const normalized = uasgCodigo.replace(/\D/g, '');
   return (
@@ -93,8 +127,9 @@ function vinculoBadges(row: AtaRegistroPrecoRow, uasgCodigo: string) {
       {row.unidadeGerenciadoraCodigo === normalized ? <Badge variant="secondary">Gerenciadora</Badge> : null}
       {row.unidadesParticipantes.includes(normalized) ? <Badge variant="outline">Participante</Badge> : null}
       {row.unidadesAderentes.includes(normalized) ? <Badge variant="outline">Aderente</Badge> : null}
-      {row.totalUnidadesParticipantes > 0 ? <Badge variant="outline">{row.totalUnidadesParticipantes} unid.</Badge> : null}
+      <ParticipantesBadge row={row} />
       {row.totalAdesoes > 0 ? <Badge variant="outline">{row.totalAdesoes} adesão</Badge> : null}
+      {row.totalItens === 0 ? <Badge variant="secondary">Itens não carregados</Badge> : null}
     </div>
   );
 }
@@ -484,7 +519,7 @@ export default function AtasRegistroPrecos() {
                 }}
                 className="pl-9"
                 aria-label="Busca"
-                placeholder="Ata, compra ou objeto"
+                placeholder="Ata, compra, objeto, item ou fornecedor"
               />
             </div>
           </FilterField>
@@ -495,6 +530,9 @@ export default function AtasRegistroPrecos() {
             </Button>
           </div>
         </div>
+        <p className="mt-3 text-xs text-text-secondary">
+          A busca por item ou fornecedor considera os detalhes já carregados. Abra uma ata e use "Atualizar detalhes" para ampliar a pesquisa local.
+        </p>
       </FilterPanel>
 
       <DataTablePanel title="Lista de atas" description={`${listResult.count} registro(s) no filtro atual`}>
@@ -533,6 +571,21 @@ export default function AtasRegistroPrecos() {
                 </TableCell>
                 <TableCell className="max-w-xl">
                   <p className="line-clamp-3 text-sm text-text-primary">{row.objeto || '-'}</p>
+                  {row.itemCorrespondente ? (
+                    <div className="mt-2 rounded-radius-md border border-primary/15 bg-primary/[0.04] px-2.5 py-2">
+                      <Badge variant="outline" className="mb-1 border-primary/20 bg-primary/[0.08] text-primary">
+                        Encontrado em item
+                      </Badge>
+                      <p className="text-xs font-medium text-text-primary">
+                        Item {row.itemCorrespondente.numeroItem}: {row.itemCorrespondente.descricaoItem || row.itemCorrespondente.codigoItem || '-'}
+                      </p>
+                      {row.itemCorrespondente.fornecedorNome || row.itemCorrespondente.fornecedorNi ? (
+                        <p className="mt-0.5 text-xs text-text-secondary">
+                          {row.itemCorrespondente.fornecedorNome || row.itemCorrespondente.fornecedorNi}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </TableCell>
                 <TableCell className="min-w-[180px] text-sm">{formatUasg(row.unidadeGerenciadoraCodigo, row.unidadeGerenciadoraNome)}</TableCell>
                 <TableCell className="min-w-[150px] text-sm">

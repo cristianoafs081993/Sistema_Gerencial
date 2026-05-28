@@ -7,7 +7,6 @@ import { toast } from 'sonner';
 import { HeaderActions, HeaderSubtitle } from '@/components/HeaderParts';
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
-import { SectionPanel } from '@/components/design-system/SectionPanel';
 import { TablePagination } from '@/components/design-system/TablePagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,7 +14,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { DEFAULT_PNCP_UASG } from '@/lib/licitacoesPncp';
 import {
   getLicitacaoLinks,
   getProposalStatus,
@@ -66,6 +64,38 @@ function formatCurrency(value?: number | null) {
   });
 }
 
+function rawText(value: unknown) {
+  if (value === null || value === undefined) return null;
+  const normalized = String(value).trim();
+  return normalized || null;
+}
+
+function rawNumber(value: unknown) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = typeof value === 'number'
+    ? value
+    : Number(String(value).replace(/\./g, '').replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getPncpItems(rawData: Record<string, unknown>) {
+  return Array.isArray(rawData.itens)
+    ? rawData.itens.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object' && !Array.isArray(item)))
+    : [];
+}
+
+function getPncpItemDescription(item: Record<string, unknown>) {
+  return rawText(item.descricao)
+    ?? rawText(item.descricaoItem)
+    ?? rawText(item.descricaoDetalhada)
+    ?? rawText(item.itemDescricao)
+    ?? '-';
+}
+
+function getPncpItemNumber(item: Record<string, unknown>) {
+  return rawText(item.numeroItem) ?? rawText(item.numero_item) ?? rawText(item.itemNumero) ?? '-';
+}
+
 function formatUasg(row: LicitacaoPncpRow) {
   if (!row.uasgCodigo) return '-';
   return `${row.uasgCodigo}${row.uasgNome ? ` - ${row.uasgNome}` : ''}`;
@@ -78,9 +108,9 @@ function proposalBadgeClass(status: string) {
   return 'border-amber-500/20 bg-amber-500/[0.08] text-amber-700';
 }
 
-function FilterField({ label, children }: { label: string; children: ReactNode }) {
+function FilterField({ label, className, children }: { label: string; className?: string; children: ReactNode }) {
   return (
-    <div className="space-y-1.5">
+    <div className={`space-y-1.5 ${className ?? ''}`}>
       <span className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">{label}</span>
       {children}
     </div>
@@ -127,6 +157,32 @@ function LicitacaoDetailsSheet({
               <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Objeto</p>
               <p className="font-ui text-sm leading-6 text-text-primary">{licitacao.objetoCompra || '-'}</p>
             </div>
+
+            {getPncpItems(licitacao.rawData).length > 0 ? (
+              <div className="rounded-radius-lg border border-border-default p-4">
+                <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Itens PNCP</p>
+                <div className="mt-3 space-y-2">
+                  {getPncpItems(licitacao.rawData).map((item, index) => {
+                    const unitValue = rawNumber(item.valorUnitarioEstimado ?? item.valorUnitario);
+                    return (
+                      <div key={`${getPncpItemNumber(item)}-${index}`} className="rounded-radius-md border border-border-default/70 bg-surface-subtle/60 p-3">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <p className="font-ui text-sm font-semibold text-text-primary">Item {getPncpItemNumber(item)}</p>
+                          <p className="font-mono text-xs font-semibold text-text-primary">
+                            {formatCurrency(rawNumber(item.valorTotal ?? item.valorTotalEstimado))}
+                          </p>
+                        </div>
+                        <p className="mt-1 font-ui text-sm text-text-secondary">{getPncpItemDescription(item)}</p>
+                        <p className="mt-1 font-ui text-xs text-text-muted">
+                          Qtd. {rawText(item.quantidade) ?? '-'} {rawText(item.unidadeMedida) ?? ''}
+                          {unitValue !== null ? ` | Unit. ${formatCurrency(unitValue)}` : ''}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
 
             <div className="grid gap-3 sm:grid-cols-2">
               <DetailItem label="Processo" value={licitacao.processo} />
@@ -189,7 +245,8 @@ export default function LicitacoesPregoes() {
   const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState('');
   const [objetoBusca, setObjetoBusca] = useState('');
-  const [uasgCodigo, setUasgCodigo] = useState(DEFAULT_PNCP_UASG);
+  const [itemBusca, setItemBusca] = useState('');
+  const [uasgCodigo, setUasgCodigo] = useState('');
   const [situacao, setSituacao] = useState('todos');
   const [srp, setSrp] = useState<LicitacaoPncpSrpFilter>('todos');
   const [proposalStatus, setProposalStatus] = useState<LicitacaoPncpProposalStatus>('todos');
@@ -203,13 +260,14 @@ export default function LicitacoesPregoes() {
     pageSize,
     search,
     objetoBusca,
+    itemBusca,
     uasgCodigo: uasgCodigo || undefined,
     situacao,
     srp,
     proposalStatus,
     dataInicial,
     dataFinal,
-  }), [dataFinal, dataInicial, objetoBusca, page, pageSize, proposalStatus, search, situacao, srp, uasgCodigo]);
+  }), [dataFinal, dataInicial, itemBusca, objetoBusca, page, pageSize, proposalStatus, search, situacao, srp, uasgCodigo]);
 
   const { data: listResult = { rows: [], count: 0 }, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['licitacoes-pncp', queryParams],
@@ -229,34 +287,33 @@ export default function LicitacoesPregoes() {
     staleTime: 60000,
   });
 
-  const { data: lastSync } = useQuery({
-    queryKey: ['licitacoes-pncp-last-sync'],
-    queryFn: () => licitacoesPncpService.getLastSyncRun(),
-    staleTime: 30000,
-  });
-
   const totalPages = Math.max(1, Math.ceil(listResult.count / pageSize));
   const currentPageRows = listResult.rows;
-  const totalEstimated = currentPageRows.reduce((sum, row) => sum + (row.valorTotalEstimado ?? 0), 0);
-  const openOnPage = currentPageRows.filter((row) => getProposalStatus(row) === 'Aberta').length;
 
   const resetPage = () => setPage(1);
+
+  const resetFilters = () => {
+    setSearch('');
+    setObjetoBusca('');
+    setItemBusca('');
+    setUasgCodigo('');
+    setSituacao('todos');
+    setSrp('todos');
+    setProposalStatus('todos');
+    setDataInicial(getDefaultStartDate());
+    setDataFinal(toDateInputValue(new Date()));
+    resetPage();
+  };
 
   const handleManualSync = async () => {
     setIsSyncing(true);
     try {
       const typedUasg = uasgCodigo.replace(/\D/g, '');
-      if (!typedUasg) {
-        toast.error('Informe uma UASG para buscar no PNCP.');
-        return;
-      }
-      const selectedUasgs = typedUasg
-        ? [typedUasg]
-        : [];
 
       const result = await licitacoesPncpService.sync({
-        unidadeCodigos: selectedUasgs.length ? selectedUasgs : [DEFAULT_PNCP_UASG],
+        ...(typedUasg ? { unidadeCodigos: [typedUasg] } : {}),
         objetoBusca,
+        itemBusca,
         dataInicial,
         dataFinal,
         source: 'frontend-search',
@@ -266,7 +323,6 @@ export default function LicitacoesPregoes() {
         queryClient.invalidateQueries({ queryKey: ['licitacoes-pncp'] }),
         queryClient.invalidateQueries({ queryKey: ['licitacoes-pncp-uasgs'] }),
         queryClient.invalidateQueries({ queryKey: ['licitacoes-pncp-situacoes'] }),
-        queryClient.invalidateQueries({ queryKey: ['licitacoes-pncp-last-sync'] }),
       ]);
 
       if (result.status === 'partial_success') {
@@ -294,7 +350,6 @@ export default function LicitacoesPregoes() {
         queryClient.invalidateQueries({ queryKey: ['licitacoes-pncp'] }),
         queryClient.invalidateQueries({ queryKey: ['licitacoes-pncp-uasgs'] }),
         queryClient.invalidateQueries({ queryKey: ['licitacoes-pncp-situacoes'] }),
-        queryClient.invalidateQueries({ queryKey: ['licitacoes-pncp-last-sync'] }),
       ]);
 
       if (result.status === 'partial_success') {
@@ -312,7 +367,7 @@ export default function LicitacoesPregoes() {
   return (
     <div className="space-y-6 pb-10">
       <HeaderSubtitle>
-        <span>PNCP / Pregões por UASG</span>
+        <span>PNCP / Pregões IFRN</span>
       </HeaderSubtitle>
       <HeaderActions>
         <div className="flex flex-wrap items-center gap-2">
@@ -327,34 +382,16 @@ export default function LicitacoesPregoes() {
         </div>
       </HeaderActions>
 
-      <SectionPanel
-        title="Pregões por UASG"
-        description="Consulta materializada do PNCP por UASG, período e objeto."
+      <FilterPanel
+        title="Filtros de pregões"
+        actions={(
+          <Button type="button" variant="ghost" size="sm" onClick={resetFilters}>
+            Limpar filtros
+          </Button>
+        )}
       >
-        <div className="grid gap-3 md:grid-cols-4">
-          <div className="rounded-radius-lg border border-border-default bg-surface-subtle/70 p-3">
-            <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Registros</p>
-            <p className="mt-1 font-ui text-2xl font-semibold text-text-primary">{listResult.count}</p>
-          </div>
-          <div className="rounded-radius-lg border border-border-default bg-surface-subtle/70 p-3">
-            <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Abertas na página</p>
-            <p className="mt-1 font-ui text-2xl font-semibold text-primary">{openOnPage}</p>
-          </div>
-          <div className="rounded-radius-lg border border-border-default bg-surface-subtle/70 p-3">
-            <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Estimado na página</p>
-            <p className="mt-1 font-ui text-xl font-semibold text-text-primary">{formatCurrency(totalEstimated)}</p>
-          </div>
-          <div className="rounded-radius-lg border border-border-default bg-surface-subtle/70 p-3">
-            <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Última sincronização</p>
-            <p className="mt-1 font-ui text-sm font-semibold text-text-primary">{lastSync ? formatDateTime(lastSync.finishedAt || lastSync.startedAt) : '-'}</p>
-            {lastSync?.status ? <p className="mt-0.5 font-ui text-xs text-text-secondary">{lastSync.status}</p> : null}
-          </div>
-        </div>
-      </SectionPanel>
-
-      <FilterPanel>
-        <div className="grid gap-3 xl:grid-cols-[140px_minmax(240px,1fr)_minmax(200px,0.8fr)_170px_170px_150px_150px_150px_150px]">
-          <FilterField label="UASG">
+        <div className="grid gap-x-4 gap-y-4 md:grid-cols-2 xl:grid-cols-12">
+          <FilterField label="UASG" className="xl:col-span-3">
             <Input
               value={uasgCodigo}
               onChange={(event) => {
@@ -364,7 +401,7 @@ export default function LicitacoesPregoes() {
               list="licitacoes-pncp-uasgs"
               inputMode="numeric"
               aria-label="UASG"
-              placeholder="158366"
+              placeholder="Todas as UASGs"
             />
             <datalist id="licitacoes-pncp-uasgs">
               {uasgOptions.map((option) => (
@@ -375,7 +412,7 @@ export default function LicitacoesPregoes() {
             </datalist>
           </FilterField>
 
-          <FilterField label="Objeto no PNCP">
+          <FilterField label="Objeto no PNCP" className="xl:col-span-5">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
               <Input
@@ -386,78 +423,102 @@ export default function LicitacoesPregoes() {
                 }}
                 className="pl-9"
                 aria-label="Objeto especifico"
-                placeholder="energia eletrica, combustivel..."
+                placeholder="Ex.: energia elétrica, combustível"
               />
             </div>
           </FilterField>
 
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
-            <Input
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
+          <FilterField label="Item no PNCP" className="xl:col-span-4">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+              <Input
+                value={itemBusca}
+                onChange={(event) => {
+                  setItemBusca(event.target.value);
+                  resetPage();
+                }}
+                className="pl-9"
+                aria-label="Item no PNCP"
+                placeholder="Ex.: notebook, cadeira, manutenção"
+              />
+            </div>
+          </FilterField>
+
+          <FilterField label="Busca na lista" className="xl:col-span-3">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+              <Input
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  resetPage();
+                }}
+                className="pl-9"
+                aria-label="Busca geral"
+                placeholder="Número, processo ou unidade"
+              />
+            </div>
+          </FilterField>
+
+          <FilterField label="Situação" className="xl:col-span-3">
+            <Select
+              value={situacao}
+              onValueChange={(value) => {
+                setSituacao(value);
                 resetPage();
               }}
-              className="pl-9"
-              aria-label="Busca geral"
-              placeholder="Nº, processo ou unidade"
-            />
-          </div>
+            >
+              <SelectTrigger aria-label="Situação">
+                <SelectValue placeholder="Situação" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todas as situações</SelectItem>
+                {situacoes.map((option) => (
+                  <SelectItem key={option} value={option}>{option}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
 
-          <Select
-            value={situacao}
-            onValueChange={(value) => {
-              setSituacao(value);
-              resetPage();
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Situação" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todas as situações</SelectItem>
-              {situacoes.map((option) => (
-                <SelectItem key={option} value={option}>{option}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <FilterField label="Prazo de propostas" className="xl:col-span-3">
+            <Select
+              value={proposalStatus}
+              onValueChange={(value) => {
+                setProposalStatus(value as LicitacaoPncpProposalStatus);
+                resetPage();
+              }}
+            >
+              <SelectTrigger aria-label="Prazo de propostas">
+                <SelectValue placeholder="Propostas" />
+              </SelectTrigger>
+              <SelectContent>
+                {proposalOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
 
-          <Select
-            value={proposalStatus}
-            onValueChange={(value) => {
-              setProposalStatus(value as LicitacaoPncpProposalStatus);
-              resetPage();
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Propostas" />
-            </SelectTrigger>
-            <SelectContent>
-              {proposalOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <FilterField label="Registro de preços" className="xl:col-span-2">
+            <Select
+              value={srp}
+              onValueChange={(value) => {
+                setSrp(value as LicitacaoPncpSrpFilter);
+                resetPage();
+              }}
+            >
+              <SelectTrigger aria-label="Registro de preços">
+                <SelectValue placeholder="SRP" />
+              </SelectTrigger>
+              <SelectContent>
+                {srpOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
 
-          <Select
-            value={srp}
-            onValueChange={(value) => {
-              setSrp(value as LicitacaoPncpSrpFilter);
-              resetPage();
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="SRP" />
-            </SelectTrigger>
-            <SelectContent>
-              {srpOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <FilterField label="Data inicial">
+          <FilterField label="Publicada a partir de" className="xl:col-span-2">
             <Input
               type="date"
               value={dataInicial}
@@ -468,7 +529,7 @@ export default function LicitacoesPregoes() {
               aria-label="Data inicial"
             />
           </FilterField>
-          <FilterField label="Data final">
+          <FilterField label="Publicada até" className="xl:col-span-2">
             <Input
               type="date"
               value={dataFinal}
@@ -479,12 +540,15 @@ export default function LicitacoesPregoes() {
               aria-label="Data final"
             />
           </FilterField>
-          <div className="flex items-end">
-            <Button type="button" className="w-full gap-2" onClick={() => void handleManualSync()} disabled={isSyncing}>
-              {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
-              Buscar PNCP
-            </Button>
-          </div>
+        </div>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border-default/60 pt-4">
+          <p className="font-ui text-xs text-text-secondary">
+            Sem UASG informada, a busca consulta todas as unidades do IFRN publicadas no PNCP. Para pesquisar por item, use Buscar no PNCP para carregar os itens no cache local.
+          </p>
+          <Button type="button" className="gap-2" onClick={() => void handleManualSync()} disabled={isSyncing}>
+            {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
+            Buscar no PNCP
+          </Button>
         </div>
       </FilterPanel>
 

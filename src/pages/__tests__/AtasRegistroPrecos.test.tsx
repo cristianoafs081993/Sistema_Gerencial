@@ -74,6 +74,7 @@ const ata = {
   totalUnidadesParticipantes: 2,
   unidadesAderentes: ['158375'],
   totalAdesoes: 1,
+  itemCorrespondente: null,
 };
 
 describe('AtasRegistroPrecos', () => {
@@ -131,6 +132,54 @@ describe('AtasRegistroPrecos', () => {
     expect(screen.getByText('Fornecedor SA')).toBeInTheDocument();
     expect(screen.getByText('R$ 1.500,00')).toBeInTheDocument();
     expect(screen.getByText('Ata de Registro de Preços')).toBeInTheDocument();
+  });
+
+  it('mostra contagem clara de participantes com hover disponivel', async () => {
+    renderPage();
+
+    expect(await screen.findByText('2 participantes')).toBeInTheDocument();
+    expect(screen.getByLabelText('Ver 2 participantes')).toBeInTheDocument();
+    expect(screen.queryByText('2 unid.')).not.toBeInTheDocument();
+  });
+
+  it('destaca item que corresponde a busca na lista', async () => {
+    mockedService.list.mockResolvedValueOnce({
+      rows: [{
+        ...ata,
+        itemCorrespondente: {
+          id: 'item-match',
+          itemKey: 'item-match',
+          ataKey: ata.ataKey,
+          numeroItem: '2',
+          codigoItem: '456',
+          tipoItem: 'Material',
+          descricaoItem: 'Café torrado',
+          fornecedorNome: 'Fornecedor Café SA',
+          fornecedorNi: '00000000000199',
+          quantidadeHomologada: 20,
+          valorUnitario: 32,
+          valorTotal: 640,
+        },
+      }],
+      count: 1,
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('Encontrado em item')).toBeInTheDocument();
+    expect(screen.getByText('Item 2: Café torrado')).toBeInTheDocument();
+    expect(screen.getByText('Fornecedor Café SA')).toBeInTheDocument();
+  });
+
+  it('indica quando itens ainda nao foram carregados para pesquisa', async () => {
+    mockedService.list.mockResolvedValueOnce({
+      rows: [{ ...ata, totalItens: 0 }],
+      count: 1,
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('Itens não carregados')).toBeInTheDocument();
   });
 
   it('atualiza detalhes de uma ata especifica sob demanda', async () => {

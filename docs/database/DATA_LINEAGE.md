@@ -117,7 +117,7 @@ Mostrar a linhagem operacional dos dados de forma curta:
     - `licitacoes_pncp_sync_runs`
     - `licitacoes_pncp_uasgs`
   - pagina: [LicitacoesPregoes.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/LicitacoesPregoes.tsx)
-- observacao: o endpoint PNCP `/v1/contratacoes/publicacao` usa datas `yyyyMMdd`, limita cada consulta a ate 365 dias e exige `cnpj=10877412000168` quando a consulta filtra `codigoUnidadeAdministrativa`. A v1 busca pregao eletronico (`codigoModalidadeContratacao = 6`) e grava o payload integral em `raw_data`.
+- observacao: o endpoint PNCP `/v1/contratacoes/publicacao` usa datas `yyyyMMdd`, limita cada consulta a ate 365 dias e e consultado por `cnpj=10877412000168` sem UASG na sincronizacao institucional; quando a consulta filtra `codigoUnidadeAdministrativa`, o CNPJ tambem e obrigatorio. A v1 busca pregao eletronico (`codigoModalidadeContratacao = 6`), nao envia `tamanhoPagina` e grava o payload integral em `raw_data`. Quando `itemBusca` e informado, a function tambem consulta `/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}/itens` e salva o resultado em `raw_data.itens` para pesquisa local por item.
 - API `https://dadosabertos.compras.gov.br`
   - enriquecimento best-effort: `/modulo-uasg/1_consultarUasg`
   - tabela: `licitacoes_pncp_uasgs`

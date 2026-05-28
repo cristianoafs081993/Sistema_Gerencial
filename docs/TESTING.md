@@ -40,13 +40,17 @@ Pregoes via PNCP:
 - helpers devem cobrir normalizacao de `numeroControlePNCP`, UASG, datas e valores do payload PNCP
 - helpers devem cobrir o catalogo interno de UASGs IFRN com CNPJ e aliases compartilhados por uma mesma UASG
 - a divisao de periodos deve garantir janelas de ate 365 dias
-- a UI deve testar lista, drawer de detalhes, UASG digitada, filtro de objeto, botao `Buscar PNCP` e botao `Sincronizar UASGs IFRN`
+- a montagem da consulta institucional deve manter o CNPJ IFRN sem restringir UASG e sem enviar `tamanhoPagina`, rejeitado pelo PNCP
+- helpers devem cobrir a URL de itens PNCP e a correspondencia textual normalizada em `raw_data.itens`
+- a UI deve testar lista institucional inicial sem card de resumo, drawer de detalhes com itens materializados, UASG digitada, filtro de objeto, filtro de item, botao `Buscar no PNCP` e botao `Sincronizar UASGs IFRN`
 - a navegacao deve manter `/licitacoes-pregoes` como tela de producao acessivel ao grupo `Diretores`
 
 Atas e ARP:
 
 - helpers devem cobrir normalizacao de ata, item, unidade participante e adesao
 - a UI deve testar lista, drawer de detalhes, UASG digitada, botao `Buscar ARP`, recarregamento do cache local mesmo quando a API externa falhar, busca de vinculo `Participante` via cache IFRN, busca de vinculo `Aderente` com UASG alvo separada, botao `Sincronizar UASGs IFRN` e continuidade do lote quando uma UASG falhar
+- a busca local deve cobrir descricao/codigo do item e fornecedor materializados, exibindo a correspondencia e indicando atas ainda sem itens carregados
+- a contagem de participantes deve usar texto claro (`participante(s)`) e manter hover com as UASGs participantes materializadas
 - a navegacao deve manter `/atas-registro-precos` como tela de producao acessivel ao grupo `Diretores`
 
 ## Como rodar

@@ -343,7 +343,7 @@ Local:
 
 Uso:
 
-- sincroniza pregoes eletronicos por UASG a partir da API de Consulta do PNCP
+- sincroniza pregoes eletronicos do IFRN a partir da API de Consulta do PNCP, por CNPJ institucional ou por UASG explicita
 - materializa compras em `licitacoes_pncp`
 - registra execucoes em `licitacoes_pncp_sync_runs`
 - atualiza o cache de UASGs em `licitacoes_pncp_uasgs` usando primeiro o catalogo interno IFRN e, para UASGs externas, Dados Abertos Compras.gov.br quando disponivel
@@ -354,6 +354,7 @@ Entrada opcional:
 {
   "unidadeCodigos": ["158366"],
   "objetoBusca": "combustivel",
+  "itemBusca": "oleo diesel",
   "dataInicial": "2025-05-05",
   "dataFinal": "2026-05-04",
   "source": "frontend-manual"
@@ -364,18 +365,20 @@ Dependencias:
 
 - `SUPABASE_SERVICE_ROLE_KEY`
 - opcional `LICITACOES_PNCP_SYNC_SECRET`
-- opcional `LICITACOES_PNCP_UASGS`
 - opcional `LICITACOES_PNCP_CNPJ`
 
 Observacao:
 
 - publicada com `verify_jwt = false`, pois pode ser chamada pelo cron
 - se `LICITACOES_PNCP_SYNC_SECRET` for configurada, chamadas HTTP precisam enviar `x-licitacoes-pncp-sync-secret`
-- quando `cnpjOrgao` nao e enviado, resolve o CNPJ de cada UASG primeiro pelo catalogo interno `IFRN_UASG_CATALOG`; UASGs fora desse catalogo continuam sendo resolvidas via Dados Abertos Compras.gov.br antes de chamar o PNCP
+- sem `unidadeCodigo`/`unidadeCodigos`, consulta o CNPJ IFRN inteiro e materializa todas as UASGs retornadas pelo PNCP; esse e o escopo do cron e da busca geral da tela
+- quando uma UASG e enviada, resolve seu CNPJ primeiro pelo catalogo interno `IFRN_UASG_CATALOG`; UASGs fora desse catalogo continuam sendo resolvidas via Dados Abertos Compras.gov.br antes de chamar o PNCP
 - a resolucao da UASG usa preferencialmente `/modulo-uasg/1.1_consultarUasg_CSV`, pois o endpoint JSON correspondente pode falhar com `400` para `statusUasg=true`
-- por padrao usa a lista interna IFRN (`152711`, `152756`, `152757`, `154582`, `154838`, `154839`, `154840`, `158155`, `158365`, `158366`, `158367`, `158368`, `158369`, `158370`, `158371`, `158372`, `158373`, `158374`, `158375`), CNPJ fallback `10877412000168` e janela dos ultimos 365 dias apenas para chamadas sem UASG explicita
+- por padrao usa o CNPJ institucional `10877412000168` e janela dos ultimos 365 dias; a lista interna segue disponivel para a acao dirigida `Sincronizar UASGs IFRN`
 - o frontend chama a sincronizacao do catalogo interno em lotes por UASG; uma chamada HTTP unica com todas as UASGs pode exceder o limite da Edge Function quando o PNCP demora
 - `objetoBusca` e aplicado como pos-filtro textual sem acentos sobre `objetoCompra`, depois da consulta PNCP por UASG/data/modalidade
+- `itemBusca` consulta `/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}/itens` para cada contratacao candidata, grava os itens em `raw_data.itens` e filtra pelas descricoes/campos do item; sem `itemBusca`, os itens nao sao buscados em lote para evitar custo desnecessario
+- a URL de publicacao nao inclui `tamanhoPagina`, parametro rejeitado pelo PNCP com `HTTP 400`
 - chamadas ao PNCP usam timeout maior e retry curto porque algumas UASGs podem responder lentamente mesmo em intervalos pequenos
 - a migration agenda `sync-licitacoes-pncp-daily` as `03:30` no horario de Brasilia
 - se o navegador registrar `404` seguido de falha de CORS/preflight para `/functions/v1/sync-licitacoes-pncp`, a causa esperada e function ausente no projeto remoto; publicar a function deve fazer o `OPTIONS` voltar `HTTP 200` com headers CORS

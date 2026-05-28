@@ -52,7 +52,8 @@ KPIs podem usar `tone` novo ou `stitchColor` legado enquanto a compatibilidade e
 Aplicacao atual:
 
 - `/artefatos-licitacao` usa resumo por tipo, filtros compactos e tabela operacional para consulta de ETP, Mapa de Risco, Termo de Referencia e Minuta de Contrato. Acoes de linha devem permanecer iconicas e alinhadas a direita.
-- `/licitacoes-pregoes` usa resumo operacional, filtros compactos, tabela paginada e drawer de detalhe para consulta de pregoes PNCP por UASG. A sincronizacao manual fica no header e aparece somente para superadmin.
+- `/licitacoes-pregoes` usa `FilterPanel` em grade responsiva com rotulos, pesquisa por objeto e item PNCP, acao de limpar, tabela paginada e drawer de detalhe para consulta institucional dos pregoes PNCP, com UASG opcional. A tela nao exibe card de resumo; a busca no PNCP fica junto aos filtros e a sincronizacao dirigida do catalogo IFRN fica no header.
+- `/atas-registro-precos` usa resumo operacional, filtros por UASG/vinculo/periodo/texto e tabela paginada; resultados de busca por item exibem o item correspondente, a contagem de participantes possui hover com as UASGs participantes materializadas e atas sem detalhes sinalizam que itens ainda nao foram carregados.
 - `/credito-disponivel` usa KPIs, filtros compactos e tabela paginada para consultar saldo por PTRES/PI, exibindo apenas linhas com saldo por padrao e sem expor o nome do arquivo importado. A importacao CSV fica no header e aparece somente para superadmin.
 - `/energia` usa filtros de periodo/fonte no header, KPIs com `StatCard`, graficos com `ChartPanel`, blocos metodologicos com `SectionPanel` e tabelas de detalhe com `DataTablePanel`; o upload XLSX aparece somente para superadmin.
 

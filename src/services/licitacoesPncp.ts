@@ -67,6 +67,7 @@ export type LicitacoesPncpListParams = {
   pageSize?: number;
   search?: string;
   objetoBusca?: string;
+  itemBusca?: string;
   uasgCodigo?: string;
   situacao?: string;
   srp?: LicitacaoPncpSrpFilter;
@@ -326,6 +327,11 @@ export const licitacoesPncpService = {
       query = query.ilike('objeto_compra', `%${escapeIlike(objetoBusca)}%`);
     }
 
+    const itemBusca = params.itemBusca?.trim();
+    if (itemBusca) {
+      query = query.filter('raw_data->>itens', 'ilike', `%${escapeIlike(itemBusca)}%`);
+    }
+
     const search = params.search?.trim();
     if (search) {
       const escaped = escapeIlike(search);
@@ -417,6 +423,7 @@ export const licitacoesPncpService = {
   async sync(input: {
     unidadeCodigos?: string[];
     objetoBusca?: string;
+    itemBusca?: string;
     dataInicial?: string;
     dataFinal?: string;
     source?: string;
@@ -429,6 +436,7 @@ export const licitacoesPncpService = {
       body: {
         unidadeCodigos: unidadeCodigos?.length ? unidadeCodigos : undefined,
         objetoBusca: input.objetoBusca?.trim() || undefined,
+        itemBusca: input.itemBusca?.trim() || undefined,
         dataInicial: input.dataInicial,
         dataFinal: input.dataFinal,
         source: input.source ?? 'frontend-manual',

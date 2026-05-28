@@ -626,7 +626,7 @@ Observacoes operacionais:
 
 Finalidade:
 
-- espelho materializado das contratacoes do PNCP usadas na tela de pregoes por UASG
+- espelho materializado das contratacoes do PNCP usadas na tela de pregoes IFRN
 - fonte primaria da lista `/licitacoes-pregoes`
 
 Campos-chave:
@@ -654,7 +654,9 @@ Observacoes operacionais:
 
 - a chave unica e `numero_controle_pncp`
 - a v1 sincroniza pregao eletronico (`codigoModalidadeContratacao = 6`) no PNCP
-- o filtro por UASG no PNCP exige tambem CNPJ; UASGs IFRN usam catalogo interno e UASGs externas usam resolucao best-effort via Compras.gov.br
+- a sincronizacao geral consulta o CNPJ institucional sem restringir UASG, permitindo descobrir todas as unidades publicadas no PNCP; buscas dirigidas por UASG exigem tambem CNPJ
+- quando a busca remota recebe `itemBusca`, `raw_data.itens` passa a guardar os itens retornados pelo PNCP para aquela contratacao; a pesquisa local por item depende desse cache materializado
+- UASGs IFRN digitadas usam catalogo interno e UASGs externas usam resolucao best-effort via Compras.gov.br
 - `Compras.gov.br` entra como enriquecimento best-effort no catalogo de UASG; a lista de pregoes vem do PNCP
 - leitura fica liberada para usuarios autenticados; escrita ocorre pela Edge Function com service role
 
@@ -767,6 +769,7 @@ Finalidade:
 
 - view agregada para listar atas com totais de itens, participantes e adesoes por unidade
 - `unidades_participantes` exclui linhas cujo `raw_data.tipoUnidade = GERENCIADORA`, mantendo o filtro `Participante` separado do filtro `Gerenciadora`
+- expoe `itens_texto_pesquisa`, agregado de numero/codigo/descricao do item e fornecedor, para pesquisa local da lista sem consulta externa em tempo real
 
 Consumido por:
 

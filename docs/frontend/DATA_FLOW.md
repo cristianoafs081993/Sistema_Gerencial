@@ -250,7 +250,7 @@ Observacao:
 - faturas sem item vinculado ficam em grupo separado e nao entram na execucao oficial por item
 - no modal de empenho, a secao `Liquidações` nao depende dessa sincronizacao local; ela le o cache dedicado de faturas por empenho e, quando o cache esta ausente ou vencido, chama a Edge Function aguardando as linhas atualizadas antes de cair para resultado vazio. A exibicao usa `raw_data.contratoEmpenho.unidade_gestora` para manter faturas de contratos da Reitoria quando o empenho e da UG `158366`, e usa `raw_data.fatura.contratante` apenas para esconder faturas claramente pertencentes a outro campus; a coluna `Valor` usa `valor_bruto` da API
 
-### Pregoes por UASG
+### Pregoes IFRN
 
 `App.tsx` -> `LicitacoesPregoes.tsx` -> `licitacoesPncpService` -> `licitacoes_pncp`
 
@@ -260,13 +260,14 @@ Sincronizacao:
 
 Observacoes:
 
-- a rota `/licitacoes-pregoes` fica no grupo Contratos e abre com a UASG `158366` apenas como valor inicial
-- a tela lista pregoes materializados, filtra por UASG digitada, objeto especifico, periodo, situacao, SRP, prazo de propostas e texto livre
+- a rota `/licitacoes-pregoes` fica no grupo Contratos e abre mostrando todas as UASGs materializadas do IFRN
+- a tela lista pregoes materializados e apresenta filtros rotulados/responsivos por UASG opcional, objeto especifico, periodo, situacao, SRP, prazo de propostas e texto livre
 - a UASG aceita qualquer codigo manual; a function resolve o CNPJ primeiro pelo catalogo interno IFRN e, se a UASG nao estiver no catalogo, pelo Compras.gov.br antes de consultar o PNCP
 - o botao `Sincronizar UASGs IFRN` usa o catalogo interno com as UASGs `152711`, `152756`, `152757`, `154582`, `154838`, `154839`, `154840`, `158155`, `158365`, `158366`, `158367`, `158368`, `158369`, `158370`, `158371`, `158372`, `158373`, `158374`, `158375`; no frontend, a chamada e feita em lotes por UASG para evitar timeout de uma chamada unica
-- o drawer exibe os dados completos armazenados do PNCP, links PNCP/Compras.gov.br e informacao complementar
-- o botao `Buscar PNCP` consulta/materializa a UASG e o periodo informados e recarrega a lista filtrada
-- o service tambem le `licitacoes_pncp_sync_runs` para informar a ultima sincronizacao
+- o drawer exibe os dados completos armazenados do PNCP, itens materializados quando existirem em `raw_data.itens`, links PNCP/Compras.gov.br e informacao complementar
+- o botao `Buscar no PNCP` sem UASG consulta/materializa pelo CNPJ institucional `10877412000168`, descobrindo todas as unidades publicadas no periodo; quando uma UASG e informada, a busca fica restrita a ela
+- o filtro `Item no PNCP` pesquisa itens ja salvos em `raw_data.itens`; ao acionar `Buscar no PNCP` com esse filtro, a Edge Function consulta o endpoint de itens da contratacao, grava os itens no cache local e retorna somente contratacoes cujo item corresponda ao termo
+- a pagina prioriza filtros e tabela operacional; o card de resumo e ultima sincronizacao nao e exibido
 
 ### Atas e ARP
 
@@ -280,6 +281,8 @@ Observacoes:
 
 - a rota `/atas-registro-precos` fica no grupo Licitacoes
 - a tela lista atas materializadas e filtra por UASG, vinculo (`gerenciadora`, `participante`, `aderente` ou qualquer vinculo), periodo e texto
+- a pesquisa textual inclui item e fornecedor ja materializados; quando a correspondencia vem de um item, a lista identifica o item/fornecedor e sinaliza atas sem itens carregados para deixar clara a cobertura do cache local
+- a coluna `Vinculos` mostra a contagem como `participante(s)` e exibe, no hover, as UASGs participantes materializadas pela view
 - o botao `Buscar ARP` consulta/materializa a UASG e o periodo informados
 - quando o vinculo selecionado e `Participante` e a UASG pertence ao catalogo IFRN, `Buscar ARP` sincroniza o catalogo IFRN em lotes com `includeParticipantes=true`; a API dos Dados Abertos nao permite buscar participantes diretamente por UASG, entao o filtro funciona sobre o cache local de unidades participantes
 - quando o vinculo selecionado e `Aderente` e a UASG pertence ao catalogo IFRN, `Buscar ARP` tambem sincroniza o catalogo IFRN em lotes, mas envia a UASG digitada como `adesaoUnidadeCodigos`; assim a busca encontra adesoes do campus a atas gerenciadas por outras UASGs IFRN
