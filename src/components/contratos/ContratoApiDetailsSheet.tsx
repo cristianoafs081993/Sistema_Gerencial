@@ -30,6 +30,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
 import { formatCurrency } from '@/lib/utils';
 import { getValorTotalFromHistorico } from '@/utils/contratosApiHistorico';
 import type {
@@ -179,6 +185,15 @@ function buildFaturaEmpenhosMap(faturaEmpenhos: ContratoApiFaturaEmpenhoRow[]) {
   }, new Map<string, ContratoApiFaturaEmpenhoRow[]>());
 }
 
+function buildFaturaItensMap(faturaItens: ContratoApiFaturaItemRow[]) {
+  return faturaItens.reduce((map, row) => {
+    const current = map.get(row.contrato_api_fatura_id) ?? [];
+    current.push(row);
+    map.set(row.contrato_api_fatura_id, current);
+    return map;
+  }, new Map<string, ContratoApiFaturaItemRow[]>());
+}
+
 function SummaryMetric({
   icon,
   label,
@@ -289,6 +304,7 @@ export function ContratoApiDetailsSheet({
   const itemById = new Map((details?.itens ?? []).map((item) => [item.id, item]));
   const faturaById = new Map(faturas.map((fatura) => [fatura.id, fatura]));
   const empenhosByFatura = buildFaturaEmpenhosMap(faturaEmpenhos);
+  const itensByFatura = buildFaturaItensMap(faturaItens);
   const linkedFaturaIds = new Set(faturaItens.map((item) => item.contrato_api_fatura_id));
   const faturasSemItem = faturas.filter((fatura) => !linkedFaturaIds.has(fatura.id));
 
@@ -408,7 +424,7 @@ export function ContratoApiDetailsSheet({
               </div>
             ) : null}
 
-            <Accordion type="multiple" defaultValue={['historico', 'itens', 'faturas']} className="space-y-3">
+            <Accordion key={contrato?.id ?? 'sem-contrato'} type="multiple" className="space-y-3">
               <AccordionItem value="historico" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
                 <AccordionTrigger className="gap-3 py-4 hover:no-underline">
                   <AccordionSectionTitle
@@ -557,61 +573,111 @@ export function ContratoApiDetailsSheet({
                   <AccordionSectionTitle
                     icon={<ReceiptText className="h-4 w-4" />}
                     title="Faturas associadas"
-                    description="Agrupadas pelo item informado pela API do Comprasnet."
+                    description="Consulte as faturas organizadas por item ou por documento."
                     count={`${faturas.length} faturas`}
                   />
                 </AccordionTrigger>
-                <AccordionContent className="space-y-4 pb-4 pt-0">
-                  {itemSummaries
-                    .filter(({ links }) => links.length > 0)
-                    .map(({ item, links }) => (
-                      <div key={item.id} className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-3">
-                        <p className="text-xs font-bold uppercase text-muted-foreground">{getItemDescription(item)}</p>
-                        {links.map((link) => {
-                          const fatura = faturaById.get(link.contrato_api_fatura_id);
-                          if (!fatura) return null;
-                          return (
+                <AccordionContent className="pb-4 pt-0">
+                  <Tabs defaultValue="item">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-xs font-semibold text-muted-foreground">Agrupar faturas por</p>
+                      <TabsList aria-label="Agrupar faturas por">
+                        <TabsTrigger value="item">Item</TabsTrigger>
+                        <TabsTrigger value="fatura">Fatura</TabsTrigger>
+                      </TabsList>
+                    </div>
+
+                    <TabsContent value="item" className="space-y-4">
+                      {itemSummaries
+                        .filter(({ links }) => links.length > 0)
+                        .map(({ item, links }) => (
+                          <div key={item.id} className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-3">
+                            <p className="text-xs font-bold uppercase text-muted-foreground">{getItemDescription(item)}</p>
+                            {links.map((link) => {
+                              const fatura = faturaById.get(link.contrato_api_fatura_id);
+                              if (!fatura) return null;
+                              return (
+                                <FaturaLine
+                                  key={link.id}
+                                  fatura={fatura}
+                                  faturaItem={link}
+                                  empenhos={empenhosByFatura.get(fatura.id) ?? []}
+                                />
+                              );
+                            })}
+                          </div>
+                        ))}
+
+                      {hasUnlinkedFaturas ? (
+                        <div className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-3">
+                          <p className="text-xs font-bold uppercase text-muted-foreground">Sem item vinculado</p>
+                          {unknownItemLinks.map((link) => {
+                            const fatura = faturaById.get(link.contrato_api_fatura_id);
+                            if (!fatura) return null;
+                            return (
+                              <FaturaLine
+                                key={link.id}
+                                fatura={fatura}
+                                faturaItem={link}
+                                empenhos={empenhosByFatura.get(fatura.id) ?? []}
+                              />
+                            );
+                          })}
+                          {faturasSemItem.map((fatura) => (
                             <FaturaLine
-                              key={link.id}
+                              key={fatura.id}
                               fatura={fatura}
-                              faturaItem={link}
                               empenhos={empenhosByFatura.get(fatura.id) ?? []}
                             />
-                          );
-                        })}
-                      </div>
-                    ))}
+                          ))}
+                        </div>
+                      ) : null}
+                    </TabsContent>
 
-                  {hasUnlinkedFaturas ? (
-                    <div className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-3">
-                      <p className="text-xs font-bold uppercase text-muted-foreground">Sem item vinculado</p>
-                      {unknownItemLinks.map((link) => {
-                        const fatura = faturaById.get(link.contrato_api_fatura_id);
-                        if (!fatura) return null;
+                    <TabsContent value="fatura" className="space-y-3">
+                      {faturas.map((fatura) => {
+                        const links = itensByFatura.get(fatura.id) ?? [];
                         return (
-                          <FaturaLine
-                            key={link.id}
-                            fatura={fatura}
-                            faturaItem={link}
-                            empenhos={empenhosByFatura.get(fatura.id) ?? []}
-                          />
+                          <div key={fatura.id} className="rounded-md border border-border/70 bg-muted/20 p-3">
+                            <FaturaLine
+                              fatura={fatura}
+                              empenhos={empenhosByFatura.get(fatura.id) ?? []}
+                            />
+                            {links.length > 0 ? (
+                              <div className="mt-3 space-y-2 border-t border-border/70 pt-3">
+                                <p className="text-[11px] font-semibold uppercase text-muted-foreground">Itens vinculados</p>
+                                {links.map((link) => {
+                                  const item = link.contrato_api_item_id
+                                    ? itemById.get(link.contrato_api_item_id)
+                                    : undefined;
+                                  return (
+                                    <div key={link.id} className="flex flex-wrap justify-between gap-2 text-xs">
+                                      <span className="max-w-[28rem] text-foreground">
+                                        {item ? getItemDescription(item) : 'Item não identificado na API'}
+                                      </span>
+                                      <span className="text-muted-foreground">
+                                        Qtd. {formatNumber(link.quantidade_faturado)} | {formatCurrency(link.valor_total_faturado ?? 0)}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <p className="mt-3 border-t border-border/70 pt-3 text-xs text-muted-foreground">
+                                Sem item vinculado na API.
+                              </p>
+                            )}
+                          </div>
                         );
                       })}
-                      {faturasSemItem.map((fatura) => (
-                        <FaturaLine
-                          key={fatura.id}
-                          fatura={fatura}
-                          empenhos={empenhosByFatura.get(fatura.id) ?? []}
-                        />
-                      ))}
-                    </div>
-                  ) : null}
+                    </TabsContent>
 
-                  {faturas.length === 0 ? (
-                    <div className="rounded-md border border-dashed border-border/70 py-8 text-center text-sm text-muted-foreground">
-                      Nenhuma fatura sincronizada.
-                    </div>
-                  ) : null}
+                    {faturas.length === 0 ? (
+                      <div className="mt-4 rounded-md border border-dashed border-border/70 py-8 text-center text-sm text-muted-foreground">
+                        Nenhuma fatura sincronizada.
+                      </div>
+                    ) : null}
+                  </Tabs>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>

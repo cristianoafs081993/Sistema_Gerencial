@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useQuery } from '@tanstack/react-query';
-import Dashboard from '@/pages/Dashboard';
+import Dashboard, { buildContractExpenseAggregation, buildContractProjectionBullets } from '@/pages/Dashboard';
 import { useData } from '@/contexts/DataContext';
 
 vi.mock('@/contexts/DataContext', () => ({
@@ -26,14 +26,24 @@ vi.mock('@/components/ui/tabs', () => ({
 vi.mock('@/components/dashboard/DashboardFiltersSheet', () => ({
   DashboardFiltersSheet: ({
     onFilterDimensaoChange,
+    onDateStartChange,
+    onDateEndChange,
     onClearFilters,
   }: {
     onFilterDimensaoChange: (value: string) => void;
+    onDateStartChange: (value: string) => void;
+    onDateEndChange: (value: string) => void;
     onClearFilters: () => void;
   }) => (
     <div>
       <button type="button" onClick={() => onFilterDimensaoChange('EN')}>
         filter-en
+      </button>
+      <button type="button" onClick={() => onDateStartChange('2025-01-01')}>
+        filter-start-2025
+      </button>
+      <button type="button" onClick={() => onDateEndChange('2025-12-31')}>
+        filter-end-2025
       </button>
       <button type="button" onClick={onClearFilters}>
         clear-filters
@@ -81,6 +91,51 @@ vi.mock('@/components/dashboard/DashboardCurrentTab', () => ({
   ),
 }));
 
+vi.mock('@/components/dashboard/DashboardContractExecutionTab', () => ({
+  DashboardContractExecutionTab: ({
+    contractExpenseData,
+    contractExpenseOptions,
+    contractExpenseSeries,
+    contractProjectionBullets,
+    selectedContractExpenseIds,
+    onToggleContractExpense,
+  }: {
+    contractExpenseData: Array<Record<string, string | number>>;
+    contractExpenseOptions: Array<{ id: string; total: number }>;
+    contractExpenseSeries: Array<{ contratoId: string; label: string; executadoKey: string; pendenteKey: string }>;
+    contractProjectionBullets: Array<{
+      id: string;
+      empenhado: number;
+      liquidado: number;
+      projetado: number;
+      saldoEmpenhos: number;
+      mesesConsiderados: number;
+      liquidacoes: Array<{ id: string; valor: number }>;
+      empenhos: Array<{ id: string; saldo: number }>;
+    }>;
+    selectedContractExpenseIds: string[];
+    onToggleContractExpense: (contratoId: string) => void;
+  }) => (
+    <div data-testid="contract-execution-tab">
+      <span data-testid="contract-expense-selected">{selectedContractExpenseIds.join(',')}</span>
+      <span data-testid="contract-expense-options">{contractExpenseOptions.map((item) => `${item.id}:${item.total}`).join(',')}</span>
+      <span data-testid="contract-expense-series">{contractExpenseSeries.map((item) => `${item.contratoId}:${item.label}`).join(',')}</span>
+      <span data-testid="contract-expense-data">{JSON.stringify(contractExpenseData)}</span>
+      <span data-testid="contract-projection-bullets">
+        {contractProjectionBullets
+          .map(
+            (item) =>
+              `${item.id}:${item.empenhado}:${item.liquidado}:${item.projetado}:${item.saldoEmpenhos}:${item.mesesConsiderados}:${item.liquidacoes.length}:${item.empenhos.length}`,
+          )
+          .join(',')}
+      </span>
+      <button type="button" onClick={() => onToggleContractExpense(contractExpenseOptions[0]?.id ?? '')}>
+        toggle-first-contract
+      </button>
+    </div>
+  ),
+}));
+
 vi.mock('@/components/dashboard/DashboardRapTab', () => ({
   DashboardRapTab: ({
     filteredRapCount,
@@ -115,6 +170,8 @@ const mockedUseQuery = vi.mocked(useQuery);
 let liquidacoesQueryData: unknown[] = [];
 let contratosApiEmpenhosQueryData: unknown[] = [];
 let contratosApiLiquidacoesQueryData: unknown[] = [];
+let contratosApiAtivosQueryData: unknown[] = [];
+let contratosApiFaturasQueryData: unknown[] = [];
 
 const makeAtividade = (overrides: Partial<ReturnType<typeof baseAtividade>> = {}) => ({
   ...baseAtividade(),
@@ -185,6 +242,8 @@ describe('Dashboard', () => {
     liquidacoesQueryData = [];
     contratosApiEmpenhosQueryData = [];
     contratosApiLiquidacoesQueryData = [];
+    contratosApiAtivosQueryData = [];
+    contratosApiFaturasQueryData = [];
     mockedUseQuery.mockImplementation((options) => {
       const queryKey = Array.isArray(options.queryKey) ? options.queryKey[0] : '';
       if (queryKey === 'dashboard-liquidacoes-por-empenho') {
@@ -195,6 +254,12 @@ describe('Dashboard', () => {
       }
       if (queryKey === 'dashboard-contratos-api-liquidacoes') {
         return { data: contratosApiLiquidacoesQueryData } as ReturnType<typeof useQuery>;
+      }
+      if (queryKey === 'dashboard-contratos-api-ativos') {
+        return { data: contratosApiAtivosQueryData } as ReturnType<typeof useQuery>;
+      }
+      if (queryKey === 'dashboard-contratos-api-faturas') {
+        return { data: contratosApiFaturasQueryData } as ReturnType<typeof useQuery>;
       }
       return { data: [] } as ReturnType<typeof useQuery>;
     });
@@ -280,6 +345,337 @@ describe('Dashboard', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('exibe o grafico de contratos em uma aba dedicada', () => {
+    render(<Dashboard />);
+
+    expect(screen.getAllByRole('button', { name: 'Orçamento' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'RAP' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Contratos' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'filter-en' })).toHaveLength(2);
+    expect(screen.getByTestId('contract-execution-tab')).toBeInTheDocument();
+    expect(within(screen.getByTestId('current-tab')).queryByTestId('contract-expense-period')).not.toBeInTheDocument();
+    expect(within(screen.getByTestId('contract-execution-tab')).queryByTestId('contract-expense-period')).not.toBeInTheDocument();
+    expect(
+      mockedUseQuery.mock.calls.find(([options]) => options.queryKey[0] === 'dashboard-contratos-api-ativos')?.[0].enabled,
+    ).toBe(false);
+  });
+
+  it('agrega faturas de contratos por mes, status e valor liquido com fallback para bruto', () => {
+    const aggregation = buildContractExpenseAggregation(
+      [
+        {
+          id: 'c1',
+          numero: '001/2026',
+          fornecedor_nome: 'Fornecedor A',
+          objeto: 'Servico A',
+        },
+        {
+          id: 'c2',
+          numero: '002/2026',
+          fornecedor_nome: 'Fornecedor B',
+          objeto: 'Servico B',
+        },
+        {
+          id: 'c3',
+          numero: '003/2026',
+          fornecedor_nome: 'Fornecedor Sem Fatura',
+          objeto: 'Servico C',
+        },
+      ] as never,
+      [
+        {
+          id: 'f1',
+          contrato_api_id: 'c1',
+          situacao: 'Pago',
+          valor_liquido: 100,
+          valor_bruto: 120,
+          data_emissao: '2026-01-05',
+          raw_data: { contratante: '158366' },
+        },
+        {
+          id: 'f2',
+          contrato_api_id: 'c1',
+          situacao: 'Pendente',
+          valor_liquido: null,
+          valor_bruto: 50,
+          data_emissao: '2026-01-20',
+          raw_data: { contratante: '158366' },
+        },
+        {
+          id: 'f3',
+          contrato_api_id: 'c2',
+          situacao: 'Siafi Apropriado',
+          valor_liquido: 70,
+          valor_bruto: 80,
+          data_emissao: '2026-02-10',
+          raw_data: { contratante: '158366' },
+        },
+        {
+          id: 'f4-fora-campus',
+          contrato_api_id: 'c2',
+          situacao: 'Pago',
+          valor_liquido: 900,
+          valor_bruto: 900,
+          data_emissao: '2026-02-12',
+          raw_data: { contratante: '158155' },
+        },
+      ] as never,
+      {
+        startDate: new Date('2026-01-01'),
+        endDate: new Date('2026-02-28'),
+      },
+    );
+
+    expect(aggregation.options.map((item) => `${item.id}:${item.total}`)).toEqual(['c1:150', 'c2:70', 'c3:0']);
+    expect(aggregation.data).toHaveLength(2);
+    expect(aggregation.data[0]).toMatchObject({
+      name: 'jan/26',
+      contract_c1_executado: 100,
+      contract_c1_pendente: 50,
+      total: 150,
+    });
+    expect(aggregation.data[1]).toMatchObject({
+      name: 'fev/26',
+      contract_c2_executado: 70,
+      total: 70,
+    });
+  });
+
+  it('monta bullet chart de projecao anual por contrato frente ao empenhado', () => {
+    const bullets = buildContractProjectionBullets(
+      [
+        {
+          id: 'c1',
+          numero: '001/2026',
+          fornecedor_nome: 'Fornecedor A',
+          objeto: 'Servico A',
+        },
+        {
+          id: 'c2',
+          numero: '002/2026',
+          fornecedor_nome: 'Fornecedor B',
+          objeto: 'Servico B',
+        },
+      ] as never,
+      [
+        {
+          id: 'f1',
+          contrato_api_id: 'c1',
+          situacao: 'Pago',
+          valor_liquido: 100,
+          valor_bruto: 120,
+          data_emissao: '2026-01-05',
+          raw_data: { contratante: '158366' },
+        },
+        {
+          id: 'f2',
+          contrato_api_id: 'c1',
+          situacao: 'Siafi Apropriado',
+          valor_liquido: 50,
+          valor_bruto: 60,
+          data_emissao: '2026-02-10',
+          raw_data: { contratante: '158366' },
+        },
+        {
+          id: 'f3-pendente',
+          contrato_api_id: 'c1',
+          situacao: 'Em analise',
+          valor_liquido: 900,
+          valor_bruto: 900,
+          data_emissao: '2026-02-20',
+          raw_data: { contratante: '158366' },
+        },
+        {
+          id: 'f4-fora-campus',
+          contrato_api_id: 'c2',
+          situacao: 'Pago',
+          valor_liquido: 500,
+          valor_bruto: 500,
+          data_emissao: '2026-02-20',
+          raw_data: { contratante: '158155' },
+        },
+      ] as never,
+      [
+        {
+          id: 'e1',
+          contrato_api_id: 'c1',
+          numero: '2026NE000001',
+          data_emissao: '2026-01-02',
+          valor_empenhado: 1000,
+          valor_a_liquidar: 830,
+          valor_liquidado: 150,
+          valor_pago: 100,
+        },
+        {
+          id: 'e2',
+          contrato_api_id: 'c2',
+          numero: '2026NE000002',
+          data_emissao: '2026-01-02',
+          valor_empenhado: 500,
+          valor_a_liquidar: null,
+          valor_liquidado: 0,
+          valor_pago: 0,
+        },
+      ] as never,
+      ['c1', 'c2'],
+      {
+        startDate: new Date('2026-01-01'),
+        endDate: new Date('2026-12-31'),
+        today: new Date('2026-03-15'),
+      },
+    );
+
+    expect(bullets).toHaveLength(2);
+    expect(bullets[0]).toMatchObject({
+      id: 'c1',
+      empenhado: 1000,
+      liquidado: 150,
+      projetado: 600,
+      saldoEmpenhos: 830,
+      mesesConsiderados: 3,
+      percentualLiquidado: 15,
+      percentualProjetado: 60,
+    });
+    expect(bullets[0].liquidacoes).toEqual([
+      expect.objectContaining({
+        id: 'f2',
+        numeroInstrumento: 'Sem instrumento',
+        situacao: 'Siafi Apropriado',
+        valor: 50,
+      }),
+      expect.objectContaining({
+        id: 'f1',
+        numeroInstrumento: 'Sem instrumento',
+        situacao: 'Pago',
+        valor: 100,
+      }),
+    ]);
+    expect(bullets[0].empenhos).toEqual([
+      expect.objectContaining({
+        id: 'e1',
+        numero: '2026NE000001',
+        valorEmpenhado: 1000,
+        valorLiquidado: 150,
+        valorPago: 100,
+        saldo: 830,
+        saldoFonte: 'api',
+      }),
+    ]);
+    expect(bullets[1]).toMatchObject({
+      id: 'c2',
+      empenhado: 500,
+      liquidado: 0,
+      projetado: 0,
+      saldoEmpenhos: 500,
+      mesesConsiderados: 3,
+    });
+    expect(bullets[1].liquidacoes).toHaveLength(0);
+    expect(bullets[1].empenhos[0]).toMatchObject({
+      id: 'e2',
+      saldo: 500,
+      saldoFonte: 'calculado',
+    });
+  });
+
+  it('seleciona automaticamente os cinco contratos com maior gasto mensal', async () => {
+    const currentYear = new Date().getFullYear();
+    contratosApiAtivosQueryData = [1, 2, 3, 4, 5, 6].map((index) => ({
+      id: `c${index}`,
+      numero: `00${index}/${currentYear}`,
+      fornecedor_nome: `Fornecedor ${index}`,
+      objeto: `Servico ${index}`,
+    }));
+    contratosApiFaturasQueryData = [1, 2, 3, 4, 5, 6].map((index) => ({
+      id: `f${index}`,
+      contrato_api_id: `c${index}`,
+      situacao: index % 2 === 0 ? 'Pago' : 'Em análise',
+      valor_liquido: index * 10,
+      valor_bruto: index * 10,
+      data_emissao: `${currentYear}-03-10`,
+      raw_data: { contratante: '158366' },
+    }));
+    contratosApiEmpenhosQueryData = [1, 2, 3, 4, 5, 6].map((index) => ({
+      id: `e${index}`,
+      contrato_api_id: `c${index}`,
+      data_emissao: `${currentYear}-01-10`,
+      valor_empenhado: index * 100,
+    }));
+
+    render(<Dashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('contract-expense-selected')).toHaveTextContent('c6,c5,c4,c3,c2');
+    });
+
+    expect(screen.getByTestId('contract-expense-options')).toHaveTextContent('c6:60,c5:50,c4:40,c3:30,c2:20,c1:10');
+    expect(screen.getByTestId('contract-expense-series')).toHaveTextContent(`c6:Fornecedor 6 - 006/${currentYear}`);
+    expect(screen.getByTestId('contract-expense-data')).toHaveTextContent('contract_c6_executado');
+    expect(screen.getByTestId('contract-expense-data')).not.toHaveTextContent('contract_c1_pendente');
+    expect(screen.getByTestId('contract-projection-bullets')).toHaveTextContent('c6:600:60');
+  });
+
+  it('permite filtrar manualmente contratos', async () => {
+    const currentYear = new Date().getFullYear();
+    contratosApiAtivosQueryData = [1, 2, 3, 4, 5, 6].map((index) => ({
+      id: `c${index}`,
+      numero: `00${index}/${currentYear}`,
+      fornecedor_nome: `Fornecedor ${index}`,
+      objeto: `Servico ${index}`,
+    }));
+    contratosApiFaturasQueryData = [1, 2, 3, 4, 5, 6].map((index) => ({
+      id: `f${index}`,
+      contrato_api_id: `c${index}`,
+      situacao: 'Pago',
+      valor_liquido: index * 10,
+      valor_bruto: index * 10,
+      data_emissao: `${currentYear}-03-10`,
+      raw_data: { contratante: '158366' },
+    }));
+
+    render(<Dashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('contract-expense-selected')).toHaveTextContent('c6,c5,c4,c3,c2');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'toggle-first-contract' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('contract-expense-selected')).toHaveTextContent('c5,c4,c3,c2');
+    });
+    expect(screen.getByTestId('contract-expense-series')).not.toHaveTextContent('c6:');
+    expect(screen.getByTestId('contract-expense-series')).toHaveTextContent('c5:Fornecedor 5');
+  });
+
+  it('inicia o gasto por contrato limitado ao ano atual e usa o periodo do filtro global', async () => {
+    const currentYear = new Date().getFullYear();
+
+    render(<Dashboard />);
+
+    expect(
+      mockedUseQuery.mock.calls.some(([options]) => {
+        const queryKey = options.queryKey as unknown[];
+        return queryKey[0] === 'dashboard-contratos-api-faturas'
+          && queryKey[2] === `${currentYear}-01-01`
+          && queryKey[3] === `${currentYear}-12-31`;
+      }),
+    ).toBe(true);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'filter-start-2025' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'filter-end-2025' })[0]);
+
+    await waitFor(() => {
+      expect(
+        mockedUseQuery.mock.calls.some(([options]) => {
+          const queryKey = options.queryKey as unknown[];
+          return queryKey[0] === 'dashboard-contratos-api-faturas'
+            && queryKey[2] === '2025-01-01'
+            && queryKey[3] === '2025-12-31';
+        }),
+      ).toBe(true);
+    });
   });
 
   it('aplica filtro de dimensao usando inferencia por plano interno em exercicio e RAP', async () => {

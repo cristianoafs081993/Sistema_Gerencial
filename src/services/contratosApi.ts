@@ -390,6 +390,11 @@ function isFaturaVisibleForDisplayUnidade(rawFatura: unknown, unidadeCodigo = DE
   return !codigoContratante || codigoContratante === unidadeCodigo;
 }
 
+export type ContratoApiFaturasPeriod = {
+  dataEmissaoInicio?: string;
+  dataEmissaoFim?: string;
+};
+
 function getEmpenhoUnidadeGestora(rawEmpenho: unknown) {
   if (!rawEmpenho || typeof rawEmpenho !== 'object') return null;
   const record = rawEmpenho as Record<string, unknown>;
@@ -670,13 +675,21 @@ export const contratosApiService = {
     return all.filter((row) => set.has(row.contrato_api_id));
   },
 
-  async getFaturasApi(contratoApiIds?: string[]): Promise<ContratoApiFaturaRow[]> {
+  async getFaturasApi(contratoApiIds?: string[], period?: ContratoApiFaturasPeriod): Promise<ContratoApiFaturaRow[]> {
     let query = supabase
       .from('contratos_api_faturas')
       .select('id, contrato_api_id, api_fatura_id, numero_instrumento_cobranca, situacao, valor_bruto, valor_liquido, data_emissao, data_pagamento, raw_data');
 
     if (contratoApiIds && contratoApiIds.length > 0 && contratoApiIds.length <= 100) {
       query = query.in('contrato_api_id', contratoApiIds);
+    }
+
+    if (period?.dataEmissaoInicio) {
+      query = query.gte('data_emissao', period.dataEmissaoInicio);
+    }
+
+    if (period?.dataEmissaoFim) {
+      query = query.lte('data_emissao', period.dataEmissaoFim);
     }
 
     const { data, error } = await query;

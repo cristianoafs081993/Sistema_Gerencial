@@ -161,6 +161,18 @@ Observacao para a aba de exercicio atual do dashboard:
 - a linha `Liquidado` usa NPs/documentos de liquidacao de `documentos_habeis` vinculadas por `empenho_numero`; quando nao houver NP vinculada para a NE, usa liquidacoes publicas da API de contratos por empenho (`data_liquidacao` ou `data_emissao`) como fonte de data; em ambos os casos, as datas distribuem o valor no tempo e o total final e escalado para fechar com o liquidado oficial do funil; `ultimaAtualizacaoSiafi` nao deve ser usado como data mensal para evitar concentrar liquidacoes no mes da sincronizacao
 - sem filtro final de data, o eixo deve preencher meses vazios ate o mes atual
 
+Observacao para a aba de contratos do dashboard:
+
+- o dashboard apresenta as abas `Orçamento`, `RAP` e `Contratos`, nessa ordem
+- o grafico `Gasto Mensal por Contrato` fica em aba propria, separado da analise de `Orçamento` e de `RAP`; suas consultas so sao habilitadas quando essa aba e ativada, e o botao de filtros permanece no header como nas demais abas
+- o grafico `Gasto Mensal por Contrato` usa `contratos_api` para listar contratos ativos e consulta `contratos_api_faturas` pelo periodo do filtro do header, aplicado sobre `data_emissao`; quando o filtro de periodo esta vazio, usa o ano atual para reduzir volume carregado na abertura da aba
+- nesse grafico, faturas `Pago` e `Siafi Apropriado` entram como `Executado`, demais situacoes entram como `Pendente`, e o valor usa `valor_liquido` com fallback para `valor_bruto`
+- o grafico de gastos por contrato exibe linhas mensais por contrato/situacao, identifica a serie por fornecedor e numero do contrato, seleciona automaticamente os 5 contratos com maior gasto no conjunto carregado e permite selecao multipla manual sem alterar a aba RAP
+- a selecao multipla de contratos fica em uma faixa de controle propria no topo da aba e filtra todos os graficos de contratos, nao apenas o grafico mensal
+- a faixa de selecao mostra todos os contratos ativos carregados, inclusive contratos sem fatura no periodo; esses contratos aparecem como bolhas clicaveis e entram na analise quando selecionados pelo usuario
+- a aba tambem exibe bullet chart de projecao anual por contrato selecionado: `Empenhado` vem de `contratos_api_empenhos.valor_empenhado`, `Liquidado` soma faturas executadas no periodo e `Projetado` anualiza a media mensal observada frente ao total empenhado
+- o bullet chart apresenta os valores na ordem `Empenhado`, `Liquidado` e `Projetado`, com hover de rastreabilidade contendo liquidações consideradas, empenhos vinculados, saldo dos empenhos e meses usados na projecao
+
 ### Financeiro
 
 `Financeiro.tsx` -> `parseFinanceiroCsv` / `saveFinanceiroRows` -> `financeiro_fonte_vinculacao`
