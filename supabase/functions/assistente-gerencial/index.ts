@@ -300,7 +300,7 @@ Deno.serve(async (req) => {
         'contratos_api_empenhos',
         supabase
           .from('contratos_api_empenhos')
-          .select('contrato_api_id,numero,unidade_gestora,valor_empenhado,valor_a_liquidar,valor_liquidado,valor_pago,rp_inscrito,rp_a_liquidar,rp_liquidado,rp_pago,rp_a_pagar', { count: 'exact' })
+          .select('contrato_api_id,numero,unidade_gestora,valor_empenhado,valor_a_liquidar,valor_liquidado,valor_pago,rp_inscrito,rp_a_pagar,raw_data', { count: 'exact' })
           .limit(2000),
       ),
       readSection(

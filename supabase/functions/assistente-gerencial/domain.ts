@@ -57,10 +57,8 @@ type ContratoApiEmpenhoRow = {
   valor_liquidado?: number | string | null;
   valor_pago?: number | string | null;
   rp_inscrito?: number | string | null;
-  rp_a_liquidar?: number | string | null;
-  rp_liquidado?: number | string | null;
-  rp_pago?: number | string | null;
   rp_a_pagar?: number | string | null;
+  raw_data?: Record<string, unknown> | null;
 };
 
 type ContratoApiFaturaRow = {
@@ -305,9 +303,11 @@ function hasCampusEvidence(row: ContratoApiRow, empenhos: ContratoApiEmpenhoRow[
 function getEmpenhoSaldo(empenho: ContratoApiEmpenhoRow) {
   const rpInscrito = toNumber(empenho.rp_inscrito);
   const rpAPagar = toNumber(empenho.rp_a_pagar);
-  const rpLiquidado = toNumber(empenho.rp_liquidado);
-  const rpPago = toNumber(empenho.rp_pago);
-  const hasRap = rpInscrito > 0 || rpAPagar > 0 || toNumber(empenho.rp_a_liquidar) > 0;
+  const raw = isRecord(empenho.raw_data) ? empenho.raw_data : {};
+  const rpALiquidar = toNumber(raw.rpaliquidar);
+  const rpLiquidado = toNumber(raw.rpliquidado);
+  const rpPago = toNumber(raw.rppago);
+  const hasRap = rpInscrito > 0 || rpAPagar > 0 || rpALiquidar > 0 || rpLiquidado > 0 || rpPago > 0;
 
   if (hasRap) {
     if (empenho.rp_a_pagar !== null && empenho.rp_a_pagar !== undefined) return Math.max(0, rpAPagar);
