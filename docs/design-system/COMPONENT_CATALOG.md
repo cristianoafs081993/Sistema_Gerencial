@@ -54,7 +54,8 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 - `ArtefatosLicitacao`: pagina operacional que combina `SectionPanel`, `FilterPanel`, `DataTablePanel`, badges de tipo e botoes iconicos para abrir, copiar, baixar DOCX e excluir artefatos.
 - `LicitacoesPregoes`: pagina operacional que combina `SectionPanel`, `FilterPanel`, `DataTablePanel`, `TablePagination`, badges de prazo/status e drawer lateral de detalhe para compras PNCP.
 - `CreditoDisponivel`: pagina operacional que combina `StatCard`, `FilterPanel`, `DataTablePanel` e `TablePagination` para leitura do saldo por PTRES/PI e importacao CSV no header.
-- `ContratoApiDetailsSheet`: drawer lateral de detalhes de contratos API com resumo visual no topo e secoes em `Accordion` para historico, itens e faturas associadas.
+- `ContratoApiDetailsSheet`: drawer lateral de detalhes de contratos API com resumo visual no topo e secoes em `Accordion`, fechadas inicialmente; faturas permitem alternar o agrupamento por item ou por fatura.
+- `DashboardContractExecutionTab`: aba analitica dedicada a contratos no dashboard, com seletor global por bolhas clicaveis, grafico mensal de faturas e bullet chart de projecao anual frente ao empenhado com hover de rastreabilidade.
 - `Layout`: sidebar global compacta com campo de busca visual, grupos expansivos, submenus expansivos, indicador ativo lateral e drawer mobile.
 
 ## Regra pratica

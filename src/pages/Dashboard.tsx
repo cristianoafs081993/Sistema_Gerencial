@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { HeaderActions } from '@/components/HeaderParts';
+import { DashboardContractExecutionTab } from '@/components/dashboard/DashboardContractExecutionTab';
 import { DashboardCurrentTab } from '@/components/dashboard/DashboardCurrentTab';
 import { DashboardFiltersSheet } from '@/components/dashboard/DashboardFiltersSheet';
 import { DashboardRapTab } from '@/components/dashboard/DashboardRapTab';
@@ -27,8 +28,11 @@ import { normalizeEmpenhoNumero, transparenciaService, type LiquidacaoPorEmpenho
 import {
   contratosApiService,
   type ContratoApiEmpenhoRow,
+  type ContratoApiFaturaRow,
   type ContratoApiPublicLiquidacaoRow,
+  type ContratoApiRow,
 } from '@/services/contratosApi';
+import { isContratoApiDisplayFatura } from '@/utils/contratosApiStatus';
 import type { Atividade, Empenho } from '@/types';
 
 type MonthlyExecutionBucket = {
@@ -38,11 +42,141 @@ type MonthlyExecutionBucket = {
   liquidado: number;
 };
 
+export type ContractExpenseStatus = 'executado' | 'pendente';
+
+export type ContractExpenseOption = {
+  id: string;
+  numero: string;
+  fornecedorNome: string;
+  objeto: string;
+  total: number;
+  color: string;
+  label: string;
+};
+
+export type ContractExpenseDataPoint = {
+  name: string;
+  monthKey: string;
+  total: number;
+  [key: string]: string | number;
+};
+
+export type ContractExpenseSeries = {
+  contratoId: string;
+  label: string;
+  color: string;
+  executadoKey: string;
+  pendenteKey: string;
+};
+
+export type ContractProjectionBulletItem = {
+  id: string;
+  label: string;
+  color: string;
+  empenhado: number;
+  liquidado: number;
+  projetado: number;
+  saldoEmpenhos: number;
+  mesesConsiderados: number;
+  percentualLiquidado: number;
+  percentualProjetado: number;
+  liquidacoes: ContractProjectionLiquidacaoTrace[];
+  empenhos: ContractProjectionEmpenhoTrace[];
+};
+
+export type ContractProjectionLiquidacaoTrace = {
+  id: string;
+  numeroInstrumento: string;
+  situacao: string;
+  dataEmissao: string | null;
+  dataPagamento: string | null;
+  valor: number;
+};
+
+export type ContractProjectionEmpenhoTrace = {
+  id: string;
+  numero: string;
+  dataEmissao: string | null;
+  valorEmpenhado: number;
+  valorLiquidado: number;
+  valorPago: number;
+  saldo: number;
+  saldoFonte: 'api' | 'calculado';
+};
+
+type ContractExpenseAggregation = {
+  options: ContractExpenseOption[];
+  data: ContractExpenseDataPoint[];
+  series: ContractExpenseSeries[];
+};
+
+const CONTRACT_EXPENSE_COLORS = ['#2563eb', '#10b981', '#a855f7', '#f59e0b', '#ec4899', '#14b8a6', '#6366f1', '#f43f5e'];
+const EXECUTED_CONTRACT_EXPENSE_STATUSES = new Set(['pago', 'siafi apropriado']);
+
+const getCurrentYearExpensePeriod = () => {
+  const year = new Date().getFullYear();
+  return {
+    startDate: `${year}-01-01`,
+    endDate: `${year}-12-31`,
+  };
+};
+
 const toValidDate = (value?: Date | string | null): Date | null => {
   if (!value) return null;
 
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const normalizeStatusText = (value?: string | null) =>
+  String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+
+const getContractExpenseStatus = (situacao?: string | null): ContractExpenseStatus =>
+  EXECUTED_CONTRACT_EXPENSE_STATUSES.has(normalizeStatusText(situacao)) ? 'executado' : 'pendente';
+
+const getContractExpenseValue = (fatura: Pick<ContratoApiFaturaRow, 'valor_liquido' | 'valor_bruto'>) =>
+  Number(fatura.valor_liquido ?? fatura.valor_bruto ?? 0) || 0;
+
+const getContractCommitmentValue = (empenho: Pick<ContratoApiEmpenhoRow, 'valor_empenhado'>) =>
+  Math.max(0, Number(empenho.valor_empenhado) || 0);
+
+const getContractCommitmentBalanceTrace = (
+  empenho: Pick<ContratoApiEmpenhoRow, 'valor_empenhado' | 'valor_a_liquidar' | 'valor_liquidado' | 'valor_pago'>,
+): Pick<ContractProjectionEmpenhoTrace, 'saldo' | 'saldoFonte'> => {
+  const apiBalance = Number(empenho.valor_a_liquidar);
+  if (Number.isFinite(apiBalance) && empenho.valor_a_liquidar !== null && empenho.valor_a_liquidar !== undefined) {
+    return {
+      saldo: Math.max(0, apiBalance),
+      saldoFonte: 'api',
+    };
+  }
+
+  const valorEmpenhado = getContractCommitmentValue(empenho);
+  const valorExecutado = Math.max(Number(empenho.valor_liquidado ?? empenho.valor_pago ?? 0) || 0, 0);
+
+  return {
+    saldo: Math.max(0, valorEmpenhado - valorExecutado),
+    saldoFonte: 'calculado',
+  };
+};
+
+const getContractExpenseFieldKey = (contratoId: string, status: ContractExpenseStatus) =>
+  `contract_${contratoId.replace(/[^a-zA-Z0-9]/g, '_')}_${status}`;
+
+const getContractExpenseLabel = (contrato: Pick<ContratoApiRow, 'numero' | 'fornecedor_nome' | 'objeto'>) => {
+  const fornecedor = contrato.fornecedor_nome?.trim();
+  if (fornecedor) return `${fornecedor} - ${contrato.numero}`;
+  return contrato.objeto ? `${contrato.objeto} - ${contrato.numero}` : contrato.numero;
+};
+
+const isDateInsideOptionalRange = (date: Date, startDate?: Date | null, endDate?: Date | null) => {
+  if (startDate && date < startOfDay(startDate)) return false;
+  if (endDate && date > endOfDay(endDate)) return false;
+  return true;
 };
 
 const toValidOperationDate = (value?: string | null): Date | null => {
@@ -103,6 +237,18 @@ const getMonthlyBucket = (buckets: Map<string, MonthlyExecutionBucket>, date: Da
 };
 
 const monthStart = (date: Date) => new Date(date.getUTCFullYear(), date.getUTCMonth(), 1);
+
+const countProjectionMonths = (startDate: Date, endDate: Date, today = new Date()) => {
+  const effectiveEnd = endDate.getTime() > today.getTime() ? today : endDate;
+  if (effectiveEnd.getTime() < startDate.getTime()) return 0;
+
+  return (
+    (effectiveEnd.getUTCFullYear() - startDate.getUTCFullYear()) * 12 +
+    effectiveEnd.getUTCMonth() -
+    startDate.getUTCMonth() +
+    1
+  );
+};
 
 const addEmptyMonthlyBuckets = (
   buckets: Map<string, MonthlyExecutionBucket>,
@@ -250,6 +396,183 @@ const buildDadosMensais = (
     });
 };
 
+export const buildContractExpenseAggregation = (
+  contratos: ContratoApiRow[],
+  faturas: ContratoApiFaturaRow[],
+  options: {
+    startDate?: Date | null;
+    endDate?: Date | null;
+  } = {},
+): ContractExpenseAggregation => {
+  const contratosById = new Map(contratos.map((contrato) => [contrato.id, contrato]));
+  const totalsByContract = new Map<string, number>();
+  const buckets = new Map<string, ContractExpenseDataPoint>();
+
+  faturas.forEach((fatura) => {
+    const contrato = contratosById.get(fatura.contrato_api_id);
+    if (!contrato || !isContratoApiDisplayFatura(fatura)) return;
+
+    const date = toValidDate(fatura.data_emissao);
+    const value = getContractExpenseValue(fatura);
+    if (!date || value <= 0 || !isDateInsideOptionalRange(date, options.startDate, options.endDate)) return;
+
+    const status = getContractExpenseStatus(fatura.situacao);
+    const key = getContractExpenseFieldKey(contrato.id, status);
+    const bucketKey = monthKey(date);
+    const bucket =
+      buckets.get(bucketKey) ||
+      ({
+        name: format(monthStart(date), 'MMM/yy', { locale: ptBR }),
+        monthKey: bucketKey,
+        total: 0,
+      } as ContractExpenseDataPoint);
+
+    bucket[key] = Number(bucket[key] || 0) + value;
+    bucket.total += value;
+    buckets.set(bucketKey, bucket);
+    totalsByContract.set(contrato.id, (totalsByContract.get(contrato.id) || 0) + value);
+  });
+
+  const optionsList = contratos
+    .map((contrato, index) => ({
+      id: contrato.id,
+      numero: contrato.numero,
+      fornecedorNome: contrato.fornecedor_nome || '',
+      objeto: contrato.objeto || '',
+      total: totalsByContract.get(contrato.id) || 0,
+      color: CONTRACT_EXPENSE_COLORS[index % CONTRACT_EXPENSE_COLORS.length],
+      label: getContractExpenseLabel(contrato),
+    }))
+    .sort((left, right) => right.total - left.total || left.label.localeCompare(right.label));
+
+  const colorByContractId = new Map(optionsList.map((option, index) => [option.id, CONTRACT_EXPENSE_COLORS[index % CONTRACT_EXPENSE_COLORS.length]]));
+  const normalizedOptions = optionsList.map((option) => ({
+    ...option,
+    color: colorByContractId.get(option.id) || option.color,
+  }));
+
+  const series = normalizedOptions.map((option) => ({
+    contratoId: option.id,
+    label: option.label,
+    color: option.color,
+    executadoKey: getContractExpenseFieldKey(option.id, 'executado'),
+    pendenteKey: getContractExpenseFieldKey(option.id, 'pendente'),
+  }));
+
+  return {
+    options: normalizedOptions,
+    data: Array.from(buckets.values()).sort((left, right) => left.monthKey.localeCompare(right.monthKey)),
+    series,
+  };
+};
+
+export const buildContractProjectionBullets = (
+  contratos: ContratoApiRow[],
+  faturas: ContratoApiFaturaRow[],
+  empenhos: ContratoApiEmpenhoRow[],
+  selectedContratoIds: string[],
+  options: {
+    startDate: Date;
+    endDate: Date;
+    today?: Date;
+  },
+): ContractProjectionBulletItem[] => {
+  const selectedIds = new Set(selectedContratoIds);
+  const contratosById = new Map(contratos.map((contrato) => [contrato.id, contrato]));
+  const elapsedMonths = countProjectionMonths(options.startDate, options.endDate, options.today);
+  const liquidadoByContrato = new Map<string, number>();
+  const empenhadoByContrato = new Map<string, number>();
+  const liquidacoesByContrato = new Map<string, ContractProjectionLiquidacaoTrace[]>();
+  const empenhosByContrato = new Map<string, ContractProjectionEmpenhoTrace[]>();
+
+  faturas.forEach((fatura) => {
+    if (!selectedIds.has(fatura.contrato_api_id) || !isContratoApiDisplayFatura(fatura)) return;
+
+    const date = toValidDate(fatura.data_emissao);
+    const value = getContractExpenseValue(fatura);
+    if (
+      !date ||
+      value <= 0 ||
+      !isDateInsideOptionalRange(date, options.startDate, options.endDate) ||
+      getContractExpenseStatus(fatura.situacao) !== 'executado'
+    ) {
+      return;
+    }
+
+    liquidadoByContrato.set(fatura.contrato_api_id, (liquidadoByContrato.get(fatura.contrato_api_id) || 0) + value);
+    const currentLiquidacoes = liquidacoesByContrato.get(fatura.contrato_api_id) || [];
+    currentLiquidacoes.push({
+      id: fatura.id,
+      numeroInstrumento: fatura.numero_instrumento_cobranca || 'Sem instrumento',
+      situacao: fatura.situacao || 'Sem situacao',
+      dataEmissao: fatura.data_emissao,
+      dataPagamento: fatura.data_pagamento,
+      valor: value,
+    });
+    liquidacoesByContrato.set(fatura.contrato_api_id, currentLiquidacoes);
+  });
+
+  empenhos.forEach((empenho) => {
+    if (!selectedIds.has(empenho.contrato_api_id)) return;
+
+    const date = toValidDate(empenho.data_emissao);
+    if (date && date.getUTCFullYear() !== options.startDate.getUTCFullYear()) return;
+
+    const value = getContractCommitmentValue(empenho);
+    if (value <= 0) return;
+
+    empenhadoByContrato.set(empenho.contrato_api_id, (empenhadoByContrato.get(empenho.contrato_api_id) || 0) + value);
+    const balance = getContractCommitmentBalanceTrace(empenho);
+    const currentEmpenhos = empenhosByContrato.get(empenho.contrato_api_id) || [];
+    currentEmpenhos.push({
+      id: empenho.id,
+      numero: empenho.numero || 'Sem numero',
+      dataEmissao: empenho.data_emissao,
+      valorEmpenhado: value,
+      valorLiquidado: Math.max(Number(empenho.valor_liquidado) || 0, 0),
+      valorPago: Math.max(Number(empenho.valor_pago) || 0, 0),
+      saldo: balance.saldo,
+      saldoFonte: balance.saldoFonte,
+    });
+    empenhosByContrato.set(empenho.contrato_api_id, currentEmpenhos);
+  });
+
+  return selectedContratoIds
+    .map((contratoId) => {
+      const contrato = contratosById.get(contratoId);
+      if (!contrato) return null;
+
+      const liquidado = liquidadoByContrato.get(contratoId) || 0;
+      const empenhado = empenhadoByContrato.get(contratoId) || 0;
+      const projetado = elapsedMonths > 0 ? (liquidado / elapsedMonths) * 12 : liquidado;
+      const liquidacoes = (liquidacoesByContrato.get(contratoId) || []).sort((left, right) =>
+        String(right.dataEmissao || '').localeCompare(String(left.dataEmissao || '')),
+      );
+      const empenhosTrace = (empenhosByContrato.get(contratoId) || []).sort((left, right) =>
+        String(right.dataEmissao || '').localeCompare(String(left.dataEmissao || '')),
+      );
+      const saldoApi = empenhosTrace.reduce((sum, empenho) => sum + empenho.saldo, 0);
+      const saldoEmpenhos = empenhosTrace.length > 0 ? saldoApi : Math.max(0, empenhado - liquidado);
+
+      return {
+        id: contratoId,
+        label: getContractExpenseLabel(contrato),
+        color: CONTRACT_EXPENSE_COLORS[selectedContratoIds.indexOf(contratoId) % CONTRACT_EXPENSE_COLORS.length],
+        empenhado,
+        liquidado,
+        projetado,
+        saldoEmpenhos,
+        mesesConsiderados: elapsedMonths,
+        percentualLiquidado: empenhado > 0 ? (liquidado / empenhado) * 100 : 0,
+        percentualProjetado: empenhado > 0 ? (projetado / empenhado) * 100 : 0,
+        liquidacoes,
+        empenhos: empenhosTrace,
+      };
+    })
+    .filter((item): item is ContractProjectionBulletItem => Boolean(item))
+    .filter((item) => item.empenhado > 0 || item.liquidado > 0 || item.projetado > 0);
+};
+
 export default function Dashboard() {
   const { atividades, empenhos, descentralizacoes, contaDescentralizacoes, isLoading } = useData();
   const [hoveredBudgetDimension, setHoveredBudgetDimension] = useState<string | null>(null);
@@ -258,7 +581,10 @@ export default function Dashboard() {
   const [filterOrigem, setFilterOrigem] = useState('all');
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
-  const [activeTab, setActiveTab] = useState<'corrente' | 'rap'>('corrente');
+  const [activeTab, setActiveTab] = useState<'corrente' | 'contratos' | 'rap'>('corrente');
+  const [selectedContractExpenseIds, setSelectedContractExpenseIds] = useState<string[]>([]);
+  const [contractExpenseSelectionTouched, setContractExpenseSelectionTouched] = useState(false);
+  const isContractExecutionTabActive = activeTab === 'contratos';
 
   const effectiveFilterDimensao = useMemo(() => {
     if (filterDimensao === 'all') return 'all';
@@ -482,6 +808,139 @@ export default function Dashboard() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const { data: contratosApiAtivos = [], isLoading: isContratosApiAtivosLoading = false } = useQuery({
+    queryKey: ['dashboard-contratos-api-ativos'],
+    queryFn: async () => {
+      try {
+        return await contratosApiService.getContratosApi(true);
+      } catch {
+        return [] as ContratoApiRow[];
+      }
+    },
+    enabled: isContractExecutionTabActive,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const contratosApiAtivosIds = useMemo(
+    () => contratosApiAtivos.map((contrato) => contrato.id),
+    [contratosApiAtivos],
+  );
+
+  const contractExpensePeriod = useMemo(() => {
+    const currentYearPeriod = getCurrentYearExpensePeriod();
+    const startDate = dateStart || currentYearPeriod.startDate;
+    const endDate = dateEnd || currentYearPeriod.endDate;
+
+    if (startDate > endDate) {
+      return { startDate: endDate, endDate: startDate };
+    }
+
+    return { startDate, endDate };
+  }, [dateStart, dateEnd]);
+
+  const { data: contratosApiFaturas = [], isLoading: isContractExpenseLoading = false } = useQuery({
+    queryKey: ['dashboard-contratos-api-faturas', contratosApiAtivosIds, contractExpensePeriod.startDate, contractExpensePeriod.endDate],
+    queryFn: async () => {
+      try {
+        return await contratosApiService.getFaturasApi(contratosApiAtivosIds, {
+          dataEmissaoInicio: contractExpensePeriod.startDate,
+          dataEmissaoFim: contractExpensePeriod.endDate,
+        });
+      } catch {
+        return [] as ContratoApiFaturaRow[];
+      }
+    },
+    enabled: isContractExecutionTabActive && contratosApiAtivosIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const contractExpenseAggregation = useMemo(
+    () =>
+      buildContractExpenseAggregation(contratosApiAtivos, contratosApiFaturas, {
+        startDate: parseISO(contractExpensePeriod.startDate),
+        endDate: parseISO(contractExpensePeriod.endDate),
+      }),
+    [contratosApiAtivos, contratosApiFaturas, contractExpensePeriod],
+  );
+
+  const contractExpenseTopIds = useMemo(
+    () => contractExpenseAggregation.options.filter((option) => option.total > 0).slice(0, 5).map((option) => option.id),
+    [contractExpenseAggregation.options],
+  );
+
+  useEffect(() => {
+    const availableIds = new Set(contractExpenseAggregation.options.map((option) => option.id));
+
+    setSelectedContractExpenseIds((currentIds) => {
+      if (!contractExpenseSelectionTouched) {
+        return contractExpenseTopIds;
+      }
+
+      const filteredIds = currentIds.filter((id) => availableIds.has(id));
+      return filteredIds.length === currentIds.length ? currentIds : filteredIds;
+    });
+  }, [contractExpenseAggregation.options, contractExpenseSelectionTouched, contractExpenseTopIds]);
+
+  const selectedContractExpenseSet = useMemo(
+    () => new Set(selectedContractExpenseIds),
+    [selectedContractExpenseIds],
+  );
+
+  const selectedContractExpenseSeries = useMemo(
+    () => contractExpenseAggregation.series.filter((serie) => selectedContractExpenseSet.has(serie.contratoId)),
+    [contractExpenseAggregation.series, selectedContractExpenseSet],
+  );
+
+  const selectedContractExpenseData = useMemo(() => {
+    if (selectedContractExpenseSeries.length === 0) return [];
+
+    const selectedKeys = new Set(
+      selectedContractExpenseSeries.flatMap((serie) => [serie.executadoKey, serie.pendenteKey]),
+    );
+
+    return contractExpenseAggregation.data
+      .map((bucket) => {
+        const nextBucket: ContractExpenseDataPoint = {
+          name: bucket.name,
+          monthKey: bucket.monthKey,
+          total: 0,
+        };
+
+        selectedKeys.forEach((key) => {
+          const value = Number(bucket[key] || 0);
+          nextBucket[key] = value;
+          nextBucket.total += value;
+        });
+
+        return nextBucket;
+      })
+      .filter((bucket) => bucket.total > 0);
+  }, [contractExpenseAggregation.data, selectedContractExpenseSeries]);
+
+  const selectedContractProjectionBullets = useMemo(
+    () =>
+      buildContractProjectionBullets(
+        contratosApiAtivos,
+        contratosApiFaturas,
+        contratosApiEmpenhos,
+        selectedContractExpenseIds,
+        {
+          startDate: parseISO(contractExpensePeriod.startDate),
+          endDate: parseISO(contractExpensePeriod.endDate),
+        },
+      ),
+    [contratosApiAtivos, contratosApiFaturas, contratosApiEmpenhos, selectedContractExpenseIds, contractExpensePeriod],
+  );
+
+  const toggleContractExpenseSelection = (contratoId: string) => {
+    setContractExpenseSelectionTouched(true);
+    setSelectedContractExpenseIds((currentIds) =>
+      currentIds.includes(contratoId)
+        ? currentIds.filter((id) => id !== contratoId)
+        : [...currentIds, contratoId],
+    );
+  };
+
   const dadosMensais = useMemo(
     () =>
       buildDadosMensais(filteredData.atividades, filteredData.empenhosCorrente, liquidacoesPorEmpenho, liquidacoesApiPorEmpenho, contratosApiEmpenhos, {
@@ -656,7 +1115,7 @@ export default function Dashboard() {
     <div className="animate-fade-in space-y-6 pb-10">
       <Tabs
         value={activeTab}
-        onValueChange={(value) => setActiveTab(value as 'corrente' | 'rap')}
+        onValueChange={(value) => setActiveTab(value as 'corrente' | 'contratos' | 'rap')}
       >
         <HeaderActions>
           <div className="hidden h-9 items-center gap-2 md:flex">
@@ -665,13 +1124,19 @@ export default function Dashboard() {
                 value="corrente"
                 className="h-7 rounded-md px-3 text-[11px] font-semibold text-slate-600 transition-all data-[state=active]:bg-[#2f9e41] data-[state=active]:text-white sm:h-8 sm:px-4 sm:text-xs"
               >
-                Exercicio Atual
+                Orçamento
               </TabsTrigger>
               <TabsTrigger
                 value="rap"
                 className="h-7 rounded-md px-3 text-[11px] font-semibold text-slate-600 transition-all data-[state=active]:bg-[#2f9e41] data-[state=active]:text-white sm:h-8 sm:px-4 sm:text-xs"
               >
                 RAP
+              </TabsTrigger>
+              <TabsTrigger
+                value="contratos"
+                className="h-7 rounded-md px-3 text-[11px] font-semibold text-slate-600 transition-all data-[state=active]:bg-[#2f9e41] data-[state=active]:text-white sm:h-8 sm:px-4 sm:text-xs"
+              >
+                Contratos
               </TabsTrigger>
             </TabsList>
 
@@ -694,18 +1159,24 @@ export default function Dashboard() {
         </HeaderActions>
 
         <div className="mb-2 flex flex-col items-start gap-4 md:hidden sm:flex-row sm:items-center sm:justify-between">
-          <TabsList className="h-auto rounded-lg bg-slate-100 p-1">
+          <TabsList className="h-auto flex-wrap rounded-lg bg-slate-100 p-1">
             <TabsTrigger
               value="corrente"
               className="rounded-md px-6 py-2 text-sm font-semibold text-slate-500 transition-all hover:text-slate-900 data-[state=active]:bg-[#2f9e41] data-[state=active]:text-white data-[state=active]:shadow-sm"
             >
-              Exercicio Atual
+              Orçamento
             </TabsTrigger>
             <TabsTrigger
               value="rap"
               className="rounded-md px-6 py-2 text-sm font-semibold text-slate-500 transition-all hover:text-slate-900 data-[state=active]:bg-[#2f9e41] data-[state=active]:text-white data-[state=active]:shadow-sm"
             >
-              Restos a Pagar (RAP)
+              RAP
+            </TabsTrigger>
+            <TabsTrigger
+              value="contratos"
+              className="rounded-md px-6 py-2 text-sm font-semibold text-slate-500 transition-all hover:text-slate-900 data-[state=active]:bg-[#2f9e41] data-[state=active]:text-white data-[state=active]:shadow-sm"
+            >
+              Contratos
             </TabsTrigger>
           </TabsList>
 
@@ -726,7 +1197,7 @@ export default function Dashboard() {
           />
         </div>
 
-        {activeDimensionLabel ? (
+        {activeTab !== 'contratos' && activeDimensionLabel ? (
           <div className="mb-6 flex items-center gap-3">
             <Badge
               variant="secondary"
@@ -780,6 +1251,19 @@ export default function Dashboard() {
             rapTotalSaldoAtual={rapTotalSaldoAtual}
             filteredRapCount={filteredData.empenhosRap.length}
             dadosRapPorOrigem={dadosRapPorOrigem}
+          />
+        </TabsContent>
+
+        <TabsContent value="contratos" className="mt-0 space-y-6 border-none p-0">
+          <DashboardContractExecutionTab
+            isLoading={isLoading}
+            contractExpenseData={selectedContractExpenseData}
+            contractExpenseOptions={contractExpenseAggregation.options}
+            contractExpenseSeries={selectedContractExpenseSeries}
+            selectedContractExpenseIds={selectedContractExpenseIds}
+            contractProjectionBullets={selectedContractProjectionBullets}
+            isContractExpenseLoading={isContratosApiAtivosLoading || isContractExpenseLoading}
+            onToggleContractExpense={toggleContractExpenseSelection}
           />
         </TabsContent>
       </Tabs>

@@ -315,10 +315,15 @@ describe('ContratoApiDetailsSheet', () => {
     );
 
     expect(screen.getByText('Contrato 00062/2018')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Histórico do contrato/i })).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('button', { name: /Itens/i })).toHaveAttribute('aria-expanded', 'true');
+    const historicoSection = screen.getByRole('button', { name: /Histórico do contrato/i });
+    const itensSection = screen.getByRole('button', { name: /Itens/i });
     const faturasSection = screen.getByRole('button', { name: /Faturas associadas/i });
-    expect(faturasSection).toHaveAttribute('aria-expanded', 'true');
+    expect(historicoSection).toHaveAttribute('aria-expanded', 'false');
+    expect(itensSection).toHaveAttribute('aria-expanded', 'false');
+    expect(faturasSection).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(historicoSection);
+    fireEvent.click(itensSection);
+    fireEvent.click(faturasSection);
     expect(screen.getAllByText('Origem Reitoria').length).toBeGreaterThan(0);
     expect(screen.getByText('Histórico do contrato')).toBeInTheDocument();
     expect(screen.getByText(/Assinatura - 00158\/2021/i)).toBeInTheDocument();
@@ -352,7 +357,12 @@ describe('ContratoApiDetailsSheet', () => {
     expect(screen.queryByText('48199')).not.toBeInTheDocument();
     expect(screen.queryByText(/Qtd\. 1 \| Unit.rio R\$ 999,00/)).not.toBeInTheDocument();
     expect(screen.getByText(/não entram na execução oficial por item/i)).toBeInTheDocument();
-    fireEvent.click(faturasSection);
-    expect(faturasSection).toHaveAttribute('aria-expanded', 'false');
+    const groupByItem = screen.getByRole('tab', { name: 'Item' });
+    const groupByFatura = screen.getByRole('tab', { name: 'Fatura' });
+    expect(groupByItem).toHaveAttribute('data-state', 'active');
+    fireEvent.mouseDown(groupByFatura, { button: 0, ctrlKey: false });
+    expect(groupByFatura).toHaveAttribute('data-state', 'active');
+    expect(screen.getAllByText('Itens vinculados').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Sem item vinculado na API/i)).toBeInTheDocument();
   });
 });

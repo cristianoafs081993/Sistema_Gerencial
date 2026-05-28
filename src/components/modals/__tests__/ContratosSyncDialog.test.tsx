@@ -45,7 +45,7 @@ describe('ContratosSyncDialog', () => {
       expect(onSyncComplete).toHaveBeenCalledTimes(1);
     });
 
-    expect(await screen.findByText(/Sincronizacao solicitada com sucesso/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Sincronização solicitada com sucesso/i)).toBeInTheDocument();
     expect(screen.getByText('Contratos: 10')).toBeInTheDocument();
     expect(screen.getByText('Ativos: 6')).toBeInTheDocument();
     expect(screen.getByText('Inativos: 4')).toBeInTheDocument();
