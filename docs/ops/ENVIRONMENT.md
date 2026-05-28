@@ -66,6 +66,25 @@ Necessarias no ambiente do Supabase:
 - `OPENAI_API_KEY`
 - opcional: `OPENAI_VISION_MODEL`
 
+### `assistente-gerencial`
+
+Necessarias no ambiente do Supabase:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+
+Opcionais:
+
+- `GEMINI_ASSISTENTE_GERENCIAL_MODEL`
+  - default no codigo: `gemini-2.5-flash-lite`
+  - fallback automatico para `gemini-2.5-flash`
+
+Observacoes operacionais:
+
+- a function valida o usuario pelo JWT recebido do frontend e consulta o banco com o contexto/RLS do usuario autenticado
+- nao usa `SUPABASE_SERVICE_ROLE_KEY` para perguntas gerenciais comuns
+- `OPENAI_API_KEY` fica reservado para a fase futura de geracao de imagens, em function separada
+- `supabase/config.toml` deve manter `verify_jwt = false` para permitir que a propria function valide o token e responda CORS corretamente
+
 ### `gerar-contrato-licitacao`
 
 Necessarias no ambiente do Supabase:

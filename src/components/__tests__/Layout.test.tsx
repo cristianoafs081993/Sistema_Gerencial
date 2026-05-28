@@ -22,6 +22,10 @@ vi.mock('@/components/auth/InviteUserDialog', () => ({
   InviteUserDialog: () => <button type="button">Convidar</button>,
 }));
 
+vi.mock('@/components/ai/AIAssistantWidget', () => ({
+  AIAssistantWidget: () => <div>assistente-gerencial-widget</div>,
+}));
+
 vi.mock('@/components/ui/tooltip', () => ({
   TooltipProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   Tooltip: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -82,6 +86,18 @@ describe('Layout', () => {
     expect(mockedToast.warning).toHaveBeenCalledWith(
       'Sua conta foi criada com a senha padrão "ifrn". Recomenda-se trocar a senha no próximo acesso.',
     );
+  });
+
+  it('monta o widget global do assistente gerencial', () => {
+    render(
+      <MemoryRouter>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('assistente-gerencial-widget')).toBeInTheDocument();
   });
 
   it('mostra controle de usuarios quando a tela esta permitida', () => {

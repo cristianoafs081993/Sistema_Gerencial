@@ -1,0 +1,91 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  assistenteGerencialService,
+  buildAssistenteGerencialPayload,
+  parseAssistenteGerencialSuggestions,
+} from '@/services/assistenteGerencial';
+import { supabase } from '@/lib/supabase';
+
+vi.mock('@/lib/supabase', () => ({
+  supabase: {
+    functions: {
+      invoke: vi.fn(),
+    },
+  },
+}));
+
+const mockedInvoke = vi.mocked(supabase.functions.invoke);
+
+describe('assistenteGerencialService', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('extrai sugestoes do marcador retornado pelo modelo', () => {
+    const parsed = parseAssistenteGerencialSuggestions([
+      'Resumo curto.',
+      '',
+      '||SUGESTOES||',
+      '- Quais contratos exigem atencao?',
+      '- Quais empenhos tem maior saldo?',
+    ].join('\n'));
+
+    expect(parsed).toEqual({
+      response: 'Resumo curto.',
+      suggestions: ['Quais contratos exigem atencao?', 'Quais empenhos tem maior saldo?'],
+    });
+  });
+
+  it('monta payload sanitizado com historico limitado', () => {
+    const payload = buildAssistenteGerencialPayload({
+      message: '  Qual   o saldo?  ',
+      history: Array.from({ length: 12 }, (_, index) => ({
+        id: `msg-${index}`,
+        role: index % 2 === 0 ? 'user' : 'assistant',
+        content: `Mensagem ${index} ${'x'.repeat(2000)}`,
+      })),
+    });
+
+    expect(payload.message).toBe('Qual o saldo?');
+    expect(payload.history).toHaveLength(8);
+    expect(payload.history[0].content.startsWith('Mensagem 4')).toBe(true);
+    expect(payload.history[0].content.length).toBeLessThanOrEqual(1500);
+  });
+
+  it('chama a Edge Function e normaliza resposta', async () => {
+    mockedInvoke.mockResolvedValueOnce({
+      data: {
+        response: 'Saldo total: **R$ 10,00**',
+        suggestions: ['Detalhar por PTRES'],
+        model: 'gemini-2.5-flash-lite',
+      },
+      error: null,
+    });
+
+    const result = await assistenteGerencialService.ask({
+      message: 'saldo',
+      history: [],
+    });
+
+    expect(mockedInvoke).toHaveBeenCalledWith(
+      'assistente-gerencial',
+      expect.objectContaining({
+        body: expect.objectContaining({ message: 'saldo' }),
+      }),
+    );
+    expect(result).toEqual({
+      response: 'Saldo total: **R$ 10,00**',
+      suggestions: ['Detalhar por PTRES'],
+      model: 'gemini-2.5-flash-lite',
+      warnings: [],
+    });
+  });
+
+  it('rejeita pergunta vazia antes de chamar a function', async () => {
+    await expect(assistenteGerencialService.ask({ message: '   ' })).rejects.toThrow(
+      'Digite uma pergunta',
+    );
+    expect(mockedInvoke).not.toHaveBeenCalled();
+  });
+});

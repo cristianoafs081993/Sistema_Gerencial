@@ -18,6 +18,7 @@ import {
 import { toast } from 'sonner';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { AIAssistantWidget } from '@/components/ai/AIAssistantWidget';
 import { appScreenGroups, appScreens, type AppScreenGroupId } from '@/lib/appScreens';
 import { APP_BRAND } from '@/lib/brand';
 import { cn } from '@/lib/utils';
@@ -413,6 +414,7 @@ export function Layout({ children }: LayoutProps) {
           <div className={cn('mx-auto w-full max-w-[1600px]', isConsultor && 'max-w-none')}>{children}</div>
         </main>
       </div>
+      <AIAssistantWidget />
     </div>
   );
 }

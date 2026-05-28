@@ -95,6 +95,7 @@ Usado quando a pagina tem pipeline proprio de importacao ou consulta:
 
 Usado em modulos com IA ou integracoes externas:
 
+- [AIAssistantWidget.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/ai/AIAssistantWidget.tsx)
 - [Consultor.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Consultor.tsx)
 - [ConsultorSessions.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/ConsultorSessions.tsx)
 - [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx)
@@ -154,6 +155,17 @@ Observacoes:
 ### Dashboard
 
 `App.tsx` -> `Dashboard.tsx` -> `useData()` -> `DataContext` -> `useDataQueries` -> services -> Supabase
+
+### Assistente Gerencial IA
+
+`Layout.tsx` -> `AIAssistantWidget.tsx` -> `assistenteGerencialService` -> Edge Function `assistente-gerencial` -> Supabase + Gemini
+
+Observacoes:
+
+- o widget aparece nas rotas protegidas porque e montado dentro do `Layout`; a rota publica `/auth` nao passa por esse shell
+- o historico do widget fica em `localStorage` com chave derivada do usuario autenticado
+- a function valida o JWT recebido, consulta tabelas/views allowlisted com o mesmo token do usuario e envia ao Gemini apenas um contexto resumido
+- a v1 responde sobre dados; geracao de imagem fica reservada para uma function futura com `OPENAI_API_KEY`
 
 Observacao para a aba RAP do dashboard:
 

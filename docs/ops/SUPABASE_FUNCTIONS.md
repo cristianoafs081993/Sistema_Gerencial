@@ -47,6 +47,54 @@ Dependencias:
 - `OPENAI_API_KEY`
 - opcional `OPENAI_VISION_MODEL`
 
+### `assistente-gerencial`
+
+Local:
+
+- [assistente-gerencial/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/assistente-gerencial/index.ts)
+
+Chamador:
+
+- [assistenteGerencial.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/assistenteGerencial.ts)
+- [AIAssistantWidget.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/ai/AIAssistantWidget.tsx)
+
+Uso:
+
+- responde perguntas gerenciais sobre dados do sistema em linguagem natural
+- consulta um contexto resumido e allowlisted de orcamento, empenhos, creditos disponiveis, documentos habeis, financeiro, contratos API, PFs e conciliacao
+- valida o usuario autenticado pelo JWT recebido e usa o cliente Supabase com esse mesmo token, respeitando RLS
+
+Entrada esperada:
+
+```json
+{
+  "message": "Quais empenhos tem maior saldo?",
+  "history": [{ "role": "user", "content": "Resumo da execucao" }]
+}
+```
+
+Saida:
+
+```json
+{
+  "response": "Resposta em Markdown simples.",
+  "suggestions": ["Proxima pergunta"],
+  "warnings": [],
+  "model": "gemini-2.5-flash-lite"
+}
+```
+
+Dependencias:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional `GEMINI_ASSISTENTE_GERENCIAL_MODEL`
+
+Observacao:
+
+- publicada com `verify_jwt = false`, pois a validacao do token acontece dentro da propria function
+- nao usa service role na v1
+- a geracao de imagens deve ficar em function separada usando `OPENAI_API_KEY`
+
 ### `gerar-contrato-licitacao`
 
 Local:

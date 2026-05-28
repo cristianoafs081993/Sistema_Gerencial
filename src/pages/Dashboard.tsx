@@ -173,6 +173,9 @@ const getContractExpenseLabel = (contrato: Pick<ContratoApiRow, 'numero' | 'forn
   return contrato.objeto ? `${contrato.objeto} - ${contrato.numero}` : contrato.numero;
 };
 
+const areStringArraysEqual = (left: string[], right: string[]) =>
+  left.length === right.length && left.every((value, index) => value === right[index]);
+
 const isDateInsideOptionalRange = (date: Date, startDate?: Date | null, endDate?: Date | null) => {
   if (startDate && date < startOfDay(startDate)) return false;
   if (endDate && date > endOfDay(endDate)) return false;
@@ -873,7 +876,7 @@ export default function Dashboard() {
 
     setSelectedContractExpenseIds((currentIds) => {
       if (!contractExpenseSelectionTouched) {
-        return contractExpenseTopIds;
+        return areStringArraysEqual(currentIds, contractExpenseTopIds) ? currentIds : contractExpenseTopIds;
       }
 
       const filteredIds = currentIds.filter((id) => availableIds.has(id));

@@ -376,6 +376,34 @@ Status:
 - as conversas do frontend ficam em `localStorage` com chave derivada do usuario autenticado, evitando compartilhar historico entre contas no mesmo navegador
 - o backlog de ingestao dos normativos que alimentam a base semantica fica em [NORMATIVOS_CONSULTOR_INGESTION.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/integrations/NORMATIVOS_CONSULTOR_INGESTION.md)
 
+## 6B. Edge Function `assistente-gerencial`
+
+Uso:
+
+- widget global de perguntas gerenciais sobre dados do sistema
+- responde sobre orcamento, empenhos, creditos disponiveis, documentos habeis, financeiro, contratos API, PFs e conciliacao a partir de contexto allowlisted e resumido
+- nao substitui o `consultor`, que continua juridico/normativo
+
+Chamador:
+
+- [AIAssistantWidget.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/ai/AIAssistantWidget.tsx)
+- [assistenteGerencial.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/assistenteGerencial.ts)
+
+Implementacao no repo:
+
+- [assistente-gerencial/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/assistente-gerencial/index.ts)
+
+Dependencias externas:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional `GEMINI_ASSISTENTE_GERENCIAL_MODEL`
+
+Observacao:
+
+- o frontend chama `supabase.functions.invoke('assistente-gerencial')`, deixando o `supabase-js` enviar o JWT da sessao
+- a function valida o usuario com `supabase.auth.getUser()` e consulta dados com o token do proprio usuario, respeitando RLS
+- `OPENAI_API_KEY` fica reservado para a fase futura de geracao de imagens em function separada
+
 ## 7. Edge Function `verificar-conformidade`
 
 Uso:
