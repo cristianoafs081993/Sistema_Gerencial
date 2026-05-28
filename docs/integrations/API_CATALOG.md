@@ -208,7 +208,7 @@ Observacao:
 
 Uso:
 
-- lista operacional de pregoes por qualquer UASG, periodo e objeto especifico
+- lista operacional de pregoes por qualquer UASG, periodo, objeto especifico e item PNCP materializado
 - base futura para preenchimento de metadados em artefatos de licitacao
 
 Fonte primaria:
@@ -219,17 +219,21 @@ Endpoints PNCP usados:
 
 - `/v1/contratacoes/publicacao`
 - `/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}`
+- `/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}/itens`
 
 Parametros operacionais:
 
-- UASG inicial da tela: `158366`
+- UASG inicial da tela: vazia; a lista e a busca padrao usam o CNPJ institucional para cobrir todas as UASGs IFRN publicadas
 - CNPJ da consulta PNCP: resolvido primeiro pelo catalogo interno IFRN em `IFRN_UASG_CATALOG`; para UASGs fora do catalogo, a function usa Dados Abertos Compras.gov.br; `LICITACOES_PNCP_CNPJ=10877412000168` fica apenas como default operacional
 - UASGs IFRN em cache interno: `152711`, `152756`, `152757`, `154582`, `154838`, `154839`, `154840`, `158155`, `158365`, `158366`, `158367`, `158368`, `158369`, `158370`, `158371`, `158372`, `158373`, `158374`, `158375`
 - pregao eletronico: `codigoModalidadeContratacao = 6`
 - datas PNCP em `yyyyMMdd`
 - janela maxima de consulta: 365 dias
+- a consulta institucional sem `codigoUnidadeAdministrativa` envia apenas o CNPJ IFRN e descobre todas as UASGs publicadas no periodo
 - quando `codigoUnidadeAdministrativa` e enviado, o PNCP tambem exige `cnpj`; por isso a function usa o catalogo interno ou chama `/modulo-uasg/1_consultarUasg` para descobrir o CNPJ da UASG antes da consulta PNCP
+- o endpoint de publicacao nao recebe `tamanhoPagina`; enviar esse parametro produz `HTTP 400`
 - o endpoint PNCP de publicacao e usado para UASG/data/modalidade; busca textual por objeto fica como filtro local sobre os dados retornados/materializados
+- o endpoint PNCP de itens e chamado sob demanda quando `itemBusca` e enviado; os itens retornados sao gravados em `licitacoes_pncp.raw_data.itens` para permitir pesquisa local posterior sem obrigar clique no drawer
 
 Fonte secundaria best-effort:
 

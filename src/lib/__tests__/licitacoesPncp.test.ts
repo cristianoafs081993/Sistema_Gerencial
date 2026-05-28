@@ -6,8 +6,11 @@ import {
   IFRN_UASG_CATALOG,
   buildComprasGovCompraKey,
   buildPncpCompraUrl,
+  buildPncpItemsUrl,
+  buildPncpPublicationUrl,
   mapPncpCompra,
   normalizePncpDate,
+  pncpCompraMatchesItemSearch,
   splitPncpDateRange,
 } from '@/lib/licitacoesPncp';
 
@@ -70,6 +73,47 @@ describe('licitacoesPncp helpers', () => {
       'https://pncp.gov.br/app/editais/10877412000168/2025/198',
     );
     expect(buildComprasGovCompraKey('158366', 6, '90001', 2025)).toBe('15836605900012025');
+  });
+
+  it('monta consulta institucional sem limitar UASG nem enviar tamanho de pagina rejeitado', () => {
+    const institutionalUrl = buildPncpPublicationUrl({
+      cnpj: IFRN_CNPJ,
+      dataInicial: '20250401',
+      dataFinal: '20250430',
+      modalidadeId: 6,
+      pagina: 1,
+    });
+    const campusUrl = buildPncpPublicationUrl({
+      cnpj: IFRN_CNPJ,
+      unidadeCodigo: '158366',
+      dataInicial: '20250401',
+      dataFinal: '20250430',
+      modalidadeId: 6,
+      pagina: 1,
+    });
+
+    expect(institutionalUrl).toContain('cnpj=10877412000168');
+    expect(institutionalUrl).not.toContain('codigoUnidadeAdministrativa');
+    expect(institutionalUrl).not.toContain('tamanhoPagina');
+    expect(campusUrl).toContain('codigoUnidadeAdministrativa=158366');
+  });
+
+  it('monta endpoint de itens e compara termo normalizado no payload de itens', () => {
+    expect(buildPncpItemsUrl({
+      cnpj: IFRN_CNPJ,
+      anoCompra: 2025,
+      sequencialCompra: 198,
+      pagina: 1,
+      tamanhoPagina: 100,
+    })).toBe('https://pncp.gov.br/api/consulta/v1/orgaos/10877412000168/compras/2025/198/itens?pagina=1&tamanhoPagina=100');
+
+    expect(pncpCompraMatchesItemSearch({
+      itens: [
+        { numeroItem: 1, descricao: 'Serviço de manutenção predial' },
+        { numeroItem: 2, descricao: 'Computador portátil' },
+      ],
+    }, 'manutencao')).toBe(true);
+    expect(pncpCompraMatchesItemSearch({ itens: [{ descricao: 'Cadeiras' }] }, 'notebook')).toBe(false);
   });
 
   it('mantem catalogo interno de UASGs IFRN com CNPJ para sincronizacao', () => {

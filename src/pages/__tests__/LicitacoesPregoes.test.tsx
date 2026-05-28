@@ -92,7 +92,18 @@ const licitacao = {
   informacaoComplementar: 'Retirada do edital nos portais oficiais.',
   linkSistemaOrigem: 'https://compras.gov.br/compra',
   linkProcessoEletronico: null,
-  rawData: {},
+  rawData: {
+    itens: [
+      {
+        numeroItem: 1,
+        descricao: 'Óleo diesel S10 para frota oficial',
+        quantidade: 1000,
+        unidadeMedida: 'Litro',
+        valorUnitarioEstimado: 6.2,
+        valorTotal: 6200,
+      },
+    ],
+  },
   comprasGovData: {},
   updatedAt: '2026-05-04T12:00:00.000Z',
 };
@@ -135,30 +146,38 @@ describe('LicitacoesPregoes', () => {
     });
   });
 
-  it('lista pregoes e abre drawer de detalhes', async () => {
+  it('lista pregoes de todas as UASGs por padrao e abre drawer de detalhes', async () => {
     renderPage();
 
     expect(await screen.findByText('Servicos de combustiveis para o campus')).toBeInTheDocument();
     expect(screen.getByText('10877412000168-1-000198/2025')).toBeInTheDocument();
+    expect(mockedService.list).toHaveBeenCalledWith(expect.objectContaining({
+      uasgCodigo: undefined,
+    }));
+    expect(screen.queryByText('Pregões IFRN')).not.toBeInTheDocument();
+    expect(screen.queryByText('Abertas na página')).not.toBeInTheDocument();
+    expect(mockedService.getLastSyncRun).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: /Detalhar/i }));
 
     expect(await screen.findByText('Retirada do edital nos portais oficiais.')).toBeInTheDocument();
     expect(screen.getByText('Lei 14.133/2021, Art. 28, I')).toBeInTheDocument();
+    expect(screen.getByText('Itens PNCP')).toBeInTheDocument();
+    expect(screen.getByText('Óleo diesel S10 para frota oficial')).toBeInTheDocument();
   });
 
-  it('busca no PNCP pela UASG e periodo informados', async () => {
+  it('busca no PNCP por todo o IFRN quando nenhuma UASG e informada', async () => {
     renderPage();
 
-    expect(await screen.findByRole('button', { name: /Buscar PNCP/i })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Buscar PNCP/i }));
+    expect(await screen.findByRole('button', { name: /Buscar no PNCP/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Buscar no PNCP/i }));
 
     await waitFor(() => {
       expect(mockedService.sync).toHaveBeenCalledWith(expect.objectContaining({
-        unidadeCodigos: ['158366'],
         source: 'frontend-search',
       }));
     });
+    expect(mockedService.sync.mock.calls[0][0]).not.toHaveProperty('unidadeCodigos');
   });
 
   it('permite sincronizar UASG digitada com filtro de objeto', async () => {
@@ -170,7 +189,7 @@ describe('LicitacoesPregoes', () => {
     fireEvent.change(screen.getByLabelText('Objeto especifico'), {
       target: { value: 'energia eletrica' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /Buscar PNCP/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Buscar no PNCP/i }));
 
     await waitFor(() => {
       expect(mockedService.sync).toHaveBeenCalledWith(expect.objectContaining({
@@ -178,6 +197,25 @@ describe('LicitacoesPregoes', () => {
         objetoBusca: 'energia eletrica',
       }));
     });
+  });
+
+  it('permite sincronizar e filtrar por item do PNCP', async () => {
+    renderPage();
+
+    fireEvent.change(await screen.findByLabelText('Item no PNCP'), {
+      target: { value: 'diesel' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Buscar no PNCP/i }));
+
+    await waitFor(() => {
+      expect(mockedService.sync).toHaveBeenCalledWith(expect.objectContaining({
+        itemBusca: 'diesel',
+        source: 'frontend-search',
+      }));
+    });
+    expect(mockedService.list).toHaveBeenCalledWith(expect.objectContaining({
+      itemBusca: 'diesel',
+    }));
   });
 
   it('sincroniza catalogo interno de UASGs IFRN no periodo atual', async () => {

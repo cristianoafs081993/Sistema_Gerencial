@@ -1,21 +1,23 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 
 import {
-  DEFAULT_PNCP_UASGS,
   DEFAULT_PNCP_UASG,
   IFRN_UASG_CATALOG,
   IFRN_CNPJ,
   PREGAO_ELETRONICO_MODALIDADE_ID,
+  buildPncpItemsUrl,
+  buildPncpPublicationUrl,
   mapPncpCompra,
   normalizePncpDate,
+  pncpCompraMatchesItemSearch,
   splitPncpDateRange,
   type LicitacaoPncpPayload,
   type PncpCompraRaw,
+  type PncpItemRaw,
 } from '../../../src/lib/licitacoesPncp.ts';
 
 const PNCP_API_BASE = 'https://pncp.gov.br/api/consulta';
 const COMPRAS_DADOS_ABERTOS_BASE = 'https://dadosabertos.compras.gov.br';
-const DEFAULT_PAGE_SIZE = 50;
 const DEFAULT_LOOKBACK_DAYS = 364;
 const PNCP_PAGE_TIMEOUT_MS = 120000;
 const PNCP_DETAIL_TIMEOUT_MS = 60000;
@@ -37,11 +39,19 @@ type SyncRequest = {
   modalidadeId?: number;
   source?: string;
   objetoBusca?: string;
+  itemBusca?: string;
   enrichUasgs?: boolean;
 };
 
 type PncpPage = {
   data?: PncpCompraRaw[];
+  totalPaginas?: number;
+  paginasRestantes?: number;
+};
+
+type PncpItemsPage = {
+  data?: PncpItemRaw[];
+  itens?: PncpItemRaw[];
   totalPaginas?: number;
   paginasRestantes?: number;
 };
@@ -60,7 +70,7 @@ type ComprasUasgRow = {
 };
 
 type UnidadeContext = {
-  unidadeCodigo: string;
+  unidadeCodigo: string | null;
   cnpj: string;
   uasgData: ComprasUasgRow | null;
 };
@@ -132,18 +142,11 @@ function defaultDateRange() {
 }
 
 function normalizeUnidadeCodigos(body: SyncRequest) {
-  const configured = Deno.env.get('LICITACOES_PNCP_UASGS')
-    ?.split(',')
-    .map((value) => value.trim())
-    .filter(Boolean);
-
   const requested = body.unidadeCodigos?.length
     ? body.unidadeCodigos
     : body.unidadeCodigo
       ? [body.unidadeCodigo]
-      : configured?.length
-        ? configured
-        : DEFAULT_PNCP_UASGS;
+      : [];
 
   return Array.from(new Set(requested.map((value) => String(value ?? '').trim()).filter(Boolean)));
 }
@@ -261,24 +264,14 @@ async function upsertInChunks(
 
 async function fetchPncpPage(params: {
   cnpj: string;
-  unidadeCodigo: string;
+  unidadeCodigo?: string | null;
   dataInicial: string;
   dataFinal: string;
   modalidadeId: number;
   pagina: number;
 }) {
-  const search = new URLSearchParams({
-    dataInicial: params.dataInicial,
-    dataFinal: params.dataFinal,
-    codigoModalidadeContratacao: String(params.modalidadeId),
-    cnpj: params.cnpj,
-    codigoUnidadeAdministrativa: params.unidadeCodigo,
-    pagina: String(params.pagina),
-    tamanhoPagina: String(DEFAULT_PAGE_SIZE),
-  });
-
   return fetchJsonWithRetry<PncpPage>(
-    `${PNCP_API_BASE}/v1/contratacoes/publicacao?${search.toString()}`,
+    buildPncpPublicationUrl(params),
     PNCP_PAGE_TIMEOUT_MS,
     2,
   );
@@ -297,6 +290,65 @@ async function fetchPncpDetail(cnpj: string, compra: PncpCompraRaw) {
   } catch {
     return compra;
   }
+}
+
+function getPncpItemsFromPage(page: PncpItemsPage | PncpItemRaw[] | null) {
+  if (!page) return [];
+  if (Array.isArray(page)) return page;
+  if (Array.isArray(page.data)) return page.data;
+  if (Array.isArray(page.itens)) return page.itens;
+  return [];
+}
+
+async function fetchPncpItemsPage(params: {
+  cnpj: string;
+  anoCompra: number;
+  sequencialCompra: number;
+  pagina: number;
+}) {
+  const withPageSize = buildPncpItemsUrl({
+    ...params,
+    tamanhoPagina: 100,
+  });
+
+  try {
+    return await fetchJsonWithRetry<PncpItemsPage | PncpItemRaw[]>(
+      withPageSize,
+      PNCP_DETAIL_TIMEOUT_MS,
+      2,
+    );
+  } catch (error) {
+    if (!/API 400/i.test(errorToMessage(error))) throw error;
+    return fetchJsonWithRetry<PncpItemsPage | PncpItemRaw[]>(
+      buildPncpItemsUrl(params),
+      PNCP_DETAIL_TIMEOUT_MS,
+      2,
+    );
+  }
+}
+
+async function fetchPncpItems(cnpj: string, compra: PncpCompraRaw) {
+  const anoCompra = Number(compra.anoCompra);
+  const sequencialCompra = Number(compra.sequencialCompra);
+  if (!anoCompra || !sequencialCompra) return [];
+
+  const items: PncpItemRaw[] = [];
+  let pagina = 1;
+  let totalPaginas = 1;
+
+  do {
+    const page = await fetchPncpItemsPage({ cnpj, anoCompra, sequencialCompra, pagina });
+    items.push(...getPncpItemsFromPage(page));
+
+    if (page && !Array.isArray(page)) {
+      totalPaginas = page.totalPaginas ?? (page.paginasRestantes ? pagina + page.paginasRestantes : pagina);
+    } else {
+      totalPaginas = pagina;
+    }
+    pagina += 1;
+  } while (pagina <= totalPaginas);
+
+  return items;
 }
 
 async function fetchComprasUasg(unidadeCodigo: string) {
@@ -402,6 +454,10 @@ async function resolveUnidadeContexts(params: {
   defaultCnpj: string;
   errors: Array<{ scope: string; message: string }>;
 }) {
+  if (params.unidadeCodigos.length === 0) {
+    return [{ unidadeCodigo: null, cnpj: params.requestedCnpj || params.defaultCnpj, uasgData: null }];
+  }
+
   const uasgRows = await mapWithConcurrency(params.unidadeCodigos, fetchComprasUasg, 3);
   const contexts: UnidadeContext[] = [];
 
@@ -431,7 +487,7 @@ async function resolveUnidadeContexts(params: {
 
 async function collectPncpCompras(params: {
   cnpj: string;
-  unidadeCodigo: string;
+  unidadeCodigo?: string | null;
   dataInicial: string;
   dataFinal: string;
   modalidadeId: number;
@@ -460,6 +516,7 @@ async function runSync(supabase: SupabaseClient, body: SyncRequest) {
   const dataFinal = normalizePncpDate(body.dataFinal ?? defaults.dataFinal);
   const modalidadeId = Number(body.modalidadeId ?? PREGAO_ELETRONICO_MODALIDADE_ID);
   const objetoBusca = body.objetoBusca?.trim() || undefined;
+  const itemBusca = body.itemBusca?.trim() || undefined;
   const windows = splitPncpDateRange(dataInicial, dataFinal);
   const errors: Array<{ scope: string; message: string }> = [];
   const unidadeContexts = await resolveUnidadeContexts({
@@ -478,12 +535,14 @@ async function runSync(supabase: SupabaseClient, body: SyncRequest) {
       data_inicial: `${dataInicial.slice(0, 4)}-${dataInicial.slice(4, 6)}-${dataInicial.slice(6, 8)}`,
       data_final: `${dataFinal.slice(0, 4)}-${dataFinal.slice(4, 6)}-${dataFinal.slice(6, 8)}`,
       modalidade_id: modalidadeId,
-      total_windows: windows.length * unidadeCodigos.length,
+      total_windows: windows.length * unidadeContexts.length,
       details: {
         source: body.source ?? 'manual',
         enrichUasgs: body.enrichUasgs !== false,
         objetoBusca,
-        resolvedCnpjs: Object.fromEntries(unidadeContexts.map((context) => [context.unidadeCodigo, context.cnpj])),
+        itemBusca,
+        scope: unidadeCodigos.length ? 'uasgs' : 'cnpj',
+        resolvedCnpjs: Object.fromEntries(unidadeContexts.map((context) => [context.unidadeCodigo ?? 'cnpj', context.cnpj])),
       },
     })
     .select('id')
@@ -514,7 +573,7 @@ async function runSync(supabase: SupabaseClient, body: SyncRequest) {
           listRows.push(...rows.map((row) => ({ cnpj: context.cnpj, row })));
         } catch (error) {
           errors.push({
-            scope: `${context.unidadeCodigo}:${window.dataInicial}-${window.dataFinal}`,
+            scope: `${context.unidadeCodigo ?? 'cnpj'}:${window.dataInicial}-${window.dataFinal}`,
             message: errorToMessage(error),
           });
         }
@@ -529,13 +588,25 @@ async function runSync(supabase: SupabaseClient, body: SyncRequest) {
 
     const detailedRows = await mapWithConcurrency(
       Array.from(uniqueByNumeroControle.values()),
-      async (item) => ({
-        cnpj: item.cnpj,
-        row: await fetchPncpDetail(item.cnpj, item.row),
-      }),
+      async (item) => {
+        const detail = await fetchPncpDetail(item.cnpj, item.row);
+        if (!itemBusca) return { cnpj: item.cnpj, row: detail };
+
+        const itens = await fetchPncpItems(item.cnpj, detail).catch(() => []);
+        return {
+          cnpj: item.cnpj,
+          row: {
+            ...detail,
+            itens,
+          },
+        };
+      },
       4,
     );
-    const matchedRows = detailedRows.filter((item) => matchesObjetoBusca(item.row, objetoBusca));
+    const matchedRows = detailedRows.filter((item) => (
+      matchesObjetoBusca(item.row, objetoBusca)
+      && pncpCompraMatchesItemSearch(item.row, itemBusca)
+    ));
 
     const payloadRows: Array<LicitacaoPncpPayload & { sync_run_id: string }> = [];
     for (const item of matchedRows) {
@@ -576,8 +647,10 @@ async function runSync(supabase: SupabaseClient, body: SyncRequest) {
           uniqueRows: uniqueByNumeroControle.size,
           matchedRows: matchedRows.length,
           objetoBusca,
+          itemBusca,
           unidadeCodigos,
-          resolvedCnpjs: Object.fromEntries(unidadeContexts.map((context) => [context.unidadeCodigo, context.cnpj])),
+          scope: unidadeCodigos.length ? 'uasgs' : 'cnpj',
+          resolvedCnpjs: Object.fromEntries(unidadeContexts.map((context) => [context.unidadeCodigo ?? 'cnpj', context.cnpj])),
           windows,
         },
       })

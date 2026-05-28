@@ -2,6 +2,8 @@ export const IFRN_CNPJ = '10877412000168';
 export const DEFAULT_PNCP_UASG = '158366';
 export const PREGAO_ELETRONICO_MODALIDADE_ID = 6;
 export const PNCP_MAX_WINDOW_DAYS = 365;
+export const PNCP_PUBLICATION_ENDPOINT = 'https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao';
+export const PNCP_ITEMS_ENDPOINT_BASE = 'https://pncp.gov.br/api/consulta/v1/orgaos';
 
 export type PncpUasgCatalogItem = {
   codigo: string;
@@ -36,6 +38,7 @@ export const IFRN_UASG_CATALOG: PncpUasgCatalogItem[] = [
 export const DEFAULT_PNCP_UASGS = IFRN_UASG_CATALOG.map((item) => item.codigo);
 
 export type PncpCompraRaw = Record<string, unknown>;
+export type PncpItemRaw = Record<string, unknown>;
 
 type UnidadeOrgao = {
   codigoUnidade?: unknown;
@@ -190,6 +193,68 @@ export function splitPncpDateRange(dataInicial: string, dataFinal: string, maxDa
 
 export function buildPncpCompraUrl(cnpj: string, anoCompra: number, sequencialCompra: number) {
   return `https://pncp.gov.br/app/editais/${cnpj}/${anoCompra}/${sequencialCompra}`;
+}
+
+export function buildPncpPublicationUrl(params: {
+  cnpj: string;
+  unidadeCodigo?: string | null;
+  dataInicial: string;
+  dataFinal: string;
+  modalidadeId: number;
+  pagina: number;
+}) {
+  const search = new URLSearchParams({
+    dataInicial: params.dataInicial,
+    dataFinal: params.dataFinal,
+    codigoModalidadeContratacao: String(params.modalidadeId),
+    cnpj: params.cnpj,
+    pagina: String(params.pagina),
+  });
+
+  if (params.unidadeCodigo) {
+    search.set('codigoUnidadeAdministrativa', params.unidadeCodigo);
+  }
+
+  return `${PNCP_PUBLICATION_ENDPOINT}?${search.toString()}`;
+}
+
+export function buildPncpItemsUrl(params: {
+  cnpj: string;
+  anoCompra: number;
+  sequencialCompra: number;
+  pagina?: number;
+  tamanhoPagina?: number;
+}) {
+  const search = new URLSearchParams();
+  if (params.pagina) search.set('pagina', String(params.pagina));
+  if (params.tamanhoPagina) search.set('tamanhoPagina', String(params.tamanhoPagina));
+
+  const query = search.toString();
+  const path = `${PNCP_ITEMS_ENDPOINT_BASE}/${params.cnpj}/compras/${params.anoCompra}/${params.sequencialCompra}/itens`;
+  return query ? `${path}?${query}` : path;
+}
+
+export function normalizePncpSearchText(value: unknown) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
+export function pncpItemMatchesSearch(item: PncpItemRaw, search?: string) {
+  const needle = normalizePncpSearchText(search);
+  if (!needle) return true;
+  return normalizePncpSearchText(JSON.stringify(item)).includes(needle);
+}
+
+export function pncpCompraMatchesItemSearch(raw: PncpCompraRaw, itemBusca?: string) {
+  const needle = normalizePncpSearchText(itemBusca);
+  if (!needle) return true;
+
+  const itens = raw.itens;
+  if (!Array.isArray(itens)) return false;
+  return itens.some((item) => pncpItemMatchesSearch(asRecord(item), needle));
 }
 
 function toComprasGovModalidadeCodigo(modalidadeId: number) {

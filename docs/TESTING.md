@@ -40,7 +40,9 @@ Pregoes via PNCP:
 - helpers devem cobrir normalizacao de `numeroControlePNCP`, UASG, datas e valores do payload PNCP
 - helpers devem cobrir o catalogo interno de UASGs IFRN com CNPJ e aliases compartilhados por uma mesma UASG
 - a divisao de periodos deve garantir janelas de ate 365 dias
-- a UI deve testar lista, drawer de detalhes, UASG digitada, filtro de objeto, botao `Buscar PNCP` e botao `Sincronizar UASGs IFRN`
+- a montagem da consulta institucional deve manter o CNPJ IFRN sem restringir UASG e sem enviar `tamanhoPagina`, rejeitado pelo PNCP
+- helpers devem cobrir a URL de itens PNCP e a correspondencia textual normalizada em `raw_data.itens`
+- a UI deve testar lista institucional inicial sem card de resumo, drawer de detalhes com itens materializados, UASG digitada, filtro de objeto, filtro de item, botao `Buscar no PNCP` e botao `Sincronizar UASGs IFRN`
 - a navegacao deve manter `/licitacoes-pregoes` como tela de producao acessivel ao grupo `Diretores`
 
 Atas e ARP:

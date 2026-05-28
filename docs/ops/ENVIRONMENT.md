@@ -261,11 +261,8 @@ Opcionais:
 
 - `LICITACOES_PNCP_SYNC_SECRET`
   - se configurada, chamadas HTTP precisam enviar o header `x-licitacoes-pncp-sync-secret`
-- `LICITACOES_PNCP_UASGS`
-  - lista separada por virgula de UASGs sincronizadas por padrao
-  - default no codigo: catalogo interno IFRN com `152711`, `152756`, `152757`, `154582`, `154838`, `154839`, `154840`, `158155`, `158365`, `158366`, `158367`, `158368`, `158369`, `158370`, `158371`, `158372`, `158373`, `158374`, `158375`
 - `LICITACOES_PNCP_CNPJ`
-  - CNPJ fallback usado apenas quando a UASG nao estiver no catalogo interno e nao puder ser resolvida no Compras.gov.br
+  - CNPJ institucional usado na sincronizacao geral e como fallback para buscas dirigidas
   - default no codigo: `10877412000168`
 
 Pre-requisitos no banco:
@@ -277,7 +274,8 @@ Observacoes operacionais:
 
 - `supabase/config.toml` deve manter `verify_jwt = false` para `sync-licitacoes-pncp`, pois a chamada periodica vem do cron
 - o PNCP exige datas `yyyyMMdd` e periodo de ate 365 dias por chamada; a function divide janelas maiores automaticamente
-- a chamada manual do frontend exige a UASG digitada no filtro; a function descobre o CNPJ dessa UASG pelo catalogo interno IFRN ou via Compras.gov.br antes de consultar o PNCP
+- a chamada sem UASG do frontend e do cron consulta todas as unidades publicadas para o CNPJ institucional; quando o filtro informa UASG, a function descobre seu CNPJ pelo catalogo interno IFRN ou via Compras.gov.br antes de consultar o PNCP
+- o endpoint PNCP de publicacao rejeita `tamanhoPagina`; esse parametro nao deve ser enviado
 - `objetoBusca` pode reduzir a materializacao ao objeto informado
 
 ### `sync-atas-registro-precos`
