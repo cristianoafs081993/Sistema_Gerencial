@@ -204,6 +204,35 @@ Observacao:
 - quando houver `dados_item_faturado`, o drawer deve exibir tambem `quantidade_faturado` e `valor_unitario_faturado` na linha da fatura
 - a tela de contratos usa a lista sincronizada de `contratos_api` filtrada por `situacao_derivada`; dados locais de `contratos` e `contratos_empenhos` servem apenas como complemento para favoritos, CNPJ e saldos locais quando houver match por numero normalizado
 
+## 4A. Supabase Database para Energia Campus
+
+Uso:
+
+- painel `/energia` e rotas filhas de COSERN, Mercatto, geração solar, contratos, financeiro e ESG
+- persistência da planilha XLSX `Levantamento de Consumo - COSERN.xlsx`
+
+Service:
+
+- [energiaCampusService.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/energiaCampusService.ts)
+
+Persistencia local:
+
+- `energia_import_runs`
+- `energia_consumo_faturas`
+- `energia_solar_geracao`
+- `energia_contratos`
+- `energia_contrato_execucoes`
+- `contratos_api`
+- `contratos_api_faturas`
+- `contratos_api_empenho_liquidacoes_cache`
+
+Observacao:
+
+- não há Edge Function nova neste corte
+- leitura é liberada para usuarios autenticados
+- escrita é restrita ao superadministrador por RLS
+- Mercatto usa kWh real quando a coluna L da aba `Consumo` indica ambiente livre; na Visão Geral, contratos, faturas e liquidacoes do modulo de contratos também podem alimentar kWh estimado pela tarifa média conhecida quando não houver kWh direto no período
+
 ## 4B. PNCP e Dados Abertos Compras.gov.br para Pregoes
 
 Uso:

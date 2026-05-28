@@ -221,6 +221,21 @@ Mostrar a linhagem operacional dos dados de forma curta:
     - `documentos_habeis_itens`
     - `documentos_habeis`
 
+### Energia Campus
+
+- planilha `Levantamento de Consumo - COSERN.xlsx`
+  - parser: [energiaCampusService.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/energiaCampusService.ts)
+  - métricas: [energyMetrics.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/utils/energyMetrics.ts)
+  - tabelas:
+    - `energia_import_runs`
+    - `energia_consumo_faturas`
+    - `energia_solar_geracao`
+    - `energia_contratos`
+    - `energia_contrato_execucoes`
+  - pagina: [EnergiaCampus.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/energia/EnergiaCampus.tsx)
+- observacao: a geração solar mensal é extraída das tabelas laterais `Período - AAAA` / `Geração (kwh)` na aba `Consumo`, além das bases anuais em `UFV's`.
+- observacao: Mercatto usa kWh real quando a coluna L da aba `Consumo` estiver preenchida no periodo do ambiente livre. Na Visão Geral, quando o período não tiver kWh direto de Mercatto, `contratos_api_faturas` ou `contratos_api_empenho_liquidacoes_cache` podem alimentar kWh estimado pela tarifa média conhecida para exibir o contrato Mercatto nos KPIs e gráficos. Linhas de previsão sem base de kWh ou valor continuam como `N/D`.
+
 ### Retencoes FD-Reinf
 
 - arquivo CSV de auditoria

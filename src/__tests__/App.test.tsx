@@ -91,6 +91,10 @@ vi.mock('@/pages/EditorDocumentos', () => ({
   default: () => <div>editor-page</div>,
 }));
 
+vi.mock('@/pages/energia/EnergiaCampus', () => ({
+  default: () => <div>energia-page</div>,
+}));
+
 vi.mock('@/pages/ConsultorSessions', () => ({
   default: () => <div>consultor-page</div>,
 }));
@@ -178,6 +182,14 @@ describe('App routes', () => {
     render(<App />);
 
     expect(await screen.findByText('economia-tempo-page')).toBeInTheDocument();
+  });
+
+  it('renderiza as rotas do painel de energia', async () => {
+    window.history.pushState({}, '', '/energia/geracao-solar');
+
+    render(<App />);
+
+    expect(await screen.findByText('energia-page')).toBeInTheDocument();
   });
 
   it('renderiza a pagina not found para rota desconhecida', async () => {

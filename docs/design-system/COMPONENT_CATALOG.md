@@ -56,6 +56,7 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 - `CreditoDisponivel`: pagina operacional que combina `StatCard`, `FilterPanel`, `DataTablePanel` e `TablePagination` para leitura do saldo por PTRES/PI e importacao CSV no header.
 - `ContratoApiDetailsSheet`: drawer lateral de detalhes de contratos API com resumo visual no topo e secoes em `Accordion`, fechadas inicialmente; faturas permitem alternar o agrupamento por item ou por fatura.
 - `DashboardContractExecutionTab`: aba analitica dedicada a contratos no dashboard, com seletor global por bolhas clicaveis, grafico mensal de faturas e bullet chart de projecao anual frente ao empenhado com hover de rastreabilidade.
+- `EnergiaCampus`: pagina analitica-operacional que combina `StatCard`, `ChartPanel`, `SectionPanel`, `DataTablePanel`, filtros no `HeaderActions` e upload XLSX restrito a superadmin.
 - `Layout`: sidebar global compacta com campo de busca visual, grupos expansivos, submenus expansivos, indicador ativo lateral e drawer mobile.
 
 ## Regra pratica

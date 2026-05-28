@@ -54,6 +54,7 @@ Aplicacao atual:
 - `/artefatos-licitacao` usa resumo por tipo, filtros compactos e tabela operacional para consulta de ETP, Mapa de Risco, Termo de Referencia e Minuta de Contrato. Acoes de linha devem permanecer iconicas e alinhadas a direita.
 - `/licitacoes-pregoes` usa resumo operacional, filtros compactos, tabela paginada e drawer de detalhe para consulta de pregoes PNCP por UASG. A sincronizacao manual fica no header e aparece somente para superadmin.
 - `/credito-disponivel` usa KPIs, filtros compactos e tabela paginada para consultar saldo por PTRES/PI, exibindo apenas linhas com saldo por padrao e sem expor o nome do arquivo importado. A importacao CSV fica no header e aparece somente para superadmin.
+- `/energia` usa filtros de periodo/fonte no header, KPIs com `StatCard`, graficos com `ChartPanel`, blocos metodologicos com `SectionPanel` e tabelas de detalhe com `DataTablePanel`; o upload XLSX aparece somente para superadmin.
 
 ## Padrao 3: importacao de arquivo
 
@@ -76,7 +77,10 @@ Estrutura:
 
 O dashboard preserva a paleta anterior para leitura analitica: azul para planejado/series base, verde para pago/naturezas, roxo para empenhado, amber para etapas intermediarias e cores complementares em barras empilhadas.
 
-O dashboard usa as abas `Orçamento`, `RAP` e `Contratos`, nessa ordem. A aba `Contratos` usa uma faixa de controle no topo com bolhas clicaveis para selecao multipla de contratos; essa selecao mostra todos os contratos ativos carregados, indica contratos sem fatura no periodo e filtra todos os graficos da aba. A aba usa `ChartPanel` para o grafico mensal de gasto por contrato e para o bullet chart de projecao anual frente ao empenhado. O grafico mensal exibe linhas por contrato com traco solido para `Executado` e tracejado para `Pendente`, legenda em `fornecedor - numero do contrato`, periodo vindo do filtro do header e estado vazio. O bullet chart exibe `Empenhado`, `Liquidado` e `Projetado`, nessa ordem, e usa hover para mostrar liquidações consideradas, empenhos vinculados, saldo dos empenhos e meses usados na projecao. O botao de filtros permanece no header tambem nessa aba.
+Aplicacao atual:
+
+- O dashboard usa as abas `Orcamento`, `RAP` e `Contratos`, nessa ordem. A aba `Contratos` usa uma faixa de controle no topo com bolhas clicaveis para selecao multipla de contratos; essa selecao mostra todos os contratos ativos carregados, indica contratos sem fatura no periodo e filtra todos os graficos da aba. A aba usa `ChartPanel` para o grafico mensal de gasto por contrato e para o bullet chart de projecao anual frente ao empenhado. O grafico mensal exibe linhas por contrato com traco solido para `Executado` e tracejado para `Pendente`, legenda em `fornecedor - numero do contrato`, periodo vindo do filtro do header e estado vazio. O bullet chart exibe `Empenhado`, `Liquidado` e `Projetado`, nessa ordem, e usa hover para mostrar liquidacoes consideradas, empenhos vinculados, saldo dos empenhos e meses usados na projecao. O botao de filtros permanece no header tambem nessa aba.
+- `/energia` usa o padrao analitico para comparar COSERN, Mercatto e geracao solar em visao geral, mantendo as abas especificas para faturas, contratos, financeiro e ESG.
 
 ## Antipadroes
 

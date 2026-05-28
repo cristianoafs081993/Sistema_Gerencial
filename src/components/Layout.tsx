@@ -12,6 +12,7 @@ import {
   ScrollText,
   Search,
   Settings2,
+  Zap,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -47,6 +48,7 @@ const groupIcons: Record<AppScreenGroupId, React.ComponentType<{ className?: str
   financeiro: Banknote,
   contratos: FileStack,
   licitacoes: ScrollText,
+  energia: Zap,
   documentos: FileText,
   automacoes: Clock3,
   administracao: Settings2,

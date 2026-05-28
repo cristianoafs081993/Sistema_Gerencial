@@ -157,6 +157,20 @@ describe('Layout', () => {
     expect(screen.getByText('Crédito disponível')).toBeInTheDocument();
   });
 
+  it('exibe o painel de energia na sidebar', () => {
+    render(
+      <MemoryRouter>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByText('Energia'));
+
+    expect(screen.getByText('Indicadores ESG')).toBeInTheDocument();
+  });
+
   it('mantem a ordem dos tipos do editor na sidebar', () => {
     render(
       <MemoryRouter initialEntries={['/editor-documentos/termo-referencia-compras']}>
