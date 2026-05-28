@@ -82,6 +82,35 @@ describe('assistenteGerencialService', () => {
     });
   });
 
+  it('repete a chamada quando ha falha transitoria de rede', async () => {
+    vi.useFakeTimers();
+    mockedInvoke
+      .mockResolvedValueOnce({
+        data: null,
+        error: { message: 'Failed to fetch' },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          response: 'Consulta recuperada.',
+          suggestions: [],
+        },
+        error: null,
+      });
+
+    const request = assistenteGerencialService.ask({ message: 'saldo' });
+
+    await vi.advanceTimersByTimeAsync(650);
+
+    await expect(request).resolves.toEqual({
+      response: 'Consulta recuperada.',
+      suggestions: [],
+      model: null,
+      warnings: [],
+    });
+    expect(mockedInvoke).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
   it('rejeita pergunta vazia antes de chamar a function', async () => {
     await expect(assistenteGerencialService.ask({ message: '   ' })).rejects.toThrow(
       'Digite uma pergunta',

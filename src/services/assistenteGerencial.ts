@@ -21,6 +21,8 @@ export type AssistenteGerencialResponse = {
 const MAX_HISTORY_MESSAGES = 8;
 const MAX_MESSAGE_LENGTH = 2500;
 const MAX_HISTORY_MESSAGE_LENGTH = 1500;
+const MAX_NETWORK_ATTEMPTS = 2;
+const NETWORK_RETRY_DELAY_MS = 650;
 
 function cleanContent(value: string, maxLength: number) {
   return value.replace(/\s+/g, ' ').trim().slice(0, maxLength);
@@ -57,6 +59,15 @@ export function buildAssistenteGerencialPayload(params: AssistenteGerencialReque
   return { message, history };
 }
 
+const wait = (ms: number) => new Promise((resolve) => globalThis.setTimeout(resolve, ms));
+
+function isTransientNetworkFailure(error: unknown) {
+  const message = error && typeof error === 'object' && 'message' in error
+    ? String((error as { message?: unknown }).message || '')
+    : String(error || '');
+  return /failed to fetch|network|err_network_changed|networkerror/i.test(message);
+}
+
 export const assistenteGerencialService = {
   async ask(params: AssistenteGerencialRequest): Promise<AssistenteGerencialResponse> {
     const body = buildAssistenteGerencialPayload(params);
@@ -65,35 +76,48 @@ export const assistenteGerencialService = {
       throw new Error('Digite uma pergunta para o Assistente Gerencial.');
     }
 
-    const { data, error } = await supabase.functions.invoke('assistente-gerencial', {
-      body,
-    });
+    let data: unknown;
+    let error: { message?: string } | null = null;
+
+    for (let attempt = 1; attempt <= MAX_NETWORK_ATTEMPTS; attempt += 1) {
+      const result = await supabase.functions.invoke('assistente-gerencial', { body });
+      data = result.data;
+      error = result.error;
+
+      if (!error || !isTransientNetworkFailure(error) || attempt === MAX_NETWORK_ATTEMPTS) {
+        break;
+      }
+
+      await wait(NETWORK_RETRY_DELAY_MS);
+    }
 
     if (error) {
       throw new Error(error.message || 'Nao foi possivel consultar o Assistente Gerencial.');
     }
 
-    if (data?.error) {
-      throw new Error(String(data.error));
+    const responseData = data as Record<string, unknown> | null | undefined;
+
+    if (responseData?.error) {
+      throw new Error(String(responseData.error));
     }
 
-    const rawResponse = typeof data?.response === 'string' ? data.response : '';
+    const rawResponse = typeof responseData?.response === 'string' ? responseData.response : '';
     if (!rawResponse.trim()) {
       throw new Error('O Assistente Gerencial nao retornou conteudo.');
     }
 
     const parsed = parseAssistenteGerencialSuggestions(rawResponse);
-    const serverSuggestions = Array.isArray(data?.suggestions)
-      ? data.suggestions.filter((item: unknown): item is string => typeof item === 'string').slice(0, 3)
+    const serverSuggestions = Array.isArray(responseData?.suggestions)
+      ? responseData.suggestions.filter((item: unknown): item is string => typeof item === 'string').slice(0, 3)
       : [];
-    const warnings = Array.isArray(data?.warnings)
-      ? data.warnings.filter((item: unknown): item is string => typeof item === 'string')
+    const warnings = Array.isArray(responseData?.warnings)
+      ? responseData.warnings.filter((item: unknown): item is string => typeof item === 'string')
       : [];
 
     return {
       response: parsed.response,
       suggestions: serverSuggestions.length ? serverSuggestions : parsed.suggestions,
-      model: typeof data?.model === 'string' ? data.model : null,
+      model: typeof responseData?.model === 'string' ? responseData.model : null,
       warnings,
     };
   },
