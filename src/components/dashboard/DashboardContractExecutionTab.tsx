@@ -676,7 +676,11 @@ export function DashboardContractExecutionTab({
                           </p>
                         </div>
                         <div className="flex items-baseline justify-between mt-2">
-                          <span className="text-[10px] font-medium opacity-75">Cobertura</span>
+                          <span className="text-[10px] font-medium opacity-75 flex items-center gap-1">
+                            Cobertura
+                            {item.isRenewalAllowed && <span title="Simulação de Renovação">🔮</span>}
+                            {item.isCapped && !item.isRenewalAllowed && <span title="Limitado ao Valor Vigente">⚠️</span>}
+                          </span>
                           <span className="text-lg font-black tracking-tight">{ratio.toFixed(0)}%</span>
                         </div>
                       </div>
@@ -720,6 +724,38 @@ export function DashboardContractExecutionTab({
                             {ratio.toFixed(1)}%
                           </span>
                         </div>
+
+                        {/* Indicadores de Teto e Vigência no Heatmap */}
+                        {(item.isCapped || item.exceedsValiditySugestion) && (
+                          <div className="space-y-2 pt-2 border-t border-slate-100">
+                            {item.isCapped && !item.isRenewalAllowed && (
+                              <div className="rounded-lg bg-amber-50 px-2 py-1.5 border border-amber-200/50 text-[10px] font-semibold text-amber-700 leading-relaxed">
+                                ⚠️ Projeção limitada ao valor vigente do contrato ({formatCurrency(item.valorTotalContrato)}).
+                              </div>
+                            )}
+                            {item.isRenewalAllowed && (
+                              <div className="rounded-lg bg-sky-50 px-2 py-1.5 border border-sky-200/50 text-[10px] font-semibold text-sky-700 leading-relaxed">
+                                🔮 Simulação de Renovação (teto desconsiderado).
+                              </div>
+                            )}
+                            {item.exceedsValiditySugestion && !item.isCapped && !item.isRenewalAllowed && (
+                              <div className="rounded-lg bg-slate-50 px-2 py-1.5 border border-slate-200/50 text-[10px] font-semibold text-slate-500 leading-relaxed">
+                                💡 A data final excede a vigência deste contrato (que encerra em {formatTraceDate(item.vigenciaFim ?? null)}).
+                              </div>
+                            )}
+                            {onToggleContractRenewal && (
+                              <label className="flex items-center gap-2 cursor-pointer select-none font-ui text-[11px] font-semibold text-text-secondary hover:text-text-primary transition-colors py-1">
+                                <input
+                                  type="checkbox"
+                                  checked={item.isRenewalAllowed}
+                                  onChange={() => onToggleContractRenewal(item.id)}
+                                  className="h-3.5 w-3.5 rounded border-slate-300 text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer"
+                                />
+                                <span>Simular renovação (ignorar limite)</span>
+                              </label>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </HoverCardContent>
                   </HoverCard>
