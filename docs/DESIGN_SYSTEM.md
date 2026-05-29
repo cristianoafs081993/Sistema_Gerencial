@@ -1,4 +1,4 @@
-# Design System - GovFlow
+# Design System - GovAnalytics
 
 Este documento define o padrao visual atual do sistema. A revisao mais recente manteve parte da simplificacao estrutural dos componentes, mas restaurou a identidade visual anterior: verde institucional como cor primaria, dashboard multicolorido e shell com sidebar.
 

@@ -532,6 +532,15 @@ describe('Contratos regressions', () => {
 
     expect(await screen.findByText('Contrato 00062/2018')).toBeInTheDocument();
     expect(screen.getByText('Histórico do contrato')).toBeInTheDocument();
+
+    const historicoSection = screen.getByRole('button', { name: /Histórico do contrato/i });
+    const itensSection = screen.getByRole('button', { name: /Itens/i });
+    const faturasSection = screen.getByRole('button', { name: /Faturas associadas/i });
+
+    fireEvent.click(historicoSection);
+    fireEvent.click(itensSection);
+    fireEvent.click(faturasSection);
+
     expect(screen.getByText(/Assinatura - 00158\/2021/i)).toBeInTheDocument();
     expect(screen.getAllByText('PRESTACAO DE SERVICOS DE APOIO ADMINISTRATIVO').length).toBeGreaterThan(0);
     expect(screen.getByText('Sem item vinculado')).toBeInTheDocument();

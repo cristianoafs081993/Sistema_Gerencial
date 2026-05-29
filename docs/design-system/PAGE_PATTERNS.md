@@ -7,7 +7,7 @@ Esta documentacao foi atualizada porque a mudanca altera comportamento visual re
 O shell principal em `src/components/Layout.tsx` usa sidebar:
 
 1. sidebar branca com borda direita;
-2. marca GovFlow no topo com ícone oficial em `public/govflow-icon-192.png`, sem avatar de usuário na sidebar;
+2. marca GovAnalytics no topo com ícone oficial em `public/govflow-icon-192.png`, sem avatar de usuário na sidebar;
 3. busca visual no header principal, alinhada ao mesmo divisor horizontal da sidebar;
 4. grupos de modulos expansivos derivados de `appScreenGroups`, com icone, texto em caixa normal, superficie discreta quando abertos e transicao de altura/opacidade;
 5. itens derivados de `appScreens`, mantendo permissoes, rotas existentes e recuo visual em relacao ao grupo;

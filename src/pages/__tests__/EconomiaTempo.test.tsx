@@ -33,7 +33,7 @@ const scenario: AutomationSavingsScenario = {
   id: 'relatorios-gerenciais',
   interactionName: 'Montagem de relatório gerencial',
   moduleName: 'Relatórios',
-  source: 'GovFlow',
+  source: 'GovAnalytics',
   baselineMinutes: 45,
   automatedMinutes: 5,
   estimatedMonthlyRuns: 12,
@@ -78,7 +78,7 @@ describe('EconomiaTempo', () => {
     expect(screen.getByText('Tempo economizado')).toBeInTheDocument();
     expect(screen.getByText('Projeção mensal')).toBeInTheDocument();
     expect(screen.getAllByText('Interações mapeadas').length).toBeGreaterThan(0);
-    expect(screen.getByText('GovFlow')).toBeInTheDocument();
+    expect(screen.getByText('GovAnalytics')).toBeInTheDocument();
     expect(screen.getByText('Estimativa')).toBeInTheDocument();
   });
 });

@@ -1,7 +1,7 @@
 {
-  "name": "GovFlow",
-  "short_name": "GovFlow",
-  "description": "GovFlow para controle e execucao orcamentaria",
+  "name": "GovAnalytics",
+  "short_name": "GovAnalytics",
+  "description": "GovAnalytics para controle e execucao orcamentaria",
   "icons": [
     {
       "src": "/govflow-icon-192.png",

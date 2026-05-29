@@ -119,6 +119,7 @@ export default function RichTextEditor({
         isSyncingExternally.current = false;
         return;
       }
+      if (editor.isDestroyed) return;
       onChange(editor.getHTML());
     },
   }, [highlightPendingFields]);
@@ -126,12 +127,13 @@ export default function RichTextEditor({
   const applyPendingFieldDomHighlight = useCallback(() => {
     if (!highlightPendingFields) return;
     window.requestAnimationFrame(() => {
+      if (!editor || editor.isDestroyed) return;
       highlightPendingFieldsInElement(editorShellRef.current?.querySelector('.tiptap') || null);
     });
-  }, [highlightPendingFields]);
+  }, [editor, highlightPendingFields]);
 
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || editor.isDestroyed) return;
     const current = editor.getHTML();
     if (content !== current) {
       isSyncingExternally.current = true;
@@ -141,11 +143,12 @@ export default function RichTextEditor({
   }, [applyPendingFieldDomHighlight, content, editor]);
 
   useEffect(() => {
-    if (!editor || !highlightPendingFields) return;
+    if (!editor || editor.isDestroyed || !highlightPendingFields) return;
     applyPendingFieldDomHighlight();
     editor.on('update', applyPendingFieldDomHighlight);
     editor.on('selectionUpdate', applyPendingFieldDomHighlight);
     return () => {
+      if (editor.isDestroyed) return;
       editor.off('update', applyPendingFieldDomHighlight);
       editor.off('selectionUpdate', applyPendingFieldDomHighlight);
     };

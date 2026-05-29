@@ -1,6 +1,6 @@
 # COMPONENT_CATALOG
 
-Este catalogo resume os blocos oficiais do design system do GovFlow.
+Este catalogo resume os blocos oficiais do design system do GovAnalytics.
 
 Esta documentacao foi atualizada porque a mudanca altera comportamento visual real em area critica de design system.
 

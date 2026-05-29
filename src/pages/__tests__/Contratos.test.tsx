@@ -250,6 +250,10 @@ describe('Contratos', () => {
     });
 
     expect(await screen.findByText('Contrato 00062/2018')).toBeInTheDocument();
+
+    const itensSection = screen.getByRole('button', { name: /Itens/i });
+    fireEvent.click(itensSection);
+
     expect(screen.getAllByText('PRESTAÇÃO DE SERVIÇOS DE APOIO ADMINISTRATIVO').length).toBeGreaterThan(0);
   });
 
