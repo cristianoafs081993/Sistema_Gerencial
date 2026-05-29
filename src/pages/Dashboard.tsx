@@ -90,6 +90,11 @@ export type ContractProjectionBulletItem = {
   empenhos: ContractProjectionEmpenhoTrace[];
   coberturaMes: string | null;
   necessidadeEmpenho: number;
+  isCapped: boolean;
+  isRenewalAllowed: boolean;
+  valorTotalContrato: number;
+  exceedsValiditySugestion?: boolean;
+  vigenciaFim?: string | null;
 };
 
 export type ContractProjectionLiquidacaoTrace = {
@@ -576,6 +581,7 @@ export const buildContractProjectionBullets = (
     endDate: Date;
     today?: Date;
     projectionTargetMonths?: number;
+    allowedRenewalContractIds?: string[];
   },
   localData?: {
     empenhos: Empenho[];
@@ -663,9 +669,21 @@ export const buildContractProjectionBullets = (
       }
 
       const targetMonths = options.projectionTargetMonths ?? 12;
-      let projetado = elapsedMonths > 0 ? (liquidado / elapsedMonths) * targetMonths : liquidado;
-      if (valorTotal > 0) {
-        projetado = Math.min(projetado, valorTotal);
+      const isRenewalAllowed = options.allowedRenewalContractIds?.includes(contratoId) ?? false;
+      const rawProjetado = elapsedMonths > 0 ? (liquidado / elapsedMonths) * targetMonths : liquidado;
+      const isCapped = valorTotal > 0 && rawProjetado > valorTotal;
+      let projetado = rawProjetado;
+      if (valorTotal > 0 && !isRenewalAllowed) {
+        projetado = Math.min(rawProjetado, valorTotal);
+      }
+
+      const vigenciaFimStr = contrato.vigencia_fim_derivada ?? contrato.vigencia_fim;
+      let exceedsValiditySugestion = false;
+      if (vigenciaFimStr) {
+        const vigenciaFim = toValidDate(vigenciaFimStr);
+        if (vigenciaFim && options.endDate.getTime() > vigenciaFim.getTime()) {
+          exceedsValiditySugestion = true;
+        }
       }
 
       let empenhosTrace: ContractProjectionEmpenhoTrace[] = [];
@@ -690,7 +708,7 @@ export const buildContractProjectionBullets = (
         }
 
         // 2. Find linked local empenhos
-        let empenhosVinculados: Empenho[] = [];
+        const empenhosVinculados: Empenho[] = [];
         if (localContrato) {
           const linkIds = localData.contratosEmpenhos
             .filter((l) => l.contrato_id === localContrato.id)
@@ -823,6 +841,11 @@ export const buildContractProjectionBullets = (
         empenhos: empenhosTrace,
         coberturaMes,
         necessidadeEmpenho,
+        isCapped,
+        isRenewalAllowed,
+        valorTotalContrato: valorTotal,
+        exceedsValiditySugestion,
+        vigenciaFim: vigenciaFimStr,
       };
     })
     .filter((item): item is ContractProjectionBulletItem => Boolean(item))
@@ -841,6 +864,7 @@ export default function Dashboard() {
   const [selectedContractExpenseIds, setSelectedContractExpenseIds] = useState<string[]>([]);
   const [contractExpenseSelectionTouched, setContractExpenseSelectionTouched] = useState(false);
   const [projectionTargetMonths, setProjectionTargetMonths] = useState(12);
+  const [contractsWithRenewalAllowed, setContractsWithRenewalAllowed] = useState<string[]>([]);
   const isContractExecutionTabActive = activeTab === 'contratos';
 
   const effectiveFilterDimensao = useMemo(() => {
@@ -1095,6 +1119,14 @@ export default function Dashboard() {
     return { startDate, endDate };
   }, [dateStart, dateEnd]);
 
+  // Keep projectionTargetMonths in sync with contractExpensePeriod date range
+  useEffect(() => {
+    const start = parseISO(contractExpensePeriod.startDate);
+    const end = parseISO(contractExpensePeriod.endDate);
+    const months = (end.getFullYear() - start.getFullYear()) * 12 + end.getMonth() - start.getMonth() + 1;
+    setProjectionTargetMonths(months > 0 ? months : 12);
+  }, [contractExpensePeriod]);
+
   const { data: contratosApiFaturas = [], isLoading: isContractExpenseLoading = false } = useQuery({
     queryKey: ['dashboard-contratos-api-faturas', contratosApiAtivosIds, contractExpensePeriod.startDate, contractExpensePeriod.endDate],
     queryFn: async () => {
@@ -1187,6 +1219,7 @@ export default function Dashboard() {
           startDate: parseISO(contractExpensePeriod.startDate),
           endDate: parseISO(contractExpensePeriod.endDate),
           projectionTargetMonths,
+          allowedRenewalContractIds: contractsWithRenewalAllowed,
         },
         {
           empenhos,
@@ -1204,6 +1237,7 @@ export default function Dashboard() {
       contratos,
       contratosEmpenhos,
       projectionTargetMonths,
+      contractsWithRenewalAllowed,
     ],
   );
 
@@ -1218,6 +1252,7 @@ export default function Dashboard() {
           startDate: parseISO(contractExpensePeriod.startDate),
           endDate: parseISO(contractExpensePeriod.endDate),
           projectionTargetMonths,
+          allowedRenewalContractIds: contractsWithRenewalAllowed,
         },
         {
           empenhos,
@@ -1235,6 +1270,7 @@ export default function Dashboard() {
       contratos,
       contratosEmpenhos,
       projectionTargetMonths,
+      contractsWithRenewalAllowed,
     ],
   );
 
@@ -1574,6 +1610,12 @@ export default function Dashboard() {
             projectionTargetMonths={projectionTargetMonths}
             onProjectionTargetMonthsChange={setProjectionTargetMonths}
             contractExpensePeriod={contractExpensePeriod}
+            contractsWithRenewalAllowed={contractsWithRenewalAllowed}
+            onToggleContractRenewal={(id) => {
+              setContractsWithRenewalAllowed((prev) =>
+                prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+              );
+            }}
           />
         </TabsContent>
       </Tabs>

@@ -35,6 +35,8 @@ type DashboardContractExecutionTabProps = {
   projectionTargetMonths?: number;
   onProjectionTargetMonthsChange?: (months: number) => void;
   contractExpensePeriod?: { startDate: string; endDate: string };
+  contractsWithRenewalAllowed?: string[];
+  onToggleContractRenewal?: (id: string) => void;
 };
 
 function ContractExpenseTooltip({
@@ -129,7 +131,7 @@ function getProjectionStatus(item: ContractProjectionBulletItem) {
   };
 }
 
-function ContractProjectionTraceHover({ item }: { item: ContractProjectionBulletItem }) {
+function ContractProjectionTraceHover({ item, targetMonths = 12 }: { item: ContractProjectionBulletItem; targetMonths?: number }) {
   const visibleLiquidacoes = item.liquidacoes.slice(0, 5);
   const visibleEmpenhos = item.empenhos.slice(0, 5);
   const hiddenLiquidacoes = Math.max(0, item.liquidacoes.length - visibleLiquidacoes.length);
@@ -150,7 +152,9 @@ function ContractProjectionTraceHover({ item }: { item: ContractProjectionBullet
         <div className="border-b border-border-default/60 bg-surface-subtle/60 px-4 py-3">
           <p className="line-clamp-1 font-ui text-sm font-semibold text-text-primary">{item.label}</p>
           <p className="mt-1 font-ui text-xs text-text-muted">
-            Projecao = liquidado / {item.mesesConsiderados || 1} mes(es) observado(s) x 12.
+            Projecao = liquidado / {item.mesesConsiderados || 1} mes(es) observado(s) x {targetMonths}
+            {item.isCapped && !item.isRenewalAllowed && " (Limitada ao teto do contrato)"}
+            {item.isRenewalAllowed && " (Simulação de Renovação)"}.
           </p>
         </div>
 
@@ -248,6 +252,8 @@ export function DashboardContractExecutionTab({
   projectionTargetMonths = 12,
   onProjectionTargetMonthsChange,
   contractExpensePeriod,
+  contractsWithRenewalAllowed = [],
+  onToggleContractRenewal,
 }: DashboardContractExecutionTabProps) {
   const selectedContractExpenseSet = new Set(selectedContractExpenseIds);
   const hasContractExpenseOptions = contractExpenseOptions.length > 0;
@@ -495,6 +501,38 @@ export function DashboardContractExecutionTab({
                           <p className="mt-1 font-ui text-xs text-text-muted">
                             Projetado em {item.percentualProjetado.toFixed(0)}% do saldo com {item.mesesConsiderados} mes(es) observado(s).
                           </p>
+                          <div className="flex flex-col gap-1">
+                            {item.isCapped && !item.isRenewalAllowed && (
+                              <div>
+                                <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-0.5 mt-2 font-ui text-[10px] font-semibold text-amber-700 border border-amber-200/50">
+                                  ⚠️ Projeção limitada ao valor vigente do contrato ({formatCurrency(item.valorTotalContrato)})
+                                </span>
+                              </div>
+                            )}
+                            {item.isRenewalAllowed && (
+                              <div>
+                                <span className="inline-flex items-center gap-1.5 rounded-md bg-sky-50 px-2 py-0.5 mt-2 font-ui text-[10px] font-semibold text-sky-700 border border-sky-200/50">
+                                  🔮 Simulação de Renovação (teto desconsiderado)
+                                </span>
+                              </div>
+                            )}
+                            {item.exceedsValiditySugestion && !item.isCapped && !item.isRenewalAllowed && (
+                              <p className="mt-1.5 font-ui text-[10px] text-slate-500 font-semibold leading-relaxed">
+                                💡 A data final do filtro excede a vigência deste contrato (que encerra em {formatTraceDate(item.vigenciaFim ?? null)}).
+                              </p>
+                            )}
+                            {onToggleContractRenewal && (item.isCapped || item.exceedsValiditySugestion) && (
+                              <label className="mt-3 flex items-center gap-2 cursor-pointer select-none font-ui text-[11px] font-semibold text-text-secondary hover:text-text-primary transition-colors">
+                                <input
+                                  type="checkbox"
+                                  checked={item.isRenewalAllowed}
+                                  onChange={() => onToggleContractRenewal(item.id)}
+                                  className="h-3.5 w-3.5 rounded border-slate-300 text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer"
+                                />
+                                <span>Simular renovação contratual (ignorar limite da vigência atual)</span>
+                              </label>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -513,7 +551,7 @@ export function DashboardContractExecutionTab({
                             <p className="mt-1 text-sm font-bold text-blue-700">{formatCurrency(item.projetado)}</p>
                           </div>
                         </div>
-                        <ContractProjectionTraceHover item={item} />
+                        <ContractProjectionTraceHover item={item} targetMonths={projectionTargetMonths} />
                       </div>
                     </div>
 
