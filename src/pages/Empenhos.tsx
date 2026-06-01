@@ -1,4 +1,4 @@
-﻿import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Pencil, Search, Filter, Calendar, FileSpreadsheet, Loader2, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, Layers, X, Star } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Empenho, DIMENSOES, COMPONENTES_POR_DIMENSAO } from '@/types';
@@ -641,7 +641,7 @@ function EmpenhoRow({
 
   return (
     <TableRow className={`hover:bg-slate-50/80 transition-colors border-b border-border-default/50 ${isChild ? 'bg-slate-50/30' : ''}`}>
-      <TableCell className={`py-4 px-6 align-top ${isChild ? 'pl-10' : ''}`}>
+      <TableCell className={`py-4 px-6 align-top ${isChild ? 'pl-10' : ''} w-[13%] min-w-[130px]`}>
         <div className="flex flex-col gap-1">
           <span className="font-mono text-sm font-semibold whitespace-nowrap">{empenho.numero}</span>
           {empenho.processo && (
@@ -657,16 +657,16 @@ function EmpenhoRow({
           )}
         </div>
       </TableCell>
-      <TableCell className="py-4 px-4 align-top">
+      <TableCell className="py-4 px-4 align-top w-[30%] min-w-[250px]">
         <div className="flex flex-col">
-          <span className="text-sm font-medium truncate max-w-[150px]" title={empenho.favorecidoNome}>{empenho.favorecidoNome || '-'}</span>
+          <span className="text-sm font-medium truncate max-w-[280px] sm:max-w-[360px] md:max-w-[420px] lg:max-w-[500px]" title={empenho.favorecidoNome}>{empenho.favorecidoNome || '-'}</span>
           <span className="text-xs text-muted-foreground">
             {formatarDocumento(empenho.favorecidoDocumento || '')}
           </span>
         </div>
       </TableCell>
       {type === 'execucao' ? (
-        <TableCell className="py-4 px-4 align-top">
+        <TableCell className="py-4 px-4 align-top w-[15%] min-w-[130px]">
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium whitespace-nowrap">{empenho.origemRecurso || '-'}</p>
             {empenho.planoInterno && (
@@ -675,11 +675,11 @@ function EmpenhoRow({
           </div>
         </TableCell>
       ) : (
-        <TableCell className="py-4 px-4 align-top">
+        <TableCell className="py-4 px-4 align-top w-[20%] min-w-[180px]">
           <span className="text-sm line-clamp-2" title={empenho.descricao}>{empenho.descricao || '-'}</span>
         </TableCell>
       )}
-      <TableCell className="py-4 px-4 text-right align-top whitespace-nowrap">
+      <TableCell className="py-4 px-4 text-right align-top whitespace-nowrap w-[18%] min-w-[150px]">
         <div className="flex flex-col gap-1 items-end">
           {type === 'restos' && empenho.rapInscrito != null ? (
             <>
@@ -715,7 +715,7 @@ function EmpenhoRow({
           )}
         </div>
       </TableCell>
-      <TableCell className="py-4 px-4 text-right align-top whitespace-nowrap">
+      <TableCell className="py-4 px-4 text-right align-top whitespace-nowrap w-[14%] min-w-[120px]">
         {(() => {
           if (type === 'restos') {
             return (
@@ -733,7 +733,7 @@ function EmpenhoRow({
         })()}
       </TableCell>
 
-      <TableCell className="py-4 px-6 align-top whitespace-nowrap">
+      <TableCell className="py-4 px-6 align-top whitespace-nowrap w-[10%] min-w-[90px]">
         <div className="flex items-center justify-center gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
@@ -875,9 +875,9 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isFavorite, toggleFav
     setPage(1);
   }, [empenhos.length, perPage, groupBy]);
 
-  const SortHeader = ({ label, colKey, align = 'left' }: { label: string; colKey: string; align?: 'left' | 'right' | 'center' }) => (
+  const SortHeader = ({ label, colKey, align = 'left', className = '' }: { label: string; colKey: string; align?: 'left' | 'right' | 'center'; className?: string }) => (
     <TableHead
-      className={`h-11 px-4 text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-slate-100/80 transition-colors select-none ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : ''}`}
+      className={`h-11 px-4 text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-slate-100/80 transition-colors select-none ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : ''} ${className}`}
       onClick={() => handleSort(colKey)}
     >
       <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
@@ -910,16 +910,16 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isFavorite, toggleFav
           <Table>
             <TableHeader className="bg-slate-50/50">
               <TableRow className="hover:bg-transparent border-b border-border-default/50">
-                {groupBy === 'none' && <SortHeader label="Número" colKey="numero" />}
-                <SortHeader label="Favorecido" colKey="favorecido" />
+                <SortHeader label="Número" colKey="numero" className="w-[13%] min-w-[130px]" />
+                <SortHeader label="Favorecido" colKey="favorecido" className="w-[30%] min-w-[250px]" />
                 {type === 'execucao' ? (
-                  <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">Origem / Plano</TableHead>
+                  <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider w-[15%] min-w-[130px]">Origem / Plano</TableHead>
                 ) : (
-                  <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">Descrição</TableHead>
+                  <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider w-[20%] min-w-[180px]">Descrição</TableHead>
                 )}
-                <SortHeader label={type === 'execucao' ? 'Empenhado / Liquidado' : 'Inscrito / Reinscrito / Liq Ano'} colKey="valor" align="right" />
-                <SortHeader label={type === 'execucao' ? 'Saldo' : 'Saldo Atual'} colKey="saldo" align="right" />
-                <TableHead className="h-11 px-6 text-center text-xs font-semibold uppercase tracking-wider">Ações</TableHead>
+                <SortHeader label={type === 'execucao' ? 'Empenhado / Liquidado' : 'Inscrito / Reinscrito / Liq Ano'} colKey="valor" align="right" className="w-[18%] min-w-[150px]" />
+                <SortHeader label={type === 'execucao' ? 'Saldo' : 'Saldo Atual'} colKey="saldo" align="right" className="w-[14%] min-w-[120px]" />
+                <TableHead className="h-11 px-6 text-center text-xs font-semibold uppercase tracking-wider w-[10%] min-w-[90px]">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -948,17 +948,17 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isFavorite, toggleFav
                           className="bg-slate-50/50 hover:bg-slate-100/80 transition-colors cursor-pointer border-b border-border-default/50"
                           onClick={() => toggleGroup(row.name)}
                         >
-                          <TableCell className="py-4 px-6 font-medium" colSpan={2}>
+                          <TableCell className="py-4 px-6 font-medium w-[43%] min-w-[380px]" colSpan={2}>
                             <div className="flex items-center gap-2">
                               <ChevronRight className={`h-4 w-4 text-slate-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                               <span>{row.name}</span>
                               <Badge variant="secondary" className="ml-2 bg-white text-xs">{row.items.length}</Badge>
                             </div>
                           </TableCell>
-                          <TableCell className="py-4 px-4 text-sm text-muted-foreground">
+                          <TableCell className={`py-4 px-4 text-sm text-muted-foreground ${type === 'execucao' ? 'w-[15%] min-w-[130px]' : 'w-[20%] min-w-[180px]'}`}>
                             -
                           </TableCell>
-                          <TableCell className="py-4 px-4 text-right">
+                          <TableCell className="py-4 px-4 text-right w-[18%] min-w-[150px]">
                             <div className="flex flex-col gap-1 items-end">
                               <span className="font-bold text-sm">{formatCurrency(row.valorTotal)}</span>
                               {type === 'execucao' ? (
@@ -981,7 +981,7 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isFavorite, toggleFav
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="py-4 px-4 text-right">
+                          <TableCell className="py-4 px-4 text-right w-[14%] min-w-[120px]">
                             {(() => {
                               if (type === 'restos') {
                                 return (
@@ -997,7 +997,7 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isFavorite, toggleFav
                               );
                             })()}
                           </TableCell>
-                          <TableCell className="py-4 px-6 text-center"></TableCell>
+                          <TableCell className="py-4 px-6 text-center w-[10%] min-w-[90px]"></TableCell>
                         </TableRow>
                         {isExpanded && row.items.map(empenho => (
                           <EmpenhoRow
