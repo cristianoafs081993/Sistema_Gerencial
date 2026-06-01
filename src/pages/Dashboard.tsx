@@ -95,6 +95,9 @@ export type ContractProjectionBulletItem = {
   valorTotalContrato: number;
   exceedsValiditySugestion?: boolean;
   vigenciaFim?: string | null;
+  categoria?: string | null;
+  prorrogavel?: string | null;
+  objeto?: string | null;
 };
 
 export type ContractProjectionLiquidacaoTrace = {
@@ -846,6 +849,9 @@ export const buildContractProjectionBullets = (
         valorTotalContrato: valorTotal,
         exceedsValiditySugestion,
         vigenciaFim: vigenciaFimStr,
+        categoria: contrato.categoria || null,
+        prorrogavel: contrato.prorrogavel || null,
+        objeto: contrato.objeto || null,
       };
     })
     .filter((item): item is ContractProjectionBulletItem => Boolean(item))

@@ -112,6 +112,8 @@ export interface ContratoApiRow {
   situacao_derivada_motivo?: string | null;
   campus_scope_reason?: string | null;
   updated_at: string;
+  categoria?: string | null;
+  prorrogavel?: string | null;
 }
 
 export interface ContratoApiEmpenhoRow {
@@ -623,7 +625,7 @@ export const contratosApiService = {
     const today = new Date().toISOString().slice(0, 10);
     let query = supabase
       .from('contratos_api')
-      .select('id, api_contrato_id, numero, fornecedor_nome, unidade_codigo, unidade_nome, unidade_origem_codigo, unidade_origem_nome, objeto, processo, vigencia_inicio, vigencia_fim, vigencia_inicio_derivada, vigencia_fim_derivada, valor_global, valor_acumulado, situacao, situacao_derivada, situacao_derivada_motivo, campus_scope_reason, updated_at')
+      .select('id, api_contrato_id, numero, fornecedor_nome, unidade_codigo, unidade_nome, unidade_origem_codigo, unidade_origem_nome, objeto, processo, vigencia_inicio, vigencia_fim, vigencia_inicio_derivada, vigencia_fim_derivada, valor_global, valor_acumulado, situacao, situacao_derivada, situacao_derivada_motivo, campus_scope_reason, updated_at, categoria, prorrogavel:raw_data->>prorrogavel')
       .order('numero', { ascending: true });
 
     if (onlyVigentes) {
