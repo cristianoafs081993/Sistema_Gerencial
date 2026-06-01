@@ -852,6 +852,8 @@ export const buildContractProjectionBullets = (
     .filter((item) => item.saldoEmpenhos > 0 || item.liquidado > 0 || item.projetado > 0);
 };
 
+const EMPTY_ARRAY: any[] = [];
+
 export default function Dashboard() {
   const { atividades, empenhos, contratos, contratosEmpenhos, descentralizacoes, contaDescentralizacoes, isLoading } = useData();
   const [hoveredBudgetDimension, setHoveredBudgetDimension] = useState<string | null>(null);
@@ -1054,26 +1056,26 @@ export default function Dashboard() {
     [filteredData.empenhosCorrente],
   );
 
-  const { data: liquidacoesPorEmpenho = [] } = useQuery({
+  const { data: liquidacoesPorEmpenho = EMPTY_ARRAY } = useQuery({
     queryKey: ['dashboard-liquidacoes-por-empenho', empenhoNumerosCorrente],
     queryFn: () => transparenciaService.getLiquidacoesPorEmpenhos(empenhoNumerosCorrente),
     enabled: empenhoNumerosCorrente.length > 0,
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: contratosApiEmpenhos = [] } = useQuery({
+  const { data: contratosApiEmpenhos = EMPTY_ARRAY } = useQuery({
     queryKey: ['dashboard-contratos-api-empenhos'],
     queryFn: async () => {
       try {
         return await contratosApiService.getEmpenhosApi();
       } catch {
-        return [];
+        return EMPTY_ARRAY;
       }
     },
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: liquidacoesApiPorEmpenho = [] } = useQuery({
+  const { data: liquidacoesApiPorEmpenho = EMPTY_ARRAY } = useQuery({
     queryKey: ['dashboard-contratos-api-liquidacoes', empenhoNumerosCorrente],
     queryFn: async () => {
       try {
@@ -1082,20 +1084,20 @@ export default function Dashboard() {
         );
         return rows.flat();
       } catch {
-        return [] as ContratoApiPublicLiquidacaoRow[];
+        return EMPTY_ARRAY;
       }
     },
     enabled: empenhoNumerosCorrente.length > 0,
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: contratosApiAtivos = [], isLoading: isContratosApiAtivosLoading = false } = useQuery({
+  const { data: contratosApiAtivos = EMPTY_ARRAY, isLoading: isContratosApiAtivosLoading = false } = useQuery({
     queryKey: ['dashboard-contratos-api-ativos'],
     queryFn: async () => {
       try {
         return await contratosApiService.getContratosApi(true);
       } catch {
-        return [] as ContratoApiRow[];
+        return EMPTY_ARRAY;
       }
     },
     enabled: isContractExecutionTabActive,
@@ -1124,10 +1126,11 @@ export default function Dashboard() {
     const start = parseISO(contractExpensePeriod.startDate);
     const end = parseISO(contractExpensePeriod.endDate);
     const months = (end.getFullYear() - start.getFullYear()) * 12 + end.getMonth() - start.getMonth() + 1;
-    setProjectionTargetMonths(months > 0 ? months : 12);
+    const target = months > 0 ? months : 12;
+    setProjectionTargetMonths((prev) => (prev === target ? prev : target));
   }, [contractExpensePeriod]);
 
-  const { data: contratosApiFaturas = [], isLoading: isContractExpenseLoading = false } = useQuery({
+  const { data: contratosApiFaturas = EMPTY_ARRAY, isLoading: isContractExpenseLoading = false } = useQuery({
     queryKey: ['dashboard-contratos-api-faturas', contratosApiAtivosIds, contractExpensePeriod.startDate, contractExpensePeriod.endDate],
     queryFn: async () => {
       try {
@@ -1136,7 +1139,7 @@ export default function Dashboard() {
           dataEmissaoFim: contractExpensePeriod.endDate,
         });
       } catch {
-        return [] as ContratoApiFaturaRow[];
+        return EMPTY_ARRAY;
       }
     },
     enabled: isContractExecutionTabActive && contratosApiAtivosIds.length > 0,
@@ -1154,7 +1157,7 @@ export default function Dashboard() {
 
   const contractExpenseTopIds = useMemo(() => {
     const activeOptions = contractExpenseAggregation.options.filter((option) => option.total > 0);
-    if (activeOptions.length === 0) return [];
+    if (activeOptions.length === 0) return EMPTY_ARRAY;
     const randomIndex = Math.floor(Math.random() * activeOptions.length);
     return [activeOptions[randomIndex].id];
   }, [contractExpenseAggregation.options]);
@@ -1164,11 +1167,23 @@ export default function Dashboard() {
 
     setSelectedContractExpenseIds((currentIds) => {
       if (!contractExpenseSelectionTouched) {
+        const isSame =
+          currentIds.length === contractExpenseTopIds.length &&
+          currentIds.every((id, index) => id === contractExpenseTopIds[index]);
+        if (isSame) {
+          return currentIds;
+        }
         return contractExpenseTopIds;
       }
 
       const filteredIds = currentIds.filter((id) => availableIds.has(id));
-      return filteredIds.length === currentIds.length ? currentIds : filteredIds;
+      const isSame =
+        currentIds.length === filteredIds.length &&
+        currentIds.every((id, index) => id === filteredIds[index]);
+      if (isSame) {
+        return currentIds;
+      }
+      return filteredIds;
     });
   }, [contractExpenseAggregation.options, contractExpenseSelectionTouched, contractExpenseTopIds]);
 
