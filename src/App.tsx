@@ -34,6 +34,8 @@ const EconomiaTempo = lazy(() => import('./pages/EconomiaTempo'));
 const ControleUsuarios = lazy(() => import('./pages/ControleUsuarios'));
 const ModelosDocumentos = lazy(() => import('./pages/ModelosDocumentos'));
 const DesignSystemPreview = lazy(() => import('./pages/DesignSystemPreview'));
+const ManutencaoAdmin = lazy(() => import('./pages/ManutencaoAdmin'));
+const PublicFeedback = lazy(() => import('./pages/PublicFeedback'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 const queryClient = new QueryClient();
@@ -63,6 +65,7 @@ const App = () => (
           <Suspense fallback={null}>
             <Routes>
               <Route path="/auth" element={<AuthPage />} />
+              <Route path="/feedback-ambiente/:codigo" element={<PublicFeedback />} />
               <Route element={<ProtectedRoute />}>
                 <Route element={<AppShell />}>
                   <Route path="/" element={<Dashboard />} />
@@ -98,6 +101,7 @@ const App = () => (
                   <Route path="/controle-usuarios" element={<ControleUsuarios />} />
                   <Route path="/modelos-documentos" element={<ModelosDocumentos />} />
                   <Route path="/design-system-preview" element={<DesignSystemPreview />} />
+                  <Route path="/manutencao" element={<ManutencaoAdmin />} />
                   <Route path="*" element={<NotFound />} />
                 </Route>
               </Route>

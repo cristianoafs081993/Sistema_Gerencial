@@ -115,6 +115,15 @@ export const appScreens: AppScreen[] = [
     sortOrder: 30,
     isAdminOnly: true,
   },
+  {
+    id: 'manutencao',
+    groupId: 'administracao',
+    name: 'Limpeza e Manutenção',
+    path: '/manutencao',
+    icon: ClipboardList,
+    sortOrder: 40,
+    isAdminOnly: true,
+  },
 ];
 
 export function getScreenForPath(pathname: string) {

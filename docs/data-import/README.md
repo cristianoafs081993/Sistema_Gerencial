@@ -68,6 +68,17 @@ Arquivos reais de operacao presentes em [docs](/C:/Users/crist/OneDrive/Desktop/
 - parte da importacao usa heuristicas de normalizacao de colunas
 - o upload de `Empenhos.tsx` agora tambem aceita um CSV especifico de saldo de RAP com cabecalho `NE CCor` + `Metrica`; nesse formato o parser atualiza apenas `saldo_rap_oficial`
 
+## Historico anual de RAP
+
+- a aba `RAP` do dashboard possui uma importacao propria para o CSV historico agregado de restos a pagar
+- esse fluxo usa `src/services/rapHistoricoAnual.ts` e `src/utils/rapHistoricoAnual.ts`
+- o parser localiza o cabecalho real com `UG Executora`, `NE CCor - Ano Emissao`, `Metrica` e `Item Informacao`, mesmo quando o arquivo traz titulo e filtro antes da tabela
+- a coluna de valor pode vir sem nome, logo apos o nome do item de informacao
+- linhas de total geral sao ignoradas; linhas validas exigem UG, ano numerico, item de informacao e valor parseavel
+- o destino e `rap_historico_anual`; cada upload cria um novo `import_batch_id` e a UI sempre le o lote mais recente
+- essa pipeline e separada do upload de saldos por NE em `Empenhos.tsx` e nao altera os campos RAP da tabela `empenhos`
+- a visao anual do dashboard usa item `50` como total quando existir; se o total nao vier no ano, usa a soma dos componentes `35`, `40` e `41`
+
 ## Saldos SIAFI de empenhos
 
 - o upload manual em `Empenhos.tsx` usa `src/lib/siafi-parser.ts`

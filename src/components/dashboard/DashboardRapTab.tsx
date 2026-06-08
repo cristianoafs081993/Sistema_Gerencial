@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCurrency } from '@/lib/utils';
+import { DashboardRapAnnualEvolutionPanel } from './DashboardRapAnnualEvolutionPanel';
 
 type RapResumo = {
   origem: string;
@@ -72,6 +73,8 @@ export function DashboardRapTab({
           isLoading={isLoading}
         />
       </div>
+
+      <DashboardRapAnnualEvolutionPanel />
 
       <Card className="card-system overflow-hidden">
         <CardHeader className="border-b border-border-default/50 px-6 py-4">

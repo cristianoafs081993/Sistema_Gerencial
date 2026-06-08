@@ -51,3 +51,5 @@ Thumbs.db
 .vercel
 .env*.local
 vite.config.ts.timestamp-*.mjs
+.codex-temp/
+

@@ -3,65 +3,56 @@
 ## Fontes de verdade
 
 - `src/index.css`
-- `src/manus-stage1.css`
 - `tailwind.config.ts`
 
-`src/manus-stage1.css` voltou a ser importado pelo runtime para restaurar a paleta verde, sombras e fundos legados solicitados.
-
-Esta documentacao foi atualizada porque a mudanca altera comportamento visual real em area critica de design system.
+Os tokens visuais do antigo `src/manus-stage1.css` foram completamente incorporados e consolidados em `src/index.css` para servir como fonte única de verdade do Design System v3.0, assegurando a paleta institucional verde, sombras realçadas e fundos aprimorados em um só arquivo.
 
 ## Tipografia
 
-- Interface: `Open Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`.
-- Dados e codigos: `IBM Plex Mono`.
-- Peso base: 500.
-- Headings usam 600 ou 700.
+- **Interface de Usuário (UI)**: `Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`.
+- **Dados e Códigos (Monospace)**: `IBM Plex Mono` com alinhamento tabular (`font-variant-numeric: tabular-nums`).
+- **Peso base**: `500` (Medium) para legibilidade encorpada premium.
+- **Títulos (Headings)**: Usam peso `600` ou `700` com tracking compacto (`tracking-[-0.03em]`).
 
 ## Cores
 
-- Verde institucional: `#2f9e41`, acao primaria, estado ativo e foco.
-- Verde ativo: derivado HSL `130 54% 34%`, hover/active de acao primaria.
-- Azul vibrante: `#1a5ce6`, graficos e destaques analiticos.
-- Roxo: `#7c3aed`, graficos e destaques analiticos.
-- Amber: `#f59e0b`, alertas leves e funil do dashboard.
-- Branco: `#ffffff`, fundo e cards.
-- Cinza suave: superficies secundarias.
-- Borda clara: divisores e contornos.
-- Ink legado: `#34322d`, texto principal.
-- Cinza secundario: `#858481`, texto de apoio.
-- Erro: vermelho destrutivo.
+- **Verde institucional**: `#2f9e41` / HSL `130 54% 40%`, usado como ação primária, estado ativo e foco.
+- **Verde ativo (Hover/Active)**: HSL `130 54% 34%`, para estados de interação.
+- **Azul vibrante**: `#1a5ce6` / HSL `220 80% 52%`, para gráficos e realces analíticos.
+- **Roxo**: `#7c3aed`, para detalhes analíticos.
+- **Amber**: `#f59e0b`, para alertas leves e avisos visuais.
+- **Branco**: `#ffffff`, para fundos principais de seções e cartões.
+- **Cinza suave**: superfícies secundárias neutras.
+- **Ink legado**: `#34322d`, texto principal de alta legibilidade.
+- **Cinza secundário**: `#858481`, texto de apoio e descrição.
+- **Erro**: Vermelho destrutivo para alertas críticos e exclusão.
 
-## Tokens semanticos
+## Tokens semânticos
 
-- `--background`: branco.
-- `--foreground`: `#34322d`.
+- `--background`: HSL do branco.
+- `--foreground`: `#34322d` (Ink legado).
 - `--card`: branco.
-- `--border` e `--input`: divisor claro.
-- `--muted`: superficie suave.
+- `--border` e `--input`: cinza divisor claro.
+- `--muted`: superfície de fundo suave.
 - `--primary`: verde institucional.
 - `--success`: verde institucional.
 - `--warning`: amber.
-- `--info`: azul.
+- `--info`: azul informativo.
 - `--destructive`: vermelho de erro.
 
-## Sombras e efeitos
+## Sombras e efeitos premium
 
-- `--shadow-sm`, `--shadow-md`, `--shadow-lg` e `--shadow-xl` preservam a elevacao suave anterior.
-- `--shadow-primary` usa verde com baixa opacidade.
-- `--gradient-primary`, `--gradient-accent` e `--gradient-warning` existem para compatibilidade com superficies legadas.
-- `app-bg-soft` aplica fundo claro com textura radial leve.
+- `--shadow-sm`, `--shadow-md`, `--shadow-lg` e `--shadow-xl` são sombras multicamadas de alta definição para profundidade.
+- `--shadow-primary` usa verde com baixa opacidade para glow de foco.
+- `.border-glow` e `.border-glow-primary` para bordas realçadas com aura de luz.
+- `.glass` e `.glass-heavy` aplicam efeitos modernos de translucidez com desfoque de fundo (`backdrop-filter`).
+- `app-bg-soft` aplica fundo branco com um gradiente radial verde institucional extremamente sutil (`rgba(47, 158, 65, 0.02)`) e padrão de pontos discretos.
 
 ## Classes recorrentes
 
-- `card-system`: painel branco com borda clara.
-- `filter-panel`: area de filtros no mesmo padrao de card.
-- `table-title` e `table-description`: titulos de painel.
-- `input-system`: campo com foco verde.
-- `stat-card`: KPI com tom opcional ou `stitchColor` legado.
-- `table-pagination`: rodape de tabela com divisor superior.
-- `pending-field-marker`: destaque inline para `[CAMPO PENDENTE]`, usando vermelho destrutivo com fundo de baixa opacidade.
-- `Layout`: sidebar branca de 248px, divisor `#dddddd`, grupos sem contorno de card, item ativo com superficie `#f7f7f7` e texto reforcado.
-
-## Atualizacao de artefatos
-
-- A pagina `/artefatos-licitacao` nao introduz novos tokens; ela reutiliza `card-system`, `filter-panel`, `table-title`, `table-description`, `input-system`, badges e botoes iconicos existentes.
+- `card-system`: painel branco com borda suave e transição física física spring no hover.
+- `filter-panel`: área de filtros unificada com ícone de controle.
+- `input-system`: campo de entrada com foco verde suavizado e transição de anel.
+- `stat-card`: KPI numérico com realce luminoso no hover e gradiente opcional.
+- `table-pagination`: rodapé de tabela paginada com layout otimizado.
+- `Layout`: sidebar global com indicador lateral verde no link ativo, cabeçalhos de grupo em caixa alta e cabeçalho com efeito de vidro.

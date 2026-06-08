@@ -66,6 +66,37 @@ Consumido por:
 - [Dashboard.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Dashboard.tsx)
 - [Empenhos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Empenhos.tsx)
 
+### `rap_historico_anual`
+
+Finalidade:
+
+- historico anual agregado de restos a pagar por UG e item de informacao
+
+Campos-chave:
+
+- `ug_executora`
+- `ug_nome`
+- `ano`
+- `metrica`
+- `item_informacao_codigo`
+- `item_informacao_nome`
+- `valor`
+- `import_batch_id`
+- `source_file`
+- `imported_at`
+
+Observacoes operacionais:
+
+- a tabela e alimentada pela importacao do painel `Evolucao anual dos restos a pagar` na aba RAP do dashboard
+- cada upload cria um novo lote e a UI le somente o `import_batch_id` mais recente
+- o historico agregado nao substitui os campos operacionais de RAP em `empenhos`
+- leitura e liberada para usuarios autenticados; insert fica restrito ao superadministrador por RLS
+
+Consumido por:
+
+- [rapHistoricoAnual.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/rapHistoricoAnual.ts)
+- [DashboardRapAnnualEvolutionPanel.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/dashboard/DashboardRapAnnualEvolutionPanel.tsx)
+
 ### `descentralizacoes`
 
 Finalidade:
@@ -927,3 +958,62 @@ Observacoes operacionais:
 
 - `metadata.count` multiplica as execucoes reais de um evento em lote
 - a escrita passa pela Edge Function `record-automation-savings-event`, com `AUTOMATION_EVENT_SECRET` para extensoes ou JWT para chamadas internas autenticadas
+
+## Limpeza e Manutenção
+
+### `manutencao_ambientes`
+
+Finalidade:
+
+- Cadastro de espaços físicos monitorados por QR Code no campus.
+
+Campos-chave:
+
+- `id`
+- `codigo` (ex: SALA-101)
+- `nome`
+- `bloco`
+- `tipo`
+- `status`
+
+Observações operacionais:
+
+- Leitura pública liberada; escrita restrita a administradores autenticados.
+
+### `manutencao_ocorrencias`
+
+Finalidade:
+
+- Ocorrências e pesquisas de satisfação de limpeza enviadas por usuários.
+
+Campos-chave:
+
+- `id`
+- `ambiente_id`
+- `respondente_tipo`
+- `avaliacao` (1 a 5)
+- `problemas` (Array de tags)
+- `observacao`
+- `status` (pendente/resolvido)
+
+Observações operacionais:
+
+- Inserção anônima pública liberada; leitura e resolução restritas a usuários autenticados.
+
+### `manutencao_checkins`
+
+Finalidade:
+
+- Registro de passagens e limpezas realizadas pelas equipes.
+
+Campos-chave:
+
+- `id`
+- `ambiente_id`
+- `responsavel_nome`
+- `acao_realizada`
+- `observacao`
+
+Observações operacionais:
+
+- Inserção anônima pública liberada (validação de PIN); leitura restrita a usuários autenticados.

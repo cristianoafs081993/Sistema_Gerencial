@@ -1,91 +1,66 @@
 # PAGE_PATTERNS
 
-Esta documentacao foi atualizada porque a mudanca altera comportamento visual real em area critica de design system.
+Este documento resume as diretrizes de composição e padrões visuais de páginas do GovAnalytics.
 
 ## Shell global
 
-O shell principal em `src/components/Layout.tsx` usa sidebar:
+O shell principal em [Layout.tsx](file:///c:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/components/Layout.tsx) usa a estrutura de sidebar e header:
 
-1. sidebar branca com borda direita;
-2. marca GovAnalytics no topo com ícone oficial em `public/govflow-icon-192.png`, sem avatar de usuário na sidebar;
-3. busca visual no header principal, alinhada ao mesmo divisor horizontal da sidebar;
-4. grupos de modulos expansivos derivados de `appScreenGroups`, com icone, texto em caixa normal, superficie discreta quando abertos e transicao de altura/opacidade;
-5. itens derivados de `appScreens`, mantendo permissoes, rotas existentes e recuo visual em relacao ao grupo;
-6. submenus expansivos quando uma tela possui variacoes de rota, como Planejamento;
-7. item ativo com fundo neutro e texto reforcado, sem barra lateral;
-8. subitem ativo com ponto discreto e texto reforcado;
-9. drawer lateral em mobile;
-10. header interno para busca, acoes de pagina e subtitulo.
-
-Nao trocar a sidebar por top nav sem validar que todos os itens continuam acessiveis.
-
-Os metadados de marca usam `public/govflow-logo.png`, `public/govflow-icon-192.png`, `public/govflow-icon-512.png`, `public/favicon.png` e `public/site.webmanifest`.
+1. **Sidebar Branca Integrada**: Fundo branco e borda direita fina semi-transparente;
+2. **Identidade da Marca**: Logotipo GovAnalytics no topo com ícone oficial, posicionado com espaçamento elegante;
+3. **Busca no Header**: Campo de pesquisa com bordas levemente arredondadas e efeito de foco dinâmico verde;
+4. **Header com Efeito de Vidro**: Barra superior com translucidez (`backdrop-blur bg-white/80`) e sombra sutil;
+5. **Grupos de Módulos (Sidebar)**: Títulos em caixa alta/tamanho reduzido, ícone verde institucional quando ativo e chevrons dinâmicos que rotacionam suavemente;
+6. **Indicador Lateral Ativo**: Links de navegação ativa recebem uma barra lateral verde à esquerda (`before:bg-[#2f9e41]`) e fundo verde suave (`bg-[#f0f9f1]`);
+7. **Submenus Expansivos**: Subitens com pontos discretos verdes indicando a rota ativa com recuo visual;
+8. **Responsividade**: Drawer lateral acionado via botão hambúrguer para dispositivos móveis;
+9. **Scrollbars**: Rolagem fina com trilha invisível e cantos arredondados na navegação interna.
 
 ## Textos e encoding
 
-- Textos de UI e documentacao devem permanecer em UTF-8 legivel.
-- Nao commitar mojibake em labels, titulos, mensagens, comentarios ou documentacao.
-- Depois de alterar copy de UI ou documentacao do design system, rode `npm test -- src/__tests__/encoding.test.ts`.
+- Todos os textos e documentações devem estar em conformidade UTF-8.
+- Após alterar copies de UI ou documentações do design system, execute:
+  ```powershell
+  npm test -- src/__tests__/encoding.test.ts
+  ```
 
-## Padrao 1: tabela operacional
-
-Estrutura:
-
-1. `HeaderActions`
-2. `FilterPanel`
-3. `DataTablePanel`
-4. `TablePagination`
-
-Tabelas devem usar cabecalho suave, linhas com divisor claro e texto denso.
-
-## Padrao 2: consulta com KPIs e tabela
+## Padrão 1: tabela operacional
 
 Estrutura:
-
 1. `HeaderActions`
-2. grid de `StatCard`
+2. `FilterPanel` (Filtros)
+3. `DataTablePanel` (Tabela com overflow horizontal)
+4. `TablePagination` (Paginação no rodapé)
+
+As tabelas devem usar cabeçalho suave, linhas com divisores claros, efeito de hover suave (`row-hover`) e tipografia tabular `IBM Plex Mono` para dados.
+
+## Padrão 2: consulta com KPIs e tabela
+
+Estrutura:
+1. `HeaderActions`
+2. Grid responsiva de `StatCard` (KPIs)
 3. `FilterPanel`
-4. tabela principal
+4. Tabela operacional com paginação
 
-KPIs podem usar `tone` novo ou `stitchColor` legado enquanto a compatibilidade existir.
-
-Aplicacao atual:
-
-- `/artefatos-licitacao` usa resumo por tipo, filtros compactos e tabela operacional para consulta de ETP, Mapa de Risco, Termo de Referencia e Minuta de Contrato. Acoes de linha devem permanecer iconicas e alinhadas a direita.
-- `/licitacoes-pregoes` usa `FilterPanel` em grade responsiva com rotulos, pesquisa por objeto e item PNCP, acao de limpar, tabela paginada e drawer de detalhe para consulta institucional dos pregoes PNCP, com UASG opcional. A tela nao exibe card de resumo; a busca no PNCP fica junto aos filtros e a sincronizacao dirigida do catalogo IFRN fica no header.
-- `/atas-registro-precos` usa `FilterPanel`, filtros por UASG/vinculo/periodo/texto e tabela paginada, sem card de resumo acima dos filtros; resultados de busca por item exibem o item correspondente, a contagem de participantes possui hover com as UASGs participantes materializadas e atas sem detalhes sinalizam que itens ainda nao foram carregados.
-- `/credito-disponivel` usa KPIs, filtros compactos e tabela paginada para consultar saldo por PTRES/PI, exibindo apenas linhas com saldo por padrao e sem expor o nome do arquivo importado. A importacao CSV fica no header e aparece somente para superadmin.
-- `/energia` usa filtros de periodo/fonte no header, KPIs com `StatCard`, graficos com `ChartPanel`, blocos metodologicos com `SectionPanel` e tabelas de detalhe com `DataTablePanel`; o upload XLSX aparece somente para superadmin.
-
-## Padrao 3: importacao de arquivo
+## Padrão 3: importação de arquivo
 
 Estrutura:
+1. `HeaderActions` com botões primários/secundários dinâmicos;
+2. Informações e progresso de carregamento;
+3. Exibição de cards ou tabelas com estados de erro/sucesso explícitos.
 
-1. `HeaderActions` com botao primario/secundario;
-2. informacao do arquivo atual quando existir;
-3. tabela ou cards derivados.
-
-Uploads devem manter estados de loading e erro claros.
-
-## Padrao 4: dashboard analitico
+## Padrão 4: dashboard analítico
 
 Estrutura:
+1. Filtros globais de período;
+2. Grid de `StatCard` com realces interativos;
+3. `ChartPanel` contendo gráficos e legendas customizadas;
+4. Tabelas secundárias de apoio.
 
-1. filtros globais;
-2. KPIs com `StatCard`;
-3. graficos com `ChartPanel`;
-4. tabelas secundarias.
+O dashboard preserva a paleta de cores analíticas (azul para planejado/séries base, verde para pago, roxo para empenhado e âmbar para etapas intermediárias) com transições suaves e estados vazios amigáveis.
 
-O dashboard preserva a paleta anterior para leitura analitica: azul para planejado/series base, verde para pago/naturezas, roxo para empenhado, amber para etapas intermediarias e cores complementares em barras empilhadas.
+## Antipadrões a evitar
 
-Aplicacao atual:
-
-- O dashboard usa as abas `Orcamento`, `RAP` e `Contratos`, nessa ordem. A aba `Contratos` usa uma faixa de controle no topo com bolhas clicaveis para selecao multipla de contratos; essa selecao mostra todos os contratos ativos carregados, indica contratos sem fatura no periodo e filtra todos os graficos da aba. A aba usa `ChartPanel` para o grafico mensal de gasto por contrato e para o bullet chart de projecao anual frente ao empenhado. O grafico mensal exibe linhas por contrato com traco solido para `Executado` e tracejado para `Pendente`, legenda em `fornecedor - numero do contrato`, periodo vindo do filtro do header e estado vazio. O bullet chart exibe `Empenhado`, `Liquidado` e `Projetado`, nessa ordem, e usa hover para mostrar liquidacoes consideradas, empenhos vinculados, saldo dos empenhos e meses usados na projecao. O botao de filtros permanece no header tambem nessa aba.
-- `/energia` usa o padrao analitico para comparar COSERN, Mercatto e geracao solar em visao geral, mantendo as abas especificas para faturas, contratos, financeiro e ESG.
-
-## Antipadroes
-
-- Remover `src/manus-stage1.css` sem migrar antes todos os tokens legados equivalentes.
-- Trocar a sidebar por navegacao superior incompleta.
-- Apagar a paleta multicolorida do dashboard.
-- Criar card/tabela/filtro ad hoc quando houver componente oficial.
+- Reintroduzir folhas de estilo separadas para sobrescritas de tokens visuais concorrentes.
+- Criar cards, tabelas ou formulários customizados ad hoc sem reutilizar os componentes oficiais de `src/components/design-system`.
+- Quebrar a curva de transição suave (`spring`) ou a paleta de contraste acessível do Dark Mode.

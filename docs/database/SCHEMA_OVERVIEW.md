@@ -81,6 +81,12 @@ Para mudancas sensiveis, confirme sempre nas migrations em [supabase/migrations]
 - `energia_contratos`
 - `energia_contrato_execucoes`
 
+### Limpeza e Manutenção
+
+- `manutencao_ambientes`
+- `manutencao_ocorrencias`
+- `manutencao_checkins`
+
 ### Automacoes e economia de tempo
 
 - `automation_savings_scenarios`

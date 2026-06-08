@@ -76,6 +76,7 @@ export function StatCard({
         "shadow-card hover:shadow-lifted hover:-translate-y-[2px]",
         "transition-all duration-200",
         "p-5",
+        "group",
       )}>
         {/* Barra lateral colorida — Aura Style accent indicator */}
         <div className={cn("absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl", accentBarMap[stitchColor])} />
@@ -113,7 +114,7 @@ export function StatCard({
           <Skeleton className="h-3.5 w-3/4 mt-2" />
         ) : (
           subtitle && (
-            <p className="text-xs text-muted-foreground mt-1.5 leading-tight">{subtitle}</p>
+            <p className="text-xs text-muted-foreground mt-1.5 leading-tight opacity-0 group-hover:opacity-100 transition-opacity duration-300">{subtitle}</p>
           )
         )}
 
@@ -150,7 +151,7 @@ export function StatCard({
   };
 
   return (
-    <div className={cn(variantStyles[variant], 'relative')}>
+    <div className={cn(variantStyles[variant], 'relative group')}>
       <div className={cn(
         "absolute top-4 right-4 rounded-lg p-2",
         iconBgStyles[variant]
@@ -179,7 +180,7 @@ export function StatCard({
         ) : (
           subtitle && (
             <p className={cn(
-              "text-sm mt-1",
+              "text-sm mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300",
               variant === 'default' ? 'text-muted-foreground' : 'text-white/70'
             )}>
               {subtitle}
