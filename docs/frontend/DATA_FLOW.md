@@ -170,7 +170,7 @@ Observacao para a aba RAP do dashboard:
 - a mesma regra deve valer para dashboard, tela de empenhos, agrupamentos e contratos vinculados
 - nao reutilizar `valor` ou `valorPagoOficial` como substitutos desses totais na agregacao da aba RAP
 - a aba RAP tambem possui a visao `Evolucao anual dos restos a pagar`, carregada por `DashboardRapAnnualEvolutionPanel.tsx` via `rapHistoricoAnualService`
-- essa visao usa `rap_historico_anual`, le o ultimo lote importado, filtra por UG e exibe itens `35`, `40`, `41` como composicao anual e item `50` como total; se o item `50` estiver ausente em algum ano, o total e derivado da soma dos componentes
+- essa visao usa `rap_historico_anual`, le o ultimo lote importado, seleciona a UG `158366` por padrao quando ela estiver disponivel, permite trocar a UG e exibe itens `35`, `40`, `41` como composicao anual e item `50` como total; se o item `50` estiver ausente em algum ano, o total e derivado da soma dos componentes
 - a importacao do historico anual fica restrita a superadmin e nao altera a tabela `empenhos`
 
 Observacao para a aba de exercicio atual do dashboard:

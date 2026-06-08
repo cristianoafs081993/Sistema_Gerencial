@@ -109,14 +109,11 @@ describe('DashboardRapAnnualEvolutionPanel', () => {
     });
   });
 
-  it('mostra estado vazio ate selecionar uma UG e renderiza a evolucao anual', async () => {
+  it('seleciona a UG 158366 por padrao e renderiza a evolucao anual', async () => {
     renderPanel();
 
-    expect(await screen.findByText(/Selecione uma UG/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('combobox', { name: /Selecionar UG/i }));
-    fireEvent.click(await screen.findByRole('option', { name: /158366 - Campus Currais Novos/i }));
-
     expect(await screen.findByTestId('composed-chart')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /Selecionar UG/i })).toHaveTextContent('158366');
     expect(screen.getAllByTestId('chart-series').map((item) => item.textContent)).toEqual([
       'Processado inscrito',
       'Não processado inscrito',
@@ -132,7 +129,7 @@ describe('DashboardRapAnnualEvolutionPanel', () => {
     mockedUseAuth.mockReturnValue({ isSuperAdmin: false } as never);
     renderPanel();
 
-    expect(await screen.findByText(/Selecione uma UG/i)).toBeInTheDocument();
+    expect(await screen.findByTestId('composed-chart')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Importar histórico RAP/i })).not.toBeInTheDocument();
   });
 

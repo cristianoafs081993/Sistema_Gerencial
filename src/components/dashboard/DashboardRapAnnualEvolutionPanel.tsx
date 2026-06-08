@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { FileSpreadsheet, Loader2, Upload } from 'lucide-react';
@@ -84,6 +84,12 @@ export function DashboardRapAnnualEvolutionPanel() {
     const option = ugOptions.find((item) => item.codigo === selectedUg);
     if (!option) return '';
     return option.nome && option.nome !== option.codigo ? `${option.codigo} - ${option.nome}` : option.codigo;
+  }, [selectedUg, ugOptions]);
+
+  useEffect(() => {
+    if (!selectedUg && ugOptions.some((option) => option.codigo === '158366')) {
+      setSelectedUg('158366');
+    }
   }, [selectedUg, ugOptions]);
 
   const chartData = useMemo(
