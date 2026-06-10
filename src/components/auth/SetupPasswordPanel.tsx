@@ -64,15 +64,10 @@ export function SetupPasswordPanel({
   };
 
   return (
-    <Card className="border-border-default/70 shadow-[0_22px_60px_rgba(15,23,42,0.08)]">
-      <CardHeader className="space-y-3">
-        <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
-          <KeyRound className="h-5 w-5" />
-        </div>
-        <div className="space-y-1">
-          <CardTitle>{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
-        </div>
+    <Card className="border-border-default/70 shadow-[0_22px_60px_rgba(15,23,42,0.08)] bg-white/80 backdrop-blur-sm">
+      <CardHeader className="space-y-2 pb-2">
+        <CardTitle className="text-2xl font-black tracking-tight text-foreground">{title}</CardTitle>
+        {description ? <CardDescription className="text-sm font-medium text-muted-foreground">{description}</CardDescription> : null}
       </CardHeader>
       <CardContent className="space-y-4">
         {statusMessage ? (

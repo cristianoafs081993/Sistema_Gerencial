@@ -39,3 +39,9 @@ verify_jwt = false
 
 [functions.sync-atas-registro-precos]
 verify_jwt = false
+
+[functions.suap-token-exchange]
+verify_jwt = false
+
+[functions.pesquisar-precos]
+verify_jwt = true

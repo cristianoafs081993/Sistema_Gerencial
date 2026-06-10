@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Loader2, LockKeyhole, Mail } from 'lucide-react';
+import { GraduationCap, Loader2, LockKeyhole, Mail } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { normalizeNextPath } from '@/lib/auth';
 
 type AuthPanelProps = {
   title: string;
@@ -17,6 +19,9 @@ export function AuthPanel({ title, description }: AuthPanelProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchParams] = useSearchParams();
+  const requestedNextPath = searchParams.get('next');
+  const nextPath = normalizeNextPath(requestedNextPath);
 
   const handleLogin = async () => {
     const normalizedEmail = email.trim();
@@ -43,16 +48,22 @@ export function AuthPanel({ title, description }: AuthPanelProps) {
     }
   };
 
+  const handleSuapLogin = () => {
+    localStorage.setItem('suap_login_next', nextPath);
+    const clientId = 'Oe1jZhORICjEB840r23FR4P1OGQCInNqyNcCzLip';
+    const redirectUri = window.location.origin + '/suap-callback';
+    const state = 'app';
+    const suapAuthUrl = `https://suap.ifrn.edu.br/o/authorize/?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(
+      redirectUri
+    )}&state=${encodeURIComponent(state)}`;
+    window.location.href = suapAuthUrl;
+  };
+
   return (
-    <Card className="border-border-default/70 shadow-[0_22px_60px_rgba(15,23,42,0.08)]">
-      <CardHeader className="space-y-3">
-        <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          <LockKeyhole className="h-5 w-5" />
-        </div>
-        <div className="space-y-1">
-          <CardTitle>{title}</CardTitle>
-          {description ? <CardDescription>{description}</CardDescription> : null}
-        </div>
+    <Card className="border-border-default/70 shadow-[0_22px_60px_rgba(15,23,42,0.08)] bg-white/80 backdrop-blur-sm">
+      <CardHeader className="space-y-2 pb-2">
+        <CardTitle className="text-2xl font-black tracking-tight text-foreground">{title}</CardTitle>
+        {description ? <CardDescription className="text-sm font-medium text-muted-foreground">{description}</CardDescription> : null}
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
@@ -99,6 +110,23 @@ export function AuthPanel({ title, description }: AuthPanelProps) {
         <Button type="button" className="h-11 w-full" disabled={isSubmitting} onClick={() => void handleLogin()}>
           {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <LockKeyhole className="h-4 w-4" />}
           {isSubmitting ? 'Entrando...' : 'Entrar'}
+        </Button>
+
+        <div className="relative flex py-2 items-center">
+          <div className="flex-grow border-t border-border"></div>
+          <span className="flex-shrink mx-4 text-xs text-muted-foreground uppercase font-bold tracking-wider">
+            ou acesse com
+          </span>
+          <div className="flex-grow border-t border-border"></div>
+        </div>
+
+        <Button
+          type="button"
+          onClick={handleSuapLogin}
+          className="w-full bg-[#1b5e20] hover:bg-[#1b5e20]/90 text-white h-11 shadow-sm rounded-xl font-bold gap-2 flex items-center justify-center transition-all"
+        >
+          <GraduationCap className="h-5 w-5" />
+          Entrar com SUAP
         </Button>
 
       </CardContent>

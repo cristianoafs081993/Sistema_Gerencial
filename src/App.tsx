@@ -25,11 +25,13 @@ const ConciliacaoPfs = lazy(() => import('./pages/ConciliacaoPfs'));
 const GeradorDocumentos = lazy(() => import('./pages/GeradorDocumentos'));
 const EditorDocumentos = lazy(() => import('./pages/EditorDocumentos'));
 const ArtefatosLicitacao = lazy(() => import('./pages/ArtefatosLicitacao'));
+const PesquisaPrecos = lazy(() => import('./pages/PesquisaPrecos'));
 const LicitacoesPregoes = lazy(() => import('./pages/LicitacoesPregoes'));
 const AtasRegistroPrecos = lazy(() => import('./pages/AtasRegistroPrecos'));
 const EnergiaCampus = lazy(() => import('./pages/energia/EnergiaCampus'));
 const Consultor = lazy(() => import('./pages/ConsultorSessions'));
 const Suap = lazy(() => import('./pages/Suap'));
+const SuapCallback = lazy(() => import('./pages/SuapCallback'));
 const EconomiaTempo = lazy(() => import('./pages/EconomiaTempo'));
 const ControleUsuarios = lazy(() => import('./pages/ControleUsuarios'));
 const ModelosDocumentos = lazy(() => import('./pages/ModelosDocumentos'));
@@ -66,6 +68,7 @@ const App = () => (
             <Routes>
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/feedback-ambiente/:codigo" element={<PublicFeedback />} />
+              <Route path="/suap-callback" element={<SuapCallback />} />
               <Route element={<ProtectedRoute />}>
                 <Route element={<AppShell />}>
                   <Route path="/" element={<Dashboard />} />
@@ -86,6 +89,7 @@ const App = () => (
                   <Route path="/editor-documentos" element={<EditorDocumentos />} />
                   <Route path="/editor-documentos/:modelId" element={<EditorDocumentos />} />
                   <Route path="/artefatos-licitacao" element={<ArtefatosLicitacao />} />
+                  <Route path="/pesquisa-precos" element={<PesquisaPrecos />} />
                   <Route path="/licitacoes-pregoes" element={<LicitacoesPregoes />} />
                   <Route path="/atas-registro-precos" element={<AtasRegistroPrecos />} />
                   <Route path="/energia" element={<EnergiaCampus />} />

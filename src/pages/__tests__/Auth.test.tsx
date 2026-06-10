@@ -83,5 +83,9 @@ describe('Auth page', () => {
     );
 
     expect(await screen.findByText('login-panel:Entrar')).toBeInTheDocument();
+    expect(screen.getByTestId('auth-visual-background')).toHaveAttribute(
+      'src',
+      '/login-finance-background.jpg',
+    );
   });
 });
