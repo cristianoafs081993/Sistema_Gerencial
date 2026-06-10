@@ -6,6 +6,7 @@ export interface Ambiente {
   nome: string;
   bloco: string | null;
   tipo: 'sala' | 'banheiro' | 'laboratorio' | 'corredor' | 'outros';
+  zona: 'academico' | 'administrativo' | 'esportivo' | 'servicos' | 'convivencia' | 'apoio_tecnico' | null;
   status: 'ativo' | 'inativo';
   created_at: string;
 }
@@ -31,13 +32,29 @@ export interface Checkin {
   id: string;
   ambiente_id: string;
   responsavel_nome: string;
-  acao_realizada: 'limpeza_padrao' | 'reposicao_insumos' | 'inspecao' | 'manutencao_corretiva';
+  acoes_realizadas: string[];
   observacao: string | null;
   created_at: string;
   ambiente?: {
     nome: string;
     codigo: string;
   };
+  materiais?: {
+    material: 'papel_higienico' | 'sabonete_liquido' | 'papel_toalha' | 'saco_lixo' | 'outros';
+    quantidade: number;
+  }[];
+}
+
+export interface BlocoMapa {
+  id: string;
+  nome: string;
+  zona: 'academico' | 'administrativo' | 'esportivo' | 'servicos' | 'convivencia' | 'apoio_tecnico';
+  badge_x: number;
+  badge_y: number;
+  geometria_tipo: 'rect' | 'circle' | 'polygon' | 'path';
+  geometria_data: any;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export const manutencaoService = {
@@ -124,7 +141,7 @@ export const manutencaoService = {
   async getCheckins(): Promise<Checkin[]> {
     const { data, error } = await supabase
       .from('manutencao_checkins')
-      .select('*, ambiente:ambiente_id(nome, codigo)')
+      .select('*, ambiente:ambiente_id(nome, codigo), materiais:manutencao_checkin_materiais(material, quantidade)')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -132,13 +149,60 @@ export const manutencaoService = {
   },
 
   async createCheckin(payload: Omit<Checkin, 'id' | 'created_at'>): Promise<Checkin> {
+    const { materiais, ...checkinData } = payload;
     const { data, error } = await supabase
       .from('manutencao_checkins')
-      .insert(payload)
+      .insert(checkinData)
       .select()
       .single();
 
     if (error) throw error;
-    return data as Checkin;
+    const newCheckin = data as Checkin;
+
+    if (materiais && materiais.length > 0) {
+      const materialsPayload = materiais.map((m) => ({
+        checkin_id: newCheckin.id,
+        material: m.material,
+        quantidade: m.quantidade,
+      }));
+      const { error: matError } = await supabase
+        .from('manutencao_checkin_materiais')
+        .insert(materialsPayload);
+
+      if (matError) throw matError;
+    }
+
+    return { ...newCheckin, materiais };
+  },
+
+  async getBlocosMapa(): Promise<BlocoMapa[]> {
+    const { data, error } = await supabase
+      .from('manutencao_blocos_mapa')
+      .select('*')
+      .order('nome', { ascending: true });
+
+    if (error) throw error;
+    return (data || []) as BlocoMapa[];
+  },
+
+  async saveBlocoMapa(bloco: Omit<BlocoMapa, 'created_at' | 'updated_at'>): Promise<BlocoMapa> {
+    const { data, error } = await supabase
+      .from('manutencao_blocos_mapa')
+      .upsert(bloco)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as BlocoMapa;
+  },
+
+  async deleteBlocoMapa(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('manutencao_blocos_mapa')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
   },
 };
+

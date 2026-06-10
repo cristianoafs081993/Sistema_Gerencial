@@ -118,6 +118,26 @@ Mostrar a linhagem operacional dos dados de forma curta:
     - `licitacoes_pncp_uasgs`
   - pagina: [LicitacoesPregoes.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/LicitacoesPregoes.tsx)
 - observacao: o endpoint PNCP `/v1/contratacoes/publicacao` usa datas `yyyyMMdd`, limita cada consulta a ate 365 dias e e consultado por `cnpj=10877412000168` sem UASG na sincronizacao institucional; quando a consulta filtra `codigoUnidadeAdministrativa`, o CNPJ tambem e obrigatorio. A v1 busca pregao eletronico (`codigoModalidadeContratacao = 6`), nao envia `tamanhoPagina` e grava o payload integral em `raw_data`. Quando `itemBusca` e informado, a function tambem consulta `/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}/itens` e salva o resultado em `raw_data.itens` para pesquisa local por item.
+
+### Pesquisa de preços
+
+- planilha XLSX/XLS/CSV
+  - parser e normalização: `src/lib/priceResearch.ts`
+  - página: `src/pages/PesquisaPrecos.tsx`
+- código CATMAT/CATSER
+  - consulta autenticada: `supabase/functions/pesquisar-precos/index.ts`
+  - fonte de preços homologados: Dados Abertos Compras.gov.br, módulo de pesquisa de preços
+  - enriquecimento opcional: Gemini reordena aderência sem alterar valores
+  - rastreabilidade complementar: link de pesquisa no PNCP por UASG/número/ano
+- revisão humana
+  - seleção ou exclusão justificada de cada referência
+  - cálculo local de estatísticas e preço estimado
+- persistência
+  - `price_researches`
+  - `price_research_items`
+- saída
+  - relatório HTML imprimível
+  - workbook XLSX com resumo e detalhamento das cotações
 - API `https://dadosabertos.compras.gov.br`
   - enriquecimento best-effort: `/modulo-uasg/1_consultarUasg`
   - tabela: `licitacoes_pncp_uasgs`

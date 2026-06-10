@@ -26,6 +26,7 @@ Este indice organiza a documentacao operacional do repositorio por dominio.
 - [DOCUMENTOS_HABEIS_E_LIQUIDACOES.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/data-import/DOCUMENTOS_HABEIS_E_LIQUIDACOES.md)
 - [ENERGIA.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/data-import/ENERGIA.md)
 - [CREDITOS_DISPONIVEIS.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/data-import/CREDITOS_DISPONIVEIS.md)
+- [PESQUISA_PRECOS.md](data-import/PESQUISA_PRECOS.md)
 
 ## Integracoes e operacao
 

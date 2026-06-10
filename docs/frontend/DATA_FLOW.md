@@ -354,6 +354,25 @@ Observacoes:
 - o Consultor salva sessoes em `localStorage`, mas agora com chave isolada por usuario autenticado em vez de um historico global compartilhado
 - no Consultor, o upload de PDF fica liberado para qualquer usuario autenticado; a restricao de superadmin continua apenas nos uploads/importacoes CSV das demais telas
 
+### Pesquisa de preços
+
+`App.tsx` -> `PesquisaPrecos.tsx` -> `priceResearch.ts` -> `pesquisar-precos` -> Dados Abertos Compras.gov.br
+
+Persistência:
+
+`PesquisaPrecos.tsx` -> `priceResearchService` -> `price_researches` / `price_research_items`
+
+Observações:
+
+- XLSX/XLS/CSV ou PDF pesquisável é lido localmente, sem upload do arquivo bruto para Storage;
+- o PDF usa a posição dos textos para recompor colunas; arquivos escaneados sem camada de texto ainda não passam por OCR;
+- quando CATMAT/CATSER não vem no arquivo, `priceCatalog.worker.ts` carrega sob demanda o catálogo compactado correspondente e ranqueia até cinco códigos semelhantes sem bloquear a interface;
+- o usuário confirma uma sugestão ou informa manualmente o código antes de chamar a Edge Function;
+- a função retorna até 15 preços homologados por item e preserva fonte, compra, fornecedor e unidade;
+- a IA é opcional e apenas reordena aderência;
+- seleção, exclusões e justificativas permanecem no estado editável e no snapshot salvo;
+- relatório HTML e exportação XLSX são gerados no navegador a partir da pesquisa revisada.
+
 ## Regras de cautela
 
 - nem toda pagina relevante usa o `DataContext`

@@ -65,6 +65,8 @@ Para mudancas sensiveis, confirme sempre nas migrations em [supabase/migrations]
 - `atas_registro_precos_adesoes`
 - `atas_registro_precos_sync_runs`
 - view `atas_registro_precos_resumo`
+- `price_researches`
+- `price_research_items`
 
 ### Importacoes auxiliares
 
@@ -136,6 +138,7 @@ Esta view aparece no frontend em [rastreabilidadePFs.ts](/C:/Users/crist/OneDriv
 - `refresh-comprasnet-liquidacoes-cache`
 - `sync-atas-registro-precos`
 - `sync-licitacoes-pncp`
+- `pesquisar-precos`
 
 ## Functions invocadas no frontend que exigem confirmacao
 

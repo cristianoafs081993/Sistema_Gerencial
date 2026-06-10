@@ -52,4 +52,5 @@ Thumbs.db
 .env*.local
 vite.config.ts.timestamp-*.mjs
 .codex-temp/
+scratch/
 

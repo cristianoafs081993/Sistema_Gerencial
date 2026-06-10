@@ -59,6 +59,28 @@ Estrutura:
 
 O dashboard preserva a paleta de cores analíticas (azul para planejado/séries base, verde para pago, roxo para empenhado e âmbar para etapas intermediárias) com transições suaves e estados vazios amigáveis.
 
+## Padrão 5: autenticação
+
+A tela desktop de autenticação usa composição dividida:
+
+1. painel institucional à esquerda com imagem temática em baixa opacidade;
+2. camada verde escura translúcida sobre a imagem para preservar o contraste;
+3. marca, mensagem de produto e informações institucionais acima das camadas decorativas;
+4. formulário de acesso em superfície branca à direita;
+5. em telas menores, o painel ilustrado é ocultado e o formulário ocupa toda a largura.
+
+## Padrão 6: fluxo assistido auditável
+
+Usado em processos com IA e decisão humana, como pesquisa de preços:
+
+1. `HeaderActions` concentra modelo, importação, salvamento e saída;
+2. uma faixa inicial explica etapas, fonte e limite da automação;
+3. metadados obrigatórios aparecem antes da execução;
+4. itens são revisados individualmente antes da chamada externa;
+5. KPIs estatísticos resumem apenas registros selecionados;
+6. `DataTablePanel` mantém fonte, valor original, valor comparável, aderência e justificativa visíveis;
+7. a ação final valida pendências e salva o snapshot antes de gerar o relatório.
+
 ## Antipadrões a evitar
 
 - Reintroduzir folhas de estilo separadas para sobrescritas de tokens visuais concorrentes.

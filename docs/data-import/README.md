@@ -25,6 +25,7 @@ Sem isso, uma IA tende a errar porque tenta inferir o contrato lendo somente a U
 - [DOCUMENTOS_HABEIS_E_LIQUIDACOES.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/data-import/DOCUMENTOS_HABEIS_E_LIQUIDACOES.md)
 - [ENERGIA.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/data-import/ENERGIA.md)
 - [CREDITOS_DISPONIVEIS.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/data-import/CREDITOS_DISPONIVEIS.md)
+- [PESQUISA_PRECOS.md](PESQUISA_PRECOS.md)
 
 ## Fixture files uteis
 

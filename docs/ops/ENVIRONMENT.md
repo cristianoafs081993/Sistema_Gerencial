@@ -326,6 +326,26 @@ Observacoes operacionais:
 - a migration agenda chamada a cada hora para revalidar cache vencido
 - o TTL fica em 12 horas quando há liquidações encontradas e 1 hora para `not_found`
 
+### `pesquisar-precos`
+
+Necessárias no ambiente do Supabase:
+
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+
+Opcionais:
+
+- `GEMINI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- `GEMINI_PRICE_RESEARCH_MODEL`
+  - default no código: `gemini-2.5-flash-lite`
+
+Observações operacionais:
+
+- sem chave Gemini, a pesquisa continua usando ranking determinístico por descrição, unidade, quantidade e recência;
+- a IA não gera preço e não é fonte de dado;
+- `supabase/config.toml` deve manter `verify_jwt = true` para `pesquisar-precos`;
+- a function depende da disponibilidade pública de `dadosabertos.compras.gov.br`.
+
 ### Consultor
 
 O frontend chama a function `consultor`, mas a implementacao nao foi localizada neste repo nesta rodada.

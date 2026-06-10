@@ -491,6 +491,34 @@ Observacao:
 - resultados encontrados recebem TTL de 12 horas
 - resultados `not_found` recebem TTL de 1 hora
 
+### `pesquisar-precos`
+
+Local:
+
+- `supabase/functions/pesquisar-precos/index.ts`
+
+Uso:
+
+- recebe itens com descrição, quantidade, unidade e CATMAT/CATSER;
+- consulta preços homologados dos últimos 12 meses no Compras.gov.br;
+- normaliza unidades determinísticas e retorna até 15 candidatos por item;
+- usa Gemini opcionalmente apenas para reordenar aderência;
+- devolve links da fonte oficial e pesquisa complementar no PNCP.
+
+Dependências:
+
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- opcional `GEMINI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional `GEMINI_PRICE_RESEARCH_MODEL`
+
+Observações:
+
+- publicada com `verify_jwt = true`;
+- também valida o usuário dentro da function;
+- não usa service role e não grava no banco;
+- limites: 25 itens por chamada e 15 candidatos por item.
+
 ## Functions chamadas pelo frontend, mas nao localizadas neste repo
 
 ### `consultor`

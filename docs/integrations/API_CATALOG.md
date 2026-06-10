@@ -781,3 +781,41 @@ Observacao:
 
 - a function busca o cenario ativo em `automation_savings_scenarios`, copia os tempos vigentes para o evento e calcula `saved_minutes`
 - `metadata.count` representa execucoes em lote e e aplicado pelo agregador do frontend
+
+## Pesquisa de preços oficial
+
+Uso:
+
+- recuperar até 15 referências de preço homologado por item importado;
+- apoiar a pesquisa exigida pela IN SEGES/ME nº 65/2021;
+- ordenar aderência técnica sem modificar valores oficiais.
+
+Fonte primária:
+
+- `https://dadosabertos.compras.gov.br`
+- `/modulo-pesquisa-preco/1_consultarMaterial`
+- `/modulo-pesquisa-preco/3_consultarServico`
+
+Parâmetros principais:
+
+- `codigoItemCatalogo`
+- `dataCompraInicio`
+- `dataCompraFim`
+- `pagina`
+- `tamanhoPagina`
+
+Implementação:
+
+- `supabase/functions/pesquisar-precos/index.ts`
+- `src/services/priceResearch.ts`
+- `src/pages/PesquisaPrecos.tsx`
+
+Observações operacionais:
+
+- a janela consultada é de 12 meses;
+- CATMAT usa o endpoint de material e CATSER usa o endpoint de serviço;
+- a função preserva a URL exata da consulta e o payload oficial no snapshot;
+- o PNCP é usado como rastreabilidade complementar da contratação, não como substituto automático do preço homologado;
+- quando houver segredo Gemini, a IA reordena no máximo 40 candidatos pela aderência técnica;
+- quando não houver segredo ou a chamada Gemini falhar, a ordenação heurística determinística continua funcionando;
+- a function exige sessão Supabase autenticada e limita a chamada a 25 itens.

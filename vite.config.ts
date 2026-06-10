@@ -126,6 +126,15 @@ export default defineConfig(({ mode }) => {
       alias: {
         "@": path.resolve(__dirname, "./src"),
       },
+      dedupe: [
+        "prosemirror-state",
+        "prosemirror-model",
+        "prosemirror-view",
+        "prosemirror-transform",
+        "prosemirror-keymap",
+        "prosemirror-gapcursor",
+        "prosemirror-history",
+      ],
     },
     build: {
       rollupOptions: {

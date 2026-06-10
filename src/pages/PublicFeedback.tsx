@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { type Ambiente, manutencaoService } from '@/services/manutencao';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
 
 const emojiMap: Record<number, string> = {
   5: '😀',
@@ -68,11 +69,80 @@ export default function PublicFeedback() {
   // Form State - Checkin (Staff)
   const [staffTab, setStaffTab] = useState(false); // Toggle to staff login view
   const [staffName, setStaffName] = useState('');
-  const [staffAction, setStaffAction] = useState<'limpeza_padrao' | 'reposicao_insumos' | 'inspecao' | 'manutencao_corretiva'>('limpeza_padrao');
+  const [staffActions, setStaffActions] = useState<string[]>([]);
+  const [materialsUsed, setMaterialsUsed] = useState<Record<string, number>>({
+    papel_higienico: 0,
+    sabonete_liquido: 0,
+    papel_toalha: 0,
+    saco_lixo: 0,
+    outros: 0,
+  });
+
+  const handleQuantityChange = (material: string, increment: number) => {
+    setMaterialsUsed((prev) => ({
+      ...prev,
+      [material]: Math.max(0, prev[material] + increment),
+    }));
+  };
   const [staffObservation, setStaffObservation] = useState('');
   const [staffPin, setStaffPin] = useState('');
   const [submittingCheckin, setSubmittingCheckin] = useState(false);
   const [checkinSuccess, setCheckinSuccess] = useState(false);
+
+  // SUAP Auth State
+  const [suapUser, setSuapUser] = useState<{ nome: string; matricula: string; email: string; foto: string | null } | null>(null);
+  const [manualLogged, setManualLogged] = useState(false);
+
+  const isStaffLoggedIn = !!suapUser || manualLogged;
+
+  const handleManualLogin = () => {
+    if (!staffName.trim()) {
+      toast.error('Preencha seu nome.');
+      return;
+    }
+    if (staffPin.trim() !== '1234') {
+      toast.error('PIN de segurança incorreto.');
+      return;
+    }
+    setManualLogged(true);
+    toast.success('Autenticado com sucesso!');
+  };
+
+  const handleDisconnect = () => {
+    sessionStorage.removeItem('suap_staff_user');
+    setSuapUser(null);
+    setManualLogged(false);
+    setStaffName('');
+    setStaffPin('');
+    toast.info('Sessão encerrada.');
+  };
+
+  useEffect(() => {
+    const storedUser = sessionStorage.getItem('suap_staff_user');
+    console.log('PublicFeedback mount storedUser:', storedUser);
+    if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser);
+        console.log('Parsed SUAP user:', user);
+        setSuapUser(user);
+        setStaffName(user.nome);
+        setStaffTab(true);
+      } catch (e) {
+        console.error('Erro ao ler usuário do SUAP da sessão:', e);
+        sessionStorage.removeItem('suap_staff_user');
+      }
+    }
+  }, []);
+
+  const handleSuapLogin = () => {
+    const clientId = 'Oe1jZhORICjEB840r23FR4P1OGQCInNqyNcCzLip';
+    const redirectUri = window.location.origin + '/suap-callback';
+    const state = codigo || '';
+    const suapAuthUrl = `https://suap.ifrn.edu.br/o/authorize/?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(
+      redirectUri
+    )}&state=${encodeURIComponent(state)}`;
+    window.location.href = suapAuthUrl;
+  };
 
   useEffect(() => {
     const fetchAmbiente = async () => {
@@ -136,23 +206,46 @@ export default function PublicFeedback() {
 
   const handleSubmitCheckin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ambiente || !staffName || !staffPin) {
+    console.log('handleSubmitCheckin triggered:', { ambiente, staffName, suapUser, staffPin });
+    if (!ambiente || (!suapUser && !staffName)) {
       toast.error('Preencha os dados obrigatórios.');
       return;
     }
 
-    if (staffPin.trim() !== '1234') {
+    if (!suapUser && !staffPin) {
+      toast.error('Informe o PIN de segurança.');
+      return;
+    }
+
+    if (!suapUser && staffPin.trim() !== '1234') {
       toast.error('PIN de segurança incorreto.');
+      return;
+    }
+
+    if (staffActions.length === 0) {
+      toast.error('Selecione pelo menos uma ação realizada.');
       return;
     }
 
     setSubmittingCheckin(true);
     try {
+      const responsavel = suapUser
+        ? `${suapUser.nome} (${suapUser.matricula})`
+        : staffName.trim();
+
+      const materiais = Object.entries(materialsUsed)
+        .filter(([_, qty]) => qty > 0)
+        .map(([mat, qty]) => ({
+          material: mat as 'papel_higienico' | 'sabonete_liquido' | 'papel_toalha' | 'saco_lixo' | 'outros',
+          quantidade: qty,
+        }));
+
       await manutencaoService.createCheckin({
         ambiente_id: ambiente.id,
-        responsavel_nome: staffName.trim(),
-        acao_realizada: staffAction,
+        responsavel_nome: responsavel,
+        acoes_realizadas: staffActions,
         observacao: staffObservation.trim() || null,
+        materiais: materiais.length > 0 ? materiais : undefined,
       });
       setCheckinSuccess(true);
       toast.success('Passagem de conservação registrada com sucesso!');
@@ -365,24 +458,59 @@ export default function PublicFeedback() {
                 </p>
               </div>
               <div className="pt-2">
-                <Button onClick={() => { setCheckinSuccess(false); setStaffName(''); setStaffObservation(''); setStaffPin(''); setStaffTab(false); }} className="bg-emerald-600 hover:bg-emerald-700 text-white h-10 px-6">
+                <Button 
+                  onClick={() => { 
+                    setCheckinSuccess(false); 
+                    setStaffName(''); 
+                    setStaffObservation(''); 
+                    setStaffPin(''); 
+                    setStaffActions([]);
+                    setMaterialsUsed({
+                      papel_higienico: 0,
+                      sabonete_liquido: 0,
+                      papel_toalha: 0,
+                      saco_lixo: 0,
+                      outros: 0,
+                    });
+                    setManualLogged(false); 
+                    setStaffTab(false); 
+                  }} 
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white h-10 px-6"
+                >
                   Voltar ao início
                 </Button>
               </div>
             </Card>
-          ) : (
+          ) : !isStaffLoggedIn ? (
             <Card className="border shadow-soft rounded-2xl bg-white">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base font-extrabold text-slate-800">Passagem de Conservação</CardTitle>
+                  <CardTitle className="text-base font-extrabold text-slate-800">Acesso da Equipe</CardTitle>
                   <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700 font-bold text-[9px] uppercase tracking-wide">
-                    Equipe
+                    Identificação
                   </Badge>
                 </div>
-                <CardDescription>Registre sua passagem ou ação de limpeza neste local.</CardDescription>
+                <CardDescription>Acesse com o SUAP ou use o PIN manual para continuar.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <form onSubmit={handleSubmitCheckin} className="space-y-4">
+                <form onSubmit={(e) => { e.preventDefault(); handleManualLogin(); }} className="space-y-4">
+                  <Button
+                    type="button"
+                    onClick={handleSuapLogin}
+                    className="w-full bg-[#1b5e20] hover:bg-[#1b5e20]/90 text-white h-11 shadow-sm rounded-xl font-bold gap-2 flex items-center justify-center transition-all"
+                  >
+                    <Lock className="h-4 w-4" />
+                    Autenticar com o SUAP
+                  </Button>
+
+                  <div className="relative flex py-1 items-center">
+                    <div className="flex-grow border-t border-slate-200"></div>
+                    <span className="flex-shrink mx-4 text-slate-400 text-[10px] uppercase font-bold tracking-wider">
+                      ou use o PIN manual
+                    </span>
+                    <div className="flex-grow border-t border-slate-200"></div>
+                  </div>
+
                   {/* Name field */}
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
@@ -396,43 +524,6 @@ export default function PublicFeedback() {
                         onChange={(e) => setStaffName(e.target.value)}
                         placeholder="Nome do colaborador"
                         className="pl-9 h-10 input-system"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Action Selector */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-                      Ação Realizada
-                    </label>
-                    <Select
-                      value={staffAction}
-                      onValueChange={(val) => setStaffAction(val as any)}
-                    >
-                      <SelectTrigger className="h-10 input-system">
-                        <SelectValue placeholder="Selecione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="limpeza_padrao">Limpeza Padrão</SelectItem>
-                        <SelectItem value="reposicao_insumos">Reposição de Insumos</SelectItem>
-                        <SelectItem value="inspecao">Inspeção / Vistoria</SelectItem>
-                        <SelectItem value="manutencao_corretiva">Manutenção Corretiva</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Observation (Optional) */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-                      Observação (Opcional)
-                    </label>
-                    <div className="relative">
-                      <MessageSquare className="absolute left-3 top-3 text-slate-400 h-4 w-4" />
-                      <Textarea
-                        value={staffObservation}
-                        onChange={(e) => setStaffObservation(e.target.value)}
-                        placeholder="Caso queira relatar alguma observação sobre a limpeza ou manutenção..."
-                        className="pl-9 min-h-[70px] input-system"
                       />
                     </div>
                   </div>
@@ -451,6 +542,186 @@ export default function PublicFeedback() {
                         onChange={(e) => setStaffPin(e.target.value)}
                         placeholder="Digite o PIN (padrão: 1234)"
                         className="pl-9 h-10 input-system font-mono tracking-widest"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setStaffTab(false)}
+                      className="flex-1 h-11 rounded-xl"
+                    >
+                      Voltar
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="flex-[2] bg-emerald-600 hover:bg-emerald-700 text-white h-11 shadow-sm rounded-xl font-bold gap-2"
+                    >
+                      Avançar
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border shadow-soft rounded-2xl bg-white">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base font-extrabold text-slate-800">Passagem de Conservação</CardTitle>
+                  <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700 font-bold text-[9px] uppercase tracking-wide">
+                    Equipe
+                  </Badge>
+                </div>
+                <CardDescription>Registre sua passagem ou ação de limpeza neste local.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <form onSubmit={handleSubmitCheckin} className="space-y-4">
+                  {suapUser ? (
+                    <div className="bg-emerald-50/75 border border-emerald-100 rounded-xl p-3.5 flex items-center gap-3">
+                      {suapUser.foto ? (
+                        <img
+                          src={suapUser.foto}
+                          alt={suapUser.nome}
+                          className="w-10 h-10 rounded-full border border-emerald-200 object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                          {suapUser.nome.charAt(0)}
+                        </div>
+                      )}
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Conectado via SUAP
+                        </div>
+                        <div className="text-sm font-bold text-slate-800 truncate">{suapUser.nome}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">
+                          {suapUser.matricula} • {suapUser.email}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleDisconnect}
+                        className="ml-auto text-xs text-rose-500 hover:text-rose-700 font-semibold underline shrink-0"
+                      >
+                        Sair
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-bold">
+                        {staffName.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Identificado Manualmente
+                        </div>
+                        <div className="text-sm font-bold text-slate-800 truncate">{staffName}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleDisconnect}
+                        className="ml-auto text-xs text-rose-500 hover:text-rose-700 font-semibold underline shrink-0"
+                      >
+                        Sair
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Action Selector (Multiple Checklist) */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
+                      Ações Realizadas
+                    </label>
+                    <div className="grid gap-2 grid-cols-2">
+                      {[
+                        { id: 'limpeza_padrao', label: '🧹 Limpeza Padrão' },
+                        { id: 'reposicao_insumos', label: '🔋 Reposição de Insumos' },
+                        { id: 'inspecao', label: '🔍 Inspeção / Vistoria' },
+                        { id: 'manutencao_corretiva', label: '🛠️ Manutenção Corretiva' },
+                      ].map((opt) => (
+                        <label
+                          key={opt.id}
+                          className={cn(
+                            'flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer select-none transition-colors duration-150 text-xs font-bold',
+                            staffActions.includes(opt.id)
+                              ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                              : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
+                          )}
+                        >
+                          <Checkbox
+                            checked={staffActions.includes(opt.id)}
+                            onCheckedChange={() => {
+                              setStaffActions((prev) =>
+                                prev.includes(opt.id)
+                                  ? prev.filter((id) => id !== opt.id)
+                                  : [...prev, opt.id]
+                              );
+                            }}
+                          />
+                          <span>{opt.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Material Usage Inputs */}
+                  {staffActions.includes('reposicao_insumos') && (
+                    <div className="space-y-3 pt-3 border-t border-dashed border-slate-200">
+                      <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
+                        Materiais Consumidos
+                      </label>
+                      <div className="grid gap-3 grid-cols-1">
+                        {[
+                          { id: 'papel_higienico', label: '🧻 Papel Higiênico (rolos)' },
+                          { id: 'sabonete_liquido', label: '🧼 Sabonete Líquido (recargas)' },
+                          { id: 'papel_toalha', label: '🧻 Papel Toalha (pacotes)' },
+                          { id: 'saco_lixo', label: '🗑️ Saco de Lixo (unidades)' },
+                          { id: 'outros', label: '📦 Outros Materiais' },
+                        ].map((m) => (
+                          <div key={m.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/50">
+                            <span className="text-xs font-bold text-slate-700">{m.label}</span>
+                            <div className="flex items-center gap-2.5">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="h-8 w-8 rounded-lg border-slate-200 p-0 flex items-center justify-center font-bold text-slate-600 hover:bg-slate-100"
+                                onClick={() => handleQuantityChange(m.id, -1)}
+                              >
+                                -
+                              </Button>
+                              <span className="text-sm font-black font-mono text-slate-800 w-6 text-center">
+                                {materialsUsed[m.id]}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="h-8 w-8 rounded-lg border-slate-200 p-0 flex items-center justify-center font-bold text-slate-600 hover:bg-slate-100"
+                                onClick={() => handleQuantityChange(m.id, 1)}
+                              >
+                                +
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Observation (Optional) */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
+                      Observação (Opcional)
+                    </label>
+                    <div className="relative">
+                      <MessageSquare className="absolute left-3 top-3 text-slate-400 h-4 w-4" />
+                      <Textarea
+                        value={staffObservation}
+                        onChange={(e) => setStaffObservation(e.target.value)}
+                        placeholder="Caso queira relatar alguma observação sobre a limpeza ou manutenção..."
+                        className="pl-9 min-h-[70px] input-system"
                       />
                     </div>
                   </div>

@@ -451,6 +451,58 @@ Consumido por:
 
 ## Importacoes auxiliares
 
+### `price_researches`
+
+Finalidade:
+
+- cabeçalho e estado das pesquisas de preços conduzidas pelo usuário
+
+Campos-chave:
+
+- `id`
+- `object_description`
+- `responsible_name`
+- `research_date`
+- `calculation_method`
+- `methodology_justification`
+- `status`
+- `created_by`
+
+Observações operacionais:
+
+- os métodos aceitos são `median`, `mean` e `minimum`
+- a RLS restringe a pesquisa ao proprietário, com acesso global para superadministrador
+- o status pode ser `draft`, `review` ou `completed`
+
+### `price_research_items`
+
+Finalidade:
+
+- snapshot dos itens importados e das referências oficiais consideradas no relatório
+
+Campos-chave:
+
+- `research_id`
+- `local_id`
+- `catalog_type`
+- `catalog_code`
+- `quantity`
+- `unit`
+- `target_capacity`
+- `target_measure_unit`
+- `candidates`
+
+Observações operacionais:
+
+- `candidates` preserva em JSONB preço original, preço comparável, fonte, compra, fornecedor, pontuação, seleção e justificativa de exclusão
+- o snapshot evita que alterações futuras da API apaguem a memória de cálculo já salva
+- a tabela filha herda o controle de acesso por vínculo com `price_researches`
+
+Consumido por:
+
+- `src/services/priceResearch.ts`
+- `src/pages/PesquisaPrecos.tsx`
+
 ### `financeiro_fonte_vinculacao`
 
 - saldo financeiro por fonte/vinculacao carregado por arquivo
