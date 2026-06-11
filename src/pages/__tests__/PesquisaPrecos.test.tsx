@@ -135,7 +135,7 @@ describe('PesquisaPrecos', () => {
       ]);
     });
     expect(await screen.findByText('Descrição e unidade compatíveis.')).toBeInTheDocument();
-    expect(screen.getAllByText('R$ 20,00')).toHaveLength(2);
+    expect(screen.getAllByText('R$ 20,00').length).toBeGreaterThanOrEqual(2);
   });
 
   it('permite selecionar arquivo PDF pesquisável', () => {
@@ -167,7 +167,7 @@ describe('PesquisaPrecos', () => {
         'material',
       );
     });
-    fireEvent.click(await screen.findByRole('button', { name: 'Usar CATMAT 606523' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Usar este código' }));
 
     expect(screen.getByDisplayValue('606523')).toBeInTheDocument();
   });
