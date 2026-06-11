@@ -125,7 +125,7 @@ describe('PesquisaPrecos', () => {
       target: { files: [new File(['xlsx'], 'custos.xlsx')] },
     });
 
-    expect(await screen.findByText('Café torrado e moído, pacote de 500 g')).toBeInTheDocument();
+    expect((await screen.findAllByText('Café torrado e moído, pacote de 500 g'))[0]).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Buscar 15 opções por item/i }));
 
     await waitFor(() => {
@@ -176,7 +176,7 @@ describe('PesquisaPrecos', () => {
     fireEvent.change(container.querySelector('input[type="file"]') as HTMLInputElement, {
       target: { files: [new File(['xlsx'], 'custos.xlsx')] },
     });
-    await screen.findByText('Café torrado e moído, pacote de 500 g');
+    await screen.findAllByText('Café torrado e moído, pacote de 500 g');
     fireEvent.click(screen.getByRole('button', { name: /Buscar 15 opções por item/i }));
     await screen.findByText('Descrição e unidade compatíveis.');
 
