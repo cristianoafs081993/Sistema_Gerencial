@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import {
   AlertCircle,
   Building2,
@@ -127,6 +127,7 @@ export default function ManutencaoAdmin() {
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
+  const [consumoGrouping, setConsumoGrouping] = useState<'ambiente' | 'dia' | 'amb_dia'>('amb_dia');
 
   // Modals
   const [isAddRoomOpen, setIsAddRoomOpen] = useState(false);
@@ -925,6 +926,95 @@ export default function ManutencaoAdmin() {
 
   const ratingColors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'];
 
+  // Aggregated consumption data calculations
+  const consumoData = useMemo(() => {
+    const map = new Map<string, {
+      ambienteNome?: string;
+      ambienteCodigo?: string;
+      data?: string;
+      papel_higienico: number;
+      sabonete_liquido: number;
+      papel_toalha: number;
+      saco_lixo: number;
+      outros: number;
+    }>();
+
+    checkins.forEach((ch) => {
+      const dateKey = ch.created_at ? new Date(ch.created_at).toLocaleDateString('pt-BR') : 'Sem data';
+      const ambId = ch.ambiente_id;
+      const ambNome = ch.ambiente?.nome || 'Ambiente Desconhecido';
+      const ambCodigo = ch.ambiente?.codigo || 'S/C';
+
+      let groupKey = '';
+      if (consumoGrouping === 'ambiente') {
+        groupKey = ambId;
+      } else if (consumoGrouping === 'dia') {
+        groupKey = dateKey;
+      } else {
+        groupKey = `${ambId}_${dateKey}`;
+      }
+
+      if (!map.has(groupKey)) {
+        map.set(groupKey, {
+          ambienteNome: consumoGrouping !== 'dia' ? ambNome : undefined,
+          ambienteCodigo: consumoGrouping !== 'dia' ? ambCodigo : undefined,
+          data: consumoGrouping !== 'ambiente' ? dateKey : undefined,
+          papel_higienico: 0,
+          sabonete_liquido: 0,
+          papel_toalha: 0,
+          saco_lixo: 0,
+          outros: 0,
+        });
+      }
+
+      const current = map.get(groupKey)!;
+      ch.materiais?.forEach((mat) => {
+        if (mat.material === 'papel_higienico') current.papel_higienico += mat.quantidade;
+        else if (mat.material === 'sabonete_liquido') current.sabonete_liquido += mat.quantidade;
+        else if (mat.material === 'papel_toalha') current.papel_toalha += mat.quantidade;
+        else if (mat.material === 'saco_lixo') current.saco_lixo += mat.quantidade;
+        else if (mat.material === 'outros') current.outros += mat.quantidade;
+      });
+    });
+
+    return Array.from(map.values()).map((item) => {
+      const total = item.papel_higienico + item.sabonete_liquido + item.papel_toalha + item.saco_lixo + item.outros;
+      return { ...item, total };
+    }).filter(item => item.total > 0);
+  }, [checkins, consumoGrouping]);
+
+  const filteredConsumoData = useMemo(() => {
+    return consumoData.filter((item) => {
+      if (!searchQuery) return true;
+      const q = searchQuery.toLowerCase();
+      const matchNome = item.ambienteNome?.toLowerCase().includes(q) || false;
+      const matchCodigo = item.ambienteCodigo?.toLowerCase().includes(q) || false;
+      const matchData = item.data?.includes(q) || false;
+      return matchNome || matchCodigo || matchData;
+    });
+  }, [consumoData, searchQuery]);
+
+  const sortedConsumoData = useMemo(() => {
+    return [...filteredConsumoData].sort((left, right) => {
+      if (consumoGrouping === 'dia') {
+        const [dL, mL, yL] = (left.data || '').split('/').map(Number);
+        const [dR, mR, yR] = (right.data || '').split('/').map(Number);
+        const dateL = new Date(yL, mL - 1, dL).getTime();
+        const dateR = new Date(yR, mR - 1, dR).getTime();
+        return dateR - dateL;
+      }
+      if (consumoGrouping === 'ambiente') {
+        return right.total - left.total;
+      }
+      const [dL, mL, yL] = (left.data || '').split('/').map(Number);
+      const [dR, mR, yR] = (right.data || '').split('/').map(Number);
+      const dateL = new Date(yL, mL - 1, dL).getTime();
+      const dateR = new Date(yR, mR - 1, dR).getTime();
+      if (dateR !== dateL) return dateR - dateL;
+      return right.total - left.total;
+    });
+  }, [filteredConsumoData, consumoGrouping]);
+
   const kpis = {
     totalPendentes: ocorrencias.filter((oc) => oc.status === 'pendente').length,
     limpezasHoje: checkins.filter((ch) => {
@@ -976,6 +1066,18 @@ export default function ManutencaoAdmin() {
               </SelectContent>
             </Select>
           )}
+          {activeTab === 'consumo' && (
+            <Select value={consumoGrouping} onValueChange={(val: any) => setConsumoGrouping(val)}>
+              <SelectTrigger className="h-10 input-system">
+                <SelectValue placeholder="Agrupamento do Consumo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="amb_dia">Por Ambiente e Dia</SelectItem>
+                <SelectItem value="ambiente">Por Ambiente</SelectItem>
+                <SelectItem value="dia">Por Dia</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </FilterPanel>
 
@@ -989,6 +1091,9 @@ export default function ManutencaoAdmin() {
           </TabsTrigger>
           <TabsTrigger value="checkins" className="px-4 py-2 font-medium transition-all rounded-md data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">
             Histórico de Limpezas ({filteredCheckins.length})
+          </TabsTrigger>
+          <TabsTrigger value="consumo" className="px-4 py-2 font-medium transition-all rounded-md data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">
+            Consumo por Ambiente/Dia
           </TabsTrigger>
           <TabsTrigger value="ambientes" className="px-4 py-2 font-medium transition-all rounded-md data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">
             Salas e Ambientes ({filteredAmbientes.length})
@@ -1740,6 +1845,78 @@ export default function ManutencaoAdmin() {
                       </TableCell>
                       <TableCell className="text-xs text-slate-500 text-right">
                         {formatDateTime(ch.created_at)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </DataTablePanel>
+        </TabsContent>
+
+        {/* Tab: Consumo */}
+        <TabsContent value="consumo">
+          <DataTablePanel
+            title="Consumo de Insumos"
+            description="Detalhamento do consumo de materiais de limpeza/higienização reportados pelas equipes nos check-ins."
+          >
+            <Table>
+              <TableHeader className="bg-slate-50/80">
+                <TableRow>
+                  {consumoGrouping !== 'dia' && <TableHead className="w-1/3">Ambiente</TableHead>}
+                  {consumoGrouping !== 'ambiente' && <TableHead className="w-40">Data</TableHead>}
+                  <TableHead className="text-right">🧻 Papel Higiênico</TableHead>
+                  <TableHead className="text-right">🧴 Sabonete Líquido</TableHead>
+                  <TableHead className="text-right">🧻 Papel Toalha</TableHead>
+                  <TableHead className="text-right">🗑️ Saco de Lixo</TableHead>
+                  <TableHead className="text-right">📦 Outros</TableHead>
+                  <TableHead className="text-right font-bold">Total Geral</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={consumoGrouping === 'amb_dia' ? 8 : 7} className="h-28 text-center italic text-muted-foreground">
+                      Carregando dados...
+                    </TableCell>
+                  </TableRow>
+                ) : sortedConsumoData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={consumoGrouping === 'amb_dia' ? 8 : 7} className="h-28 text-center italic text-muted-foreground">
+                      Nenhum consumo registrado com os filtros selecionados.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  sortedConsumoData.map((row, idx) => (
+                    <TableRow key={idx} className="hover:bg-slate-50/50">
+                      {consumoGrouping !== 'dia' && (
+                        <TableCell>
+                          <div className="font-semibold text-slate-900">{row.ambienteNome}</div>
+                          {row.ambienteCodigo && <div className="text-xs font-mono text-slate-500">{row.ambienteCodigo}</div>}
+                        </TableCell>
+                      )}
+                      {consumoGrouping !== 'ambiente' && (
+                        <TableCell className="font-medium text-slate-700">
+                          {row.data}
+                        </TableCell>
+                      )}
+                      <TableCell className="text-right text-slate-700 font-mono">
+                        {row.papel_higienico || '-'}
+                      </TableCell>
+                      <TableCell className="text-right text-slate-700 font-mono">
+                        {row.sabonete_liquido || '-'}
+                      </TableCell>
+                      <TableCell className="text-right text-slate-700 font-mono">
+                        {row.papel_toalha || '-'}
+                      </TableCell>
+                      <TableCell className="text-right text-slate-700 font-mono">
+                        {row.saco_lixo || '-'}
+                      </TableCell>
+                      <TableCell className="text-right text-slate-700 font-mono">
+                        {row.outros || '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-extrabold text-slate-900 font-mono">
+                        {row.total}
                       </TableCell>
                     </TableRow>
                   ))
