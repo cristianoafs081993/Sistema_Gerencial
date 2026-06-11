@@ -75,7 +75,12 @@ export async function parseCatalogResponse(response: Response) {
     throw new Error('Este navegador não suporta a descompactação do catálogo.');
   }
 
-  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    }
+  }).pipeThrough(new DecompressionStream('gzip'));
   return new Response(stream).json() as Promise<CompactCatalog>;
 }
 

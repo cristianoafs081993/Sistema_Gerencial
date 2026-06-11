@@ -2,6 +2,18 @@ import * as XLSX from 'xlsx';
 import * as pdfWorkerAsset from 'pdfjs-dist/build/pdf.worker.min.js?url';
 import type { PriceCatalogSuggestion } from '@/lib/priceCatalog';
 
+async function getFileArrayBuffer(file: File | Blob): Promise<ArrayBuffer> {
+  if (typeof file.arrayBuffer === 'function') {
+    return file.arrayBuffer();
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(file);
+  });
+}
+
 export type PriceResearchCatalogType = 'material' | 'service';
 export type PriceResearchMethod = 'median' | 'mean' | 'minimum';
 
@@ -300,7 +312,7 @@ async function readPdfRows(file: File): Promise<unknown[][]> {
   pdfjsLib.GlobalWorkerOptions.workerSrc = typeof bundledWorkerUrl === 'string'
     ? bundledWorkerUrl
     : new URL('../../node_modules/pdfjs-dist/build/pdf.worker.min.js', import.meta.url).href;
-  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  const pdf = await pdfjsLib.getDocument({ data: await getFileArrayBuffer(file) }).promise;
   const rows: unknown[][] = [];
   let columns: PdfHeaderColumn[] = [];
   let searchableFragments = 0;
@@ -359,14 +371,14 @@ async function readRows(file: File) {
     return readPdfRows(file);
   }
   if (extension === 'csv') {
-    const bytes = new Uint8Array(await file.arrayBuffer());
+    const bytes = new Uint8Array(await getFileArrayBuffer(file));
     const text = new TextDecoder('utf-8').decode(bytes);
     const delimiter = text.split(/\r?\n/, 1)[0]?.includes(';') ? ';' : ',';
     const workbook = XLSX.read(text, { type: 'string', raw: false, FS: delimiter });
     const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
     return XLSX.utils.sheet_to_json(firstSheet, { header: 1, raw: false, defval: '' }) as unknown[][];
   }
-  const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+  const workbook = XLSX.read(await getFileArrayBuffer(file), { type: 'array', cellDates: true });
   const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
   if (!firstSheet) throw new Error('A planilha não possui abas legíveis.');
   return XLSX.utils.sheet_to_json(firstSheet, {
