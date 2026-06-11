@@ -182,8 +182,8 @@ describe('PesquisaPrecos', () => {
     fireEvent.click(screen.getByRole('button', { name: /Disparar Busca Geral/i }));
     await screen.findByText('Descrição e unidade compatíveis.');
 
-    fireEvent.click(screen.getByRole('checkbox', { name: /Selecionar preço 1/i }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Usar preço 1/i }));
 
-    expect(screen.getByLabelText(/Justificativa de exclusão 1/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Justificativa para desconsiderar 1/i)).toBeInTheDocument();
   });
 });

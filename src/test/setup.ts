@@ -15,3 +15,5 @@ Object.defineProperty(window, "matchMedia", {
 });
 
 Element.prototype.scrollIntoView = Element.prototype.scrollIntoView ?? (() => {});
+
+document.elementFromPoint = document.elementFromPoint ?? (() => null);
