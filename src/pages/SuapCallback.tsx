@@ -12,8 +12,14 @@ export default function SuapCallback() {
   const { session, isLoading } = useAuth();
 
   useEffect(() => {
+    const code = searchParams.get('code');
+    const state = searchParams.get('state');
+    const isAppLogin = state === 'app' || (state && state.startsWith('app'));
+    const isPublicFeedbackCallback = !!(code && state && !isAppLogin);
+
     // 1. If session is already active (e.g. after Supabase hash verify redirects here), redirect to next path
-    if (session) {
+    // But ONLY if we are not actively processing a public feedback login callback.
+    if (session && !isPublicFeedbackCallback) {
       const nextPath = localStorage.getItem('suap_login_next') || '/';
       localStorage.removeItem('suap_login_next');
       navigate(nextPath, { replace: true });
@@ -26,9 +32,6 @@ export default function SuapCallback() {
     if (window.location.hash.includes('access_token')) {
       return;
     }
-
-    const code = searchParams.get('code');
-    const state = searchParams.get('state');
 
     if (!code) {
       if (isLoading) return;

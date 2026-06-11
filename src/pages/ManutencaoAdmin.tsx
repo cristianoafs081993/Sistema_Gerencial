@@ -101,18 +101,19 @@ const materialEmojis: Record<string, string> = {
   outros: '📦',
 };
 
-const CAMPUS_BUILDINGS = [
-  { id: 'lab_energias', nome: 'Laboratório de Energias Renováveis e Hidroponia', zona: 'academico', badgeX: 331, badgeY: 122 },
-  { id: 'ginasio', nome: 'Ginásio Poliesportivo', zona: 'esportivo', badgeX: 417, badgeY: 316 },
-  { id: 'bloco_central', nome: 'Bloco Acadêmico Central', zona: 'academico', badgeX: 611, badgeY: 191 },
-  { id: 'bloco_salas', nome: 'Bloco de Sala de Aula', zona: 'academico', badgeX: 611, badgeY: 384 },
-  { id: 'administracao', nome: 'Administração', zona: 'administrativo', badgeX: 753, badgeY: 378 },
-  { id: 'biblioteca', nome: 'Biblioteca', zona: 'administrativo', badgeX: 862, badgeY: 365 },
-  { id: 'complexo_aquatico', nome: 'Complexo Aquático / Piscina', zona: 'servicos', badgeX: 753, badgeY: 256 },
-  { id: 'auditorio', nome: 'Auditório', zona: 'convivencia', badgeX: 611, badgeY: 529 },
-  { id: 'torre_agua', nome: 'Torre de Água Principal', zona: 'apoio_tecnico', badgeX: 519, badgeY: 297 },
-  { id: 'torre_comunicacao', nome: 'Torre de Observação / Comunicação', zona: 'apoio_tecnico', badgeX: 793, badgeY: 135 },
-] as const;
+const LOCAL_DEFAULT_BLOCOS: BlocoMapa[] = [
+  { id: 'lab_energias', nome: 'Laboratório de Energias Renováveis e Hidroponia', zona: 'academico', badge_x: 331, badge_y: 122, geometria_tipo: 'rect', geometria_data: { x: 257, y: 85, width: 148, height: 75, rx: 5 } },
+  { id: 'ginasio', nome: 'Ginásio Poliesportivo', zona: 'esportivo', badge_x: 417, badge_y: 316, geometria_tipo: 'rect', geometria_data: { x: 303, y: 247, width: 217, height: 137, rx: 6 } },
+  { id: 'bloco_central', nome: 'Bloco Acadêmico Central', zona: 'academico', badge_x: 611, badge_y: 191, geometria_tipo: 'rect', geometria_data: { x: 554, y: 147, width: 114, height: 87, rx: 5 } },
+  { id: 'bloco_salas', nome: 'Bloco de Sala de Aula', zona: 'academico', badge_x: 611, badge_y: 384, geometria_tipo: 'rect', geometria_data: { x: 554, y: 309, width: 114, height: 150, rx: 5 } },
+  { id: 'passarela', nome: 'Área de Convivência e Passarelas', zona: 'convivencia', badge_x: 510, badge_y: 300, geometria_tipo: 'rect', geometria_data: { x: 502, y: 147, width: 34, height: 312, rx: 4 } },
+  { id: 'administracao', nome: 'Administração', zona: 'administrativo', badge_x: 753, badge_y: 378, geometria_tipo: 'rect', geometria_data: { x: 691, y: 347, width: 126, height: 62, rx: 5 } },
+  { id: 'biblioteca', nome: 'Biblioteca', zona: 'administrativo', badge_x: 862, badge_y: 365, geometria_tipo: 'rect', geometria_data: { x: 828, y: 210, width: 68, height: 312, rx: 5 } },
+  { id: 'complexo_aquatico', nome: 'Complexo Aquático / Piscina', zona: 'servicos', badge_x: 753, badge_y: 256, geometria_tipo: 'rect', geometria_data: { x: 702, y: 210, width: 103, height: 94, rx: 5 } },
+  { id: 'auditorio', nome: 'Auditório', zona: 'convivencia', badge_x: 611, badge_y: 529, geometria_tipo: 'path', geometria_data: { d: "M 512 503 H 656 A 72 72 0 0 1 512 503" } },
+  { id: 'torre_agua', nome: 'Torre de Água Principal', zona: 'apoio_tecnico', badge_x: 519, badge_y: 297, geometria_tipo: 'circle', geometria_data: { cx: 519, cy: 297, r: 16 } },
+  { id: 'torre_comunicacao', nome: 'Torre de Observação / Comunicação', zona: 'apoio_tecnico', badge_x: 793, badge_y: 135, geometria_tipo: 'circle', geometria_data: { cx: 793, cy: 135, r: 18 } }
+];
 
 export default function ManutencaoAdmin() {
   const { user } = useAuth();
@@ -145,15 +146,28 @@ export default function ManutencaoAdmin() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [ambList, ocList, chList, blocosList] = await Promise.all([
+      const [ambList, ocList, chList] = await Promise.all([
         manutencaoService.getAmbientes(),
         manutencaoService.getOcorrencias(),
         manutencaoService.getCheckins(),
-        manutencaoService.getBlocosMapa(),
       ]);
       setAmbientes(ambList);
       setOcorrencias(ocList);
       setCheckins(chList);
+
+      let blocosList = await manutencaoService.getBlocosMapa();
+      const hasSeeded = localStorage.getItem('manutencao:map_seeded') === 'true';
+      if (blocosList.length === 0 && !hasSeeded) {
+        try {
+          await Promise.all(
+            LOCAL_DEFAULT_BLOCOS.map((bloco) => manutencaoService.saveBlocoMapa(bloco))
+          );
+          blocosList = await manutencaoService.getBlocosMapa();
+          localStorage.setItem('manutencao:map_seeded', 'true');
+        } catch (seedErr) {
+          console.error("Erro ao auto-popular blocos:", seedErr);
+        }
+      }
       setBlocosMapa(blocosList);
     } catch (error) {
       console.error('Erro ao carregar dados de manutenção:', error);
@@ -527,19 +541,7 @@ export default function ManutencaoAdmin() {
   const [circleCenter, setCircleCenter] = useState<{ x: number; y: number } | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
 
-  const activeBlocos = blocosMapa.length > 0 ? blocosMapa : [
-    { id: 'lab_energias', nome: 'Laboratório de Energias Renováveis e Hidroponia', zona: 'academico', badge_x: 331, badge_y: 122, geometria_tipo: 'rect', geometria_data: { x: 257, y: 85, width: 148, height: 75, rx: 5 } },
-    { id: 'ginasio', nome: 'Ginásio Poliesportivo', zona: 'esportivo', badge_x: 417, badge_y: 316, geometria_tipo: 'rect', geometria_data: { x: 303, y: 247, width: 217, height: 137, rx: 6 } },
-    { id: 'bloco_central', nome: 'Bloco Acadêmico Central', zona: 'academico', badge_x: 611, badge_y: 191, geometria_tipo: 'rect', geometria_data: { x: 554, y: 147, width: 114, height: 87, rx: 5 } },
-    { id: 'bloco_salas', nome: 'Bloco de Sala de Aula', zona: 'academico', badge_x: 611, badge_y: 384, geometria_tipo: 'rect', geometria_data: { x: 554, y: 309, width: 114, height: 150, rx: 5 } },
-    { id: 'passarela', nome: 'Área de Convivência e Passarelas', zona: 'convivencia', badge_x: 510, badge_y: 300, geometria_tipo: 'rect', geometria_data: { x: 502, y: 147, width: 34, height: 312, rx: 4 } },
-    { id: 'administracao', nome: 'Administração', zona: 'administrativo', badge_x: 753, badge_y: 378, geometria_tipo: 'rect', geometria_data: { x: 691, y: 347, width: 126, height: 62, rx: 5 } },
-    { id: 'biblioteca', nome: 'Biblioteca', zona: 'administrativo', badge_x: 862, badge_y: 365, geometria_tipo: 'rect', geometria_data: { x: 828, y: 210, width: 68, height: 312, rx: 5 } },
-    { id: 'complexo_aquatico', nome: 'Complexo Aquático / Piscina', zona: 'servicos', badge_x: 753, badge_y: 256, geometria_tipo: 'rect', geometria_data: { x: 702, y: 210, width: 103, height: 94, rx: 5 } },
-    { id: 'auditorio', nome: 'Auditório', zona: 'convivencia', badge_x: 611, badge_y: 529, geometria_tipo: 'path', geometria_data: { d: "M 512 503 H 656 A 72 72 0 0 1 512 503" } },
-    { id: 'torre_agua', nome: 'Torre de Água Principal', zona: 'apoio_tecnico', badge_x: 519, badge_y: 297, geometria_tipo: 'circle', geometria_data: { cx: 519, cy: 297, r: 16 } },
-    { id: 'torre_comunicacao', nome: 'Torre de Observação / Comunicação', zona: 'apoio_tecnico', badge_x: 793, badge_y: 135, geometria_tipo: 'circle', geometria_data: { cx: 793, cy: 135, r: 18 } }
-  ] as BlocoMapa[];
+  const activeBlocos = blocosMapa.length > 0 ? blocosMapa : LOCAL_DEFAULT_BLOCOS;
 
   const ZONA_COLORS = {
     academico: { fill: 'rgba(139, 92, 246, 0.25)', stroke: '#8b5cf6' },
@@ -715,6 +717,75 @@ export default function ManutencaoAdmin() {
       toast.error("Delimite o bloco no mapa primeiro.");
       return;
     }
+
+    // Validação de sobreposição para evitar múltiplos blocos no mesmo lugar
+    const getBoundingBox = (tipo: string, data: any) => {
+      if (tipo === 'rect') {
+        const x = Number(data.x);
+        const y = Number(data.y);
+        const w = Number(data.width);
+        const h = Number(data.height);
+        return { minX: x, maxX: x + w, minY: y, maxY: y + h };
+      }
+      if (tipo === 'circle') {
+        const cx = Number(data.cx);
+        const cy = Number(data.cy);
+        const r = Number(data.r);
+        return { minX: cx - r, maxX: cx + r, minY: cy - r, maxY: cy + r };
+      }
+      if (tipo === 'polygon') {
+        const pointsStr = data.points || '';
+        const pairs = pointsStr.trim().split(/\s+/);
+        const xs: number[] = [];
+        const ys: number[] = [];
+        pairs.forEach((pair: string) => {
+          const [xStr, yStr] = pair.split(',');
+          if (xStr && yStr) {
+            xs.push(Number(xStr));
+            ys.push(Number(yStr));
+          }
+        });
+        if (xs.length === 0) return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+        return {
+          minX: Math.min(...xs),
+          maxX: Math.max(...xs),
+          minY: Math.min(...ys),
+          maxY: Math.max(...ys)
+        };
+      }
+      if (tipo === 'path') {
+        return { minX: 512, maxX: 656, minY: 431, maxY: 503 };
+      }
+      return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+    };
+
+    const getOverlapPercentage = (boxA: any, boxB: any) => {
+      const xOverlap = Math.min(boxA.maxX, boxB.maxX) - Math.max(boxA.minX, boxB.minX);
+      const yOverlap = Math.min(boxA.maxY, boxB.maxY) - Math.max(boxA.minY, boxB.minY);
+      
+      if (xOverlap <= 0 || yOverlap <= 0) return 0;
+      
+      const overlapArea = xOverlap * yOverlap;
+      const areaA = (boxA.maxX - boxA.minX) * (boxA.maxY - boxA.minY);
+      const areaB = (boxB.maxX - boxB.minX) * (boxB.maxY - boxB.minY);
+      
+      if (areaA <= 0 || areaB <= 0) return 0;
+      return Math.max(overlapArea / areaA, overlapArea / areaB);
+    };
+
+    const newBox = getBoundingBox(editingBloco.geometria_tipo, editingBloco.geometria_data);
+    const hasOverlap = activeBlocos.some(bloco => {
+      if (bloco.id === editingBloco.id) return false;
+      const otherBox = getBoundingBox(bloco.geometria_tipo, bloco.geometria_data);
+      const overlapPct = getOverlapPercentage(newBox, otherBox);
+      return overlapPct > 0.30; // Bloqueia se houver mais de 30% de sobreposição
+    });
+
+    if (hasOverlap) {
+      toast.error("Erro: Já existe um bloco definido na mesma área do mapa!");
+      return;
+    }
+
     try {
       const payload: BlocoMapa = {
         id: editingBloco.id || `bloco_${Date.now()}`,
@@ -745,6 +816,21 @@ export default function ManutencaoAdmin() {
     } catch (err) {
       console.error(err);
       toast.error("Erro ao deletar.");
+    }
+  };
+
+  const handleRestoreDefaults = async () => {
+    if (!confirm("Isso apagará todas as customizações e restaurará os 11 blocos padrão. Continuar?")) return;
+    try {
+      const currentIds = blocosMapa.map(b => b.id);
+      await Promise.all(currentIds.map(id => manutencaoService.deleteBlocoMapa(id)));
+      await Promise.all(LOCAL_DEFAULT_BLOCOS.map(bloco => manutencaoService.saveBlocoMapa(bloco)));
+      localStorage.setItem('manutencao:map_seeded', 'true');
+      toast.success("Mapa restaurado para o padrão!");
+      void loadData();
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao restaurar blocos padrão.");
     }
   };
 
@@ -1157,18 +1243,27 @@ export default function ManutencaoAdmin() {
                   <CardContent className="flex-1 overflow-y-auto pt-4 space-y-4">
                     {!editingBloco ? (
                       <div className="space-y-4">
-                        <Button
-                          onClick={() => setEditingBloco({
-                            nome: '',
-                            zona: 'academico',
-                            geometria_tipo: 'polygon',
-                            geometria_data: {}
-                          })}
-                          className="w-full h-9 gap-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                          Adicionar Novo Bloco
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => setEditingBloco({
+                              nome: '',
+                              zona: 'academico',
+                              geometria_tipo: 'polygon',
+                              geometria_data: {}
+                            })}
+                            className="flex-1 h-9 gap-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            Novo Bloco
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={handleRestoreDefaults}
+                            className="h-9 text-xs font-bold border-slate-200 text-slate-600 hover:bg-slate-50 shrink-0"
+                          >
+                            Restaurar Padrão
+                          </Button>
+                        </div>
                         <div className="divide-y divide-slate-100 max-h-[350px] overflow-y-auto pr-1">
                           {activeBlocos.map(bloco => (
                             <div key={bloco.id} className="py-2.5 flex items-center justify-between gap-2 text-xs">

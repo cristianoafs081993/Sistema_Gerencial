@@ -125,7 +125,7 @@ export default function PublicFeedback() {
         const user = JSON.parse(storedUser);
         console.log('Parsed SUAP user:', user);
         setSuapUser(user);
-        setStaffName(user.nome);
+        setStaffName(user.nome || 'Colaborador');
         setStaffTab(true);
       } catch (e) {
         console.error('Erro ao ler usuário do SUAP da sessão:', e);
@@ -490,79 +490,26 @@ export default function PublicFeedback() {
                     Identificação
                   </Badge>
                 </div>
-                <CardDescription>Acesse com o SUAP ou use o PIN manual para continuar.</CardDescription>
+                <CardDescription>Acesse com o SUAP para continuar.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <form onSubmit={(e) => { e.preventDefault(); handleManualLogin(); }} className="space-y-4">
-                  <Button
-                    type="button"
-                    onClick={handleSuapLogin}
-                    className="w-full bg-[#1b5e20] hover:bg-[#1b5e20]/90 text-white h-11 shadow-sm rounded-xl font-bold gap-2 flex items-center justify-center transition-all"
-                  >
-                    <Lock className="h-4 w-4" />
-                    Autenticar com o SUAP
-                  </Button>
+                <Button
+                  type="button"
+                  onClick={handleSuapLogin}
+                  className="w-full bg-[#1b5e20] hover:bg-[#1b5e20]/90 text-white h-11 shadow-sm rounded-xl font-bold gap-2 flex items-center justify-center transition-all"
+                >
+                  <Lock className="h-4 w-4" />
+                  Autenticar com o SUAP
+                </Button>
 
-                  <div className="relative flex py-1 items-center">
-                    <div className="flex-grow border-t border-slate-200"></div>
-                    <span className="flex-shrink mx-4 text-slate-400 text-[10px] uppercase font-bold tracking-wider">
-                      ou use o PIN manual
-                    </span>
-                    <div className="flex-grow border-t border-slate-200"></div>
-                  </div>
-
-                  {/* Name field */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-                      Seu Nome / Identificador
-                    </label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <Input
-                        required
-                        value={staffName}
-                        onChange={(e) => setStaffName(e.target.value)}
-                        placeholder="Nome do colaborador"
-                        className="pl-9 h-10 input-system"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Passcode validation field */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-                      PIN de Segurança
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <Input
-                        required
-                        type="password"
-                        value={staffPin}
-                        onChange={(e) => setStaffPin(e.target.value)}
-                        placeholder="Digite o PIN (padrão: 1234)"
-                        className="pl-9 h-10 input-system font-mono tracking-widest"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => setStaffTab(false)}
-                      className="flex-1 h-11 rounded-xl"
-                    >
-                      Voltar
-                    </Button>
-                    <Button
-                      type="submit"
-                      className="flex-[2] bg-emerald-600 hover:bg-emerald-700 text-white h-11 shadow-sm rounded-xl font-bold gap-2"
-                    >
-                      Avançar
-                    </Button>
-                  </div>
-                </form>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setStaffTab(false)}
+                  className="w-full h-11 rounded-xl"
+                >
+                  Voltar
+                </Button>
               </CardContent>
             </Card>
           ) : (
@@ -589,7 +536,7 @@ export default function PublicFeedback() {
                         />
                       ) : (
                         <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
-                          {suapUser.nome.charAt(0)}
+                          {suapUser.nome?.charAt(0) || 'C'}
                         </div>
                       )}
                       <div className="space-y-0.5 min-w-0">
@@ -612,7 +559,7 @@ export default function PublicFeedback() {
                   ) : (
                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-bold">
-                        {staffName.charAt(0).toUpperCase()}
+                        {(staffName?.charAt(0) || 'C').toUpperCase()}
                       </div>
                       <div className="space-y-0.5 min-w-0">
                         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">

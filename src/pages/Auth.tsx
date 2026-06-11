@@ -69,9 +69,16 @@ export default function Auth() {
   return (
     <main className="grid grid-cols-1 md:grid-cols-12 min-h-screen bg-background text-foreground font-ui">
       {/* Left Column: Visual Brand side for Desktop */}
-      <div className="md:col-span-5 lg:col-span-6 xl:col-span-7 hidden md:flex flex-col justify-between p-12 bg-gradient-to-br from-[#0b2414] via-[#144722] to-[#237d39] text-white relative overflow-hidden">
-        {/* Glows and Grids */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.06),transparent)] pointer-events-none" />
+      <div className="md:col-span-5 lg:col-span-6 xl:col-span-7 hidden md:flex flex-col justify-between p-12 bg-[#0b2414] text-white relative overflow-hidden">
+        <img
+          src="/login-finance-background.jpg"
+          alt=""
+          aria-hidden="true"
+          data-testid="auth-visual-background"
+          className="absolute inset-0 h-full w-full object-cover object-center opacity-45 pointer-events-none"
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#071d11]/90 via-[#0b3b1e]/70 to-[#237d39]/45 pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.08),transparent_45%)] pointer-events-none" />
         <div className="absolute -left-16 -top-16 w-96 h-96 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
         <div className="absolute -right-16 -bottom-16 w-96 h-96 rounded-full bg-emerald-300/15 blur-3xl pointer-events-none" />
         
