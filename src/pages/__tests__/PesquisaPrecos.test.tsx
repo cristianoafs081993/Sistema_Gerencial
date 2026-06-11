@@ -126,7 +126,8 @@ describe('PesquisaPrecos', () => {
     });
 
     expect((await screen.findAllByText('Café torrado e moído, pacote de 500 g'))[0]).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Buscar 15 opções por item/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Avançar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Disparar Busca Geral/i }));
 
     await waitFor(() => {
       expect(mockedService.search).toHaveBeenCalledWith([
@@ -177,7 +178,8 @@ describe('PesquisaPrecos', () => {
       target: { files: [new File(['xlsx'], 'custos.xlsx')] },
     });
     await screen.findAllByText('Café torrado e moído, pacote de 500 g');
-    fireEvent.click(screen.getByRole('button', { name: /Buscar 15 opções por item/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Avançar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Disparar Busca Geral/i }));
     await screen.findByText('Descrição e unidade compatíveis.');
 
     fireEvent.click(screen.getByRole('checkbox', { name: /Selecionar preço 1/i }));
