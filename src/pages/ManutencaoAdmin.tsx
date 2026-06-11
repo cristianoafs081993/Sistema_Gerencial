@@ -324,7 +324,6 @@ export default function ManutencaoAdmin() {
             <div class="subtitle">Escaneie o QR Code para avaliar este espaço ou informar qualquer problema encontrado.</div>
             <img class="qr-image" src="${qrCodeUrl}" width="230" height="230" alt="QR Code" />
             <div class="room-info">${qrCodeData?.nome}</div>
-            <div class="footer">IFRN Campus Currais Novos</div>
           </div>
           <script>
             window.onload = function() {
@@ -365,7 +364,6 @@ export default function ManutencaoAdmin() {
           <div class="subtitle">Escaneie o QR Code para avaliar este espaço ou informar qualquer problema encontrado.</div>
           <img class="qr-image" src="${qrCodeUrl}" width="200" height="200" alt="QR Code" />
           <div class="room-info">${amb.nome}</div>
-          <div class="footer">IFRN Campus Currais Novos</div>
         </div>
       `;
     }).join('\n');
