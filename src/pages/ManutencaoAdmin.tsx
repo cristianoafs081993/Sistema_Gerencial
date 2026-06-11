@@ -322,7 +322,7 @@ export default function ManutencaoAdmin() {
             <div class="title">Ajude-nos a melhorar este ambiente!</div>
             <div class="subtitle">Escaneie o QR Code para avaliar este espaço ou informar qualquer problema encontrado.</div>
             <img class="qr-image" src="${qrCodeUrl}" width="230" height="230" alt="QR Code" />
-            <div class="room-info">${qrCodeData?.nome}<br/>[ ${qrCodeData?.codigo} ]</div>
+            <div class="room-info">${qrCodeData?.nome}</div>
             <div class="footer">IFRN Campus Currais Novos</div>
           </div>
           <script>
@@ -363,7 +363,7 @@ export default function ManutencaoAdmin() {
           <div class="title">Ajude-nos a melhorar este ambiente!</div>
           <div class="subtitle">Escaneie o QR Code para avaliar este espaço ou informar qualquer problema encontrado.</div>
           <img class="qr-image" src="${qrCodeUrl}" width="200" height="200" alt="QR Code" />
-          <div class="room-info">${amb.nome}<br/>[ ${amb.codigo} ]</div>
+          <div class="room-info">${amb.nome}</div>
           <div class="footer">IFRN Campus Currais Novos</div>
         </div>
       `;
@@ -1931,7 +1931,6 @@ export default function ManutencaoAdmin() {
 
             <div className="w-full bg-slate-200/60 p-3 rounded-xl text-center">
               <div className="text-slate-900 font-extrabold text-sm">{qrCodeData?.nome}</div>
-              <div className="text-slate-500 font-mono text-[11px] mt-0.5">{qrCodeData?.codigo}</div>
             </div>
           </div>
 
