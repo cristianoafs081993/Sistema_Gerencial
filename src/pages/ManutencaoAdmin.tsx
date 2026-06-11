@@ -270,11 +270,10 @@ export default function ManutencaoAdmin() {
               max-width: 400px;
               box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
             }
-            .logo {
-              font-size: 24px;
-              font-weight: 800;
-              color: #10b981;
-              margin-bottom: 5px;
+            .logo-img {
+              height: 70px;
+              object-fit: contain;
+              margin-bottom: 15px;
             }
             .title {
               font-size: 18px;
@@ -319,12 +318,12 @@ export default function ManutencaoAdmin() {
         </head>
         <body>
           <div class="qr-card">
-            <div class="logo">GovAnalytics</div>
-            <div class="title">Controle de Limpeza & Manutenção</div>
-            <div class="subtitle">Escaneie o QR Code abaixo para relatar problemas ou registrar passagem de limpeza.</div>
+            <img class="logo-img" src="/logo-ifrn-cn.png" alt="Logo IFRN" />
+            <div class="title">Ajude-nos a melhorar este ambiente!</div>
+            <div class="subtitle">Escaneie o QR Code para avaliar este espaço ou informar qualquer problema encontrado.</div>
             <img class="qr-image" src="${qrCodeUrl}" width="230" height="230" alt="QR Code" />
             <div class="room-info">${qrCodeData?.nome}<br/>[ ${qrCodeData?.codigo} ]</div>
-            <div class="footer">IFRN Campus Central</div>
+            <div class="footer">IFRN Campus Currais Novos</div>
           </div>
           <script>
             window.onload = function() {
@@ -360,12 +359,12 @@ export default function ManutencaoAdmin() {
       )}`;
       return `
         <div class="qr-card">
-          <div class="logo">GovAnalytics</div>
-          <div class="title">Controle de Limpeza & Manutenção</div>
-          <div class="subtitle">Escaneie o QR Code abaixo para relatar problemas ou registrar passagem de limpeza.</div>
+          <img class="logo-img" src="/logo-ifrn-cn.png" alt="Logo IFRN" />
+          <div class="title">Ajude-nos a melhorar este ambiente!</div>
+          <div class="subtitle">Escaneie o QR Code para avaliar este espaço ou informar qualquer problema encontrado.</div>
           <img class="qr-image" src="${qrCodeUrl}" width="200" height="200" alt="QR Code" />
           <div class="room-info">${amb.nome}<br/>[ ${amb.codigo} ]</div>
-          <div class="footer">IFRN Campus Central</div>
+          <div class="footer">IFRN Campus Currais Novos</div>
         </div>
       `;
     }).join('\n');
@@ -400,11 +399,10 @@ export default function ManutencaoAdmin() {
               justify-content: space-between;
               box-sizing: border-box;
             }
-            .logo {
-              font-size: 20px;
-              font-weight: 800;
-              color: #10b981;
-              margin-bottom: 5px;
+            .logo-img {
+              height: 55px;
+              object-fit: contain;
+              margin-bottom: 10px;
             }
             .title {
               font-size: 15px;
@@ -1911,10 +1909,10 @@ export default function ManutencaoAdmin() {
 
           {/* QR Card Container */}
           <div className="flex flex-col items-center justify-center p-6 bg-slate-50 border rounded-2xl my-2" id="printable-qr-card">
-            <div className="text-[#10b981] font-black text-xl tracking-tight mb-0.5">GovAnalytics</div>
-            <div className="text-slate-800 font-extrabold text-sm text-center mb-1">Controle de Limpeza e Manutenção</div>
-            <div className="text-slate-400 text-[10px] text-center max-w-xs leading-normal mb-4">
-              Aponte a câmera do celular para este QR Code para relatar problemas ou registrar limpeza.
+            <img src="/logo-ifrn-cn.png" alt="Logo IFRN" className="h-16 object-contain mb-3" />
+            <div className="text-slate-800 font-extrabold text-sm text-center mb-1">Ajude-nos a melhorar este ambiente!</div>
+            <div className="text-slate-500 text-[10px] text-center max-w-xs leading-normal mb-4">
+              Escaneie o QR Code para avaliar este espaço ou informar qualquer problema encontrado.
             </div>
 
             {qrCodeData && (
