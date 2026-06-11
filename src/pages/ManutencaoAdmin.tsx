@@ -840,12 +840,43 @@ export default function ManutencaoAdmin() {
 
   const filteredAmbientesByZona = filteredAmbientes.filter((amb) => {
     if (!selectedZona) return true;
-    return amb.zona === selectedZona;
+    const buildingsInZone = activeBlocos.filter(b => b.zona === selectedZona);
+    const buildingNames = buildingsInZone.map(b => b.nome.toLowerCase().trim());
+    
+    if (amb.bloco && buildingNames.includes(amb.bloco.toLowerCase().trim())) {
+      return true;
+    }
+    
+    const activeBuildingNames = activeBlocos.map(b => b.nome.toLowerCase().trim());
+    const hasUnmatchedBlock = !amb.bloco || !activeBuildingNames.includes(amb.bloco.toLowerCase().trim());
+    
+    return hasUnmatchedBlock && amb.zona === selectedZona;
   });
 
-  const getBuildingStats = (zona: string) => {
-    const rooms = ambientes.filter(amb => amb.zona === zona);
-    const openAlerts = ocorrencias.filter(o => o.status === 'pendente' && o.ambiente?.zona === zona);
+  const getBuildingStats = (zona: string, blocoNome?: string) => {
+    const rooms = ambientes.filter(amb => {
+      if (blocoNome && amb.bloco && amb.bloco.toLowerCase().trim() === blocoNome.toLowerCase().trim()) {
+        return true;
+      }
+      if (blocoNome && ambientes.some(a => a.bloco && a.bloco.toLowerCase().trim() === blocoNome.toLowerCase().trim())) {
+        return false;
+      }
+      return amb.zona === zona;
+    });
+
+    const openAlerts = ocorrencias.filter(o => {
+      if (o.status !== 'pendente') return false;
+      const amb = o.ambiente;
+      if (!amb) return false;
+      if (blocoNome && amb.bloco && amb.bloco.toLowerCase().trim() === blocoNome.toLowerCase().trim()) {
+        return true;
+      }
+      if (blocoNome && ambientes.some(a => a.bloco && a.bloco.toLowerCase().trim() === blocoNome.toLowerCase().trim())) {
+        return false;
+      }
+      return amb.zona === zona;
+    });
+
     const roomIds = rooms.map(r => r.id);
     const lastCh = checkins.find(c => roomIds.includes(c.ambiente_id));
     return {
@@ -1177,7 +1208,7 @@ export default function ManutencaoAdmin() {
 
                     {/* Alert Badges pulsantes renderizados por cima de tudo */}
                     {!isEditMapMode && activeBlocos.map((building) => {
-                      const stats = getBuildingStats(building.zona);
+                      const stats = getBuildingStats(building.zona, building.nome);
                       if (stats.alertsCount === 0) return null;
                       return (
                         <g
@@ -1198,7 +1229,7 @@ export default function ManutencaoAdmin() {
                   {hoveredBuilding && (() => {
                     const bInfo = activeBlocos.find(b => b.id === hoveredBuilding);
                     if (!bInfo) return null;
-                    const stats = getBuildingStats(bInfo.zona);
+                    const stats = getBuildingStats(bInfo.zona, bInfo.nome);
                     return (
                       <div
                         className="absolute pointer-events-none z-50 backdrop-blur-md bg-slate-900/90 border border-slate-700/80 text-white rounded-xl p-3 shadow-xl space-y-1 text-xs transition-all duration-150"
