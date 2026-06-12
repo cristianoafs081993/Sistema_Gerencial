@@ -20,7 +20,7 @@ O projeto esta configurado para deploy em Vercel.
 Parametros atuais:
 
 - framework: `vite`
-- install: `npm install`
+- install: `npm install --legacy-peer-deps`
 - build: `npm run build`
 - output: `dist`
 
