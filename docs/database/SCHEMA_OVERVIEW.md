@@ -88,6 +88,8 @@ Para mudancas sensiveis, confirme sempre nas migrations em [supabase/migrations]
 - `manutencao_ambientes`
 - `manutencao_ocorrencias`
 - `manutencao_checkins`
+- `manutencao_blocos_mapa`
+- Storage privado `manutencao-ocorrencias` para fotos opcionais vinculadas por `manutencao_ocorrencias.foto_path`
 
 ### Automacoes e economia de tempo
 

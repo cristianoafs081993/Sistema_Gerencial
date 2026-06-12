@@ -44,6 +44,7 @@ import {
   type Ocorrencia,
   type BlocoMapa,
 } from '@/services/manutencao';
+import { countOpenOccurrencesByBloco, filterAmbientesByBloco } from '@/utils/manutencaoMap';
 import {
   Bar,
   BarChart,
@@ -76,15 +77,6 @@ const mapAcaoBadge: Record<string, string> = {
   manutencao_corretiva: 'border-red-200 bg-red-50 text-red-700',
 };
 
-const mapZonaName: Record<string, string> = {
-  academico: 'Acadêmico',
-  administrativo: 'Administrativo',
-  esportivo: 'Esportivo',
-  servicos: 'Serviços',
-  convivencia: 'Convivência',
-  apoio_tecnico: 'Apoio Técnico',
-};
-
 const materialLabels: Record<string, string> = {
   papel_higienico: 'Papel Higiênico (rolos)',
   sabonete_liquido: 'Sabonete Líquido (L)',
@@ -102,17 +94,17 @@ const materialEmojis: Record<string, string> = {
 };
 
 const LOCAL_DEFAULT_BLOCOS: BlocoMapa[] = [
-  { id: 'lab_energias', nome: 'Laboratório de Energias Renováveis e Hidroponia', zona: 'academico', badge_x: 331, badge_y: 122, geometria_tipo: 'rect', geometria_data: { x: 257, y: 85, width: 148, height: 75, rx: 5 } },
-  { id: 'ginasio', nome: 'Ginásio Poliesportivo', zona: 'esportivo', badge_x: 417, badge_y: 316, geometria_tipo: 'rect', geometria_data: { x: 303, y: 247, width: 217, height: 137, rx: 6 } },
-  { id: 'bloco_central', nome: 'Bloco Acadêmico Central', zona: 'academico', badge_x: 611, badge_y: 191, geometria_tipo: 'rect', geometria_data: { x: 554, y: 147, width: 114, height: 87, rx: 5 } },
-  { id: 'bloco_salas', nome: 'Bloco de Sala de Aula', zona: 'academico', badge_x: 611, badge_y: 384, geometria_tipo: 'rect', geometria_data: { x: 554, y: 309, width: 114, height: 150, rx: 5 } },
-  { id: 'passarela', nome: 'Área de Convivência e Passarelas', zona: 'convivencia', badge_x: 510, badge_y: 300, geometria_tipo: 'rect', geometria_data: { x: 502, y: 147, width: 34, height: 312, rx: 4 } },
-  { id: 'administracao', nome: 'Administração', zona: 'administrativo', badge_x: 753, badge_y: 378, geometria_tipo: 'rect', geometria_data: { x: 691, y: 347, width: 126, height: 62, rx: 5 } },
-  { id: 'biblioteca', nome: 'Biblioteca', zona: 'administrativo', badge_x: 862, badge_y: 365, geometria_tipo: 'rect', geometria_data: { x: 828, y: 210, width: 68, height: 312, rx: 5 } },
-  { id: 'complexo_aquatico', nome: 'Complexo Aquático / Piscina', zona: 'servicos', badge_x: 753, badge_y: 256, geometria_tipo: 'rect', geometria_data: { x: 702, y: 210, width: 103, height: 94, rx: 5 } },
-  { id: 'auditorio', nome: 'Auditório', zona: 'convivencia', badge_x: 611, badge_y: 529, geometria_tipo: 'path', geometria_data: { d: "M 512 503 H 656 A 72 72 0 0 1 512 503" } },
-  { id: 'torre_agua', nome: 'Torre de Água Principal', zona: 'apoio_tecnico', badge_x: 519, badge_y: 297, geometria_tipo: 'circle', geometria_data: { cx: 519, cy: 297, r: 16 } },
-  { id: 'torre_comunicacao', nome: 'Torre de Observação / Comunicação', zona: 'apoio_tecnico', badge_x: 793, badge_y: 135, geometria_tipo: 'circle', geometria_data: { cx: 793, cy: 135, r: 18 } }
+  { id: 'lab_energias', nome: 'Laboratório de Energias Renováveis e Hidroponia', badge_x: 331, badge_y: 122, geometria_tipo: 'rect', geometria_data: { x: 257, y: 85, width: 148, height: 75, rx: 5 } },
+  { id: 'ginasio', nome: 'Ginásio Poliesportivo', badge_x: 417, badge_y: 316, geometria_tipo: 'rect', geometria_data: { x: 303, y: 247, width: 217, height: 137, rx: 6 } },
+  { id: 'bloco_central', nome: 'Bloco Acadêmico Central', badge_x: 611, badge_y: 191, geometria_tipo: 'rect', geometria_data: { x: 554, y: 147, width: 114, height: 87, rx: 5 } },
+  { id: 'bloco_salas', nome: 'Bloco de Sala de Aula', badge_x: 611, badge_y: 384, geometria_tipo: 'rect', geometria_data: { x: 554, y: 309, width: 114, height: 150, rx: 5 } },
+  { id: 'passarela', nome: 'Área de Convivência e Passarelas', badge_x: 510, badge_y: 300, geometria_tipo: 'rect', geometria_data: { x: 502, y: 147, width: 34, height: 312, rx: 4 } },
+  { id: 'administracao', nome: 'Administração', badge_x: 753, badge_y: 378, geometria_tipo: 'rect', geometria_data: { x: 691, y: 347, width: 126, height: 62, rx: 5 } },
+  { id: 'biblioteca', nome: 'Biblioteca', badge_x: 862, badge_y: 365, geometria_tipo: 'rect', geometria_data: { x: 828, y: 210, width: 68, height: 312, rx: 5 } },
+  { id: 'complexo_aquatico', nome: 'Complexo Aquático / Piscina', badge_x: 753, badge_y: 256, geometria_tipo: 'rect', geometria_data: { x: 702, y: 210, width: 103, height: 94, rx: 5 } },
+  { id: 'auditorio', nome: 'Auditório', badge_x: 611, badge_y: 529, geometria_tipo: 'path', geometria_data: { d: "M 512 503 H 656 A 72 72 0 0 1 512 503" } },
+  { id: 'torre_agua', nome: 'Torre de Água Principal', badge_x: 519, badge_y: 297, geometria_tipo: 'circle', geometria_data: { cx: 519, cy: 297, r: 16 } },
+  { id: 'torre_comunicacao', nome: 'Torre de Observação / Comunicação', badge_x: 793, badge_y: 135, geometria_tipo: 'circle', geometria_data: { cx: 793, cy: 135, r: 18 } }
 ];
 
 export default function ManutencaoAdmin() {
@@ -136,7 +128,6 @@ export default function ManutencaoAdmin() {
     nome: '',
     bloco: '',
     tipo: 'sala' as Ambiente['tipo'],
-    zona: 'academico' as Ambiente['zona'],
   });
 
   const [qrCodeData, setQrCodeData] = useState<{ codigo: string; nome: string } | null>(null);
@@ -195,12 +186,11 @@ export default function ManutencaoAdmin() {
         nome: newRoom.nome.trim(),
         bloco: newRoom.bloco.trim() || null,
         tipo: newRoom.tipo,
-        zona: newRoom.zona,
         status: 'ativo',
       });
       toast.success('Ambiente cadastrado com sucesso!');
       setIsAddRoomOpen(false);
-      setNewRoom({ codigo: '', nome: '', bloco: '', tipo: 'sala', zona: 'academico' });
+      setNewRoom({ codigo: '', nome: '', bloco: '', tipo: 'sala' });
       void loadData();
     } catch (error) {
       console.error('Erro ao cadastrar ambiente:', error);
@@ -525,7 +515,7 @@ export default function ManutencaoAdmin() {
     );
   });
 
-  const [selectedZona, setSelectedZona] = useState<string | null>(null);
+  const [selectedBlocoId, setSelectedBlocoId] = useState<string | null>(null);
   const [hoveredBuilding, setHoveredBuilding] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
@@ -539,21 +529,12 @@ export default function ManutencaoAdmin() {
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
 
   const activeBlocos = blocosMapa.length > 0 ? blocosMapa : LOCAL_DEFAULT_BLOCOS;
-
-  const ZONA_COLORS = {
-    academico: { fill: 'rgba(139, 92, 246, 0.25)', stroke: '#8b5cf6' },
-    esportivo: { fill: 'rgba(217, 119, 6, 0.25)', stroke: '#d97706' },
-    administrativo: { fill: 'rgba(249, 115, 22, 0.25)', stroke: '#f97316' },
-    servicos: { fill: 'rgba(59, 130, 246, 0.25)', stroke: '#3b82f6' },
-    convivencia: { fill: 'rgba(132, 204, 22, 0.25)', stroke: '#84cc16' },
-    apoio_tecnico: { fill: 'rgba(6, 182, 212, 0.25)', stroke: '#06b6d4' },
-  } as const;
+  const selectedBloco = activeBlocos.find((bloco) => bloco.id === selectedBlocoId) || null;
 
   const renderGeometria = (bloco: BlocoMapa | Partial<BlocoMapa>, isHoveredOrSelected: boolean) => {
     if (!bloco.geometria_tipo || !bloco.geometria_data) return null;
-    const color = ZONA_COLORS[bloco.zona || 'academico'] || ZONA_COLORS.academico;
-    const fill = isHoveredOrSelected ? color.fill : 'rgba(255, 255, 255, 0.01)';
-    const stroke = isHoveredOrSelected ? color.stroke : 'transparent';
+    const fill = isHoveredOrSelected ? 'rgba(47, 158, 65, 0.22)' : 'rgba(255, 255, 255, 0.01)';
+    const stroke = isHoveredOrSelected ? '#2f9e41' : 'transparent';
     const data = bloco.geometria_data;
 
     switch (bloco.geometria_tipo) {
@@ -706,8 +687,8 @@ export default function ManutencaoAdmin() {
   };
 
   const handleSaveBloco = async () => {
-    if (!editingBloco || !editingBloco.nome || !editingBloco.zona) {
-      toast.error("Nome e zona são obrigatórios.");
+    if (!editingBloco || !editingBloco.nome) {
+      toast.error("O nome do bloco é obrigatório.");
       return;
     }
     if (!editingBloco.geometria_tipo || !editingBloco.geometria_data) {
@@ -787,7 +768,6 @@ export default function ManutencaoAdmin() {
       const payload: BlocoMapa = {
         id: editingBloco.id || `bloco_${Date.now()}`,
         nome: editingBloco.nome,
-        zona: editingBloco.zona as any,
         badge_x: editingBloco.badge_x || 500,
         badge_y: editingBloco.badge_y || 325,
         geometria_tipo: editingBloco.geometria_tipo as any,
@@ -831,60 +811,28 @@ export default function ManutencaoAdmin() {
     }
   };
 
-  const handleZonaClick = (zona: string) => {
-    setSelectedZona((prev) => (prev === zona ? null : zona));
+  const handleBlocoClick = (blocoId: string) => {
+    setSelectedBlocoId((prev) => (prev === blocoId ? null : blocoId));
   };
 
-  const filteredAmbientesByZona = filteredAmbientes.filter((amb) => {
-    if (!selectedZona) return true;
-    const buildingsInZone = activeBlocos.filter(b => b.zona === selectedZona);
-    const buildingNames = buildingsInZone.map(b => b.nome.toLowerCase().trim());
-    
-    if (amb.bloco && buildingNames.includes(amb.bloco.toLowerCase().trim())) {
-      return true;
-    }
-    
-    const activeBuildingNames = activeBlocos.map(b => b.nome.toLowerCase().trim());
-    const hasUnmatchedBlock = !amb.bloco || !activeBuildingNames.includes(amb.bloco.toLowerCase().trim());
-    
-    return hasUnmatchedBlock && amb.zona === selectedZona;
-  });
+  const filteredAmbientesByBloco = filterAmbientesByBloco(
+    filteredAmbientes,
+    selectedBloco?.nome,
+  );
 
-  const getBuildingStats = (zona: string, blocoNome?: string) => {
-    const rooms = ambientes.filter(amb => {
-      if (blocoNome && amb.bloco && amb.bloco.toLowerCase().trim() === blocoNome.toLowerCase().trim()) {
-        return true;
-      }
-      if (blocoNome && ambientes.some(a => a.bloco && a.bloco.toLowerCase().trim() === blocoNome.toLowerCase().trim())) {
-        return false;
-      }
-      return amb.zona === zona;
-    });
-
-    const openAlerts = ocorrencias.filter(o => {
-      if (o.status !== 'pendente') return false;
-      const amb = o.ambiente;
-      if (!amb) return false;
-      if (blocoNome && amb.bloco && amb.bloco.toLowerCase().trim() === blocoNome.toLowerCase().trim()) {
-        return true;
-      }
-      if (blocoNome && ambientes.some(a => a.bloco && a.bloco.toLowerCase().trim() === blocoNome.toLowerCase().trim())) {
-        return false;
-      }
-      return amb.zona === zona;
-    });
-
-    const roomIds = rooms.map(r => r.id);
-    const lastCh = checkins.find(c => roomIds.includes(c.ambiente_id));
+  const getBuildingStats = (blocoNome: string) => {
+    const rooms = filterAmbientesByBloco(ambientes, blocoNome);
+    const roomIds = new Set(rooms.map((room) => room.id));
+    const lastCh = checkins.find(c => roomIds.has(c.ambiente_id));
     return {
       roomsCount: rooms.length,
-      alertsCount: openAlerts.length,
+      alertsCount: countOpenOccurrencesByBloco(ambientes, ocorrencias, blocoNome),
       lastCheckin: lastCh ? new Date(lastCh.created_at).toLocaleDateString('pt-BR') : 'Sem registro',
     };
   };
 
-  const isBuildingDimmed = (zona: string) => {
-    return selectedZona !== null && selectedZona !== zona;
+  const isBuildingDimmed = (blocoId: string) => {
+    return selectedBlocoId !== null && selectedBlocoId !== blocoId;
   };
 
   // Material consumption aggregation
@@ -1101,12 +1049,12 @@ export default function ManutencaoAdmin() {
         {/* Tab: Dashboard */}
         <TabsContent value="dashboard" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-12">
-            {/* SVG Zoning Map */}
+            {/* Campus map */}
             <div className="lg:col-span-8 space-y-3">
               <div className="bg-white p-4 border rounded-2xl shadow-sm space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="font-extrabold text-slate-800 text-sm uppercase tracking-wide">
-                    Mapa de Zoneamento - Currais Novos
+                    Mapa do Campus - Currais Novos
                   </h3>
                   <div className="flex items-center gap-2">
                     <Button
@@ -1122,15 +1070,15 @@ export default function ManutencaoAdmin() {
                     >
                       {isEditMapMode ? "Sair da Edição" : "Configurar Mapa"}
                     </Button>
-                    {selectedZona && (
-                      <Button variant="ghost" size="xs" onClick={() => setSelectedZona(null)} className="text-xs text-rose-500 hover:text-rose-600 font-bold">
+                    {selectedBloco && (
+                      <Button variant="ghost" size="xs" onClick={() => setSelectedBlocoId(null)} className="text-xs text-rose-500 hover:text-rose-600 font-bold">
                         Limpar Filtro
                       </Button>
                     )}
                   </div>
                 </div>
                 <p className="text-xs text-slate-400">
-                  Passe o mouse sobre os blocos para informações detalhadas. Clique em um prédio para filtrar as salas por zona.
+                  Passe o mouse sobre os blocos para informações detalhadas. Clique em um prédio para filtrar seus ambientes.
                 </p>
                 
                 <div className="relative map-container overflow-visible">
@@ -1177,8 +1125,8 @@ export default function ManutencaoAdmin() {
                     {/* Renderização dinâmica dos blocos cadastrados */}
                     {activeBlocos.map((bloco) => {
                       const isHovered = hoveredBuilding === bloco.id;
-                      const isSelected = selectedZona === bloco.zona;
-                      const isDimmed = selectedZona !== null && selectedZona !== bloco.zona;
+                      const isSelected = selectedBlocoId === bloco.id;
+                      const isDimmed = selectedBlocoId !== null && selectedBlocoId !== bloco.id;
 
                       return (
                         <g
@@ -1187,7 +1135,7 @@ export default function ManutencaoAdmin() {
                             "cursor-pointer transition-all duration-300",
                             isDimmed ? 'opacity-20' : 'opacity-100'
                           )}
-                          onClick={() => !isEditMapMode && handleZonaClick(bloco.zona)}
+                          onClick={() => !isEditMapMode && handleBlocoClick(bloco.id)}
                           onMouseEnter={(e) => {
                             if (isEditMapMode) return;
                             setHoveredBuilding(bloco.id);
@@ -1309,14 +1257,14 @@ export default function ManutencaoAdmin() {
 
                     {/* Alert Badges pulsantes renderizados por cima de tudo */}
                     {!isEditMapMode && activeBlocos.map((building) => {
-                      const stats = getBuildingStats(building.zona, building.nome);
+                      const stats = getBuildingStats(building.nome);
                       if (stats.alertsCount === 0) return null;
                       return (
                         <g
                           key={`alert-${building.id}`}
                           className={cn(
                             "pointer-events-none transition-opacity duration-300",
-                            isBuildingDimmed(building.zona) ? 'opacity-30' : 'opacity-100'
+                            isBuildingDimmed(building.id) ? 'opacity-30' : 'opacity-100'
                           )}
                         >
                           <circle cx={building.badge_x} cy={building.badge_y} r="5" fill="#ef4444" stroke="#ffffff" strokeWidth="1" />
@@ -1330,7 +1278,7 @@ export default function ManutencaoAdmin() {
                   {hoveredBuilding && (() => {
                     const bInfo = activeBlocos.find(b => b.id === hoveredBuilding);
                     if (!bInfo) return null;
-                    const stats = getBuildingStats(bInfo.zona, bInfo.nome);
+                    const stats = getBuildingStats(bInfo.nome);
                     return (
                       <div
                         className="absolute pointer-events-none z-50 backdrop-blur-md bg-slate-900/90 border border-slate-700/80 text-white rounded-xl p-3 shadow-xl space-y-1 text-xs transition-all duration-150"
@@ -1341,9 +1289,6 @@ export default function ManutencaoAdmin() {
                       >
                         <div className="font-extrabold text-sm text-emerald-400">
                           {bInfo.nome}
-                        </div>
-                        <div className="text-[9px] text-slate-300 font-semibold uppercase tracking-wider">
-                          Setor: {mapZonaName[bInfo.zona]}
                         </div>
                         <div className="border-t border-slate-800 my-1 pt-1 space-y-0.5 text-slate-400">
                           <div>Salas cadastradas: <span className="text-white font-bold">{stats.roomsCount}</span></div>
@@ -1379,7 +1324,6 @@ export default function ManutencaoAdmin() {
                           <Button
                             onClick={() => setEditingBloco({
                               nome: '',
-                              zona: 'academico',
                               geometria_tipo: 'polygon',
                               geometria_data: {}
                             })}
@@ -1401,7 +1345,7 @@ export default function ManutencaoAdmin() {
                             <div key={bloco.id} className="py-2.5 flex items-center justify-between gap-2 text-xs">
                               <div className="min-w-0">
                                 <div className="font-bold text-slate-700 truncate">{bloco.nome}</div>
-                                <div className="text-[10px] text-slate-400 capitalize">{mapZonaName[bloco.zona] || bloco.zona} ({bloco.geometria_tipo})</div>
+                                <div className="text-[10px] text-slate-400 capitalize">{bloco.geometria_tipo}</div>
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
                                 <Button
@@ -1435,26 +1379,6 @@ export default function ManutencaoAdmin() {
                             placeholder="Ex: Bloco Acadêmico Central"
                             className="h-9 text-xs"
                           />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-slate-600">Zona Funcional</label>
-                          <Select
-                            value={editingBloco.zona || 'academico'}
-                            onValueChange={val => setEditingBloco({ ...editingBloco, zona: val as any })}
-                          >
-                            <SelectTrigger className="h-9 text-xs">
-                              <SelectValue placeholder="Selecione a zona..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="academico">Acadêmico (Roxo)</SelectItem>
-                              <SelectItem value="administrativo">Administrativo (Laranja)</SelectItem>
-                              <SelectItem value="esportivo">Esportivo (Amarelo)</SelectItem>
-                              <SelectItem value="servicos">Serviços (Azul)</SelectItem>
-                              <SelectItem value="convivencia">Convivência (Verde-limão)</SelectItem>
-                              <SelectItem value="apoio_tecnico">Apoio Técnico (Ciano)</SelectItem>
-                            </SelectContent>
-                          </Select>
                         </div>
 
                         <div className="space-y-2 pt-2 border-t">
@@ -1573,21 +1497,21 @@ export default function ManutencaoAdmin() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base font-extrabold text-slate-800 flex items-center gap-2">
                       <Building2 className="h-5 w-5 text-emerald-600" />
-                      {selectedZona ? `Setor: ${mapZonaName[selectedZona]}` : 'Todos os Ambientes'}
+                      {selectedBloco ? selectedBloco.nome : 'Todos os Ambientes'}
                     </CardTitle>
                     <CardDescription className="text-xs">
-                      {selectedZona 
-                        ? 'Salas cadastradas pertencentes a esta zona funcional.' 
-                        : 'Selecione uma zona no mapa para filtrar.'}
+                      {selectedBloco
+                        ? 'Ambientes cadastrados neste bloco.'
+                        : 'Selecione um bloco no mapa para filtrar.'}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="flex-1 overflow-y-auto max-h-[350px] space-y-2">
-                    {filteredAmbientesByZona.length === 0 ? (
+                    {filteredAmbientesByBloco.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-10 text-center text-slate-400 italic text-xs">
-                        Nenhum ambiente cadastrado nesta zona.
+                        Nenhum ambiente cadastrado neste bloco.
                       </div>
                     ) : (
-                      filteredAmbientesByZona.map((amb) => {
+                      filteredAmbientesByBloco.map((amb) => {
                         const roomOcorrencias = ocorrencias.filter((o) => o.ambiente_id === amb.id && o.status === 'pendente');
                         const roomCheckins = checkins.filter((ch) => ch.ambiente_id === amb.id);
                         const lastCheckin = roomCheckins[0];
@@ -1710,6 +1634,7 @@ export default function ManutencaoAdmin() {
                   <TableHead className="w-12">Avaliação</TableHead>
                   <TableHead className="w-1/4">Problemas Relatados</TableHead>
                   <TableHead>Detalhes</TableHead>
+                  <TableHead className="w-24">Foto</TableHead>
                   <TableHead className="w-40">Data de Envio</TableHead>
                   <TableHead className="w-24">Status</TableHead>
                   <TableHead className="w-24 text-right">Ação</TableHead>
@@ -1717,9 +1642,9 @@ export default function ManutencaoAdmin() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={7} className="h-28 text-center italic text-muted-foreground">Carregando dados...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="h-28 text-center italic text-muted-foreground">Carregando dados...</TableCell></TableRow>
                 ) : filteredOcorrencias.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="h-28 text-center italic text-muted-foreground">Nenhuma ocorrência encontrada.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="h-28 text-center italic text-muted-foreground">Nenhuma ocorrência encontrada.</TableCell></TableRow>
                 ) : (
                   filteredOcorrencias.map((oc) => (
                     <TableRow key={oc.id} className={cn('hover:bg-slate-50/50', oc.status === 'pendente' && 'bg-red-50/20')}>
@@ -1750,6 +1675,25 @@ export default function ManutencaoAdmin() {
                       </TableCell>
                       <TableCell className="align-top text-xs text-slate-600 max-w-xs truncate">
                         {oc.observacao || <span className="italic text-slate-400">Sem observações</span>}
+                      </TableCell>
+                      <TableCell className="align-top">
+                        {oc.foto_url ? (
+                          <a
+                            href={oc.foto_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex overflow-hidden rounded-lg border border-slate-200 bg-slate-50 transition hover:border-emerald-300"
+                            title="Abrir foto da ocorrência"
+                          >
+                            <img
+                              src={oc.foto_url}
+                              alt={`Foto da ocorrência em ${oc.ambiente?.nome || 'ambiente'}`}
+                              className="h-14 w-16 object-cover"
+                            />
+                          </a>
+                        ) : (
+                          <span className="text-xs italic text-slate-400">Sem foto</span>
+                        )}
                       </TableCell>
                       <TableCell className="align-top text-xs text-slate-500">
                         {formatDateTime(oc.created_at)}
@@ -2027,22 +1971,6 @@ export default function ManutencaoAdmin() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-600">Zona do Campus</label>
-              <Select value={newRoom.zona || 'academico'} onValueChange={(value) => setNewRoom({ ...newRoom, zona: value as Ambiente['zona'] })}>
-                <SelectTrigger className="h-10 input-system">
-                  <SelectValue placeholder="Selecione a zona..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="academico">Acadêmico</SelectItem>
-                  <SelectItem value="administrativo">Administrativo</SelectItem>
-                  <SelectItem value="esportivo">Esportivo</SelectItem>
-                  <SelectItem value="servicos">Serviços</SelectItem>
-                  <SelectItem value="convivencia">Convivência</SelectItem>
-                  <SelectItem value="apoio_tecnico">Apoio Técnico</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
             <DialogFooter className="pt-4">
               <Button type="button" variant="ghost" onClick={() => setIsAddRoomOpen(false)} className="h-10">

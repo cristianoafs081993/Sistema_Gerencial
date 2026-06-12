@@ -1031,6 +1031,27 @@ Campos-chave:
 Observações operacionais:
 
 - Leitura pública liberada; escrita restrita a administradores autenticados.
+- O vínculo com o mapa usa diretamente o nome armazenado em `bloco`; o módulo não classifica mais ambientes por zona funcional.
+
+### `manutencao_blocos_mapa`
+
+Finalidade:
+
+- Configuração dos blocos interativos exibidos no mapa do campus.
+
+Campos-chave:
+
+- `id`
+- `nome`
+- `badge_x`
+- `badge_y`
+- `geometria_tipo`
+- `geometria_data`
+
+Observações operacionais:
+
+- Cada bloco é selecionado e destacado individualmente.
+- A coluna legada `zona` foi removida; cores, filtros e estatísticas não dependem mais de zona funcional.
 
 ### `manutencao_ocorrencias`
 
@@ -1046,11 +1067,14 @@ Campos-chave:
 - `avaliacao` (1 a 5)
 - `problemas` (Array de tags)
 - `observacao`
+- `foto_path` (caminho opcional no bucket privado `manutencao-ocorrencias`)
 - `status` (pendente/resolvido)
 
 Observações operacionais:
 
 - Inserção anônima pública liberada; leitura e resolução restritas a usuários autenticados.
+- A foto opcional aceita JPEG, PNG ou WebP com até 5 MB. O banco persiste apenas o caminho; a tela administrativa gera URL assinada temporária para visualização.
+- Ocorrências pendentes geram alerta no bloco informado pelo ambiente relacionado em `manutencao_ambientes.bloco`.
 
 ### `manutencao_checkins`
 

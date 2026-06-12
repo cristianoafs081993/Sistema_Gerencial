@@ -650,14 +650,24 @@ Observacao:
 Uso:
 
 - PDFs do modulo SUAP
+- fotos opcionais de ocorrencias de limpeza e manutencao
 
 Chamador:
 
 - [suapProcessos.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/suapProcessos.ts)
+- [manutencao.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/manutencao.ts)
 
-Bucket observado:
+Buckets observados:
 
 - `suap-pdfs`
+- `manutencao-ocorrencias`
+
+Contrato de `manutencao-ocorrencias`:
+
+- bucket privado
+- upload publico restrito por policy a um diretorio UUID de ambiente e arquivo UUID com extensao `jpg`, `png` ou `webp`
+- limite de 5 MB e MIME types `image/jpeg`, `image/png` e `image/webp`
+- leitura autenticada; o frontend administrativo usa URL assinada temporaria
 
 ## 9. Bibliotecas com contrato operacional relevante
 

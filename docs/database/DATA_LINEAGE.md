@@ -256,6 +256,20 @@ Mostrar a linhagem operacional dos dados de forma curta:
 - observacao: a geração solar mensal é extraída das tabelas laterais `Período - AAAA` / `Geração (kwh)` na aba `Consumo`, além das bases anuais em `UFV's`.
 - observacao: Mercatto usa kWh real quando a coluna L da aba `Consumo` estiver preenchida no periodo do ambiente livre. Na Visão Geral, quando o período não tiver kWh direto de Mercatto, `contratos_api_faturas` ou `contratos_api_empenho_liquidacoes_cache` podem alimentar kWh estimado pela tarifa média conhecida para exibir o contrato Mercatto nos KPIs e gráficos. Linhas de previsão sem base de kWh ou valor continuam como `N/D`.
 
+### Limpeza e Manutencao
+
+- avaliacao publica por QR Code
+  - pagina: [PublicFeedback.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/PublicFeedback.tsx)
+  - service: [manutencao.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/manutencao.ts)
+  - persistencia: `manutencao_ocorrencias`
+  - foto opcional: bucket privado `manutencao-ocorrencias`; o registro guarda `foto_path`
+  - formatos: JPEG, PNG ou WebP, com limite de 5 MB
+- acompanhamento administrativo
+  - pagina: [ManutencaoAdmin.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/ManutencaoAdmin.tsx)
+  - visualizacao da foto: URL assinada temporaria gerada pelo service
+  - alerta do mapa: ocorrencias pendentes -> `ambiente_id` -> `manutencao_ambientes.bloco` -> `manutencao_blocos_mapa.nome`
+  - observacao: o alerta pertence ao bloco exato do ambiente e nao depende de zona funcional
+
 ### Retencoes FD-Reinf
 
 - arquivo CSV de auditoria

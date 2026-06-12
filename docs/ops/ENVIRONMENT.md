@@ -141,6 +141,16 @@ Observacoes operacionais:
 - quando a function ainda nao estiver publicada ou falhar por indisponibilidade/CORS, o frontend usa fallback local em `riskMapsService`
 - `supabase/config.toml` deve manter `verify_jwt = false` para `gerar-mapa-riscos-licitacao`
 
+### Fotos de ocorrencias de manutencao
+
+Nao exige nova variavel de ambiente.
+
+Observacoes operacionais:
+
+- o frontend usa as credenciais publicas ja configuradas para o Supabase
+- a migration `20260612123000_add_manutencao_ocorrencia_fotos.sql` cria o bucket privado `manutencao-ocorrencias`, o limite de 5 MB e as policies de upload publico e leitura autenticada
+- a tabela `manutencao_ocorrencias` guarda somente `foto_path`; o acesso administrativo usa URL assinada temporaria
+
 ### `sugerir-respostas-etp-servicos-continuos`
 
 Necessarias no ambiente do Supabase:

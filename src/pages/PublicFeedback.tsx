@@ -4,6 +4,7 @@ import {
   AlertCircle,
   AlertTriangle,
   Building,
+  Camera,
   Check,
   CheckCircle2,
   Clock,
@@ -11,6 +12,7 @@ import {
   Lock,
   MessageSquare,
   ShieldCheck,
+  Trash2,
   User,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -22,7 +24,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { type Ambiente, manutencaoService } from '@/services/manutencao';
+import {
+  type Ambiente,
+  manutencaoService,
+  OCORRENCIA_FOTO_ACCEPT,
+  validateOcorrenciaFoto,
+} from '@/services/manutencao';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 
@@ -63,6 +70,8 @@ export default function PublicFeedback() {
   const [rating, setRating] = useState<number | null>(null);
   const [selectedProblems, setSelectedProblems] = useState<string[]>([]);
   const [observation, setObservation] = useState('');
+  const [occurrencePhoto, setOccurrencePhoto] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [submittingReport, setSubmittingReport] = useState(false);
   const [reportSuccess, setReportSuccess] = useState(false);
 
@@ -178,6 +187,46 @@ export default function PublicFeedback() {
     );
   };
 
+  const clearOccurrencePhoto = () => {
+    setPhotoPreviewUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+    setOccurrencePhoto(null);
+  };
+
+  const resetReport = () => {
+    setReportSuccess(false);
+    setRating(null);
+    setSelectedProblems([]);
+    setObservation('');
+    clearOccurrencePhoto();
+  };
+
+  const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    event.target.value = '';
+    if (!file) return;
+
+    const validationError = validateOcorrenciaFoto(file);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
+    setPhotoPreviewUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return URL.createObjectURL(file);
+    });
+    setOccurrencePhoto(file);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    };
+  }, [photoPreviewUrl]);
+
   const handleSubmitReport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ambiente || !rating) {
@@ -193,7 +242,7 @@ export default function PublicFeedback() {
         avaliacao: rating,
         problemas: selectedProblems,
         observacao: observation.trim() || null,
-      });
+      }, occurrencePhoto);
       setReportSuccess(true);
       toast.success('Muito obrigado! Sua avaliação foi enviada.');
     } catch (err) {
@@ -332,7 +381,7 @@ export default function PublicFeedback() {
                 </p>
               </div>
               <div className="pt-2">
-                <Button onClick={() => { setReportSuccess(false); setRating(null); setSelectedProblems([]); setObservation(''); }} variant="outline" className="h-10">
+                <Button onClick={resetReport} variant="outline" className="h-10">
                   Enviar outro feedback
                 </Button>
               </div>
@@ -412,6 +461,63 @@ export default function PublicFeedback() {
                         className="pl-9 min-h-[90px] input-system"
                       />
                     </div>
+                  </div>
+
+                  {/* Optional photo */}
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
+                        Foto do problema (Opcional)
+                      </label>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Use a câmera ou escolha uma imagem JPEG, PNG ou WebP de até 5 MB.
+                      </p>
+                    </div>
+
+                    <input
+                      id="occurrence-photo"
+                      type="file"
+                      accept={OCORRENCIA_FOTO_ACCEPT}
+                      capture="environment"
+                      className="sr-only"
+                      onChange={handlePhotoChange}
+                    />
+
+                    {photoPreviewUrl ? (
+                      <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                        <img
+                          src={photoPreviewUrl}
+                          alt="Pré-visualização da foto selecionada"
+                          className="max-h-64 w-full object-cover"
+                        />
+                        <div className="flex items-center justify-between gap-3 p-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-semibold text-slate-700">
+                              {occurrencePhoto?.name}
+                            </p>
+                            <p className="text-[11px] text-slate-400">Foto pronta para envio</p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearOccurrencePhoto}
+                            className="shrink-0 gap-1.5 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Remover
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <label
+                        htmlFor="occurrence-photo"
+                        className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 px-4 py-5 text-sm font-semibold text-slate-600 transition hover:border-emerald-400 hover:bg-emerald-50/50 hover:text-emerald-700"
+                      >
+                        <Camera className="h-5 w-5" />
+                        Tirar ou escolher foto
+                      </label>
+                    )}
                   </div>
 
                   <Button
