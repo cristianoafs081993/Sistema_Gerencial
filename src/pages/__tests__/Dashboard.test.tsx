@@ -522,9 +522,9 @@ describe('Dashboard', () => {
       ] as never,
       ['c1', 'c2'],
       {
-        startDate: new Date('2026-01-01'),
-        endDate: new Date('2026-12-31'),
-        today: new Date('2026-03-15'),
+        startDate: new Date(2026, 0, 1),
+        endDate: new Date(2026, 11, 31),
+        today: new Date(2026, 2, 15),
       },
     );
 
@@ -538,7 +538,7 @@ describe('Dashboard', () => {
       mesesConsiderados: 3,
       percentualLiquidado: expect.closeTo(18.07, 1),
       percentualProjetado: expect.closeTo(72.29, 1),
-      coberturaMes: 'Julho/27',
+      coberturaMes: 'Agosto/27',
       necessidadeEmpenho: 0,
     });
     expect(bullets[0].liquidacoes).toEqual([
@@ -606,9 +606,9 @@ describe('Dashboard', () => {
       [] as never,
       ['c1'],
       {
-        startDate: new Date('2026-01-01'),
-        endDate: new Date('2026-12-31'),
-        today: new Date('2026-03-15'),
+        startDate: new Date(2026, 0, 1),
+        endDate: new Date(2026, 11, 31),
+        today: new Date(2026, 2, 15),
         projectionTargetMonths: 15,
       },
     );
