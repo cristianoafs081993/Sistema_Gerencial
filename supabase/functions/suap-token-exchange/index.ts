@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { code, redirectUri, loginSupabase } = await req.json();
+    const { code, redirectUri, loginSupabase, clientId: reqClientId } = await req.json();
 
     if (!code || !redirectUri) {
       return new Response(JSON.stringify({ error: 'Parâmetros code e redirectUri são obrigatórios.' }), {
@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const clientId = 'Oe1jZhORICjEB840r23FR4P1OGQCInNqyNcCzLip';
+    const clientId = reqClientId || Deno.env.get('SUAP_CLIENT_ID') || 'Oe1jZhORICjEB840r23FR4P1OGQCInNqyNcCzLip';
     const clientSecret = Deno.env.get('SUAP_CLIENT_SECRET') || 'B2wQ8Ikaoj6DILy1RTpXgkfsEQcr81hqPK7gLitQWmIlYSYvNAKY2if1MrRL8pBhan56jM4qcTxKMdHRzN9iDkyFjWOqaNLz5ARrQsk2k3QSlLHnMzEX12I3yYz9OPRj';
 
     // 1. Exchange authorization code for token

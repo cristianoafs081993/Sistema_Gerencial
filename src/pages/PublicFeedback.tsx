@@ -32,6 +32,7 @@ import {
 } from '@/services/manutencao';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
+import { env } from '@/lib/env';
 
 const emojiMap: Record<number, string> = {
   5: '😀',
@@ -144,7 +145,7 @@ export default function PublicFeedback() {
   }, []);
 
   const handleSuapLogin = () => {
-    const clientId = 'Oe1jZhORICjEB840r23FR4P1OGQCInNqyNcCzLip';
+    const clientId = env.suapClientId;
     const redirectUri = window.location.origin + '/suap-callback';
     const state = codigo || '';
     const suapAuthUrl = `https://suap.ifrn.edu.br/o/authorize/?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(

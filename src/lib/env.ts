@@ -15,6 +15,7 @@ const optionalEnvSchema = z.object({
   ),
   VITE_SIAFI_CONTA_PAGADORA: z.string().trim().min(1).optional().default('408034'),
   VITE_SIAFI_MACRO_CODIGO_FINAL: z.string().trim().min(1).optional().default('2200'),
+  VITE_SUAP_CLIENT_ID: z.string().trim().min(1).optional(),
 });
 
 const requiredSupabaseEnvSchema = z.object({
@@ -28,6 +29,7 @@ export const env = {
   appOrigin: optionalEnv.VITE_APP_ORIGIN ? new URL(optionalEnv.VITE_APP_ORIGIN).origin : undefined,
   siafiContaPagadora: optionalEnv.VITE_SIAFI_CONTA_PAGADORA,
   siafiMacroCodigoFinal: optionalEnv.VITE_SIAFI_MACRO_CODIGO_FINAL,
+  suapClientId: optionalEnv.VITE_SUAP_CLIENT_ID || 'Oe1jZhORICjEB840r23FR4P1OGQCInNqyNcCzLip',
 };
 
 export function getSupabaseEnv() {

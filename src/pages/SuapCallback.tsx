@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { env } from '@/lib/env';
 
 export default function SuapCallback() {
   const [searchParams] = useSearchParams();
@@ -57,7 +58,8 @@ export default function SuapCallback() {
           body: JSON.stringify({ 
             code, 
             redirectUri,
-            loginSupabase: isAppLogin
+            loginSupabase: isAppLogin,
+            clientId: env.suapClientId
           }),
         });
 

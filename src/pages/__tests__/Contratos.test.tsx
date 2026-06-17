@@ -40,6 +40,7 @@ vi.mock('@/services/contratosApi', async (importOriginal) => {
       getHistoricosApi: vi.fn(),
       getLastSyncRun: vi.fn(),
       getContratoApiDetails: vi.fn(),
+      getFaturasApi: vi.fn(),
     },
   };
 });
@@ -153,6 +154,7 @@ describe('Contratos', () => {
     ]);
     mockedContratosApiService.getEmpenhosApi.mockResolvedValue([]);
     mockedContratosApiService.getHistoricosApi.mockResolvedValue([]);
+    mockedContratosApiService.getFaturasApi.mockResolvedValue([]);
     mockedContratosApiService.getLastSyncRun.mockResolvedValue(null);
     mockedContratosApiService.getContratoApiDetails.mockResolvedValue({
       historico: [
