@@ -9,6 +9,7 @@ export interface SiafiMacroInputRow {
   agenciaCodigo: string;
   contaPagadora: string;
   contaFavorecido: string;
+  valor?: number;
 }
 
 export interface SiafiMacroOptions {
@@ -37,7 +38,7 @@ function onlyDigits(value: string): string {
   return (value || '').replace(/\D/g, '');
 }
 
-function padLeft(value: string, size: number): string {
+export function padLeft(value: string, size: number): string {
   const digits = onlyDigits(value);
   if (!digits) return ''.padStart(size, '0');
   return digits.length > size ? digits.slice(-size) : digits.padStart(size, '0');
@@ -121,6 +122,7 @@ export function buildSiafiMacroRowsFromComparison(
       agenciaCodigo: preferred.agenciaCodigo || '0001',
       contaPagadora: contaPagadoraPadrao,
       contaFavorecido: contaLcDigits,
+      valor: b.valor,
     });
   }
 
@@ -167,6 +169,7 @@ export function buildSiafiMacroRowsFromPendencias(
       agenciaCodigo,
       contaPagadora: contaPagadoraPadrao,
       contaFavorecido,
+      valor: bolsista?.valor,
     });
   }
 

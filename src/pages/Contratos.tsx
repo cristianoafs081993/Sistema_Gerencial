@@ -20,7 +20,7 @@ import { getRapBaseVigente, getRapReferenceYear, getRapSaldoAtual } from '@/util
 import { buildEmpenhoLookupKeys, normalizeContratoNumero, shouldIgnoreContratoNumero } from '@/utils/contratosSync';
 import { getValorTotalFromHistorico } from '@/utils/contratosApiHistorico';
 import { isContratoApiCampusEmpenho } from '@/utils/contratosApiStatus';
-import { contratosApiService, type ContratoApiDetails, type ContratoApiEmpenhoRow, type ContratoApiHistoricoRow, type ContratoApiRow, type ContratoApiSyncRun } from '@/services/contratosApi';
+import { contratosApiService, type ContratoApiDetails, type ContratoApiEmpenhoRow, type ContratoApiHistoricoRow, type ContratoApiRow, type ContratoApiSyncRun, type ContratoApiFaturaRow } from '@/services/contratosApi';
 import { ContratoApiDetailsSheet } from '@/components/contratos/ContratoApiDetailsSheet';
 import { useUserFavorites } from '@/services/userFavorites';
 
@@ -138,7 +138,7 @@ export default function Contratos() {
   const { isSuperAdmin } = useAuth();
   const { contratos, empenhos, contratosEmpenhos, isLoading, refreshData } = useData();
   const [searchTerm, setSearchTerm] = useState('');
-  const [favoritesFilter, setFavoritesFilter] = useState<'all' | 'favorites'>('all');
+  const [viewFilter, setViewFilter] = useState<'all' | 'favorites' | 'expired120'>('all');
   const { favoriteIdsByType, isFavorite, toggleFavorite, isPending: isFavoritePending } = useUserFavorites();
   const [sortConfig, setSortConfig] = useState<{
     key: string;
@@ -148,6 +148,7 @@ export default function Contratos() {
   const [apiContratos, setApiContratos] = useState<ContratoApiRow[]>([]);
   const [apiEmpenhos, setApiEmpenhos] = useState<ContratoApiEmpenhoRow[]>([]);
   const [apiHistoricos, setApiHistoricos] = useState<ContratoApiHistoricoRow[]>([]);
+  const [apiFaturas, setApiFaturas] = useState<ContratoApiFaturaRow[]>([]);
   const [lastApiSyncRun, setLastApiSyncRun] = useState<ContratoApiSyncRun | null>(null);
   const [selectedApiContrato, setSelectedApiContrato] = useState<ContratoApiRow | null>(null);
   const [selectedApiDetails, setSelectedApiDetails] = useState<ContratoApiDetails | null>(null);
@@ -158,11 +159,17 @@ export default function Contratos() {
     try {
       const contratosApi = await contratosApiService.getContratosApi(true);
       const contratoApiIds = contratosApi.map((contrato) => contrato.id);
-      const [empenhosApi, historicosApi, lastSync] = await Promise.all([contratosApiService.getEmpenhosApi(contratoApiIds), contratosApiService.getHistoricosApi(contratoApiIds), contratosApiService.getLastSyncRun().catch(() => null)]);
+      const [empenhosApi, historicosApi, faturasApi, lastSync] = await Promise.all([
+        contratosApiService.getEmpenhosApi(contratoApiIds),
+        contratosApiService.getHistoricosApi(contratoApiIds),
+        contratosApiService.getFaturasApi(contratoApiIds),
+        contratosApiService.getLastSyncRun().catch(() => null),
+      ]);
       if (isCancelled()) return;
       setApiContratos(contratosApi);
       setApiEmpenhos(empenhosApi.filter((empenho) => isContratoApiCampusEmpenho(empenho)));
       setApiHistoricos(historicosApi);
+      setApiFaturas(faturasApi);
       setLastApiSyncRun(lastSync);
     } catch (error) {
       console.warn('Contratos: nao foi possivel carregar dados da API do Comprasnet', error);
@@ -330,9 +337,26 @@ export default function Contratos() {
 
   const filteredContratos = useMemo(() => {
     const searchNormalized = normalizeString(searchTerm);
-    const baseContratos = favoritesFilter === 'favorites'
-      ? visibleContratos.filter((contrato) => contrato.localId && favoriteIdsByType.contrato.has(contrato.localId))
-      : visibleContratos;
+    let baseContratos = visibleContratos;
+
+    if (viewFilter === 'all') {
+      baseContratos = visibleContratos.filter(
+        (contrato) => !contrato.apiContrato || contrato.apiContrato.situacao_derivada === true
+      );
+    } else if (viewFilter === 'favorites') {
+      baseContratos = visibleContratos.filter(
+        (contrato) => contrato.localId && favoriteIdsByType.contrato.has(contrato.localId)
+      );
+    } else if (viewFilter === 'expired120') {
+      const today = new Date();
+      const hundredTwentyDaysAgo = new Date(today.getTime() - 120 * 24 * 60 * 60 * 1000);
+      baseContratos = visibleContratos.filter((contrato) => {
+        if (!contrato.data_termino) return false;
+        const dateTermino = new Date(contrato.data_termino);
+        if (isNaN(dateTermino.getTime())) return false;
+        return dateTermino.getTime() < today.getTime() && dateTermino.getTime() >= hundredTwentyDaysAgo.getTime();
+      });
+    }
 
     let result = baseContratos.filter((c) => {
       return normalizeString(c.numero).includes(searchNormalized) || normalizeString(c.contratada).includes(searchNormalized) || normalizeString(c.cnpj || '').includes(searchNormalized);
@@ -358,7 +382,7 @@ export default function Contratos() {
     }
 
     return result;
-  }, [visibleContratos, favoritesFilter, favoriteIdsByType, searchTerm, normalizeString, sortConfig]);
+  }, [visibleContratos, viewFilter, favoriteIdsByType, searchTerm, normalizeString, sortConfig]);
 
   const safeFormatDate = (dateVal: Date | string | null | undefined) => {
     if (!dateVal) return '-';
@@ -579,20 +603,29 @@ export default function Contratos() {
           <div className="inline-flex h-10 overflow-hidden rounded-xl border border-border-default bg-white shadow-sm">
             <Button
               type="button"
-              variant={favoritesFilter === 'all' ? 'default' : 'ghost'}
+              variant={viewFilter === 'all' ? 'default' : 'ghost'}
               className="h-10 rounded-none px-4 text-xs font-semibold"
-              onClick={() => setFavoritesFilter('all')}
+              onClick={() => setViewFilter('all')}
             >
               Todos
             </Button>
             <Button
               type="button"
-              variant={favoritesFilter === 'favorites' ? 'default' : 'ghost'}
+              variant={viewFilter === 'favorites' ? 'default' : 'ghost'}
               className="h-10 rounded-none px-4 text-xs font-semibold"
-              onClick={() => setFavoritesFilter('favorites')}
+              onClick={() => setViewFilter('favorites')}
             >
-              <Star className="h-3.5 w-3.5" />
+              <Star className="h-3.5 w-3.5 mr-1" />
               Favoritos
+            </Button>
+            <Button
+              type="button"
+              variant={viewFilter === 'expired120' ? 'default' : 'ghost'}
+              className="h-10 rounded-none px-4 text-xs font-semibold"
+              onClick={() => setViewFilter('expired120')}
+            >
+              <Calendar className="h-3.5 w-3.5 mr-1" />
+              Vencidos (120d)
             </Button>
           </div>
         </div>
@@ -657,8 +690,23 @@ export default function Contratos() {
                 const favoriteLocalId = c.localId;
                 const contratoFavorite = favoriteLocalId ? isFavorite('contrato', favoriteLocalId) : false;
 
+                const contractFaturas = apiFaturas.filter((f) => f.contrato_api_id === apiContrato?.id);
+                const openFaturas = contractFaturas.filter((f) => {
+                  const status = (f.situacao || '').toLowerCase();
+                  return status !== 'pago' && status !== 'siafi apropriado';
+                });
+                const hasOpenInvoice = openFaturas.length > 0;
+
                 return (
-                  <TableRow key={c.id} className="border-b border-border-default/40 transition-colors last:border-0 hover:bg-surface-subtle/60">
+                  <TableRow
+                    key={c.id}
+                    className={cn(
+                      'border-b border-border-default/40 transition-all last:border-0',
+                      hasOpenInvoice
+                        ? 'bg-amber-500/[0.03] hover:bg-amber-500/[0.06] border-l-4 border-l-amber-500'
+                        : 'hover:bg-surface-subtle/60'
+                    )}
+                  >
                     <TableCell className="py-4 px-6">
                       <div className="flex items-center gap-2">
                         <Tooltip>
@@ -687,6 +735,32 @@ export default function Contratos() {
                           </TooltipContent>
                         </Tooltip>
                         <span className="font-data text-sm font-medium text-text-primary">{c.numero}</span>
+                        {hasOpenInvoice ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold bg-amber-500 hover:bg-amber-600 text-white animate-pulse shadow-sm flex items-center gap-1 border-none cursor-help">
+                                <span className="relative flex h-1.5 w-1.5">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
+                                </span>
+                                Invoice Aberta
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs p-3 space-y-2 border-border-default/60 shadow-lifted">
+                              <div className="space-y-1">
+                                <span className="font-bold text-xs text-status-warning block">Invoices (Faturas) Pendentes:</span>
+                                <div className="text-[11px] space-y-1 font-mono">
+                                  {openFaturas.map((f) => (
+                                    <div key={f.id} className="flex justify-between gap-4 border-b border-border-default/40 pb-0.5 last:border-0 last:pb-0">
+                                      <span>#{f.numero_instrumento_cobranca || f.api_fatura_id}</span>
+                                      <span className="font-semibold text-status-warning">{f.situacao}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : null}
                       </div>
                       {hasReitoriaOrigin ? (
                         <Badge variant="secondary" className="ml-2 rounded-md text-[10px]" title="Contrato com unidade de origem 158155. O contrato global pode ser da Reitoria; leia a execução pelos empenhos/faturas da UG 158366.">

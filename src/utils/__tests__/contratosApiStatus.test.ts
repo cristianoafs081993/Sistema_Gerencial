@@ -189,4 +189,33 @@ describe('contratosApiStatus', () => {
     expect(derived.situacao_derivada).toBe(false);
     expect(derived.situacao_derivada_motivo).toBe('historico_vencido_sem_renovacao');
   });
+
+  it('reativa contrato vencido se houver fatura recente emitida nos ultimos 120 dias', () => {
+    const derived = buildContratoApiDerivedFields(
+      {
+        unidade_codigo: '158366',
+        vigencia_inicio: '2024-01-01',
+        vigencia_fim: '2027-01-01',
+        situacao: true,
+      },
+      [
+        {
+          tipo: 'Termo Aditivo',
+          vigencia_inicio: '2024-01-01',
+          vigencia_fim: '2026-04-30',
+          situacao_contrato: 'Ativo',
+        },
+      ],
+      [],
+      [
+        {
+          data_emissao: '2026-04-15', // 17 days before today (2026-05-02)
+        },
+      ],
+      today,
+    );
+
+    expect(derived.situacao_derivada).toBe(true);
+    expect(derived.situacao_derivada_motivo).toBe('historico_vencido_com_fatura_recente');
+  });
 });

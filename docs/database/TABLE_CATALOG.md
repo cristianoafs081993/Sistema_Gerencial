@@ -402,7 +402,7 @@ Observacoes operacionais:
   - `vigencia_fim_derivada`
   - `situacao_derivada_motivo`
   - `campus_scope_reason`
-- `situacao_derivada_motivo` registra se a decisao veio de historico vigente, historico vencido sem renovacao, rescisao/cancelamento ou fallback sem historico
+- `situacao_derivada_motivo` registra se a decisao veio de historico vigente, historico vencido sem renovacao, rescisao/cancelamento, fallback sem historico ou historico vencido com fatura recente (excecao para contratos ativos com faturas nos ultimos 120 dias)
 - `campus_scope_reason` registra se o contrato entrou por UG do campus, evidencia operacional da Reitoria ou ficou fora do escopo
 
 ### `contratos_api_historico`
@@ -441,13 +441,73 @@ Observacoes operacionais:
 
 ### `contratos_api_sync_runs`
 
-- historico das sincronizacoes da API de contratos
-- guarda tambem contadores de historico, itens, vinculos fatura-item, vinculos fatura-empenho e detalhes com totais derivados de contratos ativos/inativos
-
 Consumido por:
 
 - [contratos.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/contratos.ts)
 - [contratosApi.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/contratosApi.ts)
+
+### `requisicoes_compra`
+
+Finalidade:
+- Armazenar o cabeçalho e estado de cada Requisição de Compra cadastrada por prestadores terceirizados.
+
+Campos-chave:
+- `id`
+- `number`
+- `status` ('draft', 'review', 'approved', 'rejected')
+- `contrato_id` (FK para contratos)
+- `empenho_id` (FK para empenhos)
+- `created_by` (FK para auth.users)
+
+### `requisicao_compra_itens`
+
+Finalidade:
+- Armazenar os itens detalhados de cada Requisição de Compra.
+
+Campos-chave:
+- `id`
+- `requisicao_compra_id` (FK para requisicoes_compra)
+- `description`
+- `quantity`
+- `unit`
+- `unit_price`
+
+### `terceirizados`
+
+Finalidade:
+- Cadastrar e identificar o perfil/tipo de prestadores de serviços terceirizados (ex: Limpeza/Manutenção ou Refeitório).
+- A chave operacional do terceirizado e a `matricula` do SUAP, nao o e-mail.
+
+Campos-chave:
+- `id`
+- `user_id` (Opcional, FK para auth.users, sincronizado por trigger a partir da matricula SUAP)
+- `name`
+- `matricula` (unica, normalizada; usada para login SUAP e permissoes)
+- `email` (legado/opcional, mantido apenas para compatibilidade)
+- `tipo` ('limpeza_manutencao', 'refeitorio')
+
+Consumido por:
+- [requisicoesCompra.ts](file:///c:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/services/requisicoesCompra.ts)
+- [CadastroTerceirizados.tsx](file:///c:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/pages/CadastroTerceirizados.tsx)
+- [userAccess.ts](file:///c:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/services/userAccess.ts)
+
+### `terceirizado_permissions`
+
+Finalidade:
+- Controlar o escopo de contratos e empenhos que cada terceirizado pode ver/utilizar nas suas requisições.
+- O vinculo principal usa `user_matricula`; `user_email` permanece como fallback legado.
+
+Campos-chave:
+- `id`
+- `user_id` (ID do terceirizado)
+- `user_matricula`
+- `user_email` (legado/opcional)
+- `contrato_id` (Opcional, FK para contratos)
+- `empenho_id` (Opcional, FK para empenhos)
+
+Consumido por:
+- [requisicoesCompra.ts](file:///c:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/services/requisicoesCompra.ts)
+- [RequisicaoCompra.tsx](file:///c:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/pages/RequisicaoCompra.tsx)
 
 ## Importacoes auxiliares
 

@@ -4,6 +4,8 @@ export type ContratoApiStatusContrato = {
   objeto?: string | null;
   vigencia_inicio?: string | null;
   vigencia_fim?: string | null;
+  situacao?: boolean | null;
+  prorrogavel?: string | null;
 };
 
 export type ContratoApiStatusHistorico = {
@@ -22,6 +24,8 @@ export type ContratoApiStatusEmpenho = {
 };
 
 export type ContratoApiStatusFatura = {
+  data_emissao?: string | null;
+  data_pagamento?: string | null;
   raw_data?: Record<string, unknown> | null;
 };
 
@@ -231,7 +235,31 @@ export function buildContratoApiDerivedFields(
   faturas: ContratoApiStatusFatura[],
   today = new Date(),
 ) {
-  const status = deriveContratoApiStatus(contrato, historico, today);
+  let status = deriveContratoApiStatus(contrato, historico, today);
+
+  // Exception: if the history has expired, but the contract is active in Comprasnet (situacao = true),
+  // AND it has recent faturas (invoices) in the last 120 days, we consider it active.
+  if (!status.situacao_derivada && contrato.situacao) {
+    const todayTime = today.getTime();
+    const hundredTwentyDaysAgo = todayTime - 120 * 24 * 60 * 60 * 1000;
+
+    const hasRecentFatura = faturas.some((fatura) => {
+      const dateStr = fatura.data_emissao || fatura.data_pagamento;
+      if (!dateStr) return false;
+      const faturaTime = new Date(`${dateStr}T00:00:00Z`).getTime();
+      return !Number.isNaN(faturaTime) && faturaTime >= hundredTwentyDaysAgo;
+    });
+
+    if (hasRecentFatura) {
+      status = {
+        situacao_derivada: true,
+        vigencia_inicio_derivada: status.vigencia_inicio_derivada,
+        vigencia_fim_derivada: status.vigencia_fim_derivada,
+        situacao_derivada_motivo: 'historico_vencido_com_fatura_recente',
+      };
+    }
+  }
+
   const scope = deriveContratoApiCampusScope(contrato, empenhos, faturas);
 
   return {

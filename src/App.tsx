@@ -16,6 +16,8 @@ const Descentralizacoes = lazy(() => import('./pages/Descentralizacoes'));
 const CreditoDisponivel = lazy(() => import('./pages/CreditoDisponivel'));
 const Empenhos = lazy(() => import('./pages/Empenhos'));
 const Contratos = lazy(() => import('./pages/Contratos'));
+const RequisicaoCompra = lazy(() => import('./pages/RequisicaoCompra'));
+const CadastroTerceirizados = lazy(() => import('./pages/CadastroTerceirizados'));
 const LiquidacoesPagamentos = lazy(() => import('./pages/LiquidacoesPagamentos'));
 const Financeiro = lazy(() => import('./pages/Financeiro'));
 const LCPage = lazy(() => import('./pages/LC'));
@@ -79,6 +81,8 @@ const App = () => (
                   <Route path="/credito-disponivel" element={<CreditoDisponivel />} />
                   <Route path="/empenhos" element={<Empenhos />} />
                   <Route path="/contratos" element={<Contratos />} />
+                  <Route path="/requisicao-compra" element={<RequisicaoCompra />} />
+                  <Route path="/cadastro-terceirizados" element={<CadastroTerceirizados />} />
                   <Route path="/liquidacoes-pagamentos" element={<LiquidacoesPagamentos />} />
                   <Route path="/financeiro" element={<Financeiro />} />
                   <Route path="/lc" element={<LCPage />} />

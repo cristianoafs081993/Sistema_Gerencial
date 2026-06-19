@@ -443,8 +443,10 @@ describe('Contratos regressions', () => {
     renderContratos();
 
     expect(await screen.findByText('62/2018')).toBeInTheDocument();
-    expect(screen.queryByText('123/2024')).not.toBeInTheDocument();
-    expect(screen.queryByText('00089/2016')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText('123/2024')).not.toBeInTheDocument();
+      expect(screen.queryByText('00089/2016')).not.toBeInTheDocument();
+    });
     expect(screen.getAllByRole('button', { name: /Detalhes/i })).toHaveLength(1);
 
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Fornecedor Teste' } });

@@ -63,12 +63,18 @@ A tela monta uma visao consolidada por documento do favorecido e escolhe a melho
 ### Comparacao com PDFs
 
 O usuario envia PDFs de pagamento.
-O sistema:
+O sistema extrai os bolsistas e compara com a base carregada na LC. Suporta dois formatos de PDFs:
 
-- extrai bolsistas e contas bancarias dos PDFs
-- compara com a LC
-- gera pendencias
-- opcionalmente gera macro `.mac` para SIAFI
+1. **Layout com Rótulos (Format A)**:
+   - Apresenta informações de 1 bolsista por bloco com rótulos descritivos (ex: `CPF`, `Dados bancários Banco`, `Agência`, `Conta`).
+   - O valor da bolsa é uniforme para o documento e extraído de frases como `corresponde a R$ [valor]`.
+2. **Layout de Tabela (Format B)**:
+   - Apresenta os bolsistas listados em uma grade com cabeçalho (contendo `MATRÍCULA`, `VALOR REFERÊNCIA` ou similar).
+   - Extrai automaticamente CPF, Banco, Agência, Código de Operação, Conta e Valor individual de cada linha.
+
+O fluxo de comparação gera pendências de cruzamento e permite ao usuário:
+- Copiar blocos formatados de 7 alunos (com destaque em amarelo na 7ª linha) no mesmo padrão de leiaute da macro `.mac` para colagem direta (via Shift+Insert). Os campos são concatenados continuamente sem nenhum espaçador ou tabulador (CPF com 14, Banco com 3, Agência com 4, Operação/Resto com 24, Conta preenchida com 20 caracteres com zeros à esquerda, e Valor em centavos como última coluna). Isso garante o preenchimento exato de cada coluna limite do emulador, ativando o recurso de "auto-tab" nativo do SIAFI em cada transição de campo sem risco de pulos ou desalinhamentos.
+- Gerar e baixar arquivo de macro `.mac` para preenchimento automatizado no SIAFI.
 
 ## Arquivo de exemplo
 
@@ -77,4 +83,4 @@ O sistema:
 ## Riscos e observacoes
 
 - valores `-9` fazem parte do contrato de descarte
-- a documentacao futura deve registrar explicitamente o formato esperado dos PDFs que entram na comparacao
+- a especificação de formatos de PDFs suportados foi unificada e integrada ao parser dinâmico.

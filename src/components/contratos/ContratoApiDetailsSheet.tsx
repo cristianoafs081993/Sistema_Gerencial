@@ -296,7 +296,13 @@ export function ContratoApiDetailsSheet({
   lastSyncRun,
   loading = false,
 }: ContratoApiDetailsSheetProps) {
-  const faturas = (details?.faturas ?? []).filter(isFaturaVisibleForDisplayUnidade);
+  const rawFaturas = details?.faturas ?? [];
+  const empenhoLinkedFaturaIds = new Set(
+    (details?.faturaEmpenhos ?? []).map((fe) => fe.contrato_api_fatura_id)
+  );
+  const faturas = rawFaturas.filter(
+    (fatura) => isFaturaVisibleForDisplayUnidade(fatura) || empenhoLinkedFaturaIds.has(fatura.id)
+  );
   const visibleFaturaIds = new Set(faturas.map((fatura) => fatura.id));
   const faturaItens = (details?.faturaItens ?? []).filter((item) => visibleFaturaIds.has(item.contrato_api_fatura_id));
   const faturaEmpenhos = (details?.faturaEmpenhos ?? []).filter((item) => visibleFaturaIds.has(item.contrato_api_fatura_id));
@@ -305,8 +311,8 @@ export function ContratoApiDetailsSheet({
   const faturaById = new Map(faturas.map((fatura) => [fatura.id, fatura]));
   const empenhosByFatura = buildFaturaEmpenhosMap(faturaEmpenhos);
   const itensByFatura = buildFaturaItensMap(faturaItens);
-  const linkedFaturaIds = new Set(faturaItens.map((item) => item.contrato_api_fatura_id));
-  const faturasSemItem = faturas.filter((fatura) => !linkedFaturaIds.has(fatura.id));
+  const itemLinkedFaturaIds = new Set(faturaItens.map((item) => item.contrato_api_fatura_id));
+  const faturasSemItem = faturas.filter((fatura) => !itemLinkedFaturaIds.has(fatura.id));
 
   const itemSummaries = (details?.itens ?? []).map((item) => {
     const links = faturaItens.filter((link) => link.contrato_api_item_id === item.id);

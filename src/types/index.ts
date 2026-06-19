@@ -417,3 +417,59 @@ export interface ContaDescentralizacaoSaldo {
   valor: number;
   updatedAt: string;
 }
+
+export interface TerceirizadoPermission {
+  id: string;
+  userId?: string;
+  userEmail: string;
+  userMatricula?: string;
+  contratoId?: string;
+  empenhoId?: string;
+  createdBy: string;
+  createdAt: Date;
+}
+
+export interface Terceirizado {
+  id: string;
+  userId?: string;
+  name: string;
+  matricula: string;
+  email?: string;
+  tipo: 'limpeza_manutencao' | 'refeitorio';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface RequisicaoCompraItem {
+  id: string;
+  requisicaoCompraId: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  sortOrder: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface RequisicaoCompra {
+  id: string;
+  title: string;
+  number: string;
+  processNumber?: string;
+  contratoId?: string;
+  contratoNumero?: string;
+  empenhoId?: string;
+  empenhoNumero?: string;
+  notes?: string;
+  status: 'draft' | 'review' | 'approved' | 'rejected';
+  createdBy: string;
+  createdByEmail: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface RequisicaoCompraRecord extends RequisicaoCompra {
+  items: RequisicaoCompraItem[];
+}
+

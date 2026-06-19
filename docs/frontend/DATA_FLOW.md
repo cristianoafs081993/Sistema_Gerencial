@@ -90,6 +90,7 @@ Usado quando a pagina tem pipeline proprio de importacao ou consulta:
 - [LiquidacoesPagamentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/LiquidacoesPagamentos.tsx)
 - [RastreabilidadePFs/index.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/RastreabilidadePFs/index.tsx)
 - [EnergiaCampus.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/energia/EnergiaCampus.tsx)
+- [RequisicaoCompra.tsx](file:///c:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/pages/RequisicaoCompra.tsx)
 
 ### Padrao C: pagina + Edge Function ou API externa
 
@@ -233,7 +234,7 @@ Sincronizacao:
 
 Observacao:
 
-- a lista principal usa contratos sincronizados da API com `situacao_derivada = true`; o endpoint de "ativos" do Comprasnet nao e confiavel sozinho porque pode retornar contratos com vigencia vencida
+- a lista principal usa contratos sincronizados da API; a tela oferece um controle de visualização (`viewFilter`) com três opções: "Todos" (filtrando apenas `situacao_derivada = true`), "Favoritos" (favoritos do usuário) e "Vencidos (120d)" (contratos cuja vigência expirou nos últimos 120 dias). Contratos com faturas abertas (qualquer situação diferente de "Pago" e "Siafi Apropriado") recebem destaque visual na linha da tabela (fundo âmbar suave e borda lateral esquerda âmbar), além de um badge com pulso de animação ("Invoice Aberta") contendo um tooltip detalhado das faturas pendentes.
 - o upload manual XLSX foi removido da tela; superadmin ve a ultima sincronizacao e pode acionar "Atualizar Comprasnet" para antecipar o cron diario
 - `situacao_derivada`, `vigencia_inicio_derivada`, `vigencia_fim_derivada` e `situacao_derivada_motivo` sao calculados na sincronizacao pela maior vigencia valida do historico; rescisao/cancelamento inativa o contrato; sem historico, usa `vigencia_fim` da listagem como fallback registrado
 - contratos da UG `158366` entram se ativos pela regra derivada; contratos da UG `158155` so entram se houver evidencia operacional estruturada do campus, como empenho ou fatura com UG/contratante `158366`, registrada em `campus_scope_reason`
@@ -372,6 +373,30 @@ Observações:
 - a IA é opcional e apenas reordena aderência;
 - seleção, exclusões e justificativas permanecem no estado editável e no snapshot salvo;
 - relatório HTML e exportação XLSX são gerados no navegador a partir da pesquisa revisada.
+
+### Requisições de Compra (Perfil Terceirizado e Fiscal de Contratos)
+
+`App.tsx` -> `RequisicaoCompra.tsx` -> `requisicoesCompra.ts` -> `requisicoes_compra` / `requisicao_compra_itens` / `terceirizado_permissions`
+
+Observações:
+- O perfil `Terceirizado` acessa apenas a rota `/requisicao-compra` e gerencia suas próprias requisições de compra.
+- Um terceirizado só pode vincular contratos e empenhos que tenham sido previamente associados a ele na tabela `terceirizado_permissions` por um gestor/fiscal.
+- Perfis gestores (`fiscal-contratos`, `diretores`, `teste`) visualizam a aba "Gerenciamento de Terceirizados", onde podem cadastrar novos terceirizados pela matrícula SUAP, vincular essa matrícula aos contratos e empenhos autorizados e auditar todas as requisições de compra (com opções de aprovação/rejeição).
+- O login SUAP grava `user_metadata.matricula` no Supabase Auth; permissões de terceirizados são resolvidas por essa matrícula, com fallback por e-mail apenas para registros legados.
+- O superadministrador também possui permissão para criar e gerenciar requisições de compra diretamente na mesma tela, com acesso irrestrito a todos os contratos e empenhos.
+- A geração de PDF é feita de forma estritamente local (no cliente), carregando os dados da requisição e dos itens em um template timbrado institucional em um iframe para impressão direta via `window.print()`.
+
+### Limpeza e Manutenção
+
+`App.tsx` -> `ManutencaoAdmin.tsx` -> `manutencao.ts` -> `manutencao_ambientes` / `manutencao_ocorrencias` / `manutencao_checkins` / `manutencao_blocos_mapa`
+
+Observações:
+
+- O mapa seleciona cada bloco pelo próprio `id` e relaciona ambientes pelo nome de `bloco`.
+- O cadastro, os filtros, as estatísticas e a geometria do mapa não usam zona funcional.
+- A rota pública `feedback-ambiente/:codigo` permite anexar uma foto opcional JPEG, PNG ou WebP de até 5 MB; o arquivo vai para o bucket privado `manutencao-ocorrencias` e a ocorrência guarda apenas `foto_path`.
+- A tela administrativa cria uma URL assinada temporária para exibir a miniatura e abrir a foto.
+- Cada ocorrência pendente incrementa o alerta do bloco cujo nome coincide com `manutencao_ambientes.bloco` do ambiente indicado.
 
 ## Regras de cautela
 

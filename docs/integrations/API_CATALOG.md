@@ -51,6 +51,8 @@ Configuracao operacional:
 Observacao:
 
 - o app depende de sessao persistida pelo `supabase-js` no navegador
+- o login SUAP via `suap-token-exchange` grava `user_metadata.matricula`; para usuarios cadastrados em `terceirizados`, essa matricula e usada para sincronizar `user_id`, aplicar permissoes e atribuir o grupo `terceirizado` em vez de `Diretores`
+- o login SUAP em localhost deve usar um client OAuth separado via `VITE_SUAP_CLIENT_ID`; a Edge Function seleciona `SUAP_DEV_CLIENT_SECRET` quando o `clientId` recebido corresponde a `SUAP_DEV_CLIENT_ID`, sem alterar o client de producao
 - links de convite e recuperacao retornam para `/auth` com token na URL
 - ao perder a sessao, qualquer rota protegida redireciona novamente para `/auth`
 - botoes de upload/importacao no frontend so aparecem para o superadministrador autenticado
@@ -183,7 +185,7 @@ Persistencia local:
 Observacao:
 
 - o endpoint `/contrato/ug/{unidadeCodigo}` nao e fonte confiavel de vigencia ativa sozinho; em maio/2026 ele ainda retornava como ativos contratos com `vigencia_fim` vencida
-- a fonte de verdade operacional para exibicao de ativos e `contratos_api.situacao_derivada = true`, calculada pela maior `vigencia_fim` valida do historico; termos de rescisao/cancelamento tornam o contrato inativo
+- a fonte de verdade operacional para exibicao de ativos e `contratos_api.situacao_derivada = true`, calculada pela maior `vigencia_fim` valida do historico; termos de rescisao/cancelamento tornam o contrato inativo. Como excecao, se o historico estiver vencido mas o contrato for ativo na API com faturas nos ultimos 120 dias, e reativado com motivo `historico_vencido_com_fatura_recente`
 - quando nao ha historico, a sincronizacao usa `vigencia_fim` da listagem como fallback e registra o motivo em `situacao_derivada_motivo`
 - contratos da UG `158366` entram no escopo se estiverem ativos pela regra derivada; contratos da UG `158155` entram somente com evidencia operacional estruturada do campus, como empenho ou fatura com UG/contratante `158366`, registrada em `campus_scope_reason`
 - contratos em que a UASG `158366` aparece apenas como unidade de compra/origem, mas o objeto indica atendimento a outro campus avancado, como Parelhas ou Jucurutu, ficam fora do escopo com `campus_scope_reason = ug_campus_objeto_fora_currais_novos`

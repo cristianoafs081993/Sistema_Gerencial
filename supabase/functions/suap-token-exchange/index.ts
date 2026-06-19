@@ -28,8 +28,20 @@ Deno.serve(async (req) => {
       });
     }
 
-    const clientId = reqClientId || Deno.env.get('SUAP_CLIENT_ID') || 'Oe1jZhORICjEB840r23FR4P1OGQCInNqyNcCzLip';
-    const clientSecret = Deno.env.get('SUAP_CLIENT_SECRET') || 'B2wQ8Ikaoj6DILy1RTpXgkfsEQcr81hqPK7gLitQWmIlYSYvNAKY2if1MrRL8pBhan56jM4qcTxKMdHRzN9iDkyFjWOqaNLz5ARrQsk2k3QSlLHnMzEX12I3yYz9OPRj';
+    const defaultClientId = Deno.env.get('SUAP_CLIENT_ID') || 'Oe1jZhORICjEB840r23FR4P1OGQCInNqyNcCzLip';
+    const devClientId = Deno.env.get('SUAP_DEV_CLIENT_ID') || '';
+    const clientId = reqClientId || defaultClientId;
+    const clientSecret =
+      devClientId && clientId === devClientId
+        ? Deno.env.get('SUAP_DEV_CLIENT_SECRET') || ''
+        : Deno.env.get('SUAP_CLIENT_SECRET') || 'B2wQ8Ikaoj6DILy1RTpXgkfsEQcr81hqPK7gLitQWmIlYSYvNAKY2if1MrRL8pBhan56jM4qcTxKMdHRzN9iDkyFjWOqaNLz5ARrQsk2k3QSlLHnMzEX12I3yYz9OPRj';
+
+    if (!clientSecret) {
+      return new Response(JSON.stringify({ error: 'Secret OAuth do SUAP nao configurado para o client informado.' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // 1. Exchange authorization code for token
     const tokenUrl = 'https://suap.ifrn.edu.br/o/token/';
@@ -89,6 +101,7 @@ Deno.serve(async (req) => {
         ? (profileData.url_foto_150x200.startsWith('http') ? profileData.url_foto_150x200 : `https://suap.ifrn.edu.br${profileData.url_foto_150x200}`) 
         : null,
     };
+    const normalizedMatricula = String(userProfile.matricula || '').trim().replace(/[^0-9A-Za-z]/g, '').toLowerCase();
 
     let actionLink = null;
 
@@ -165,8 +178,67 @@ Deno.serve(async (req) => {
           }
         }
 
-        // 3. Check and assign 'Diretores' group if no group membership exists
+        // 3. Keep SUAP identity metadata and terceirizado links synchronized by matricula.
         if (userId) {
+          try {
+            const mergedMetadata = {
+              ...(userObj?.user_metadata || {}),
+              nome: userProfile.nome,
+              matricula: normalizedMatricula,
+              vinculo: userProfile.vinculo,
+              foto: userProfile.foto,
+              uses_default_password: false,
+            };
+
+            const { error: updateUserError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+              user_metadata: mergedMetadata,
+            });
+
+            if (updateUserError) {
+              console.error('Erro ao atualizar metadados SUAP do usuario:', updateUserError);
+            }
+          } catch (err) {
+            console.error('Falha ao sincronizar metadados SUAP do usuario:', err);
+          }
+
+          let isTerceirizado = false;
+          if (normalizedMatricula) {
+            const { data: terceirizadoMatch, error: terceirizadoError } = await supabaseAdmin
+              .from('terceirizados')
+              .select('id')
+              .eq('matricula', normalizedMatricula)
+              .maybeSingle();
+
+            if (terceirizadoError) {
+              console.error('Erro ao verificar terceirizado por matricula:', terceirizadoError);
+            } else if (terceirizadoMatch) {
+              isTerceirizado = true;
+              await supabaseAdmin.from('terceirizados').update({ user_id: userId }).eq('id', terceirizadoMatch.id);
+              await supabaseAdmin
+                .from('terceirizado_permissions')
+                .update({ user_id: userId })
+                .eq('user_matricula', normalizedMatricula);
+            }
+          }
+
+          if (!isTerceirizado && email) {
+            const { data: legacyTerceirizadoMatch, error: legacyTerceirizadoError } = await supabaseAdmin
+              .from('terceirizados')
+              .select('id')
+              .eq('email', email)
+              .maybeSingle();
+
+            if (legacyTerceirizadoError) {
+              console.error('Erro ao verificar terceirizado legado por email:', legacyTerceirizadoError);
+            } else if (legacyTerceirizadoMatch) {
+              isTerceirizado = true;
+              await supabaseAdmin.from('terceirizados').update({ user_id: userId }).eq('id', legacyTerceirizadoMatch.id);
+              await supabaseAdmin
+                .from('terceirizado_permissions')
+                .update({ user_id: userId })
+                .eq('user_email', email);
+            }
+          }
           const { data: memberships, error: memError } = await supabaseAdmin
             .from('user_group_memberships')
             .select('group_id')
@@ -175,17 +247,17 @@ Deno.serve(async (req) => {
           if (memError) {
             console.error('Erro ao buscar grupos do usuário:', memError);
           } else if (!memberships || memberships.length === 0) {
-            // Get group ID for 'diretores'
+            const targetGroupSlug = isTerceirizado ? 'terceirizado' : 'diretores';
             const { data: groupData, error: groupError } = await supabaseAdmin
               .from('user_groups')
               .select('id')
-              .eq('slug', 'diretores')
+              .eq('slug', targetGroupSlug)
               .single();
 
             if (groupError) {
-              console.error('Erro ao buscar o grupo diretores:', groupError);
+              console.error(`Erro ao buscar o grupo ${targetGroupSlug}:`, groupError);
             } else if (groupData) {
-              console.log(`Associando usuário ${email} ao grupo Diretores`);
+              console.log(`Associando usuario ${email} ao grupo ${targetGroupSlug}`);
               const { error: insertError } = await supabaseAdmin
                 .from('user_group_memberships')
                 .insert({
@@ -195,7 +267,7 @@ Deno.serve(async (req) => {
                 });
 
               if (insertError) {
-                console.error('Erro ao associar usuário ao grupo:', insertError);
+                console.error('Erro ao associar usuario ao grupo:', insertError);
               }
             }
           }

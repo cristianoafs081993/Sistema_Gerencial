@@ -236,6 +236,25 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
         }
 
         if (unidadeCodigo === '158155') {
+          if (!contrato.situacao) {
+            return {
+              contratoApiId: contractDb.id,
+              apiContratoId: contractDb.api_contrato_id,
+              rawFaturas: [],
+              empenhos: [],
+              faturas: [],
+              itens: [],
+              historico: [],
+              derived: {
+                situacao_derivada: false,
+                vigencia_inicio_derivada: contrato.vigencia_inicio ?? null,
+                vigencia_fim_derivada: contrato.vigencia_fim ?? null,
+                situacao_derivada_motivo: 'inativo_no_comprasnet',
+                campus_scope_reason: 'reitoria_inativo',
+              },
+            };
+          }
+
           const apiEmpenhos = await fetchJson<ApiEmpenho[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/empenhos`).catch(() => []);
 
           const empenhos = (apiEmpenhos ?? [])
@@ -286,8 +305,24 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
             }
             apiItens = await fetchJson<ApiContratoItem[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/itens`).catch(() => []);
           }
-          const campusRawFaturas = rawFaturas.filter((fatura) => isContratoApiCampusFatura(fatura));
-          const campusFaturas = faturas.filter((fatura) => isContratoApiCampusFatura(fatura));
+          const campusEmpenhoNumeros = new Set(campusEmpenhos.map((e) => String(e.numero || '').trim()));
+          const campusEmpenhoIds = new Set(campusEmpenhos.map((e) => Number(e.api_empenho_id)));
+
+          const isCampusFatura = (fatura: ApiFatura) => {
+            if (isContratoApiCampusFatura(fatura)) return true;
+            const emps = Array.isArray(fatura.dados_empenho) ? fatura.dados_empenho : [];
+            return emps.some((emp: any) => {
+              const num = String(emp.numero_empenho || '').trim();
+              const id = Number(emp.id_empenho);
+              return campusEmpenhoNumeros.has(num) || campusEmpenhoIds.has(id);
+            });
+          };
+
+          const campusRawFaturas = rawFaturas.filter(isCampusFatura);
+          const campusFaturas = faturas.filter((f) => {
+            const raw = rawFaturas.find((r) => Number(r.id) === Number(f.api_fatura_id));
+            return raw ? isCampusFatura(raw) : isContratoApiCampusFatura(f);
+          });
 
           return {
             contratoApiId: contractDb.id,

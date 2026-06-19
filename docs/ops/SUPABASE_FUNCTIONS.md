@@ -47,6 +47,37 @@ Dependencias:
 - `OPENAI_API_KEY`
 - opcional `OPENAI_VISION_MODEL`
 
+### `suap-token-exchange`
+
+Local:
+
+- [suap-token-exchange/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/suap-token-exchange/index.ts)
+
+Chamador:
+
+- [SuapCallback.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/SuapCallback.tsx)
+
+Uso:
+
+- troca o `code` OAuth do SUAP por token e busca o perfil em `/api/rh/meus-dados/`
+- cria ou localiza o usuario no Supabase Auth e gera magic link para concluir a sessao do app
+- grava `user_metadata.matricula` normalizada para ser a chave de terceirizados
+- quando a matricula existe em `terceirizados`, sincroniza `user_id` em `terceirizados` e `terceirizado_permissions` e associa o usuario ao grupo `terceirizado`
+- quando nao ha cadastro de terceirizado e o usuario ainda nao possui grupo, associa ao grupo `diretores`
+
+Dependencias:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- opcional `SUAP_CLIENT_ID`
+- opcional `SUAP_CLIENT_SECRET`
+- opcional `SUAP_DEV_CLIENT_ID`
+- opcional `SUAP_DEV_CLIENT_SECRET`
+
+Observacao:
+
+- a chave operacional do terceirizado e a matricula SUAP; e-mail e usado apenas como fallback legado.
+- para login local, o frontend pode enviar um `VITE_SUAP_CLIENT_ID` proprio; quando ele corresponde a `SUAP_DEV_CLIENT_ID`, a function usa `SUAP_DEV_CLIENT_SECRET`, mantendo o client de producao inalterado.
+
 ### `gerar-contrato-licitacao`
 
 Local:
@@ -314,7 +345,7 @@ Uso:
 - sincroniza contratos das UGs `158366` e `158155` a partir de `https://contratos.comprasnet.gov.br/api`
 - busca contratos ativos, inativos, historico, empenhos, faturas e itens
 - deriva `situacao_derivada`, `vigencia_inicio_derivada`, `vigencia_fim_derivada`, `situacao_derivada_motivo` e `campus_scope_reason` em `contratos_api`
-- considera ativo somente contrato com vigencia derivada pelo historico ainda vigente; termos de rescisao/cancelamento tornam o contrato inativo; sem historico, usa `vigencia_fim` da listagem como fallback com motivo registrado
+- considera ativo somente contrato com vigencia derivada pelo historico ainda vigente; termos de rescisao/cancelamento tornam o contrato inativo; sem historico, usa `vigencia_fim` da listagem como fallback com motivo registrado. Se o historico estiver vencido mas o contrato for ativo na API com faturas nos ultimos 120 dias, e reativado com motivo `historico_vencido_com_fatura_recente`
 - contratos da UG `158155` entram no escopo somente com evidencia operacional estruturada do campus `158366`, como empenho ou fatura com UG/contratante do campus
 - contratos com UASG/origem `158366` cujo objeto indique atendimento a outro campus avancado, como Parelhas ou Jucurutu, sao marcados fora do escopo com `ug_campus_objeto_fora_currais_novos`
 - na UG `158155`, a coleta e feita em etapas para reduzir consumo do worker: historico e empenhos primeiro; faturas e itens apenas para contratos ativos e em escopo, ou quando a fatura ainda pode comprovar escopo

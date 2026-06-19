@@ -626,12 +626,14 @@ export const contratosApiService = {
     let query = supabase
       .from('contratos_api')
       .select('id, api_contrato_id, numero, fornecedor_nome, unidade_codigo, unidade_nome, unidade_origem_codigo, unidade_origem_nome, objeto, processo, vigencia_inicio, vigencia_fim, vigencia_inicio_derivada, vigencia_fim_derivada, valor_global, valor_acumulado, situacao, situacao_derivada, situacao_derivada_motivo, campus_scope_reason, updated_at, categoria, prorrogavel:raw_data->>prorrogavel')
+      .in('campus_scope_reason', ['ug_campus', 'reitoria_com_empenho_campus', 'reitoria_com_fatura_campus'])
       .order('numero', { ascending: true });
 
     if (onlyVigentes) {
-      query = query
-        .eq('situacao_derivada', true)
-        .or(`vigencia_fim_derivada.is.null,vigencia_fim_derivada.gte.${today}`);
+      const hundredTwentyDaysAgo = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      query = query.or(
+        `situacao_derivada.eq.true,and(vigencia_fim_derivada.gte.${hundredTwentyDaysAgo},vigencia_fim_derivada.lt.${today})`
+      );
     }
 
     const { data, error } = await query;
@@ -747,16 +749,19 @@ export const contratosApiService = {
     const empenhos = ((empenhosResult.data ?? []) as ContratoApiEmpenhoRow[]).filter((empenho) => isContratoApiCampusEmpenho(empenho));
     const empenhoIds = new Set(empenhos.map((empenho) => empenho.id));
     const apiEmpenhoIds = new Set(empenhos.map((empenho) => Number(empenho.api_empenho_id)));
+
+    const faturaEmpenhos = ((faturaEmpenhosResult.data ?? []) as ContratoApiFaturaEmpenhoRow[]).filter((row) =>
+      (row.contrato_api_empenho_id != null && empenhoIds.has(row.contrato_api_empenho_id)) ||
+      (row.api_empenho_id != null && apiEmpenhoIds.has(Number(row.api_empenho_id))),
+    );
+    const linkedFaturaIds = new Set(faturaEmpenhos.map((fe) => fe.contrato_api_fatura_id));
+
     const faturas = ((faturasResult.data ?? []) as ContratoApiFaturaRow[]).filter((fatura) =>
-      isFaturaVisibleForDisplayUnidade(fatura.raw_data ?? fatura),
+      isFaturaVisibleForDisplayUnidade(fatura.raw_data ?? fatura) || linkedFaturaIds.has(fatura.id)
     );
     const faturaIds = new Set(faturas.map((fatura) => fatura.id));
     const faturaItens = ((faturaItensResult.data ?? []) as ContratoApiFaturaItemRow[]).filter((item) =>
       faturaIds.has(item.contrato_api_fatura_id),
-    );
-    const faturaEmpenhos = ((faturaEmpenhosResult.data ?? []) as ContratoApiFaturaEmpenhoRow[]).filter((row) =>
-      (row.contrato_api_empenho_id != null && empenhoIds.has(row.contrato_api_empenho_id)) ||
-      (row.api_empenho_id != null && apiEmpenhoIds.has(Number(row.api_empenho_id))),
     );
 
     return {

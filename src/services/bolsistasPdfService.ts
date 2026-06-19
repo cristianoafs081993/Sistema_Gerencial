@@ -1,4 +1,4 @@
-﻿import * as pdfjsLib from 'pdfjs-dist';
+import * as pdfjsLib from 'pdfjs-dist';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
@@ -9,6 +9,7 @@ export interface BolsistaPdfRecord {
   agencia: string;
   conta: string;
   sourceFile: string;
+  valor?: number;
 }
 
 function normalizeWhitespace(value: string): string {
@@ -47,29 +48,71 @@ function extractFieldAfterLabel(segment: string, labelRegex: RegExp): string {
 }
 
 function extractFromText(text: string, sourceFile: string): BolsistaPdfRecord[] {
-  const cpfRegex = /\d{3}\.\d{3}\.\d{3}-\d{2}/g;
-  const matches = [...text.matchAll(cpfRegex)];
+  const isTableFormat = /MATRÍCULA\s+CPF\s+BANCO/i.test(text) || /VALOR\s+REFERÊNCIA/i.test(text);
   const found: BolsistaPdfRecord[] = [];
-  const seen = new Set<string>();
 
-  for (let i = 0; i < matches.length; i += 1) {
-    const match = matches[i];
-    const cpf = match[0];
-    const idx = match.index ?? 0;
-    const key = `${sourceFile}|${cpf}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+  if (isTableFormat) {
+    const cleanText = text.replace(/\s+/g, ' ');
+    const studentRegex = /(\d+)\s+([A-ZÀ-ÿ][A-Za-zÀ-ÿ'`´\s.-]{4,40}?)\s+(\d{10,15})\s+(\d{3}\.\d{3}\.\d{3}-\d{2})\s+(\d{3,4})\s+([0-9A-Za-z-]+)\s+(?:([0-9A-Za-z-]+)\s+)?([0-9A-Za-z-]+)\s+(?:R\$\s*)?([0-9.,]+)/g;
+    const matches = [...cleanText.matchAll(studentRegex)];
+    
+    for (const m of matches) {
+      const cpf = m[4];
+      const nome = m[2].trim();
+      const banco = m[5];
+      const agencia = m[6];
+      const conta = m[7] ? `${m[7]}-${m[8]}` : m[8]; 
+      const valorStr = m[9].replace(/\./g, '').replace(',', '.');
+      const valor = parseFloat(valorStr);
 
-    const prevCpfIndex = i > 0 ? (matches[i - 1].index ?? 0) : Math.max(0, idx - 350);
-    const nextCpfIndex = i + 1 < matches.length ? (matches[i + 1].index ?? text.length) : Math.min(text.length, idx + 450);
-    const segment = text.slice(idx, nextCpfIndex);
+      found.push({
+        cpf,
+        nome,
+        banco,
+        agencia,
+        conta,
+        sourceFile,
+        valor
+      });
+    }
+  } else {
+    let docValor: number | undefined = undefined;
+    const valorMatch = text.match(/(?:valor de|corresponde a|individual de)\s*R\$\s*([0-9.,]+)/i) || text.match(/R\$\s*([0-9.,]+)/i);
+    if (valorMatch?.[1]) {
+      docValor = parseFloat(valorMatch[1].replace(/\./g, '').replace(',', '.'));
+    }
 
-    const nome = extractNameNear(text, prevCpfIndex, idx);
-    const banco = extractFieldAfterLabel(segment, /Banco\s+(.+?)(?:\s+Dados\b|\s+Ag[êe]ncia\b|\s+Conta\b|$)/i);
-    const agencia = extractFieldAfterLabel(segment, /Ag[êe]ncia\s+([0-9A-Za-z-]+)/i);
-    const conta = extractFieldAfterLabel(segment, /Conta\s+([0-9A-Za-z-]+)/i);
+    const cpfRegex = /\d{3}\.\d{3}\.\d{3}-\d{2}/g;
+    const matches = [...text.matchAll(cpfRegex)];
+    const seen = new Set<string>();
 
-    found.push({ cpf, nome, banco, agencia, conta, sourceFile });
+    for (let i = 0; i < matches.length; i += 1) {
+      const match = matches[i];
+      const cpf = match[0];
+      const idx = match.index ?? 0;
+      const key = `${sourceFile}|${cpf}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const prevCpfIndex = i > 0 ? (matches[i - 1].index ?? 0) : Math.max(0, idx - 350);
+      const nextCpfIndex = i + 1 < matches.length ? (matches[i + 1].index ?? text.length) : Math.min(text.length, idx + 450);
+      const segment = text.slice(idx, nextCpfIndex);
+
+      const nome = extractNameNear(text, prevCpfIndex, idx);
+      const banco = extractFieldAfterLabel(segment, /Banco\s+(.+?)(?:\s+Dados\b|\s+Ag[êe]ncia\b|\s+Conta\b|$)/i);
+      const agencia = extractFieldAfterLabel(segment, /Ag[êe]ncia\s+([0-9A-Za-z-]+)/i);
+      const conta = extractFieldAfterLabel(segment, /Conta\s+([0-9A-Za-z-]+)/i);
+
+      found.push({ 
+        cpf, 
+        nome, 
+        banco, 
+        agencia, 
+        conta, 
+        sourceFile,
+        valor: docValor
+      });
+    }
   }
 
   return found;

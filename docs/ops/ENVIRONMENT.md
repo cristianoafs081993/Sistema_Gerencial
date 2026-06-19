@@ -50,6 +50,9 @@ Sem isso:
   - default: `408034`
 - `VITE_SIAFI_MACRO_CODIGO_FINAL`
   - default: `2200`
+- `VITE_SUAP_CLIENT_ID`
+  - opcional; se ausente, usa o client OAuth SUAP de producao embutido no frontend
+  - em desenvolvimento local, deve apontar para um client SUAP separado cujo redirect seja `http://localhost:5173/suap-callback`
 - `VITE_APP_ORIGIN`
   - sem default
   - recomendada para qualquer ambiente que possa enviar convites de usuário
@@ -58,6 +61,27 @@ Sem isso:
   - usada pelo proxy local do Vite para injetar a credencial nas chamadas `/api-transparencia`; se ausente, o proxy usa o fallback operacional atual do codigo
 
 ## Variaveis necessarias em funcoes e integracoes
+
+### `suap-token-exchange`
+
+Necessarias no ambiente do Supabase:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUAP_CLIENT_SECRET`
+
+Opcionais:
+
+- `SUAP_CLIENT_ID`
+  - client OAuth SUAP padrao de producao
+- `SUAP_DEV_CLIENT_ID`
+  - client OAuth SUAP usado pelo frontend local via `VITE_SUAP_CLIENT_ID`
+- `SUAP_DEV_CLIENT_SECRET`
+  - secret correspondente ao `SUAP_DEV_CLIENT_ID`
+
+Observacoes operacionais:
+
+- o frontend envia o `clientId` usado no login para a function; a function escolhe `SUAP_DEV_CLIENT_SECRET` quando esse `clientId` corresponde a `SUAP_DEV_CLIENT_ID`, sem afetar o client de producao.
+- o cadastro do client SUAP local deve aceitar `http://localhost:5173/suap-callback`, e o Supabase Auth tambem precisa aceitar essa URL como redirect.
 
 ### `analisar-liquidacao-siafi`
 

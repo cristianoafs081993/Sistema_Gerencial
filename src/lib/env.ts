@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 
 const emptyStringToUndefined = (value: unknown) => {
   if (typeof value === 'string' && value.trim() === '') {

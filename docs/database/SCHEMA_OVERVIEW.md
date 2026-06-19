@@ -44,6 +44,7 @@ Para mudancas sensiveis, confirme sempre nas migrations em [supabase/migrations]
 - `contratos`
 - `contratos_empenhos`
 - `contratos_api`
+
 - `contratos_api_historico`
 - `contratos_api_empenhos`
 - `contratos_api_faturas`
@@ -53,12 +54,14 @@ Para mudancas sensiveis, confirme sempre nas migrations em [supabase/migrations]
 - `contratos_api_empenho_liquidacoes_cache_status`
 - `contratos_api_empenho_liquidacoes_cache`
 - `contratos_api_sync_runs`
+- `requisicoes_compra`
+- `requisicao_compra_itens`
+- `terceirizados`
+- `terceirizado_permissions`
 
 ### Licitacoes, pregoes PNCP e ARP
 
 - `licitacoes_pncp`
-- `licitacoes_pncp_sync_runs`
-- `licitacoes_pncp_uasgs`
 - `atas_registro_precos`
 - `atas_registro_precos_itens`
 - `atas_registro_precos_unidades`

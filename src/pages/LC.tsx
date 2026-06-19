@@ -1,8 +1,9 @@
-﻿import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { Upload, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { Upload, Search, ChevronLeft, ChevronRight, Copy, Check, Download, AlertCircle, Table as TableIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
 import {
@@ -27,7 +28,11 @@ import {
   buildSiafiMacroRowsFromComparison,
   buildSiafiMacroRowsFromPendencias,
   downloadSiafiMacroFile,
+  padLeft,
+  buildSiafiContaPayload,
+  type SiafiMacroInputRow,
 } from '@/services/siafiMacroService';
+import { env } from '@/lib/env';
 
 const statusLabel: Record<PendenciaStatus, string> = {
   sem_cadastro_lc: 'Sem cadastro na LC',
@@ -51,6 +56,12 @@ export default function LCPage() {
   const [macroFileName, setMacroFileName] = useState('');
   const [macroRowsCount, setMacroRowsCount] = useState(0);
   const [macroContext, setMacroContext] = useState<'sem_pendencias' | 'com_pendencias'>('sem_pendencias');
+  const [dialogMacroRows, setDialogMacroRows] = useState<SiafiMacroInputRow[]>([]);
+  const [gridRows, setGridRows] = useState<any[]>([]);
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
+  const [chunkIndex, setChunkIndex] = useState(0);
+  const [dialogTab, setDialogTab] = useState<'macro' | 'grid'>('grid');
+  const [isCopied, setIsCopied] = useState(false);
   const [pageLC, setPageLC] = useState(1);
   const [pagePendencias, setPagePendencias] = useState(1);
   const [pageSizeLC, setPageSizeLC] = useState(100);
@@ -200,12 +211,32 @@ export default function LCPage() {
   };
 
   const handleConfirmarGeracaoMacro = () => {
-    if (!macroContent || !macroFileName) {
+    if (!dialogMacroRows.length || !macroFileName) {
       toast.error('Nao foi possivel gerar a macro desta comparacao.');
       return;
     }
 
-    downloadSiafiMacroFile(macroContent, macroFileName);
+    // Regenerar a macro com base nos dados e seleções atuais da grade!
+    const updatedMacroRows = dialogMacroRows.map((mRow) => {
+      const match = gridRows.find((gRow) => gRow.cpf === mRow.cpf);
+      if (match) {
+        return {
+          ...mRow,
+          bancoCodigo: match.selectedBanco,
+          agenciaCodigo: match.selectedAgencia,
+          contaFavorecido: match.selectedConta,
+        };
+      }
+      return mRow;
+    });
+
+    const finalMacroContent = buildSiafiListaCredoresMacro(updatedMacroRows, {
+      scriptName: macroContext === 'sem_pendencias' ? 'Lista de Credores' : 'Lista de Credores - Pendencias',
+      author: 'sistema-gerencial',
+      includeFirstConfirmationEnter: true,
+    });
+
+    downloadSiafiMacroFile(finalMacroContent, macroFileName);
     toast.success(`Macro gerada com sucesso: ${macroFileName}`);
   };
 
@@ -238,10 +269,71 @@ export default function LCPage() {
             author: 'sistema-gerencial',
             includeFirstConfirmationEnter: true,
           });
+          // 2. Gerar linhas para a Grade do Excel (Sempre todos os bolsistas na sequencia do PDF!)
+          const fullGridRows = bolsistas.map((b) => {
+            const doc = onlyDigits(b.cpf);
+            const lcList = rows.filter((r) => onlyDigits(r.favorecidoDocumento) === doc);
+            
+            const lcAccounts = lcList.map((r) => ({
+              bancoCodigo: onlyDigits(r.bancoCodigo) || '001',
+              agenciaCodigo: onlyDigits(r.agenciaCodigo) || '0001',
+              contaBancaria: onlyDigits(r.contaBancaria) || '',
+            })).filter(acc => acc.contaBancaria);
+
+            const hasCpfInLc = lcList.length > 0;
+            const pdfContaDigits = onlyDigits(b.conta);
+            const matchedLcAcc = lcAccounts.find(acc => acc.contaBancaria === pdfContaDigits);
+            
+            let status: 'ok' | 'aluno_nao_encontrado' | 'conta_nao_encontrada' = 'ok';
+            let selectedBanco = b.banco || '001';
+            let selectedAgencia = b.agencia || '0001';
+            let selectedConta = pdfContaDigits;
+
+            if (!hasCpfInLc) {
+              status = 'aluno_nao_encontrado';
+            } else if (!matchedLcAcc) {
+              status = 'conta_nao_encontrada';
+              // Mantém a conta do PDF como selecionada por padrão,
+              // mas a LC tem outras contas disponíveis.
+            } else {
+              // Encontrou correspondência exata de conta!
+              selectedBanco = matchedLcAcc.bancoCodigo;
+              selectedAgencia = matchedLcAcc.agenciaCodigo;
+              selectedConta = matchedLcAcc.contaBancaria;
+            }
+
+            // Achar a conta pagadora correspondente na lista do macro, se houver
+            const macroMatch = macroRows.find((m) => onlyDigits(m.cpf) === doc);
+            const contaPagadora = macroMatch?.contaPagadora || macroRows[0]?.contaPagadora || '';
+
+            return {
+              id: `${doc}-${b.sourceFile}`,
+              cpf: doc,
+              nome: b.nome,
+              bancoPdf: onlyDigits(b.banco) || '001',
+              agenciaPdf: onlyDigits(b.agencia) || '0001',
+              contaPdf: pdfContaDigits,
+              valor: b.valor,
+              selectedBanco: onlyDigits(selectedBanco) || '001',
+              selectedAgencia: onlyDigits(selectedAgencia) || '0001',
+              selectedConta: onlyDigits(selectedConta),
+              contaPagadora,
+              status,
+              lcAccounts,
+              originalLcAccounts: lcAccounts,
+            };
+          });
+
           setMacroContent(macro);
           setMacroFileName(generatedFileName);
           setMacroRowsCount(macroRows.length);
           setMacroContext(resultado.length === 0 ? 'sem_pendencias' : 'com_pendencias');
+          setDialogMacroRows(macroRows);
+          setGridRows(fullGridRows);
+          setExpandedRowId(null);
+          setChunkIndex(0);
+          setDialogTab('grid');
+          setIsCopied(false);
           setMacroDialogOpen(true);
         } else {
           setMacroContent('');
@@ -451,20 +543,418 @@ export default function LCPage() {
         />
       </DataTablePanel>
 
-      <ConfirmDialog
-        open={macroDialogOpen}
-        onOpenChange={setMacroDialogOpen}
-        onConfirm={handleConfirmarGeracaoMacro}
-        title="Gerar macro SIAFI?"
-        description={
-          macroContext === 'sem_pendencias'
-            ? `Nao ha pendencias nesta lista. Deseja gerar agora o arquivo .mac com ${macroRowsCount} linha(s) para preenchimento da Lista de Credores no SIAFI?`
-            : `Foram encontradas pendencias. Deseja gerar o arquivo .mac com ${macroRowsCount} linha(s) baseado nas pendencias para regularizacao no SIAFI?`
-        }
-        confirmText="Gerar .mac"
-        cancelText="Agora nao"
-        variant="info"
-      />
+      <Dialog open={macroDialogOpen} onOpenChange={setMacroDialogOpen}>
+        <DialogContent className="max-w-3xl w-full max-h-[90vh] flex flex-col p-6 overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xl">
+          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
+            <DialogTitle className="text-lg font-bold text-slate-900 dark:text-slate-50 flex items-center gap-2">
+              <TableIcon className="h-5 w-5 text-indigo-500" />
+              Preenchimento SIAFI & Lista de Credores
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500 dark:text-slate-400">
+              Gerencie a inserção de credores no SIAFI via macro ou copiando os dados formatados para colar na planilha.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Custom Tabs Segmented Control */}
+          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-md my-4">
+            <button
+              onClick={() => {
+                setDialogTab('grid');
+                setIsCopied(false);
+              }}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-md transition-all ${
+                dialogTab === 'grid'
+                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              <TableIcon className="h-4 w-4" />
+              Copiar Dados (Excel / LC)
+            </button>
+            <button
+              onClick={() => {
+                setDialogTab('macro');
+                setIsCopied(false);
+              }}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-md transition-all ${
+                dialogTab === 'macro'
+                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              <Download className="h-4 w-4" />
+              Gerar Macro SIAFI (.mac)
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto pr-1">
+            {dialogTab === 'grid' ? (
+              <div className="space-y-4">
+                <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-md border border-slate-150 dark:border-slate-800/80 flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-indigo-500 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                      Instruções de Cópia
+                    </p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                      Selecione a primeira célula (CPF) da linha correspondente na aba <strong>LC</strong> da planilha no Excel e cole. Cada bloco contém no máximo 7 alunos. O 7º aluno de cada bloco está destacado em amarelo para demarcar os limites de tela do SIAFI.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Pagination Info */}
+                {(() => {
+                  const totalStudents = gridRows.length;
+                  const totalChunks = Math.ceil(totalStudents / 7);
+                  const startIdx = chunkIndex * 7;
+                  const endIdx = Math.min(startIdx + 7, totalStudents);
+                  const currentChunk = gridRows.slice(startIdx, endIdx);
+
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">
+                          Bloco {chunkIndex + 1} de {totalChunks}
+                        </span>
+                        <span>
+                          Exibindo alunos {startIdx + 1}-{endIdx} de {totalStudents}
+                        </span>
+                      </div>
+
+                      <div className="border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
+                        <Table>
+                          <TableHeader className="bg-slate-50/80 dark:bg-slate-850">
+                            <TableRow className="hover:bg-transparent border-b border-slate-200 dark:border-slate-850">
+                              <TableHead className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-350">CPF</TableHead>
+                              <TableHead className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-350">Banco</TableHead>
+                              <TableHead className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-350">Ag.</TableHead>
+                              <TableHead className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-350">Conta</TableHead>
+                              <TableHead className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-350">Valor</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {currentChunk.map((row, idx) => {
+                              const isSeventhRow = idx === 6 || (startIdx + idx + 1) % 7 === 0;
+                              const isExpanded = expandedRowId === row.id;
+                              
+                              let rowClass = 'hover:bg-slate-50/50 dark:hover:bg-slate-850/30';
+                              if (row.status === 'aluno_nao_encontrado') {
+                                rowClass = 'bg-red-50/40 dark:bg-red-950/10 hover:bg-red-50/60 dark:hover:bg-red-950/20 border-l-4 border-l-red-500';
+                              } else if (row.status === 'conta_nao_encontrada') {
+                                rowClass = 'bg-amber-50/40 dark:bg-amber-950/10 hover:bg-amber-50/60 dark:hover:bg-amber-950/20 border-l-4 border-l-amber-500';
+                              } else if (isSeventhRow) {
+                                rowClass = 'bg-yellow-50/70 hover:bg-yellow-150/80 dark:bg-yellow-950/20 dark:hover:bg-yellow-900/30 text-yellow-900 dark:text-yellow-100 font-semibold border-y border-yellow-250 dark:border-yellow-900/60';
+                              }
+
+                              return (
+                                <React.Fragment key={row.id}>
+                                  <TableRow
+                                    onClick={() => setExpandedRowId(isExpanded ? null : row.id)}
+                                    className={`border-b border-slate-100 dark:border-slate-850/50 last:border-0 transition-colors cursor-pointer ${rowClass}`}
+                                  >
+                                    <TableCell className="px-4 py-2.5 text-xs font-mono flex items-center gap-1.5">
+                                      {padLeft(row.cpf, 11)}
+                                      {row.status === 'aluno_nao_encontrado' && (
+                                        <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-red-100 text-red-800 dark:bg-red-950/80 dark:text-red-300">
+                                          Não no LC
+                                        </span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="px-4 py-2.5 text-xs font-mono">{padLeft(row.selectedBanco, 3)}</TableCell>
+                                    <TableCell className="px-4 py-2.5 text-xs font-mono">{padLeft(row.selectedAgencia, 4)}</TableCell>
+                                    <TableCell className="px-4 py-2.5 text-xs font-mono flex items-center gap-1.5">
+                                      {row.selectedConta.replace(/\D/g, '') || <span className="text-red-500 italic">Vazia</span>}
+                                      {row.status === 'conta_nao_encontrada' && (
+                                        <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300">
+                                          Conta Divergente
+                                        </span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="px-4 py-2.5 text-xs font-mono">
+                                      {row.valor !== undefined ? Math.round(row.valor * 100) : 30000}
+                                    </TableCell>
+                                  </TableRow>
+
+                                  {isExpanded && (
+                                    <TableRow className="bg-slate-50/70 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 hover:bg-slate-50/70 dark:hover:bg-slate-900/60">
+                                      <TableCell colSpan={5} className="px-6 py-4">
+                                        <div className="space-y-3">
+                                          <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
+                                            <p className="text-xs font-bold text-slate-850 dark:text-slate-100">
+                                              Resolução de Conta: <span className="font-semibold text-slate-600 dark:text-slate-400">{row.nome}</span>
+                                            </p>
+                                            <span className="text-[10px] text-slate-450 italic">Clique na linha do aluno para recolher</span>
+                                          </div>
+                                          
+                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                                            {/* Conta do PDF */}
+                                            <div className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md space-y-2">
+                                              <div className="flex items-center justify-between">
+                                                <span className="text-xs font-bold text-slate-700 dark:text-slate-350">Conta no PDF</span>
+                                                {row.selectedConta === row.contaPdf && (
+                                                  <span className="text-[9px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-1.5 py-0.5 rounded">Selecionada</span>
+                                                )}
+                                              </div>
+                                              <div className="text-xs font-mono space-y-1 text-slate-600 dark:text-slate-300">
+                                                <div>Banco: {row.bancoPdf}</div>
+                                                <div>Agência: {row.agenciaPdf}</div>
+                                                <div>Conta: {row.contaPdf}</div>
+                                              </div>
+                                              {row.selectedConta !== row.contaPdf && (
+                                                <Button
+                                                  size="sm"
+                                                  variant="outline"
+                                                  className="text-[10px] h-7 px-2.5 w-full mt-2"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const updated = gridRows.map((g) => {
+                                                      if (g.id === row.id) {
+                                                        return {
+                                                          ...g,
+                                                          selectedBanco: row.bancoPdf,
+                                                          selectedAgencia: row.agenciaPdf,
+                                                          selectedConta: row.contaPdf,
+                                                          status: row.lcAccounts.length > 0 ? 'conta_nao_encontrada' : 'aluno_nao_encontrado'
+                                                        };
+                                                      }
+                                                      return g;
+                                                    });
+                                                    setGridRows(updated);
+                                                    toast.success('Alterado para a conta do PDF (marcada para cadastro).');
+                                                  }}
+                                                >
+                                                  Usar Conta do PDF
+                                                </Button>
+                                              )}
+                                            </div>
+
+                                            {/* Contas da LC */}
+                                            <div className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md space-y-2">
+                                              <span className="text-xs font-bold text-slate-700 dark:text-slate-350 block">Contas Cadastradas na LC</span>
+                                              {row.lcAccounts.length === 0 ? (
+                                                <p className="text-[11px] text-red-500 dark:text-red-400 italic">Nenhuma conta cadastrada para este bolsista na LC.</p>
+                                              ) : (
+                                                <div className="space-y-2 max-h-[120px] overflow-y-auto">
+                                                  {row.lcAccounts.map((acc, aIdx) => {
+                                                    const isSelected = row.selectedConta === acc.contaBancaria;
+                                                    return (
+                                                      <div key={aIdx} className="flex items-center justify-between p-2 border border-slate-100 dark:border-slate-700/60 rounded bg-slate-50/50 dark:bg-slate-800/50">
+                                                        <div className="text-xs font-mono text-slate-600 dark:text-slate-300">
+                                                          B:{acc.bancoCodigo} A:{acc.agenciaCodigo} C:{acc.contaBancaria}
+                                                        </div>
+                                                        {isSelected ? (
+                                                          <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded">Selecionada</span>
+                                                        ) : (
+                                                          <Button
+                                                            size="sm"
+                                                            className="text-[10px] h-7 px-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/40"
+                                                            onClick={(e) => {
+                                                              e.stopPropagation();
+                                                              const updated = gridRows.map((g) => {
+                                                                if (g.id === row.id) {
+                                                                  return {
+                                                                    ...g,
+                                                                    selectedBanco: acc.bancoCodigo,
+                                                                    selectedAgencia: acc.agenciaCodigo,
+                                                                    selectedConta: acc.contaBancaria,
+                                                                    status: 'ok'
+                                                                  };
+                                                                }
+                                                                return g;
+                                                              });
+                                                              setGridRows(updated);
+                                                              toast.success('Conta resolvida para o cadastro oficial da LC!');
+                                                            }}
+                                                          >
+                                                            Selecionar
+                                                          </Button>
+                                                        )}
+                                                      </div>
+                                                    );
+                                                  })}
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  )}
+                                </React.Fragment>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+
+                      {/* Controls Area */}
+                      <div className="flex items-center justify-between pt-3">
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={chunkIndex === 0}
+                            onClick={() => {
+                              setChunkIndex((prev) => prev - 1);
+                              setIsCopied(false);
+                            }}
+                            className="h-8 px-3 text-xs"
+                          >
+                            <ChevronLeft className="h-4 w-4 mr-1" />
+                            Anterior
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={chunkIndex === totalChunks - 1}
+                            onClick={() => {
+                              setChunkIndex((prev) => prev + 1);
+                              setIsCopied(false);
+                            }}
+                            className="h-8 px-3 text-xs"
+                          >
+                            Próximo
+                            <ChevronRight className="h-4 w-4 ml-1" />
+                          </Button>
+                        </div>
+
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            const formattedChunk = currentChunk.map((row, idx) => {
+                              // Formato SIAFI para colagem direta com buffers de separador:
+                              //
+                              // O SIAFI consome 1 caractere como separador visual entre cada
+                              // campo. Sem buffer, esse caractere é o 1º dígito real do campo
+                              // seguinte, causando deslocamento em cascata.
+                              //
+                              // Solução: adicionar 1 zero extra antes de cada campo (exceto
+                              // CPF) para que o separador "engula" o zero, não o dígito real.
+                                     // Campo  | Tamanho real | Buffer | Total enviado
+                              // -------|--------------|--------|---------------
+                              // CPF    |     14       |   0    |     14
+                              // Banco  |      3       |   1    |      4  → sep consome o 1º zero
+                              // Agência|      4       |   1    |      5  → sep consome o 1º zero
+                              // Conta  |     20       |   1    |     21  → sep consome o 1º zero
+                              // Valor  |     17       |   8    |     25  → sep consome os primeiros 7 zeros do gap
+
+                              const cpf     = padLeft(row.cpf, 14);           // 14 chars
+                              const banco   = padLeft(row.selectedBanco, 4);   // 3 + 1 buffer
+                              const agencia = padLeft(row.selectedAgencia, 5); // 4 + 1 buffer
+                              const conta   = padLeft(row.selectedConta, 21);  // 20 + 1 buffer
+
+                              const valorCents = row.valor !== undefined
+                                ? Math.round(row.valor * 100)
+                                : 0;
+                              const valor = String(valorCents).padStart(25, '0'); // 17 + 8 buffer
+
+                              let line = `${cpf}${banco}${agencia}${conta}${valor}`;
+                              
+                              // A 7ª linha do bloco recebe o comando de quebra de tela do SIAFI se não for o último registro geral
+                              const globalIdx = startIdx + idx;
+                              const isSeventhRowOfBlock = idx === 6;
+                              const isLastRowOverall = globalIdx === totalStudents - 1;
+                              
+                              if (isSeventhRowOfBlock && !isLastRowOverall) {
+                                const isFirstBlock = chunkIndex === 0;
+                                line += isFirstBlock ? '\rs\r\r' : '\rs\r';
+                              }
+                              
+                              return line;
+                            }).join('\r00000000000');
+
+                            navigator.clipboard.writeText(formattedChunk)
+                              .then(() => {
+                                setIsCopied(true);
+                                toast.success(`Bloco ${chunkIndex + 1} copiado com sucesso!`);
+                                setTimeout(() => {
+                                  setIsCopied(false);
+                                }, 1500);
+                              })
+                              .catch((err) => {
+                                toast.error('Erro ao copiar: ' + err.message);
+                              });
+                          }}
+                          className={`h-8 px-4 text-xs font-semibold gap-1.5 transition-all ${
+                            isCopied
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                              : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm'
+                          }`}
+                        >
+                          {isCopied ? (
+                            <>
+                              <Check className="h-4 w-4" />
+                              Bloco Copiado!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-4 w-4" />
+                              Copiar Bloco {chunkIndex + 1}
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-md border border-slate-150 dark:border-slate-800/80 flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-indigo-500 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                      Sobre a Macro SIAFI
+                    </p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                      A macro automatiza o preenchimento de todas as contas no SIAFI de forma rápida, rodando pelo emulador de terminal. Recomenda-se o download para processos maiores com muitos alunos para evitar digitação ou cópia manual repetitiva.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 p-4 rounded-md space-y-3 shadow-sm">
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-450 block mb-0.5">Nome do Arquivo</span>
+                      <span className="font-semibold text-slate-850 dark:text-slate-100 font-mono break-all">{macroFileName}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-450 block mb-0.5">Registros a Preencher</span>
+                      <span className="font-semibold text-slate-850 dark:text-slate-100">{macroRowsCount} bolsista(s)</span>
+                    </div>
+                  </div>
+                  <div className="pt-2 text-xs text-slate-600 dark:text-slate-400">
+                    {macroContext === 'sem_pendencias'
+                      ? 'Nenhuma inconsistência de dados foi encontrada. O arquivo .mac gerado preencherá a totalidade da Lista de Credores.'
+                      : 'Foram detectadas inconsistências no cruzamento. O arquivo .mac gerado preencherá apenas os dados necessários para regularização.'}
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-3">
+                  <Button
+                    onClick={handleConfirmarGeracaoMacro}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    Baixar arquivo .mac
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMacroDialogOpen(false)}
+              className="text-xs h-8 px-4"
+            >
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

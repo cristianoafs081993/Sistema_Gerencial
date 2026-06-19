@@ -73,6 +73,8 @@ export const appScreens: AppScreen[] = [
   { id: 'rastreabilidade-pfs', groupId: 'financeiro', name: 'Rastreabilidade de PFs', path: '/rastreabilidade-pfs', icon: ClipboardList, sortOrder: 50 },
   { id: 'conciliacao-pfs', groupId: 'financeiro', name: 'Conciliação de PFs', path: '/conciliacao-pfs', icon: ScanSearch, sortOrder: 60 },
   { id: 'contratos', groupId: 'contratos', name: 'Contratos', path: '/contratos', icon: FileStack, sortOrder: 10 },
+  { id: 'requisicao-compra', groupId: 'contratos', name: 'Requisição de Compra', path: '/requisicao-compra', icon: ClipboardList, sortOrder: 20 },
+  { id: 'cadastro-terceirizados', groupId: 'contratos', name: 'Cadastro de Terceirizados', path: '/cadastro-terceirizados', icon: UserCog, sortOrder: 25 },
   { id: 'pesquisa-precos', groupId: 'licitacoes', name: 'Pesquisa de Preços', path: '/pesquisa-precos', icon: SearchCheck, sortOrder: 5 },
   { id: 'licitacoes-pregoes', groupId: 'licitacoes', name: 'Pregões por UASG', path: '/licitacoes-pregoes', icon: ScrollText, sortOrder: 10 },
   { id: 'atas-registro-precos', groupId: 'licitacoes', name: 'Atas e ARP', path: '/atas-registro-precos', icon: ClipboardList, sortOrder: 20 },
