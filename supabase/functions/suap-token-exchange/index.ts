@@ -28,13 +28,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    const defaultClientId = Deno.env.get('SUAP_CLIENT_ID') || 'Oe1jZhORICjEB840r23FR4P1OGQCInNqyNcCzLip';
+    const defaultClientId = Deno.env.get('SUAP_CLIENT_ID') || 'CFHflhpMyHPgGvJtDgTMga0hhDSQNsKl7SKAhNhC';
     const devClientId = Deno.env.get('SUAP_DEV_CLIENT_ID') || '';
     const clientId = reqClientId || defaultClientId;
     const clientSecret =
       devClientId && clientId === devClientId
         ? Deno.env.get('SUAP_DEV_CLIENT_SECRET') || ''
-        : Deno.env.get('SUAP_CLIENT_SECRET') || 'B2wQ8Ikaoj6DILy1RTpXgkfsEQcr81hqPK7gLitQWmIlYSYvNAKY2if1MrRL8pBhan56jM4qcTxKMdHRzN9iDkyFjWOqaNLz5ARrQsk2k3QSlLHnMzEX12I3yYz9OPRj';
+        : Deno.env.get('SUAP_CLIENT_SECRET') || 'OeAHTAz6jAluDwzd2xXJ1CnKSLNJtJ81rmjV0yJp8dWFYcsnqG2zhUm5OJjlXriRrqJpE8ZuqErT57MKdlsdrnCkDYiUa96UWhz8JVHWKWNUHMGIM1EnTjZAMvgNORLE';
 
     if (!clientSecret) {
       return new Response(JSON.stringify({ error: 'Secret OAuth do SUAP nao configurado para o client informado.' }), {
