@@ -112,4 +112,36 @@ describe('ProtectedRoute', () => {
     expect(await screen.findByText('Acesso restrito')).toBeInTheDocument();
     expect(screen.queryByText('controle-page')).not.toBeInTheDocument();
   });
+
+  it('redireciona a rota inicial para a primeira tela permitida do terceirizado', async () => {
+    mockedUseAuth.mockReturnValue({
+      session: { user: { id: 'user-1', email: 'terceirizado@ifrn.edu.br' } } as never,
+      user: { id: 'user-1', email: 'terceirizado@ifrn.edu.br' } as never,
+      isAuthenticated: true,
+      isLoading: false,
+      ...authDefaults,
+      screenAccessIds: ['requisicao-compra'],
+      canAccessPath: vi.fn((path: string) => path === '/requisicao-compra'),
+      isSuperAdmin: false,
+      canInviteUsers: false,
+      signInWithPassword: vi.fn(),
+      updatePassword: vi.fn(),
+      requestPasswordReset: vi.fn(),
+      signOut: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<div>dashboard-page</div>} />
+            <Route path="/requisicao-compra" element={<div>requisicao-page</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('requisicao-page')).toBeInTheDocument();
+    expect(screen.queryByText('Acesso restrito')).not.toBeInTheDocument();
+  });
 });

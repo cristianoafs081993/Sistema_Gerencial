@@ -195,7 +195,17 @@ export function buildSiafiListaCredoresMacro(
 
   let firstBreakApplied = false;
   const inputActions = rows.map((row, index) => {
-    let line = `${padLeft(row.cpf, 11)}[tab]${buildSiafiContaPayload(row, codigoFinalCampo2)}[tab]${buildSiafiCampo3(row)}`;
+    const cpf = padLeft(row.cpf, 11);
+    const banco = padLeft(row.bancoCodigo, 3);
+    const agencia = padLeft(row.agenciaCodigo, 4);
+    const conta = padLeft(row.contaFavorecido, 20);
+    
+    const valorCents = row.valor !== undefined
+      ? Math.round(row.valor * 100)
+      : 0;
+    const valor = padLeft(String(valorCents), 17);
+
+    let line = `${cpf}[tab]${banco}${agencia}${conta}${valor}`;
     const shouldBreak = (index + 1) % chunkSize === 0 && index < rows.length - 1;
 
     if (shouldBreak) {
@@ -205,14 +215,17 @@ export function buildSiafiListaCredoresMacro(
       } else {
         line += breakDefault;
       }
+    } else {
+      line += '[tab]';
     }
 
-    return `            <input value="${escapeXmlAttribute(line)}" row="0" col="0" movecursor="true" xlatehostkeys="true" encrypted="false" />`;
+    return `            <input value="${escapeXmlAttribute(line)}" row="0" col="0" movecursor="true" xlatehostkeys="true" encrypted="false" />
+            <pause time="300" />`;
   });
 
   const creationDate = formatCreationDate(new Date());
 
-  return `<HAScript name="${escapeXmlAttribute(scriptName)}" description="" timeout="60000" pausetime="300" promptall="true" blockinput="false" author="${escapeXmlAttribute(author)}" creationdate="${creationDate}" supressclearevents="false" usevars="false" ignorepauseforenhancedtn="true" delayifnotenhancedtn="0" ignorepausetimeforenhancedtn="true">
+  return `<HAScript name="${escapeXmlAttribute(scriptName)}" description="" timeout="60000" pausetime="300" promptall="true" blockinput="false" author="${escapeXmlAttribute(author)}" creationdate="${creationDate}" supressclearevents="false" usevars="false" ignorepauseforenhancedtn="false" delayifnotenhancedtn="0" ignorepausetimeforenhancedtn="false">
 
     <screen name="Tela1" entryscreen="true" exitscreen="true" transient="false">
         <description >
@@ -220,6 +233,7 @@ export function buildSiafiListaCredoresMacro(
         </description>
         <actions>
             <mouseclick row="${mouseClickRow}" col="${mouseClickCol}" />
+            <pause time="300" />
 ${inputActions.join('\n')}
         </actions>
         <nextscreens timeout="0" >

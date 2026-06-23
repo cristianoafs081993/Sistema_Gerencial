@@ -383,6 +383,10 @@ Observações:
 - Um terceirizado só pode vincular contratos e empenhos que tenham sido previamente associados a ele na tabela `terceirizado_permissions` por um gestor/fiscal.
 - Perfis gestores (`fiscal-contratos`, `diretores`, `teste`) visualizam a aba "Gerenciamento de Terceirizados", onde podem cadastrar novos terceirizados pela matrícula SUAP, vincular essa matrícula aos contratos e empenhos autorizados e auditar todas as requisições de compra (com opções de aprovação/rejeição).
 - O login SUAP grava `user_metadata.matricula` no Supabase Auth; permissões de terceirizados são resolvidas por essa matrícula, com fallback por e-mail apenas para registros legados.
+- Mesmo que o usuário possua associações antigas a outros grupos, um terceirizado de refeitório recebe somente a tela `/requisicao-compra`; o login SUAP também remove memberships incompatíveis.
+- Quando a autenticação termina na rota inicial `/` e o perfil não possui acesso ao Dashboard, `ProtectedRoute` redireciona para a primeira tela permitida; para o terceirizado de refeitório, o destino é `/requisicao-compra`.
+- O formulário mostra o saldo do empenho local/SIAFI selecionado e bloqueia o envio para revisão quando o total excede o saldo. O salvamento usa a RPC transacional `save_requisicao_compra`, que repete a validação no banco e desconta requisições que já estejam em revisão.
+- Quando o contrato possui dados sincronizados, a tela exibe o saldo contratual por item como `contratado - executado`. A execução considera apenas faturas `Pago` ou `Siafi Apropriado` com item oficialmente vinculado; esse saldo por item é complementar e não substitui o saldo total do empenho usado no bloqueio.
 - O superadministrador também possui permissão para criar e gerenciar requisições de compra diretamente na mesma tela, com acesso irrestrito a todos os contratos e empenhos.
 - A geração de PDF é feita de forma estritamente local (no cliente), carregando os dados da requisição e dos itens em um template timbrado institucional em um iframe para impressão direta via `window.print()`.
 

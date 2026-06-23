@@ -69,7 +69,7 @@ describe('siafiMacroService', () => {
     expect(macro).toContain('[enter]s[enter][erinp]');
     expect(macro.match(/\[enter\]s\[enter\]\[enter\]\[erinp\]/g)?.length).toBe(1);
     expect(macro.match(/\[enter\]s\[enter\]\[erinp\]/g)?.length).toBe(1);
-    expect(macro).toContain('<input value="10000000000[tab]0011197000000000040803400002200[tab]00236428"');
+    expect(macro).toContain('<input value="10000000000[tab]00111970000000000000023642800000000000000000[tab]"');
   });
 
   it('gera linhas aptas apenas para bolsistas sem pendencia', () => {
@@ -176,7 +176,7 @@ describe('siafiMacroService', () => {
     );
 
     expect(macro).toContain('<mouseclick row="8" col="12" />');
-    expect(macro).toContain('<input value="12302654260[tab]0010223000000000022020000002200[tab]22220000"');
+    expect(macro).toContain('<input value="12302654260[tab]00102230000000000002222000000000000000000000[tab]"');
     expect(macro).toContain('<nextscreens timeout="0" >');
   });
 });

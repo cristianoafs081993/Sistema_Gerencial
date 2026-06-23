@@ -58,10 +58,6 @@ async function fetchTerceirizadoAccess(user: User): Promise<TerceirizadoAccessRo
   return (data as TerceirizadoAccessRow | null) || null;
 }
 
-function ensureScreenAccess(screenIds: string[], screenId: string) {
-  return screenIds.includes(screenId) ? screenIds : [...screenIds, screenId];
-}
-
 export async function fetchUserAccess(user: User, isSuperAdmin: boolean): Promise<UserAccess> {
   if (isSuperAdmin) {
     return {
@@ -100,6 +96,13 @@ export async function fetchUserAccess(user: User, isSuperAdmin: boolean): Promis
     groups.push({ id: 'terceirizado', name: 'Terceirizado', slug: 'terceirizado' });
   }
 
+  if (isRefeitorioTerceirizado) {
+    return {
+      groups: groups.filter((group) => group.slug === 'terceirizado'),
+      screenIds: ['requisicao-compra'],
+    };
+  }
+
   if (groupIds.length === 0) {
     return {
       groups,
@@ -119,9 +122,7 @@ export async function fetchUserAccess(user: User, isSuperAdmin: boolean): Promis
 
   let screenIds = Array.from(new Set(((permissions || []) as PermissionRow[]).map((row) => row.screen_id)));
 
-  if (isRefeitorioTerceirizado) {
-    screenIds = ensureScreenAccess(screenIds, 'requisicao-compra');
-  } else if (isTerceirizado && !isSuperAdmin) {
+  if (isTerceirizado && !isSuperAdmin) {
     screenIds = screenIds.filter((id) => id !== 'requisicao-compra');
   }
 

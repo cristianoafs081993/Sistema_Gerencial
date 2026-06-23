@@ -459,6 +459,11 @@ Campos-chave:
 - `empenho_id` (FK para empenhos)
 - `created_by` (FK para auth.users)
 
+Regras:
+- `save_requisicao_compra` salva cabeçalho e itens na mesma transacao.
+- Requisicoes em `review` ou `approved` exigem empenho com saldo suficiente; requisicoes em `review` do mesmo empenho entram como valor reservado.
+- `fn_empenho_saldo_disponivel` calcula saldo de exercicio com dados SIAFI locais e prioriza `saldo_rap_oficial` para RAP.
+
 ### `requisicao_compra_itens`
 
 Finalidade:

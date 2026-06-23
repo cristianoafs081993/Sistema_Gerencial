@@ -2,12 +2,18 @@ import { Loader2, ShieldCheck } from 'lucide-react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { appScreens } from '@/lib/appScreens';
 import { buildAuthRoute } from '@/lib/auth';
 import { APP_BRAND } from '@/lib/brand';
 
+function getFirstAllowedPath(screenAccessIds: string[]) {
+  const allowedIds = new Set(screenAccessIds);
+  return appScreens.find((screen) => allowedIds.has(screen.id))?.path;
+}
+
 export function ProtectedRoute() {
   const location = useLocation();
-  const { isAuthenticated, isLoading, isAccessLoading, accessError, canAccessPath } = useAuth();
+  const { isAuthenticated, isLoading, isAccessLoading, accessError, canAccessPath, screenAccessIds } = useAuth();
 
   if (isLoading || (isAuthenticated && isAccessLoading)) {
     return (
@@ -57,6 +63,11 @@ export function ProtectedRoute() {
   }
 
   if (!canAccessPath(location.pathname)) {
+    const firstAllowedPath = location.pathname === '/' ? getFirstAllowedPath(screenAccessIds) : undefined;
+    if (firstAllowedPath && firstAllowedPath !== location.pathname) {
+      return <Navigate to={firstAllowedPath} replace />;
+    }
+
     return (
       <div className="min-h-screen bg-white px-4 py-10">
         <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-xl items-center justify-center">

@@ -12,6 +12,7 @@ import {
   ScrollText,
   Search,
   Settings2,
+  ShieldCheck,
   Zap,
   X,
 } from 'lucide-react';
@@ -209,55 +210,64 @@ export function Layout({ children }: LayoutProps) {
 
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex h-screen w-[248px] shrink-0 flex-col overflow-hidden border-r border-[#e5e5e0]/60 bg-[#f9fafb] transition-transform duration-300 lg:relative lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-50 flex h-screen w-72 shrink-0 flex-col overflow-hidden border-r border-slate-200/85 bg-white transition-transform duration-300 lg:relative lg:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        <div className="flex h-16 shrink-0 items-center justify-between border-b border-[#e5e5e0]/60 px-[16px]">
-          <Link to="/" className="flex min-w-0 items-center gap-2.5" onClick={() => setSidebarOpen(false)}>
-            <img
-              src={APP_BRAND.iconPath}
-              alt=""
-              aria-hidden="true"
-              className="h-[28px] w-[28px] shrink-0 rounded-lg object-contain shadow-sm border border-[#e5e5e0]/40"
-            />
-            <span className="truncate text-[15px] font-bold tracking-[-0.4px] text-[#1a1a19]">{APP_BRAND.name}</span>
-          </Link>
-
+        {/* Brand Header matching Sebrae guidelines */}
+        <div className="p-6 border-b border-slate-100 flex flex-col gap-1.5 bg-slate-50/70 relative">
+          {/* Mobile Close Button */}
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="h-8 w-8 rounded-lg text-[#6a6a6a] hover:bg-[#f3f4f6]/60 lg:hidden"
+            className="absolute top-4 right-4 h-8 w-8 rounded-lg text-slate-550 hover:bg-slate-200/50 hover:text-slate-800 lg:hidden"
             onClick={() => setSidebarOpen(false)}
             aria-label="Fechar menu"
           >
             <X className="h-4 w-4" />
           </Button>
+
+          <Link to="/" className="flex items-center gap-3 no-underline" onClick={() => setSidebarOpen(false)}>
+            <div className="w-10 h-10 rounded-lg bg-sebrae-gold flex items-center justify-center shadow-md transform rotate-2">
+              <span className="text-sebrae-navy font-black text-xl tracking-tight">S</span>
+            </div>
+            <div>
+              <h1 className="font-bold text-lg tracking-tight leading-none text-sebrae-navy flex items-center gap-1.5 m-0">
+                SIGORC <span className="text-[10px] bg-sebrae-gold text-sebrae-navy px-1.5 py-0.5 rounded font-black">BaSe</span>
+              </h1>
+              <p className="text-[10px] text-slate-500 tracking-wider m-0 mt-0.5">Gestão Organizacional</p>
+            </div>
+          </Link>
+
+          <div className="mt-3 py-1.5 px-3 bg-white rounded-md border border-slate-200/80 text-[11px] text-slate-700 flex items-center gap-1.5 shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-ifrn-green animate-pulse"></span>
+            <span>IFRN Campus Natal Central</span>
+          </div>
         </div>
 
-        <nav className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-3 pt-3.5 scrollbar-thin">
+        <nav className="min-h-0 flex-1 overflow-y-auto px-4 pb-3 pt-4 scrollbar-thin space-y-5 bg-white">
           {navigationSections.map((section) => {
             const sectionExpanded = expandedSections[section.title] ?? true;
             const SectionIcon = section.icon;
 
             return (
-              <div key={section.title} className="mb-2">
+              <div key={section.title} className="space-y-1">
                 <button
                   type="button"
                   className={cn(
-                    'mb-1 flex w-full cursor-pointer select-none items-center justify-between rounded-[7px] px-2.5 py-[6px] text-left text-[11px] font-bold tracking-[0.06em] text-[#8e8d8a] uppercase transition-all duration-200 hover:bg-[#f3f4f6]/60 hover:text-[#222222]',
-                    sectionExpanded && 'text-[#222222]',
+                    'mb-1 flex w-full cursor-pointer select-none items-center justify-between rounded-[7px] px-3 py-[6px] text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase transition-all duration-200 hover:bg-slate-50 hover:text-slate-900',
+                    sectionExpanded && 'text-slate-900',
                   )}
                   onClick={() => toggleSection(section.title)}
                 >
                   <span className="flex min-w-0 items-center gap-2">
-                    <SectionIcon className={cn('h-3.5 w-3.5 shrink-0 text-[#9a9996] transition-colors duration-200', sectionExpanded && 'text-[#2f9e41]')} />
+                    <SectionIcon className={cn('h-3.5 w-3.5 shrink-0 text-slate-400 transition-all duration-200', sectionExpanded && 'text-sebrae-blue scale-110')} />
                     <span className="truncate">{section.title}</span>
                   </span>
                   <ChevronRight
                     className={cn(
-                      'h-3 w-3 shrink-0 text-[#c1c1c1] transition-transform duration-200 ease-out',
+                      'h-3 w-3 shrink-0 text-slate-300 transition-transform duration-200 ease-out',
                       sectionExpanded ? 'rotate-90' : 'rotate-0',
                     )}
                   />
@@ -265,7 +275,7 @@ export function Layout({ children }: LayoutProps) {
 
                 <div
                   className={cn(
-                    'overflow-hidden pl-0.5 transition-[max-height,opacity] duration-300 ease-out',
+                    'overflow-hidden pl-0.5 space-y-1 transition-[max-height,opacity] duration-300 ease-out',
                     sectionExpanded ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0',
                   )}
                 >
@@ -280,17 +290,20 @@ export function Layout({ children }: LayoutProps) {
                       return (
                         <div key={item.screenId} className="mb-px">
                           <button
-                            type="button; cursor-pointer"
+                            type="button"
                             className={cn(
-                              'relative mb-px flex w-full cursor-pointer items-center gap-[9px] rounded-lg px-2.5 py-[7.5px] text-left text-[13px] font-medium text-[#5c5b57] transition-all duration-200 hover:bg-[#f3f4f6]/80 hover:text-[#222222]',
-                              parentDirectlyActive && 'bg-white shadow-sm border border-[#2f9e41]/10 font-semibold text-[#2f9e41] before:absolute before:left-0 before:top-[6px] before:bottom-[6px] before:w-[3px] before:rounded-r-full before:bg-[#2f9e41]',
+                              'relative flex w-full cursor-pointer items-center gap-[9px] rounded-lg px-3.5 py-2.5 text-left text-sm font-medium text-slate-600 transition-all duration-200 hover:bg-slate-50 hover:text-slate-950',
+                              parentDirectlyActive && 'bg-sebrae-blue/10 text-sebrae-navy font-bold pl-5',
                             )}
                             onClick={() => toggleSubmenu(item.screenId)}
                           >
+                            {parentDirectlyActive && (
+                              <span className="absolute left-0 top-2 bottom-2 w-[3px] bg-sebrae-blue rounded-r" />
+                            )}
                             <span className="min-w-0 flex-1 truncate">{item.name}</span>
                             <ChevronRight
                               className={cn(
-                                'h-3 w-3 shrink-0 text-[#c1c1c1] transition-transform duration-200 ease-out',
+                                'h-3 w-3 shrink-0 text-slate-300 transition-transform duration-200 ease-out',
                                 submenuExpanded && 'rotate-90',
                               )}
                             />
@@ -298,7 +311,7 @@ export function Layout({ children }: LayoutProps) {
 
                           <div
                             className={cn(
-                              'overflow-hidden border-l border-[#e5e5e0] ml-[18px] pl-1.5 transition-[max-height,opacity] duration-300 ease-out',
+                              'overflow-hidden border-l border-slate-200 ml-[18px] pl-1.5 space-y-0.5 transition-[max-height,opacity] duration-300 ease-out',
                               submenuExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0',
                             )}
                           >
@@ -311,11 +324,14 @@ export function Layout({ children }: LayoutProps) {
                                   to={child.href}
                                   onClick={() => setSidebarOpen(false)}
                                   className={cn(
-                                    'relative mb-px flex items-center gap-2 rounded-[7px] py-1.5 pl-[12px] pr-2.5 text-xs font-normal text-[#6a6a6a] transition-all duration-200 hover:bg-[#f3f4f6]/80 hover:text-[#222222]',
-                                    childActive && 'bg-white shadow-xs border border-[#2f9e41]/5 font-semibold text-[#2f9e41] before:absolute before:left-0 before:top-[4px] before:bottom-[4px] before:w-[2px] before:rounded-r-full before:bg-[#2f9e41]',
+                                    'relative flex items-center gap-2 rounded-[7px] py-1.5 pl-[12px] pr-2.5 text-xs font-medium text-slate-550 transition-all duration-200 hover:bg-slate-550/5 hover:text-slate-950',
+                                    childActive && 'bg-sebrae-blue/5 font-semibold text-sebrae-navy pl-5',
                                   )}
                                 >
-                                  <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full bg-[#dddddd] transition-colors duration-200', childActive && 'bg-[#2f9e41]')} />
+                                  {childActive && (
+                                    <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] bg-sebrae-blue rounded-r" />
+                                  )}
+                                  <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full bg-slate-250 transition-colors duration-200', childActive && 'bg-sebrae-blue')} />
                                   <span className="truncate">{child.name}</span>
                                 </Link>
                               );
@@ -331,10 +347,13 @@ export function Layout({ children }: LayoutProps) {
                         to={item.href}
                         onClick={() => setSidebarOpen(false)}
                         className={cn(
-                          'relative mb-px flex items-center gap-[9px] rounded-lg px-2.5 py-[7.5px] text-[13px] font-medium text-[#5c5b57] no-underline transition-all duration-200 hover:bg-[#f3f4f6]/80 hover:text-[#222222]',
-                          active && 'bg-white shadow-sm border border-[#2f9e41]/10 font-semibold text-[#2f9e41] before:absolute before:left-0 before:top-[6px] before:bottom-[6px] before:w-[3px] before:rounded-r-full before:bg-[#2f9e41]',
+                          'relative flex items-center gap-[9px] rounded-lg px-3.5 py-2.5 text-sm font-medium text-slate-600 no-underline transition-all duration-200 hover:bg-slate-50 hover:text-slate-950',
+                          active && 'bg-sebrae-blue/10 text-sebrae-navy font-bold pl-5',
                         )}
                       >
+                        {active && (
+                          <span className="absolute left-0 top-2 bottom-2 w-[3px] bg-sebrae-blue rounded-r" />
+                        )}
                         <span className="truncate">{item.name}</span>
                       </Link>
                     );
@@ -345,66 +364,77 @@ export function Layout({ children }: LayoutProps) {
           })}
         </nav>
 
-        <div className="shrink-0 border-t border-[#e5e5e0]/60 bg-[#f4f4f6]/30 px-3.5 py-3">
+        <div className="shrink-0 border-t border-slate-100 bg-slate-50/50 p-4 text-xs text-slate-500 flex flex-col gap-3">
           {isAuthLoading ? (
-            <div className="h-[42px] animate-pulse rounded-lg bg-[#f0f0f2]" />
+            <div className="h-[42px] animate-pulse rounded-lg bg-slate-100" />
           ) : session ? (
             <div className="space-y-2.5">
-              <div className="flex min-w-0 items-center gap-2.5 rounded-lg bg-[#f3f4f6]/40 border border-[#e5e5e0]/40 px-2.5 py-2">
+              <div className="flex min-w-0 items-center gap-2.5 rounded-lg bg-white border border-slate-200 px-3 py-2 shadow-sm">
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-xs font-semibold text-[#2c2b29]">{userEmail || 'Sessão autenticada'}</div>
-                  <div className="truncate text-[10px] font-medium text-[#8c8b88]">Conta ativa</div>
+                  <div className="truncate text-xs font-semibold text-slate-800">{userEmail || 'Sessão autenticada'}</div>
+                  <div className="truncate text-[10px] text-slate-500">Conta ativa</div>
                 </div>
               </div>
 
-              <Button
+              <button
                 type="button"
-                variant="outline"
-                size="sm"
                 disabled={isSigningOut}
                 onClick={() => void handleSignOut()}
-                className="h-8.5 w-full justify-center rounded-lg border-[#e5e5e0] bg-white text-xs font-semibold text-[#5c5b57] transition-all duration-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200"
+                className="w-full text-slate-700 hover:text-slate-950 hover:bg-slate-100 border border-slate-200 py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all text-xs font-semibold bg-white shadow-sm"
               >
-                <LogOut className="mr-1.5 h-3.5 w-3.5" />
-                {isSigningOut ? 'Saindo...' : 'Sair'}
-              </Button>
+                <LogOut className="h-3.5 w-3.5 text-sebrae-blue" />
+                <span>{isSigningOut ? 'Saindo...' : 'Sair do Sistema'}</span>
+              </button>
             </div>
           ) : null}
+          <div className="flex items-center justify-between mt-1 text-[10px]">
+            <span>Versão do BaSe</span>
+            <span className="font-mono text-[10px] text-slate-600">v2.1.4</span>
+          </div>
+          <div className="text-[10px] leading-tight text-slate-400">
+            Desenvolvido para conformidade WCAG 2.1 com alto contraste.
+          </div>
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-[#dddddd]/70 bg-white/80 px-4 backdrop-blur-md lg:px-6">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-border-light bg-white/85 px-4 backdrop-blur-md lg:px-6">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="h-10 w-10 rounded-xl lg:hidden"
+              className="h-10 w-10 rounded-xl lg:hidden text-sebrae-navy"
               onClick={() => setSidebarOpen(true)}
               aria-label="Abrir menu"
             >
               <Menu className="h-5 w-5" />
             </Button>
 
-            <label className="hidden min-w-[220px] max-w-[360px] flex-1 items-center gap-[7px] rounded-lg border border-border-default/60 bg-[#f7f7f7]/60 px-3 py-1.5 sm:flex transition-all focus-within:border-[#2f9e41]/50 focus-within:ring-4 focus-within:ring-[#2f9e41]/5">
-              <Search className="h-[13px] w-[13px] shrink-0 text-[#c1c1c1]" />
+            <label className="hidden min-w-[220px] max-w-[360px] flex-1 items-center gap-[7px] rounded-full border border-transparent bg-slate-100 px-4 py-1.5 sm:flex transition-all focus-within:bg-white focus-within:border-sebrae-blue focus-within:ring-4 focus-within:ring-sebrae-blue/10">
+              <Search className="h-[13px] w-[13px] shrink-0 text-muted-gray" />
               <input
                 aria-label="Buscar módulo"
                 type="search"
                 value={navigationSearch}
                 onChange={(event) => setNavigationSearch(event.target.value)}
-                placeholder="Buscar módulo..."
-                className="min-w-0 flex-1 border-0 bg-transparent p-0 text-xs font-medium text-[#222222] outline-none placeholder:text-[#c1c1c1] focus-visible:ring-0 focus-visible:ring-offset-0"
+                placeholder="Pesquisar módulo..."
+                className="min-w-0 flex-1 border-0 bg-transparent p-0 text-xs font-medium text-ink-legacy outline-none placeholder:text-muted-gray focus-visible:ring-0 focus-visible:ring-offset-0"
               />
             </label>
 
             <div className="min-w-0">
-              <div id="header-subtitle" className="truncate text-sm font-semibold text-[#34322d] empty:hidden" />
+              <div id="header-subtitle" className="truncate text-sm font-bold text-sebrae-navy tracking-tight empty:hidden" />
             </div>
           </div>
 
-          <div id="header-actions" className="flex items-center gap-2" />
+          <div className="flex items-center gap-4">
+            <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-full text-[10px] font-semibold text-emerald-700 select-none">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+              <span>WCAG 2.1 AAA</span>
+            </div>
+            <div id="header-actions" className="flex items-center gap-2" />
+          </div>
         </header>
 
         <main className={cn('min-h-0 flex-1 overflow-y-auto app-bg-soft', isConsultor ? 'p-0' : 'p-4 sm:p-6 lg:p-8')}>

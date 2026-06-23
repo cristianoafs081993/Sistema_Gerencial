@@ -62,7 +62,7 @@ Uso:
 - troca o `code` OAuth do SUAP por token e busca o perfil em `/api/rh/meus-dados/`
 - cria ou localiza o usuario no Supabase Auth e gera magic link para concluir a sessao do app
 - grava `user_metadata.matricula` normalizada para ser a chave de terceirizados
-- quando a matricula existe em `terceirizados`, sincroniza `user_id` em `terceirizados` e `terceirizado_permissions` e associa o usuario ao grupo `terceirizado`
+- quando a matricula existe em `terceirizados`, sincroniza `user_id` em `terceirizados` e `terceirizado_permissions`, associa o usuario ao grupo `terceirizado` e remove memberships incompatíveis
 - quando nao ha cadastro de terceirizado e o usuario ainda nao possui grupo, associa ao grupo `diretores`
 
 Dependencias:

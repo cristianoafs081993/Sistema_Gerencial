@@ -4,6 +4,7 @@ import { Loader2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { env } from '@/lib/env';
+import { supabase } from '@/lib/supabase';
 
 export default function SuapCallback() {
   const [searchParams] = useSearchParams();
@@ -71,8 +72,25 @@ export default function SuapCallback() {
         }
 
         if (isAppLogin) {
-          if (data && data.action_link) {
-            // Redirect the user to the Supabase verification action link
+          // Use verifyOtp with the token_hash to establish the session directly,
+          // avoiding the Supabase redirect URL whitelist that sends localhost to production.
+          if (data?.hashed_token) {
+            const { error: verifyError } = await supabase.auth.verifyOtp({
+              token_hash: data.hashed_token,
+              type: 'magiclink',
+            });
+
+            if (verifyError) {
+              console.error('Erro ao verificar OTP:', verifyError);
+              throw new Error(verifyError.message || 'Falha ao verificar autenticação.');
+            }
+
+            const nextPath = localStorage.getItem('suap_login_next') || '/';
+            localStorage.removeItem('suap_login_next');
+            navigate(nextPath, { replace: true });
+            toast.success('Autenticado com sucesso!');
+          } else if (data?.action_link) {
+            // Fallback: redirect to action_link (works when redirect URLs are whitelisted)
             window.location.href = data.action_link;
           } else {
             throw new Error('Link de autenticação não gerado pela Edge Function.');

@@ -104,6 +104,9 @@ Deno.serve(async (req) => {
     const normalizedMatricula = String(userProfile.matricula || '').trim().replace(/[^0-9A-Za-z]/g, '').toLowerCase();
 
     let actionLink = null;
+    let hashedToken = null;
+    let emailOtp = null;
+    let verificationType = null;
 
     if (loginSupabase && userProfile.email) {
       const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -246,7 +249,7 @@ Deno.serve(async (req) => {
 
           if (memError) {
             console.error('Erro ao buscar grupos do usuário:', memError);
-          } else if (!memberships || memberships.length === 0) {
+          } else {
             const targetGroupSlug = isTerceirizado ? 'terceirizado' : 'diretores';
             const { data: groupData, error: groupError } = await supabaseAdmin
               .from('user_groups')
@@ -257,17 +260,32 @@ Deno.serve(async (req) => {
             if (groupError) {
               console.error(`Erro ao buscar o grupo ${targetGroupSlug}:`, groupError);
             } else if (groupData) {
-              console.log(`Associando usuario ${email} ao grupo ${targetGroupSlug}`);
-              const { error: insertError } = await supabaseAdmin
-                .from('user_group_memberships')
-                .insert({
-                  user_id: userId,
-                  email,
-                  group_id: groupData.id,
-                });
+              if (isTerceirizado) {
+                const { error: cleanupError } = await supabaseAdmin
+                  .from('user_group_memberships')
+                  .delete()
+                  .eq('user_id', userId)
+                  .neq('group_id', groupData.id);
 
-              if (insertError) {
-                console.error('Erro ao associar usuario ao grupo:', insertError);
+                if (cleanupError) {
+                  console.error('Erro ao remover grupos incompatÃ­veis do terceirizado:', cleanupError);
+                }
+              }
+
+              const alreadyInTargetGroup = (memberships || []).some((membership) => membership.group_id === groupData.id);
+              if (!alreadyInTargetGroup) {
+                console.log(`Associando usuario ${email} ao grupo ${targetGroupSlug}`);
+                const { error: insertError } = await supabaseAdmin
+                  .from('user_group_memberships')
+                  .insert({
+                    user_id: userId,
+                    email,
+                    group_id: groupData.id,
+                  });
+
+                if (insertError) {
+                  console.error('Erro ao associar usuario ao grupo:', insertError);
+                }
               }
             }
           }
@@ -288,6 +306,12 @@ Deno.serve(async (req) => {
         }
 
         actionLink = linkData?.properties?.action_link || null;
+
+        // Return token properties so frontend can verify locally via verifyOtp
+        // instead of redirecting through Supabase (which validates redirect URLs).
+        hashedToken = linkData?.properties?.hashed_token || null;
+        emailOtp = linkData?.properties?.email_otp || null;
+        verificationType = linkData?.properties?.verification_type || 'magiclink';
       } else {
         console.error('SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY ausentes no ambiente');
       }
@@ -297,6 +321,9 @@ Deno.serve(async (req) => {
       token: tokenData,
       user: userProfile,
       action_link: actionLink,
+      hashed_token: hashedToken,
+      email_otp: emailOtp,
+      verification_type: verificationType,
       rawProfile: profileData
     }), {
       status: 200,

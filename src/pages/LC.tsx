@@ -25,11 +25,8 @@ import { extractBolsistasFromPdfFiles } from '@/services/bolsistasPdfService';
 import { compararBolsistasComLC, type ComparacaoBolsista, type PendenciaStatus } from '@/services/lcComparisonService';
 import {
   buildSiafiListaCredoresMacro,
-  buildSiafiMacroRowsFromComparison,
-  buildSiafiMacroRowsFromPendencias,
   downloadSiafiMacroFile,
   padLeft,
-  buildSiafiContaPayload,
   type SiafiMacroInputRow,
 } from '@/services/siafiMacroService';
 import { env } from '@/lib/env';
@@ -258,9 +255,71 @@ export default function LCPage() {
       setPdfFileNames(sourcePdfNames);
 
       if (bolsistas.length > 0) {
-        const macroRows = resultado.length === 0
-          ? buildSiafiMacroRowsFromComparison(bolsistas, rows)
-          : buildSiafiMacroRowsFromPendencias(resultado, bolsistas);
+        // 1. Gerar linhas para a Grade do Excel (Sempre todos os bolsistas na sequencia do PDF!)
+        const fullGridRows = bolsistas.map((b) => {
+          const doc = onlyDigits(b.cpf);
+          const lcList = rows.filter((r) => onlyDigits(r.favorecidoDocumento) === doc);
+          
+          const lcAccounts = lcList.map((r) => ({
+            bancoCodigo: onlyDigits(r.bancoCodigo) || '001',
+            agenciaCodigo: onlyDigits(r.agenciaCodigo) || '0001',
+            contaBancaria: onlyDigits(r.contaBancaria) || '',
+          })).filter(acc => acc.contaBancaria);
+
+          const hasCpfInLc = lcList.length > 0;
+          const pdfContaDigits = onlyDigits(b.conta);
+          const matchedLcAcc = lcAccounts.find(acc => acc.contaBancaria === pdfContaDigits);
+          
+          let status: 'ok' | 'aluno_nao_encontrado' | 'conta_nao_encontrada' = 'ok';
+          let selectedBanco = b.banco || '001';
+          let selectedAgencia = b.agencia || '0001';
+          let selectedConta = pdfContaDigits;
+
+          if (!hasCpfInLc) {
+            status = 'aluno_nao_encontrado';
+          } else if (!matchedLcAcc) {
+            status = 'conta_nao_encontrada';
+            // Mantém a conta do PDF como selecionada por padrão,
+            // mas a LC tem outras contas disponíveis.
+          } else {
+            // Encontrou correspondência exata de conta!
+            selectedBanco = matchedLcAcc.bancoCodigo;
+            selectedAgencia = matchedLcAcc.agenciaCodigo;
+            selectedConta = matchedLcAcc.contaBancaria;
+          }
+
+          const contaPagadora = env.siafiContaPagadora || '';
+
+          return {
+            id: `${doc}-${b.sourceFile}`,
+            cpf: doc,
+            nome: b.nome,
+            bancoPdf: onlyDigits(b.banco) || '001',
+            agenciaPdf: onlyDigits(b.agencia) || '0001',
+            contaPdf: pdfContaDigits,
+            valor: b.valor,
+            selectedBanco: onlyDigits(selectedBanco) || '001',
+            selectedAgencia: onlyDigits(selectedAgencia) || '0001',
+            selectedConta: onlyDigits(selectedConta),
+            contaPagadora,
+            status,
+            lcAccounts,
+            originalLcAccounts: lcAccounts,
+          };
+        });
+
+        // 2. Gerar linhas da macro a partir de fullGridRows, filtrando 'aluno_nao_encontrado'
+        const macroRows: SiafiMacroInputRow[] = fullGridRows
+          .filter((r) => r.status !== 'aluno_nao_encontrado')
+          .map((r) => ({
+            cpf: r.cpf,
+            bancoCodigo: r.selectedBanco,
+            agenciaCodigo: r.selectedAgencia,
+            contaPagadora: r.contaPagadora,
+            contaFavorecido: r.selectedConta,
+            valor: r.valor,
+          }))
+          .slice(0, 7);
 
         if (macroRows.length > 0) {
           const generatedFileName = buildMacroFileName(sourcePdfNames);
@@ -268,60 +327,6 @@ export default function LCPage() {
             scriptName: resultado.length === 0 ? 'Lista de Credores' : 'Lista de Credores - Pendencias',
             author: 'sistema-gerencial',
             includeFirstConfirmationEnter: true,
-          });
-          // 2. Gerar linhas para a Grade do Excel (Sempre todos os bolsistas na sequencia do PDF!)
-          const fullGridRows = bolsistas.map((b) => {
-            const doc = onlyDigits(b.cpf);
-            const lcList = rows.filter((r) => onlyDigits(r.favorecidoDocumento) === doc);
-            
-            const lcAccounts = lcList.map((r) => ({
-              bancoCodigo: onlyDigits(r.bancoCodigo) || '001',
-              agenciaCodigo: onlyDigits(r.agenciaCodigo) || '0001',
-              contaBancaria: onlyDigits(r.contaBancaria) || '',
-            })).filter(acc => acc.contaBancaria);
-
-            const hasCpfInLc = lcList.length > 0;
-            const pdfContaDigits = onlyDigits(b.conta);
-            const matchedLcAcc = lcAccounts.find(acc => acc.contaBancaria === pdfContaDigits);
-            
-            let status: 'ok' | 'aluno_nao_encontrado' | 'conta_nao_encontrada' = 'ok';
-            let selectedBanco = b.banco || '001';
-            let selectedAgencia = b.agencia || '0001';
-            let selectedConta = pdfContaDigits;
-
-            if (!hasCpfInLc) {
-              status = 'aluno_nao_encontrado';
-            } else if (!matchedLcAcc) {
-              status = 'conta_nao_encontrada';
-              // Mantém a conta do PDF como selecionada por padrão,
-              // mas a LC tem outras contas disponíveis.
-            } else {
-              // Encontrou correspondência exata de conta!
-              selectedBanco = matchedLcAcc.bancoCodigo;
-              selectedAgencia = matchedLcAcc.agenciaCodigo;
-              selectedConta = matchedLcAcc.contaBancaria;
-            }
-
-            // Achar a conta pagadora correspondente na lista do macro, se houver
-            const macroMatch = macroRows.find((m) => onlyDigits(m.cpf) === doc);
-            const contaPagadora = macroMatch?.contaPagadora || macroRows[0]?.contaPagadora || '';
-
-            return {
-              id: `${doc}-${b.sourceFile}`,
-              cpf: doc,
-              nome: b.nome,
-              bancoPdf: onlyDigits(b.banco) || '001',
-              agenciaPdf: onlyDigits(b.agencia) || '0001',
-              contaPdf: pdfContaDigits,
-              valor: b.valor,
-              selectedBanco: onlyDigits(selectedBanco) || '001',
-              selectedAgencia: onlyDigits(selectedAgencia) || '0001',
-              selectedConta: onlyDigits(selectedConta),
-              contaPagadora,
-              status,
-              lcAccounts,
-              originalLcAccounts: lcAccounts,
-            };
           });
 
           setMacroContent(macro);
@@ -821,7 +826,7 @@ export default function LCPage() {
                         <Button
                           size="sm"
                           onClick={() => {
-                            const formattedChunk = currentChunk.map((row, idx) => {
+                            const formattedChunk = currentChunk.flatMap((row, idx) => {
                               // Formato SIAFI para colagem direta com buffers de separador:
                               //
                               // O SIAFI consome 1 caractere como separador visual entre cada
@@ -832,13 +837,13 @@ export default function LCPage() {
                               // CPF) para que o separador "engula" o zero, não o dígito real.
                                      // Campo  | Tamanho real | Buffer | Total enviado
                               // -------|--------------|--------|---------------
-                              // CPF    |     14       |   0    |     14
+                               // CPF    |     11       |   0    |     11  → seguido de Tab (\t) para avançar
                               // Banco  |      3       |   1    |      4  → sep consome o 1º zero
                               // Agência|      4       |   1    |      5  → sep consome o 1º zero
                               // Conta  |     20       |   1    |     21  → sep consome o 1º zero
                               // Valor  |     17       |   8    |     25  → sep consome os primeiros 7 zeros do gap
 
-                              const cpf     = padLeft(row.cpf, 14);           // 14 chars
+                              const cpf     = padLeft(row.cpf, 11);           // 11 chars
                               const banco   = padLeft(row.selectedBanco, 4);   // 3 + 1 buffer
                               const agencia = padLeft(row.selectedAgencia, 5); // 4 + 1 buffer
                               const conta   = padLeft(row.selectedConta, 21);  // 20 + 1 buffer
@@ -848,7 +853,8 @@ export default function LCPage() {
                                 : 0;
                               const valor = String(valorCents).padStart(25, '0'); // 17 + 8 buffer
 
-                              let line = `${cpf}${banco}${agencia}${conta}${valor}`;
+                              const line1 = `${cpf}\t\t\t${banco}${agencia}${conta}${valor}`;
+                              let line2 = `${cpf}\t\t\t${banco}${agencia}${conta}${valor}`;
                               
                               // A 7ª linha do bloco recebe o comando de quebra de tela do SIAFI se não for o último registro geral
                               const globalIdx = startIdx + idx;
@@ -857,11 +863,11 @@ export default function LCPage() {
                               
                               if (isSeventhRowOfBlock && !isLastRowOverall) {
                                 const isFirstBlock = chunkIndex === 0;
-                                line += isFirstBlock ? '\rs\r\r' : '\rs\r';
+                                line2 += isFirstBlock ? '\rs\r\r' : '\rs\r';
                               }
                               
-                              return line;
-                            }).join('\r00000000000');
+                              return [line1, line2];
+                            }).join('\r');
 
                             navigator.clipboard.writeText(formattedChunk)
                               .then(() => {

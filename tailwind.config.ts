@@ -16,11 +16,21 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["Open Sans", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
-        ui: ["Open Sans", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
+        sans: ["Figtree", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
+        ui: ["Figtree", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
         data: ["IBM Plex Mono", "ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"],
       },
       colors: {
+        // --- SEBRAE BASE BRAND COLORS ---
+        "sebrae-blue": "#2A4FDA",
+        "sebrae-navy": "#1A2B66",
+        "sebrae-gold": "#FED303",
+        "ifrn-green": "#2f9e41",
+        "app-bg": "#F4F7FC",
+        "ink-legacy": "#1E293B",
+        "muted-gray": "#64748B",
+        "border-light": "#E2E8F0",
+
         // --- TOKENS SEMÂNTICOS (SISTEMA GERENCIAL) ---
         "text-primary":   "hsl(var(--foreground))",
         "text-secondary": "hsl(var(--muted-foreground))",

@@ -15,120 +15,120 @@
 
 @layer base {
   :root {
-    /* === NEUTROS (60%) === */
-    --background: 0 0% 100%;          /* Branco puro de fundo */
-    --foreground: 39 8% 20.5%;        /* Ink legado #34322d */
+    /* === PALETA SEBRAE BASE (NEUTROS & BRAND) === */
+    --background: 218 57% 97%;          /* #F4F7FC (App bg) */
+    --foreground: 217 33% 17%;          /* #1E293B (Ink color) */
 
-    --card: 0 0% 100%;                /* #ffffff — cards */
-    --card-foreground: 39 8% 20.5%;
+    --card: 0 0% 100%;                /* Branco puro */
+    --card-foreground: 217 33% 17%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 39 8% 20.5%;
+    --popover-foreground: 217 33% 17%;
 
-    --border: 0 0% 92%;               /* Divisores claros e limpos */
-    --input: 0 0% 92%;
-    --ring: 130 54% 40%;              /* Foco verde institucional */
+    --border: 210 40% 90%;               /* #E2E8F0 sutil */
+    --input: 210 40% 90%;
+    --ring: 227 72% 51%;              /* Foco Sebrae Blue #2A4FDA */
 
-    --muted: 0 0% 96.7%;              /* Superfície cinza suave */
-    --muted-foreground: 30 3% 52%;    /* Texto secundário cinza */
+    --muted: 218 20% 94%;              /* Cinza/azul claro */
+    --muted-foreground: 215 16% 47%;    /* Texto secundário #64748B */
 
     /* === SECUNDÁRIO (30%) === */
-    --secondary: 0 0% 98%;            /* Fundo levemente acinzentado */
-    --secondary-foreground: 39 8% 26%;
+    --secondary: 218 30% 95%;            /* Cinza suave para fundos */
+    --secondary-foreground: 217 33% 17%;
 
     /* === ACCENT / PRIMARY (10%) === */
-    --primary: 130 54% 40%;           /* Verde institucional IFRN #2f9e41 */
+    --primary: 227 72% 51%;           /* Sebrae Blue #2A4FDA */
     --primary-foreground: 0 0% 100%;
 
-    --accent: 130 54% 40%;
+    --accent: 227 72% 51%;
     --accent-foreground: 0 0% 100%;
 
     /* Estados semânticos */
     --destructive: 358 78% 45%;       /* Vermelho de erro */
     --destructive-foreground: 0 0% 100%;
-    --success: 130 54% 40%;
+    --success: 130 54% 40%;           /* Verde institucional */
     --success-foreground: 0 0% 100%;
     --warning: 42 82% 48%;            /* Âmbar de atenção */
     --warning-foreground: 0 0% 100%;
     --info: 210 70% 48%;              /* Azul informativo */
     --info-foreground: 0 0% 100%;
 
-    /* Raio padrão — 8pt grid */
-    --radius: 0.65rem;
+    /* Raio padrão — Grid Sebrae */
+    --radius: 0.5rem;
 
-    /* === SIDEBAR (Aparência Premium) === */
+    /* === SIDEBAR (Branding Sebrae Navy & Gold) === */
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 39 8% 20.5%;
-    --sidebar-primary: 130 54% 40%;
+    --sidebar-foreground: 227 59% 25%;   /* Sebrae Navy #1A2B66 */
+    --sidebar-primary: 227 72% 51%;      /* Sebrae Blue */
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 98%;
-    --sidebar-accent-foreground: 130 54% 34%;
-    --sidebar-border: 0 0% 92%;
-    --sidebar-ring: 130 54% 40%;
+    --sidebar-accent: 227 40% 97%;       /* Fundo hover sutil */
+    --sidebar-accent-foreground: 227 59% 25%;
+    --sidebar-border: 210 40% 94%;
+    --sidebar-ring: 227 72% 51%;
 
     /* === SOMBRAS MULTICAMADAS PREMIUM === */
-    --shadow-xs: 0 1px 2px 0 rgba(52, 50, 45, 0.03);
-    --shadow-sm: 0 1px 3px 0 rgba(52, 50, 45, 0.05), 0 1px 2px -1px rgba(52, 50, 45, 0.04);
-    --shadow-md: 0 4px 10px -6px rgba(52, 50, 45, 0.09), 0 2px 4px -2px rgba(52, 50, 45, 0.05);
-    --shadow-lg: 0 12px 24px -18px rgba(52, 50, 45, 0.12), 0 6px 12px -8px rgba(52, 50, 45, 0.06);
-    --shadow-xl: 0 20px 36px -24px rgba(52, 50, 45, 0.14), 0 10px 18px -12px rgba(52, 50, 45, 0.08);
-    --shadow-primary: 0 10px 24px -16px rgba(47, 158, 65, 0.28);
+    --shadow-xs: 0 1px 2px 0 rgba(26, 43, 102, 0.03);
+    --shadow-sm: 0 1px 3px 0 rgba(26, 43, 102, 0.05), 0 1px 2px -1px rgba(26, 43, 102, 0.04);
+    --shadow-md: 0 4px 10px -6px rgba(26, 43, 102, 0.09), 0 2px 4px -2px rgba(26, 43, 102, 0.05);
+    --shadow-lg: 0 12px 24px -18px rgba(26, 43, 102, 0.12), 0 6px 12px -8px rgba(26, 43, 102, 0.06);
+    --shadow-xl: 0 20px 36px -24px rgba(26, 43, 102, 0.14), 0 10px 18px -12px rgba(26, 43, 102, 0.08);
+    --shadow-primary: 0 10px 24px -16px rgba(42, 79, 218, 0.28);
 
     /* Glassmorphism sutil */
-    --glass-border: rgba(120, 110, 95, 0.08);
+    --glass-border: rgba(42, 79, 218, 0.08);
     --glass-bg: rgba(255, 255, 255, 0.88);
     --glass-highlight: rgba(255, 255, 255, 0.62);
 
     /* Dot-pattern SVG para fundos */
-    --dot-pattern: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='2' cy='2' r='1' fill='%23d8d1c8' fill-opacity='0.32'/%3E%3C/svg%3E");
+    --dot-pattern: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='2' cy='2' r='1' fill='%232a4fda' fill-opacity='0.08'/%3E%3C/svg%3E");
 
     /* Gradientes */
-    --gradient-primary: linear-gradient(135deg, hsl(130 54% 42%) 0%, hsl(130 54% 34%) 100%);
-    --gradient-accent:  linear-gradient(135deg, hsl(130 54% 40%) 0%, hsl(130 54% 32%) 100%);
-    --gradient-warning: linear-gradient(135deg, hsl(42 82% 52%) 0%, hsl(42 82% 44%) 100%);
-    --gradient-card:    linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(42 18% 96.8%) 100%);
+    --gradient-primary: linear-gradient(135deg, #2A4FDA 0%, #1A2B66 100%);
+    --gradient-accent:  linear-gradient(135deg, #1A2B66 0%, #0F1A3E 100%);
+    --gradient-warning: linear-gradient(135deg, #FED303 0%, #DCA702 100%);
+    --gradient-card:    linear-gradient(180deg, #FFFFFF 0%, #F4F7FC 100%);
   }
 
-  /* === DARK MODE — Cinzas quentes com elevação === */
+  /* === DARK MODE — Sebrae Navy com elevação === */
   .dark {
-    --background: 36 10% 11%;          /* Fundo escuro levemente quente */
-    --foreground: 48 18% 92%;
+    --background: 224 71% 4%;          /* Fundo escuro azulado premium */
+    --foreground: 210 40% 98%;
 
-    --card: 36 10% 15%;                /* Cards mais claros que o fundo */
-    --card-foreground: 48 18% 92%;
+    --card: 224 71% 7%;                /* Cards um pouco mais claros */
+    --card-foreground: 210 40% 98%;
 
-    --popover: 36 10% 15%;
-    --popover-foreground: 48 18% 92%;
+    --popover: 224 71% 7%;
+    --popover-foreground: 210 40% 98%;
 
-    --secondary: 36 9% 19%;
-    --secondary-foreground: 48 12% 80%;
+    --secondary: 224 71% 12%;
+    --secondary-foreground: 210 40% 98%;
 
-    --muted: 36 8% 18%;
-    --muted-foreground: 42 8% 62%;
+    --muted: 224 71% 10%;
+    --muted-foreground: 215 16% 65%;
 
-    --border: 36 8% 24%;
-    --input: 36 8% 20%;
-    --ring: 130 54% 46%;
+    --border: 224 71% 12%;
+    --input: 224 71% 12%;
+    --ring: 227 72% 51%;
 
-    --primary: 130 54% 46%;
-    --primary-foreground: 48 18% 96%;
+    --primary: 227 72% 51%;
+    --primary-foreground: 210 40% 98%;
 
-    --accent: 130 54% 40%;
+    --accent: 227 72% 51%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 358 70% 54%;
     --destructive-foreground: 0 0% 98%;
 
-    --sidebar-background: 36 10% 12%;
-    --sidebar-foreground: 42 8% 74%;
-    --sidebar-primary: 130 54% 46%;
+    --sidebar-background: 224 71% 5%;
+    --sidebar-foreground: 210 40% 90%;
+    --sidebar-primary: 227 72% 51%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 36 8% 18%;
-    --sidebar-accent-foreground: 48 18% 92%;
-    --sidebar-border: 36 8% 18%;
+    --sidebar-accent: 224 71% 10%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 224 71% 10%;
 
-    --shadow-primary: 0 8px 18px 0 rgba(47, 158, 65, 0.18);
-    --glass-bg: rgba(29, 28, 25, 0.84);
+    --shadow-primary: 0 8px 18px 0 rgba(42, 79, 218, 0.18);
+    --glass-bg: rgba(15, 23, 42, 0.84);
   }
 }
 
@@ -598,22 +598,22 @@
     background-image: var(--dot-pattern);
   }
   .dark .dot-pattern {
-    --dot-pattern: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='2' cy='2' r='1' fill='%232f9e41' fill-opacity='0.12'/%3E%3C/svg%3E");
+    --dot-pattern: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='2' cy='2' r='1' fill='%232a4fda' fill-opacity='0.16'/%3E%3C/svg%3E");
   }
 
   /* Gradiente de fundo dinâmico e polido */
   .app-bg-soft {
-    background-color: #ffffff;
+    background-color: #F4F7FC;
     background-image:
-      radial-gradient(920px 380px at 12% -18%, rgba(47, 158, 65, 0.02), rgba(47, 158, 65, 0) 58%),
-      linear-gradient(180deg, #ffffff 0%, #fcfcfc 100%);
+      radial-gradient(920px 380px at 12% -18%, rgba(42, 79, 218, 0.03), rgba(42, 79, 218, 0) 58%),
+      linear-gradient(180deg, #F4F7FC 0%, #EBF1FA 100%);
   }
 
   .dark .app-bg-soft {
-    background-color: hsl(108 10% 11%);
+    background-color: hsl(224 71% 4%);
     background-image:
-      radial-gradient(1000px 520px at 12% -22%, rgba(47, 158, 65, 0.16), rgba(47, 158, 65, 0) 62%),
-      linear-gradient(180deg, hsl(108 10% 13%) 0%, hsl(108 10% 10%) 100%);
+      radial-gradient(1000px 520px at 12% -22%, rgba(42, 79, 218, 0.16), rgba(42, 79, 218, 0) 62%),
+      linear-gradient(180deg, hsl(224 71% 6%) 0%, hsl(224 71% 4%) 100%);
   }
 
   /* Bordas Luminosas (Glow Effect) */
