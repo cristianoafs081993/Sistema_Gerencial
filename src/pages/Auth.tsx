@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { AUTH_INVITE_MODE, AUTH_RECOVERY_MODE, normalizeAuthMode, normalizeNextPath } from '@/lib/auth';
-import { APP_BRAND } from '@/lib/brand';
+import { LogoIcon } from '@/components/Logo';
 
 export default function Auth() {
   const { isLoading, session } = useAuth();
@@ -69,55 +69,63 @@ export default function Auth() {
   return (
     <main className="grid grid-cols-1 md:grid-cols-12 min-h-screen bg-background text-foreground font-ui">
       {/* Left Column: Visual Brand side for Desktop */}
-      <div className="md:col-span-5 lg:col-span-6 xl:col-span-7 hidden md:flex flex-col justify-between p-12 bg-[#0b2414] text-white relative overflow-hidden">
+      <div className="md:col-span-5 lg:col-span-6 xl:col-span-7 hidden md:flex flex-col justify-between p-12 bg-[#0B1538] text-white relative overflow-hidden">
         <img
           src="/login-finance-background.jpg"
           alt=""
           aria-hidden="true"
           data-testid="auth-visual-background"
-          className="absolute inset-0 h-full w-full object-cover object-center opacity-45 pointer-events-none"
+          className="absolute inset-0 h-full w-full object-cover object-center opacity-30 pointer-events-none"
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-[#071d11]/90 via-[#0b3b1e]/70 to-[#237d39]/45 pointer-events-none" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.08),transparent_45%)] pointer-events-none" />
-        <div className="absolute -left-16 -top-16 w-96 h-96 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
-        <div className="absolute -right-16 -bottom-16 w-96 h-96 rounded-full bg-emerald-300/15 blur-3xl pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0B1538]/95 via-[#1A2B66]/85 to-[#2A4FDA]/45 pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.06),transparent_45%)] pointer-events-none" />
+        <div className="absolute -left-16 -top-16 w-96 h-96 rounded-full bg-sebrae-blue/15 blur-3xl pointer-events-none" />
+        <div className="absolute -right-16 -bottom-16 w-96 h-96 rounded-full bg-sebrae-gold/10 blur-3xl pointer-events-none" />
         
-        {/* Top Branding Spacer */}
-        <div className="h-10 z-10" />
+        {/* Top Branding Logo */}
+        <div className="flex items-center gap-3 z-10 select-none">
+          <LogoIcon size={38} className="transform rotate-2" />
+          <div>
+            <h1 className="font-bold text-lg tracking-tight leading-none text-white flex items-center gap-1.5 m-0">
+              SIAGES <span className="text-[10px] bg-sebrae-gold text-sebrae-navy px-1.5 py-0.5 rounded font-black">Beta</span>
+            </h1>
+            <p className="text-[10px] text-slate-300 tracking-wider m-0 mt-0.5">Administração & Gestão Estratégica</p>
+          </div>
+        </div>
 
         {/* Hero message & metrics */}
-        <div className="space-y-8 max-w-xl z-10">
+        <div className="space-y-10 max-w-lg z-10">
           <div className="space-y-4">
             <h2 className="text-4xl lg:text-5xl font-black tracking-tight leading-tight text-white drop-shadow-sm">
-              Gestão Orçamentária & Financeira
+              Administração & Gestão Estratégica
             </h2>
-            <p className="text-emerald-100/90 text-base lg:text-lg leading-relaxed font-medium">
-              Controle unificado de despesas, restos a pagar (RAP), contratos e licitações com o apoio de inteligência artificial.
+            <p className="text-slate-300/90 text-sm lg:text-base leading-relaxed font-medium">
+              Plataforma integrada para planejamento, conformidade regulatória e otimização dos fluxos de gestão pública.
             </p>
           </div>
 
-          {/* Premium Glassmorphic Feature Highlight Cards */}
-          <div className="space-y-4 pt-4">
-            <div className="flex items-start gap-4 p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:bg-white/10 transition-all duration-300">
-              <div className="flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
-                <RefreshCw className="h-5 w-5 animate-[spin_8s_linear_infinite]" />
+          {/* Refined Minimalist Feature Highlight Bullets */}
+          <div className="space-y-6">
+            <div className="flex items-start gap-4 group">
+              <div className="flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-sebrae-gold transition-all duration-300 group-hover:bg-white/15">
+                <RefreshCw className="h-5 w-5 animate-[spin_12s_linear_infinite]" />
               </div>
-              <div className="space-y-1">
-                <h3 className="text-sm font-bold text-white tracking-wide">Integração Automática</h3>
-                <p className="text-xs text-emerald-100/80 leading-relaxed font-medium">
-                  Sincronização contínua de contratos e atas de registro de preços via Comprasnet/PNCP.
+              <div className="space-y-0.5">
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">Integração de Sistemas Administrativos</h3>
+                <p className="text-xs text-slate-300/80 leading-relaxed">
+                  Centralização de registros provenientes do PNCP, SUAP e faturas de consumo em uma única interface, garantindo a integridade da informação.
                 </p>
               </div>
             </div>
 
-            <div className="flex items-start gap-4 p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:bg-white/10 transition-all duration-300">
-              <div className="flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
+            <div className="flex items-start gap-4 group">
+              <div className="flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-sebrae-gold transition-all duration-300 group-hover:bg-white/15">
                 <Sparkles className="h-5 w-5" />
               </div>
-              <div className="space-y-1">
-                <h3 className="text-sm font-bold text-white tracking-wide">Inteligência Artificial</h3>
-                <p className="text-xs text-emerald-100/80 leading-relaxed font-medium">
-                  Elaboração ágil de ETP, Termos de Referência e minutas com suporte inteligente.
+              <div className="space-y-0.5">
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">Automação e Padronização Documental</h3>
+                <p className="text-xs text-slate-300/80 leading-relaxed">
+                  Geração automatizada de Estudos Técnicos Preliminares (ETP), Termos de Referência e despachos oficiais, reduzindo o tempo de tramitação processual.
                 </p>
               </div>
             </div>
@@ -125,19 +133,29 @@ export default function Auth() {
         </div>
 
         {/* Footer brand info */}
-        <div className="text-xs text-emerald-200/80 font-medium z-10">
-          {APP_BRAND.name} v3.0 • IFRN Campus Currais Novos
+        <div className="text-xs text-slate-400 font-medium z-10">
+          SIAGES Beta v3.0 • IFRN Campus Currais Novos
         </div>
       </div>
 
       {/* Right Column: Authentication Card form */}
-      <div className="md:col-span-7 lg:col-span-6 xl:col-span-5 flex flex-col justify-center px-4 py-12 sm:px-6 lg:px-16 bg-[radial-gradient(120%_120%_at_50%_10%,#ffffff_50%,rgba(47,158,65,0.03)_100%)] relative">
+      <div className="md:col-span-7 lg:col-span-6 xl:col-span-5 flex flex-col justify-center px-4 py-12 sm:px-6 lg:px-16 bg-[radial-gradient(120%_120%_at_50%_10%,#ffffff_50%,rgba(42,79,218,0.02)_100%)] relative">
         <div className="mx-auto w-full max-w-md space-y-8">
-
+          
+          {/* Mobile-only branding logo */}
+          <div className="flex md:hidden items-center justify-center gap-3 mb-6 select-none">
+            <LogoIcon size={42} className="transform rotate-2" />
+            <div>
+              <h1 className="font-bold text-xl tracking-tight leading-none text-sebrae-navy flex items-center gap-1.5 m-0">
+                SIAGES <span className="text-[10px] bg-sebrae-gold text-sebrae-navy px-1.5 py-0.5 rounded font-black">Beta</span>
+              </h1>
+              <p className="text-[10px] text-slate-500 tracking-wider m-0 mt-0.5">Administração & Gestão Estratégica</p>
+            </div>
+          </div>
 
           <div className="relative">
             {isLoading ? (
-              <Card className="border-border-default/70 shadow-[0_22px_60px_rgba(15,23,42,0.08)] bg-white/80 backdrop-blur-sm">
+              <Card className="border-border-default/70 shadow-[0_22px_60px_rgba(26,43,102,0.06)] bg-white/80 backdrop-blur-sm">
                 <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -158,15 +176,15 @@ export default function Auth() {
                   onSuccess={handlePasswordSetupSuccess}
                 />
               ) : (
-                <Card className="border-border-default/70 shadow-[0_22px_60px_rgba(15,23,42,0.08)] bg-white/80 backdrop-blur-sm">
+                <Card className="border-border-default/70 shadow-[0_22px_60px_rgba(26,43,102,0.06)] bg-white/80 backdrop-blur-sm">
                   <CardContent className="space-y-5 py-10 text-center">
-                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#2f9e41]/10 text-[#2f9e41]">
                       <CheckCircle2 className="h-6 w-6" />
                     </div>
                     <div className="space-y-2">
                       <p className="text-xl font-semibold text-foreground">Login confirmado</p>
                       <p className="text-sm leading-6 text-muted-foreground">
-                        {session.user.email ? `Sessão activa para ${session.user.email}.` : 'Sessão ativa.'}
+                        {session.user.email ? `Sessão ativa para ${session.user.email}.` : 'Sessão ativa.'}
                       </p>
                       <p className="text-sm font-medium text-primary">Redirecionando...</p>
                     </div>

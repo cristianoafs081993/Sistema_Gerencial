@@ -47,13 +47,13 @@ function extractFieldAfterLabel(segment: string, labelRegex: RegExp): string {
   return normalizeWhitespace(match[1]);
 }
 
-function extractFromText(text: string, sourceFile: string): BolsistaPdfRecord[] {
+export function extractFromText(text: string, sourceFile: string): BolsistaPdfRecord[] {
   const isTableFormat = /MATRÍCULA\s+CPF\s+BANCO/i.test(text) || /VALOR\s+REFERÊNCIA/i.test(text);
   const found: BolsistaPdfRecord[] = [];
 
   if (isTableFormat) {
     const cleanText = text.replace(/\s+/g, ' ');
-    const studentRegex = /(\d+)\s+([A-ZÀ-ÿ][A-Za-zÀ-ÿ'`´\s.-]{4,40}?)\s+(\d{10,15})\s+(\d{3}\.\d{3}\.\d{3}-\d{2})\s+(\d{3,4})\s+([0-9A-Za-z-]+)\s+(?:([0-9A-Za-z-]+)\s+)?([0-9A-Za-z-]+)\s+(?:R\$\s*)?([0-9.,]+)/g;
+    const studentRegex = /(\d+)\s+([A-ZÀ-ÿ][A-Za-zÀ-ÿ'`´\s.-]{4,80}?)\s+(\d{10,15})\s+(\d{3}\.\d{3}\.\d{3}-\d{2})\s+(\d{2,4})\s+([0-9A-Za-z.-]+)\s+(?:([0-9A-Za-z.-]+)\s+)?([0-9A-Za-z.-]+)\s+(?:R\$\s*)?([0-9.,]+)/g;
     const matches = [...cleanText.matchAll(studentRegex)];
     
     for (const m of matches) {

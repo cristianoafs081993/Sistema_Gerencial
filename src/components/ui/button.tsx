@@ -22,7 +22,7 @@ const buttonVariants = cva(
     "disabled:pointer-events-none disabled:opacity-40",
     "[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
     // Micro-interação no clique (conceito 10)
-    "active:scale-[0.97]",
+    "active:scale-95",
     "select-none cursor-pointer",
   ].join(" "),
   {
@@ -51,6 +51,14 @@ const buttonVariants = cva(
         // Link — affordance de texto clicável
         link:
           "text-primary underline-offset-4 hover:underline p-0 h-auto shadow-none",
+
+        // Brand — Sebrae Navy oficial
+        brand:
+          "bg-sebrae-navy text-white hover:bg-[#13204d] shadow-soft",
+
+        // Gold — Sebrae Gold oficial
+        gold:
+          "bg-sebrae-gold text-sebrae-navy hover:bg-[#e6be02] shadow-soft",
       },
       size: {
         // Padding baseado em múltiplos de 8pt (conceito 8 e 3)

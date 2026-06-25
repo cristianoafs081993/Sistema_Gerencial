@@ -23,7 +23,7 @@ export function Header({ title, icon: Icon, onRefresh, isRefreshing }: HeaderPro
                 <div className="p-2.5 bg-primary/10 rounded-xl text-primary shadow-sm border border-primary/20">
                     <Icon className="w-6 h-6" />
                 </div>
-                <h1 className="text-3xl font-black tracking-tight text-foreground">
+                <h1 className="text-3xl font-black tracking-tight text-[#1A2B66] dark:text-foreground">
                     {title}
                 </h1>
             </div>

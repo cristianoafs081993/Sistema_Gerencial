@@ -61,7 +61,7 @@ export function AuthPanel({ title, description }: AuthPanelProps) {
   };
 
   return (
-    <Card className="border-border-default/70 shadow-[0_22px_60px_rgba(15,23,42,0.08)] bg-white/80 backdrop-blur-sm">
+    <Card className="border-border-default/70 shadow-[0_22px_60px_rgba(26,43,102,0.06)] bg-white/80 backdrop-blur-sm">
       <CardHeader className="space-y-2 pb-2">
         <CardTitle className="text-2xl font-black tracking-tight text-foreground">{title}</CardTitle>
         {description ? <CardDescription className="text-sm font-medium text-muted-foreground">{description}</CardDescription> : null}

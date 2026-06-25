@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Banknote,
+  Bell,
   ChevronRight,
   Clock3,
   FileStack,
@@ -23,6 +24,7 @@ import { appScreenGroups, appScreens, type AppScreenGroupId } from '@/lib/appScr
 import { APP_BRAND } from '@/lib/brand';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { LogoIcon } from './Logo';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -32,6 +34,7 @@ type NavigationLeaf = {
   name: string;
   href: string;
   screenId: string;
+  icon?: React.ComponentType<{ className?: string }>;
 };
 
 type NavigationItem = NavigationLeaf & {
@@ -82,6 +85,7 @@ function buildNavigationSections(canAccessScreen: (screenId: string) => boolean)
           name: screen.name,
           href: screen.path,
           screenId: screen.id,
+          icon: screen.icon,
           children: nestedNavigation[screen.id],
         }));
 
@@ -94,7 +98,7 @@ function isPathActive(pathname: string, href: string) {
   if (href === '/') return pathname === '/';
   if (href === '/planejamento') return pathname.startsWith('/planejamento') || pathname.startsWith('/atividades');
   // Para o pai editor-documentos: ativo apenas quando a rota é exatamente /editor-documentos
-  // (sem modelo na URL). Quando um filho está ativo, só o filho deve ser destacado.
+  // (sem modelo na URL). Quando um  filho está ativo, só o filho deve ser destacado.
   if (href === '/editor-documentos') return pathname === '/editor-documentos';
   return pathname === href || pathname.startsWith(`${href}/`);
 }
@@ -109,7 +113,24 @@ export function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [navigationSearch, setNavigationSearch] = useState('');
-  const navigationSections = useMemo(() => buildNavigationSections(canAccessScreen), [canAccessScreen]);
+  const navigationSections = useMemo(() => {
+    const sections = buildNavigationSections(canAccessScreen);
+    if (!navigationSearch.trim()) return sections;
+
+    const query = navigationSearch.toLowerCase();
+    return sections
+      .map((section) => {
+        const filteredItems = section.items.filter((item) => {
+          const matchName = item.name.toLowerCase().includes(query);
+          const matchChildren = item.children?.some((child) =>
+            child.name.toLowerCase().includes(query)
+          );
+          return matchName || matchChildren;
+        });
+        return { ...section, items: filteredItems };
+      })
+      .filter((section) => section.items.length > 0);
+  }, [canAccessScreen, navigationSearch]);
   const defaultPasswordToastRef = useRef<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
@@ -151,6 +172,10 @@ export function Layout({ children }: LayoutProps) {
           next[section.title] = true;
           changed = true;
         }
+        if (navigationSearch.trim() && !next[section.title]) {
+          next[section.title] = true;
+          changed = true;
+        }
       });
 
       return changed ? next : current;
@@ -166,12 +191,20 @@ export function Layout({ children }: LayoutProps) {
             next[item.screenId] = true;
             changed = true;
           }
+          if (navigationSearch.trim()) {
+            const query = navigationSearch.toLowerCase();
+            const childMatches = item.children?.some((child) => child.name.toLowerCase().includes(query));
+            if (childMatches && !next[item.screenId]) {
+              next[item.screenId] = true;
+              changed = true;
+            }
+          }
         });
       });
 
       return changed ? next : current;
     });
-  }, [location.pathname, navigationSections]);
+  }, [location.pathname, navigationSections, navigationSearch]);
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
@@ -203,7 +236,7 @@ export function Layout({ children }: LayoutProps) {
         <button
           type="button"
           aria-label="Fechar menu"
-          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          className="fixed inset-0 z-40 bg-[#1A2B66]/60 backdrop-blur-sm lg:hidden transition-opacity duration-300 pointer-events-auto"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -221,7 +254,7 @@ export function Layout({ children }: LayoutProps) {
             type="button"
             variant="ghost"
             size="icon"
-            className="absolute top-4 right-4 h-8 w-8 rounded-lg text-slate-550 hover:bg-slate-200/50 hover:text-slate-800 lg:hidden"
+            className="absolute top-4 right-4 h-8 w-8 rounded-lg text-slate-500 hover:bg-slate-200/50 hover:text-slate-800 lg:hidden"
             onClick={() => setSidebarOpen(false)}
             aria-label="Fechar menu"
           >
@@ -229,20 +262,18 @@ export function Layout({ children }: LayoutProps) {
           </Button>
 
           <Link to="/" className="flex items-center gap-3 no-underline" onClick={() => setSidebarOpen(false)}>
-            <div className="w-10 h-10 rounded-lg bg-sebrae-gold flex items-center justify-center shadow-md transform rotate-2">
-              <span className="text-sebrae-navy font-black text-xl tracking-tight">S</span>
-            </div>
+            <LogoIcon size={38} className="transform rotate-2" />
             <div>
               <h1 className="font-bold text-lg tracking-tight leading-none text-sebrae-navy flex items-center gap-1.5 m-0">
-                SIGORC <span className="text-[10px] bg-sebrae-gold text-sebrae-navy px-1.5 py-0.5 rounded font-black">BaSe</span>
+                SIAGES <span className="text-[10px] bg-sebrae-gold text-sebrae-navy px-1.5 py-0.5 rounded font-black">Beta</span>
               </h1>
-              <p className="text-[10px] text-slate-500 tracking-wider m-0 mt-0.5">Gestão Organizacional</p>
+              <p className="text-[10px] text-slate-500 tracking-wider m-0 mt-0.5">Gestão Estratégica & Integrada</p>
             </div>
           </Link>
 
           <div className="mt-3 py-1.5 px-3 bg-white rounded-md border border-slate-200/80 text-[11px] text-slate-700 flex items-center gap-1.5 shadow-sm">
             <span className="w-2 h-2 rounded-full bg-ifrn-green animate-pulse"></span>
-            <span>IFRN Campus Natal Central</span>
+            <span>IFRN Campus Currais Novos</span>
           </div>
         </div>
 
@@ -256,13 +287,13 @@ export function Layout({ children }: LayoutProps) {
                 <button
                   type="button"
                   className={cn(
-                    'mb-1 flex w-full cursor-pointer select-none items-center justify-between rounded-[7px] px-3 py-[6px] text-left text-[10px] font-bold tracking-widest text-slate-400 uppercase transition-all duration-200 hover:bg-slate-50 hover:text-slate-900',
+                    'mb-1 flex w-full cursor-pointer select-none items-center justify-between rounded-[7px] px-3 py-[6px] text-left text-[10px] font-bold tracking-widest text-slate-500 uppercase transition-all duration-200 hover:bg-slate-50 hover:text-slate-950',
                     sectionExpanded && 'text-slate-900',
                   )}
                   onClick={() => toggleSection(section.title)}
                 >
                   <span className="flex min-w-0 items-center gap-2">
-                    <SectionIcon className={cn('h-3.5 w-3.5 shrink-0 text-slate-400 transition-all duration-200', sectionExpanded && 'text-sebrae-blue scale-110')} />
+                    <SectionIcon className={cn('h-3.5 w-3.5 shrink-0 text-slate-500 transition-all duration-200', sectionExpanded && 'text-sebrae-blue scale-110')} />
                     <span className="truncate">{section.title}</span>
                   </span>
                   <ChevronRight
@@ -285,6 +316,7 @@ export function Layout({ children }: LayoutProps) {
                       ? location.pathname === item.href
                       : active;
                     const submenuExpanded = expandedSubmenus[item.screenId] ?? false;
+                    const ItemIcon = item.icon;
 
                     if (item.children?.length) {
                       return (
@@ -292,13 +324,23 @@ export function Layout({ children }: LayoutProps) {
                           <button
                             type="button"
                             className={cn(
-                              'relative flex w-full cursor-pointer items-center gap-[9px] rounded-lg px-3.5 py-2.5 text-left text-sm font-medium text-slate-600 transition-all duration-200 hover:bg-slate-50 hover:text-slate-950',
+                              'relative flex w-full cursor-pointer items-center gap-[9px] rounded-lg px-3.5 py-2.5 text-left text-sm font-medium text-slate-700 transition-all duration-200 hover:bg-slate-50 hover:text-slate-950 group',
                               parentDirectlyActive && 'bg-sebrae-blue/10 text-sebrae-navy font-bold pl-5',
                             )}
                             onClick={() => toggleSubmenu(item.screenId)}
                           >
                             {parentDirectlyActive && (
                               <span className="absolute left-0 top-2 bottom-2 w-[3px] bg-sebrae-blue rounded-r" />
+                            )}
+                            {ItemIcon && (
+                              <ItemIcon
+                                className={cn(
+                                  'h-4 w-4 shrink-0 transition-transform duration-200',
+                                  parentDirectlyActive
+                                    ? 'text-sebrae-blue scale-110'
+                                    : 'text-slate-500 group-hover:text-slate-700 group-hover:scale-105'
+                                )}
+                              />
                             )}
                             <span className="min-w-0 flex-1 truncate">{item.name}</span>
                             <ChevronRight
@@ -311,7 +353,7 @@ export function Layout({ children }: LayoutProps) {
 
                           <div
                             className={cn(
-                              'overflow-hidden border-l border-slate-200 ml-[18px] pl-1.5 space-y-0.5 transition-[max-height,opacity] duration-300 ease-out',
+                              'overflow-hidden border-l border-slate-200 ml-[26px] pl-1.5 space-y-0.5 transition-[max-height,opacity] duration-300 ease-out',
                               submenuExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0',
                             )}
                           >
@@ -324,14 +366,14 @@ export function Layout({ children }: LayoutProps) {
                                   to={child.href}
                                   onClick={() => setSidebarOpen(false)}
                                   className={cn(
-                                    'relative flex items-center gap-2 rounded-[7px] py-1.5 pl-[12px] pr-2.5 text-xs font-medium text-slate-550 transition-all duration-200 hover:bg-slate-550/5 hover:text-slate-950',
+                                    'relative flex items-center gap-2 rounded-[7px] py-1.5 pl-[12px] pr-2.5 text-xs font-medium text-slate-600 transition-all duration-200 hover:bg-slate-50 hover:text-slate-955',
                                     childActive && 'bg-sebrae-blue/5 font-semibold text-sebrae-navy pl-5',
                                   )}
                                 >
                                   {childActive && (
                                     <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] bg-sebrae-blue rounded-r" />
                                   )}
-                                  <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full bg-slate-250 transition-colors duration-200', childActive && 'bg-sebrae-blue')} />
+                                  <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300 transition-colors duration-200', childActive && 'bg-sebrae-blue')} />
                                   <span className="truncate">{child.name}</span>
                                 </Link>
                               );
@@ -347,12 +389,22 @@ export function Layout({ children }: LayoutProps) {
                         to={item.href}
                         onClick={() => setSidebarOpen(false)}
                         className={cn(
-                          'relative flex items-center gap-[9px] rounded-lg px-3.5 py-2.5 text-sm font-medium text-slate-600 no-underline transition-all duration-200 hover:bg-slate-50 hover:text-slate-950',
+                          'relative flex items-center gap-[9px] rounded-lg px-3.5 py-2.5 text-sm font-medium text-slate-700 no-underline transition-all duration-200 hover:bg-slate-50 hover:text-slate-955 group',
                           active && 'bg-sebrae-blue/10 text-sebrae-navy font-bold pl-5',
                         )}
                       >
                         {active && (
                           <span className="absolute left-0 top-2 bottom-2 w-[3px] bg-sebrae-blue rounded-r" />
+                        )}
+                        {ItemIcon && (
+                          <ItemIcon
+                            className={cn(
+                              'h-4 w-4 shrink-0 transition-transform duration-200',
+                              active
+                                ? 'text-sebrae-blue scale-110'
+                                : 'text-slate-500 group-hover:text-slate-700 group-hover:scale-105'
+                            )}
+                          />
                         )}
                         <span className="truncate">{item.name}</span>
                       </Link>
@@ -364,31 +416,9 @@ export function Layout({ children }: LayoutProps) {
           })}
         </nav>
 
-        <div className="shrink-0 border-t border-slate-100 bg-slate-50/50 p-4 text-xs text-slate-500 flex flex-col gap-3">
-          {isAuthLoading ? (
-            <div className="h-[42px] animate-pulse rounded-lg bg-slate-100" />
-          ) : session ? (
-            <div className="space-y-2.5">
-              <div className="flex min-w-0 items-center gap-2.5 rounded-lg bg-white border border-slate-200 px-3 py-2 shadow-sm">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-xs font-semibold text-slate-800">{userEmail || 'Sessão autenticada'}</div>
-                  <div className="truncate text-[10px] text-slate-500">Conta ativa</div>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                disabled={isSigningOut}
-                onClick={() => void handleSignOut()}
-                className="w-full text-slate-700 hover:text-slate-950 hover:bg-slate-100 border border-slate-200 py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all text-xs font-semibold bg-white shadow-sm"
-              >
-                <LogOut className="h-3.5 w-3.5 text-sebrae-blue" />
-                <span>{isSigningOut ? 'Saindo...' : 'Sair do Sistema'}</span>
-              </button>
-            </div>
-          ) : null}
-          <div className="flex items-center justify-between mt-1 text-[10px]">
-            <span>Versão do BaSe</span>
+        <div className="shrink-0 border-t border-slate-100 bg-slate-50/50 p-4 text-xs text-slate-500 flex flex-col gap-2.5">
+          <div className="flex items-center justify-between text-[10px]">
+            <span>Versão do Beta</span>
             <span className="font-mono text-[10px] text-slate-600">v2.1.4</span>
           </div>
           <div className="text-[10px] leading-tight text-slate-400">
@@ -424,16 +454,55 @@ export function Layout({ children }: LayoutProps) {
             </label>
 
             <div className="min-w-0">
-              <div id="header-subtitle" className="truncate text-sm font-bold text-sebrae-navy tracking-tight empty:hidden" />
+              <div id="header-subtitle" className="truncate text-[10px] md:text-[11px] text-muted-gray font-semibold uppercase tracking-[0.14em] empty:hidden" />
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
+            {/* dynamic page action buttons (eg sync) */}
+            <div id="header-actions" className="flex items-center gap-2" />
+
+            {/* Help/WCAG Badge */}
             <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-full text-[10px] font-semibold text-emerald-700 select-none">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
               <span>WCAG 2.1 AAA</span>
             </div>
-            <div id="header-actions" className="flex items-center gap-2" />
+
+            {/* Notifications button */}
+            <button 
+              type="button" 
+              className="p-1.5 hover:bg-slate-100 rounded-full text-muted-gray hover:text-ink-legacy transition-colors relative"
+              title="Notificações"
+            >
+              <Bell className="w-4 h-4 md:w-4.5 md:h-4.5" />
+              <span className="absolute top-1 right-1 w-2 h-2 bg-sebrae-gold rounded-full border border-white" />
+            </button>
+
+            {/* User Profile Info & Logout */}
+            {session && (
+              <div className="flex items-center gap-2 md:gap-2.5 pl-2 md:pl-3 border-l border-slate-200">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-sebrae-blue to-ifrn-green flex items-center justify-center text-white font-bold text-xs shadow shrink-0 select-none">
+                  {userEmail ? userEmail.substring(0, 1).toUpperCase() : 'U'}
+                </div>
+                <div className="flex flex-col text-right hidden sm:flex">
+                  <span className="text-xs font-semibold text-ink-legacy leading-none">
+                    {userEmail ? userEmail.split('@')[0] : 'Usuário'}
+                  </span>
+                  <span className="text-[10px] text-muted-gray">
+                    {userEmail || ''}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  disabled={isSigningOut}
+                  onClick={() => void handleSignOut()}
+                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors ml-1 hidden sm:block"
+                  title="Sair do sistema"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
         </header>
 

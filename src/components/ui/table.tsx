@@ -9,16 +9,16 @@ const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableE
 ));
 Table.displayName = 'Table';
 
-const TableHeader = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(({ className, ...props }, ref) => <thead ref={ref} className={cn('bg-surface-subtle/70 text-text-secondary', className)} {...props} />);
+const TableHeader = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(({ className, ...props }, ref) => <thead ref={ref} className={cn('bg-slate-50/75 dark:bg-slate-900/50 border-b border-border-default/60', className)} {...props} />);
 TableHeader.displayName = 'TableHeader';
 
 const TableBody = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(({ className, ...props }, ref) => <tbody ref={ref} className={cn('[&_tr:last-child]:border-0', className)} {...props} />);
 TableBody.displayName = 'TableBody';
 
-const TableFooter = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(({ className, ...props }, ref) => <tfoot ref={ref} className={cn('border-t border-border-default/55 bg-surface-subtle/60 font-medium text-text-primary [&>tr]:last:border-b-0', className)} {...props} />);
+const TableFooter = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(({ className, ...props }, ref) => <tfoot ref={ref} className={cn('border-t border-border-default/60 bg-slate-50/40 dark:bg-slate-900/30 font-medium text-text-primary [&>tr]:last:border-b-0', className)} {...props} />);
 TableFooter.displayName = 'TableFooter';
 
-const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTMLTableRowElement>>(({ className, ...props }, ref) => <tr ref={ref} className={cn('border-b border-border-default/55 transition-colors hover:bg-surface-subtle/60 data-[state=selected]:bg-surface-subtle/80', className)} {...props} />);
+const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTMLTableRowElement>>(({ className, ...props }, ref) => <tr ref={ref} className={cn('border-b border-border-default/50 transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-900/40 data-[state=selected]:bg-slate-100/50 dark:data-[state=selected]:bg-slate-900/60', className)} {...props} />);
 TableRow.displayName = 'TableRow';
 
 const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<HTMLTableCellElement>>(({ className, ...props }, ref) => <th ref={ref} className={cn('label-eyebrow h-11 px-4 text-left align-middle text-text-secondary [&:has([role=checkbox])]:pr-0', className)} {...props} />);
