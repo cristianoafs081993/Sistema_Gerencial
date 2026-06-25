@@ -130,7 +130,7 @@ const MEASURE_ALIASES: Record<string, string> = {
   HORAS: 'H',
 };
 
-const METHOD_LABELS: Record<PriceResearchMethod, string> = {
+export const METHOD_LABELS: Record<PriceResearchMethod, string> = {
   median: 'Mediana',
   mean: 'Média',
   minimum: 'Menor preço',

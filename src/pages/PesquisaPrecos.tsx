@@ -1,23 +1,29 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Bot,
+  Calendar,
   CheckCircle2,
   Download,
   ExternalLink,
   FileDown,
   FileSpreadsheet,
+  FolderOpen,
   Loader2,
+  Pencil,
+  Plus,
   Printer,
   RefreshCw,
   Save,
   Search,
   ShieldCheck,
   Sparkles,
+  Trash2,
   Upload,
+  User,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -38,6 +44,7 @@ import {
   exportPriceResearchWorkbook,
   getEstimatedUnitPrice,
   getSelectedStatistics,
+  METHOD_LABELS,
   parsePriceResearchFile,
   validatePriceResearchReport,
   type PriceResearchCandidate,
@@ -79,7 +86,6 @@ export default function PesquisaPrecos() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [researchId, setResearchId] = useState<string>();
   const [activeStep, setActiveStep] = useState(1);
-  const [title, setTitle] = useState('Relatório de Pesquisa de Preços');
   const [processNumber, setProcessNumber] = useState('');
   const [objectDescription, setObjectDescription] = useState('');
   const [responsibleName, setResponsibleName] = useState('');
@@ -96,6 +102,42 @@ export default function PesquisaPrecos() {
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [loadingResearchId, setLoadingResearchId] = useState<string>();
+
+  const [viewMode, setViewMode] = useState<'list' | 'wizard'>('list');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
+
+  const deleteResearch = async (id: string) => {
+    if (!window.confirm('Tem certeza de que deseja excluir esta pesquisa de preços? Isso removerá permanentemente o relatório e todos os itens orçados.')) return;
+    setIsDeletingId(id);
+    try {
+      await priceResearchService.delete(id);
+      await queryClient.invalidateQueries({ queryKey: ['price-researches'] });
+      toast.success('Pesquisa de preços excluída com sucesso.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível excluir a pesquisa.');
+    } finally {
+      setIsDeletingId(null);
+    }
+  };
+
+  const startNewResearch = () => {
+    setResearchId(undefined);
+    setActiveStep(1);
+    setProcessNumber('');
+    setObjectDescription('');
+    setResponsibleName('');
+    setResearchDate(today());
+    setMethod('median');
+    setMethodologyJustification(
+      'A mediana foi adotada por reduzir o efeito de valores extremos, após análise crítica da comparabilidade das especificações, unidades e quantidades.',
+    );
+    setNotes('');
+    setSourceFile('');
+    setItems([]);
+    setSelectedItemId(undefined);
+    setViewMode('wizard');
+  };
 
   const { data: recentResearches = [], isFetching: isFetchingRecent } = useQuery({
     queryKey: ['price-researches'],
@@ -117,7 +159,7 @@ export default function PesquisaPrecos() {
   );
 
   const reportData = useMemo<PriceResearchReportData>(() => ({
-    title,
+    title: objectDescription || 'Pesquisa de Preços',
     processNumber,
     objectDescription,
     responsibleName,
@@ -137,7 +179,6 @@ export default function PesquisaPrecos() {
     researchDate,
     responsibleName,
     sourceFile,
-    title,
   ]);
 
   const updateItem = (localId: string, patch: Partial<PriceResearchItem>) => {
@@ -257,6 +298,27 @@ export default function PesquisaPrecos() {
     }
   };
 
+  const hasTriggeredSearch = useRef(false);
+
+  useEffect(() => {
+    if (activeStep === 3) {
+      // Se todos os itens já foram buscados com sucesso, avança imediatamente para a etapa 4
+      const allSuccess = items.length > 0 && items.every((item) => item.searchStatus === 'success');
+      if (allSuccess) {
+        setActiveStep(4);
+        return;
+      }
+
+      const hasPendingSearch = items.some((item) => item.searchStatus === 'idle' || item.searchStatus === 'error');
+      if (hasPendingSearch && !isSearching && !hasTriggeredSearch.current) {
+        hasTriggeredSearch.current = true;
+        void searchPrices();
+      }
+    } else {
+      hasTriggeredSearch.current = false;
+    }
+  }, [activeStep, items, isSearching]);
+
   const saveResearch = async (status: 'review' | 'completed' = 'review', silent = false) => {
     if (items.length === 0) {
       if (!silent) toast.error('Importe uma planilha antes de salvar.');
@@ -349,7 +411,6 @@ export default function PesquisaPrecos() {
       const record = await priceResearchService.getById(id);
       if (!record) throw new Error('Pesquisa não encontrada.');
       setResearchId(record.id);
-      setTitle(record.title);
       setProcessNumber(record.processNumber);
       setObjectDescription(record.objectDescription);
       setResponsibleName(record.responsibleName);
@@ -371,7 +432,8 @@ export default function PesquisaPrecos() {
       } else {
         setActiveStep(2); // Vai para catalogação se faltam códigos
       }
-      
+
+      setViewMode('wizard');
       toast.success('Pesquisa carregada com sucesso.');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Não foi possível abrir a pesquisa.');
@@ -383,7 +445,6 @@ export default function PesquisaPrecos() {
   // Compila erros de validação da IN 65/2021
   const validationErrors = useMemo(() => {
     const errors: Array<{ type: string; message: string; itemId?: string }> = [];
-    if (!title.trim()) errors.push({ type: 'meta', message: 'Título do relatório não preenchido.' });
     if (!processNumber.trim()) errors.push({ type: 'meta', message: 'Número do processo não informado.' });
     if (!responsibleName.trim()) errors.push({ type: 'meta', message: 'Agente responsável não informado.' });
     if (!objectDescription.trim()) errors.push({ type: 'meta', message: 'Descrição do objeto não informada.' });
@@ -408,66 +469,258 @@ export default function PesquisaPrecos() {
       }
     }
     return errors;
-  }, [items, title, processNumber, responsibleName, objectDescription, methodologyJustification]);
+  }, [items, processNumber, responsibleName, objectDescription, methodologyJustification]);
+
+  const totalCount = recentResearches.length;
+  const reviewCount = recentResearches.filter((r) => r.status !== 'completed').length;
+  const completedCount = recentResearches.filter((r) => r.status === 'completed').length;
+
+  const filteredResearches = useMemo(() => {
+    if (!searchTerm.trim()) return recentResearches;
+    const term = searchTerm.toLowerCase();
+    return recentResearches.filter(
+      (r) =>
+        r.processNumber.toLowerCase().includes(term) ||
+        r.responsibleName.toLowerCase().includes(term) ||
+        (r.objectDescription && r.objectDescription.toLowerCase().includes(term))
+    );
+  }, [recentResearches, searchTerm]);
 
   return (
     <div className="space-y-6 pb-10">
       <HeaderSubtitle>Pesquisa de preços com fontes oficiais e revisão humana</HeaderSubtitle>
-      
-      {/* Visual Stepper Wizard (5 Etapas) */}
-      <div className="border border-border-default bg-surface-card rounded-radius-lg p-4 shadow-soft">
-        <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-4">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 w-full">
+
+      {viewMode === 'list' ? (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {/* Header Panel / Dashboard Welcome */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-surface-card border border-border-subtle/70 rounded-radius-xl shadow-soft">
+            <div className="space-y-1">
+              <h3 className="text-xl font-bold text-sebrae-navy">Pesquisas de Preços</h3>
+              <p className="text-sm text-text-muted">
+                Histórico e gerenciamento de estimativas de preços oficiais sob a IN SEGES/ME nº 65/2021.
+              </p>
+            </div>
+            <Button
+              type="button"
+              className="btn-primary gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-sm h-10 px-4 rounded-radius-md transition-all shrink-0 flex items-center justify-center shadow-md shadow-primary/20"
+              onClick={startNewResearch}
+            >
+              <Plus className="h-4 w-4" />
+              Iniciar Nova Pesquisa
+            </Button>
+          </div>
+
+          {/* Search & Filter Bar */}
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+            <Input
+              type="text"
+              placeholder="Buscar por título, processo ou responsável..."
+              className="pl-10 h-10 text-sm bg-surface-card border border-border-default focus-visible:ring-2 focus-visible:ring-sebrae-blue"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          {/* Main Listing Section */}
+          {isFetchingRecent && recentResearches.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 bg-surface-card border border-border-default rounded-radius-lg">
+              <Loader2 className="h-8 w-8 animate-spin text-sebrae-blue" />
+              <p className="mt-4 text-sm text-text-secondary">Carregando pesquisas recentes...</p>
+            </div>
+          ) : filteredResearches.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 bg-surface-card border border-border-default rounded-radius-lg text-center p-6">
+              <div className="p-4 bg-slate-100 rounded-full text-slate-400 mb-4">
+                <Search className="h-8 w-8" />
+              </div>
+              <h4 className="text-base font-bold text-sebrae-navy">Nenhuma pesquisa encontrada</h4>
+              <p className="text-sm text-text-muted mt-1 max-w-sm">
+                {searchTerm
+                  ? 'Nenhum resultado corresponde à sua busca. Tente buscar por outros termos.'
+                  : 'Nenhuma pesquisa de preços foi iniciada ainda no sistema.'}
+              </p>
+              {!searchTerm && (
+                <Button type="button" className="btn-primary mt-4 bg-sebrae-blue text-white" onClick={startNewResearch}>
+                  <Plus className="h-4 w-4 mr-2" /> Iniciar Primeira Pesquisa
+                </Button>
+              )}
+            </div>
+          ) : (
+            <DataTablePanel>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[250px]">Objeto da Contratação</TableHead>
+                    <TableHead>Processo</TableHead>
+                    <TableHead>Responsável</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right w-24">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredResearches.map((record) => {
+                    const isCompleted = record.status === 'completed';
+                    return (
+                      <TableRow key={record.id} className="hover:bg-surface-subtle/40">
+                        <TableCell className="max-w-[350px]">
+                          <p className="font-ui text-sm font-bold text-sebrae-navy truncate" title={record.objectDescription || ''}>
+                            {record.objectDescription || 'Sem objeto descrito'}
+                          </p>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs font-semibold text-text-secondary">
+                          {record.processNumber || '-'}
+                        </TableCell>
+                        <TableCell className="font-ui text-xs text-text-secondary">
+                          {record.responsibleName || '-'}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs text-text-secondary">
+                          {formatDate(record.researchDate)}
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
+                              isCompleted
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                : 'bg-amber-50 text-amber-700 border border-amber-100'
+                            }`}
+                          >
+                            {isCompleted ? 'Concluída' : 'Em Revisão'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex gap-1 justify-end items-center">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-sebrae-blue hover:text-white hover:bg-sebrae-blue rounded-full transition-all flex items-center justify-center"
+                              onClick={() => void loadResearch(record.id)}
+                              disabled={loadingResearchId === record.id || isDeletingId === record.id}
+                              title="Editar Pesquisa"
+                            >
+                              {loadingResearchId === record.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Pencil className="h-4 w-4" />
+                              )}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-white hover:bg-destructive rounded-full transition-all flex items-center justify-center"
+                              onClick={() => void deleteResearch(record.id)}
+                              disabled={loadingResearchId === record.id || isDeletingId === record.id}
+                              title="Excluir Pesquisa"
+                            >
+                              {isDeletingId === record.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </DataTablePanel>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {/* Voltar para a lista */}
+          <div className="flex items-center">
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-1.5 text-xs text-text-secondary hover:text-sebrae-blue border-border-default hover:border-sebrae-blue/30 font-semibold px-3 h-8 rounded-md transition-all"
+              onClick={() => {
+                setViewMode('list');
+                void queryClient.invalidateQueries({ queryKey: ['price-researches'] });
+              }}
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Voltar para a Lista
+            </Button>
+          </div>
+
+          {/* Visual Stepper Wizard (4 Etapas) - Timeline Progress Style */}
+      <div className="w-full py-4 mb-6">
+        <div className="max-w-4xl mx-auto space-y-3">
+          {/* Grid of Columns for Labels */}
+          <div className="grid grid-cols-4 text-center text-xs md:text-sm font-ui">
             {[
-              { number: 1, label: '1. Identificação', desc: 'Metadados e Carga' },
-              { number: 2, label: '2. Catálogo', desc: 'Mapeamento CATMAT/SER' },
-              { number: 3, label: '3. Busca', desc: 'Consulta de Preços' },
-              { number: 4, label: '4. Curadoria', desc: 'Seleção de Referências' },
-              { number: 5, label: '5. Relatório', desc: 'Validação e Fechamento' },
+              { wizardNumber: 1, label: '1. Identificação', targetSteps: [1] },
+              { wizardNumber: 2, label: '2. Catálogo', targetSteps: [2] },
+              { wizardNumber: 3, label: '3. Curadoria', targetSteps: [3, 4] },
+              { wizardNumber: 4, label: '4. Relatório', targetSteps: [5] },
             ].map((step) => {
-              const isCompleted = step.number < activeStep;
-              const isActive = step.number === activeStep;
+              const isCompleted = Math.min(...step.targetSteps) < activeStep && !step.targetSteps.includes(activeStep);
+              const isActive = step.targetSteps.includes(activeStep);
               
               // Determina se pode clicar diretamente no botão
-              let isSelectable = step.number === 1;
-              if (step.number === 2) {
+              let isSelectable = false;
+              if (step.wizardNumber === 1) {
+                isSelectable = true;
+              } else if (step.wizardNumber === 2) {
                 isSelectable = items.length > 0;
-              } else if (step.number === 3) {
+              } else if (step.wizardNumber === 3) {
                 isSelectable = items.length > 0 && items.every(i => i.catalogCode);
-              } else if (step.number >= 4) {
+              } else if (step.wizardNumber === 4) {
                 isSelectable = items.length > 0 && items.every(i => i.catalogCode) && items.every(i => i.searchStatus !== 'idle');
               }
-              
+
+              const handleWizardClick = () => {
+                if (step.wizardNumber === 3) {
+                  // Se o usuário clicar em "Curadoria":
+                  // Se a busca já foi feita (nenhum item 'idle'), vai direto para a etapa 4.
+                  // Se a busca não foi feita, vai para a etapa 3 (transição/busca) para disparar a busca!
+                  const hasSearch = items.every(item => item.searchStatus !== 'idle');
+                  goToStep(hasSearch ? 4 : 3);
+                } else if (step.wizardNumber === 4) {
+                  goToStep(5);
+                } else {
+                  goToStep(step.wizardNumber);
+                }
+              };
+
               return (
                 <button
-                  key={step.number}
+                  key={step.wizardNumber}
                   type="button"
                   disabled={!isSelectable}
-                  onClick={() => goToStep(step.number)}
-                  className={`flex items-start gap-2.5 text-left p-3 rounded-radius-md border transition-all ${
+                  onClick={handleWizardClick}
+                  className={`font-sans text-xs md:text-sm font-bold transition-all px-1 truncate ${
                     isActive
-                      ? 'border-primary bg-primary/[0.04] text-primary shadow-sm'
+                      ? 'text-sebrae-blue font-extrabold text-[13px] md:text-[14px]'
                       : isCompleted
-                      ? 'border-primary/20 bg-surface-subtle/40 text-text-primary'
-                      : 'border-border-default bg-surface-subtle/10 text-text-muted opacity-60'
-                  } ${isSelectable ? 'hover:opacity-100 cursor-pointer' : 'cursor-not-allowed'}`}
+                      ? 'text-sebrae-blue/80 hover:text-sebrae-navy font-semibold'
+                      : 'text-slate-400 font-semibold'
+                  } ${isSelectable ? 'cursor-pointer hover:opacity-90' : 'cursor-not-allowed'}`}
                 >
-                  <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors ${
-                    isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : isCompleted
-                      ? 'bg-primary/25 text-primary'
-                      : 'bg-surface-subtle border border-border-default text-text-muted'
-                  }`}>
-                    {isCompleted ? '✓' : step.number}
-                  </span>
-                  <div className="min-w-0">
-                    <p className={`font-ui text-xs font-bold leading-none truncate ${isActive ? 'text-primary' : 'text-text-primary'}`}>{step.label}</p>
-                    <p className="font-ui text-[10px] text-text-secondary mt-1 truncate">{step.desc}</p>
-                  </div>
+                  {step.label}
                 </button>
               );
             })}
+          </div>
+
+          {/* Continuous Progress Bar aligned with column centers */}
+          <div className="relative w-full">
+            <div className="w-full h-[6px] bg-slate-200/60 rounded-full overflow-hidden relative">
+              <div
+                className="absolute top-0 left-0 h-full bg-sebrae-blue rounded-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-sm"
+                style={{
+                  width: activeStep === 1 ? '12.5%' :
+                         activeStep === 2 ? '37.5%' :
+                         activeStep === 3 || activeStep === 4 ? '62.5%' :
+                         '100%'
+                }}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -509,26 +762,22 @@ export default function PesquisaPrecos() {
           >
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <div className="space-y-2 xl:col-span-2">
-                <Label htmlFor="research-title">Título do Relatório</Label>
-                <Input id="research-title" value={title} onChange={(event) => setTitle(event.target.value)} />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="research-process">Número do Processo</Label>
                 <Input id="research-process" value={processNumber} onChange={(event) => setProcessNumber(event.target.value)} placeholder="23035.000000/2026-00" />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 xl:col-span-2">
                 <Label htmlFor="research-date">Data da Pesquisa</Label>
                 <Input id="research-date" type="date" value={researchDate} onChange={(event) => setResearchDate(event.target.value)} />
               </div>
-              <div className="space-y-2 xl:col-span-2">
+              <div className="space-y-2 xl:col-span-4">
                 <Label htmlFor="research-object">Objeto da Contratação</Label>
                 <Textarea id="research-object" value={objectDescription} onChange={(event) => setObjectDescription(event.target.value)} rows={3} placeholder="Descrição sucinta do objeto..." />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 xl:col-span-2">
                 <Label htmlFor="research-responsible">Agente Responsável</Label>
                 <Input id="research-responsible" value={responsibleName} onChange={(event) => setResponsibleName(event.target.value)} />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 xl:col-span-2">
                 <Label>Método Estatístico</Label>
                 <Select value={method} onValueChange={(value) => setMethod(value as PriceResearchMethod)}>
                   <SelectTrigger aria-label="Método de cálculo"><SelectValue /></SelectTrigger>
@@ -817,41 +1066,41 @@ export default function PesquisaPrecos() {
         <div className="space-y-6 animate-in fade-in duration-200">
           <SectionPanel
             title="Consulta de Preços Homologados"
-            description="Dispare a consulta à API de Compras do Governo Federal (últimos 12 meses) com base nos códigos CATMAT/CATSER mapeados."
+            description="A consulta à API de Compras do Governo Federal (últimos 12 meses) é disparada automaticamente com base nos códigos CATMAT/CATSER mapeados."
           >
             <div className="space-y-3">
-              <p className="font-ui text-xs font-semibold text-text-muted uppercase tracking-wider px-1">Progresso da Busca por Item</p>
+              <p className="font-ui text-xs font-semibold text-slate-500 uppercase tracking-wider px-1">Progresso da Busca por Item</p>
               {items.map((item) => (
-                <div key={item.localId} className="flex items-center justify-between p-3.5 rounded-radius-lg border border-border-default bg-surface-card shadow-sm">
+                <div key={item.localId} className="flex items-center justify-between p-3.5 rounded-xl border border-border-light bg-white shadow-sm hover:border-slate-300 transition-all">
                   <div className="flex items-center gap-3">
-                    <span className="font-ui text-xs font-bold text-text-primary">Item {item.itemNumber}</span>
-                    <p className="font-ui text-xs text-text-secondary truncate max-w-[320px]" title={item.description}>{item.description}</p>
+                    <span className="font-ui text-xs font-bold text-sebrae-navy">Item {item.itemNumber}</span>
+                    <p className="font-ui text-xs text-slate-700 truncate max-w-[320px]" title={item.description}>{item.description}</p>
                   </div>
                   <div className="flex items-center gap-4">
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-xs font-semibold border-slate-200 text-slate-600 bg-slate-50">
                       {item.catalogType === 'material' ? 'CATMAT' : 'CATSER'} {item.catalogCode}
                     </Badge>
                     {item.searchStatus === 'searching' && (
-                      <div className="flex items-center gap-1.5 text-xs text-primary font-medium">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <div className="flex items-center gap-1.5 text-xs text-sebrae-blue font-semibold">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-sebrae-blue" />
                         Consultando API...
                       </div>
                     )}
                     {item.searchStatus === 'success' && (
-                      <div className="flex items-center gap-1.5 text-xs text-primary font-semibold">
-                        <span className="text-primary font-bold">✓</span>
+                      <div className="flex items-center gap-1.5 text-xs text-ifrn-green font-bold">
+                        <span className="text-ifrn-green font-extrabold text-sm">✓</span>
                         {item.candidates.length} cotações encontradas
                       </div>
                     )}
                     {item.searchStatus === 'error' && (
-                      <div className="flex items-center gap-1.5 text-xs text-destructive font-semibold" title={item.searchError}>
-                        <AlertTriangle className="h-3.5 w-3.5" />
+                      <div className="flex items-center gap-1.5 text-xs text-red-600 font-semibold" title={item.searchError}>
+                        <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
                         Falhou
                       </div>
                     )}
                     {item.searchStatus === 'idle' && (
-                      <div className="flex items-center gap-1.5 text-xs text-text-muted">
-                        <span className="h-2 w-2 rounded-full bg-border-default"></span>
+                      <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                        <span className="h-2 w-2 rounded-full bg-slate-300 animate-pulse"></span>
                         Aguardando disparo
                       </div>
                     )}
@@ -860,33 +1109,56 @@ export default function PesquisaPrecos() {
               ))}
             </div>
 
-            {/* Painel de Disparo */}
-            <div className="mt-6 border border-border-default bg-surface-card rounded-radius-lg p-5 flex flex-col md:flex-row items-center justify-between gap-4 shadow-soft">
-              <div className="text-center md:text-left">
-                <h4 className="font-ui text-sm font-semibold text-text-primary">Buscar Cotações no Compras.gov</h4>
-                <p className="font-ui text-xs text-text-secondary mt-0.5">Duração aproximada: 5 a 15 segundos. A pesquisa consultará os códigos listados acima.</p>
+            {/* Dynamic Search Feedback Panel */}
+            {isSearching ? (
+              <div className="mt-6 border border-[#E2E8F0] bg-white rounded-xl p-5 flex items-center gap-4 shadow-sm animate-pulse">
+                <Loader2 className="h-6 h-6 animate-spin text-sebrae-blue" />
+                <div>
+                  <h4 className="font-ui text-sm font-bold text-sebrae-navy">Pesquisa em Andamento</h4>
+                  <p className="font-ui text-xs text-slate-500 mt-0.5">Buscando cotações oficiais no Compras.gov... Por favor, aguarde de 5 a 15 segundos.</p>
+                </div>
               </div>
-              <Button
-                type="button"
-                className="gap-2 bg-primary hover:bg-primary-hover text-primary-foreground font-semibold"
-                onClick={() => void searchPrices()}
-                disabled={isSearching}
-              >
-                {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                {isSearching ? 'Pesquisando base oficial...' : 'Disparar Busca Geral'}
-              </Button>
-            </div>
+            ) : items.some((item) => item.searchStatus === 'error') ? (
+              <div className="mt-6 border border-red-200 bg-red-50/30 rounded-xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="h-6 w-6 text-red-600 shrink-0" />
+                  <div>
+                    <h4 className="font-ui text-sm font-bold text-red-950">Algumas consultas falharam</h4>
+                    <p className="font-ui text-xs text-red-800 mt-0.5">Houve uma instabilidade ao conectar com a API oficial. Você pode tentar novamente.</p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  className="gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-xs h-9 px-4 rounded-lg shadow-sm"
+                  onClick={() => {
+                    hasTriggeredSearch.current = true;
+                    void searchPrices();
+                  }}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Tentar Novamente
+                </Button>
+              </div>
+            ) : items.every((item) => item.searchStatus === 'idle') ? (
+              <div className="mt-6 border border-border-light bg-white rounded-xl p-5 flex items-center gap-4 shadow-sm">
+                <Loader2 className="h-5 h-5 animate-spin text-slate-400" />
+                <div>
+                  <h4 className="font-ui text-sm font-bold text-slate-700">Inicializando busca...</h4>
+                  <p className="font-ui text-xs text-slate-500 mt-0.5">Aguardando início da consulta automatizada.</p>
+                </div>
+              </div>
+            ) : null}
 
             {/* Banner de Sucesso pós Busca */}
             {items.length > 0 && items.every((i) => i.searchStatus === 'success') && (
-              <div className="mt-4 rounded-radius-lg border border-primary/20 bg-primary/[0.02] p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex gap-2.5 text-primary text-xs leading-normal">
-                  <CheckCircle2 className="h-5 w-5 shrink-0 text-primary mt-0.5" />
+              <div className="mt-6 rounded-xl border border-ifrn-green/20 bg-ifrn-green/[0.02] p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex gap-2.5 text-ifrn-green text-xs leading-normal">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-ifrn-green mt-0.5" />
                   <div>
                     <span className="font-bold">Pesquisa Finalizada com Sucesso!</span> Todas as cotações oficiais foram baixadas e analisadas.
                   </div>
                 </div>
-                <Button type="button" className="gap-1.5 text-xs bg-primary text-primary-foreground" onClick={() => goToStep(4)}>
+                <Button type="button" className="gap-1.5 text-xs bg-sebrae-blue text-white hover:bg-sebrae-navy" onClick={() => goToStep(4)}>
                   Avançar para Curadoria
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Button>
@@ -1207,12 +1479,18 @@ export default function PesquisaPrecos() {
       )}
 
       {/* WIZARD NAVIGATION FOOTER */}
-      <div className="flex justify-between items-center border-t border-border-default pt-6 mt-6">
+      <div className="flex justify-between items-center border-t border-border-light pt-6 mt-6">
         <Button
           type="button"
           variant="outline"
-          className="gap-2 font-semibold text-xs h-10"
-          onClick={() => goToStep(activeStep - 1)}
+          className="gap-2 font-semibold text-xs h-10 hover:text-sebrae-blue hover:border-sebrae-blue/30"
+          onClick={() => {
+            if (activeStep === 4 || activeStep === 3) {
+              goToStep(2);
+            } else {
+              goToStep(activeStep - 1);
+            }
+          }}
           disabled={activeStep === 1}
         >
           <ArrowLeft className="h-4 w-4" />
@@ -1222,7 +1500,7 @@ export default function PesquisaPrecos() {
           {activeStep < 5 ? (
             <Button
               type="button"
-              className="gap-2 bg-primary hover:bg-primary-hover text-primary-foreground font-semibold text-xs h-10"
+              className="gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-xs h-10 transition-all"
               onClick={() => goToStep(activeStep + 1)}
               disabled={items.length === 0}
             >
@@ -1232,7 +1510,7 @@ export default function PesquisaPrecos() {
           ) : (
             <Button
               type="button"
-              className="gap-2 bg-primary hover:bg-primary-hover text-primary-foreground font-semibold text-xs h-10"
+              className="gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-xs h-10 transition-all"
               onClick={() => void printReport()}
               disabled={items.length === 0 || isSaving}
             >
@@ -1242,6 +1520,8 @@ export default function PesquisaPrecos() {
           )}
         </div>
       </div>
+      </div>
+      )}
     </div>
   );
 }

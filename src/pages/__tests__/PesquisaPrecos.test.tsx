@@ -98,11 +98,16 @@ function renderPage() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return render(
+  const renderResult = render(
     <QueryClientProvider client={queryClient}>
       <PesquisaPrecos />
     </QueryClientProvider>,
   );
+  const startBtn = screen.queryByRole('button', { name: /Iniciar Nova Pesquisa/i });
+  if (startBtn) {
+    fireEvent.click(startBtn);
+  }
+  return renderResult;
 }
 
 describe('PesquisaPrecos', () => {
@@ -127,7 +132,6 @@ describe('PesquisaPrecos', () => {
 
     expect((await screen.findAllByText('Café torrado e moído, pacote de 500 g'))[0]).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Avançar/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Disparar Busca Geral/i }));
 
     await waitFor(() => {
       expect(mockedService.search).toHaveBeenCalledWith([
@@ -179,7 +183,6 @@ describe('PesquisaPrecos', () => {
     });
     await screen.findAllByText('Café torrado e moído, pacote de 500 g');
     fireEvent.click(screen.getByRole('button', { name: /Avançar/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Disparar Busca Geral/i }));
     await screen.findByText('Descrição e unidade compatíveis.');
 
     fireEvent.click(screen.getByRole('checkbox', { name: /Usar preço 1/i }));
