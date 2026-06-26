@@ -37,6 +37,34 @@ const statusLabel: Record<PendenciaStatus, string> = {
   conta_divergente: 'Conta divergente',
 };
 
+function CopyButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!value) return;
+    navigator.clipboard.writeText(value);
+    setCopied(true);
+    toast.success(`Copiado: ${value}`, { duration: 1500 });
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      type="button"
+      className="p-1 rounded text-slate-450 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors inline-flex items-center justify-center shrink-0"
+      title="Copiar"
+    >
+      {copied ? (
+        <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+      ) : (
+        <Copy className="h-3 w-3" />
+      )}
+    </button>
+  );
+}
+
 export default function LCPage() {
   const [rows, setRows] = useState<LCRegistro[]>([]);
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
@@ -460,9 +488,21 @@ export default function LCPage() {
                 ) : (
                   pendenciasPage.map((row, idx) => (
                     <TableRow key={`${row.cpf}-${row.status}-${idx}`} className="border-b border-border-default/30 last:border-0">
-                      <TableCell className="px-4 py-3 text-xs font-mono font-semibold">{row.cpf}</TableCell>
+                      <TableCell className="px-4 py-3 text-xs font-mono font-semibold">
+                        <div className="flex items-center gap-1">
+                          <span>{row.cpf}</span>
+                          <CopyButton value={onlyDigits(row.cpf)} />
+                        </div>
+                      </TableCell>
                       <TableCell className="px-4 py-3 text-xs">{row.nome || '-'}</TableCell>
-                      <TableCell className="px-4 py-3 text-xs font-mono">{row.contaPdf || '-'}</TableCell>
+                      <TableCell className="px-4 py-3 text-xs font-mono">
+                        <div className="flex items-center gap-1">
+                          <span>{row.contaPdf || '-'}</span>
+                          {row.contaPdf && row.contaPdf !== '-' && (
+                            <CopyButton value={onlyDigits(row.contaPdf)} />
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="px-4 py-3 text-xs">
                         <div>{row.nomeLc || '-'}</div>
                         <div className="font-mono text-muted-foreground">{row.contaLc || '-'}</div>
@@ -639,6 +679,7 @@ export default function LCPage() {
                             {currentChunk.map((row, idx) => {
                               const isSeventhRow = idx === 6 || (startIdx + idx + 1) % 7 === 0;
                               const isExpanded = expandedRowId === row.id;
+                              const hasDivergence = row.status === 'aluno_nao_encontrado' || row.status === 'conta_nao_encontrada';
                               
                               let rowClass = 'hover:bg-slate-50/50 dark:hover:bg-slate-850/30';
                               if (row.status === 'aluno_nao_encontrado') {
@@ -656,17 +697,35 @@ export default function LCPage() {
                                     className={`border-b border-slate-100 dark:border-slate-850/50 last:border-0 transition-colors cursor-pointer ${rowClass}`}
                                   >
                                     <TableCell className="px-4 py-2.5 text-xs font-mono flex items-center gap-1.5">
-                                      {padLeft(row.cpf, 11)}
+                                      <span>{padLeft(row.cpf, 11)}</span>
+                                      {hasDivergence && <CopyButton value={row.cpf} />}
                                       {row.status === 'aluno_nao_encontrado' && (
                                         <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-red-100 text-red-800 dark:bg-red-950/80 dark:text-red-300">
                                           Credor não localizado
                                         </span>
                                       )}
                                     </TableCell>
-                                    <TableCell className="px-4 py-2.5 text-xs font-mono">{padLeft(row.selectedBanco, 3)}</TableCell>
-                                    <TableCell className="px-4 py-2.5 text-xs font-mono">{padLeft(row.selectedAgencia, 4)}</TableCell>
+                                    <TableCell className="px-4 py-2.5 text-xs font-mono">
+                                      <div className="flex items-center gap-1">
+                                        <span>{padLeft(row.selectedBanco, 3)}</span>
+                                        {hasDivergence && row.selectedBanco && (
+                                          <CopyButton value={onlyDigits(row.selectedBanco)} />
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="px-4 py-2.5 text-xs font-mono">
+                                      <div className="flex items-center gap-1">
+                                        <span>{padLeft(row.selectedAgencia, 4)}</span>
+                                        {hasDivergence && row.selectedAgencia && (
+                                          <CopyButton value={onlyDigits(row.selectedAgencia)} />
+                                        )}
+                                      </div>
+                                    </TableCell>
                                     <TableCell className="px-4 py-2.5 text-xs font-mono flex items-center gap-1.5">
-                                      {row.selectedConta.replace(/\D/g, '') || <span className="text-red-500 italic">Vazia</span>}
+                                      <span>{row.selectedConta.replace(/\D/g, '') || <span className="text-red-500 italic">Vazia</span>}</span>
+                                      {hasDivergence && row.selectedConta.replace(/\D/g, '') && (
+                                        <CopyButton value={row.selectedConta.replace(/\D/g, '')} />
+                                      )}
                                       {row.status === 'conta_nao_encontrada' && (
                                         <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300">
                                           Conta Divergente
