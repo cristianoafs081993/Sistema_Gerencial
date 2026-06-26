@@ -365,49 +365,55 @@ export default function LCPage() {
 
   return (
     <div className="space-y-6 pb-10">
-      <HeaderActions>
-        {isSuperAdmin ? (
-          <div className="flex items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,.xlsx,.xls"
-              className="hidden"
-              onChange={(e) => handleUpload(e.target.files?.[0])}
-            />
-            <input
-              ref={pdfInputRef}
-              type="file"
-              accept=".pdf"
-              multiple
-              className="hidden"
-              onChange={(e) => handleCompararPdf(e.target.files)}
-            />
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              size="sm"
-              variant="outline"
-              disabled={isUploading}
-              className="gap-space-2 h-space-9 shadow-shadow-sm"
-            >
-              <Upload className="h-4 w-4" />
-              {isUploading ? 'Carregando...' : 'Upload CSV LC'}
-            </Button>
-            <Button
-              onClick={() => pdfInputRef.current?.click()}
-              size="sm"
-              variant="outline"
-              disabled={isComparingPdf}
-              className="gap-space-2 h-space-9 shadow-shadow-sm"
-            >
-              <Upload className="h-4 w-4" />
-              {isComparingPdf ? 'Comparando...' : 'Comparar PDFs de Pagamento'}
-            </Button>
-          </div>
-        ) : null}
-      </HeaderActions>
+      {isSuperAdmin ? (
+        <>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            className="hidden"
+            onChange={(e) => handleUpload(e.target.files?.[0])}
+          />
+          <input
+            ref={pdfInputRef}
+            type="file"
+            accept=".pdf"
+            multiple
+            className="hidden"
+            onChange={(e) => handleCompararPdf(e.target.files)}
+          />
+        </>
+      ) : null}
 
-      <SectionPanel title="Lista de Credores (LC)">
+      <SectionPanel 
+        title="Lista de Credores (LC)"
+        actions={
+          isSuperAdmin ? (
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                size="sm"
+                variant="outline"
+                disabled={isUploading}
+                className="gap-space-2 h-space-9 shadow-shadow-sm"
+              >
+                <Upload className="h-4 w-4" />
+                {isUploading ? 'Carregando...' : 'Upload CSV LC'}
+              </Button>
+              <Button
+                onClick={() => pdfInputRef.current?.click()}
+                size="sm"
+                variant="outline"
+                disabled={isComparingPdf}
+                className="gap-space-2 h-space-9 shadow-shadow-sm"
+              >
+                <Upload className="h-4 w-4" />
+                {isComparingPdf ? 'Comparando...' : 'Comparar PDFs de Pagamento'}
+              </Button>
+            </div>
+          ) : null
+        }
+      >
         <div className="mb-3">
           <span className="text-xs text-muted-foreground">
             {rowsForDisplay.length} registro(s) unico(s)
