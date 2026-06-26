@@ -35,7 +35,12 @@ import {
 } from '@/lib/consultorSessions';
 import { cn } from '@/lib/utils';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+import * as pdfWorkerAsset from 'pdfjs-dist/build/pdf.worker.min.js?url';
+
+const bundledWorkerUrl = (pdfWorkerAsset as { default?: unknown }).default;
+pdfjsLib.GlobalWorkerOptions.workerSrc = typeof bundledWorkerUrl === 'string'
+  ? bundledWorkerUrl
+  : new URL('../../node_modules/pdfjs-dist/build/pdf.worker.min.js', import.meta.url).href;
 
 const loadingTexts = [
   'Analisando normativos do IFRN...',
