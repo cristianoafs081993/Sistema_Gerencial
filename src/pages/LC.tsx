@@ -37,12 +37,12 @@ const statusLabel: Record<PendenciaStatus, string> = {
   conta_divergente: 'Conta divergente',
 };
 
-function CopyButton({ value }: { value: string }) {
+function CopyButton({ value, disabled }: { value: string; disabled?: boolean }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!value) return;
+    if (disabled || !value) return;
     navigator.clipboard.writeText(value);
     setCopied(true);
     toast.success(`Copiado: ${value}`, { duration: 1500 });
@@ -52,9 +52,14 @@ function CopyButton({ value }: { value: string }) {
   return (
     <button
       onClick={handleCopy}
+      disabled={disabled}
       type="button"
-      className="p-1 rounded text-slate-450 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors inline-flex items-center justify-center shrink-0"
-      title="Copiar"
+      className={`p-1 rounded transition-colors inline-flex items-center justify-center shrink-0 ${
+        disabled
+          ? 'text-slate-200 dark:text-slate-800 cursor-not-allowed pointer-events-none'
+          : 'text-slate-455 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800'
+      }`}
+      title={disabled ? 'Selecione a linha para copiar' : 'Copiar'}
     >
       {copied ? (
         <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
@@ -698,7 +703,7 @@ export default function LCPage() {
                                   >
                                     <TableCell className="px-4 py-2.5 text-xs font-mono flex items-center gap-1.5">
                                       <span>{padLeft(row.cpf, 11)}</span>
-                                      {hasDivergence && <CopyButton value={row.cpf} />}
+                                      {hasDivergence && <CopyButton value={row.cpf} disabled={!isExpanded} />}
                                       {row.status === 'aluno_nao_encontrado' && (
                                         <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-red-100 text-red-800 dark:bg-red-950/80 dark:text-red-300">
                                           Credor não localizado
@@ -709,7 +714,7 @@ export default function LCPage() {
                                       <div className="flex items-center gap-1">
                                         <span>{padLeft(row.selectedBanco, 3)}</span>
                                         {hasDivergence && row.selectedBanco && (
-                                          <CopyButton value={onlyDigits(row.selectedBanco)} />
+                                          <CopyButton value={onlyDigits(row.selectedBanco)} disabled={!isExpanded} />
                                         )}
                                       </div>
                                     </TableCell>
@@ -717,14 +722,14 @@ export default function LCPage() {
                                       <div className="flex items-center gap-1">
                                         <span>{padLeft(row.selectedAgencia, 4)}</span>
                                         {hasDivergence && row.selectedAgencia && (
-                                          <CopyButton value={onlyDigits(row.selectedAgencia)} />
+                                          <CopyButton value={onlyDigits(row.selectedAgencia)} disabled={!isExpanded} />
                                         )}
                                       </div>
                                     </TableCell>
                                     <TableCell className="px-4 py-2.5 text-xs font-mono flex items-center gap-1.5">
                                       <span>{row.selectedConta.replace(/\D/g, '') || <span className="text-red-500 italic">Vazia</span>}</span>
                                       {hasDivergence && row.selectedConta.replace(/\D/g, '') && (
-                                        <CopyButton value={row.selectedConta.replace(/\D/g, '')} />
+                                        <CopyButton value={row.selectedConta.replace(/\D/g, '')} disabled={!isExpanded} />
                                       )}
                                       {row.status === 'conta_nao_encontrada' && (
                                         <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300">
