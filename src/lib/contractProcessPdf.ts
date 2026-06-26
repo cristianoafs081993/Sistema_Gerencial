@@ -1,6 +1,10 @@
 import * as pdfjsLib from 'pdfjs-dist';
+import * as pdfWorkerAsset from 'pdfjs-dist/build/pdf.worker.min.js?url';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+const bundledWorkerUrl = (pdfWorkerAsset as { default?: unknown }).default;
+pdfjsLib.GlobalWorkerOptions.workerSrc = typeof bundledWorkerUrl === 'string'
+  ? bundledWorkerUrl
+  : new URL('../../node_modules/pdfjs-dist/build/pdf.worker.min.js', import.meta.url).href;
 
 export type ContractSnippetKind =
   | 'termo-referencia'

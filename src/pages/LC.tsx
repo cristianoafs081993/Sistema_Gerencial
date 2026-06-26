@@ -318,8 +318,7 @@ export default function LCPage() {
             contaPagadora: r.contaPagadora,
             contaFavorecido: r.selectedConta,
             valor: r.valor,
-          }))
-          .slice(0, 7);
+          }));
 
         if (macroRows.length > 0) {
           const generatedFileName = buildMacroFileName(sourcePdfNames);
@@ -661,7 +660,7 @@ export default function LCPage() {
                                       {padLeft(row.cpf, 11)}
                                       {row.status === 'aluno_nao_encontrado' && (
                                         <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-red-100 text-red-800 dark:bg-red-950/80 dark:text-red-300">
-                                          Não no LC
+                                          Credor não localizado
                                         </span>
                                       )}
                                     </TableCell>

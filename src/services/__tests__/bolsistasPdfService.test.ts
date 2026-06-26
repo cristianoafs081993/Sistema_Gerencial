@@ -67,4 +67,63 @@ describe('bolsistasPdfService', () => {
       expect(results[2].cpf).toBe('711.783.284-30');
     });
   });
+
+  describe('extractFromText in New Table Layout (VR R$ format)', () => {
+    it('should parse students from VR R$ layout without OP column', () => {
+      const text = `
+        N°   NOME   MATRÍCULA   SETOR   TURNO   VR R$   CPF  BANCO   AGÊNCIA   OP.   CONTA
+        3   Cailany Vivian Silva de Macedo   20241031160031   Extensão   MAT.   300,00 R$   708.245.154-71   0260   0001   251198763-8
+      `;
+      const results = extractFromText(text, 'doc22.pdf');
+      expect(results).toHaveLength(1);
+      expect(results[0]).toEqual({
+        cpf: '708.245.154-71',
+        nome: 'Cailany Vivian Silva de Macedo',
+        banco: '0260',
+        agencia: '0001',
+        conta: '251198763-8',
+        sourceFile: 'doc22.pdf',
+        valor: 300.00,
+      });
+    });
+
+    it('should parse students from VR R$ layout with OP column (Caixa)', () => {
+      const text = `
+        N°   NOME   MATRÍCULA   SETOR   TURNO   VR R$   CPF  BANCO   AGÊNCIA   OP.   CONTA
+        1   Allyson Fernando Miranda de Castro   20251034010037   DIAD   MAT.   300,00 R$   129.220.414-17   104   3880   1288   718134525-8
+      `;
+      const results = extractFromText(text, 'doc22.pdf');
+      expect(results).toHaveLength(1);
+      expect(results[0].cpf).toBe('129.220.414-17');
+      expect(results[0].banco).toBe('104');
+      expect(results[0].agencia).toBe('3880');
+      expect(results[0].conta).toBe('718134525-8');
+      expect(results[0].valor).toBe(300.00);
+    });
+
+    it('should strip superscript footnote markers from names', () => {
+      const text = `
+        N°   NOME   MATRÍCULA   SETOR   TURNO   VR R$   CPF  BANCO   AGÊNCIA   OP.   CONTA
+        2   Arthur Carvalho Borges ¹   20251031160060   COADES   MAT.   245,00 R$   110.124.444-57   104   3880   1288   718140085-2
+      `;
+      const results = extractFromText(text, 'doc22.pdf');
+      expect(results).toHaveLength(1);
+      expect(results[0].nome).toBe('Arthur Carvalho Borges');
+      expect(results[0].valor).toBe(245.00);
+    });
+
+    it('should parse multiple students with mixed OP presence', () => {
+      const text = `
+        N°   NOME   MATRÍCULA   SETOR   TURNO   VR R$   CPF  BANCO   AGÊNCIA   OP.   CONTA
+        1   Allyson Fernando Miranda de Castro   20251034010037   DIAD   MAT.   300,00 R$   129.220.414-17   104   3880   1288   718134525-8
+        3   Cailany Vivian Silva de Macedo   20241031160031   Extensão   MAT.   300,00 R$   708.245.154-71   0260   0001   251198763-8
+        4   Ediclebson Leomark Medeiros da Silva   20231031160060   NAPNE   MAT.   300,00 R$   174.636.934-57   077   0001   28737112-3
+      `;
+      const results = extractFromText(text, 'doc22.pdf');
+      expect(results).toHaveLength(3);
+      expect(results[0].cpf).toBe('129.220.414-17');
+      expect(results[1].cpf).toBe('708.245.154-71');
+      expect(results[2].cpf).toBe('174.636.934-57');
+    });
+  });
 });

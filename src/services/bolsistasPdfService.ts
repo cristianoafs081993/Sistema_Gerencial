@@ -1,6 +1,10 @@
 import * as pdfjsLib from 'pdfjs-dist';
+import * as pdfWorkerAsset from 'pdfjs-dist/build/pdf.worker.min.js?url';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+const bundledWorkerUrl = (pdfWorkerAsset as { default?: unknown }).default;
+pdfjsLib.GlobalWorkerOptions.workerSrc = typeof bundledWorkerUrl === 'string'
+  ? bundledWorkerUrl
+  : new URL('../../node_modules/pdfjs-dist/build/pdf.worker.min.js', import.meta.url).href;
 
 export interface BolsistaPdfRecord {
   cpf: string;
@@ -48,11 +52,18 @@ function extractFieldAfterLabel(segment: string, labelRegex: RegExp): string {
 }
 
 export function extractFromText(text: string, sourceFile: string): BolsistaPdfRecord[] {
-  const isTableFormat = /MATRÍCULA\s+CPF\s+BANCO/i.test(text) || /VALOR\s+REFERÊNCIA/i.test(text);
+  const cleanText = text.replace(/\s+/g, ' ');
   const found: BolsistaPdfRecord[] = [];
 
-  if (isTableFormat) {
-    const cleanText = text.replace(/\s+/g, ' ');
+  // Layout 1: Old table — headers like "MATRÍCULA CPF BANCO" or "VALOR REFERÊNCIA"
+  // Columns: Seq Nome Matrícula CPF Banco Agência [OP] Conta [Valor]
+  const isOldTableFormat = /MATRÍCULA\s+CPF\s+BANCO/i.test(text) || /VALOR\s+REFERÊNCIA/i.test(text);
+
+  // Layout 2: New table — headers with "VR R$" and "MATRÍCULA"
+  // Columns: N° Nome Matrícula Setor Turno Valor R$ CPF Banco Agência [OP] Conta
+  const isNewTableFormat = !isOldTableFormat && /VR\s+R\$/i.test(text) && /MATRÍCULA/i.test(text);
+
+  if (isOldTableFormat) {
     const studentRegex = /(\d+)\s+([A-ZÀ-ÿ][A-Za-zÀ-ÿ'`´\s.-]{4,80}?)\s+(\d{10,15})\s+(\d{3}\.\d{3}\.\d{3}-\d{2})\s+(\d{2,4})\s+([0-9A-Za-z.-]+)\s+(?:([0-9A-Za-z.-]+)\s+)?([0-9A-Za-z.-]+)\s+(?:R\$\s*)?([0-9.,]+)/g;
     const matches = [...cleanText.matchAll(studentRegex)];
     
@@ -65,17 +76,26 @@ export function extractFromText(text: string, sourceFile: string): BolsistaPdfRe
       const valorStr = m[9].replace(/\./g, '').replace(',', '.');
       const valor = parseFloat(valorStr);
 
-      found.push({
-        cpf,
-        nome,
-        banco,
-        agencia,
-        conta,
-        sourceFile,
-        valor
-      });
+      found.push({ cpf, nome, banco, agencia, conta, sourceFile, valor });
+    }
+  } else if (isNewTableFormat) {
+    // Regex: seq  nome  matrícula  setor  turno  valor R$  CPF  banco  agência  [op]  conta
+    const studentRegex = /(\d{1,3})\s+([A-ZÀ-ÿ][A-Za-zÀ-ÿ'`´\s.²¹³-]{4,80}?)\s+(\d{10,15})\s+([A-Za-zÀ-ÿ.\s]+?)\s+(?:MAT\.|VESP\.|NOT\.)\s+([0-9.,]+)\s*R\$\s+(\d{3}\.\d{3}\.\d{3}-\d{2})\s+(\d{2,4})\s+([0-9A-Za-z-]+)\s+(?:(\d{3,4})\s+)?([0-9A-Za-z.-]+)/g;
+    const matches = [...cleanText.matchAll(studentRegex)];
+
+    for (const m of matches) {
+      const cpf = m[6];
+      const nome = m[2].trim().replace(/\s*[¹²³]+$/, '');
+      const banco = m[7];
+      const agencia = m[8];
+      const conta = m[10];
+      const valorStr = m[5].replace(/\./g, '').replace(',', '.');
+      const valor = parseFloat(valorStr);
+
+      found.push({ cpf, nome, banco, agencia, conta, sourceFile, valor });
     }
   } else {
+    // Layout 3: Labeled format — individual fields with labels like "CPF", "Banco", "Agência", "Conta"
     let docValor: number | undefined = undefined;
     const valorMatch = text.match(/(?:valor de|corresponde a|individual de)\s*R\$\s*([0-9.,]+)/i) || text.match(/R\$\s*([0-9.,]+)/i);
     if (valorMatch?.[1]) {
@@ -103,15 +123,7 @@ export function extractFromText(text: string, sourceFile: string): BolsistaPdfRe
       const agencia = extractFieldAfterLabel(segment, /Ag[êe]ncia\s+([0-9A-Za-z-]+)/i);
       const conta = extractFieldAfterLabel(segment, /Conta\s+([0-9A-Za-z-]+)/i);
 
-      found.push({ 
-        cpf, 
-        nome, 
-        banco, 
-        agencia, 
-        conta, 
-        sourceFile,
-        valor: docValor
-      });
+      found.push({ cpf, nome, banco, agencia, conta, sourceFile, valor: docValor });
     }
   }
 
