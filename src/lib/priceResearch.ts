@@ -17,12 +17,26 @@ async function getFileArrayBuffer(file: File | Blob): Promise<ArrayBuffer> {
 export type PriceResearchCatalogType = 'material' | 'service';
 export type PriceResearchMethod = 'median' | 'mean' | 'minimum';
 
+export type PriceResearchCandidateSourceType =
+  | 'compras_gov_precos'
+  | 'amazon'
+  | 'magalu'
+  | 'americanas'
+  | 'casasbahia'
+  | 'kabum'
+  | 'dell'
+  | 'lenovo'
+  | 'custom';
+
 export type PriceResearchCandidate = {
   id: string;
-  sourceType: 'compras_gov_precos';
+  sourceType: PriceResearchCandidateSourceType;
   sourceLabel: string;
   sourceUrl: string;
   pncpSearchUrl?: string;
+  thumbnailLink?: string;
+  displayLink?: string;
+  evidenceImage?: string;
   purchaseId: string;
   purchaseItemId: string;
   purchaseDate: string | null;
@@ -646,6 +660,42 @@ export function buildPriceResearchReportHtml(data: PriceResearchReportData) {
         <strong>Observações:</strong> ${escapeHtml(data.notes || 'Sem observações adicionais.')}<br />
         A classificação assistida por IA apenas ordena a aderência descritiva. A seleção, as exclusões e o método de cálculo permanecem sob responsabilidade do agente público.
       </div>
+      ${
+        data.items.some((item) => item.candidates.some((c) => c.selected && c.evidenceImage))
+          ? `
+          <div style="page-break-before: always; margin-top: 30px;">
+            <h1 style="border-bottom: 2px solid #1f6f32; padding-bottom: 6px; font-size: 16px; color: #1f6f32; margin-top: 0;">Anexo I — Evidências de Preços</h1>
+            <p style="font-size: 10px; color: #555; margin-bottom: 20px;">Capturas de tela das cotações que compõem a cesta de preços como prova de conformidade legal (Instrução Normativa ME nº 65/2021).</p>
+            ${data.items
+              .map((item) => {
+                const selectedWithEvidence = item.candidates.filter((c) => c.selected && c.evidenceImage);
+                if (selectedWithEvidence.length === 0) return '';
+                return `
+                  <div style="margin-bottom: 24px; page-break-inside: avoid;">
+                    <h2 style="font-size: 12px; color: #1f6f32; margin-bottom: 8px; border-bottom: 1px dashed #ddd; padding-bottom: 4px;">Item ${escapeHtml(item.itemNumber)} — ${escapeHtml(item.description)}</h2>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+                      ${selectedWithEvidence
+                        .map(
+                          (c) => `
+                        <div style="border: 1px solid #d7d7d7; padding: 8px; background: #f9f9f9; border-radius: 6px; page-break-inside: avoid;">
+                          <strong style="display: block; font-size: 9px; color: #222; margin-bottom: 2px;">${escapeHtml(c.sourceLabel)} — ${formatCurrency(c.comparableUnitPrice)}</strong>
+                          <span style="display: block; font-size: 8px; color: #666; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">URL: <a href="${escapeHtml(c.sourceUrl)}" style="color:#1f5e9c; text-decoration: none;">${escapeHtml(c.sourceUrl)}</a></span>
+                          <div style="border: 1px solid #e0e0e0; background: white; border-radius: 4px; padding: 2px; text-align: center;">
+                            <img src="${c.evidenceImage}" alt="Evidência ${escapeHtml(c.sourceLabel)}" style="max-width: 100%; max-height: 200px; object-fit: contain;" />
+                          </div>
+                        </div>
+                      `,
+                        )
+                        .join('')}
+                    </div>
+                  </div>
+                `;
+              })
+              .join('')}
+          </div>
+        `
+          : ''
+      }
     </body>
   </html>`;
 }

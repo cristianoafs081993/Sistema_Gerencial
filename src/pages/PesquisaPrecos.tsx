@@ -6,12 +6,16 @@ import {
   ArrowRight,
   Bot,
   Calendar,
+  Camera,
+  Check,
   CheckCircle2,
   Download,
   ExternalLink,
   FileDown,
   FileSpreadsheet,
   FolderOpen,
+  Globe,
+  Image,
   Loader2,
   Pencil,
   Plus,
@@ -20,6 +24,7 @@ import {
   Save,
   Search,
   ShieldCheck,
+  ShoppingBag,
   Sparkles,
   Trash2,
   Upload,
@@ -54,6 +59,7 @@ import {
 } from '@/lib/priceResearch';
 import { findCatalogSuggestions } from '@/lib/priceCatalogClient';
 import { priceResearchService } from '@/services/priceResearch';
+import { marketSearchService, type MarketSearchResult } from '@/services/marketSearch';
 
 const METHOD_OPTIONS: Array<{ value: PriceResearchMethod; label: string }> = [
   { value: 'median', label: 'Mediana' },
@@ -106,6 +112,15 @@ export default function PesquisaPrecos() {
   const [viewMode, setViewMode] = useState<'list' | 'wizard'>('list');
   const [searchTerm, setSearchTerm] = useState('');
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
+
+  const [curadoriaTab, setCuradoriaTab] = useState<'basket' | 'market'>('basket');
+  const [marketSearchTerm, setMarketSearchTerm] = useState('');
+  const [selectedMarketProviders, setSelectedMarketProviders] = useState<string[]>(['amazon', 'magalu', 'americanas']);
+  const [marketResults, setMarketResults] = useState<MarketSearchResult[]>([]);
+  const [isSearchingMarket, setIsSearchingMarket] = useState(false);
+
+  const [capturingCandidateId, setCapturingCandidateId] = useState<string | null>(null);
+  const [previewCandidate, setPreviewCandidate] = useState<PriceResearchCandidate | null>(null);
 
   const deleteResearch = async (id: string) => {
     if (!window.confirm('Tem certeza de que deseja excluir esta pesquisa de preços? Isso removerá permanentemente o relatório e todos os itens orçados.')) return;
@@ -295,6 +310,117 @@ export default function PesquisaPrecos() {
       toast.error(error instanceof Error ? error.message : 'Não foi possível pesquisar os preços.');
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedItem) {
+      setMarketSearchTerm(selectedItem.description);
+      setMarketResults([]);
+      setCuradoriaTab('basket');
+    }
+  }, [selectedItemId, selectedItem?.description]);
+
+  function parseMarketPrice(priceStr: string): number {
+    if (!priceStr) return 0;
+    let clean = priceStr.replace(/[R$\s]/gi, '');
+    if (clean.includes(',') && clean.includes('.')) {
+      clean = clean.replace(/\./g, '').replace(',', '.');
+    } else if (clean.includes(',')) {
+      clean = clean.replace(',', '.');
+    }
+    const parsed = parseFloat(clean);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+
+  const handleMarketSearch = async () => {
+    if (!marketSearchTerm.trim()) {
+      toast.error('Informe um termo de busca.');
+      return;
+    }
+    if (selectedMarketProviders.length === 0) {
+      toast.error('Selecione ao menos um provedor.');
+      return;
+    }
+    setIsSearchingMarket(true);
+    try {
+      const results = await marketSearchService.search(marketSearchTerm, selectedMarketProviders);
+      setMarketResults(results);
+      toast.success(`${results.length} resultado(s) encontrado(s).`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Falha na pesquisa de mercado.');
+    } finally {
+      setIsSearchingMarket(false);
+    }
+  };
+
+  const handleAddMarketCandidate = (result: MarketSearchResult) => {
+    if (!selectedItem) return;
+
+    const alreadyAdded = selectedItem.candidates.some(
+      (c) => c.sourceUrl === result.link
+    );
+    if (alreadyAdded) {
+      toast.error('Esta oferta já foi adicionada à cesta.');
+      return;
+    }
+
+    const price = parseMarketPrice(result.price);
+    if (price <= 0) {
+      toast.error('Não foi possível obter um preço válido para esta oferta.');
+      return;
+    }
+
+    const newCandidate: PriceResearchCandidate = {
+      id: `market-${result.provider}-${crypto.randomUUID()}`,
+      sourceType: result.provider as any,
+      sourceLabel: result.provider.charAt(0).toUpperCase() + result.provider.slice(1),
+      sourceUrl: result.link,
+      thumbnailLink: result.thumbnailLink,
+      displayLink: result.displayLink,
+      purchaseId: 'E-COMMERCE',
+      purchaseItemId: 'OFFER',
+      purchaseDate: today(),
+      resultDate: today(),
+      supplierDocument: null,
+      supplierName: result.provider.toUpperCase(),
+      agencyCode: 'E-COMMERCE',
+      agencyName: result.displayLink,
+      state: null,
+      municipality: null,
+      description: result.title,
+      detailedDescription: result.snippet,
+      brand: null,
+      quantity: 1,
+      originalUnitPrice: price,
+      comparableUnitPrice: price,
+      originalUnitLabel: 'UN',
+      unitCompatible: true,
+      aiScore: 100,
+      aiReason: 'Selecionado via pesquisa de mercado privada',
+      selected: true,
+      exclusionReason: '',
+      rawData: { ...result },
+    };
+
+    updateItem(selectedItem.localId, {
+      candidates: [...selectedItem.candidates, newCandidate],
+    });
+    toast.success('Oferta incluída na cesta com sucesso.');
+  };
+
+  const handleCaptureEvidence = async (candidateId: string, url: string) => {
+    setCapturingCandidateId(candidateId);
+    try {
+      const base64 = await marketSearchService.capture(url);
+      updateCandidate(selectedItem.localId, candidateId, {
+        evidenceImage: base64,
+      });
+      toast.success('Evidência capturada com sucesso.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Falha ao capturar a evidência.');
+    } finally {
+      setCapturingCandidateId(null);
     }
   };
 
@@ -1210,7 +1336,7 @@ export default function PesquisaPrecos() {
 
             {/* Detalhes de Cotações do Item */}
             <div className="lg:col-span-3 space-y-6">
-              {selectedItem && selectedItem.candidates.length > 0 ? (
+              {selectedItem ? (
                 <>
                   {/* Estatísticas Individuais do Item */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -1233,105 +1359,359 @@ export default function PesquisaPrecos() {
                     <div className="flex gap-2.5 rounded-radius-lg border border-amber-200 bg-amber-50/50 p-4 text-amber-900 shadow-sm">
                       <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
                       <div className="font-ui text-xs leading-normal">
-                        <span className="font-bold">Aviso legal da IN 65/2021:</span> Selecione no mínimo 3 preços homologados para compor a estimativa do item. Casos excepcionais exigem justificativa formal anexa ao processo.
+                        <span className="font-bold">Aviso legal da IN 65/2021:</span> Selecione no mínimo 3 preços homologados para compom a estimativa do item. Casos excepcionais exigem justificativa formal anexa ao processo.
                       </div>
                     </div>
                   )}
 
-                  {/* Cesta de Cotações */}
-                  <DataTablePanel
-                    title={`Cesta de Preços - Item ${selectedItem.itemNumber}`}
-                    description="Selecione as referências mais compatíveis tecnicamente. Exclusões precisam de justificativa descritiva."
-                    actions={(
-                      <Button type="button" variant="outline" className="gap-2 h-9 text-xs" onClick={() => void exportPriceResearchWorkbook(reportData)}>
-                        <Download className="h-3.5 w-3.5" />
-                        Exportar XLSX
-                      </Button>
-                    )}
-                  >
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-12">Usar</TableHead>
-                          <TableHead>Fonte / Aderência</TableHead>
-                          <TableHead>Órgão e Fornecedor</TableHead>
-                          <TableHead>Unidade</TableHead>
-                          <TableHead className="text-right">Preço Original</TableHead>
-                          <TableHead className="text-right">Preço Comparável</TableHead>
-                          <TableHead className="min-w-[200px]">Exclusão</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedItem.candidates.map((candidate) => {
-                          const status = candidateStatus(candidate);
-                          const isExcludedWithoutReason = !candidate.selected && !candidate.exclusionReason.trim();
-                          return (
-                            <TableRow key={candidate.id} className={candidate.selected ? 'bg-primary/[0.01]' : 'opacity-85'}>
-                              <TableCell>
-                                <Checkbox
-                                  aria-label={`Usar preço ${candidate.purchaseItemId}`}
-                                  checked={candidate.selected}
-                                  onCheckedChange={(checked) => updateCandidate(selectedItem.localId, candidate.id, {
-                                    selected: checked === true,
-                                    exclusionReason: checked === true ? '' : candidate.exclusionReason,
-                                  })}
-                                />
-                              </TableCell>
-                              <TableCell className="min-w-[220px]">
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                  <Badge variant="outline" className={`text-[10px] ${status.className}`}>{status.label}</Badge>
-                                  <Badge variant="secondary" className="gap-0.5 text-[10px] font-mono">
-                                    <Bot className="h-2.5 w-2.5" />
-                                    {candidate.aiScore}
-                                  </Badge>
-                                </div>
-                                <p className="mt-1.5 font-ui text-[10px] text-text-secondary leading-normal">{candidate.aiReason}</p>
-                                <p className="mt-1 line-clamp-1 font-ui text-[10px] text-text-muted">{candidate.description}</p>
-                                <div className="mt-1.5 flex gap-2">
-                                  <a href={candidate.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-bold text-primary hover:underline">
-                                    Fonte Oficial <ExternalLink className="h-2.5 w-2.5" />
-                                  </a>
-                                  {candidate.pncpSearchUrl && (
-                                    <a href={candidate.pncpSearchUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-bold text-blue-700 hover:underline">
-                                      PNCP <ExternalLink className="h-2.5 w-2.5" />
-                                    </a>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="min-w-[180px]">
-                                <p className="font-mono text-[10px] font-bold text-text-primary">{candidate.agencyCode || '-'}</p>
-                                <p className="font-ui text-[10px] text-text-secondary truncate max-w-[160px]" title={candidate.agencyName || ''}>{candidate.agencyName || '-'}</p>
-                                <p className="mt-1.5 font-ui text-[10px] font-bold text-text-primary truncate max-w-[160px]" title={candidate.supplierName || ''}>{candidate.supplierName || '-'}</p>
-                                <p className="font-mono text-[9px] text-text-muted leading-none mt-0.5">{candidate.supplierDocument || '-'}</p>
-                                <p className="font-ui text-[9px] text-text-muted mt-1 leading-none">{formatDate(candidate.resultDate || candidate.purchaseDate)}</p>
-                              </TableCell>
-                              <TableCell className="font-mono text-[11px]">{candidate.originalUnitLabel}</TableCell>
-                              <TableCell className="text-right font-mono text-[11px]">{formatCurrency(candidate.originalUnitPrice)}</TableCell>
-                              <TableCell className="text-right font-mono text-[11px] font-bold">{formatCurrency(candidate.comparableUnitPrice)}</TableCell>
-                              <TableCell>
-                                {candidate.selected ? (
-                                  <span className="font-ui text-[10px] text-primary font-medium">Incluído</span>
-                                ) : (
-                                  <div className="relative flex items-center">
-                                    <Input
-                                      aria-label={`Justificativa para desconsiderar ${candidate.purchaseItemId}`}
-                                      value={candidate.exclusionReason}
-                                      onChange={(event) => updateCandidate(selectedItem.localId, candidate.id, { exclusionReason: event.target.value })}
-                                      placeholder="Justifique a exclusão..."
-                                      className={`h-8 text-xs pr-8 ${isExcludedWithoutReason ? 'border-amber-300 focus:border-amber-500 bg-amber-50/20' : ''}`}
-                                    />
-                                    {isExcludedWithoutReason && (
-                                      <AlertTriangle className="absolute right-2.5 h-3.5 w-3.5 text-amber-500" title="Justificativa obrigatória" />
-                                    )}
-                                  </div>
-                                )}
+                  {/* Tabs de Navegação */}
+                  <div className="flex border-b border-border-default space-x-6">
+                    <button
+                      type="button"
+                      className={`pb-3 text-sm font-semibold transition-all relative ${
+                        curadoriaTab === 'basket' ? 'text-primary' : 'text-text-muted hover:text-text-primary'
+                      }`}
+                      onClick={() => setCuradoriaTab('basket')}
+                    >
+                      Cesta de Preços ({selectedItem.candidates.length})
+                      {curadoriaTab === 'basket' && (
+                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className={`pb-3 text-sm font-semibold transition-all relative ${
+                        curadoriaTab === 'market' ? 'text-primary' : 'text-text-muted hover:text-text-primary'
+                      }`}
+                      onClick={() => setCuradoriaTab('market')}
+                    >
+                      Pesquisa de Mercado (Internet)
+                      {curadoriaTab === 'market' && (
+                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Exibição da Aba Ativa */}
+                  {curadoriaTab === 'basket' ? (
+                    <DataTablePanel
+                      title={`Cesta de Preços - Item ${selectedItem.itemNumber}`}
+                      description="Selecione as referências mais compatíveis tecnicamente. Exclusões precisam de justificativa descritiva."
+                      actions={(
+                        <Button type="button" variant="outline" className="gap-2 h-9 text-xs" onClick={() => void exportPriceResearchWorkbook(reportData)}>
+                          <Download className="h-3.5 w-3.5" />
+                          Exportar XLSX
+                        </Button>
+                      )}
+                    >
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-12">Usar</TableHead>
+                            <TableHead>Fonte / Aderência</TableHead>
+                            <TableHead>Órgão e Fornecedor</TableHead>
+                            <TableHead>Unidade</TableHead>
+                            <TableHead className="text-right">Preço Original</TableHead>
+                            <TableHead className="text-right">Preço Comparável</TableHead>
+                            <TableHead className="text-center w-28">Evidência</TableHead>
+                            <TableHead className="min-w-[160px]">Exclusão</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedItem.candidates.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={8} className="text-center py-8 text-text-muted text-xs">
+                                Nenhuma cotação adicionada. Use a aba "Pesquisa de Mercado (Internet)" para complementar os preços com buscas em e-commerces.
                               </TableCell>
                             </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </DataTablePanel>
+                          ) : (
+                            selectedItem.candidates.map((candidate) => {
+                              const status = candidateStatus(candidate);
+                              const isExcludedWithoutReason = !candidate.selected && !candidate.exclusionReason.trim();
+                              return (
+                                <TableRow key={candidate.id} className={candidate.selected ? 'bg-primary/[0.01]' : 'opacity-85'}>
+                                  <TableCell>
+                                    <Checkbox
+                                      aria-label={`Usar preço ${candidate.purchaseItemId}`}
+                                      checked={candidate.selected}
+                                      onCheckedChange={(checked) => updateCandidate(selectedItem.localId, candidate.id, {
+                                        selected: checked === true,
+                                        exclusionReason: checked === true ? '' : candidate.exclusionReason,
+                                      })}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="min-w-[220px]">
+                                    <div className="flex gap-3 items-start">
+                                      {candidate.thumbnailLink && (
+                                        <img
+                                          src={candidate.thumbnailLink}
+                                          alt="Thumbnail"
+                                          className="h-12 w-12 object-contain rounded-md border border-border-default bg-white p-0.5 shrink-0"
+                                        />
+                                      )}
+                                      <div className="space-y-1.5 flex-1">
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                          <Badge variant="outline" className={`text-[10px] ${status.className}`}>{status.label}</Badge>
+                                          <Badge variant="secondary" className="gap-0.5 text-[10px] font-mono">
+                                            <Bot className="h-2.5 w-2.5" />
+                                            {candidate.aiScore}
+                                          </Badge>
+                                        </div>
+                                        <p className="font-ui text-[10px] text-text-secondary leading-normal">{candidate.aiReason}</p>
+                                        <p className="line-clamp-2 font-ui text-[10px] text-text-muted leading-relaxed" title={candidate.description}>{candidate.description}</p>
+                                        <div className="flex gap-2">
+                                          <a href={candidate.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-bold text-primary hover:underline">
+                                            {candidate.sourceType !== 'compras_gov_precos' && candidate.sourceType !== 'custom'
+                                              ? `Acessar no ${candidate.sourceLabel}`
+                                              : 'Fonte Oficial'}{' '}
+                                            <ExternalLink className="h-2.5 w-2.5" />
+                                          </a>
+                                          {candidate.pncpSearchUrl && (
+                                            <a href={candidate.pncpSearchUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-bold text-blue-700 hover:underline">
+                                              PNCP <ExternalLink className="h-2.5 w-2.5" />
+                                            </a>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="min-w-[180px]">
+                                    <p className="font-mono text-[10px] font-bold text-text-primary">{candidate.agencyCode || '-'}</p>
+                                    <p className="font-ui text-[10px] text-text-secondary truncate max-w-[160px]" title={candidate.agencyName || ''}>{candidate.agencyName || '-'}</p>
+                                    <p className="mt-1.5 font-ui text-[10px] font-bold text-text-primary truncate max-w-[160px]" title={candidate.supplierName || ''}>{candidate.supplierName || '-'}</p>
+                                    <p className="font-mono text-[9px] text-text-muted leading-none mt-0.5">{candidate.supplierDocument || '-'}</p>
+                                    <p className="font-ui text-[9px] text-text-muted mt-1 leading-none">{formatDate(candidate.resultDate || candidate.purchaseDate)}</p>
+                                  </TableCell>
+                                  <TableCell className="font-mono text-[11px]">{candidate.originalUnitLabel}</TableCell>
+                                  <TableCell className="text-right font-mono text-[11px]">{formatCurrency(candidate.originalUnitPrice)}</TableCell>
+                                  <TableCell className="text-right font-mono text-[11px] font-bold">{formatCurrency(candidate.comparableUnitPrice)}</TableCell>
+                                  <TableCell className="text-center">
+                                    {candidate.selected ? (
+                                      candidate.evidenceImage ? (
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-8 px-2.5 text-[10px] gap-1 border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 transition-all font-semibold"
+                                          onClick={() => setPreviewCandidate(candidate)}
+                                          title="Visualizar print da evidência"
+                                        >
+                                          <Image className="h-3.5 w-3.5" />
+                                          Ver Print
+                                        </Button>
+                                      ) : (
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-8 px-2.5 text-[10px] gap-1 border-border-default hover:border-primary/30 text-text-secondary hover:text-primary transition-all font-semibold"
+                                          onClick={() => void handleCaptureEvidence(candidate.id, candidate.sourceUrl)}
+                                          disabled={capturingCandidateId === candidate.id}
+                                          title="Capturar print da página em tempo real"
+                                        >
+                                          {capturingCandidateId === candidate.id ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                                          ) : (
+                                            <Camera className="h-3.5 w-3.5 text-primary" />
+                                          )}
+                                          Tirar Print
+                                        </Button>
+                                      )
+                                    ) : (
+                                      <span className="text-[10px] text-text-muted">-</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    {candidate.selected ? (
+                                      <span className="font-ui text-[10px] text-primary font-medium">Incluído</span>
+                                    ) : (
+                                      <div className="relative flex items-center">
+                                        <Input
+                                          aria-label={`Justificativa para desconsiderar ${candidate.purchaseItemId}`}
+                                          value={candidate.exclusionReason}
+                                          onChange={(event) => updateCandidate(selectedItem.localId, candidate.id, { exclusionReason: event.target.value })}
+                                          placeholder="Justifique a exclusão..."
+                                          className={`h-8 text-xs pr-8 ${isExcludedWithoutReason ? 'border-amber-300 focus:border-amber-500 bg-amber-50/20' : ''}`}
+                                        />
+                                        {isExcludedWithoutReason && (
+                                          <AlertTriangle className="absolute right-2.5 h-3.5 w-3.5 text-amber-500" title="Justificativa obrigatória" />
+                                        )}
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })
+                          )}
+                        </TableBody>
+                      </Table>
+                    </DataTablePanel>
+                  ) : (
+                    <div className="space-y-6">
+                      {/* Painel de busca e provedores */}
+                      <div className="p-5 border border-border-default bg-surface-card rounded-radius-lg shadow-soft space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+                          <div className="space-y-1">
+                            <h4 className="font-ui text-sm font-bold text-text-primary">Buscador de Canais Privados</h4>
+                            <p className="font-ui text-xs text-text-muted">Pesquise preços diretamente nos maiores e-commerces do país.</p>
+                          </div>
+                          {/* Seleção de Provedores */}
+                          <div className="flex flex-wrap items-center gap-4">
+                            {[
+                              { id: 'amazon', label: 'Amazon' },
+                              { id: 'magalu', label: 'Magalu' },
+                              { id: 'americanas', label: 'Americanas' },
+                            ].map((prov) => {
+                              const isChecked = selectedMarketProviders.includes(prov.id);
+                              return (
+                                <label key={prov.id} className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-text-secondary select-none">
+                                  <Checkbox
+                                    checked={isChecked}
+                                    onCheckedChange={(checked) => {
+                                      if (checked) {
+                                        setSelectedMarketProviders((prev) => [...prev, prov.id]);
+                                      } else {
+                                        setSelectedMarketProviders((prev) => prev.filter((p) => p !== prov.id));
+                                      }
+                                    }}
+                                  />
+                                  {prov.label}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Input de busca */}
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+                            <Input
+                              type="text"
+                              value={marketSearchTerm}
+                              onChange={(e) => setMarketSearchTerm(e.target.value)}
+                              placeholder="Digite a palavra-chave para buscar no e-commerce..."
+                              className="pl-10 h-10 text-sm focus-visible:ring-sebrae-blue"
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            className="bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-sm h-10 px-6 gap-2"
+                            onClick={() => void handleMarketSearch()}
+                            disabled={isSearchingMarket}
+                          >
+                            {isSearchingMarket ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Search className="h-4 w-4" />
+                            )}
+                            Buscar
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Resultados */}
+                      {isSearchingMarket ? (
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                          {Array.from({ length: 3 }).map((_, idx) => (
+                            <div key={idx} className="border border-border-default rounded-radius-lg bg-surface-card p-4 animate-pulse space-y-3">
+                              <div className="h-36 bg-slate-100 rounded-md w-full" />
+                              <div className="h-4 bg-slate-100 rounded w-1/4" />
+                              <div className="h-6 bg-slate-100 rounded w-full" />
+                              <div className="h-4 bg-slate-100 rounded w-1/2" />
+                              <div className="flex justify-between items-center pt-3">
+                                <div className="h-6 bg-slate-100 rounded w-20" />
+                                <div className="h-8 bg-slate-100 rounded w-24" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : marketResults.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 bg-surface-card border border-dashed border-border-default rounded-radius-lg text-center p-6">
+                          <div className="p-3.5 bg-slate-100 rounded-full text-slate-400 mb-3">
+                            <ShoppingBag className="h-6 w-6" />
+                          </div>
+                          <h5 className="font-ui text-sm font-bold text-text-primary">Nenhum resultado para exibir</h5>
+                          <p className="font-ui text-xs text-text-muted mt-1 max-w-sm">
+                            Faça uma busca acima utilizando a descrição do produto para listar as ofertas das lojas.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                          {marketResults.map((result, idx) => {
+                            const isAdded = selectedItem.candidates.some((c) => c.sourceUrl === result.link);
+                            return (
+                              <div
+                                key={idx}
+                                className="flex flex-col justify-between border border-border-default hover:border-primary/45 bg-surface-card rounded-radius-lg p-4 shadow-soft hover:shadow-md transition-all group"
+                              >
+                                <div className="space-y-3">
+                                  {/* Imagem do produto */}
+                                  <div className="h-36 bg-white rounded-md border border-border-default/50 p-2 flex items-center justify-center overflow-hidden relative">
+                                    {result.thumbnailLink ? (
+                                      <img
+                                        src={result.thumbnailLink}
+                                        alt={result.title}
+                                        className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
+                                      />
+                                    ) : (
+                                      <ShoppingBag className="h-10 w-10 text-slate-300" />
+                                    )}
+                                    {/* Badge do Provedor */}
+                                    <Badge variant="outline" className="absolute top-2 right-2 border-primary/20 bg-primary/5 text-primary text-[10px] font-semibold py-0.5 px-2 capitalize shadow-sm">
+                                      {result.provider}
+                                    </Badge>
+                                  </div>
+
+                                  {/* Títulos e snippets */}
+                                  <div className="space-y-1">
+                                    <a
+                                      href={result.link}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="font-ui text-xs font-bold text-text-primary hover:text-sebrae-blue hover:underline line-clamp-2 leading-snug flex items-start gap-1"
+                                    >
+                                      {result.title}
+                                      <ExternalLink className="h-3 w-3 shrink-0 mt-0.5 text-text-muted" />
+                                    </a>
+                                    <p className="font-ui text-[10px] text-text-muted line-clamp-2 leading-relaxed">{result.snippet}</p>
+                                    <p className="font-mono text-[9px] text-text-muted">{result.displayLink}</p>
+                                  </div>
+                                </div>
+
+                                {/* Preço e ação */}
+                                <div className="mt-4 pt-3 border-t border-border-default/50 flex items-center justify-between gap-2">
+                                  <span className="font-mono text-base font-extrabold text-text-primary">{result.price}</span>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    className={`gap-1 font-semibold text-xs h-8 px-3 transition-all ${
+                                      isAdded
+                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-50 cursor-default'
+                                        : 'bg-primary hover:bg-primary-hover text-primary-foreground shadow-sm'
+                                    }`}
+                                    onClick={() => !isAdded && handleAddMarketCandidate(result)}
+                                  >
+                                    {isAdded ? (
+                                      <>
+                                        <Check className="h-3.5 w-3.5" />
+                                        Na Cesta
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Plus className="h-3.5 w-3.5" />
+                                        Incluir
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="text-center py-16 border border-dashed border-border-default rounded-radius-lg bg-surface-card text-text-muted">
@@ -1521,6 +1901,78 @@ export default function PesquisaPrecos() {
         </div>
       </div>
       </div>
+      )}
+
+      {/* Modal de Visualização de Evidência */}
+      {previewCandidate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-4xl bg-surface-card border border-border-default rounded-radius-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-border-default flex items-center justify-between bg-surface-subtle/50">
+              <div>
+                <h3 className="text-sm font-bold text-sebrae-navy capitalize animate-none">
+                  Evidência de Preço — {previewCandidate.sourceLabel}
+                </h3>
+                <p className="text-[11px] text-text-muted mt-0.5 truncate max-w-[500px]">
+                  URL: <a href={previewCandidate.sourceUrl} target="_blank" rel="noreferrer" className="text-sebrae-blue hover:underline font-mono">{previewCandidate.sourceUrl}</a>
+                </p>
+              </div>
+              <button
+                type="button"
+                className="h-8 w-8 rounded-full p-0 flex items-center justify-center text-text-secondary hover:bg-slate-100 hover:text-text-primary"
+                onClick={() => setPreviewCandidate(null)}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-auto p-6 bg-slate-50 flex items-center justify-center min-h-[300px]">
+              {previewCandidate.evidenceImage ? (
+                <img
+                  src={previewCandidate.evidenceImage}
+                  alt={`Evidência ${previewCandidate.sourceLabel}`}
+                  className="max-w-full max-h-[60vh] object-contain rounded-md border border-border-default bg-white shadow-sm"
+                />
+              ) : (
+                <p className="text-sm text-text-muted">Nenhuma imagem capturada.</p>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-3.5 border-t border-border-default bg-surface-subtle/50 flex justify-between items-center gap-3">
+              <span className="text-[10px] font-mono text-text-muted">
+                Preço Comparável: <span className="font-bold text-text-primary">{formatCurrency(previewCandidate.comparableUnitPrice)}</span>
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs h-9 font-semibold"
+                  onClick={() => {
+                    if (!previewCandidate.evidenceImage) return;
+                    const link = document.createElement('a');
+                    link.href = previewCandidate.evidenceImage;
+                    link.download = `evidencia-${previewCandidate.sourceLabel.toLowerCase()}-${previewCandidate.id}.png`;
+                    link.click();
+                  }}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Baixar Imagem
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="bg-primary text-primary-foreground text-xs h-9 font-semibold"
+                  onClick={() => setPreviewCandidate(null)}
+                >
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
