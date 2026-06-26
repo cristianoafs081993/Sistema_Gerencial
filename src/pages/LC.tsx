@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { useAuth } from '@/contexts/AuthContext';
+
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -38,7 +38,6 @@ const statusLabel: Record<PendenciaStatus, string> = {
 };
 
 export default function LCPage() {
-  const { isSuperAdmin } = useAuth();
   const [rows, setRows] = useState<LCRegistro[]>([]);
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
@@ -365,53 +364,47 @@ export default function LCPage() {
 
   return (
     <div className="space-y-6 pb-10">
-      {isSuperAdmin ? (
-        <>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,.xlsx,.xls"
-            className="hidden"
-            onChange={(e) => handleUpload(e.target.files?.[0])}
-          />
-          <input
-            ref={pdfInputRef}
-            type="file"
-            accept=".pdf"
-            multiple
-            className="hidden"
-            onChange={(e) => handleCompararPdf(e.target.files)}
-          />
-        </>
-      ) : null}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv,.xlsx,.xls"
+        className="hidden"
+        onChange={(e) => handleUpload(e.target.files?.[0])}
+      />
+      <input
+        ref={pdfInputRef}
+        type="file"
+        accept=".pdf"
+        multiple
+        className="hidden"
+        onChange={(e) => handleCompararPdf(e.target.files)}
+      />
 
       <SectionPanel 
         title="Lista de Credores (LC)"
         actions={
-          isSuperAdmin ? (
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                size="sm"
-                variant="outline"
-                disabled={isUploading}
-                className="gap-space-2 h-space-9 shadow-shadow-sm"
-              >
-                <Upload className="h-4 w-4" />
-                {isUploading ? 'Carregando...' : 'Upload CSV LC'}
-              </Button>
-              <Button
-                onClick={() => pdfInputRef.current?.click()}
-                size="sm"
-                variant="outline"
-                disabled={isComparingPdf}
-                className="gap-space-2 h-space-9 shadow-shadow-sm"
-              >
-                <Upload className="h-4 w-4" />
-                {isComparingPdf ? 'Comparando...' : 'Comparar PDFs de Pagamento'}
-              </Button>
-            </div>
-          ) : null
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              size="sm"
+              variant="outline"
+              disabled={isUploading}
+              className="gap-space-2 h-space-9 shadow-shadow-sm"
+            >
+              <Upload className="h-4 w-4" />
+              {isUploading ? 'Carregando...' : 'Upload CSV LC'}
+            </Button>
+            <Button
+              onClick={() => pdfInputRef.current?.click()}
+              size="sm"
+              variant="outline"
+              disabled={isComparingPdf}
+              className="gap-space-2 h-space-9 shadow-shadow-sm"
+            >
+              <Upload className="h-4 w-4" />
+              {isComparingPdf ? 'Comparando...' : 'Comparar PDFs de Pagamento'}
+            </Button>
+          </div>
         }
       >
         <div className="mb-3">
