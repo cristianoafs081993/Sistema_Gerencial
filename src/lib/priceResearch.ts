@@ -661,14 +661,14 @@ export function buildPriceResearchReportHtml(data: PriceResearchReportData) {
         A classificação assistida por IA apenas ordena a aderência descritiva. A seleção, as exclusões e o método de cálculo permanecem sob responsabilidade do agente público.
       </div>
       ${
-        data.items.some((item) => item.candidates.some((c) => c.selected && c.evidenceImage))
+        data.items.some((item) => item.candidates.some((c) => c.selected && c.sourceType !== 'compras_gov_precos' && c.evidenceImage && c.evidenceImage.startsWith('http')))
           ? `
           <div style="page-break-before: always; margin-top: 30px;">
             <h1 style="border-bottom: 2px solid #1f6f32; padding-bottom: 6px; font-size: 16px; color: #1f6f32; margin-top: 0;">Anexo I — Evidências de Preços</h1>
             <p style="font-size: 10px; color: #555; margin-bottom: 20px;">Capturas de tela das cotações que compõem a cesta de preços como prova de conformidade legal (Instrução Normativa ME nº 65/2021).</p>
             ${data.items
               .map((item) => {
-                const selectedWithEvidence = item.candidates.filter((c) => c.selected && c.evidenceImage);
+                const selectedWithEvidence = item.candidates.filter((c) => c.selected && c.sourceType !== 'compras_gov_precos' && c.evidenceImage && c.evidenceImage.startsWith('http'));
                 if (selectedWithEvidence.length === 0) return '';
                 return `
                   <div style="margin-bottom: 24px; page-break-inside: avoid;">

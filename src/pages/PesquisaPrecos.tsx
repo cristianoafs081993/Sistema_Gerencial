@@ -1486,8 +1486,8 @@ export default function PesquisaPrecos() {
                                   <TableCell className="text-right font-mono text-[11px]">{formatCurrency(candidate.originalUnitPrice)}</TableCell>
                                   <TableCell className="text-right font-mono text-[11px] font-bold">{formatCurrency(candidate.comparableUnitPrice)}</TableCell>
                                   <TableCell className="text-center">
-                                    {candidate.selected ? (
-                                      candidate.evidenceImage ? (
+                                    {candidate.selected && candidate.sourceType !== 'compras_gov_precos' ? (
+                                      candidate.evidenceImage && candidate.evidenceImage.startsWith('http') ? (
                                         <Button
                                           type="button"
                                           variant="outline"
