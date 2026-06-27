@@ -118,6 +118,7 @@ export default function PesquisaPrecos() {
   const [selectedMarketProviders, setSelectedMarketProviders] = useState<string[]>(['amazon', 'magalu', 'americanas']);
   const [marketResults, setMarketResults] = useState<MarketSearchResult[]>([]);
   const [isSearchingMarket, setIsSearchingMarket] = useState(false);
+  const [capturingUrls, setCapturingUrls] = useState<Set<string>>(new Set());
 
   const [capturingCandidateId, setCapturingCandidateId] = useState<string | null>(null);
   const [previewCandidate, setPreviewCandidate] = useState<PriceResearchCandidate | null>(null);
@@ -354,7 +355,7 @@ export default function PesquisaPrecos() {
     }
   };
 
-  const handleAddMarketCandidate = (result: MarketSearchResult) => {
+  const handleAddMarketCandidate = async (result: MarketSearchResult) => {
     if (!selectedItem) return;
 
     const alreadyAdded = selectedItem.candidates.some(
@@ -371,8 +372,9 @@ export default function PesquisaPrecos() {
       return;
     }
 
+    const candidateId = `market-${result.provider}-${crypto.randomUUID()}`;
     const newCandidate: PriceResearchCandidate = {
-      id: `market-${result.provider}-${crypto.randomUUID()}`,
+      id: candidateId,
       sourceType: result.provider as any,
       sourceLabel: result.provider.charAt(0).toUpperCase() + result.provider.slice(1),
       sourceUrl: result.link,
@@ -406,7 +408,19 @@ export default function PesquisaPrecos() {
     updateItem(selectedItem.localId, {
       candidates: [...selectedItem.candidates, newCandidate],
     });
-    toast.success('Oferta incluída na cesta com sucesso.');
+    toast.success('Oferta incluída na cesta. Capturando evidência...');
+
+    // Dispara captura de print em background automaticamente
+    setCapturingUrls((prev) => new Set(prev).add(result.link));
+    try {
+      const imageUrl = await marketSearchService.capture(result.link);
+      updateCandidate(selectedItem.localId, candidateId, { evidenceImage: imageUrl });
+      toast.success('Evidência capturada e salva com sucesso.');
+    } catch {
+      toast.error('Oferta incluída, mas não foi possível capturar o print. Tente manualmente na cesta.');
+    } finally {
+      setCapturingUrls((prev) => { const s = new Set(prev); s.delete(result.link); return s; });
+    }
   };
 
   const handleCaptureEvidence = async (candidateId: string, url: string) => {
@@ -1685,14 +1699,22 @@ export default function PesquisaPrecos() {
                                   <Button
                                     type="button"
                                     size="sm"
+                                    disabled={capturingUrls.has(result.link)}
                                     className={`gap-1 font-semibold text-xs h-8 px-3 transition-all ${
-                                      isAdded
+                                      capturingUrls.has(result.link)
+                                        ? 'bg-amber-50 text-amber-700 border border-amber-200 cursor-wait'
+                                        : isAdded
                                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-50 cursor-default'
                                         : 'bg-primary hover:bg-primary-hover text-primary-foreground shadow-sm'
                                     }`}
-                                    onClick={() => !isAdded && handleAddMarketCandidate(result)}
+                                    onClick={() => !isAdded && !capturingUrls.has(result.link) && void handleAddMarketCandidate(result)}
                                   >
-                                    {isAdded ? (
+                                    {capturingUrls.has(result.link) ? (
+                                      <>
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        Capturando...
+                                      </>
+                                    ) : isAdded ? (
                                       <>
                                         <Check className="h-3.5 w-3.5" />
                                         Na Cesta
