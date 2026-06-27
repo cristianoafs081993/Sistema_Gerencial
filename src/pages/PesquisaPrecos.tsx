@@ -17,6 +17,7 @@ import {
   Globe,
   Image,
   Loader2,
+  MapPin,
   Pencil,
   Plus,
   Printer,
@@ -119,6 +120,7 @@ export default function PesquisaPrecos() {
   const [marketResults, setMarketResults] = useState<MarketSearchResult[]>([]);
   const [isSearchingMarket, setIsSearchingMarket] = useState(false);
   const [capturingUrls, setCapturingUrls] = useState<Set<string>>(new Set());
+  const [freightCep, setFreightCep] = useState<string>(() => localStorage.getItem('pp_freight_cep') || '');
 
   const [capturingCandidateId, setCapturingCandidateId] = useState<string | null>(null);
   const [previewCandidate, setPreviewCandidate] = useState<PriceResearchCandidate | null>(null);
@@ -421,12 +423,17 @@ export default function PesquisaPrecos() {
     // Dispara captura de print em background automaticamente
     setCapturingUrls((prev) => new Set(prev).add(result.link));
     try {
-      const imageUrl = await marketSearchService.capture(result.link);
+      const { imageUrl, freight } = await marketSearchService.capture(result.link, freightCep || undefined);
+      const freightTotal = freight.status !== 'pending' && freight.total != null ? freight.total : undefined;
       updateCandidate(selectedItem.localId, candidateId, {
         evidenceImage: imageUrl,
         evidenceCapturedAt: new Date().toISOString(),
+        freightCost: freightTotal,
+        comparableUnitPrice: newCandidate.originalUnitPrice + (freightTotal ?? 0),
       });
-      toast.success('Evidência capturada e salva com sucesso.');
+      if (freight.status === 'free') toast.success('Evidência capturada. Frete grátis detectado automaticamente.');
+      else if (freight.status === 'captured') toast.success(`Evidência capturada. Frete R$ ${freight.total?.toFixed(2).replace('.', ',')} detectado automaticamente.`);
+      else toast.success('Evidência capturada. Informe o frete manualmente na coluna Frete.');
     } catch {
       toast.error('Oferta incluída, mas não foi possível capturar o print. Tente manualmente na cesta.');
     } finally {
@@ -434,15 +441,20 @@ export default function PesquisaPrecos() {
     }
   };
 
-  const handleCaptureEvidence = async (candidateId: string, url: string) => {
+  const handleCaptureEvidence = async (candidateId: string, url: string, originalUnitPrice: number) => {
     setCapturingCandidateId(candidateId);
     try {
-      const imageUrl = await marketSearchService.capture(url);
+      const { imageUrl, freight } = await marketSearchService.capture(url, freightCep || undefined);
+      const freightTotal = freight.status !== 'pending' && freight.total != null ? freight.total : undefined;
       updateCandidate(selectedItem.localId, candidateId, {
         evidenceImage: imageUrl,
         evidenceCapturedAt: new Date().toISOString(),
+        freightCost: freightTotal,
+        comparableUnitPrice: originalUnitPrice + (freightTotal ?? 0),
       });
-      toast.success('Evidência capturada com sucesso.');
+      if (freight.status === 'free') toast.success('Evidência capturada. Frete grátis detectado automaticamente.');
+      else if (freight.status === 'captured') toast.success(`Evidência capturada. Frete R$ ${freight.total?.toFixed(2).replace('.', ',')} detectado automaticamente.`);
+      else toast.success('Evidência capturada. Informe o frete na coluna Frete se necessário.');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Falha ao capturar a evidência.');
     } finally {
@@ -1554,7 +1566,7 @@ export default function PesquisaPrecos() {
                                           variant="outline"
                                           size="sm"
                                           className="h-8 px-2.5 text-[10px] gap-1 border-border-default hover:border-primary/30 text-text-secondary hover:text-primary transition-all font-semibold"
-                                          onClick={() => void handleCaptureEvidence(candidate.id, candidate.sourceUrl)}
+                                          onClick={() => void handleCaptureEvidence(candidate.id, candidate.sourceUrl, candidate.originalUnitPrice)}
                                           disabled={capturingCandidateId === candidate.id}
                                           title="Capturar print da página em tempo real"
                                         >
@@ -1629,6 +1641,30 @@ export default function PesquisaPrecos() {
                               );
                             })}
                           </div>
+                        </div>
+
+                        {/* CEP para cálculo de frete */}
+                        <div className="flex items-center gap-2 mt-1">
+                          <MapPin className="h-3.5 w-3.5 text-text-muted shrink-0" />
+                          <span className="text-[11px] text-text-secondary font-semibold whitespace-nowrap">CEP (frete Amazon):</span>
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={9}
+                            placeholder="00000-000"
+                            value={freightCep}
+                            onChange={(e) => {
+                              const raw = e.target.value.replace(/\D/g, '').slice(0, 8);
+                              const formatted = raw.length > 5 ? `${raw.slice(0, 5)}-${raw.slice(5)}` : raw;
+                              setFreightCep(formatted);
+                              localStorage.setItem('pp_freight_cep', raw);
+                            }}
+                            className="h-7 text-xs w-32 font-mono"
+                            title="CEP para cálculo automático de frete na Amazon. Para outros marketplaces, informe manualmente na coluna Frete."
+                          />
+                          {freightCep.replace(/\D/g, '').length === 8 && (
+                            <span className="text-[10px] text-emerald-600 font-semibold">✓ Configurado</span>
+                          )}
                         </div>
 
                         {/* Input de busca */}
