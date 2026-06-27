@@ -316,8 +316,9 @@ export default function PesquisaPrecos() {
 
   useEffect(() => {
     if (selectedItem) {
-      setMarketSearchTerm(selectedItem.description);
-      setMarketResults([]);
+      // Restaura o termo e resultados da última busca deste item
+      setMarketSearchTerm(selectedItem.marketSearchTerm ?? selectedItem.description);
+      setMarketResults(selectedItem.marketSearchResults ?? []);
       setCuradoriaTab('basket');
     }
   }, [selectedItemId, selectedItem?.description]);
@@ -347,6 +348,13 @@ export default function PesquisaPrecos() {
     try {
       const results = await marketSearchService.search(marketSearchTerm, selectedMarketProviders);
       setMarketResults(results);
+      // Persiste os resultados no item para não perder ao trocar de item
+      if (selectedItem) {
+        updateItem(selectedItem.localId, {
+          marketSearchTerm,
+          marketSearchResults: results,
+        });
+      }
       toast.success(`${results.length} resultado(s) encontrado(s).`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Falha na pesquisa de mercado.');
@@ -414,7 +422,10 @@ export default function PesquisaPrecos() {
     setCapturingUrls((prev) => new Set(prev).add(result.link));
     try {
       const imageUrl = await marketSearchService.capture(result.link);
-      updateCandidate(selectedItem.localId, candidateId, { evidenceImage: imageUrl });
+      updateCandidate(selectedItem.localId, candidateId, {
+        evidenceImage: imageUrl,
+        evidenceCapturedAt: new Date().toISOString(),
+      });
       toast.success('Evidência capturada e salva com sucesso.');
     } catch {
       toast.error('Oferta incluída, mas não foi possível capturar o print. Tente manualmente na cesta.');
@@ -426,9 +437,10 @@ export default function PesquisaPrecos() {
   const handleCaptureEvidence = async (candidateId: string, url: string) => {
     setCapturingCandidateId(candidateId);
     try {
-      const base64 = await marketSearchService.capture(url);
+      const imageUrl = await marketSearchService.capture(url);
       updateCandidate(selectedItem.localId, candidateId, {
-        evidenceImage: base64,
+        evidenceImage: imageUrl,
+        evidenceCapturedAt: new Date().toISOString(),
       });
       toast.success('Evidência capturada com sucesso.');
     } catch (error) {
@@ -1426,7 +1438,8 @@ export default function PesquisaPrecos() {
                             <TableHead>Órgão e Fornecedor</TableHead>
                             <TableHead>Unidade</TableHead>
                             <TableHead className="text-right">Preço Original</TableHead>
-                            <TableHead className="text-right">Preço Comparável</TableHead>
+                            <TableHead className="text-right w-24">Frete (R$)</TableHead>
+                            <TableHead className="text-right">Preço Comp.</TableHead>
                             <TableHead className="text-center w-28">Evidência</TableHead>
                             <TableHead className="min-w-[160px]">Exclusão</TableHead>
                           </TableRow>
@@ -1498,6 +1511,28 @@ export default function PesquisaPrecos() {
                                   </TableCell>
                                   <TableCell className="font-mono text-[11px]">{candidate.originalUnitLabel}</TableCell>
                                   <TableCell className="text-right font-mono text-[11px]">{formatCurrency(candidate.originalUnitPrice)}</TableCell>
+                                  <TableCell className="text-right w-24">
+                                    {candidate.sourceType !== 'compras_gov_precos' ? (
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="0,00"
+                                        aria-label="Frete"
+                                        className="h-7 text-right font-mono text-[11px] w-20 ml-auto px-1.5"
+                                        value={candidate.freightCost ?? ''}
+                                        onChange={(e) => {
+                                          const freight = e.target.value === '' ? undefined : Math.max(0, parseFloat(e.target.value) || 0);
+                                          updateCandidate(selectedItem.localId, candidate.id, {
+                                            freightCost: freight,
+                                            comparableUnitPrice: candidate.originalUnitPrice + (freight ?? 0),
+                                          });
+                                        }}
+                                      />
+                                    ) : (
+                                      <span className="text-[10px] text-text-muted font-mono">-</span>
+                                    )}
+                                  </TableCell>
                                   <TableCell className="text-right font-mono text-[11px] font-bold">{formatCurrency(candidate.comparableUnitPrice)}</TableCell>
                                   <TableCell className="text-center">
                                     {candidate.selected && candidate.sourceType !== 'compras_gov_precos' ? (
