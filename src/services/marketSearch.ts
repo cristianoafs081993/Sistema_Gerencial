@@ -68,6 +68,7 @@ export const marketSearchService = {
       });
 
     if (uploadError) {
+      console.error('[capture] Supabase upload error:', uploadError);
       throw new Error(`Erro ao salvar a evidência no armazenamento: ${uploadError.message}`);
     }
 
