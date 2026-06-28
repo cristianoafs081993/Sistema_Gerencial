@@ -558,16 +558,53 @@ export default function PesquisaPrecos() {
     const saved = await saveResearch('completed');
     if (!saved) return;
 
+    // Pré-carrega todas as imagens de evidência como base64 para embutir no HTML
+    // (evita imagens em branco no PDF causadas por carregamento assíncrono de URLs externas)
+    const fetchImageAsDataUri = async (url: string): Promise<string> => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return url;
+        const blob = await res.blob();
+        return await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => resolve(url);
+          reader.readAsDataURL(blob);
+        });
+      } catch {
+        return url; // fallback: usa URL original
+      }
+    };
+
+    // Clona os dados e substitui URLs por data URIs
+    const reportDataWithEmbeddedImages: typeof reportData = {
+      ...reportData,
+      items: await Promise.all(
+        reportData.items.map(async (item) => ({
+          ...item,
+          candidates: await Promise.all(
+            item.candidates.map(async (c) => {
+              if (c.evidenceImage && c.evidenceImage.startsWith('http')) {
+                return { ...c, evidenceImage: await fetchImageAsDataUri(c.evidenceImage) };
+              }
+              return c;
+            })
+          ),
+        }))
+      ),
+    };
+
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       toast.error('O navegador bloqueou a abertura do relatório.');
       return;
     }
-    printWindow.document.write(buildPriceResearchReportHtml(reportData));
+    printWindow.document.write(buildPriceResearchReportHtml(reportDataWithEmbeddedImages));
     printWindow.document.close();
     printWindow.focus();
-    window.setTimeout(() => printWindow.print(), 100);
+    window.setTimeout(() => printWindow.print(), 500);
   };
+
 
   const loadResearch = async (id: string) => {
     setLoadingResearchId(id);
