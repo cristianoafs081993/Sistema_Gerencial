@@ -677,11 +677,19 @@ export function buildPriceResearchReportHtml(data: PriceResearchReportData) {
                 return `
                   <div style="margin-bottom: 8px;">
                     <h2 style="font-size: 12px; color: #1f6f32; margin-bottom: 12px; border-bottom: 1px dashed #ddd; padding-bottom: 4px;">Item ${escapeHtml(item.itemNumber)} — ${escapeHtml(item.description)}</h2>
-                    ${selectedWithEvidence
                       .map(
-                        (c) => `
-                      <div style="page-break-before: always; padding: 16px 0;">
-                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 10px;">
+                        (c) => {
+                          const captureDate = c.evidenceCapturedAt || c.resultDate || new Date().toISOString();
+                          let formattedDate = 'Data indisponível';
+                          try {
+                            formattedDate = new Date(captureDate).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+                          } catch (e) {
+                            formattedDate = String(captureDate);
+                          }
+
+                          return `
+                      <div style="page-break-inside: avoid; padding: 12px 0; border-bottom: 1px dashed #ddd; margin-bottom: 16px;">
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 10px;">
                           <tr>
                             <td style="padding: 4px 8px; background: #f0f7f0; border: 1px solid #c8e0c8; width: 120px; color: #444; font-weight: bold;">Fonte</td>
                             <td style="padding: 4px 8px; border: 1px solid #ddd;">${escapeHtml(c.sourceLabel)}</td>
@@ -701,17 +709,17 @@ export function buildPriceResearchReportHtml(data: PriceResearchReportData) {
                               <a href="${escapeHtml(c.sourceUrl)}" style="color:#1f5e9c; text-decoration: none; font-size: 9px;">${escapeHtml(c.sourceUrl)}</a>
                             </td>
                           </tr>
-                          ${c.evidenceCapturedAt ? `
                           <tr>
                             <td style="padding: 4px 8px; background: #f0f7f0; border: 1px solid #c8e0c8; color: #444; font-weight: bold;">Data captura</td>
-                            <td colspan="3" style="padding: 4px 8px; border: 1px solid #ddd; color: #555; font-size: 9px;">${new Date(c.evidenceCapturedAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</td>
-                          </tr>` : ''}
+                            <td colspan="3" style="padding: 4px 8px; border: 1px solid #ddd; color: #555; font-size: 9px;">${formattedDate}</td>
+                          </tr>
                         </table>
                         <div style="border: 1px solid #ccc; background: white; border-radius: 4px; padding: 4px; text-align: center;">
-                          <img src="${c.evidenceImage}" alt="Evidência ${escapeHtml(c.sourceLabel)}" style="width: 100%; max-height: 520px; object-fit: contain;" />
+                          <img src="${c.evidenceImage}" alt="Evidência ${escapeHtml(c.sourceLabel)}" style="width: 100%; max-height: 280px; object-fit: contain;" />
                         </div>
                       </div>
-                    `,
+                    `;
+                        }
                       )
                       .join('')}
                   </div>
