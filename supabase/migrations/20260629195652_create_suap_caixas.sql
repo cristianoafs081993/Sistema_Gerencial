@@ -4,11 +4,13 @@ CREATE TABLE IF NOT EXISTS public.suap_caixas (
   tenant_id uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
   nome text NOT NULL,
   url text NOT NULL,
-  sync_automatica boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-  updated_at timestamptz NOT NULL DEFAULT timezone('utc', now()),
-  last_sync_at timestamptz NULL
+  updated_at timestamptz NOT NULL DEFAULT timezone('utc', now())
 );
+
+-- Garantir que as novas colunas existam mesmo se a tabela já existia antes
+ALTER TABLE public.suap_caixas ADD COLUMN IF NOT EXISTS sync_automatica boolean NOT NULL DEFAULT true;
+ALTER TABLE public.suap_caixas ADD COLUMN IF NOT EXISTS last_sync_at timestamptz NULL;
 
 -- Ativar RLS
 ALTER TABLE public.suap_caixas ENABLE ROW LEVEL SECURITY;
