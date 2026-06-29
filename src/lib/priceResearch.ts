@@ -622,6 +622,79 @@ export function buildPriceResearchReportHtml(data: PriceResearchReportData) {
     `;
   }).join('');
 
+  // Pré-gera a seção de evidências de forma limpa, evitando código complexo dentro do template string principal
+  const evidenceSections = data.items
+    .map((item) => {
+      const selectedWithEvidence = item.candidates.filter(
+        (c) =>
+          c.selected &&
+          c.sourceType !== 'compras_gov_precos' &&
+          c.evidenceImage &&
+          (c.evidenceImage.startsWith('http') || c.evidenceImage.startsWith('data:'))
+      );
+      if (selectedWithEvidence.length === 0) return '';
+
+      const evidencesHtml = selectedWithEvidence
+        .map((c) => {
+          const captureDate = c.evidenceCapturedAt || c.resultDate || new Date().toISOString();
+          let formattedDate = 'Data indisponível';
+          try {
+            formattedDate = new Date(captureDate).toLocaleString('pt-BR', {
+              dateStyle: 'short',
+              timeStyle: 'short',
+            });
+          } catch (e) {
+            formattedDate = String(captureDate);
+          }
+
+          return `
+            <div style="page-break-inside: avoid; padding: 12px 0; border-bottom: 1px dashed #ddd; margin-bottom: 16px;">
+              <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 10px;">
+                <tr>
+                  <td style="padding: 4px 8px; background: #f0f7f0; border: 1px solid #c8e0c8; width: 120px; color: #444; font-weight: bold;">Fonte</td>
+                  <td style="padding: 4px 8px; border: 1px solid #ddd;">${escapeHtml(c.sourceLabel)}</td>
+                  <td style="padding: 4px 8px; background: #f0f7f0; border: 1px solid #c8e0c8; width: 120px; color: #444; font-weight: bold;">Preço unitário</td>
+                  <td style="padding: 4px 8px; border: 1px solid #ddd; font-weight: bold;">${formatCurrency(c.originalUnitPrice)}</td>
+                </tr>
+                ${
+                  c.freightCost != null && c.freightCost > 0
+                    ? `
+                <tr>
+                  <td style="padding: 4px 8px; background: #f0f7f0; border: 1px solid #c8e0c8; color: #444; font-weight: bold;">Frete</td>
+                  <td style="padding: 4px 8px; border: 1px solid #ddd;">${formatCurrency(c.freightCost)}</td>
+                  <td style="padding: 4px 8px; background: #f0f7f0; border: 1px solid #c8e0c8; color: #444; font-weight: bold;">Preço + Frete</td>
+                  <td style="padding: 4px 8px; border: 1px solid #ddd; font-weight: bold; color: #1f6f32;">${formatCurrency(c.comparableUnitPrice)}</td>
+                </tr>`
+                    : ''
+                }
+                <tr>
+                  <td style="padding: 4px 8px; background: #f0f7f0; border: 1px solid #c8e0c8; color: #444; font-weight: bold;">URL</td>
+                  <td colspan="3" style="padding: 4px 8px; border: 1px solid #ddd; word-break: break-all;">
+                    <a href="${escapeHtml(c.sourceUrl)}" style="color:#1f5e9c; text-decoration: none; font-size: 9px;">${escapeHtml(c.sourceUrl)}</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 4px 8px; background: #f0f7f0; border: 1px solid #c8e0c8; color: #444; font-weight: bold;">Data captura</td>
+                  <td colspan="3" style="padding: 4px 8px; border: 1px solid #ddd; color: #555; font-size: 9px;">${formattedDate}</td>
+                </tr>
+              </table>
+              <div style="border: 1px solid #ccc; background: white; border-radius: 4px; padding: 4px; text-align: center;">
+                <img src="${c.evidenceImage}" alt="Evidência ${escapeHtml(c.sourceLabel)}" style="width: 100%; max-height: 280px; object-fit: contain;" />
+              </div>
+            </div>
+          `;
+        })
+        .join('');
+
+      return `
+        <div style="margin-bottom: 8px;">
+          <h2 style="font-size: 12px; color: #1f6f32; margin-bottom: 12px; border-bottom: 1px dashed #ddd; padding-bottom: 4px;">Item ${escapeHtml(item.itemNumber)} — ${escapeHtml(item.description)}</h2>
+          ${evidencesHtml}
+        </div>
+      `;
+    })
+    .join('');
+
   return `<!doctype html>
   <html lang="pt-BR">
     <head>
@@ -670,62 +743,7 @@ export function buildPriceResearchReportHtml(data: PriceResearchReportData) {
           <div style="page-break-before: always; margin-top: 30px;">
             <h1 style="border-bottom: 2px solid #1f6f32; padding-bottom: 6px; font-size: 16px; color: #1f6f32; margin-top: 0;">Anexo I — Evidências de Preços</h1>
             <p style="font-size: 10px; color: #555; margin-bottom: 20px;">Capturas de tela das cotações que compõem a cesta de preços como prova de conformidade legal (Instrução Normativa ME nº 65/2021).</p>
-            ${data.items
-              .map((item) => {
-                const selectedWithEvidence = item.candidates.filter((c) => c.selected && c.sourceType !== 'compras_gov_precos' && c.evidenceImage && (c.evidenceImage.startsWith('http') || c.evidenceImage.startsWith('data:')));
-                if (selectedWithEvidence.length === 0) return '';
-                return `
-                  <div style="margin-bottom: 8px;">
-                    <h2 style="font-size: 12px; color: #1f6f32; margin-bottom: 12px; border-bottom: 1px dashed #ddd; padding-bottom: 4px;">Item ${escapeHtml(item.itemNumber)} — ${escapeHtml(item.description)}</h2>
-                      .map(
-                        (c) => {
-                          const captureDate = c.evidenceCapturedAt || c.resultDate || new Date().toISOString();
-                          let formattedDate = 'Data indisponível';
-                          try {
-                            formattedDate = new Date(captureDate).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
-                          } catch (e) {
-                            formattedDate = String(captureDate);
-                          }
-
-                          return `
-                      <div style="page-break-inside: avoid; padding: 12px 0; border-bottom: 1px dashed #ddd; margin-bottom: 16px;">
-                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 10px;">
-                          <tr>
-                            <td style="padding: 4px 8px; background: #f0f7f0; border: 1px solid #c8e0c8; width: 120px; color: #444; font-weight: bold;">Fonte</td>
-                            <td style="padding: 4px 8px; border: 1px solid #ddd;">${escapeHtml(c.sourceLabel)}</td>
-                            <td style="padding: 4px 8px; background: #f0f7f0; border: 1px solid #c8e0c8; width: 120px; color: #444; font-weight: bold;">Preço unitário</td>
-                            <td style="padding: 4px 8px; border: 1px solid #ddd; font-weight: bold;">${formatCurrency(c.originalUnitPrice)}</td>
-                          </tr>
-                          ${c.freightCost != null && c.freightCost > 0 ? `
-                          <tr>
-                            <td style="padding: 4px 8px; background: #f0f7f0; border: 1px solid #c8e0c8; color: #444; font-weight: bold;">Frete</td>
-                            <td style="padding: 4px 8px; border: 1px solid #ddd;">${formatCurrency(c.freightCost)}</td>
-                            <td style="padding: 4px 8px; background: #f0f7f0; border: 1px solid #c8e0c8; color: #444; font-weight: bold;">Preço + Frete</td>
-                            <td style="padding: 4px 8px; border: 1px solid #ddd; font-weight: bold; color: #1f6f32;">${formatCurrency(c.comparableUnitPrice)}</td>
-                          </tr>` : ''}
-                          <tr>
-                            <td style="padding: 4px 8px; background: #f0f7f0; border: 1px solid #c8e0c8; color: #444; font-weight: bold;">URL</td>
-                            <td colspan="3" style="padding: 4px 8px; border: 1px solid #ddd; word-break: break-all;">
-                              <a href="${escapeHtml(c.sourceUrl)}" style="color:#1f5e9c; text-decoration: none; font-size: 9px;">${escapeHtml(c.sourceUrl)}</a>
-                            </td>
-                          </tr>
-                          <tr>
-                            <td style="padding: 4px 8px; background: #f0f7f0; border: 1px solid #c8e0c8; color: #444; font-weight: bold;">Data captura</td>
-                            <td colspan="3" style="padding: 4px 8px; border: 1px solid #ddd; color: #555; font-size: 9px;">${formattedDate}</td>
-                          </tr>
-                        </table>
-                        <div style="border: 1px solid #ccc; background: white; border-radius: 4px; padding: 4px; text-align: center;">
-                          <img src="${c.evidenceImage}" alt="Evidência ${escapeHtml(c.sourceLabel)}" style="width: 100%; max-height: 280px; object-fit: contain;" />
-                        </div>
-                      </div>
-                    `;
-                        }
-                      )
-                      .join('')}
-                  </div>
-                `;
-              })
-              .join('')}
+            ${evidenceSections}
           </div>
         `
           : ''
