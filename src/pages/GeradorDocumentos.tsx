@@ -508,7 +508,7 @@ export default function GeradorDocumentos() {
                     <Plus className="w-4 h-4 mr-2" /> ADICIONAR NATUREZA DE DESPESA
                   </Button>
 
-                  <div className="flex justify-between items-center px-4 py-3 bg-blue-50/50 border-2 border-blue-200 rounded-lg text-blue-800">
+                  <div className="flex justify-between items-center px-4 py-3 bg-sebrae-blue/5 border-2 border-sebrae-blue/20 rounded-lg text-sebrae-navy">
                     <span className="text-sm font-semibold">TOTAL PREVISTO:</span>
                     <span className="text-lg font-black font-mono tabular-nums">R$ {formatCurrency(totalCDO())}</span>
                   </div>
@@ -552,7 +552,7 @@ export default function GeradorDocumentos() {
                 >
                   <Button 
                     variant="outline"
-                    className="h-14 bg-blue-600 hover:bg-blue-700 text-white font-black transition-all border-none active:scale-[0.98]"
+                    className="h-14 bg-sebrae-blue hover:bg-sebrae-navy text-white font-black transition-all border-none active:scale-[0.98]"
                     onClick={handleClone}
                   >
                     <ExternalLink className="w-5 h-5 mr-2" /> CLONAR NO SUAP
@@ -663,7 +663,7 @@ export default function GeradorDocumentos() {
 
               <div className="px-6 py-4 border-t flex gap-4 bg-muted/20 shrink-0">
                 <Button 
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 shadow-sm px-6"
+                  className="bg-sebrae-blue hover:bg-sebrae-navy text-white font-bold h-12 shadow-sm px-6"
                   onClick={handleClone}
                 >
                   <ExternalLink className="w-4 h-4 mr-2" /> CLONAR NO SUAP

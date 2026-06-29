@@ -893,7 +893,7 @@ export default function RequisicaoCompraPage() {
                         )}
                         {requisicao.processNumber && (
                           <div className="flex gap-1.5 items-start">
-                            <FileText className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                            <FileText className="h-4 w-4 text-sebrae-blue shrink-0 mt-0.5" />
                             <span>Processo: <span className="font-bold text-text-primary">{requisicao.processNumber}</span></span>
                           </div>
                         )}
@@ -1064,7 +1064,7 @@ export default function RequisicaoCompraPage() {
                             <TableRow key={perm.id}>
                               <TableCell className="font-bold font-mono">{perm.userMatricula || perm.userEmail}</TableCell>
                               <TableCell>
-                                <Badge variant="secondary" className={perm.contratoId ? 'bg-blue-50 text-blue-800' : 'bg-amber-50 text-amber-800'}>
+                                <Badge variant="secondary" className={perm.contratoId ? 'bg-sebrae-blue/10 text-sebrae-blue border border-sebrae-blue/20' : 'bg-amber-50 text-amber-800'}>
                                   {perm.contratoId ? 'Contrato' : 'Empenho'}
                                 </Badge>
                               </TableCell>

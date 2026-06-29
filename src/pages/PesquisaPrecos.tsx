@@ -70,7 +70,7 @@ function formatDate(value?: string | null) {
 function candidateStatus(candidate: PriceResearchCandidate) {
   if (!candidate.unitCompatible) return { label: 'Revisar unidade', className: 'border-amber-300 bg-amber-50 text-amber-800' };
   if (candidate.aiScore >= 80) return { label: 'Alta aderência', className: 'border-primary/20 bg-primary/[0.08] text-primary' };
-  if (candidate.aiScore >= 60) return { label: 'Aderente', className: 'border-blue-300 bg-blue-50 text-blue-700' };
+  if (candidate.aiScore >= 60) return { label: 'Aderente', className: 'border-sebrae-blue/25 bg-sebrae-blue/[0.08] text-sebrae-blue' };
   return { label: 'Revisar descrição', className: 'border-slate-300 bg-slate-50 text-slate-700' };
 }
 
@@ -744,17 +744,17 @@ export default function PesquisaPrecos() {
                   </div>
 
                   {selectedItem.catalogMatchStatus === 'searching' && (
-                    <div className="mt-4 flex items-center gap-2 rounded-radius-md border border-blue-200 bg-blue-50/50 p-4 font-ui text-sm text-blue-800">
-                      <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                    <div className="mt-4 flex items-center gap-2 rounded-radius-md border border-sebrae-blue/20 bg-sebrae-blue/5 p-4 font-ui text-sm text-sebrae-navy">
+                      <Loader2 className="h-4 w-4 animate-spin text-sebrae-blue" />
                       Pesquisando correspondências no catálogo de referência de IA...
                     </div>
                   )}
 
                   {selectedItem.catalogSuggestions && selectedItem.catalogSuggestions.length > 0 && (
-                    <div className="mt-4 space-y-3 rounded-radius-lg border border-blue-200 bg-blue-50/20 p-4">
+                    <div className="mt-4 space-y-3 rounded-radius-lg border border-sebrae-blue/20 bg-sebrae-blue/[0.04] p-4">
                       <div>
-                        <h4 className="font-ui text-sm font-semibold text-blue-950">Códigos Semelhantes Identificados no Catálogo</h4>
-                        <p className="font-ui text-xs text-blue-800">Selecione uma das opções para usá-la como filtro da consulta.</p>
+                        <h4 className="font-ui text-sm font-semibold text-sebrae-navy">Códigos Semelhantes Identificados no Catálogo</h4>
+                        <p className="font-ui text-xs text-sebrae-blue">Selecione uma das opções para usá-la como filtro da consulta.</p>
                       </div>
                       <div className="grid gap-3 md:grid-cols-2">
                         {selectedItem.catalogSuggestions.map((suggestion) => {
@@ -1020,7 +1020,7 @@ export default function PesquisaPrecos() {
                                     Fonte Oficial <ExternalLink className="h-2.5 w-2.5" />
                                   </a>
                                   {candidate.pncpSearchUrl && (
-                                    <a href={candidate.pncpSearchUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-bold text-blue-700 hover:underline">
+                                    <a href={candidate.pncpSearchUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-bold text-sebrae-blue hover:underline">
                                       PNCP <ExternalLink className="h-2.5 w-2.5" />
                                     </a>
                                   )}

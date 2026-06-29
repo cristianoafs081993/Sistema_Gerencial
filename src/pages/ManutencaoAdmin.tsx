@@ -71,7 +71,7 @@ const mapAcaoLabel: Record<string, string> = {
 };
 
 const mapAcaoBadge: Record<string, string> = {
-  limpeza_padrao: 'border-blue-200 bg-blue-50 text-blue-700',
+  limpeza_padrao: 'border-sebrae-blue/20 bg-sebrae-blue/10 text-sebrae-blue',
   reposicao_insumos: 'border-purple-200 bg-purple-50 text-purple-700',
   inspecao: 'border-amber-200 bg-amber-50 text-amber-700',
   manutencao_corretiva: 'border-red-200 bg-red-50 text-red-700',

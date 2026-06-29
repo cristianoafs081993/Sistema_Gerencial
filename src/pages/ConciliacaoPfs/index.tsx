@@ -187,8 +187,8 @@ export default function ConciliacaoPfs() {
         <Card className="shadow-sm card-system overflow-hidden">
           <CardHeader className="px-6 py-4 border-b border-border-default/50 flex flex-row items-center justify-between bg-white">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-50 rounded-lg">
-                <ArrowRightCircle className="h-5 w-5 text-blue-500" />
+              <div className="p-2 bg-sebrae-blue/10 rounded-lg">
+                <ArrowRightCircle className="h-5 w-5 text-sebrae-blue" />
               </div>
               <div>
                 <CardTitle className="table-title">

@@ -540,7 +540,7 @@ export default function CadastroTerceirizadosPage() {
                             <TableRow key={perm.id} className="hover:bg-surface-hover/10">
                               <TableCell className="py-2.5">
                                 {isContrato ? (
-                                  <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-100 flex items-center gap-1 w-fit">
+                                  <Badge variant="outline" className="bg-sebrae-blue/10 text-sebrae-blue border-sebrae-blue/20 flex items-center gap-1 w-fit">
                                     <FileText className="h-3 w-3 shrink-0" />
                                     Contrato
                                   </Badge>

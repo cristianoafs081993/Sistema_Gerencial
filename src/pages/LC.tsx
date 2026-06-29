@@ -62,7 +62,7 @@ function CopyButton({ value, disabled }: { value: string; disabled?: boolean }) 
       title={disabled ? 'Selecione a linha para copiar' : 'Copiar'}
     >
       {copied ? (
-        <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+        <Check className="h-3 w-3 text-ifrn-green" />
       ) : (
         <Copy className="h-3 w-3" />
       )}

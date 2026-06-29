@@ -409,7 +409,7 @@ export default function Consultor() {
                 
                 {/* File Attachment Badge */}
                 {msg.attachedFile && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 border border-blue-100 rounded-lg text-xs font-semibold w-fit">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-sebrae-blue/10 text-sebrae-blue border border-sebrae-blue/20 rounded-lg text-xs font-semibold w-fit">
                     <FileText className="w-4 h-4 shrink-0" />
                     <span className="truncate">{msg.attachedFile.name}</span>
                   </div>
@@ -492,9 +492,9 @@ export default function Consultor() {
           
           {/* Active File Preview */}
           {attachedFile && (
-            <div className="flex items-center justify-between p-3 mb-3 bg-white border border-blue-200 rounded-xl shadow-sm w-fit max-w-full">
+            <div className="flex items-center justify-between p-3 mb-3 bg-white border border-sebrae-blue/20 rounded-xl shadow-sm w-fit max-w-full">
               <div className="flex items-center gap-3 overflow-hidden">
-                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                <div className="p-2 bg-sebrae-blue/10 text-sebrae-blue rounded-lg">
                   <FileText className="w-5 h-5" />
                 </div>
                 <div className="truncate shrink">

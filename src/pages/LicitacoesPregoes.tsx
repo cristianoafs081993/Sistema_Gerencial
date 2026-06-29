@@ -103,7 +103,7 @@ function formatUasg(row: LicitacaoPncpRow) {
 
 function proposalBadgeClass(status: string) {
   if (status === 'Aberta') return 'border-primary/20 bg-primary/[0.08] text-primary';
-  if (status === 'Futura') return 'border-blue-500/20 bg-blue-500/[0.08] text-blue-700';
+  if (status === 'Futura') return 'border-sebrae-blue/20 bg-sebrae-blue/[0.08] text-sebrae-blue';
   if (status === 'Encerrada') return 'border-slate-300 bg-slate-50 text-slate-600';
   return 'border-amber-500/20 bg-amber-500/[0.08] text-amber-700';
 }

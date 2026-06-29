@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { transparenciaService } from '@/services/transparencia';
 import { DocumentoDespesa, DocumentoSituacao } from '@/types';
@@ -455,7 +455,7 @@ export default function LiquidacoesPagamentos() {
                                                     {doc.estado}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="text-right font-black text-[11px] text-blue-600 dark:text-blue-400 py-4 px-3 align-top">
+                                            <TableCell className="text-right font-black text-[11px] text-sebrae-blue py-4 px-3 align-top">
                                                 {doc.valor_original ? formatCurrency(doc.valor_original) : '-'}
                                             </TableCell>
                                             <TableCell className="text-right font-black text-[11px] text-emerald-600 dark:text-emerald-400 py-4 px-3 align-top">
