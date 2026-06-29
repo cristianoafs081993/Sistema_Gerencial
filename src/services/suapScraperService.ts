@@ -934,4 +934,99 @@ export const suapScraperService = {
     log(`[${proc.suapId}] Sincronização concluída com sucesso!`);
     return true;
   },
+
+  // Descobre todas as caixas de processos disponíveis analisando o HTML principal da caixa do SUAP
+  discoverCaixasProcessos(html: string): Array<{ nome: string; url: string }> {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    
+    // O menu lateral de filtros/caixas do SUAP costuma usar links apontando para caixa_processos
+    const links = Array.from(doc.querySelectorAll('a[href*="/processo_eletronico/caixa_processos/"]'));
+    const caixasMap = new Map<string, string>(); // url -> nome
+    
+    // Caixa padrão (Recebidos)
+    caixasMap.set('https://suap.ifrn.edu.br/processo_eletronico/caixa_processos/', 'Caixa de Entrada (Padrão)');
+
+    for (const link of links) {
+      const href = link.getAttribute('href') || '';
+      let fullUrl = href;
+      if (href.startsWith('/')) {
+        fullUrl = `https://suap.ifrn.edu.br${href}`;
+      } else if (!href.startsWith('http')) {
+        fullUrl = `https://suap.ifrn.edu.br/processo_eletronico/caixa_processos/${href}`;
+      }
+      
+      const nome = link.textContent?.trim().replace(/\s+/g, ' ') || '';
+      // Limpar nomes vazios ou links repetitivos de paginação/filtros
+      if (!nome || nome.includes('Anterior') || nome.includes('Próximo') || nome.match(/^\d+$/)) {
+        continue;
+      }
+      
+      // Ignorar parâmetros de paginação (?page=) que alteram a mesma caixa
+      if (fullUrl.includes('page=')) continue;
+      
+      caixasMap.set(fullUrl, nome);
+    }
+    
+    return Array.from(caixasMap.entries()).map(([url, nome]) => ({ nome, url }));
+  },
+
+  // CRUD de caixas de processos no banco de dados do Supabase
+  async fetchCaixas(tenantId: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('suap_caixas')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  async addCaixa(tenantId: string, nome: string, url: string, syncAutomatica = true): Promise<any> {
+    const { data, error } = await supabase
+      .from('suap_caixas')
+      .insert({
+        tenant_id: tenantId,
+        nome,
+        url,
+        sync_automatica: syncAutomatica,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteCaixa(caixaId: string, tenantId: string): Promise<void> {
+    const { error } = await supabase
+      .from('suap_caixas')
+      .delete()
+      .eq('id', caixaId)
+      .eq('tenant_id', tenantId);
+
+    if (error) throw error;
+  },
+
+  async toggleSyncAutomatica(caixaId: string, tenantId: string, enabled: boolean): Promise<any> {
+    const { data, error } = await supabase
+      .from('suap_caixas')
+      .update({ sync_automatica: enabled, updated_at: new Date().toISOString() })
+      .eq('id', caixaId)
+      .eq('tenant_id', tenantId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  async updateLastSyncTime(caixaId: string, tenantId: string): Promise<void> {
+    await supabase
+      .from('suap_caixas')
+      .update({ last_sync_at: new Date().toISOString() })
+      .eq('id', caixaId)
+      .eq('tenant_id', tenantId);
+  }
 };
