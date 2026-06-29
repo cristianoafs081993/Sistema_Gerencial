@@ -43,5 +43,9 @@ verify_jwt = false
 [functions.suap-token-exchange]
 verify_jwt = false
 
+[functions.suap-proxy]
+verify_jwt = false
+
 [functions.pesquisar-precos]
 verify_jwt = true
+

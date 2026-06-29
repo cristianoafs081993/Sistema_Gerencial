@@ -21,7 +21,7 @@ export default function SuapCallback() {
 
     // 1. If session is already active (e.g. after Supabase hash verify redirects here), redirect to next path
     // But ONLY if we are not actively processing a public feedback login callback.
-    if (session && !isPublicFeedbackCallback) {
+    if (session && !code && !isPublicFeedbackCallback) {
       const nextPath = localStorage.getItem('suap_login_next') || '/';
       localStorage.removeItem('suap_login_next');
       navigate(nextPath, { replace: true });
@@ -71,7 +71,25 @@ export default function SuapCallback() {
           throw new Error(data.details || data.error || 'Falha ao autenticar com o SUAP.');
         }
 
+        if (data?.token?.access_token) {
+          localStorage.setItem('suap_access_token', data.token.access_token);
+          if (data.token.refresh_token) {
+            localStorage.setItem('suap_refresh_token', data.token.refresh_token);
+          }
+          const expiresAt = Date.now() + (data.token.expires_in || 3600) * 1000;
+          localStorage.setItem('suap_token_expires_at', String(expiresAt));
+        }
+
         if (isAppLogin) {
+          // Se o usuário já possui sessão ativa no Supabase, apenas redireciona
+          if (session) {
+            const nextPath = localStorage.getItem('suap_login_next') || '/';
+            localStorage.removeItem('suap_login_next');
+            navigate(nextPath, { replace: true });
+            toast.success('Conectado ao SUAP com sucesso!');
+            return;
+          }
+
           // Use verifyOtp with the token_hash to establish the session directly,
           // avoiding the Supabase redirect URL whitelist that sends localhost to production.
           if (data?.hashed_token) {
