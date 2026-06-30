@@ -92,15 +92,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Montar cookies do GET para enviar de volta no POST
-      const cookiesList: string[] = [`csrftoken=${csrfToken}`];
-      const sessionMatchFromGet = setCookieHeaders.match(/sessionid=([^;]+)/);
-      if (sessionMatchFromGet) {
-        cookiesList.push(`sessionid=${sessionMatchFromGet[1]}`);
-      }
-      const cookieHeader = cookiesList.join('; ');
-      console.log('[suap-proxy] Cookies enviados no POST de login:', cookieHeader);
-
       // 2. Executar o POST de login no SUAP
       const loginParams = new URLSearchParams();
       loginParams.append('username', username);
@@ -112,7 +103,7 @@ Deno.serve(async (req) => {
       const postRes = await fetch(loginPageUrl, {
         method: 'POST',
         headers: {
-          'Cookie': cookieHeader,
+          'Cookie': `csrftoken=${csrfToken}`,
           'Referer': loginPageUrl,
           'Content-Type': 'application/x-www-form-urlencoded',
         },
@@ -122,22 +113,15 @@ Deno.serve(async (req) => {
 
       console.log(`[suap-proxy] Resposta de login do SUAP: status=${postRes.status}`);
 
-      // No Django, login com sucesso REDIRECIONA (status 302 ou 301)
-      if (postRes.status !== 302 && postRes.status !== 301) {
-        return new Response(JSON.stringify({ error: 'Matrícula ou senha inválidas no SUAP.' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
       const postSetCookie = postRes.headers.get('Set-Cookie') || '';
       console.log('[suap-proxy] Set-Cookie recebidos do login:', postSetCookie);
 
       const sessionIdMatch = postSetCookie.match(/sessionid=([^;]+)/);
       const suapSessionId = sessionIdMatch ? sessionIdMatch[1] : null;
 
-      if (!suapSessionId) {
-        return new Response(JSON.stringify({ error: 'Não foi possível recuperar o cookie de sessão autenticado do SUAP.' }), {
+      // No Django, login bem-sucedido resulta em redirecionamento (302/301) e gera o cookie sessionid
+      if ((postRes.status !== 302 && postRes.status !== 301) || !suapSessionId) {
+        return new Response(JSON.stringify({ error: 'Matrícula ou senha inválidas no SUAP.' }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
