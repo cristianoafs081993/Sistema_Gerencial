@@ -68,8 +68,11 @@ export function SuapSyncPanel({ onSyncComplete }: SuapSyncPanelProps) {
   // Carregar dados iniciais
   useEffect(() => {
     const savedSession = localStorage.getItem('suap_session_id');
-    if (savedSession) {
+    if (savedSession && savedSession !== 'undefined' && savedSession !== 'null') {
       setSuapSessionId(savedSession);
+    } else {
+      localStorage.removeItem('suap_session_id');
+      setSuapSessionId(null);
     }
   }, []);
 
@@ -147,6 +150,9 @@ export function SuapSyncPanel({ onSyncComplete }: SuapSyncPanelProps) {
 
     try {
       const sessionId = await suapScraperService.loginSuap(suapUser.trim(), suapPass);
+      if (!sessionId || sessionId === 'undefined' || sessionId === 'null') {
+        throw new Error('O SUAP não retornou um cookie de sessão válido. Verifique usuário e senha.');
+      }
       localStorage.setItem('suap_session_id', sessionId);
       setSuapSessionId(sessionId);
       setSuapPass('');
