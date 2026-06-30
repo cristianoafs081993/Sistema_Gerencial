@@ -44,6 +44,10 @@ export function SuapSyncPanel({ onSyncComplete }: SuapSyncPanelProps) {
   const [suapUser, setSuapUser] = useState('');
   const [suapPass, setSuapPass] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [authMode, setAuthMode] = useState<'credentials' | 'cookie'>('credentials');
+  const [cookieInput, setCookieInput] = useState('');
+  const [isConnectingCookie, setIsConnectingCookie] = useState(false);
+  const [showCookieInstructions, setShowCookieInstructions] = useState(false);
   
   const [caixas, setCaixas] = useState<CaixasSUAP[]>([]);
   const [selectedBoxIds, setSelectedBoxIds] = useState<Set<string>>(new Set());
@@ -170,6 +174,33 @@ export function SuapSyncPanel({ onSyncComplete }: SuapSyncPanelProps) {
       toast.error(err.message || 'Falha na autenticação do SUAP. Verifique usuário e senha.', { id: loadingToast });
     } finally {
       setIsLoggingIn(false);
+    }
+  };
+
+  const handleConnectCookie = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cookieInput.trim()) {
+      toast.error('Cole o cookie sessionid.');
+      return;
+    }
+    
+    setIsConnectingCookie(true);
+    const loadingToast = toast.loading('Validando cookie de sessão...');
+    
+    try {
+      const isValid = await suapScraperService.validateSession(cookieInput.trim());
+      if (!isValid) {
+        throw new Error('Sessão expirada ou cookie inválido no SUAP. Certifique-se de que o cookie é recente e de que copiou o código completo.');
+      }
+      
+      localStorage.setItem('suap_session_id', cookieInput.trim());
+      setSuapSessionId(cookieInput.trim());
+      setCookieInput('');
+      toast.success('Conectado via cookie com sucesso!', { id: loadingToast });
+    } catch (err: any) {
+      toast.error(err.message || 'Falha ao validar cookie.', { id: loadingToast });
+    } finally {
+      setIsConnectingCookie(false);
     }
   };
 
@@ -447,52 +478,129 @@ export function SuapSyncPanel({ onSyncComplete }: SuapSyncPanelProps) {
           
           {/* Seção 1: Formulário de Autenticação */}
           {!suapSessionId ? (
-            <form onSubmit={handleConnectSuap} className="grid gap-3 p-3.5 bg-slate-50 border border-slate-200/60 rounded-xl md:grid-cols-12 md:items-end">
-              <div className="md:col-span-12 font-ui text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <KeyRound className="h-4 w-4 text-emerald-600" />
-                CONEXÃO INSTITUCIONAL DO SUAP
-              </div>
-              
-              <div className="md:col-span-5 space-y-1">
-                <label htmlFor="suap-user" className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  Matrícula / Usuário
-                </label>
-                <Input
-                  id="suap-user"
-                  value={suapUser}
-                  onChange={(e) => setSuapUser(e.target.value)}
-                  placeholder="Ex: 304806"
-                  className="text-xs h-9 bg-white"
-                  disabled={isLoggingIn}
-                />
-              </div>
+            <div className="space-y-2.5">
+              {authMode === 'credentials' ? (
+                <form onSubmit={handleConnectSuap} className="grid gap-3 p-3.5 bg-slate-50 border border-slate-200/60 rounded-xl md:grid-cols-12 md:items-end">
+                  <div className="md:col-span-12 font-ui text-xs font-bold text-slate-700 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <KeyRound className="h-4 w-4 text-emerald-600" />
+                      CONEXÃO INSTITUCIONAL DO SUAP
+                    </span>
+                    <button 
+                      type="button"
+                      onClick={() => setAuthMode('cookie')}
+                      className="text-[11px] text-emerald-700 hover:underline font-semibold"
+                    >
+                      Conectar via Cookie (Sem Captcha)
+                    </button>
+                  </div>
+                  
+                  <div className="md:col-span-5 space-y-1">
+                    <label htmlFor="suap-user" className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      Matrícula / Usuário
+                    </label>
+                    <Input
+                      id="suap-user"
+                      value={suapUser}
+                      onChange={(e) => setSuapUser(e.target.value)}
+                      placeholder="Ex: 304806"
+                      className="text-xs h-9 bg-white"
+                      disabled={isLoggingIn}
+                    />
+                  </div>
 
-              <div className="md:col-span-5 space-y-1">
-                <label htmlFor="suap-pass" className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  Senha do SUAP
-                </label>
-                <Input
-                  id="suap-pass"
-                  type="password"
-                  value={suapPass}
-                  onChange={(e) => setSuapPass(e.target.value)}
-                  placeholder="Sua senha do SUAP"
-                  className="text-xs h-9 bg-white"
-                  disabled={isLoggingIn}
-                />
-              </div>
+                  <div className="md:col-span-5 space-y-1">
+                    <label htmlFor="suap-pass" className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      Senha do SUAP
+                    </label>
+                    <Input
+                      id="suap-pass"
+                      type="password"
+                      value={suapPass}
+                      onChange={(e) => setSuapPass(e.target.value)}
+                      placeholder="Sua senha do SUAP"
+                      className="text-xs h-9 bg-white"
+                      disabled={isLoggingIn}
+                    />
+                  </div>
 
-              <div className="md:col-span-2">
-                <Button 
-                  type="submit"
-                  disabled={isLoggingIn}
-                  className="w-full bg-[#1b5e20] hover:bg-[#1b5e20]/90 text-white font-bold h-9 text-xs shadow-sm gap-1"
-                >
-                  {isLoggingIn ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : null}
-                  Conectar
-                </Button>
-              </div>
-            </form>
+                  <div className="md:col-span-2">
+                    <Button 
+                      type="submit"
+                      disabled={isLoggingIn}
+                      className="w-full bg-[#1b5e20] hover:bg-[#1b5e20]/90 text-white font-bold h-9 text-xs shadow-sm gap-1"
+                    >
+                      {isLoggingIn ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : null}
+                      Conectar
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleConnectCookie} className="grid gap-3 p-3.5 bg-slate-50 border border-slate-200/60 rounded-xl md:grid-cols-12 md:items-end">
+                  <div className="md:col-span-12 font-ui text-xs font-bold text-slate-700 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <KeyRound className="h-4 w-4 text-emerald-600" />
+                      CONEXÃO MANUAL VIA COOKIE (SESSIONID)
+                    </span>
+                    <button 
+                      type="button"
+                      onClick={() => setAuthMode('credentials')}
+                      className="text-[11px] text-emerald-700 hover:underline font-semibold"
+                    >
+                      Voltar para Usuário e Senha
+                    </button>
+                  </div>
+                  
+                  <div className="md:col-span-10 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label htmlFor="suap-cookie" className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        Valor do Cookie sessionid
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowCookieInstructions(!showCookieInstructions)}
+                        className="text-[10px] text-emerald-600 hover:underline font-semibold"
+                      >
+                        {showCookieInstructions ? 'Ocultar instruções' : 'Como pegar o cookie?'}
+                      </button>
+                    </div>
+                    
+                    <Input
+                      id="suap-cookie"
+                      value={cookieInput}
+                      onChange={(e) => setCookieInput(e.target.value)}
+                      placeholder="Cole o cookie 'sessionid' aqui (ex: aai0agmn...)"
+                      className="text-xs h-9 bg-white"
+                      disabled={isConnectingCookie}
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <Button 
+                      type="submit"
+                      disabled={isConnectingCookie}
+                      className="w-full bg-[#1b5e20] hover:bg-[#1b5e20]/90 text-white font-bold h-9 text-xs shadow-sm gap-1"
+                    >
+                      {isConnectingCookie ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : null}
+                      Conectar Cookie
+                    </Button>
+                  </div>
+
+                  {showCookieInstructions && (
+                    <div className="md:col-span-12 mt-1.5 p-3 bg-white border border-slate-200 rounded-lg text-[11px] text-slate-600 space-y-1 leading-relaxed">
+                      <p className="font-bold text-slate-700">Instruções para capturar o sessionid:</p>
+                      <ol className="list-decimal pl-4 space-y-0.5">
+                        <li>Abra o SUAP (<a href="https://suap.ifrn.edu.br" target="_blank" rel="noreferrer" className="text-emerald-700 hover:underline font-bold">https://suap.ifrn.edu.br</a>) em outra aba do seu navegador e faça o login normal (resolvendo o Captcha se necessário).</li>
+                        <li>Na aba do SUAP logado, pressione a tecla <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-300 rounded text-[9px] font-bold">F12</kbd> no teclado para abrir as Ferramentas do Desenvolvedor.</li>
+                        <li>Clique na aba <strong className="text-slate-800">Aplicativo</strong> (ou <strong className="text-slate-800">Application</strong> / <strong className="text-slate-800">Armazenamento</strong>).</li>
+                        <li>No menu lateral esquerdo, expanda a opção <strong className="text-slate-800">Cookies</strong> e selecione <strong className="text-emerald-700">https://suap.ifrn.edu.br</strong>.</li>
+                        <li>Procure pelo cookie com o nome <strong className="text-slate-800">sessionid</strong>, copie o seu valor (uma cadeia de letras e números) e cole no campo acima.</li>
+                      </ol>
+                    </div>
+                  )}
+                </form>
+              )}
+            </div>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-emerald-50/50 border border-emerald-100 rounded-xl">
               <div className="flex items-center gap-2 text-xs font-ui">
