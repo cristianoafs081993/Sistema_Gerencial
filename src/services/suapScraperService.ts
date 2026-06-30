@@ -1028,5 +1028,28 @@ export const suapScraperService = {
       .update({ last_sync_at: new Date().toISOString() })
       .eq('id', caixaId)
       .eq('tenant_id', tenantId);
+  },
+
+  // Valida se um cookie de sessão do SUAP ainda é ativo
+  async validateSession(suapSessionId: string): Promise<boolean> {
+    try {
+      const { data, error } = await supabase.functions.invoke('suap-proxy', {
+        body: {
+          path: '/processo_eletronico/caixa_processos/',
+          method: 'GET',
+          suapSessionId,
+        },
+      });
+
+      if (error || !data?.text) return false;
+      
+      // Se contiver o form de login do Django, a sessão expirou
+      if (data.text.includes('id="login-form"') || data.text.includes('/accounts/login/')) {
+        return false;
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 };

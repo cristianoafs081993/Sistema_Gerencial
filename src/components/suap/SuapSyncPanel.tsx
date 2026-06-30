@@ -69,7 +69,15 @@ export function SuapSyncPanel({ onSyncComplete }: SuapSyncPanelProps) {
   useEffect(() => {
     const savedSession = localStorage.getItem('suap_session_id');
     if (savedSession && savedSession !== 'undefined' && savedSession !== 'null') {
-      setSuapSessionId(savedSession);
+      suapScraperService.validateSession(savedSession).then((isValid) => {
+        if (isValid) {
+          setSuapSessionId(savedSession);
+        } else {
+          localStorage.removeItem('suap_session_id');
+          setSuapSessionId(null);
+          toast.error('Sessão expirada ou inválida no SUAP. Conecte-se novamente.');
+        }
+      });
     } else {
       localStorage.removeItem('suap_session_id');
       setSuapSessionId(null);

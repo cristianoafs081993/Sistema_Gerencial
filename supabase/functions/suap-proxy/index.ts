@@ -110,6 +110,8 @@ Deno.serve(async (req) => {
         redirect: 'manual', // Impedir redirecionamento automático para podermos ler os cookies de resposta
       });
 
+      console.log(`[suap-proxy] Resposta de login do SUAP: status=${postRes.status}`);
+
       const postSetCookie = postRes.headers.get('Set-Cookie') || '';
       console.log('[suap-proxy] Set-Cookie recebidos do login:', postSetCookie);
 
@@ -117,7 +119,7 @@ Deno.serve(async (req) => {
       const suapSessionId = sessionIdMatch ? sessionIdMatch[1] : null;
 
       if (!suapSessionId) {
-        return new Response(JSON.stringify({ error: 'Credenciais inválidas ou falha na autenticação do SUAP' }), {
+        return new Response(JSON.stringify({ error: 'Credenciais inválidas ou falha na autenticação do SUAP.' }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
