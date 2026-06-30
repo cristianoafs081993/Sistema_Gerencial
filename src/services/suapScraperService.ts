@@ -669,7 +669,6 @@ async function downloadProcessPdf(
 
 // Portabilidade do scraping da página de listagem do SUAP
 export const suapScraperService = {
-  // Realiza o login institucional do SUAP e retorna o cookie sessionid
   async loginSuap(username: string, password: string): Promise<string> {
     const { data, error } = await supabase.functions.invoke('suap-proxy', {
       body: {
@@ -683,8 +682,8 @@ export const suapScraperService = {
       throw new Error(`Erro de rede no login: ${error.message}`);
     }
 
-    if (data?.error) {
-      throw new Error(data.error);
+    if (!data || data.success === false || data.error) {
+      throw new Error(data?.error || 'Falha ao autenticar no SUAP. Verifique usuário e senha.');
     }
 
     return data.suapSessionId;

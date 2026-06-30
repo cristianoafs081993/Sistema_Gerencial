@@ -92,6 +92,17 @@ Deno.serve(async (req) => {
         });
       }
 
+      const sessionMatchFromGet = setCookieHeaders.match(/sessionid=([^;]+)/);
+      const sessionGet = sessionMatchFromGet ? sessionMatchFromGet[1] : null;
+
+      // Montar cookies do GET para enviar de volta no POST (essencial para promover a sessão de forma consistente)
+      const cookiesList: string[] = [`csrftoken=${csrfToken}`];
+      if (sessionGet) {
+        cookiesList.push(`sessionid=${sessionGet}`);
+      }
+      const cookieHeader = cookiesList.join('; ');
+      console.log('[suap-proxy] Cookies enviados no POST de login:', cookieHeader);
+
       // 2. Executar o POST de login no SUAP
       const loginParams = new URLSearchParams();
       loginParams.append('username', username);
@@ -103,31 +114,53 @@ Deno.serve(async (req) => {
       const postRes = await fetch(loginPageUrl, {
         method: 'POST',
         headers: {
-          'Cookie': `csrftoken=${csrfToken}`,
+          'Cookie': cookieHeader,
           'Referer': loginPageUrl,
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: loginParams.toString(),
-        redirect: 'manual', // Impedir redirecionamento automático para lermos os cookies
+        redirect: 'manual', // Impedir redirecionamento automático
       });
 
       console.log(`[suap-proxy] Resposta de login do SUAP: status=${postRes.status}`);
 
-      const postSetCookie = postRes.headers.get('Set-Cookie') || '';
-      console.log('[suap-proxy] Set-Cookie recebidos do login:', postSetCookie);
+      // No Django, login bem-sucedido resulta em redirecionamento (302 ou 301)
+      const isLoginSuccess = postRes.status === 302 || postRes.status === 301;
 
-      const sessionIdMatch = postSetCookie.match(/sessionid=([^;]+)/);
-      const suapSessionId = sessionIdMatch ? sessionIdMatch[1] : null;
-
-      // No Django, login bem-sucedido resulta em redirecionamento (302/301) e gera o cookie sessionid
-      if ((postRes.status !== 302 && postRes.status !== 301) || !suapSessionId) {
-        return new Response(JSON.stringify({ error: 'Matrícula ou senha inválidas no SUAP.' }), {
-          status: 401,
+      if (!isLoginSuccess) {
+        let errorMsg = 'Matrícula ou senha inválidas no SUAP.';
+        if (postRes.status === 403) {
+          errorMsg = 'Bloqueio de segurança (CSRF) no SUAP. Tente novamente.';
+        }
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: errorMsg,
+          suapStatus: postRes.status 
+        }), {
+          status: 200, // Retorna 200 para que o SDK do Supabase passe a mensagem real de erro
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      console.log('[suap-proxy] Login no SUAP realizado com sucesso e sessão autenticada obtida!');
+      // Se logou com sucesso, ler Set-Cookie da resposta
+      const postSetCookie = postRes.headers.get('Set-Cookie') || '';
+      console.log('[suap-proxy] Set-Cookie recebidos do login POST:', postSetCookie);
+
+      const sessionIdMatch = postSetCookie.match(/sessionid=([^;]+)/);
+      // Se vier novo sessionid usa o novo, senão usa o do GET que agora foi autenticado
+      const suapSessionId = sessionIdMatch ? sessionIdMatch[1] : sessionGet;
+
+      if (!suapSessionId) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: 'Não foi possível recuperar o cookie de sessão autenticado do SUAP.' 
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      console.log('[suap-proxy] Login no SUAP realizado com sucesso!');
       return new Response(JSON.stringify({ 
         success: true, 
         suapSessionId 
