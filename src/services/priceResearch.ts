@@ -236,4 +236,18 @@ export const priceResearchService = {
 
     return researchId;
   },
+
+  async delete(id: string): Promise<void> {
+    const { error: itemsError } = await supabase
+      .from('price_research_items')
+      .delete()
+      .eq('research_id', id);
+    if (itemsError) throw itemsError;
+
+    const { error: researchError } = await supabase
+      .from('price_researches')
+      .delete()
+      .eq('id', id);
+    if (researchError) throw researchError;
+  },
 };

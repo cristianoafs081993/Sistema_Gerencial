@@ -1158,3 +1158,47 @@ Campos-chave:
 Observações operacionais:
 
 - Inserção anônima pública liberada (validação de PIN); leitura restrita a usuários autenticados.
+
+## Módulo do SUAP (Processos Eletrônicos)
+
+### `processos`
+
+Finalidade:
+
+- Persistir metadados preliminares e resultados de extrações de processos do SUAP.
+
+Campos-chave:
+
+- `id` (UUID)
+- `tenant_id` (UUID, mapeado para `auth.users.id`)
+- `suap_id` (ID interno do SUAP)
+- `url` (Link direto para o processo no SUAP)
+- `num_processo` (Número de processo formatado)
+- `beneficiario` (Interessado)
+- `cpf_cnpj` (Documento do beneficiário)
+- `valor_nf` (Valor financeiro bruto identificado)
+- `contrato` (Contrato associado)
+- `assunto` (Assunto principal do processo)
+- `status` (pending_extraction, pdf_uploaded, concluido etc.)
+- `dados_completos` (JSONB com a estrutura de notas, empenhos, dados bancários e dados preliminares)
+- `pdf_url` (Caminho para o PDF armazenado no bucket `suap-pdfs`)
+
+Observações operacionais:
+
+- Isolamento por Tenant (RLS `tenant_isolation`): `(auth.uid() = tenant_id)`. O usuário só pode ver e editar processos criados por ele mesmo.
+- Quando o robô de sincronização faz a leitura, ele cria ou atualiza os registros de processos pendentes para posterior enriquecimento pela IA.
+
+### Storage Bucket: `suap-pdfs`
+
+Finalidade:
+
+- Armazenamento de arquivos PDF completos de processos do SUAP baixados durante a sincronização nativa.
+
+Observações operacionais e RLS:
+
+- **Isolamento por pasta**: O caminho do arquivo segue a estrutura `{tenant_id}/{suap_id}.pdf`.
+- **INSERT**: Permitido para usuários autenticados na própria pasta: `((bucket_id = 'suap-pdfs'::text) AND ((storage.foldername(name))[1] = (auth.uid())::text))`.
+- **SELECT**: Leitura permitida para o próprio usuário autenticado que enviou o arquivo.
+- **UPDATE**: Atualização permitida para o próprio usuário autenticado dono da pasta (RLS `Tenant can update their own PDFs`), essencial para a funcionalidade de `upsert` na sincronização.
+- **DELETE**: Remoção permitida para o próprio usuário autenticado dono da pasta (RLS `Tenant can delete their own PDFs`).
+

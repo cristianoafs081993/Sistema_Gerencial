@@ -1,4 +1,4 @@
-﻿import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import {
@@ -30,10 +30,10 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
-import { suapExtensionGithubUrl } from '@/lib/suapExtension';
 import { cn } from '@/lib/utils';
 import { SuapProcesso } from '@/types';
 import { suapProcessosService } from '@/services/suapProcessos';
+import { SuapSyncPanel } from '@/components/suap/SuapSyncPanel';
 
 type StatusFilter = 'all' | 'active' | 'concluded' | 'pending' | 'error';
 
@@ -441,20 +441,11 @@ export default function Suap() {
   return (
     <div className="space-y-6 pb-10">
       <HeaderSubtitle>
-        Espelho dos processos sincronizados pela extensão no SUAP.
+        Espelho dos processos sincronizados no SUAP.
       </HeaderSubtitle>
 
       <HeaderActions>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.open(suapExtensionGithubUrl, '_blank', 'noopener,noreferrer')}
-            className="h-space-9 gap-space-2 border-border-default bg-white text-slate-700 shadow-shadow-sm hover:bg-[hsl(var(--secondary))]"
-          >
-            <ExternalLink className="h-4 w-4" />
-            Baixar extensão
-          </Button>
           {session ? (
             <Button
               variant="outline"
@@ -468,6 +459,8 @@ export default function Suap() {
           ) : null}
         </div>
       </HeaderActions>
+
+      <SuapSyncPanel onSyncComplete={() => void refetch()} />
 
       <SuapConclusaoDialog
         open={isConclusaoDialogOpen}

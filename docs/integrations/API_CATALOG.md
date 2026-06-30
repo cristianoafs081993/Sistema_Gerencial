@@ -736,25 +736,28 @@ Credenciais/segredos:
 - `SUPABASE_SERVICE_ROLE_KEY` na Edge Function para gravacao no banco
 - opcional `EMAIL_CSV_ALLOWED_SENDERS` para restringir remetentes
 
-## 11. Extensao SUAP Scraper
+## 11. Sincronização Nativa SUAP (Antiga Extensão SUAP Scraper)
 
 Uso:
 
-- sincronizacao da caixa de processos do SUAP para a tabela `processos`
-- envio de PDFs para o bucket `suap-pdfs`
+- Sincronização direta e nativa da caixa de processos do SUAP para a tabela `processos`
+- Download automático de PDFs e envio para o bucket `suap-pdfs`
+- Extração determinística direta no frontend aliada à extração por IA no backend
 
-Repositorio:
+Fluxo Técnico:
 
-- `https://github.com/cristianoafs081993/suap-scraper`
+- O frontend realiza as chamadas de scraping e download fazendo requests ao SUAP através da Edge Function `suap-proxy` (evitando bloqueios de CORS).
+- As credenciais de acesso do SUAP (access token OAuth) são mantidas de forma segura no `localStorage` após o login do usuário.
 
 Consumidores no app:
 
 - [Suap.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Suap.tsx)
 - [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx)
 
-Observacao:
+Observação:
 
-- o link no app aparece no header das telas consumidoras com o rotulo `Baixar extensão` e aponta para o GitHub da extensao.
+- Não é mais necessária a instalação de extensão Chrome. A sincronização ocorre diretamente através do componente `<SuapSyncPanel>` na tela de processos.
+- O usuário deve manter a aba ativa no navegador durante a sincronização em razão das requisições assíncronas do Celery.
 
 ## 12. Edge Function `record-automation-savings-event`
 

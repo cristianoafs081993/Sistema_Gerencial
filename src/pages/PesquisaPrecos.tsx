@@ -1,23 +1,35 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Bot,
+  Calendar,
+  Camera,
+  Check,
   CheckCircle2,
   Download,
   ExternalLink,
   FileDown,
   FileSpreadsheet,
+  FolderOpen,
+  Globe,
+  Image,
   Loader2,
+  MapPin,
+  Pencil,
+  Plus,
   Printer,
   RefreshCw,
   Save,
   Search,
   ShieldCheck,
+  ShoppingBag,
   Sparkles,
+  Trash2,
   Upload,
+  User,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -38,6 +50,7 @@ import {
   exportPriceResearchWorkbook,
   getEstimatedUnitPrice,
   getSelectedStatistics,
+  METHOD_LABELS,
   parsePriceResearchFile,
   validatePriceResearchReport,
   type PriceResearchCandidate,
@@ -47,6 +60,7 @@ import {
 } from '@/lib/priceResearch';
 import { findCatalogSuggestions } from '@/lib/priceCatalogClient';
 import { priceResearchService } from '@/services/priceResearch';
+import { marketSearchService, type MarketSearchResult } from '@/services/marketSearch';
 
 const METHOD_OPTIONS: Array<{ value: PriceResearchMethod; label: string }> = [
   { value: 'median', label: 'Mediana' },
@@ -79,7 +93,6 @@ export default function PesquisaPrecos() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [researchId, setResearchId] = useState<string>();
   const [activeStep, setActiveStep] = useState(1);
-  const [title, setTitle] = useState('Relatório de Pesquisa de Preços');
   const [processNumber, setProcessNumber] = useState('');
   const [objectDescription, setObjectDescription] = useState('');
   const [responsibleName, setResponsibleName] = useState('');
@@ -96,6 +109,53 @@ export default function PesquisaPrecos() {
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [loadingResearchId, setLoadingResearchId] = useState<string>();
+
+  const [viewMode, setViewMode] = useState<'list' | 'wizard'>('list');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
+
+  const [curadoriaTab, setCuradoriaTab] = useState<'basket' | 'market'>('basket');
+  const [marketSearchTerm, setMarketSearchTerm] = useState('');
+  const [selectedMarketProviders, setSelectedMarketProviders] = useState<string[]>(['amazon', 'magalu', 'americanas']);
+  const [marketResults, setMarketResults] = useState<MarketSearchResult[]>([]);
+  const [isSearchingMarket, setIsSearchingMarket] = useState(false);
+  const [capturingUrls, setCapturingUrls] = useState<Set<string>>(new Set());
+  const [freightCep, setFreightCep] = useState<string>(() => localStorage.getItem('pp_freight_cep') || '');
+
+  const [capturingCandidateId, setCapturingCandidateId] = useState<string | null>(null);
+  const [previewCandidate, setPreviewCandidate] = useState<PriceResearchCandidate | null>(null);
+
+  const deleteResearch = async (id: string) => {
+    if (!window.confirm('Tem certeza de que deseja excluir esta pesquisa de preços? Isso removerá permanentemente o relatório e todos os itens orçados.')) return;
+    setIsDeletingId(id);
+    try {
+      await priceResearchService.delete(id);
+      await queryClient.invalidateQueries({ queryKey: ['price-researches'] });
+      toast.success('Pesquisa de preços excluída com sucesso.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível excluir a pesquisa.');
+    } finally {
+      setIsDeletingId(null);
+    }
+  };
+
+  const startNewResearch = () => {
+    setResearchId(undefined);
+    setActiveStep(1);
+    setProcessNumber('');
+    setObjectDescription('');
+    setResponsibleName('');
+    setResearchDate(today());
+    setMethod('median');
+    setMethodologyJustification(
+      'A mediana foi adotada por reduzir o efeito de valores extremos, após análise crítica da comparabilidade das especificações, unidades e quantidades.',
+    );
+    setNotes('');
+    setSourceFile('');
+    setItems([]);
+    setSelectedItemId(undefined);
+    setViewMode('wizard');
+  };
 
   const { data: recentResearches = [], isFetching: isFetchingRecent } = useQuery({
     queryKey: ['price-researches'],
@@ -117,7 +177,7 @@ export default function PesquisaPrecos() {
   );
 
   const reportData = useMemo<PriceResearchReportData>(() => ({
-    title,
+    title: objectDescription || 'Pesquisa de Preços',
     processNumber,
     objectDescription,
     responsibleName,
@@ -137,7 +197,6 @@ export default function PesquisaPrecos() {
     researchDate,
     responsibleName,
     sourceFile,
-    title,
   ]);
 
   const updateItem = (localId: string, patch: Partial<PriceResearchItem>) => {
@@ -257,6 +316,173 @@ export default function PesquisaPrecos() {
     }
   };
 
+  useEffect(() => {
+    if (selectedItem) {
+      // Restaura o termo e resultados da última busca deste item
+      setMarketSearchTerm(selectedItem.marketSearchTerm ?? selectedItem.description);
+      setMarketResults(selectedItem.marketSearchResults ?? []);
+      setCuradoriaTab('basket');
+    }
+  }, [selectedItemId, selectedItem?.description]);
+
+  function parseMarketPrice(priceStr: string): number {
+    if (!priceStr) return 0;
+    let clean = priceStr.replace(/[R$\s]/gi, '');
+    if (clean.includes(',') && clean.includes('.')) {
+      clean = clean.replace(/\./g, '').replace(',', '.');
+    } else if (clean.includes(',')) {
+      clean = clean.replace(',', '.');
+    }
+    const parsed = parseFloat(clean);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+
+  const handleMarketSearch = async () => {
+    if (!marketSearchTerm.trim()) {
+      toast.error('Informe um termo de busca.');
+      return;
+    }
+    if (selectedMarketProviders.length === 0) {
+      toast.error('Selecione ao menos um provedor.');
+      return;
+    }
+    setIsSearchingMarket(true);
+    try {
+      const results = await marketSearchService.search(marketSearchTerm, selectedMarketProviders);
+      setMarketResults(results);
+      // Persiste os resultados no item para não perder ao trocar de item
+      if (selectedItem) {
+        updateItem(selectedItem.localId, {
+          marketSearchTerm,
+          marketSearchResults: results,
+        });
+      }
+      toast.success(`${results.length} resultado(s) encontrado(s).`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Falha na pesquisa de mercado.');
+    } finally {
+      setIsSearchingMarket(false);
+    }
+  };
+
+  const handleAddMarketCandidate = async (result: MarketSearchResult) => {
+    if (!selectedItem) return;
+
+    const alreadyAdded = selectedItem.candidates.some(
+      (c) => c.sourceUrl === result.link
+    );
+    if (alreadyAdded) {
+      toast.error('Esta oferta já foi adicionada à cesta.');
+      return;
+    }
+
+    const price = parseMarketPrice(result.price);
+    if (price <= 0) {
+      toast.error('Não foi possível obter um preço válido para esta oferta.');
+      return;
+    }
+
+    const candidateId = `market-${result.provider}-${crypto.randomUUID()}`;
+    const newCandidate: PriceResearchCandidate = {
+      id: candidateId,
+      sourceType: result.provider as any,
+      sourceLabel: result.provider.charAt(0).toUpperCase() + result.provider.slice(1),
+      sourceUrl: result.link,
+      thumbnailLink: result.thumbnailLink,
+      displayLink: result.displayLink,
+      purchaseId: 'E-COMMERCE',
+      purchaseItemId: 'OFFER',
+      purchaseDate: today(),
+      resultDate: today(),
+      supplierDocument: null,
+      supplierName: result.provider.toUpperCase(),
+      agencyCode: 'E-COMMERCE',
+      agencyName: result.displayLink,
+      state: null,
+      municipality: null,
+      description: result.title,
+      detailedDescription: result.snippet,
+      brand: null,
+      quantity: 1,
+      originalUnitPrice: price,
+      comparableUnitPrice: price,
+      originalUnitLabel: 'UN',
+      unitCompatible: true,
+      aiScore: 100,
+      aiReason: 'Selecionado via pesquisa de mercado privada',
+      selected: true,
+      exclusionReason: '',
+      rawData: { ...result },
+    };
+
+    updateItem(selectedItem.localId, {
+      candidates: [...selectedItem.candidates, newCandidate],
+    });
+    toast.success('Oferta incluída na cesta. Capturando evidência...');
+
+    // Dispara captura de print em background automaticamente
+    setCapturingUrls((prev) => new Set(prev).add(result.link));
+    try {
+      const { imageUrl, freight } = await marketSearchService.capture(result.link, freightCep || undefined);
+      const freightTotal = freight.status !== 'pending' && freight.total != null ? freight.total : undefined;
+      updateCandidate(selectedItem.localId, candidateId, {
+        evidenceImage: imageUrl,
+        evidenceCapturedAt: new Date().toISOString(),
+        freightCost: freightTotal,
+        comparableUnitPrice: newCandidate.originalUnitPrice + (freightTotal ?? 0),
+      });
+      if (freight.status === 'free') toast.success('Evidência capturada. Frete grátis detectado automaticamente.');
+      else if (freight.status === 'captured') toast.success(`Evidência capturada. Frete R$ ${freight.total?.toFixed(2).replace('.', ',')} detectado automaticamente.`);
+      else toast.success('Evidência capturada. Informe o frete manualmente na coluna Frete.');
+    } catch {
+      toast.error('Oferta incluída, mas não foi possível capturar o print. Tente manualmente na cesta.');
+    } finally {
+      setCapturingUrls((prev) => { const s = new Set(prev); s.delete(result.link); return s; });
+    }
+  };
+
+  const handleCaptureEvidence = async (candidateId: string, url: string, originalUnitPrice: number) => {
+    setCapturingCandidateId(candidateId);
+    try {
+      const { imageUrl, freight } = await marketSearchService.capture(url, freightCep || undefined);
+      const freightTotal = freight.status !== 'pending' && freight.total != null ? freight.total : undefined;
+      updateCandidate(selectedItem.localId, candidateId, {
+        evidenceImage: imageUrl,
+        evidenceCapturedAt: new Date().toISOString(),
+        freightCost: freightTotal,
+        comparableUnitPrice: originalUnitPrice + (freightTotal ?? 0),
+      });
+      if (freight.status === 'free') toast.success('Evidência capturada. Frete grátis detectado automaticamente.');
+      else if (freight.status === 'captured') toast.success(`Evidência capturada. Frete R$ ${freight.total?.toFixed(2).replace('.', ',')} detectado automaticamente.`);
+      else toast.success('Evidência capturada. Informe o frete na coluna Frete se necessário.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Falha ao capturar a evidência.');
+    } finally {
+      setCapturingCandidateId(null);
+    }
+  };
+
+  const hasTriggeredSearch = useRef(false);
+
+  useEffect(() => {
+    if (activeStep === 3) {
+      // Se todos os itens já foram buscados com sucesso, avança imediatamente para a etapa 4
+      const allSuccess = items.length > 0 && items.every((item) => item.searchStatus === 'success');
+      if (allSuccess) {
+        setActiveStep(4);
+        return;
+      }
+
+      const hasPendingSearch = items.some((item) => item.searchStatus === 'idle' || item.searchStatus === 'error');
+      if (hasPendingSearch && !isSearching && !hasTriggeredSearch.current) {
+        hasTriggeredSearch.current = true;
+        void searchPrices();
+      }
+    } else {
+      hasTriggeredSearch.current = false;
+    }
+  }, [activeStep, items, isSearching]);
+
   const saveResearch = async (status: 'review' | 'completed' = 'review', silent = false) => {
     if (items.length === 0) {
       if (!silent) toast.error('Importe uma planilha antes de salvar.');
@@ -332,16 +558,53 @@ export default function PesquisaPrecos() {
     const saved = await saveResearch('completed');
     if (!saved) return;
 
+    // Pré-carrega todas as imagens de evidência como base64 para embutir no HTML
+    // (evita imagens em branco no PDF causadas por carregamento assíncrono de URLs externas)
+    const fetchImageAsDataUri = async (url: string): Promise<string> => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return url;
+        const blob = await res.blob();
+        return await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => resolve(url);
+          reader.readAsDataURL(blob);
+        });
+      } catch {
+        return url; // fallback: usa URL original
+      }
+    };
+
+    // Clona os dados e substitui URLs por data URIs
+    const reportDataWithEmbeddedImages: typeof reportData = {
+      ...reportData,
+      items: await Promise.all(
+        reportData.items.map(async (item) => ({
+          ...item,
+          candidates: await Promise.all(
+            item.candidates.map(async (c) => {
+              if (c.evidenceImage && c.evidenceImage.startsWith('http')) {
+                return { ...c, evidenceImage: await fetchImageAsDataUri(c.evidenceImage) };
+              }
+              return c;
+            })
+          ),
+        }))
+      ),
+    };
+
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       toast.error('O navegador bloqueou a abertura do relatório.');
       return;
     }
-    printWindow.document.write(buildPriceResearchReportHtml(reportData));
+    printWindow.document.write(buildPriceResearchReportHtml(reportDataWithEmbeddedImages));
     printWindow.document.close();
     printWindow.focus();
-    window.setTimeout(() => printWindow.print(), 100);
+    window.setTimeout(() => printWindow.print(), 500);
   };
+
 
   const loadResearch = async (id: string) => {
     setLoadingResearchId(id);
@@ -349,7 +612,6 @@ export default function PesquisaPrecos() {
       const record = await priceResearchService.getById(id);
       if (!record) throw new Error('Pesquisa não encontrada.');
       setResearchId(record.id);
-      setTitle(record.title);
       setProcessNumber(record.processNumber);
       setObjectDescription(record.objectDescription);
       setResponsibleName(record.responsibleName);
@@ -371,7 +633,8 @@ export default function PesquisaPrecos() {
       } else {
         setActiveStep(2); // Vai para catalogação se faltam códigos
       }
-      
+
+      setViewMode('wizard');
       toast.success('Pesquisa carregada com sucesso.');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Não foi possível abrir a pesquisa.');
@@ -383,7 +646,6 @@ export default function PesquisaPrecos() {
   // Compila erros de validação da IN 65/2021
   const validationErrors = useMemo(() => {
     const errors: Array<{ type: string; message: string; itemId?: string }> = [];
-    if (!title.trim()) errors.push({ type: 'meta', message: 'Título do relatório não preenchido.' });
     if (!processNumber.trim()) errors.push({ type: 'meta', message: 'Número do processo não informado.' });
     if (!responsibleName.trim()) errors.push({ type: 'meta', message: 'Agente responsável não informado.' });
     if (!objectDescription.trim()) errors.push({ type: 'meta', message: 'Descrição do objeto não informada.' });
@@ -408,66 +670,258 @@ export default function PesquisaPrecos() {
       }
     }
     return errors;
-  }, [items, title, processNumber, responsibleName, objectDescription, methodologyJustification]);
+  }, [items, processNumber, responsibleName, objectDescription, methodologyJustification]);
+
+  const totalCount = recentResearches.length;
+  const reviewCount = recentResearches.filter((r) => r.status !== 'completed').length;
+  const completedCount = recentResearches.filter((r) => r.status === 'completed').length;
+
+  const filteredResearches = useMemo(() => {
+    if (!searchTerm.trim()) return recentResearches;
+    const term = searchTerm.toLowerCase();
+    return recentResearches.filter(
+      (r) =>
+        r.processNumber.toLowerCase().includes(term) ||
+        r.responsibleName.toLowerCase().includes(term) ||
+        (r.objectDescription && r.objectDescription.toLowerCase().includes(term))
+    );
+  }, [recentResearches, searchTerm]);
 
   return (
     <div className="space-y-6 pb-10">
       <HeaderSubtitle>Pesquisa de preços com fontes oficiais e revisão humana</HeaderSubtitle>
-      
-      {/* Visual Stepper Wizard (5 Etapas) */}
-      <div className="border border-border-default bg-surface-card rounded-radius-lg p-4 shadow-soft">
-        <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-4">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 w-full">
+
+      {viewMode === 'list' ? (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {/* Header Panel / Dashboard Welcome */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-surface-card border border-border-subtle/70 rounded-radius-xl shadow-soft">
+            <div className="space-y-1">
+              <h3 className="text-xl font-bold text-sebrae-navy">Pesquisas de Preços</h3>
+              <p className="text-sm text-text-muted">
+                Histórico e gerenciamento de estimativas de preços oficiais sob a IN SEGES/ME nº 65/2021.
+              </p>
+            </div>
+            <Button
+              type="button"
+              className="btn-primary gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-sm h-10 px-4 rounded-radius-md transition-all shrink-0 flex items-center justify-center shadow-md shadow-primary/20"
+              onClick={startNewResearch}
+            >
+              <Plus className="h-4 w-4" />
+              Iniciar Nova Pesquisa
+            </Button>
+          </div>
+
+          {/* Search & Filter Bar */}
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+            <Input
+              type="text"
+              placeholder="Buscar por título, processo ou responsável..."
+              className="pl-10 h-10 text-sm bg-surface-card border border-border-default focus-visible:ring-2 focus-visible:ring-sebrae-blue"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          {/* Main Listing Section */}
+          {isFetchingRecent && recentResearches.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 bg-surface-card border border-border-default rounded-radius-lg">
+              <Loader2 className="h-8 w-8 animate-spin text-sebrae-blue" />
+              <p className="mt-4 text-sm text-text-secondary">Carregando pesquisas recentes...</p>
+            </div>
+          ) : filteredResearches.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 bg-surface-card border border-border-default rounded-radius-lg text-center p-6">
+              <div className="p-4 bg-slate-100 rounded-full text-slate-400 mb-4">
+                <Search className="h-8 w-8" />
+              </div>
+              <h4 className="text-base font-bold text-sebrae-navy">Nenhuma pesquisa encontrada</h4>
+              <p className="text-sm text-text-muted mt-1 max-w-sm">
+                {searchTerm
+                  ? 'Nenhum resultado corresponde à sua busca. Tente buscar por outros termos.'
+                  : 'Nenhuma pesquisa de preços foi iniciada ainda no sistema.'}
+              </p>
+              {!searchTerm && (
+                <Button type="button" className="btn-primary mt-4 bg-sebrae-blue text-white" onClick={startNewResearch}>
+                  <Plus className="h-4 w-4 mr-2" /> Iniciar Primeira Pesquisa
+                </Button>
+              )}
+            </div>
+          ) : (
+            <DataTablePanel>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[250px]">Objeto da Contratação</TableHead>
+                    <TableHead>Processo</TableHead>
+                    <TableHead>Responsável</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right w-24">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredResearches.map((record) => {
+                    const isCompleted = record.status === 'completed';
+                    return (
+                      <TableRow key={record.id} className="hover:bg-surface-subtle/40">
+                        <TableCell className="max-w-[350px]">
+                          <p className="font-ui text-sm font-bold text-sebrae-navy truncate" title={record.objectDescription || ''}>
+                            {record.objectDescription || 'Sem objeto descrito'}
+                          </p>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs font-semibold text-text-secondary">
+                          {record.processNumber || '-'}
+                        </TableCell>
+                        <TableCell className="font-ui text-xs text-text-secondary">
+                          {record.responsibleName || '-'}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs text-text-secondary">
+                          {formatDate(record.researchDate)}
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
+                              isCompleted
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                : 'bg-amber-50 text-amber-700 border border-amber-100'
+                            }`}
+                          >
+                            {isCompleted ? 'Concluída' : 'Em Revisão'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex gap-1 justify-end items-center">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-sebrae-blue hover:text-white hover:bg-sebrae-blue rounded-full transition-all flex items-center justify-center"
+                              onClick={() => void loadResearch(record.id)}
+                              disabled={loadingResearchId === record.id || isDeletingId === record.id}
+                              title="Editar Pesquisa"
+                            >
+                              {loadingResearchId === record.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Pencil className="h-4 w-4" />
+                              )}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-white hover:bg-destructive rounded-full transition-all flex items-center justify-center"
+                              onClick={() => void deleteResearch(record.id)}
+                              disabled={loadingResearchId === record.id || isDeletingId === record.id}
+                              title="Excluir Pesquisa"
+                            >
+                              {isDeletingId === record.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </DataTablePanel>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {/* Voltar para a lista */}
+          <div className="flex items-center">
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-1.5 text-xs text-text-secondary hover:text-sebrae-blue border-border-default hover:border-sebrae-blue/30 font-semibold px-3 h-8 rounded-md transition-all"
+              onClick={() => {
+                setViewMode('list');
+                void queryClient.invalidateQueries({ queryKey: ['price-researches'] });
+              }}
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Voltar para a Lista
+            </Button>
+          </div>
+
+          {/* Visual Stepper Wizard (4 Etapas) - Timeline Progress Style */}
+      <div className="w-full py-4 mb-6">
+        <div className="max-w-4xl mx-auto space-y-3">
+          {/* Grid of Columns for Labels */}
+          <div className="grid grid-cols-4 text-center text-xs md:text-sm font-ui">
             {[
-              { number: 1, label: '1. Identificação', desc: 'Metadados e Carga' },
-              { number: 2, label: '2. Catálogo', desc: 'Mapeamento CATMAT/SER' },
-              { number: 3, label: '3. Busca', desc: 'Consulta de Preços' },
-              { number: 4, label: '4. Curadoria', desc: 'Seleção de Referências' },
-              { number: 5, label: '5. Relatório', desc: 'Validação e Fechamento' },
+              { wizardNumber: 1, label: '1. Identificação', targetSteps: [1] },
+              { wizardNumber: 2, label: '2. Catálogo', targetSteps: [2] },
+              { wizardNumber: 3, label: '3. Curadoria', targetSteps: [3, 4] },
+              { wizardNumber: 4, label: '4. Relatório', targetSteps: [5] },
             ].map((step) => {
-              const isCompleted = step.number < activeStep;
-              const isActive = step.number === activeStep;
+              const isCompleted = Math.min(...step.targetSteps) < activeStep && !step.targetSteps.includes(activeStep);
+              const isActive = step.targetSteps.includes(activeStep);
               
               // Determina se pode clicar diretamente no botão
-              let isSelectable = step.number === 1;
-              if (step.number === 2) {
+              let isSelectable = false;
+              if (step.wizardNumber === 1) {
+                isSelectable = true;
+              } else if (step.wizardNumber === 2) {
                 isSelectable = items.length > 0;
-              } else if (step.number === 3) {
+              } else if (step.wizardNumber === 3) {
                 isSelectable = items.length > 0 && items.every(i => i.catalogCode);
-              } else if (step.number >= 4) {
+              } else if (step.wizardNumber === 4) {
                 isSelectable = items.length > 0 && items.every(i => i.catalogCode) && items.every(i => i.searchStatus !== 'idle');
               }
-              
+
+              const handleWizardClick = () => {
+                if (step.wizardNumber === 3) {
+                  // Se o usuário clicar em "Curadoria":
+                  // Se a busca já foi feita (nenhum item 'idle'), vai direto para a etapa 4.
+                  // Se a busca não foi feita, vai para a etapa 3 (transição/busca) para disparar a busca!
+                  const hasSearch = items.every(item => item.searchStatus !== 'idle');
+                  goToStep(hasSearch ? 4 : 3);
+                } else if (step.wizardNumber === 4) {
+                  goToStep(5);
+                } else {
+                  goToStep(step.wizardNumber);
+                }
+              };
+
               return (
                 <button
-                  key={step.number}
+                  key={step.wizardNumber}
                   type="button"
                   disabled={!isSelectable}
-                  onClick={() => goToStep(step.number)}
-                  className={`flex items-start gap-2.5 text-left p-3 rounded-radius-md border transition-all ${
+                  onClick={handleWizardClick}
+                  className={`font-sans text-xs md:text-sm font-bold transition-all px-1 truncate ${
                     isActive
-                      ? 'border-primary bg-primary/[0.04] text-primary shadow-sm'
+                      ? 'text-sebrae-blue font-extrabold text-[13px] md:text-[14px]'
                       : isCompleted
-                      ? 'border-primary/20 bg-surface-subtle/40 text-text-primary'
-                      : 'border-border-default bg-surface-subtle/10 text-text-muted opacity-60'
-                  } ${isSelectable ? 'hover:opacity-100 cursor-pointer' : 'cursor-not-allowed'}`}
+                      ? 'text-sebrae-blue/80 hover:text-sebrae-navy font-semibold'
+                      : 'text-slate-400 font-semibold'
+                  } ${isSelectable ? 'cursor-pointer hover:opacity-90' : 'cursor-not-allowed'}`}
                 >
-                  <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors ${
-                    isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : isCompleted
-                      ? 'bg-primary/25 text-primary'
-                      : 'bg-surface-subtle border border-border-default text-text-muted'
-                  }`}>
-                    {isCompleted ? '✓' : step.number}
-                  </span>
-                  <div className="min-w-0">
-                    <p className={`font-ui text-xs font-bold leading-none truncate ${isActive ? 'text-primary' : 'text-text-primary'}`}>{step.label}</p>
-                    <p className="font-ui text-[10px] text-text-secondary mt-1 truncate">{step.desc}</p>
-                  </div>
+                  {step.label}
                 </button>
               );
             })}
+          </div>
+
+          {/* Continuous Progress Bar aligned with column centers */}
+          <div className="relative w-full">
+            <div className="w-full h-[6px] bg-slate-200/60 rounded-full overflow-hidden relative">
+              <div
+                className="absolute top-0 left-0 h-full bg-sebrae-blue rounded-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-sm"
+                style={{
+                  width: activeStep === 1 ? '12.5%' :
+                         activeStep === 2 ? '37.5%' :
+                         activeStep === 3 || activeStep === 4 ? '62.5%' :
+                         '100%'
+                }}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -509,26 +963,22 @@ export default function PesquisaPrecos() {
           >
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <div className="space-y-2 xl:col-span-2">
-                <Label htmlFor="research-title">Título do Relatório</Label>
-                <Input id="research-title" value={title} onChange={(event) => setTitle(event.target.value)} />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="research-process">Número do Processo</Label>
                 <Input id="research-process" value={processNumber} onChange={(event) => setProcessNumber(event.target.value)} placeholder="23035.000000/2026-00" />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 xl:col-span-2">
                 <Label htmlFor="research-date">Data da Pesquisa</Label>
                 <Input id="research-date" type="date" value={researchDate} onChange={(event) => setResearchDate(event.target.value)} />
               </div>
-              <div className="space-y-2 xl:col-span-2">
+              <div className="space-y-2 xl:col-span-4">
                 <Label htmlFor="research-object">Objeto da Contratação</Label>
                 <Textarea id="research-object" value={objectDescription} onChange={(event) => setObjectDescription(event.target.value)} rows={3} placeholder="Descrição sucinta do objeto..." />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 xl:col-span-2">
                 <Label htmlFor="research-responsible">Agente Responsável</Label>
                 <Input id="research-responsible" value={responsibleName} onChange={(event) => setResponsibleName(event.target.value)} />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 xl:col-span-2">
                 <Label>Método Estatístico</Label>
                 <Select value={method} onValueChange={(value) => setMethod(value as PriceResearchMethod)}>
                   <SelectTrigger aria-label="Método de cálculo"><SelectValue /></SelectTrigger>
@@ -817,41 +1267,41 @@ export default function PesquisaPrecos() {
         <div className="space-y-6 animate-in fade-in duration-200">
           <SectionPanel
             title="Consulta de Preços Homologados"
-            description="Dispare a consulta à API de Compras do Governo Federal (últimos 12 meses) com base nos códigos CATMAT/CATSER mapeados."
+            description="A consulta à API de Compras do Governo Federal (últimos 12 meses) é disparada automaticamente com base nos códigos CATMAT/CATSER mapeados."
           >
             <div className="space-y-3">
-              <p className="font-ui text-xs font-semibold text-text-muted uppercase tracking-wider px-1">Progresso da Busca por Item</p>
+              <p className="font-ui text-xs font-semibold text-slate-500 uppercase tracking-wider px-1">Progresso da Busca por Item</p>
               {items.map((item) => (
-                <div key={item.localId} className="flex items-center justify-between p-3.5 rounded-radius-lg border border-border-default bg-surface-card shadow-sm">
+                <div key={item.localId} className="flex items-center justify-between p-3.5 rounded-xl border border-border-light bg-white shadow-sm hover:border-slate-300 transition-all">
                   <div className="flex items-center gap-3">
-                    <span className="font-ui text-xs font-bold text-text-primary">Item {item.itemNumber}</span>
-                    <p className="font-ui text-xs text-text-secondary truncate max-w-[320px]" title={item.description}>{item.description}</p>
+                    <span className="font-ui text-xs font-bold text-sebrae-navy">Item {item.itemNumber}</span>
+                    <p className="font-ui text-xs text-slate-700 truncate max-w-[320px]" title={item.description}>{item.description}</p>
                   </div>
                   <div className="flex items-center gap-4">
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-xs font-semibold border-slate-200 text-slate-600 bg-slate-50">
                       {item.catalogType === 'material' ? 'CATMAT' : 'CATSER'} {item.catalogCode}
                     </Badge>
                     {item.searchStatus === 'searching' && (
-                      <div className="flex items-center gap-1.5 text-xs text-primary font-medium">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <div className="flex items-center gap-1.5 text-xs text-sebrae-blue font-semibold">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-sebrae-blue" />
                         Consultando API...
                       </div>
                     )}
                     {item.searchStatus === 'success' && (
-                      <div className="flex items-center gap-1.5 text-xs text-primary font-semibold">
-                        <span className="text-primary font-bold">✓</span>
+                      <div className="flex items-center gap-1.5 text-xs text-ifrn-green font-bold">
+                        <span className="text-ifrn-green font-extrabold text-sm">✓</span>
                         {item.candidates.length} cotações encontradas
                       </div>
                     )}
                     {item.searchStatus === 'error' && (
-                      <div className="flex items-center gap-1.5 text-xs text-destructive font-semibold" title={item.searchError}>
-                        <AlertTriangle className="h-3.5 w-3.5" />
+                      <div className="flex items-center gap-1.5 text-xs text-red-600 font-semibold" title={item.searchError}>
+                        <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
                         Falhou
                       </div>
                     )}
                     {item.searchStatus === 'idle' && (
-                      <div className="flex items-center gap-1.5 text-xs text-text-muted">
-                        <span className="h-2 w-2 rounded-full bg-border-default"></span>
+                      <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                        <span className="h-2 w-2 rounded-full bg-slate-300 animate-pulse"></span>
                         Aguardando disparo
                       </div>
                     )}
@@ -860,33 +1310,56 @@ export default function PesquisaPrecos() {
               ))}
             </div>
 
-            {/* Painel de Disparo */}
-            <div className="mt-6 border border-border-default bg-surface-card rounded-radius-lg p-5 flex flex-col md:flex-row items-center justify-between gap-4 shadow-soft">
-              <div className="text-center md:text-left">
-                <h4 className="font-ui text-sm font-semibold text-text-primary">Buscar Cotações no Compras.gov</h4>
-                <p className="font-ui text-xs text-text-secondary mt-0.5">Duração aproximada: 5 a 15 segundos. A pesquisa consultará os códigos listados acima.</p>
+            {/* Dynamic Search Feedback Panel */}
+            {isSearching ? (
+              <div className="mt-6 border border-[#E2E8F0] bg-white rounded-xl p-5 flex items-center gap-4 shadow-sm animate-pulse">
+                <Loader2 className="h-6 h-6 animate-spin text-sebrae-blue" />
+                <div>
+                  <h4 className="font-ui text-sm font-bold text-sebrae-navy">Pesquisa em Andamento</h4>
+                  <p className="font-ui text-xs text-slate-500 mt-0.5">Buscando cotações oficiais no Compras.gov... Por favor, aguarde de 5 a 15 segundos.</p>
+                </div>
               </div>
-              <Button
-                type="button"
-                className="gap-2 bg-primary hover:bg-primary-hover text-primary-foreground font-semibold"
-                onClick={() => void searchPrices()}
-                disabled={isSearching}
-              >
-                {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                {isSearching ? 'Pesquisando base oficial...' : 'Disparar Busca Geral'}
-              </Button>
-            </div>
+            ) : items.some((item) => item.searchStatus === 'error') ? (
+              <div className="mt-6 border border-red-200 bg-red-50/30 rounded-xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="h-6 w-6 text-red-600 shrink-0" />
+                  <div>
+                    <h4 className="font-ui text-sm font-bold text-red-950">Algumas consultas falharam</h4>
+                    <p className="font-ui text-xs text-red-800 mt-0.5">Houve uma instabilidade ao conectar com a API oficial. Você pode tentar novamente.</p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  className="gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-xs h-9 px-4 rounded-lg shadow-sm"
+                  onClick={() => {
+                    hasTriggeredSearch.current = true;
+                    void searchPrices();
+                  }}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Tentar Novamente
+                </Button>
+              </div>
+            ) : items.every((item) => item.searchStatus === 'idle') ? (
+              <div className="mt-6 border border-border-light bg-white rounded-xl p-5 flex items-center gap-4 shadow-sm">
+                <Loader2 className="h-5 h-5 animate-spin text-slate-400" />
+                <div>
+                  <h4 className="font-ui text-sm font-bold text-slate-700">Inicializando busca...</h4>
+                  <p className="font-ui text-xs text-slate-500 mt-0.5">Aguardando início da consulta automatizada.</p>
+                </div>
+              </div>
+            ) : null}
 
             {/* Banner de Sucesso pós Busca */}
             {items.length > 0 && items.every((i) => i.searchStatus === 'success') && (
-              <div className="mt-4 rounded-radius-lg border border-primary/20 bg-primary/[0.02] p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex gap-2.5 text-primary text-xs leading-normal">
-                  <CheckCircle2 className="h-5 w-5 shrink-0 text-primary mt-0.5" />
+              <div className="mt-6 rounded-xl border border-ifrn-green/20 bg-ifrn-green/[0.02] p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex gap-2.5 text-ifrn-green text-xs leading-normal">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-ifrn-green mt-0.5" />
                   <div>
                     <span className="font-bold">Pesquisa Finalizada com Sucesso!</span> Todas as cotações oficiais foram baixadas e analisadas.
                   </div>
                 </div>
-                <Button type="button" className="gap-1.5 text-xs bg-primary text-primary-foreground" onClick={() => goToStep(4)}>
+                <Button type="button" className="gap-1.5 text-xs bg-sebrae-blue text-white hover:bg-sebrae-navy" onClick={() => goToStep(4)}>
                   Avançar para Curadoria
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Button>
@@ -938,7 +1411,7 @@ export default function PesquisaPrecos() {
 
             {/* Detalhes de Cotações do Item */}
             <div className="lg:col-span-3 space-y-6">
-              {selectedItem && selectedItem.candidates.length > 0 ? (
+              {selectedItem ? (
                 <>
                   {/* Estatísticas Individuais do Item */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -961,105 +1434,414 @@ export default function PesquisaPrecos() {
                     <div className="flex gap-2.5 rounded-radius-lg border border-amber-200 bg-amber-50/50 p-4 text-amber-900 shadow-sm">
                       <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
                       <div className="font-ui text-xs leading-normal">
-                        <span className="font-bold">Aviso legal da IN 65/2021:</span> Selecione no mínimo 3 preços homologados para compor a estimativa do item. Casos excepcionais exigem justificativa formal anexa ao processo.
+                        <span className="font-bold">Aviso legal da IN 65/2021:</span> Selecione no mínimo 3 preços homologados para compom a estimativa do item. Casos excepcionais exigem justificativa formal anexa ao processo.
                       </div>
                     </div>
                   )}
 
-                  {/* Cesta de Cotações */}
-                  <DataTablePanel
-                    title={`Cesta de Preços - Item ${selectedItem.itemNumber}`}
-                    description="Selecione as referências mais compatíveis tecnicamente. Exclusões precisam de justificativa descritiva."
-                    actions={(
-                      <Button type="button" variant="outline" className="gap-2 h-9 text-xs" onClick={() => void exportPriceResearchWorkbook(reportData)}>
-                        <Download className="h-3.5 w-3.5" />
-                        Exportar XLSX
-                      </Button>
-                    )}
-                  >
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-12">Usar</TableHead>
-                          <TableHead>Fonte / Aderência</TableHead>
-                          <TableHead>Órgão e Fornecedor</TableHead>
-                          <TableHead>Unidade</TableHead>
-                          <TableHead className="text-right">Preço Original</TableHead>
-                          <TableHead className="text-right">Preço Comparável</TableHead>
-                          <TableHead className="min-w-[200px]">Exclusão</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedItem.candidates.map((candidate) => {
-                          const status = candidateStatus(candidate);
-                          const isExcludedWithoutReason = !candidate.selected && !candidate.exclusionReason.trim();
-                          return (
-                            <TableRow key={candidate.id} className={candidate.selected ? 'bg-primary/[0.01]' : 'opacity-85'}>
-                              <TableCell>
-                                <Checkbox
-                                  aria-label={`Usar preço ${candidate.purchaseItemId}`}
-                                  checked={candidate.selected}
-                                  onCheckedChange={(checked) => updateCandidate(selectedItem.localId, candidate.id, {
-                                    selected: checked === true,
-                                    exclusionReason: checked === true ? '' : candidate.exclusionReason,
-                                  })}
-                                />
-                              </TableCell>
-                              <TableCell className="min-w-[220px]">
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                  <Badge variant="outline" className={`text-[10px] ${status.className}`}>{status.label}</Badge>
-                                  <Badge variant="secondary" className="gap-0.5 text-[10px] font-mono">
-                                    <Bot className="h-2.5 w-2.5" />
-                                    {candidate.aiScore}
-                                  </Badge>
-                                </div>
-                                <p className="mt-1.5 font-ui text-[10px] text-text-secondary leading-normal">{candidate.aiReason}</p>
-                                <p className="mt-1 line-clamp-1 font-ui text-[10px] text-text-muted">{candidate.description}</p>
-                                <div className="mt-1.5 flex gap-2">
-                                  <a href={candidate.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-bold text-primary hover:underline">
-                                    Fonte Oficial <ExternalLink className="h-2.5 w-2.5" />
-                                  </a>
-                                  {candidate.pncpSearchUrl && (
-                                    <a href={candidate.pncpSearchUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-bold text-sebrae-blue hover:underline">
-                                      PNCP <ExternalLink className="h-2.5 w-2.5" />
-                                    </a>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="min-w-[180px]">
-                                <p className="font-mono text-[10px] font-bold text-text-primary">{candidate.agencyCode || '-'}</p>
-                                <p className="font-ui text-[10px] text-text-secondary truncate max-w-[160px]" title={candidate.agencyName || ''}>{candidate.agencyName || '-'}</p>
-                                <p className="mt-1.5 font-ui text-[10px] font-bold text-text-primary truncate max-w-[160px]" title={candidate.supplierName || ''}>{candidate.supplierName || '-'}</p>
-                                <p className="font-mono text-[9px] text-text-muted leading-none mt-0.5">{candidate.supplierDocument || '-'}</p>
-                                <p className="font-ui text-[9px] text-text-muted mt-1 leading-none">{formatDate(candidate.resultDate || candidate.purchaseDate)}</p>
-                              </TableCell>
-                              <TableCell className="font-mono text-[11px]">{candidate.originalUnitLabel}</TableCell>
-                              <TableCell className="text-right font-mono text-[11px]">{formatCurrency(candidate.originalUnitPrice)}</TableCell>
-                              <TableCell className="text-right font-mono text-[11px] font-bold">{formatCurrency(candidate.comparableUnitPrice)}</TableCell>
-                              <TableCell>
-                                {candidate.selected ? (
-                                  <span className="font-ui text-[10px] text-primary font-medium">Incluído</span>
-                                ) : (
-                                  <div className="relative flex items-center">
-                                    <Input
-                                      aria-label={`Justificativa para desconsiderar ${candidate.purchaseItemId}`}
-                                      value={candidate.exclusionReason}
-                                      onChange={(event) => updateCandidate(selectedItem.localId, candidate.id, { exclusionReason: event.target.value })}
-                                      placeholder="Justifique a exclusão..."
-                                      className={`h-8 text-xs pr-8 ${isExcludedWithoutReason ? 'border-amber-300 focus:border-amber-500 bg-amber-50/20' : ''}`}
-                                    />
-                                    {isExcludedWithoutReason && (
-                                      <AlertTriangle className="absolute right-2.5 h-3.5 w-3.5 text-amber-500" title="Justificativa obrigatória" />
-                                    )}
-                                  </div>
-                                )}
+                  {/* Tabs de Navegação */}
+                  <div className="flex border-b border-border-default space-x-6">
+                    <button
+                      type="button"
+                      className={`pb-3 text-sm font-semibold transition-all relative ${
+                        curadoriaTab === 'basket' ? 'text-primary' : 'text-text-muted hover:text-text-primary'
+                      }`}
+                      onClick={() => setCuradoriaTab('basket')}
+                    >
+                      Cesta de Preços ({selectedItem.candidates.length})
+                      {curadoriaTab === 'basket' && (
+                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className={`pb-3 text-sm font-semibold transition-all relative ${
+                        curadoriaTab === 'market' ? 'text-primary' : 'text-text-muted hover:text-text-primary'
+                      }`}
+                      onClick={() => setCuradoriaTab('market')}
+                    >
+                      Pesquisa de Mercado (Internet)
+                      {curadoriaTab === 'market' && (
+                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Exibição da Aba Ativa */}
+                  {curadoriaTab === 'basket' ? (
+                    <DataTablePanel
+                      title={`Cesta de Preços - Item ${selectedItem.itemNumber}`}
+                      description="Selecione as referências mais compatíveis tecnicamente. Exclusões precisam de justificativa descritiva."
+                      actions={(
+                        <Button type="button" variant="outline" className="gap-2 h-9 text-xs" onClick={() => void exportPriceResearchWorkbook(reportData)}>
+                          <Download className="h-3.5 w-3.5" />
+                          Exportar XLSX
+                        </Button>
+                      )}
+                    >
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-12">Usar</TableHead>
+                            <TableHead>Fonte / Aderência</TableHead>
+                            <TableHead>Órgão e Fornecedor</TableHead>
+                            <TableHead>Unidade</TableHead>
+                            <TableHead className="text-right">Preço Original</TableHead>
+                            <TableHead className="text-right w-24">Frete (R$)</TableHead>
+                            <TableHead className="text-right">Preço Comp.</TableHead>
+                            <TableHead className="text-center w-28">Evidência</TableHead>
+                            <TableHead className="min-w-[160px]">Exclusão</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedItem.candidates.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={8} className="text-center py-8 text-text-muted text-xs">
+                                Nenhuma cotação adicionada. Use a aba "Pesquisa de Mercado (Internet)" para complementar os preços com buscas em e-commerces.
                               </TableCell>
                             </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </DataTablePanel>
+                          ) : (
+                            selectedItem.candidates.map((candidate) => {
+                              const status = candidateStatus(candidate);
+                              const isExcludedWithoutReason = !candidate.selected && !candidate.exclusionReason.trim();
+                              return (
+                                <TableRow key={candidate.id} className={candidate.selected ? 'bg-primary/[0.01]' : 'opacity-85'}>
+                                  <TableCell>
+                                    <Checkbox
+                                      aria-label={`Usar preço ${candidate.purchaseItemId}`}
+                                      checked={candidate.selected}
+                                      onCheckedChange={(checked) => updateCandidate(selectedItem.localId, candidate.id, {
+                                        selected: checked === true,
+                                        exclusionReason: checked === true ? '' : candidate.exclusionReason,
+                                      })}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="min-w-[220px]">
+                                    <div className="flex gap-3 items-start">
+                                      {candidate.thumbnailLink && (
+                                        <img
+                                          src={candidate.thumbnailLink}
+                                          alt="Thumbnail"
+                                          className="h-12 w-12 object-contain rounded-md border border-border-default bg-white p-0.5 shrink-0"
+                                        />
+                                      )}
+                                      <div className="space-y-1.5 flex-1">
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                          <Badge variant="outline" className={`text-[10px] ${status.className}`}>{status.label}</Badge>
+                                          <Badge variant="secondary" className="gap-0.5 text-[10px] font-mono">
+                                            <Bot className="h-2.5 w-2.5" />
+                                            {candidate.aiScore}
+                                          </Badge>
+                                        </div>
+                                        <p className="font-ui text-[10px] text-text-secondary leading-normal">{candidate.aiReason}</p>
+                                        <p className="line-clamp-2 font-ui text-[10px] text-text-muted leading-relaxed" title={candidate.description}>{candidate.description}</p>
+                                        <div className="flex gap-2">
+                                          <a href={candidate.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-bold text-primary hover:underline">
+                                            {candidate.sourceType !== 'compras_gov_precos' && candidate.sourceType !== 'custom'
+                                              ? `Acessar no ${candidate.sourceLabel}`
+                                              : 'Fonte Oficial'}{' '}
+                                            <ExternalLink className="h-2.5 w-2.5" />
+                                          </a>
+                                          {candidate.pncpSearchUrl && (
+                                            <a href={candidate.pncpSearchUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-bold text-sebrae-blue hover:underline">
+                                              PNCP <ExternalLink className="h-2.5 w-2.5" />
+                                            </a>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="min-w-[180px]">
+                                    <p className="font-mono text-[10px] font-bold text-text-primary">{candidate.agencyCode || '-'}</p>
+                                    <p className="font-ui text-[10px] text-text-secondary truncate max-w-[160px]" title={candidate.agencyName || ''}>{candidate.agencyName || '-'}</p>
+                                    <p className="mt-1.5 font-ui text-[10px] font-bold text-text-primary truncate max-w-[160px]" title={candidate.supplierName || ''}>{candidate.supplierName || '-'}</p>
+                                    <p className="font-mono text-[9px] text-text-muted leading-none mt-0.5">{candidate.supplierDocument || '-'}</p>
+                                    <p className="font-ui text-[9px] text-text-muted mt-1 leading-none">{formatDate(candidate.resultDate || candidate.purchaseDate)}</p>
+                                  </TableCell>
+                                  <TableCell className="font-mono text-[11px]">{candidate.originalUnitLabel}</TableCell>
+                                  <TableCell className="text-right font-mono text-[11px]">{formatCurrency(candidate.originalUnitPrice)}</TableCell>
+                                  <TableCell className="text-right w-24">
+                                    {candidate.sourceType !== 'compras_gov_precos' ? (
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="0,00"
+                                        aria-label="Frete"
+                                        className="h-7 text-right font-mono text-[11px] w-20 ml-auto px-1.5"
+                                        value={candidate.freightCost ?? ''}
+                                        onChange={(e) => {
+                                          const freight = e.target.value === '' ? undefined : Math.max(0, parseFloat(e.target.value) || 0);
+                                          updateCandidate(selectedItem.localId, candidate.id, {
+                                            freightCost: freight,
+                                            comparableUnitPrice: candidate.originalUnitPrice + (freight ?? 0),
+                                          });
+                                        }}
+                                      />
+                                    ) : (
+                                      <span className="text-[10px] text-text-muted font-mono">-</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-[11px] font-bold">{formatCurrency(candidate.comparableUnitPrice)}</TableCell>
+                                  <TableCell className="text-center">
+                                    {candidate.selected && candidate.sourceType !== 'compras_gov_precos' ? (
+                                      candidate.evidenceImage && candidate.evidenceImage.startsWith('http') ? (
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-8 px-2.5 text-[10px] gap-1 border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 transition-all font-semibold"
+                                          onClick={() => setPreviewCandidate(candidate)}
+                                          title="Visualizar print da evidência"
+                                        >
+                                          <Image className="h-3.5 w-3.5" />
+                                          Ver Print
+                                        </Button>
+                                      ) : (
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-8 px-2.5 text-[10px] gap-1 border-border-default hover:border-primary/30 text-text-secondary hover:text-primary transition-all font-semibold"
+                                          onClick={() => void handleCaptureEvidence(candidate.id, candidate.sourceUrl, candidate.originalUnitPrice)}
+                                          disabled={capturingCandidateId === candidate.id}
+                                          title="Capturar print da página em tempo real"
+                                        >
+                                          {capturingCandidateId === candidate.id ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                                          ) : (
+                                            <Camera className="h-3.5 w-3.5 text-primary" />
+                                          )}
+                                          Tirar Print
+                                        </Button>
+                                      )
+                                    ) : (
+                                      <span className="text-[10px] text-text-muted">-</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    {candidate.selected ? (
+                                      <span className="font-ui text-[10px] text-primary font-medium">Incluído</span>
+                                    ) : (
+                                      <div className="relative flex items-center">
+                                        <Input
+                                          aria-label={`Justificativa para desconsiderar ${candidate.purchaseItemId}`}
+                                          value={candidate.exclusionReason}
+                                          onChange={(event) => updateCandidate(selectedItem.localId, candidate.id, { exclusionReason: event.target.value })}
+                                          placeholder="Justifique a exclusão..."
+                                          className={`h-8 text-xs pr-8 ${isExcludedWithoutReason ? 'border-amber-300 focus:border-amber-500 bg-amber-50/20' : ''}`}
+                                        />
+                                        {isExcludedWithoutReason && (
+                                          <AlertTriangle className="absolute right-2.5 h-3.5 w-3.5 text-amber-500" title="Justificativa obrigatória" />
+                                        )}
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })
+                          )}
+                        </TableBody>
+                      </Table>
+                    </DataTablePanel>
+                  ) : (
+                    <div className="space-y-6">
+                      {/* Painel de busca e provedores */}
+                      <div className="p-5 border border-border-default bg-surface-card rounded-radius-lg shadow-soft space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+                          <div className="space-y-1">
+                            <h4 className="font-ui text-sm font-bold text-text-primary">Buscador de Canais Privados</h4>
+                            <p className="font-ui text-xs text-text-muted">Pesquise preços diretamente nos maiores e-commerces do país.</p>
+                          </div>
+                          {/* Seleção de Provedores */}
+                          <div className="flex flex-wrap items-center gap-4">
+                            {[
+                              { id: 'amazon', label: 'Amazon' },
+                              { id: 'magalu', label: 'Magalu' },
+                              { id: 'americanas', label: 'Americanas' },
+                            ].map((prov) => {
+                              const isChecked = selectedMarketProviders.includes(prov.id);
+                              return (
+                                <label key={prov.id} className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-text-secondary select-none">
+                                  <Checkbox
+                                    checked={isChecked}
+                                    onCheckedChange={(checked) => {
+                                      if (checked) {
+                                        setSelectedMarketProviders((prev) => [...prev, prov.id]);
+                                      } else {
+                                        setSelectedMarketProviders((prev) => prev.filter((p) => p !== prov.id));
+                                      }
+                                    }}
+                                  />
+                                  {prov.label}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* CEP para cálculo de frete */}
+                        <div className="flex items-center gap-2 mt-1">
+                          <MapPin className="h-3.5 w-3.5 text-text-muted shrink-0" />
+                          <span className="text-[11px] text-text-secondary font-semibold whitespace-nowrap">CEP (frete Amazon):</span>
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={9}
+                            placeholder="00000-000"
+                            value={freightCep}
+                            onChange={(e) => {
+                              const raw = e.target.value.replace(/\D/g, '').slice(0, 8);
+                              const formatted = raw.length > 5 ? `${raw.slice(0, 5)}-${raw.slice(5)}` : raw;
+                              setFreightCep(formatted);
+                              localStorage.setItem('pp_freight_cep', raw);
+                            }}
+                            className="h-7 text-xs w-32 font-mono"
+                            title="CEP para cálculo automático de frete na Amazon. Para outros marketplaces, informe manualmente na coluna Frete."
+                          />
+                          {freightCep.replace(/\D/g, '').length === 8 && (
+                            <span className="text-[10px] text-emerald-600 font-semibold">✓ Configurado</span>
+                          )}
+                        </div>
+
+                        {/* Input de busca */}
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+                            <Input
+                              type="text"
+                              value={marketSearchTerm}
+                              onChange={(e) => setMarketSearchTerm(e.target.value)}
+                              placeholder="Digite a palavra-chave para buscar no e-commerce..."
+                              className="pl-10 h-10 text-sm focus-visible:ring-sebrae-blue"
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            className="bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-sm h-10 px-6 gap-2"
+                            onClick={() => void handleMarketSearch()}
+                            disabled={isSearchingMarket}
+                          >
+                            {isSearchingMarket ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Search className="h-4 w-4" />
+                            )}
+                            Buscar
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Resultados */}
+                      {isSearchingMarket ? (
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                          {Array.from({ length: 3 }).map((_, idx) => (
+                            <div key={idx} className="border border-border-default rounded-radius-lg bg-surface-card p-4 animate-pulse space-y-3">
+                              <div className="h-36 bg-slate-100 rounded-md w-full" />
+                              <div className="h-4 bg-slate-100 rounded w-1/4" />
+                              <div className="h-6 bg-slate-100 rounded w-full" />
+                              <div className="h-4 bg-slate-100 rounded w-1/2" />
+                              <div className="flex justify-between items-center pt-3">
+                                <div className="h-6 bg-slate-100 rounded w-20" />
+                                <div className="h-8 bg-slate-100 rounded w-24" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : marketResults.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 bg-surface-card border border-dashed border-border-default rounded-radius-lg text-center p-6">
+                          <div className="p-3.5 bg-slate-100 rounded-full text-slate-400 mb-3">
+                            <ShoppingBag className="h-6 w-6" />
+                          </div>
+                          <h5 className="font-ui text-sm font-bold text-text-primary">Nenhum resultado para exibir</h5>
+                          <p className="font-ui text-xs text-text-muted mt-1 max-w-sm">
+                            Faça uma busca acima utilizando a descrição do produto para listar as ofertas das lojas.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                          {marketResults.map((result, idx) => {
+                            const isAdded = selectedItem.candidates.some((c) => c.sourceUrl === result.link);
+                            return (
+                              <div
+                                key={idx}
+                                className="flex flex-col justify-between border border-border-default hover:border-primary/45 bg-surface-card rounded-radius-lg p-4 shadow-soft hover:shadow-md transition-all group"
+                              >
+                                <div className="space-y-3">
+                                  {/* Imagem do produto */}
+                                  <div className="h-36 bg-white rounded-md border border-border-default/50 p-2 flex items-center justify-center overflow-hidden relative">
+                                    {result.thumbnailLink ? (
+                                      <img
+                                        src={result.thumbnailLink}
+                                        alt={result.title}
+                                        className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
+                                      />
+                                    ) : (
+                                      <ShoppingBag className="h-10 w-10 text-slate-300" />
+                                    )}
+                                    {/* Badge do Provedor */}
+                                    <Badge variant="outline" className="absolute top-2 right-2 border-primary/20 bg-primary/5 text-primary text-[10px] font-semibold py-0.5 px-2 capitalize shadow-sm">
+                                      {result.provider}
+                                    </Badge>
+                                  </div>
+
+                                  {/* Títulos e snippets */}
+                                  <div className="space-y-1">
+                                    <a
+                                      href={result.link}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="font-ui text-xs font-bold text-text-primary hover:text-sebrae-blue hover:underline line-clamp-2 leading-snug flex items-start gap-1"
+                                    >
+                                      {result.title}
+                                      <ExternalLink className="h-3 w-3 shrink-0 mt-0.5 text-text-muted" />
+                                    </a>
+                                    <p className="font-ui text-[10px] text-text-muted line-clamp-2 leading-relaxed">{result.snippet}</p>
+                                    <p className="font-mono text-[9px] text-text-muted">{result.displayLink}</p>
+                                  </div>
+                                </div>
+
+                                {/* Preço e ação */}
+                                <div className="mt-4 pt-3 border-t border-border-default/50 flex items-center justify-between gap-2">
+                                  <span className="font-mono text-base font-extrabold text-text-primary">{result.price}</span>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    disabled={capturingUrls.has(result.link)}
+                                    className={`gap-1 font-semibold text-xs h-8 px-3 transition-all ${
+                                      capturingUrls.has(result.link)
+                                        ? 'bg-amber-50 text-amber-700 border border-amber-200 cursor-wait'
+                                        : isAdded
+                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-50 cursor-default'
+                                        : 'bg-primary hover:bg-primary-hover text-primary-foreground shadow-sm'
+                                    }`}
+                                    onClick={() => !isAdded && !capturingUrls.has(result.link) && void handleAddMarketCandidate(result)}
+                                  >
+                                    {capturingUrls.has(result.link) ? (
+                                      <>
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        Capturando...
+                                      </>
+                                    ) : isAdded ? (
+                                      <>
+                                        <Check className="h-3.5 w-3.5" />
+                                        Na Cesta
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Plus className="h-3.5 w-3.5" />
+                                        Incluir
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="text-center py-16 border border-dashed border-border-default rounded-radius-lg bg-surface-card text-text-muted">
@@ -1207,12 +1989,18 @@ export default function PesquisaPrecos() {
       )}
 
       {/* WIZARD NAVIGATION FOOTER */}
-      <div className="flex justify-between items-center border-t border-border-default pt-6 mt-6">
+      <div className="flex justify-between items-center border-t border-border-light pt-6 mt-6">
         <Button
           type="button"
           variant="outline"
-          className="gap-2 font-semibold text-xs h-10"
-          onClick={() => goToStep(activeStep - 1)}
+          className="gap-2 font-semibold text-xs h-10 hover:text-sebrae-blue hover:border-sebrae-blue/30"
+          onClick={() => {
+            if (activeStep === 4 || activeStep === 3) {
+              goToStep(2);
+            } else {
+              goToStep(activeStep - 1);
+            }
+          }}
           disabled={activeStep === 1}
         >
           <ArrowLeft className="h-4 w-4" />
@@ -1222,7 +2010,7 @@ export default function PesquisaPrecos() {
           {activeStep < 5 ? (
             <Button
               type="button"
-              className="gap-2 bg-primary hover:bg-primary-hover text-primary-foreground font-semibold text-xs h-10"
+              className="gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-xs h-10 transition-all"
               onClick={() => goToStep(activeStep + 1)}
               disabled={items.length === 0}
             >
@@ -1232,7 +2020,7 @@ export default function PesquisaPrecos() {
           ) : (
             <Button
               type="button"
-              className="gap-2 bg-primary hover:bg-primary-hover text-primary-foreground font-semibold text-xs h-10"
+              className="gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-xs h-10 transition-all"
               onClick={() => void printReport()}
               disabled={items.length === 0 || isSaving}
             >
@@ -1242,6 +2030,80 @@ export default function PesquisaPrecos() {
           )}
         </div>
       </div>
+      </div>
+      )}
+
+      {/* Modal de Visualização de Evidência */}
+      {previewCandidate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-4xl bg-surface-card border border-border-default rounded-radius-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-border-default flex items-center justify-between bg-surface-subtle/50">
+              <div>
+                <h3 className="text-sm font-bold text-sebrae-navy capitalize animate-none">
+                  Evidência de Preço — {previewCandidate.sourceLabel}
+                </h3>
+                <p className="text-[11px] text-text-muted mt-0.5 truncate max-w-[500px]">
+                  URL: <a href={previewCandidate.sourceUrl} target="_blank" rel="noreferrer" className="text-sebrae-blue hover:underline font-mono">{previewCandidate.sourceUrl}</a>
+                </p>
+              </div>
+              <button
+                type="button"
+                className="h-8 w-8 rounded-full p-0 flex items-center justify-center text-text-secondary hover:bg-slate-100 hover:text-text-primary"
+                onClick={() => setPreviewCandidate(null)}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-auto p-6 bg-slate-50 flex items-center justify-center min-h-[300px]">
+              {previewCandidate.evidenceImage ? (
+                <img
+                  src={previewCandidate.evidenceImage}
+                  alt={`Evidência ${previewCandidate.sourceLabel}`}
+                  className="max-w-full max-h-[60vh] object-contain rounded-md border border-border-default bg-white shadow-sm"
+                />
+              ) : (
+                <p className="text-sm text-text-muted">Nenhuma imagem capturada.</p>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-3.5 border-t border-border-default bg-surface-subtle/50 flex justify-between items-center gap-3">
+              <span className="text-[10px] font-mono text-text-muted">
+                Preço Comparável: <span className="font-bold text-text-primary">{formatCurrency(previewCandidate.comparableUnitPrice)}</span>
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs h-9 font-semibold"
+                  onClick={() => {
+                    if (!previewCandidate.evidenceImage) return;
+                    const link = document.createElement('a');
+                    link.href = previewCandidate.evidenceImage;
+                    link.download = `evidencia-${previewCandidate.sourceLabel.toLowerCase()}-${previewCandidate.id}.png`;
+                    link.click();
+                  }}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Baixar Imagem
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="bg-primary text-primary-foreground text-xs h-9 font-semibold"
+                  onClick={() => setPreviewCandidate(null)}
+                >
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

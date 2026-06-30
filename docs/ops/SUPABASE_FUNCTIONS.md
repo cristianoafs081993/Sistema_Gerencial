@@ -1,5 +1,11 @@
 # SUPABASE_FUNCTIONS
 
+> [!IMPORTANT]
+> **Regra de Deploy**: Sempre que uma nova Edge Function for criada, modificada ou adicionada como dependência no projeto, **deve ser executado o deploy dela** no ambiente correspondente usando a CLI do Supabase para que as atualizações fiquem disponíveis no backend remoto:
+> ```bash
+> supabase functions deploy <nome-da-funcao>
+> ```
+
 ## Functions identificadas no repo
 
 ### `ingest-email-csv`
@@ -77,6 +83,32 @@ Observacao:
 
 - a chave operacional do terceirizado e a matricula SUAP; e-mail e usado apenas como fallback legado.
 - para login local, o frontend pode enviar um `VITE_SUAP_CLIENT_ID` proprio; quando ele corresponde a `SUAP_DEV_CLIENT_ID`, a function usa `SUAP_DEV_CLIENT_SECRET`, mantendo o client de producao inalterado.
+
+### `suap-proxy`
+
+Local:
+
+- [suap-proxy/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/suap-proxy/index.ts)
+
+Chamador:
+
+- [suapScraperService.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/suapScraperService.ts)
+
+Uso:
+
+- Encaminha requisições HTTP para a API do SUAP contornando as restrições de CORS no frontend
+- Utiliza o token OAuth do usuário (`suapToken`) para autenticação
+- Retorna páginas HTML ou binário (PDF codificado em base64)
+
+Dependencias:
+
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+
+Observação:
+
+- Possui política de segurança interna que valida a sessão do usuário no Supabase
+- Restringe o proxy aos caminhos `/processo_eletronico/*` e `/djtools/*` no SUAP
 
 ### `gerar-contrato-licitacao`
 
