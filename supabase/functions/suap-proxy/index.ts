@@ -69,7 +69,11 @@ Deno.serve(async (req) => {
 
       // 1. Fazer GET na página de login do SUAP para capturar o token CSRF e cookies de sessão iniciais
       const loginPageUrl = `${SUAP_BASE_URL}/accounts/login/`;
-      const getRes = await fetch(loginPageUrl);
+      const getRes = await fetch(loginPageUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        }
+      });
       const getHtml = await getRes.text();
 
       // Capturar cookies do GET
@@ -103,12 +107,14 @@ Deno.serve(async (req) => {
       const cookieHeader = cookiesList.join('; ');
       console.log('[suap-proxy] Cookies enviados no POST de login:', cookieHeader);
 
-      // 2. Executar o POST de login no SUAP
+      // 2. Executar o POST de login no SUAP enviando todos os campos do form e cabeçalhos de navegador
       const loginParams = new URLSearchParams();
       loginParams.append('username', username);
       loginParams.append('password', password);
       loginParams.append('csrfmiddlewaretoken', csrfToken);
+      loginParams.append('this_is_the_login_form', '1');
       loginParams.append('next', '/');
+      loginParams.append('auth_code', '');
 
       console.log('[suap-proxy] Enviando credenciais ao SUAP...');
       const postRes = await fetch(loginPageUrl, {
@@ -116,6 +122,8 @@ Deno.serve(async (req) => {
         headers: {
           'Cookie': cookieHeader,
           'Referer': loginPageUrl,
+          'Origin': SUAP_BASE_URL,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: loginParams.toString(),
