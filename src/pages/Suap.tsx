@@ -16,6 +16,14 @@ import {
   ShieldCheck,
   Sparkles,
   Wallet,
+  Inbox,
+  FileText,
+  Users,
+  Send,
+  ChevronDown,
+  Plus,
+  Trash2,
+  Settings,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -25,13 +33,36 @@ import { HeaderActions, HeaderSubtitle } from '@/components/HeaderParts';
 import { SuapConclusaoDialog } from '@/components/modals/SuapConclusaoDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { suapExtensionGithubUrl } from '@/lib/suapExtension';
+import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
-import { SuapProcesso } from '@/types';
+import { SuapProcesso, SuapCaixa } from '@/types';
 import { suapProcessosService } from '@/services/suapProcessos';
 import { SuapSyncPanel } from '@/components/suap/SuapSyncPanel';
 
@@ -94,7 +125,29 @@ const getProcessCompleteness = (processo: SuapProcesso) => {
   };
 };
 
-const getVisibleProcesses = (processos: SuapProcesso[], searchTerm: string, statusFilter: StatusFilter) => {
+const getCaixaBadgeColor = (caixa: string) => {
+  const normalized = caixa.toLowerCase();
+  if (normalized.includes('entrada') || normalized.includes('recebido')) {
+    return 'bg-emerald-50 text-emerald-700 border-emerald-200/80 hover:bg-emerald-50';
+  }
+  if (normalized.includes('meus') || normalized.includes('criado')) {
+    return 'bg-sky-50 text-sky-700 border-sky-200/80 hover:bg-sky-50';
+  }
+  if (normalized.includes('interessado')) {
+    return 'bg-violet-50 text-violet-700 border-violet-200/80 hover:bg-violet-50';
+  }
+  if (normalized.includes('aguardando') || normalized.includes('envio') || normalized.includes('saida')) {
+    return 'bg-amber-50 text-amber-700 border-amber-200/80 hover:bg-amber-50';
+  }
+  return 'bg-slate-50 text-slate-700 border-slate-200/80 hover:bg-slate-50';
+};
+
+const getVisibleProcesses = (
+  processos: SuapProcesso[],
+  searchTerm: string,
+  statusFilter: StatusFilter,
+  caixaFilter: string
+) => {
   const normalizedSearch = searchTerm.trim().toLowerCase();
 
   return processos
@@ -117,9 +170,14 @@ const getVisibleProcesses = (processos: SuapProcesso[], searchTerm: string, stat
         (statusFilter === 'pending' && isPendingStatus(status)) ||
         (statusFilter === 'error' && isErrorStatus(status));
 
+      const matchesCaixa =
+        caixaFilter === 'all' ||
+        (processo.caixa && processo.caixa.toLowerCase().includes(caixaFilter.toLowerCase())) ||
+        (caixaFilter === 'none' && !processo.caixa);
+
       const visibleInCurrentFilter = statusFilter === 'pending' ? true : hasExtractedInfo;
 
-      return matchesSearch && matchesStatus && visibleInCurrentFilter;
+      return matchesSearch && matchesStatus && matchesCaixa && visibleInCurrentFilter;
     })
     .sort((left, right) => {
       const leftCompleteness = getProcessCompleteness(left);
@@ -341,10 +399,22 @@ export default function Suap() {
   const { session } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
+  const [caixaFilter, setCaixaFilter] = useState<string>('all');
   const [openingPdfId, setOpeningPdfId] = useState<string | null>(null);
   const [reopeningProcessId, setReopeningProcessId] = useState<string | null>(null);
   const [selectedProcesso, setSelectedProcesso] = useState<SuapProcesso | null>(null);
   const [isConclusaoDialogOpen, setIsConclusaoDialogOpen] = useState(false);
+
+  // local login states
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+
+  // registered caixas states
+  const [isCaixasDialogOpen, setIsCaixasDialogOpen] = useState(false);
+  const [newCaixaNome, setNewCaixaNome] = useState('');
+  const [newCaixaUrl, setNewCaixaUrl] = useState('');
+  const [isAddingCaixa, setIsAddingCaixa] = useState(false);
 
   useEffect(() => {
     setSelectedProcesso(null);
@@ -365,16 +435,83 @@ export default function Suap() {
     refetchInterval: 30000,
   });
 
-  const visibleProcesses = getVisibleProcesses(processos, searchTerm, statusFilter);
+  const {
+    data: registeredCaixas = [],
+    isLoading: isCaixasLoading,
+    refetch: refetchCaixas,
+  } = useQuery({
+    queryKey: ['suap-caixas'],
+    queryFn: suapProcessosService.getRegisteredCaixas,
+    enabled: !!session,
+  });
+
+
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      toast.error('Informe e-mail e senha do Supabase.');
+      return;
+    }
+    setIsAuthLoading(true);
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (signInError) throw signInError;
+      toast.success('Login realizado com sucesso.');
+      setPassword('');
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : 'Falha ao autenticar.');
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleAddCaixa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCaixaNome.trim() || !newCaixaUrl.trim()) {
+      toast.error('Preencha o nome e o link da caixa.');
+      return;
+    }
+    setIsAddingCaixa(true);
+    try {
+      await suapProcessosService.addRegisteredCaixa(newCaixaNome.trim(), newCaixaUrl.trim());
+      toast.success('Caixa cadastrada com sucesso.');
+      setNewCaixaNome('');
+      setNewCaixaUrl('');
+      void refetchCaixas();
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : 'Falha ao cadastrar caixa.');
+    } finally {
+      setIsAddingCaixa(false);
+    }
+  };
+
+  const handleDeleteCaixa = async (id: string) => {
+    const loadingToast = toast.loading('Removendo caixa...');
+    try {
+      await suapProcessosService.deleteRegisteredCaixa(id);
+      toast.success('Caixa removida.', { id: loadingToast });
+      void refetchCaixas();
+    } catch (err) {
+      console.error(err);
+      toast.error('Falha ao remover caixa.', { id: loadingToast });
+    }
+  };
+
+  const visibleProcesses = getVisibleProcesses(processos, searchTerm, statusFilter, caixaFilter);
   const processCounts = useMemo(
     () => ({
-      active: getVisibleProcesses(processos, '', 'active').length,
-      concluded: getVisibleProcesses(processos, '', 'concluded').length,
-      pending: getVisibleProcesses(processos, '', 'pending').length,
-      error: getVisibleProcesses(processos, '', 'error').length,
-      all: getVisibleProcesses(processos, '', 'all').length,
+      active: getVisibleProcesses(processos, '', 'active', caixaFilter).length,
+      concluded: getVisibleProcesses(processos, '', 'concluded', caixaFilter).length,
+      pending: getVisibleProcesses(processos, '', 'pending', caixaFilter).length,
+      error: getVisibleProcesses(processos, '', 'error', caixaFilter).length,
+      all: getVisibleProcesses(processos, '', 'all', caixaFilter).length,
     }),
-    [processos],
+    [processos, caixaFilter],
   );
 
   const replaceCachedProcess = (processoAtualizado: SuapProcesso) => {
@@ -447,20 +584,135 @@ export default function Suap() {
       <HeaderActions>
         <div className="flex items-center gap-2">
           {session ? (
-            <Button
-              variant="outline"
-              onClick={() => void refetch()}
-              disabled={isFetching}
-              className="gap-2 h-9 text-sm"
-            >
-              <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
-              {isFetching ? 'Atualizando...' : 'Atualizar'}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 gap-2 border-border-default bg-white text-slate-700 shadow-shadow-sm hover:bg-[hsl(var(--secondary))]"
+                >
+                  <RefreshCw className="h-4 w-4 text-emerald-600" />
+                  <span>Sincronizar caixa...</span>
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel className="text-xs text-muted-foreground font-ui">
+                  Abrir caixa no SUAP:
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {registeredCaixas.length === 0 ? (
+                  <div className="py-3 px-2 text-center text-xs text-muted-foreground font-ui">
+                    Nenhuma caixa cadastrada
+                  </div>
+                ) : (
+                  registeredCaixas.map((caixa) => {
+                    const normalized = caixa.nome.toLowerCase();
+                    let IconComponent = FileText;
+                    let colorClass = 'text-slate-500';
+                    if (normalized.includes('entrada') || normalized.includes('recebido')) {
+                      IconComponent = Inbox;
+                      colorClass = 'text-emerald-600';
+                    } else if (normalized.includes('meus') || normalized.includes('criado')) {
+                      IconComponent = FileText;
+                      colorClass = 'text-sky-600';
+                    } else if (normalized.includes('interessado')) {
+                      IconComponent = Users;
+                      colorClass = 'text-violet-600';
+                    } else if (normalized.includes('aguardando') || normalized.includes('envio') || normalized.includes('saida')) {
+                      IconComponent = Send;
+                      colorClass = 'text-amber-600';
+                    }
+                    return (
+                      <DropdownMenuItem
+                        key={caixa.id}
+                        onClick={() => {
+                          const separator = caixa.url.includes('?') ? '&' : '?';
+                          window.open(`${caixa.url}${separator}suap-auto-sync=true`, '_blank', 'noopener,noreferrer');
+                        }}
+                        className="flex items-center gap-2 cursor-pointer py-2 text-sm"
+                      >
+                        <IconComponent className={cn('h-4 w-4', colorClass)} />
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-text-primary text-xs">{caixa.nome}</span>
+                          <span className="text-[10px] text-muted-foreground truncate max-w-[200px]" title={caixa.url}>
+                            {caixa.url}
+                          </span>
+                        </div>
+                      </DropdownMenuItem>
+                    );
+                  })
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setIsCaixasDialogOpen(true)}
+                  className="flex items-center gap-2 cursor-pointer py-2 text-sm font-semibold text-primary hover:bg-slate-50"
+                >
+                  <Settings className="h-4 w-4" />
+                  <span>Gerenciar caixas...</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open(suapExtensionGithubUrl, '_blank', 'noopener,noreferrer')}
+            className="h-space-9 gap-space-2 border-border-default bg-white text-slate-700 shadow-shadow-sm hover:bg-[hsl(var(--secondary))]"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Baixar extensão
+          </Button>
+          {session ? (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => void refetch()}
+                disabled={isFetching}
+                className="gap-2 h-9 text-sm"
+              >
+                <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
+                {isFetching ? 'Atualizando...' : 'Atualizar'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  const { error: signOutError } = await supabase.auth.signOut();
+                  if (signOutError) {
+                    toast.error('Erro ao sair.');
+                  } else {
+                    toast.success('Sessão encerrada.');
+                  }
+                }}
+                className="h-9 text-sm text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                Sair
+              </Button>
+            </>
           ) : null}
         </div>
       </HeaderActions>
 
       <SuapSyncPanel onSyncComplete={() => void refetch()} />
+
+      {session ? (
+        <Card className="border-emerald-100 bg-emerald-50/20 overflow-hidden shadow-soft">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600 shrink-0">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="font-ui text-sm font-semibold text-emerald-950">Sincronização de Processos do SUAP</h4>
+                <p className="text-xs text-emerald-800/90 mt-0.5 leading-5">
+                  Para importar ou atualizar processos de uma caixa específica, clique em <strong>"Sincronizar caixa..."</strong> no menu acima, faça login no SUAP se necessário, e utilize a extensão instalada no seu navegador.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <SuapConclusaoDialog
         open={isConclusaoDialogOpen}
@@ -475,9 +727,125 @@ export default function Suap() {
         onSuccess={handleConclusaoSuccess}
       />
 
-      <>
-          <div className="space-y-4">
+      <Dialog open={isCaixasDialogOpen} onOpenChange={setIsCaixasDialogOpen}>
+        <DialogContent className="w-[95vw] sm:max-w-lg bg-surface-card border-border-default overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="font-ui text-lg text-text-primary">
+              Gerenciar Caixas do SUAP
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6 py-2 w-full min-w-0 overflow-hidden">
+            <form onSubmit={handleAddCaixa} className="space-y-3 border-b border-border-default/60 pb-5 w-full min-w-0">
+              <h4 className="font-ui text-xs font-semibold text-text-secondary uppercase tracking-[0.1em]">
+                Cadastrar Nova Caixa
+              </h4>
+              <div className="grid gap-3 sm:grid-cols-2 w-full min-w-0">
+                <div className="space-y-1 min-w-0">
+                  <label className="text-[11px] font-medium text-text-secondary">Nome da Caixa</label>
+                  <Input
+                    value={newCaixaNome}
+                    onChange={(e) => setNewCaixaNome(e.target.value)}
+                    placeholder="Ex: Caixa de Entrada"
+                    className="h-9 bg-white w-full"
+                  />
+                </div>
+                <div className="space-y-1 min-w-0">
+                  <label className="text-[11px] font-medium text-text-secondary">Link (URL) do SUAP</label>
+                  <Input
+                    value={newCaixaUrl}
+                    onChange={(e) => setNewCaixaUrl(e.target.value)}
+                    placeholder="https://suap.ifrn.edu.br/..."
+                    className="h-9 bg-white w-full"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button type="submit" size="sm" disabled={isAddingCaixa} className="h-9 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">
+                  <Plus className="h-4 w-4" />
+                  Adicionar Caixa
+                </Button>
+              </div>
+            </form>
+
+            <div className="space-y-3 w-full min-w-0">
+              <h4 className="font-ui text-xs font-semibold text-text-secondary uppercase tracking-[0.1em]">
+                Caixas Cadastradas
+              </h4>
+              {isCaixasLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              ) : registeredCaixas.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">Nenhuma caixa cadastrada.</p>
+              ) : (
+                <div className="max-h-60 overflow-y-auto border border-border-default/50 rounded-xl divide-y divide-border-default/50 bg-white w-full min-w-0">
+                  {registeredCaixas.map((caixa) => (
+                    <div key={caixa.id} className="flex items-center justify-between p-3 hover:bg-slate-50/50 transition-colors w-full min-w-0">
+                      <div className="space-y-0.5 min-w-0 flex-1 pr-4">
+                        <p className="text-xs font-bold text-text-primary truncate">{caixa.nome}</p>
+                        <p className="text-[10px] text-muted-foreground truncate block" title={caixa.url}>{caixa.url}</p>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            const separator = caixa.url.includes('?') ? '&' : '?';
+                            window.open(`${caixa.url}${separator}suap-auto-sync=true`, '_blank', 'noopener,noreferrer');
+                          }}
+                          title="Sincronizar esta caixa"
+                          className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => void handleDeleteCaixa(caixa.id)}
+                          title="Excluir caixa"
+                          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {session ? (
+        <Card className="border-emerald-200/50 bg-emerald-50/30 shadow-sm max-w-full mb-6">
+          <CardContent className="flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-semibold text-emerald-900 text-sm">Conectado ao Espelho SUAP</p>
+                <p className="text-xs text-emerald-700 mt-0.5">
+                  Sincronização configurada para o usuário <strong>{session.user.email}</strong>
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-xs text-emerald-700 bg-white/60 px-3 py-2 rounded-lg border border-emerald-100">
+              <RefreshCw className="h-4 w-4 text-emerald-500" />
+              <span>A extensão sincroniza automaticamente as caixas ativas a cada hora.</span>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <div className="space-y-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center flex-1">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -487,6 +855,24 @@ export default function Suap() {
                   className="pl-9"
                 />
               </div>
+
+              <div className="w-full sm:w-56 shrink-0">
+                <Select value={caixaFilter} onValueChange={setCaixaFilter}>
+                  <SelectTrigger className="w-full bg-white border-border-default/80">
+                    <SelectValue placeholder="Filtrar por caixa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as caixas</SelectItem>
+                    {registeredCaixas.map((caixa) => (
+                      <SelectItem key={caixa.id} value={caixa.nome}>
+                        {caixa.nome}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="none">Sem caixa atribuída</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
               <Tabs
                 value={statusFilter}
@@ -599,6 +985,19 @@ export default function Suap() {
                             className="mt-0.5 h-7 w-7 shrink-0 rounded-lg"
                           />
                         </div>
+                        {processo.caixa && (
+                          <div className="pt-1 flex">
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                'text-[11px] font-semibold px-2.5 py-0.5 rounded-full border shadow-xs transition-colors',
+                                getCaixaBadgeColor(processo.caixa)
+                              )}
+                            >
+                              {processo.caixa}
+                            </Badge>
+                          </div>
+                        )}
                       </div>
 
                       {isProcessConcluded(processo) ? (
@@ -912,7 +1311,7 @@ export default function Suap() {
 
       {!isLoading && !isError && visibleProcesses.length === 0 ? (
         <Card className="border-dashed">
-          <CardContent className="py-16 text-center">
+          <CardContent className="py-16 text-center flex flex-col items-center justify-center">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-500">
               <Search className="h-6 w-6" />
             </div>
@@ -920,10 +1319,27 @@ export default function Suap() {
             <p className="mt-2 text-sm text-muted-foreground">
               Ajuste os filtros ou sincronize novos processos pela extensão do SUAP.
             </p>
+            {(() => {
+              const selectedCaixaObj = registeredCaixas.find(c => c.nome === caixaFilter);
+              if (!selectedCaixaObj) return null;
+              return (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const separator = selectedCaixaObj.url.includes('?') ? '&' : '?';
+                    window.open(`${selectedCaixaObj.url}${separator}suap-auto-sync=true`, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="mt-4 gap-2 border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-semibold"
+                >
+                  <RefreshCw className="h-4 w-4 text-emerald-600" />
+                  Sincronizar caixa "{selectedCaixaObj.nome}" agora
+                </Button>
+              );
+            })()}
           </CardContent>
         </Card>
       ) : null}
-      </>
     </div>
   );
 }

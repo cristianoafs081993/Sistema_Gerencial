@@ -1,4 +1,4 @@
-﻿import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { formatCurrency, formatDocumentoId, formatarDocumento, parseCurrency } from '@/lib/utils';
 import type {
@@ -348,14 +348,24 @@ const inferObjetoCategoria = (context: {
   tipoPessoa: 'PF' | 'PJ';
   objeto?: string;
   projeto?: string;
+  favorecido?: string;
 }) => {
   const haystack = `${context.objeto || ''} ${context.projeto || ''}`.toLowerCase();
+  const normalizedHaystack = haystack
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 
-  if (context.tipoPessoa === 'PF' || /\bbolsa\b|\bbolsista\b|\bauxilio\b|\bprojeto\b/.test(haystack)) {
+  const isFolha = !!context.favorecido && /folha de pagamento/i.test(context.favorecido);
+
+  if (
+    context.tipoPessoa === 'PF' ||
+    isFolha ||
+    /\bbolsa\b|\bbolsista\b|\bauxilio\b|\bprojeto\b/.test(normalizedHaystack)
+  ) {
     return 'bolsa';
   }
 
-  if (/\baquisi|material|equipamento|produto|fornecimento|compra\b/.test(haystack)) {
+  if (/\baquisi|material|equipamento|produto|fornecimento|compra\b/.test(normalizedHaystack)) {
     return 'aquisicao';
   }
 
@@ -1361,10 +1371,12 @@ export async function buildResolvedContextFromSuapProcess(
 
 export function buildDespachoLiquidacaoHtml(context: ResolvedDocumentContext) {
   const categoria = inferObjetoCategoria(context);
+  const isFolhaPagamento = !!context.favorecido && /folha de pagamento/i.test(context.favorecido);
   const favorecidoHtml = htmlValue(context.favorecido, 'favorecido', { uppercase: true, bold: true });
   const processoHtml = htmlValue(context.processo, 'numero do processo', { bold: true });
   const empenhoHtml = htmlValue(normalizeEmpenhoDisplay(context.empenho), 'empenho', { uppercase: true, bold: true });
-  const valorHtml = htmlCurrency(context.valor, 'valor da liquidacao');
+  const minRequiredValue = context.valor;
+  const valorHtml = htmlCurrency(minRequiredValue, 'valor da liquidacao');
   const objetoLimpo = simplifyObjectForCategory(cleanObjectReference(context.objeto, context.contrato), categoria);
   const objetoHtml = htmlValue(
     objetoLimpo,
@@ -1379,12 +1391,16 @@ export function buildDespachoLiquidacaoHtml(context: ResolvedDocumentContext) {
   let htmlTexto = '';
 
   if (categoria === 'bolsa') {
+    const bolsistasTexto = isFolhaPagamento
+      ? '<b>pelos estudantes presentes na folha de pagamento</b>'
+      : `pelo(s) bolsista(s) ${favorecidoHtml}`;
+
     if (context.projeto) {
       const projetoHtml = htmlQuoted(context.projeto, 'nome do projeto');
       const editalHtml = htmlValue(context.edital, 'numero do edital', { bold: true });
-      htmlTexto = `Considerando a regularidade da documenta&ccedil;&atilde;o apresentada e o ateste da execu&ccedil;&atilde;o das atividades pelo(s) bolsista(s) ${favorecidoHtml}, no &acirc;mbito do projeto ${projetoHtml}, aprovado no Edital n&ordm; ${editalHtml} (Processo n&ordm; ${processoHtml}), <b>AUTORIZO</b> a liquida&ccedil;&atilde;o da despesa no valor de ${valorHtml}, referente ao empenho ${empenhoHtml}.`;
+      htmlTexto = `Considerando a regularidade da documenta&ccedil;&atilde;o apresentada e o ateste da execu&ccedil;&atilde;o das atividades ${bolsistasTexto}, no &acirc;mbito do projeto ${projetoHtml}, aprovado no Edital n&ordm; ${editalHtml} (Processo n&ordm; ${processoHtml}), <b>AUTORIZO</b> a liquida&ccedil;&atilde;o da despesa no valor de ${valorHtml}, referente ao empenho ${empenhoHtml}.`;
     } else {
-      htmlTexto = `Considerando a regularidade da documenta&ccedil;&atilde;o apresentada e o ateste da execu&ccedil;&atilde;o das atividades pelo(s) bolsista(s) ${favorecidoHtml} (Processo n&ordm; ${processoHtml}), <b>AUTORIZO</b> a liquida&ccedil;&atilde;o da despesa no valor de ${valorHtml}, referente ao empenho ${empenhoHtml}.`;
+      htmlTexto = `Considerando a regularidade da documenta&ccedil;&atilde;o apresentada e o ateste da execu&ccedil;&atilde;o das atividades ${bolsistasTexto} (Processo n&ordm; ${processoHtml}), <b>AUTORIZO</b> a liquida&ccedil;&atilde;o da despesa no valor de ${valorHtml}, referente ao empenho ${empenhoHtml}.`;
     }
   } else {
     const trechoObjeto =

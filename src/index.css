@@ -27,7 +27,7 @@
 
     --border: 210 40% 90%;               /* #E2E8F0 sutil */
     --input: 210 40% 90%;
-    --ring: 227 72% 51%;              /* Foco Sebrae Blue #2A4FDA */
+    --ring: 213 100% 38%;              /* Foco Sebrae Blue #0056C3 */
 
     --muted: 218 20% 94%;              /* Cinza/azul claro */
     --muted-foreground: 215 16% 47%;    /* Texto secundário #64748B */
@@ -37,10 +37,10 @@
     --secondary-foreground: 217 33% 17%;
 
     /* === ACCENT / PRIMARY (10%) === */
-    --primary: 227 72% 51%;           /* Sebrae Blue #2A4FDA */
+    --primary: 213 100% 38%;           /* Sebrae Blue #0056C3 */
     --primary-foreground: 0 0% 100%;
 
-    --accent: 227 72% 51%;
+    --accent: 213 100% 38%;
     --accent-foreground: 0 0% 100%;
 
     /* Estados semânticos */
@@ -59,12 +59,12 @@
     /* === SIDEBAR (Branding Sebrae Navy & Gold) === */
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 227 59% 25%;   /* Sebrae Navy #1A2B66 */
-    --sidebar-primary: 227 72% 51%;      /* Sebrae Blue */
+    --sidebar-primary: 213 100% 38%;      /* Sebrae Blue */
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 227 40% 97%;       /* Fundo hover sutil */
     --sidebar-accent-foreground: 227 59% 25%;
     --sidebar-border: 210 40% 94%;
-    --sidebar-ring: 227 72% 51%;
+    --sidebar-ring: 213 100% 38%;
 
     /* === SOMBRAS MULTICAMADAS PREMIUM === */
     --shadow-xs: 0 1px 2px 0 rgba(26, 43, 102, 0.03);
@@ -80,10 +80,10 @@
     --glass-highlight: rgba(255, 255, 255, 0.62);
 
     /* Dot-pattern SVG para fundos */
-    --dot-pattern: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='2' cy='2' r='1' fill='%232a4fda' fill-opacity='0.08'/%3E%3C/svg%3E");
+    --dot-pattern: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='2' cy='2' r='1' fill='%230056c3' fill-opacity='0.08'/%3E%3C/svg%3E");
 
     /* Gradientes */
-    --gradient-primary: linear-gradient(135deg, #2A4FDA 0%, #1A2B66 100%);
+    --gradient-primary: linear-gradient(135deg, #0056C3 0%, #1A2B66 100%);
     --gradient-accent:  linear-gradient(135deg, #1A2B66 0%, #0F1A3E 100%);
     --gradient-warning: linear-gradient(135deg, #FED303 0%, #DCA702 100%);
     --gradient-card:    linear-gradient(180deg, #FFFFFF 0%, #F4F7FC 100%);
@@ -598,14 +598,14 @@
     background-image: var(--dot-pattern);
   }
   .dark .dot-pattern {
-    --dot-pattern: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='2' cy='2' r='1' fill='%232a4fda' fill-opacity='0.16'/%3E%3C/svg%3E");
+    --dot-pattern: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='2' cy='2' r='1' fill='%230056c3' fill-opacity='0.16'/%3E%3C/svg%3E");
   }
 
   /* Gradiente de fundo dinâmico e polido */
   .app-bg-soft {
     background-color: #F4F7FC;
     background-image:
-      radial-gradient(920px 380px at 12% -18%, rgba(42, 79, 218, 0.03), rgba(42, 79, 218, 0) 58%),
+      radial-gradient(920px 380px at 12% -18%, rgba(0, 86, 195, 0.03), rgba(0, 86, 195, 0) 58%),
       linear-gradient(180deg, #F4F7FC 0%, #EBF1FA 100%);
   }
 

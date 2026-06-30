@@ -149,17 +149,17 @@ export function Layout({ children }: LayoutProps) {
     return initial;
   });
   const isConsultor = location.pathname === '/consultor';
-  const userEmail = session?.user.email || null;
+  const userEmail = session?.user?.email || null;
 
   useEffect(() => {
-    const userId = session?.user.id || null;
-    const usesDefaultPassword = session?.user.user_metadata?.uses_default_password === true;
+    const userId = session?.user?.id || null;
+    const usesDefaultPassword = session?.user?.user_metadata?.uses_default_password === true;
 
     if (!userId || !usesDefaultPassword || defaultPasswordToastRef.current === userId) return;
 
     defaultPasswordToastRef.current = userId;
     toast.warning('Sua conta foi criada com a senha padrão "ifrn". Recomenda-se trocar a senha no próximo acesso.');
-  }, [session?.user.id, session?.user.user_metadata?.uses_default_password]);
+  }, [session?.user?.id, session?.user?.user_metadata?.uses_default_password]);
 
   useEffect(() => {
     setExpandedSections((current) => {
@@ -247,7 +247,7 @@ export function Layout({ children }: LayoutProps) {
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        {/* Brand Header matching Sebrae guidelines */}
+        {/* Brand Header matching guidelines */}
         <div className="p-6 border-b border-slate-100 flex flex-col gap-1.5 bg-slate-50/70 relative">
           {/* Mobile Close Button */}
           <Button
@@ -262,7 +262,7 @@ export function Layout({ children }: LayoutProps) {
           </Button>
 
           <Link to="/" className="flex items-center gap-3 no-underline" onClick={() => setSidebarOpen(false)}>
-            <LogoIcon size={38} className="transform rotate-2" />
+             <LogoIcon size={32} />
             <div>
               <h1 className="font-bold text-lg tracking-tight leading-none text-sebrae-navy flex items-center gap-1.5 m-0">
                 SIAGES <span className="text-[10px] bg-sebrae-gold text-sebrae-navy px-1.5 py-0.5 rounded font-black">Beta</span>

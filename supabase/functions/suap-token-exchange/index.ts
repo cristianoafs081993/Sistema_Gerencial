@@ -28,13 +28,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    const defaultClientId = Deno.env.get('SUAP_CLIENT_ID') || 'CFHflhpMyHPgGvJtDgTMga0hhDSQNsKl7SKAhNhC';
+    const defaultClientId = Deno.env.get('SUAP_CLIENT_ID') || 'Oe1jZhORICjEB840r23FR4P1OGQCInNqyNcCzLip';
     const devClientId = Deno.env.get('SUAP_DEV_CLIENT_ID') || '';
     const clientId = reqClientId || defaultClientId;
     const clientSecret =
       devClientId && clientId === devClientId
         ? Deno.env.get('SUAP_DEV_CLIENT_SECRET') || ''
-        : Deno.env.get('SUAP_CLIENT_SECRET') || 'OeAHTAz6jAluDwzd2xXJ1CnKSLNJtJ81rmjV0yJp8dWFYcsnqG2zhUm5OJjlXriRrqJpE8ZuqErT57MKdlsdrnCkDYiUa96UWhz8JVHWKWNUHMGIM1EnTjZAMvgNORLE';
+        : Deno.env.get('SUAP_CLIENT_SECRET') || 'B2wQ8Ikaoj6DILy1RTpXgkfsEQcr81hqPK7gLitQWmIlYSYvNAKY2if1MrRL8pBhan56jM4qcTxKMdHRzN9iDkyFjWOqaNLz5ARrQsk2k3QSlLHnMzEX12I3yYz9OPRj';
 
     if (!clientSecret) {
       return new Response(JSON.stringify({ error: 'Secret OAuth do SUAP nao configurado para o client informado.' }), {
@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
       nome: profileData.nome_usual || profileData.nome || profileData.nome_completo || 'Colaborador',
       matricula: profileData.matricula || profileData.username || profileData.identificacao || '',
       vinculo: profileData.tipo_vinculo || profileData.vinculo?.tipo_vinculo || '',
-      email: profileData.email || profileData.email_secundario || profileData.email_institucional || '',
+      email: profileData.email || profileData.email_secundario || profileData.email_institucional || profileData.email_preferencial || profileData.email_google || '',
       foto: profileData.url_foto_150x200 
         ? (profileData.url_foto_150x200.startsWith('http') ? profileData.url_foto_150x200 : `https://suap.ifrn.edu.br${profileData.url_foto_150x200}`) 
         : null,
@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
     let emailOtp = null;
     let verificationType = null;
 
-    if (loginSupabase && userProfile.email) {
+    if (userProfile.email) {
       const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
       const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
@@ -268,7 +268,7 @@ Deno.serve(async (req) => {
                   .neq('group_id', groupData.id);
 
                 if (cleanupError) {
-                  console.error('Erro ao remover grupos incompatÃ­veis do terceirizado:', cleanupError);
+                  console.error('Erro ao remover grupos incompatíveis do terceirizado:', cleanupError);
                 }
               }
 
@@ -291,27 +291,29 @@ Deno.serve(async (req) => {
           }
         }
 
-        // 4. Generate login verification link (magiclink)
-        const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-          type: 'magiclink',
-          email,
-          options: {
-            redirectTo: redirectUri,
-          },
-        });
+        // 4. Generate login verification link (magiclink) only if loginSupabase is true
+        if (loginSupabase) {
+          const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+            type: 'magiclink',
+            email,
+            options: {
+              redirectTo: redirectUri,
+            },
+          });
 
-        if (linkError) {
-          console.error('Erro ao gerar link de acesso:', linkError);
-          throw linkError;
+          if (linkError) {
+            console.error('Erro ao gerar link de acesso:', linkError);
+            throw linkError;
+          }
+
+          actionLink = linkData?.properties?.action_link || null;
+
+          // Return token properties so frontend can verify locally via verifyOtp
+          // instead of redirecting through Supabase (which validates redirect URLs).
+          hashedToken = linkData?.properties?.hashed_token || null;
+          emailOtp = linkData?.properties?.email_otp || null;
+          verificationType = linkData?.properties?.verification_type || 'magiclink';
         }
-
-        actionLink = linkData?.properties?.action_link || null;
-
-        // Return token properties so frontend can verify locally via verifyOtp
-        // instead of redirecting through Supabase (which validates redirect URLs).
-        hashedToken = linkData?.properties?.hashed_token || null;
-        emailOtp = linkData?.properties?.email_otp || null;
-        verificationType = linkData?.properties?.verification_type || 'magiclink';
       } else {
         console.error('SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY ausentes no ambiente');
       }

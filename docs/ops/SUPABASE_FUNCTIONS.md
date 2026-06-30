@@ -66,7 +66,8 @@ Chamador:
 Uso:
 
 - troca o `code` OAuth do SUAP por token e busca o perfil em `/api/rh/meus-dados/`
-- cria ou localiza o usuario no Supabase Auth e gera magic link para concluir a sessao do app
+- cria ou localiza o usuario no Supabase Auth em todos os logins do SUAP (incluindo o fluxo de feedback público), associando-o ao grupo de acesso correspondente no banco para que sempre conste no controle de usuários
+- gera magic link para concluir a sessao do app apenas se `loginSupabase` for verdadeiro
 - grava `user_metadata.matricula` normalizada para ser a chave de terceirizados
 - quando a matricula existe em `terceirizados`, sincroniza `user_id` em `terceirizados` e `terceirizado_permissions`, associa o usuario ao grupo `terceirizado` e remove memberships incompatíveis
 - quando nao ha cadastro de terceirizado e o usuario ainda nao possui grupo, associa ao grupo `diretores`

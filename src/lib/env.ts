@@ -29,7 +29,7 @@ export const env = {
   appOrigin: optionalEnv.VITE_APP_ORIGIN ? new URL(optionalEnv.VITE_APP_ORIGIN).origin : undefined,
   siafiContaPagadora: optionalEnv.VITE_SIAFI_CONTA_PAGADORA,
   siafiMacroCodigoFinal: optionalEnv.VITE_SIAFI_MACRO_CODIGO_FINAL,
-  suapClientId: optionalEnv.VITE_SUAP_CLIENT_ID || 'CFHflhpMyHPgGvJtDgTMga0hhDSQNsKl7SKAhNhC',
+  suapClientId: optionalEnv.VITE_SUAP_CLIENT_ID || 'Oe1jZhORICjEB840r23FR4P1OGQCInNqyNcCzLip',
 };
 
 export function getSupabaseEnv() {

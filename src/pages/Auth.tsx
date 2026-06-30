@@ -77,14 +77,14 @@ export default function Auth() {
           data-testid="auth-visual-background"
           className="absolute inset-0 h-full w-full object-cover object-center opacity-30 pointer-events-none"
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0B1538]/95 via-[#1A2B66]/85 to-[#2A4FDA]/45 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0B1538]/95 via-[#1A2B66]/85 to-[#0056C3]/45 pointer-events-none" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.06),transparent_45%)] pointer-events-none" />
         <div className="absolute -left-16 -top-16 w-96 h-96 rounded-full bg-sebrae-blue/15 blur-3xl pointer-events-none" />
         <div className="absolute -right-16 -bottom-16 w-96 h-96 rounded-full bg-sebrae-gold/10 blur-3xl pointer-events-none" />
         
         {/* Top Branding Logo */}
         <div className="flex items-center gap-3 z-10 select-none">
-          <LogoIcon size={38} className="transform rotate-2" />
+          <LogoIcon size={34} />
           <div>
             <h1 className="font-bold text-lg tracking-tight leading-none text-white flex items-center gap-1.5 m-0">
               SIAGES <span className="text-[10px] bg-sebrae-gold text-sebrae-navy px-1.5 py-0.5 rounded font-black">Beta</span>
@@ -144,7 +144,7 @@ export default function Auth() {
           
           {/* Mobile-only branding logo */}
           <div className="flex md:hidden items-center justify-center gap-3 mb-6 select-none">
-            <LogoIcon size={42} className="transform rotate-2" />
+            <LogoIcon size={38} />
             <div>
               <h1 className="font-bold text-xl tracking-tight leading-none text-sebrae-navy flex items-center gap-1.5 m-0">
                 SIAGES <span className="text-[10px] bg-sebrae-gold text-sebrae-navy px-1.5 py-0.5 rounded font-black">Beta</span>

@@ -144,4 +144,24 @@ describe('buildDespachoLiquidacaoHtml', () => {
     expect(html).not.toContain('[nome do projeto]');
     expect(html).not.toContain('[numero do edital]');
   });
+
+  it('trata folha de pagamento como categoria bolsa e usa redacao amigavel', () => {
+    const html = buildDespachoLiquidacaoHtml({
+      ...baseContext,
+      favorecido: 'VÁRIOS (FOLHA DE PAGAMENTO)',
+    });
+
+    // Como é folha de pagamento, deve ser inferido como bolsa e usar a redação correspondente
+    expect(html).toContain('pelos estudantes presentes na folha de pagamento');
+    expect(html).not.toContain('pelo(s) bolsista(s)');
+    expect(html).not.toContain('VÁRIOS (FOLHA DE PAGAMENTO)');
+    expect(html).not.toContain('em favor de'); // A minuta de bolsa não tem "em favor de" no final
+  });
+
+  it('mantem redacao original de servico/aquisicao para favorecidos comuns', () => {
+    const html = buildDespachoLiquidacaoHtml(baseContext); // favorecido: 'Empresa Teste Ltda'
+
+    expect(html).toContain('em favor de <b>EMPRESA TESTE LTDA</b>');
+    expect(html).not.toContain('estudantes presentes na folha de pagamento');
+  });
 });

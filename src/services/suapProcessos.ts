@@ -3,6 +3,7 @@ import {
   SuapLiquidacaoAnalise,
   SuapProcesso,
   SuapWorkflowConclusao,
+  SuapCaixa,
 } from '@/types';
 import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { supabase } from '@/lib/supabase';
@@ -20,6 +21,7 @@ type SuapProcessoRow = {
   contrato?: string | null;
   pdf_url?: string | null;
   dados_completos?: SuapDadosCompletos | null;
+  caixa?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -40,7 +42,7 @@ type ConcluirProcessoParams = {
 };
 
 const PROCESSOS_SELECT =
-  'id,tenant_id,suap_id,url,status,num_processo,beneficiario,cpf_cnpj,assunto,contrato,pdf_url,dados_completos,created_at,updated_at';
+  'id,tenant_id,suap_id,url,status,num_processo,beneficiario,cpf_cnpj,assunto,contrato,pdf_url,dados_completos,caixa,created_at,updated_at';
 
 const mapProcessoRow = (item: SuapProcessoRow): SuapProcesso => ({
   id: item.id,
@@ -55,6 +57,7 @@ const mapProcessoRow = (item: SuapProcessoRow): SuapProcesso => ({
   contrato: item.contrato || undefined,
   pdfUrl: item.pdf_url || undefined,
   dadosCompletos: item.dados_completos || undefined,
+  caixa: item.caixa || undefined,
   createdAt: item.created_at ? new Date(item.created_at) : undefined,
   updatedAt: item.updated_at ? new Date(item.updated_at) : undefined,
 });
@@ -187,5 +190,57 @@ export const suapProcessosService = {
     }
 
     return data as SuapLiquidacaoAnalise;
+  },
+
+  async getRegisteredCaixas(): Promise<SuapCaixa[]> {
+    const { data, error } = await supabase
+      .from('suap_caixas')
+      .select('id,tenant_id,nome,url,created_at,updated_at')
+      .order('nome', { ascending: true });
+
+    if (error) {
+      throw error;
+    }
+
+    return ((data as any[] | null) || []).map((item) => ({
+      id: item.id,
+      tenantId: item.tenant_id,
+      nome: item.nome,
+      url: item.url,
+      createdAt: new Date(item.created_at),
+      updatedAt: new Date(item.updated_at),
+    }));
+  },
+
+  async addRegisteredCaixa(nome: string, url: string): Promise<SuapCaixa> {
+    const { data, error } = await supabase
+      .from('suap_caixas')
+      .insert({ nome, url })
+      .select('id,tenant_id,nome,url,created_at,updated_at')
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return {
+      id: data.id,
+      tenantId: data.tenant_id,
+      nome: data.nome,
+      url: data.url,
+      createdAt: new Date(data.created_at),
+      updatedAt: new Date(data.updated_at),
+    };
+  },
+
+  async deleteRegisteredCaixa(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('suap_caixas')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw error;
+    }
   },
 };

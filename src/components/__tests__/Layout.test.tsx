@@ -107,7 +107,7 @@ describe('Layout', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.change(screen.getByLabelText('Buscar módulo'), { target: { value: 'cred' } });
+    fireEvent.change(screen.getByLabelText('Buscar módulo'), { target: { value: 'a' } });
     fireEvent.click(screen.getByText('Planejamento'));
 
     expect(screen.getByText('Campus')).toBeInTheDocument();

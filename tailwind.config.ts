@@ -22,7 +22,7 @@ export default {
       },
       colors: {
         // --- SEBRAE BASE BRAND COLORS ---
-        "sebrae-blue": "#2A4FDA",
+        "sebrae-blue": "#0056C3",
         "sebrae-navy": "#1A2B66",
         "sebrae-gold": "#FED303",
         "ifrn-green": "#2f9e41",

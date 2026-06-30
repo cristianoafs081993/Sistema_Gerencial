@@ -370,6 +370,16 @@ export interface SuapProcesso {
   contrato?: string;
   pdfUrl?: string;
   dadosCompletos?: SuapDadosCompletos;
+  caixa?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface SuapCaixa {
+  id: string;
+  tenantId?: string;
+  nome: string;
+  url: string;
   createdAt?: Date;
   updatedAt?: Date;
 }

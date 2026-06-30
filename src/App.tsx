@@ -71,6 +71,9 @@ const App = () => (
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/feedback-ambiente/:codigo" element={<PublicFeedback />} />
               <Route path="/suap-callback" element={<SuapCallback />} />
+              <Route element={<AppShell />}>
+                <Route path="/suap" element={<Suap />} />
+              </Route>
               <Route element={<ProtectedRoute />}>
                 <Route element={<AppShell />}>
                   <Route path="/" element={<Dashboard />} />
@@ -104,7 +107,6 @@ const App = () => (
                   <Route path="/energia/financeiro" element={<EnergiaCampus />} />
                   <Route path="/energia/esg" element={<EnergiaCampus />} />
                   <Route path="/consultor" element={<Consultor />} />
-                  <Route path="/suap" element={<Suap />} />
                   <Route path="/economia-tempo" element={<EconomiaTempo />} />
                   <Route path="/controle-usuarios" element={<ControleUsuarios />} />
                   <Route path="/modelos-documentos" element={<ModelosDocumentos />} />
