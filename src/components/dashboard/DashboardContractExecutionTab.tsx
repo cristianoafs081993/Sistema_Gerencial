@@ -450,13 +450,27 @@ const totalB = b.liquidado + b.saldoEmpenhos;
                           return 'bg-slate-50 border-slate-200/50 text-slate-350 opacity-60';
                         }
                         if (percent < 80) {
-                          return 'bg-[#ef4444] border border-red-600/20 text-white hover:bg-[#dc2626] shadow-sm hover:brightness-105 ring-2 ring-red-500/10';
+                          // Gradação de Vermelho para níveis críticos
+                          if (percent < 40) {
+                            return 'bg-[#991b1b] border border-red-900/20 text-white hover:bg-[#7f1d1d] shadow-sm hover:brightness-105 ring-2 ring-red-800/10';
+                          }
+                          if (percent < 65) {
+                            return 'bg-[#dc2626] border border-red-700/20 text-white hover:bg-[#b91c1c] shadow-sm hover:brightness-105 ring-2 ring-red-600/10';
+                          }
+                          return 'bg-[#ef4444] border border-red-500/20 text-white hover:bg-[#dc2626] shadow-sm hover:brightness-105 ring-2 ring-red-500/10';
                         }
                         if (percent < 90) {
                           return 'bg-[#f97316] border border-orange-600/20 text-white hover:bg-[#ea580c] shadow-sm hover:brightness-105 ring-2 ring-orange-500/10';
                         }
                         if (percent < 100) {
                           return 'bg-[#fbbf24] border border-amber-500/20 text-slate-950 hover:bg-[#f59e0b] shadow-sm hover:brightness-105 ring-2 ring-amber-400/10 font-semibold';
+                        }
+                        // Gradação de Verde para níveis adequados
+                        if (percent >= 115) {
+                          return 'bg-[#166534] border border-green-800/20 text-white hover:bg-[#14532d] shadow-md hover:brightness-105 ring-2 ring-green-700/10';
+                        }
+                        if (percent >= 105) {
+                          return 'bg-[#15803d] border border-green-700/20 text-white hover:bg-[#166534] shadow-md hover:brightness-105 ring-2 ring-green-600/10';
                         }
                         return 'bg-[#22c55e] border border-green-600/20 text-white hover:bg-[#16a34a] shadow-md hover:brightness-105 ring-2 ring-green-500/10';
                       };
@@ -606,10 +620,17 @@ const totalB = b.liquidado + b.saldoEmpenhos;
                         <span className="w-3.5 h-3.5 rounded bg-slate-50 border border-slate-200/50" />
                         <span>Sem Gasto / Vazio (0%)</span>
                       </div>
+                      
+                      {/* Crítico Gradation */}
                       <div className="flex items-center gap-1.5">
-                        <span className="w-3.5 h-3.5 rounded bg-[#ef4444] border border-red-600/20" />
+                        <div className="flex -space-x-1.5 mr-0.5">
+                          <span className="w-3.5 h-3.5 rounded bg-[#ef4444] border border-red-500/10 z-20" />
+                          <span className="w-3.5 h-3.5 rounded bg-[#dc2626] border border-red-700/10 z-10" />
+                          <span className="w-3.5 h-3.5 rounded bg-[#991b1b] border border-red-900/10 z-0" />
+                        </div>
                         <span>Crítico (&lt; 80%)</span>
                       </div>
+
                       <div className="flex items-center gap-1.5">
                         <span className="w-3.5 h-3.5 rounded bg-[#f97316] border border-orange-600/20" />
                         <span>Alerta (80% - 89%)</span>
@@ -618,8 +639,14 @@ const totalB = b.liquidado + b.saldoEmpenhos;
                         <span className="w-3.5 h-3.5 rounded bg-[#fbbf24] border border-amber-500/20" />
                         <span>Atenção (90% - 99%)</span>
                       </div>
+                      
+                      {/* Adequado Gradation */}
                       <div className="flex items-center gap-1.5">
-                        <span className="w-3.5 h-3.5 rounded bg-[#22c55e] border border-green-600/20" />
+                        <div className="flex -space-x-1.5 mr-0.5">
+                          <span className="w-3.5 h-3.5 rounded bg-[#22c55e] border border-green-600/10 z-20" />
+                          <span className="w-3.5 h-3.5 rounded bg-[#15803d] border border-green-700/10 z-10" />
+                          <span className="w-3.5 h-3.5 rounded bg-[#166534] border border-green-800/10 z-0" />
+                        </div>
                         <span>Adequado (&ge; 100%)</span>
                       </div>
                     </div>
