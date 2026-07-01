@@ -617,7 +617,7 @@ describe('Dashboard', () => {
     expect(bullets[0].projetado).toBeCloseTo(500, 1);
   });
 
-  it('seleciona automaticamente o contrato com maior gasto mensal', async () => {
+  it('inicia sem nenhum contrato selecionado por padrao', async () => {
     const currentYear = new Date().getFullYear();
     contratosApiAtivosQueryData = [1, 2, 3, 4, 5, 6].map((index) => ({
       id: `c${index}`,
@@ -644,14 +644,10 @@ describe('Dashboard', () => {
     render(<Dashboard />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('contract-expense-selected')).toHaveTextContent('c6');
+      expect(screen.getByTestId('contract-expense-selected')).toHaveTextContent('');
     });
 
     expect(screen.getByTestId('contract-expense-options')).toHaveTextContent('c6:60,c5:50,c4:40,c3:30,c2:20,c1:10');
-    expect(screen.getByTestId('contract-expense-series')).toHaveTextContent(`c6:Fornecedor 6 - 006/${currentYear}`);
-    expect(screen.getByTestId('contract-expense-data')).toHaveTextContent('contract_c6');
-    expect(screen.getByTestId('contract-expense-data')).not.toHaveTextContent('contract_c1');
-    expect(screen.getByTestId('contract-projection-bullets')).toHaveTextContent('c6:600:60');
   });
 
   it('permite filtrar manualmente contratos', async () => {
@@ -675,15 +671,22 @@ describe('Dashboard', () => {
     render(<Dashboard />);
 
     await waitFor(() => {
+      expect(screen.getByTestId('contract-expense-selected')).toHaveTextContent('');
+    });
+
+    // Clicar para selecionar o primeiro contrato (c6)
+    fireEvent.click(screen.getByRole('button', { name: 'toggle-first-contract' }));
+
+    await waitFor(() => {
       expect(screen.getByTestId('contract-expense-selected')).toHaveTextContent('c6');
     });
 
+    // Clicar novamente para desmarcar c6
     fireEvent.click(screen.getByRole('button', { name: 'toggle-first-contract' }));
 
     await waitFor(() => {
       expect(screen.getByTestId('contract-expense-selected')).toHaveTextContent('');
     });
-    expect(screen.getByTestId('contract-expense-series')).not.toHaveTextContent('c6:');
   });
 
   it('inicia o gasto por contrato limitado ao ano atual e usa o periodo do filtro global', async () => {

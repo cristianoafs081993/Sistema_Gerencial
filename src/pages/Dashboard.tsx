@@ -1162,11 +1162,8 @@ export default function Dashboard() {
   );
 
   const contractExpenseTopIds = useMemo(() => {
-    const activeOptions = contractExpenseAggregation.options.filter((option) => option.total > 0);
-    if (activeOptions.length === 0) return EMPTY_ARRAY;
-    const randomIndex = Math.floor(Math.random() * activeOptions.length);
-    return [activeOptions[randomIndex].id];
-  }, [contractExpenseAggregation.options]);
+    return EMPTY_ARRAY;
+  }, []);
 
   useEffect(() => {
     const availableIds = new Set(contractExpenseAggregation.options.map((option) => option.id));

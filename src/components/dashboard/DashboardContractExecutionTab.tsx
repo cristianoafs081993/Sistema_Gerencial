@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Check, Info, TrendingUp } from 'lucide-react';
+import { Check, Info, TrendingUp, FileText } from 'lucide-react';
 import {
   CartesianGrid,
   ComposedChart,
@@ -10,6 +10,7 @@ import {
   YAxis,
 } from 'recharts';
 import { ChartPanel } from '@/components/design-system/ChartPanel';
+import { Card, CardContent } from '@/components/ui/card';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { cn, formatCurrency } from '@/lib/utils';
 import type {
@@ -339,7 +340,7 @@ export function DashboardContractExecutionTab({
 
   const heatmapBullets = useMemo(() => {
     const rawBullets = allContractProjectionBullets.length > 0 ? allContractProjectionBullets : contractProjectionBullets;
-    return rawBullets.filter((item) => {
+    const filtered = rawBullets.filter((item) => {
       const isService = item.categoria === 'Serviços' || item.categoria === 'Mão de Obra';
       const isContinuo = isService;
       const isExclusiva = isContinuo && isMaoDeObraExclusiva(item.objeto || null, item.categoria || null);
@@ -351,513 +352,540 @@ export function DashboardContractExecutionTab({
       if (heatmapFilter === 'outros') return !isContinuo && !isObras;
       return true;
     });
+
+    // Ordenar do maior para o menor percentual de cobertura (ratio)
+    return [...filtered].sort((a, b) => {
+      const totalA = a.liquidado + a.saldoEmpenhos;
+      const ratioA = a.projetado > 0 ? (totalA / a.projetado) * 100 : 100;
+
+const totalB = b.liquidado + b.saldoEmpenhos;
+      const ratioB = b.projetado > 0 ? (totalB / b.projetado) * 100 : 100;
+
+      return ratioB - ratioA;
+    });
   }, [allContractProjectionBullets, contractProjectionBullets, heatmapFilter]);
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[18px] border border-border-default/80 bg-white px-4 py-4 shadow-soft">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
-                <TrendingUp className="h-4 w-4" />
-              </span>
-              <div>
-                <h3 className="font-ui text-sm font-bold text-text-primary">Contratos analisados</h3>
-                <p className="font-ui text-xs text-text-muted">A selecao abaixo filtra o gasto mensal e a projecao anual.</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-            <span className="inline-flex h-9 items-center rounded-full border border-border-default/60 bg-surface-subtle/50 px-3 font-ui text-xs font-semibold text-text-secondary">
-              {selectedContractExpenseIds.length} de {contractExpenseOptions.length} contrato(s)
-            </span>
-          </div>
+      {/* Banner de Introdução da Aba */}
+      <div className="bg-white border border-[#E6ECF4] rounded-[18px] p-5 shadow-soft flex flex-col md:flex-row md:items-start justify-between gap-4">
+        <div className="space-y-1.5 max-w-4xl">
+          <h4 className="text-sm font-bold text-sebrae-navy flex items-center gap-2">
+            <FileText className="w-5 h-5 text-sebrae-blue" />
+            <span>Painel de Monitoramento de Cobertura Orçamentária</span>
+          </h4>
+          <p className="text-xs text-muted-gray leading-relaxed">
+            Este painel interativo exibe o percentual de cobertura dos empenhos vigentes (Liquidado + Saldo) frente à provável necessidade anual projetada para todos os contratos ativos. Os blocos de calor no heatmap atualizam-se dinamicamente ao simular renovações ou ajustar a projeção temporal.
+          </p>
         </div>
 
-        {hasContractExpenseOptions ? (
-          <div className="mt-4 flex max-h-[148px] flex-wrap gap-2 overflow-y-auto pr-1">
-            {contractExpenseOptions.map((contrato) => {
-              const selected = selectedContractExpenseSet.has(contrato.id);
+        <span className="text-[10px] bg-emerald-50 text-emerald-800 font-bold font-sans px-2.5 py-1 rounded-lg flex items-center gap-1.5 w-fit border border-emerald-200/50 shadow-xs h-fit shrink-0">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+          Apurador em Tempo Real
+        </span>
+      </div>
 
-              return (
-                <button
-                  key={contrato.id}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => onToggleContractExpense(contrato.id)}
-                  className={cn(
-                    'inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5 font-ui text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45',
-                    selected
-                      ? 'bg-white text-text-primary shadow-[0_8px_18px_rgba(15,23,42,0.08)]'
-                      : 'border-border-default/60 bg-surface-subtle/45 text-text-secondary hover:border-border-default hover:bg-white',
-                  )}
-                  style={selected ? { borderColor: contrato.color, backgroundColor: `${contrato.color}14` } : undefined}
-                  title={contrato.label}
-                >
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: contrato.color }} />
-                  <span className="max-w-[240px] truncate">{contrato.label}</span>
-                  {contrato.total <= 0 ? <span className="shrink-0 text-[11px] font-semibold text-text-muted">sem fatura</span> : null}
-                  {selected ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" /> : null}
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="mt-4 rounded-xl border border-dashed border-border-default/70 bg-surface-subtle/40 px-3 py-2 font-ui text-xs text-text-muted">
-            Nenhum contrato ativo encontrado para selecao.
-          </p>
-        )}
-      </section>
-
-      <ChartPanel
-        title="Gasto Mensal por Contrato"
-        description="Faturas emitidas no periodo (valor total acumulado mensal)"
-        loading={isLoading || isContractExpenseLoading}
-        heightClassName="h-[380px]"
-      >
-        <div className="space-y-4">
-          {hasContractExpenseData ? (
-            <>
-              <div className="flex flex-wrap gap-2">
-                {contractExpenseSeries.map((serie) => (
-                  <span
-                    key={serie.contratoId}
-                    className="inline-flex max-w-full items-center gap-2 rounded-full border border-border-default/60 bg-white px-3 py-1 text-xs font-semibold text-text-secondary shadow-[0_6px_16px_rgba(15,23,42,0.05)]"
-                    title={serie.label}
-                  >
-                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: serie.color }} />
-                    <span className="max-w-[220px] truncate">{serie.label}</span>
-                  </span>
-                ))}
+      {/* Heatmap de Cobertura de Empenhos (Seletor de Contratos) */}
+      <Card className="border border-border-default/80 bg-white p-5 rounded-[18px] shadow-soft">
+        <CardContent className="p-0">
+          {(allContractProjectionBullets.length > 0 ? allContractProjectionBullets : contractProjectionBullets).length > 0 ? (
+            <div className="space-y-6">
+              {/* Configuração de Filtros e Projeção */}
+              <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4 border border-slate-100/80 shadow-xs">
+                <div className="flex flex-wrap items-center gap-4 font-ui text-[11px] font-medium text-text-muted w-full justify-between gap-y-3">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-text-secondary">Filtrar por:</span>
+                      <select
+                        value={heatmapFilter}
+                        onChange={(e) => setHeatmapFilter(e.target.value as any)}
+                        className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-text-primary focus:border-primary/50 focus:outline-none cursor-pointer"
+                      >
+                        <option value="all">Todos os Contratos</option>
+                        <option value="continuos_exclusiva">Serviços Continuados (Mão de Obra Exclusiva)</option>
+                        <option value="continuos_geral">Serviços Continuados (Geral)</option>
+                        <option value="obras">Obras</option>
+                        <option value="outros">Outras Categorias</option>
+                      </select>
+                    </div>
+                    <div className="hidden sm:block text-slate-200">|</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-text-secondary">Projetar cobertura até:</span>
+                      <select
+                        value={projectionTargetMonths}
+                        onChange={(e) => onProjectionTargetMonthsChange?.(Number(e.target.value))}
+                        className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-text-primary focus:border-primary/50 focus:outline-none cursor-pointer"
+                      >
+                        {projectionOptions.map((opt) => (
+                          <option key={opt.months} value={opt.months}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-4">
+                    {selectedContractExpenseIds.length > 0 && (
+                      <span className="text-[10px] bg-primary/10 text-primary font-bold font-sans px-2.5 py-1 rounded-lg border border-primary/20 shadow-xs">
+                        {selectedContractExpenseIds.length} selecionado(s)
+                      </span>
+                    )}
+                    <div className="hidden sm:block text-slate-200">|</div>
+                    <div>Fórmula: (Liquidado + Saldo) / Projetado</div>
+                  </div>
+                </div>
               </div>
 
-              <div className="h-[380px] rounded-[22px] border border-border-default/60 bg-[linear-gradient(180deg,rgba(248,250,252,0.95),rgba(255,255,255,0.85))] p-3">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={contractExpenseData} margin={{ top: 12, right: 12, left: 0, bottom: 8 }}>
-                    <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#dbe3f0" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }} />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      width={74}
-                      tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
-                      tickFormatter={formatCompactCurrency}
-                    />
-                    <Tooltip content={<ContractExpenseTooltip series={contractExpenseSeries} />} />
-                    {contractExpenseSeries.map((serie) => (
-                      <Line
-                        key={serie.contratoId}
-                        type="monotone"
-                        dataKey={serie.dataKey}
-                        name={serie.label}
-                        stroke={serie.color}
-                        strokeWidth={2.5}
-                        dot={{ r: 2.5, fill: serie.color }}
-                        activeDot={{ r: 4 }}
-                        connectNulls
-                      />
-                    ))}
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            </>
+              {/* Grid do Heatmap */}
+              {heatmapBullets.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                    {heatmapBullets.map((item) => {
+                      const totalCapacidade = item.liquidado + item.saldoEmpenhos;
+                      const ratio = item.projetado > 0 ? (totalCapacidade / item.projetado) * 100 : 100;
+                      
+                      const getCellColorClass = (percent: number) => {
+                        if (percent === 0) {
+                          return 'bg-slate-50 border-slate-200/50 text-slate-350 opacity-60';
+                        }
+                        if (percent < 80) {
+                          return 'bg-[#ef4444] border border-red-600/20 text-white hover:bg-[#dc2626] shadow-sm hover:brightness-105 ring-2 ring-red-500/10';
+                        }
+                        if (percent < 90) {
+                          return 'bg-[#f97316] border border-orange-600/20 text-white hover:bg-[#ea580c] shadow-sm hover:brightness-105 ring-2 ring-orange-500/10';
+                        }
+                        if (percent < 100) {
+                          return 'bg-[#fbbf24] border border-amber-500/20 text-slate-950 hover:bg-[#f59e0b] shadow-sm hover:brightness-105 ring-2 ring-amber-400/10 font-semibold';
+                        }
+                        return 'bg-[#22c55e] border border-green-600/20 text-white hover:bg-[#16a34a] shadow-md hover:brightness-105 ring-2 ring-green-500/10';
+                      };
+
+                      const isDarkBackground = ratio > 0 && (ratio < 90 || ratio >= 100);
+                      const isSelected = selectedContractExpenseSet.has(item.id);
+                      const hasSelection = selectedContractExpenseIds.length > 0;
+
+                      return (
+                        <HoverCard key={item.id} openDelay={100} closeDelay={100}>
+                          <HoverCardTrigger asChild>
+                            <div
+                              className={cn(
+                                "flex flex-col justify-between rounded-xl p-4 transition-all duration-200 cursor-pointer h-24 border font-ui translate-z-0 select-none",
+                                getCellColorClass(ratio),
+                                hasSelection && (isSelected ? "ring-2 ring-offset-2 ring-primary scale-[1.02] z-10 shadow-lg" : "opacity-40 scale-[0.97]")
+                              )}
+                              onClick={() => onToggleContractExpense(item.id)}
+                            >
+                              <div className="min-w-0">
+                                <div className="flex items-center justify-between gap-1">
+                                  <p className={cn(
+                                    "text-[9px] font-bold uppercase tracking-wider opacity-90 truncate",
+                                    isDarkBackground ? "text-white/80" : "text-slate-500"
+                                  )}>
+                                    {item.label.split(' - ').slice(-1)[0]}
+                                  </p>
+                                  {isSelected && (
+                                    <Check className={cn(
+                                      "w-3 h-3 shrink-0 stroke-[3px]",
+                                      isDarkBackground ? "text-white" : "text-slate-900"
+                                    )} />
+                                  )}
+                                </div>
+                                <p className={cn(
+                                  "mt-0.5 text-[11px] font-bold leading-tight line-clamp-2",
+                                  isDarkBackground ? "text-white" : "text-slate-900"
+                                )}>
+                                  {item.label.split(' - ')[0]}
+                                </p>
+                              </div>
+                              <div className="flex items-baseline justify-between mt-1">
+                                <span className={cn(
+                                  "text-[9px] font-extrabold tracking-wider uppercase",
+                                  isDarkBackground ? "text-white/70" : "text-slate-500"
+                                )}>
+                                  Cobertura
+                                </span>
+                                <span className={cn(
+                                  "text-sm font-black tracking-tight",
+                                  isDarkBackground ? "text-white" : "text-slate-900"
+                                )}>
+                                  {ratio.toFixed(0)}%
+                                </span>
+                              </div>
+                            </div>
+                          </HoverCardTrigger>
+                          <HoverCardContent className="w-80 rounded-2xl p-4 shadow-xl border border-border-default/80 bg-white font-ui text-sm z-50">
+                            <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                              <div>
+                                <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Detalhamento Orçamentário</p>
+                                <p className="font-bold text-text-primary mt-0.5">{item.label}</p>
+                              </div>
+
+                              <div className="h-px bg-slate-100" />
+
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div>
+                                  <span className="text-text-muted font-medium">Liquidado</span>
+                                  <p className="font-bold text-text-primary mt-0.5">{formatCurrency(item.liquidado)}</p>
+                                </div>
+                                <div>
+                                  <span className="text-text-muted font-medium">Saldo Empenhos</span>
+                                  <p className="font-bold text-text-primary mt-0.5">{formatCurrency(item.saldoEmpenhos)}</p>
+                                </div>
+                                <div className="col-span-2 bg-slate-50 rounded-xl p-2.5 mt-1 border border-slate-100">
+                                  <div className="flex justify-between items-center text-xs">
+                                    <span className="text-text-muted font-semibold">Capacidade Vigente</span>
+                                    <span className="font-bold text-text-primary">{formatCurrency(totalCapacidade)}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center text-xs mt-1.5 pt-1.5 border-t border-slate-200/60">
+                                    <span className="text-text-muted font-semibold">Projetado Anual</span>
+                                    <span className="font-bold text-text-primary">{formatCurrency(item.projetado)}</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 border border-slate-100 text-xs">
+                                <span className="font-semibold text-text-muted">Cobertura Realizada</span>
+                                <span className={cn(
+                                  'font-black',
+                                  ratio < 80 ? 'text-[#ef4444]' : ratio < 90 ? 'text-[#f97316]' : ratio < 100 ? 'text-[#b45309]' : 'text-[#16a34a]'
+                                )}>
+                                  {ratio.toFixed(1)}%
+                                </span>
+                              </div>
+
+                              {/* Indicadores de Teto e Vigência no Heatmap */}
+                              {(item.isCapped || item.exceedsValiditySugestion) && (
+                                <div className="space-y-2 pt-2 border-t border-slate-100">
+                                  {item.isCapped && !item.isRenewalAllowed && (
+                                    <div className="rounded-lg bg-amber-50 px-2 py-1.5 border border-amber-200/50 text-[10px] font-semibold text-amber-700 leading-relaxed">
+                                      ⚠️ Projeção limitada ao valor vigente do contrato ({formatCurrency(item.valorTotalContrato)}).
+                                    </div>
+                                  )}
+                                  {item.isRenewalAllowed && (
+                                    <div className="rounded-lg bg-sky-50 px-2 py-1.5 border border-sky-200/50 text-[10px] font-semibold text-sky-700 leading-relaxed">
+                                      🔮 Simulação de Renovação (teto desconsiderado).
+                                    </div>
+                                  )}
+                                  {item.exceedsValiditySugestion && !item.isCapped && !item.isRenewalAllowed && (
+                                    <div className="rounded-lg bg-slate-50 px-2 py-1.5 border border-slate-200/50 text-[10px] font-semibold text-slate-500 leading-relaxed">
+                                      💡 A data final excede a vigência deste contrato (que encerra em {formatTraceDate(item.vigenciaFim ?? null)}).
+                                    </div>
+                                  )}
+                                  {onToggleContractRenewal && (
+                                    item.prorrogavel === 'Sim' ? (
+                                      <label className="flex items-center gap-2 cursor-pointer select-none font-ui text-[11px] font-semibold text-text-secondary hover:text-text-primary transition-colors py-1">
+                                        <input
+                                          type="checkbox"
+                                          checked={item.isRenewalAllowed}
+                                          onChange={() => onToggleContractRenewal(item.id)}
+                                          className="h-3.5 w-3.5 rounded border-slate-300 text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer"
+                                        />
+                                        <span>Simular renovação (ignorar limite)</span>
+                                      </label>
+                                    ) : (
+                                      <span className="text-[10px] text-text-muted font-bold py-1 block">
+                                        🚫 Renovação indisponível (não prorrogável)
+                                      </span>
+                                    )
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </HoverCardContent>
+                        </HoverCard>
+                      );
+                    })}
+                  </div>
+
+                  {/* Heatmap Legend Plate */}
+                  <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[11px] text-muted-gray bg-slate-50/50 p-4 rounded-xl mt-2 font-ui">
+                    <div className="font-semibold text-slate-600 uppercase tracking-wider">Legenda de Cobertura (Heatmap):</div>
+                    <div className="flex flex-wrap items-center gap-4">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-3.5 h-3.5 rounded bg-slate-50 border border-slate-200/50" />
+                        <span>Sem Gasto / Vazio (0%)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-3.5 h-3.5 rounded bg-[#ef4444] border border-red-600/20" />
+                        <span>Crítico (&lt; 80%)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-3.5 h-3.5 rounded bg-[#f97316] border border-orange-600/20" />
+                        <span>Alerta (80% - 89%)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-3.5 h-3.5 rounded bg-[#fbbf24] border border-amber-500/20" />
+                        <span>Atenção (90% - 99%)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-3.5 h-3.5 rounded bg-[#22c55e] border border-green-600/20" />
+                        <span>Adequado (&ge; 100%)</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex h-[140px] items-center justify-center rounded-[22px] border border-dashed border-border-default/80 bg-surface-subtle/40 px-6 text-center">
+                  <div>
+                    <p className="font-ui text-sm font-semibold text-text-primary">Nenhum contrato ativo corresponde a esta categoria.</p>
+                    <p className="mt-1 font-ui text-xs text-text-muted">
+                      Selecione outra opção de filtro no painel acima para visualizar os percentuais de cobertura.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
-            <div className="flex h-[260px] items-center justify-center rounded-[22px] border border-dashed border-border-default/80 bg-surface-subtle/40 px-6 text-center">
+            <div className="flex h-[180px] items-center justify-center rounded-[22px] border border-dashed border-border-default/80 bg-surface-subtle/40 px-6 text-center">
               <div>
-                <p className="font-ui text-sm font-semibold text-text-primary">
-                  {hasContractExpenseOptions ? 'Nenhum contrato selecionado.' : 'Nenhuma fatura encontrada para contratos ativos.'}
-                </p>
+                <p className="font-ui text-sm font-semibold text-text-primary">Sem dados de empenho para cobertura.</p>
                 <p className="mt-1 font-ui text-xs text-text-muted">
-                  {hasContractExpenseOptions
-                    ? 'Selecione um ou mais contratos para montar o grafico.'
-                    : 'O grafico sera exibido quando houver faturas sincronizadas.'}
+                  Os percentuais de cobertura aparecerão quando houver faturas e empenhos sincronizados.
                 </p>
               </div>
             </div>
           )}
-        </div>
-      </ChartPanel>
+        </CardContent>
+      </Card>
 
-      <ChartPanel
-        title={`Projeção de Cobertura por Contrato (até ${selectedTargetLabel})`}
-        description={`Liquidações executadas projetadas até ${selectedTargetLabel} frente ao saldo dos empenhos`}
-        loading={isLoading || isContractExpenseLoading}
-        heightClassName="min-h-[260px]"
-      >
-        {contractProjectionBullets.length > 0 ? (
-          <div className="space-y-5">
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4 border border-slate-100">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                  <span className="h-3 w-0.5 rounded-full bg-slate-700" />
-                  Saldo dos empenhos
-                </span>
-                <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                  <span className="h-2 w-2 rounded-full bg-emerald-600" />
-                  Liquidado
-                </span>
-                <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                  <span className="h-2 w-5 rounded-full bg-blue-500/45" />
-                  Projetado
-                </span>
-              </div>
-              <div className="flex flex-wrap items-center gap-4 font-ui text-[11px] font-medium text-text-muted">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-text-secondary">Projetar cobertura até:</span>
-                  <select
-                    value={projectionTargetMonths}
-                    onChange={(e) => onProjectionTargetMonthsChange?.(Number(e.target.value))}
-                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-text-primary focus:border-primary/50 focus:outline-none cursor-pointer"
-                  >
-                    {projectionOptions.map((opt) => (
-                      <option key={opt.months} value={opt.months}>
-                        {opt.label}
-                      </option>
+      {/* Exibir cards de detalhamento condicionalmente quando há contratos selecionados */}
+      {selectedContractExpenseIds.length > 0 && (
+        <>
+          <ChartPanel
+            title="Gasto Mensal por Contrato"
+            description="Faturas emitidas no periodo (valor total acumulado mensal)"
+            loading={isLoading || isContractExpenseLoading}
+            heightClassName="h-[380px]"
+          >
+            <div className="space-y-4">
+              {hasContractExpenseData ? (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    {contractExpenseSeries.map((serie) => (
+                      <span
+                        key={serie.contratoId}
+                        className="inline-flex max-w-full items-center gap-2 rounded-full border border-border-default/60 bg-white px-3 py-1 text-xs font-semibold text-text-secondary shadow-[0_6px_16px_rgba(15,23,42,0.05)]"
+                        title={serie.label}
+                      >
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: serie.color }} />
+                        <span className="max-w-[220px] truncate">{serie.label}</span>
+                      </span>
                     ))}
-                  </select>
+                  </div>
+
+                  <div className="h-[380px] rounded-[22px] border border-border-default/60 bg-[linear-gradient(180deg,rgba(248,250,252,0.95),rgba(255,255,255,0.85))] p-3">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={contractExpenseData} margin={{ top: 12, right: 12, left: 0, bottom: 8 }}>
+                        <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#dbe3f0" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }} />
+                        <YAxis
+                          axisLine={false}
+                          tickLine={false}
+                          width={74}
+                          tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
+                          tickFormatter={formatCompactCurrency}
+                        />
+                        <Tooltip content={<ContractExpenseTooltip series={contractExpenseSeries} />} />
+                        {contractExpenseSeries.map((serie) => (
+                          <Line
+                            key={serie.contratoId}
+                            type="monotone"
+                            dataKey={serie.dataKey}
+                            name={serie.label}
+                            stroke={serie.color}
+                            strokeWidth={2.5}
+                            dot={{ r: 2.5, fill: serie.color }}
+                            activeDot={{ r: 4 }}
+                            connectNulls
+                          />
+                        ))}
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
+                </>
+              ) : (
+                <div className="flex h-[260px] items-center justify-center rounded-[22px] border border-dashed border-border-default/80 bg-surface-subtle/40 px-6 text-center">
+                  <div>
+                    <p className="font-ui text-sm font-semibold text-text-primary">
+                      {hasContractExpenseOptions ? 'Nenhum contrato selecionado.' : 'Nenhuma fatura encontrada para contratos ativos.'}
+                    </p>
+                    <p className="mt-1 font-ui text-xs text-text-muted">
+                      {hasContractExpenseOptions
+                        ? 'Selecione um ou mais contratos para montar o grafico.'
+                        : 'O grafico sera exibido quando houver faturas sincronizadas.'}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
+          </ChartPanel>
 
-            <div className="space-y-3">
-              {contractProjectionBullets.map((item) => {
-                const scaleMax = Math.max(item.liquidado + item.saldoEmpenhos, item.projetado, 1);
-                const liquidadoWidth = Math.min((item.liquidado / scaleMax) * 100, 100);
-                const projetadoWidth = Math.min((item.projetado / scaleMax) * 100, 100);
-                const saldoPosition = Math.min(((item.liquidado + item.saldoEmpenhos) / scaleMax) * 100, 100);
-                const status = getProjectionStatus(item);
-
-                return (
-                  <div
-                    key={item.id}
-                    className="rounded-[18px] border border-border-default/70 bg-white px-4 py-4 shadow-[0_8px_20px_rgba(15,23,42,0.04)] transition-shadow hover:shadow-[0_14px_32px_rgba(15,23,42,0.08)]"
-                  >
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="flex min-w-0 items-start gap-3">
-                        <span className="mt-1 h-3 w-3 shrink-0 rounded-full ring-4 ring-surface-subtle" style={{ backgroundColor: item.color }} />
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="truncate font-ui text-sm font-bold text-text-primary">{item.label}</p>
-                            <span className={cn('inline-flex rounded-full border px-2 py-0.5 font-ui text-[11px] font-bold', status.className)}>
-                              {status.label}
-                            </span>
-                          </div>
-                          <p className="mt-1 font-ui text-xs text-text-muted">
-                            Projetado em {item.percentualProjetado.toFixed(0)}% do saldo com {item.mesesConsiderados} mes(es) observado(s).
-                          </p>
-                          <div className="flex flex-col gap-1">
-                            {item.isCapped && !item.isRenewalAllowed && (
-                              <div>
-                                <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-0.5 mt-2 font-ui text-[10px] font-semibold text-amber-700 border border-amber-200/50">
-                                  ⚠️ Projeção limitada ao valor vigente do contrato ({formatCurrency(item.valorTotalContrato)})
-                                </span>
-                              </div>
-                            )}
-                            {item.isRenewalAllowed && (
-                              <div>
-                                <span className="inline-flex items-center gap-1.5 rounded-md bg-sky-50 px-2 py-0.5 mt-2 font-ui text-[10px] font-semibold text-sky-700 border border-sky-200/50">
-                                  🔮 Simulação de Renovação (teto desconsiderado)
-                                </span>
-                              </div>
-                            )}
-                            {item.exceedsValiditySugestion && !item.isCapped && !item.isRenewalAllowed && (
-                              <p className="mt-1.5 font-ui text-[10px] text-slate-500 font-semibold leading-relaxed">
-                                💡 A data final do filtro excede a vigência deste contrato (que encerra em {formatTraceDate(item.vigenciaFim ?? null)}).
-                              </p>
-                            )}
-                            {onToggleContractRenewal && (item.isCapped || item.exceedsValiditySugestion) && (
-                              item.prorrogavel === 'Sim' ? (
-                                <label className="mt-3 flex items-center gap-2 cursor-pointer select-none font-ui text-[11px] font-semibold text-text-secondary hover:text-text-primary transition-colors">
-                                  <input
-                                    type="checkbox"
-                                    checked={item.isRenewalAllowed}
-                                    onChange={() => onToggleContractRenewal(item.id)}
-                                    className="h-3.5 w-3.5 rounded border-slate-300 text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer"
-                                  />
-                                  <span>Simular renovação contratual (ignorar limite da vigência atual)</span>
-                                </label>
-                              ) : (
-                                <div className="mt-3 font-ui text-[10px] font-bold text-text-muted flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200 w-fit">
-                                  <span>🚫 Renovação indisponível (contrato não prorrogável)</span>
-                                </div>
-                              )
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-3">
-                        <div className="grid min-w-[min(100%,440px)] grid-cols-3 gap-2 text-right font-ui">
-                          <div className="rounded-xl bg-slate-50 px-3 py-2">
-                            <p className="text-[11px] font-semibold text-text-muted">Saldo</p>
-                            <p className="mt-1 text-sm font-bold text-text-primary">{formatCurrency(item.saldoEmpenhos)}</p>
-                          </div>
-                          <div className="rounded-xl bg-emerald-50 px-3 py-2">
-                            <p className="text-[11px] font-semibold text-emerald-700/80">Liquidado</p>
-                            <p className="mt-1 text-sm font-bold text-emerald-700">{formatCurrency(item.liquidado)}</p>
-                          </div>
-                          <div className="rounded-xl bg-blue-50 px-3 py-2">
-                            <p className="text-[11px] font-semibold text-blue-700/80">Projetado</p>
-                            <p className="mt-1 text-sm font-bold text-blue-700">{formatCurrency(item.projetado)}</p>
-                          </div>
-                        </div>
-                        <ContractProjectionTraceHover item={item} targetMonths={projectionTargetMonths} />
-                      </div>
-                    </div>
-
-                    <div className="mt-4">
-                      <div className="relative h-8 rounded-full bg-slate-100 ring-1 ring-inset ring-slate-200">
-                        <div
-                          className="absolute left-0 top-1/2 h-5 -translate-y-1/2 rounded-full bg-blue-500/20"
-                          style={{ width: `${projetadoWidth}%` }}
-                        />
-                        <div
-                          className="absolute left-0 top-1/2 h-3 -translate-y-1/2 rounded-full bg-emerald-600 shadow-[0_0_0_1px_rgba(16,185,129,0.18)]"
-                          style={{ width: `${liquidadoWidth}%` }}
-                        />
-                        <div
-                          className="absolute top-1/2 h-8 w-0.5 -translate-y-1/2 rounded-full bg-slate-900 shadow-[0_0_0_3px_rgba(15,23,42,0.08)]"
-                          style={{ left: `${saldoPosition}%` }}
-                        />
-                      </div>
-                      <div className="mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 font-ui text-[11px] font-semibold text-text-muted">
-                        <span>
-                          Provável necessidade de empenho:{' '}
-                          <span className={cn('font-bold', item.necessidadeEmpenho > 0 ? 'text-status-warning' : 'text-status-success')}>
-                            {formatCurrency(item.necessidadeEmpenho)}
-                          </span>
-                        </span>
-                        <span>
-                          Cobertura provável até:{' '}
-                          <span className="font-bold text-text-primary">
-                            {item.coberturaMes || 'N/D'}
-                          </span>
-                        </span>
-                      </div>
+          <ChartPanel
+            title={`Projeção de Cobertura por Contrato (até ${selectedTargetLabel})`}
+            description={`Liquidações executadas projetadas até ${selectedTargetLabel} frente ao saldo dos empenhos`}
+            loading={isLoading || isContractExpenseLoading}
+            heightClassName="min-h-[260px]"
+          >
+            {contractProjectionBullets.length > 0 ? (
+              <div className="space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4 border border-slate-100">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                      <span className="h-3 w-0.5 rounded-full bg-slate-700" />
+                      Saldo dos empenhos
+                    </span>
+                    <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                      <span className="h-2 w-2 rounded-full bg-emerald-600" />
+                      Liquidado
+                    </span>
+                    <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                      <span className="h-2 w-5 rounded-full bg-blue-500/45" />
+                      Projetado
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-4 font-ui text-[11px] font-medium text-text-muted">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-text-secondary">Projetar cobertura até:</span>
+                      <select
+                        value={projectionTargetMonths}
+                        onChange={(e) => onProjectionTargetMonthsChange?.(Number(e.target.value))}
+                        className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-text-primary focus:border-primary/50 focus:outline-none cursor-pointer"
+                      >
+                        {projectionOptions.map((opt) => (
+                          <option key={opt.months} value={opt.months}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : (
-          <div className="flex h-[180px] items-center justify-center rounded-[22px] border border-dashed border-border-default/80 bg-surface-subtle/40 px-6 text-center">
-            <div>
-              <p className="font-ui text-sm font-semibold text-text-primary">Sem dados de empenho para projecao.</p>
-              <p className="mt-1 font-ui text-xs text-text-muted">
-                Selecione contratos com empenhos e liquidacoes sincronizados para comparar a projecao anual.
-              </p>
-            </div>
-          </div>
-        )}
-      </ChartPanel>
+                </div>
 
-      {/* Heatmap de Cobertura de Empenhos */}
-      <ChartPanel
-        title="Heatmap de Cobertura de Empenhos"
-        description="Percentual de cobertura dos empenhos vigentes (Liquidado + Saldo) frente à provável necessidade anual projetada para todos os contratos ativos."
-        loading={isLoading || isContractExpenseLoading}
-      >
-        {(allContractProjectionBullets.length > 0 ? allContractProjectionBullets : contractProjectionBullets).length > 0 ? (
-          <div className="space-y-6">
-            {/* Legenda do Heatmap */}
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4 border border-slate-100">
-              <div className="flex flex-wrap items-center gap-6">
-                <div className="flex items-center gap-2">
-                  <span className="h-3.5 w-3.5 rounded-lg bg-rose-600 ring-2 ring-rose-600/20" />
-                  <span className="font-ui text-xs font-semibold text-text-muted">Crítico (&lt; 70%)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-3.5 w-3.5 rounded-lg bg-yellow-500 ring-2 ring-yellow-500/20" />
-                  <span className="font-ui text-xs font-semibold text-text-muted">Atenção (70% - 99%)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-3.5 w-3.5 rounded-lg bg-emerald-600 ring-2 ring-emerald-600/20" />
-                  <span className="font-ui text-xs font-semibold text-text-muted">Adequado (&ge; 100%)</span>
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-4 font-ui text-[11px] font-medium text-text-muted">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-text-secondary">Filtrar por:</span>
-                  <select
-                    value={heatmapFilter}
-                    onChange={(e) => setHeatmapFilter(e.target.value as any)}
-                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-text-primary focus:border-primary/50 focus:outline-none cursor-pointer"
-                  >
-                    <option value="all">Todos os Contratos</option>
-                    <option value="continuos_exclusiva">Serviços Continuados (Mão de Obra Exclusiva)</option>
-                    <option value="continuos_geral">Serviços Continuados (Geral)</option>
-                    <option value="obras">Obras</option>
-                    <option value="outros">Outras Categorias</option>
-                  </select>
-                </div>
-                <div className="hidden sm:block text-slate-200">|</div>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-text-secondary">Projetar cobertura até:</span>
-                  <select
-                    value={projectionTargetMonths}
-                    onChange={(e) => onProjectionTargetMonthsChange?.(Number(e.target.value))}
-                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-text-primary focus:border-primary/50 focus:outline-none cursor-pointer"
-                  >
-                    {projectionOptions.map((opt) => (
-                      <option key={opt.months} value={opt.months}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="hidden sm:block text-slate-200">|</div>
-                <div>Fórmula: (Liquidado + Saldo) / Projetado</div>
-              </div>
-            </div>
+                <div className="space-y-4">
+                  {contractProjectionBullets.map((item) => {
+                    const totalCapacidade = item.liquidado + item.saldoEmpenhos;
+                    const ratio = item.projetado > 0 ? (totalCapacidade / item.projetado) * 100 : 100;
+                    
+                    let statusColor = 'bg-emerald-600';
+                    let statusBg = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+                    let statusText = 'Adequado';
 
-            {/* Grid do Heatmap */}
-            {heatmapBullets.length > 0 ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-                {heatmapBullets.map((item) => {
-                  const totalCapacidade = item.liquidado + item.saldoEmpenhos;
-                  const ratio = item.projetado > 0 ? (totalCapacidade / item.projetado) * 100 : 100;
-                  
-                  const getCellColorClass = (percent: number) => {
-                    if (percent < 70) return 'bg-rose-600 text-white shadow-sm hover:bg-rose-700 ring-2 ring-rose-600/20';
-                    if (percent < 100) return 'bg-yellow-500 text-slate-950 shadow-sm hover:bg-yellow-600 ring-2 ring-yellow-500/20';
-                    return 'bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 ring-2 ring-emerald-600/20';
-                  };
+                    if (ratio < 70) {
+                      statusColor = 'bg-rose-600';
+                      statusBg = 'bg-rose-50 text-rose-700 border-rose-100';
+                      statusText = 'Crítico';
+                    } else if (ratio < 100) {
+                      statusColor = 'bg-yellow-500';
+                      statusBg = 'bg-yellow-50 text-amber-700 border-yellow-100';
+                      statusText = 'Atenção';
+                    }
 
-                  return (
-                    <HoverCard key={item.id} openDelay={100} closeDelay={100}>
-                      <HoverCardTrigger asChild>
-                        <div
-                          className={cn(
-                            "flex flex-col justify-between rounded-2xl p-4 transition-all duration-200 cursor-pointer h-28 border border-black/5 font-ui",
-                            getCellColorClass(ratio)
-                          )}
-                        >
-                          <div className="min-w-0">
-                            <p className="text-[10px] font-bold uppercase tracking-wider opacity-90 truncate text-current">
-                              {item.label.split(' - ').slice(-1)[0]}
-                            </p>
-                            <p className="mt-1 text-xs font-bold leading-tight line-clamp-2 text-current">
-                              {item.label.split(' - ')[0]}
-                            </p>
+                    const formatTraceDate = (val: string | null) => {
+                      if (!val) return '';
+                      const parts = val.split('-');
+                      if (parts.length < 3) return val;
+                      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+                    };
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="rounded-2xl border border-border-default/70 bg-white p-4 transition-all hover:shadow-[0_8px_24px_rgba(15,23,42,0.04)]"
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="min-w-0 space-y-1">
+                            <h4 className="font-ui text-xs font-bold text-text-primary uppercase tracking-wide truncate">{item.label}</h4>
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-medium text-text-muted">
+                              <span>Teto Contrato: {formatCurrency(item.valorTotalContrato)}</span>
+                              <span>•</span>
+                              <span>Vigência Fim: {formatTraceDate(item.vigenciaFim ?? null)}</span>
+                            </div>
                           </div>
-                          <div className="flex items-baseline justify-between mt-2">
-                            <span className="text-[10px] font-medium opacity-75 flex items-center gap-1">
-                              Cobertura
-                              {item.isRenewalAllowed && <span title="Simulação de Renovação">🔮</span>}
-                              {item.isCapped && !item.isRenewalAllowed && <span title="Limitado ao Valor Vigente">⚠️</span>}
+
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-ui text-[11px] font-bold', statusBg)}>
+                              <span className={cn('h-1.5 w-1.5 rounded-full', statusColor)} />
+                              {statusText}
                             </span>
-                            <span className="text-lg font-black tracking-tight">{ratio.toFixed(0)}%</span>
+                            <span className="font-ui text-lg font-black tracking-tight text-text-primary">{ratio.toFixed(1)}%</span>
                           </div>
                         </div>
-                      </HoverCardTrigger>
-                      <HoverCardContent className="w-80 rounded-2xl p-4 shadow-xl border border-border-default/80 bg-white font-ui text-sm z-50">
-                        <div className="space-y-3">
-                          <div>
-                            <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Contrato</p>
-                            <p className="font-bold text-text-primary mt-0.5">{item.label}</p>
+
+                        <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-center">
+                          <div className="flex-1">
+                            <div className="h-6 w-full overflow-hidden rounded-full bg-slate-100 border border-slate-200/50 p-0.5 flex relative">
+                              {/* Barra de Liquidado */}
+                              <div
+                                className="h-full rounded-l-full bg-emerald-500 transition-all duration-500"
+                                style={{ width: `${item.projetado > 0 ? (item.liquidado / item.projetado) * 100 : 0}%` }}
+                                title={`Liquidado: ${formatCurrency(item.liquidado)}`}
+                              />
+                              {/* Barra de Saldo Empenhado */}
+                              <div
+                                className="h-full bg-slate-400/90 transition-all duration-500"
+                                style={{ width: `${item.projetado > 0 ? (item.saldoEmpenhos / item.projetado) * 100 : 0}%` }}
+                                title={`Saldo Empenhos: ${formatCurrency(item.saldoEmpenhos)}`}
+                              />
+                            </div>
                           </div>
 
-                          <div className="h-px bg-slate-100" />
-
-                          <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="grid grid-cols-3 gap-4 shrink-0 text-right font-ui text-xs">
                             <div>
-                              <span className="text-text-muted font-medium">Liquidado</span>
+                              <span className="text-[10px] font-semibold text-text-muted uppercase">Liquidado</span>
                               <p className="font-bold text-text-primary mt-0.5">{formatCurrency(item.liquidado)}</p>
                             </div>
                             <div>
-                              <span className="text-text-muted font-medium">Saldo Empenhos</span>
+                              <span className="text-[10px] font-semibold text-text-muted uppercase">Saldo Empenhos</span>
                               <p className="font-bold text-text-primary mt-0.5">{formatCurrency(item.saldoEmpenhos)}</p>
                             </div>
-                            <div className="col-span-2 bg-slate-50 rounded-xl p-2.5 mt-1 border border-slate-100">
-                              <div className="flex justify-between items-center text-xs">
-                                <span className="text-text-muted font-semibold">Capacidade Vigente</span>
-                                <span className="font-bold text-text-primary">{formatCurrency(totalCapacidade)}</span>
-                              </div>
-                              <div className="flex justify-between items-center text-xs mt-1.5 pt-1.5 border-t border-slate-200/60">
-                                <span className="text-text-muted font-semibold">Projetado Anual</span>
-                                <span className="font-bold text-text-primary">{formatCurrency(item.projetado)}</span>
-                              </div>
+                            <div>
+                              <span className="text-[10px] font-semibold text-text-muted uppercase">Projetado Anual</span>
+                              <p className="font-bold text-text-primary mt-0.5">{formatCurrency(item.projetado)}</p>
                             </div>
                           </div>
-
-                          <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 border border-slate-100 text-xs">
-                            <span className="font-semibold text-text-muted">Cobertura Realizada</span>
-                            <span className={cn(
-                              'font-black',
-                              ratio < 70 ? 'text-rose-600' : ratio < 100 ? 'text-amber-600' : 'text-emerald-600'
-                            )}>
-                              {ratio.toFixed(1)}%
-                            </span>
-                          </div>
-
-                          {/* Indicadores de Teto e Vigência no Heatmap */}
-                          {(item.isCapped || item.exceedsValiditySugestion) && (
-                            <div className="space-y-2 pt-2 border-t border-slate-100">
-                              {item.isCapped && !item.isRenewalAllowed && (
-                                <div className="rounded-lg bg-amber-50 px-2 py-1.5 border border-amber-200/50 text-[10px] font-semibold text-amber-700 leading-relaxed">
-                                  ⚠️ Projeção limitada ao valor vigente do contrato ({formatCurrency(item.valorTotalContrato)}).
-                                </div>
-                              )}
-                              {item.isRenewalAllowed && (
-                                <div className="rounded-lg bg-sky-50 px-2 py-1.5 border border-sky-200/50 text-[10px] font-semibold text-sky-700 leading-relaxed">
-                                  🔮 Simulação de Renovação (teto desconsiderado).
-                                </div>
-                              )}
-                              {item.exceedsValiditySugestion && !item.isCapped && !item.isRenewalAllowed && (
-                                <div className="rounded-lg bg-slate-50 px-2 py-1.5 border border-slate-200/50 text-[10px] font-semibold text-slate-500 leading-relaxed">
-                                  💡 A data final excede a vigência deste contrato (que encerra em {formatTraceDate(item.vigenciaFim ?? null)}).
-                                </div>
-                              )}
-                              {onToggleContractRenewal && (
-                                item.prorrogavel === 'Sim' ? (
-                                  <label className="flex items-center gap-2 cursor-pointer select-none font-ui text-[11px] font-semibold text-text-secondary hover:text-text-primary transition-colors py-1">
-                                    <input
-                                      type="checkbox"
-                                      checked={item.isRenewalAllowed}
-                                      onChange={() => onToggleContractRenewal(item.id)}
-                                      className="h-3.5 w-3.5 rounded border-slate-300 text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer"
-                                    />
-                                    <span>Simular renovação (ignorar limite)</span>
-                                  </label>
-                                ) : (
-                                  <span className="text-[10px] text-text-muted font-bold py-1 block">
-                                    🚫 Renovação indisponível (não prorrogável)
-                                  </span>
-                                )
-                              )}
-                            </div>
-                          )}
                         </div>
-                      </HoverCardContent>
-                    </HoverCard>
-                  );
-                })}
+
+                        {/* Indicadores de Teto e Vigência */}
+                        {(item.isCapped || item.exceedsValiditySugestion) && (
+                          <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-2 text-[10px] font-semibold text-text-secondary leading-relaxed">
+                            {item.isCapped && !item.isRenewalAllowed && (
+                              <div className="rounded-lg bg-amber-50 px-2 py-1 border border-amber-200/40 text-amber-700">
+                                ⚠️ Projeção limitada ao valor vigente do contrato ({formatCurrency(item.valorTotalContrato)}).
+                              </div>
+                            )}
+                            {item.isRenewalAllowed && (
+                              <div className="rounded-lg bg-sky-50 px-2 py-1 border border-sky-200/40 text-sky-700">
+                                🔮 Simulação de Renovação ativa (limite de teto desconsiderado).
+                              </div>
+                            )}
+                            {item.exceedsValiditySugestion && !item.isCapped && !item.isRenewalAllowed && (
+                              <div className="rounded-lg bg-slate-50 px-2 py-1 border border-slate-200/40 text-slate-500">
+                                💡 Cobertura provável até:{' '}
+                                <span className="font-bold">{item.coberturaMes || 'N/D'}</span> devido ao encerramento do contrato em{' '}
+                                <span className="font-bold">{formatTraceDate(item.vigenciaFim ?? null)}</span>.
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             ) : (
-              <div className="flex h-[140px] items-center justify-center rounded-[22px] border border-dashed border-border-default/80 bg-surface-subtle/40 px-6 text-center">
-                <div>
-                  <p className="font-ui text-sm font-semibold text-text-primary">Nenhum contrato ativo corresponde a esta categoria.</p>
+              <div className="flex h-[180px] items-center justify-center rounded-[22px] border border-dashed border-border-default/80 bg-surface-subtle/40 px-6 text-center">
+                <div className="space-y-1">
+                  <p className="font-ui text-sm font-semibold text-text-primary">Sem dados de empenho para projecao.</p>
                   <p className="mt-1 font-ui text-xs text-text-muted">
-                    Selecione outra opção de filtro no painel acima para visualizar os percentuais de cobertura.
+                    Selecione contratos com empenhos e liquidacoes sincronizados para comparar a projecao anual.
                   </p>
                 </div>
               </div>
             )}
-          </div>
-        ) : (
-          <div className="flex h-[180px] items-center justify-center rounded-[22px] border border-dashed border-border-default/80 bg-surface-subtle/40 px-6 text-center">
-            <div>
-              <p className="font-ui text-sm font-semibold text-text-primary">Sem dados de empenho para cobertura.</p>
-              <p className="mt-1 font-ui text-xs text-text-muted">
-                Os percentuais de cobertura aparecerão quando houver faturas e empenhos sincronizados.
-              </p>
-            </div>
-          </div>
-        )}
-      </ChartPanel>
+          </ChartPanel>
+        </>
+      )}
     </div>
   );
 }
