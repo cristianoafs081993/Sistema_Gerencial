@@ -191,8 +191,11 @@ export function splitPncpDateRange(dataInicial: string, dataFinal: string, maxDa
   return windows;
 }
 
-export function buildPncpCompraUrl(cnpj: string, anoCompra: number, sequencialCompra: number) {
-  return `https://pncp.gov.br/app/editais/${cnpj}/${anoCompra}/${sequencialCompra}`;
+export function buildPncpCompraUrl(cnpj: string | null | undefined, anoCompra: number | string, sequencialCompra: number | string) {
+  const cleanCnpj = (cnpj && cnpj !== 'null') ? String(cnpj).replace(/\D/g, '') : IFRN_CNPJ;
+  const cleanSeq = Number(sequencialCompra);
+  const cleanYear = Number(anoCompra);
+  return `https://pncp.gov.br/app/editais/${cleanCnpj}/${cleanYear}/${cleanSeq}`;
 }
 
 export function buildPncpPublicationUrl(params: {

@@ -198,13 +198,20 @@ export function normalizeLicitacoesPncpSyncError(error: unknown): Error {
 }
 
 export function mapLicitacaoPncpRow(row: DbLicitacaoRow): LicitacaoPncpRow {
+  const match = String(row.numero_controle_pncp || '').match(/^(\d{14})-\d+-(\d+)\/(\d{4})/);
+  const cnpjFromCtrl = match ? match[1] : '';
+  const seqFromCtrl = match ? Number(match[2]) : 0;
+  const yearFromCtrl = match ? Number(match[3]) : 0;
+
   return {
     id: String(row.id),
     numeroControlePncp: String(row.numero_controle_pncp),
-    cnpjOrgao: String(row.cnpj_orgao),
+    cnpjOrgao: (row.cnpj_orgao && String(row.cnpj_orgao) !== 'null')
+      ? String(row.cnpj_orgao)
+      : (cnpjFromCtrl || IFRN_CNPJ),
     razaoSocialOrgao: stringOrNull(row.razao_social_orgao),
-    anoCompra: Number(row.ano_compra),
-    sequencialCompra: Number(row.sequencial_compra),
+    anoCompra: Number(row.ano_compra) || yearFromCtrl,
+    sequencialCompra: Number(row.sequencial_compra) || seqFromCtrl,
     numeroCompra: stringOrNull(row.numero_compra),
     processo: stringOrNull(row.processo),
     objetoCompra: stringOrNull(row.objeto_compra),

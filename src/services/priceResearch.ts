@@ -105,7 +105,7 @@ function mapItemRow(row: DbResearchItemRow): PriceResearchItem {
     targetMeasureUnit: row.target_measure_unit,
     referenceUnitCost: row.reference_unit_cost === null ? null : Number(row.reference_unit_cost),
     candidates: Array.isArray(row.candidates) ? row.candidates : [],
-    searchStatus: Array.isArray(row.candidates) && row.candidates.length > 0 ? 'success' : 'idle',
+    searchStatus: 'success',
     catalogMatchStatus: 'idle',
     catalogSuggestions: [],
   };

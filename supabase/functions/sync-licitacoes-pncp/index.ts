@@ -169,12 +169,16 @@ function matchesObjetoBusca(row: PncpCompraRaw, objetoBusca?: string) {
   return normalizeSearchText(row.objetoCompra).includes(needle);
 }
 
-async function fetchWithTimeout(url: string, timeoutMs = 30000) {
+async function fetchWithTimeout(url: string, timeoutMs = 30000, headers: Record<string, string> = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const defaultHeaders = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/plain, */*',
+  };
   try {
     return await fetch(url, {
-      headers: { Accept: 'application/json' },
+      headers: { ...defaultHeaders, ...headers },
       signal: controller.signal,
     });
   } finally {
@@ -208,7 +212,9 @@ async function fetchJsonWithRetry<T>(url: string, timeoutMs = 30000, attempts = 
 }
 
 async function fetchText(url: string, timeoutMs = 30000): Promise<string | null> {
-  const response = await fetchWithTimeout(url, timeoutMs);
+  const response = await fetchWithTimeout(url, timeoutMs, {
+    'Accept': 'text/csv, text/plain, */*'
+  });
   if (response.status === 204) return null;
   if (!response.ok) {
     const body = await response.text().catch(() => '');
@@ -702,7 +708,7 @@ Deno.serve(async (request) => {
   try {
     assertOptionalSharedSecret(request);
 
-    const body = await request.json().catch(() => ({})) as SyncRequest;
+    const body = await request.json().catch(() => ({})) as any;
     const supabase = createClient(
       requireEnv('SUPABASE_URL'),
       requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
@@ -713,6 +719,57 @@ Deno.serve(async (request) => {
         },
       },
     );
+
+    if (body.resolveIndividual === true && body.query) {
+      console.log(`[resolveIndividual] Buscando no Elasticsearch do PNCP: ${body.query}`);
+      const searchUrl = `https://pncp.gov.br/api/search/?q=${encodeURIComponent(body.query)}&tipos_documento=edital&pagina=1&tam_pagina=10`;
+      
+      const response = await fetchWithTimeout(searchUrl, 15000);
+      if (!response.ok) {
+        throw new Error(`PNCP Search API returned ${response.status}`);
+      }
+      
+      const searchData = await response.json();
+      const items = Array.isArray(searchData?.items) ? searchData.items : [];
+      const insertedRows = [];
+
+      for (const item of items) {
+        if (!item.numero_controle_pncp || !item.unidade_codigo) continue;
+        
+        const match = item.title.match(/n[ºo]\s*(\d+)\/(\d{4})/i);
+        if (match) {
+          const num = match[1];
+
+          const row1 = {
+            numero_controle_pncp: item.numero_controle_pncp,
+            cnpj_orgao: item.orgao_cnpj,
+            ano_compra: Number(item.ano),
+            sequencial_compra: Number(item.numero_sequencial),
+            numero_compra: num,
+            uasg_codigo: item.unidade_codigo,
+            objeto_compra: item.description || '',
+            raw_data: item,
+            compras_gov_data: {}
+          };
+          
+          const { error: err1 } = await supabase
+            .from('licitacoes_pncp')
+            .upsert(row1, { onConflict: 'numero_controle_pncp' });
+            
+          if (err1) {
+            console.error('Error inserting row:', err1);
+          } else {
+            insertedRows.push(row1);
+          }
+        }
+      }
+
+      return jsonResponse({
+        status: 'success',
+        resolvedCount: insertedRows.length,
+        resolved: insertedRows
+      });
+    }
 
     return jsonResponse(await runSync(supabase, body));
   } catch (error) {

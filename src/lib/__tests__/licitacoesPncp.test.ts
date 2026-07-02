@@ -72,6 +72,15 @@ describe('licitacoesPncp helpers', () => {
     expect(buildPncpCompraUrl('10877412000168', 2025, 198)).toBe(
       'https://pncp.gov.br/app/editais/10877412000168/2025/198',
     );
+    expect(buildPncpCompraUrl(null, 2025, 198)).toBe(
+      'https://pncp.gov.br/app/editais/10877412000168/2025/198',
+    );
+    expect(buildPncpCompraUrl('10.877.412/0001-68', 2025, 198)).toBe(
+      'https://pncp.gov.br/app/editais/10877412000168/2025/198',
+    );
+    expect(buildPncpCompraUrl('10877412000168', '2025', '000198')).toBe(
+      'https://pncp.gov.br/app/editais/10877412000168/2025/198',
+    );
     expect(buildComprasGovCompraKey('158366', 6, '90001', 2025)).toBe('15836605900012025');
   });
 

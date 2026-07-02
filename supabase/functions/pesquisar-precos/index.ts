@@ -231,6 +231,15 @@ function mapCandidate(item: SearchItem, row: PriceApiRow, sourceUrl: string): Ra
   const purchaseItemId = String(row.idCompraItem ?? row.idItemCompra ?? '');
   if (!purchaseItemId) return null;
   const parsedPurchase = parsePurchaseId(purchaseId);
+  if (parsedPurchase) {
+    const dateValue = textOrNull(row.dataResultado) ?? textOrNull(row.dataCompra);
+    if (dateValue && dateValue.length >= 4) {
+      const parsedYear = dateValue.slice(0, 4);
+      if (/^\d{4}$/.test(parsedYear)) {
+        parsedPurchase.year = parsedYear;
+      }
+    }
+  }
   const comparison = comparablePrice(item, row);
   const description = textOrNull(row.descricaoItem) ?? textOrNull(row.descricaoDetalhadaItem) ?? item.description;
   const detailedDescription = textOrNull(row.descricaoDetalhadaItem);
@@ -263,11 +272,20 @@ function mapCandidate(item: SearchItem, row: PriceApiRow, sourceUrl: string): Ra
     sourceType: 'compras_gov_precos',
     sourceLabel: 'Compras.gov.br - Pesquisa de Preços',
     sourceUrl,
-    pncpSearchUrl: `https://pncp.gov.br/app/editais?q=${encodeURIComponent(
-      parsedPurchase
-        ? `${parsedPurchase.uasg} ${parsedPurchase.number}/${parsedPurchase.year}`
-        : purchaseId,
-    )}`,
+    pncpSearchUrl: (() => {
+      const pncpMatch = purchaseId.match(/^(\d{14})-\d+-(\d+)\/(\d{4})/);
+      if (pncpMatch) {
+        const cnpj = pncpMatch[1];
+        const num = parseInt(pncpMatch[2], 10);
+        const year = pncpMatch[3];
+        return `https://pncp.gov.br/app/editais/${cnpj}/${year}/${num}`;
+      }
+      return `https://pncp.gov.br/app/editais?q=${encodeURIComponent(
+        parsedPurchase
+          ? `${parsedPurchase.uasg} ${parseInt(parsedPurchase.number, 10)}/${parsedPurchase.year}`
+          : purchaseId,
+      )}`;
+    })(),
     purchaseId,
     purchaseItemId,
     purchaseDate: textOrNull(row.dataCompra),
@@ -288,7 +306,7 @@ function mapCandidate(item: SearchItem, row: PriceApiRow, sourceUrl: string): Ra
     unitCompatible: comparison.compatible,
     aiScore: heuristicScore,
     aiReason: comparison.compatible
-      ? 'Descrição e unidade comparável avaliadas por critérios objetivos.'
+      ? 'Descrição e unidade compatíveis.'
       : 'A descrição é relacionada, mas a equivalência de unidade precisa de revisão.',
     selected: comparison.compatible,
     exclusionReason: comparison.compatible ? '' : 'Unidade de fornecimento não convertida automaticamente.',
@@ -412,6 +430,179 @@ async function searchOne(item: SearchItem, limit: number) {
   };
 }
 
+async function resolvePncpSearchUrls(client: any, candidates: RankedCandidate[]) {
+  const purchasesToResolve: Array<{
+    candidate: RankedCandidate;
+    uasg: string;
+    num: string;
+    year: string;
+    numInt: number;
+  }> = [];
+
+  const uasgsSet = new Set<string>();
+
+  for (const c of candidates) {
+    if (c.sourceType === 'compras_gov_precos' && c.purchaseId && c.agencyCode) {
+      const digits = c.purchaseId.replace(/\D/g, '');
+      let uasg = c.agencyCode;
+      let number = '';
+      let year = '';
+      const dateVal = c.resultDate || c.purchaseDate;
+      if (dateVal && dateVal.length >= 4) {
+        const parsedYear = dateVal.slice(0, 4);
+        if (/^\d{4}$/.test(parsedYear)) {
+          year = parsedYear;
+        }
+      }
+      if (digits.length === 15) {
+        number = digits.slice(6, 11);
+        if (!year) year = digits.slice(11, 15);
+      } else if (digits.length >= 17) {
+        number = digits.slice(8, 13);
+        if (!year) year = digits.slice(13, 17);
+      }
+
+      if (uasg && number && year) {
+        const numInt = parseInt(number, 10);
+        purchasesToResolve.push({
+          candidate: c,
+          uasg,
+          num: number,
+          year,
+          numInt,
+        });
+        uasgsSet.add(uasg);
+      }
+    }
+  }
+
+  if (purchasesToResolve.length === 0) return;
+
+  const uasgs = Array.from(uasgsSet);
+
+  try {
+    // 1. Query local DB first
+    const { data: dbRows, error } = await client
+      .from('licitacoes_pncp')
+      .select('numero_controle_pncp, uasg_codigo, numero_compra, ano_compra')
+      .in('uasg_codigo', uasgs);
+
+    const pncpMap = new Map<string, string>();
+    if (!error && dbRows) {
+      dbRows.forEach((r: any) => {
+        if (r.numero_compra) {
+          const cleanNum = String(r.numero_compra).includes('/')
+            ? String(r.numero_compra).split('/')[0]
+            : String(r.numero_compra);
+          const keyFull = `${r.uasg_codigo}_${cleanNum}/${r.ano_compra}`;
+          const keyShort = `${r.uasg_codigo}_${parseInt(cleanNum, 10)}/${r.ano_compra}`;
+          pncpMap.set(keyFull, r.numero_controle_pncp);
+          pncpMap.set(keyShort, r.numero_controle_pncp);
+        }
+      });
+    }
+
+    // 2. Identify which ones need API resolution
+    const unresolved: typeof purchasesToResolve = [];
+    for (const p of purchasesToResolve) {
+      const keyFull = `${p.uasg}_${p.num}/${p.year}`;
+      const keyShort = `${p.uasg}_${p.numInt}/${p.year}`;
+      const ctrlNum = pncpMap.get(keyFull) || pncpMap.get(keyShort);
+      
+      if (ctrlNum) {
+        const match = ctrlNum.match(/^(\d{14})-\d+-(\d+)\/(\d{4})/);
+        if (match) {
+          p.candidate.pncpSearchUrl = `https://pncp.gov.br/app/editais/${match[1]}/${match[3]}/${parseInt(match[2], 10)}`;
+          continue;
+        }
+      }
+      unresolved.push(p);
+    }
+
+    if (unresolved.length === 0) return;
+
+    // 3. Resolve unresolved in parallel via PNCP search API (up to 5 concurrent requests)
+    const limitConcurrency = async (tasks: (() => Promise<void>)[], limit: number) => {
+      const active: Promise<void>[] = [];
+      for (const task of tasks) {
+        const p = task();
+        active.push(p);
+        if (active.length >= limit) {
+          await Promise.race(active);
+          const index = active.findIndex((item) => item === p);
+          if (index !== -1) active.splice(index, 1);
+        }
+      }
+      await Promise.all(active);
+    };
+
+    const apiTasks = unresolved.map((p) => async () => {
+      try {
+        const query = `${p.uasg} ${p.numInt}/${p.year}`;
+        const searchUrl = `https://pncp.gov.br/api/search/?q=${encodeURIComponent(query)}&tipos_documento=edital&pagina=1&tam_pagina=10`;
+        
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 10000);
+        
+        const response = await fetch(searchUrl, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Referer': 'https://pncp.gov.br/app/editais',
+          }
+        });
+        clearTimeout(timer);
+        
+        if (!response.ok) return;
+        const searchData = await response.json();
+        const items = searchData?.items || [];
+        
+        let matchedItem = null;
+        for (const item of items) {
+          if (item.unidade_codigo === p.uasg && String(item.ano) === p.year) {
+            const titleMatch = item.title?.match(/n[ºo]\s*(\d+)/i);
+            if (titleMatch && parseInt(titleMatch[1], 10) === p.numInt) {
+              matchedItem = item;
+              break;
+            }
+          }
+        }
+
+        if (matchedItem && matchedItem.numero_controle_pncp && matchedItem.orgao_cnpj && matchedItem.numero_sequencial) {
+          const cnpj = matchedItem.orgao_cnpj;
+          const seq = Number(matchedItem.numero_sequencial);
+          p.candidate.pncpSearchUrl = `https://pncp.gov.br/app/editais/${cnpj}/${p.year}/${seq}`;
+
+          // Write to local database cache
+          const { error: insertErr } = await client.from('licitacoes_pncp').upsert({
+            numero_controle_pncp: matchedItem.numero_controle_pncp,
+            cnpj_orgao: cnpj,
+            ano_compra: Number(p.year),
+            sequencial_compra: Number(seq),
+            numero_compra: String(p.numInt),
+            uasg_codigo: p.uasg,
+            objeto_compra: matchedItem.description || '',
+            raw_data: matchedItem,
+            compras_gov_data: {}
+          }, { onConflict: 'numero_controle_pncp' });
+
+          if (insertErr) {
+            console.warn(`Failed to insert PNCP cache for UASG ${p.uasg} ${p.numInt}/${p.year}:`, insertErr);
+          }
+        }
+      } catch (err) {
+        console.warn(`Failed to resolve PNCP link for UASG ${p.uasg} ${p.numInt}/${p.year}:`, err);
+      }
+    });
+
+    await limitConcurrency(apiTasks, 5);
+  } catch (err) {
+    console.error('Error in resolvePncpSearchUrls:', err);
+  }
+}
+
 async function validateUser(request: Request) {
   const authorization = request.headers.get('authorization');
   if (!authorization?.startsWith('Bearer ')) throw new HttpError('Sessão autenticada obrigatória.', 401);
@@ -447,6 +638,15 @@ Deno.serve(async (request) => {
         }))),
       ));
     }
+
+    const client = createClient(requireEnv('SUPABASE_URL'), requireEnv('SUPABASE_SERVICE_ROLE_KEY'), {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const allCandidates = results.flatMap((r) => r.candidates || []);
+    if (allCandidates.length > 0) {
+      await resolvePncpSearchUrls(client, allCandidates);
+    }
+
     return jsonResponse({ results });
   } catch (error) {
     const status = error instanceof HttpError ? error.status : 500;

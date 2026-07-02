@@ -8,6 +8,19 @@ import { findCatalogSuggestions } from '@/lib/priceCatalogClient';
 import { parsePriceResearchFile } from '@/lib/priceResearch';
 import { priceResearchService } from '@/services/priceResearch';
 
+vi.mock('@/lib/supabase', () => ({
+  supabase: {
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        in: vi.fn(() => Promise.resolve({ data: [], error: null })),
+      })),
+    })),
+    functions: {
+      invoke: vi.fn(() => Promise.resolve({ data: null, error: null })),
+    },
+  },
+}));
+
 vi.mock('@/components/HeaderParts', () => ({
   HeaderActions: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   HeaderSubtitle: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -138,7 +151,7 @@ describe('PesquisaPrecos', () => {
         expect.objectContaining({ catalogCode: '606523', catalogType: 'material' }),
       ]);
     });
-    expect(await screen.findByText('Descrição e unidade compatíveis.')).toBeInTheDocument();
+    expect(await screen.findByText('Fornecedor')).toBeInTheDocument();
     expect(screen.getAllByText('R$ 20,00').length).toBeGreaterThanOrEqual(2);
   });
 
@@ -183,10 +196,57 @@ describe('PesquisaPrecos', () => {
     });
     await screen.findAllByText('Café torrado e moído, pacote de 500 g');
     fireEvent.click(screen.getByRole('button', { name: /Avançar/i }));
-    await screen.findByText('Descrição e unidade compatíveis.');
+    await screen.findByText('Fornecedor');
 
     fireEvent.click(screen.getByRole('checkbox', { name: /Usar preço 1/i }));
 
     expect(screen.getByLabelText(/Justificativa para desconsiderar 1/i)).toBeInTheDocument();
+  });
+
+  it('monta o link correto do PNCP preferindo o ano da data real do candidato em vez de 2030 do purchaseId', async () => {
+    const candidateWithMismatchedYear = {
+      ...candidate,
+      purchaseId: '93153605000522030', // Ano fatiado seria 2030
+      purchaseDate: '2026-05-01', // Ano da data real é 2026
+      agencyCode: '931536',
+      pncpSearchUrl: 'https://pncp.gov.br/app/editais?q=931536%2052%2F2030', // Fallback inicial
+    };
+
+    mockedService.search.mockResolvedValue([
+      { localId: 'item-1', candidates: [candidateWithMismatchedYear] },
+    ]);
+
+    const { supabase } = await import('@/lib/supabase');
+    vi.mocked(supabase.from).mockReturnValue({
+      select: vi.fn(() => ({
+        in: vi.fn(() => Promise.resolve({
+          data: [
+            {
+              numero_controle_pncp: '51792919000104-1-000052/2026',
+              uasg_codigo: '931536',
+              numero_compra: '00052',
+              ano_compra: 2026,
+            },
+          ],
+          error: null,
+        })),
+      })),
+    } as any);
+
+    const { container } = renderPage();
+    fireEvent.change(container.querySelector('input[type="file"]') as HTMLInputElement, {
+      target: { files: [new File(['xlsx'], 'custos.xlsx')] },
+    });
+
+    await screen.findAllByText('Café torrado e moído, pacote de 500 g');
+    fireEvent.click(screen.getByRole('button', { name: /Avançar/i }));
+    await screen.findByText('Fornecedor');
+
+    // Verifica que o link do PNCP montado no front-end aponta para o ano correto (2026) e tem o CNPJ resolvido
+    const pncpLink = screen.getByRole('link', { name: /pncp/i });
+    expect(pncpLink).toHaveAttribute(
+      'href',
+      'https://pncp.gov.br/app/editais/51792919000104/2026/52',
+    );
   });
 });

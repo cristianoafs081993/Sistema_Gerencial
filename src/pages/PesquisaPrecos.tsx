@@ -30,6 +30,11 @@ import {
   Trash2,
   Upload,
   User,
+  Calculator,
+  TrendingUp,
+  Layers,
+  Percent,
+  DollarSign,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -37,6 +42,14 @@ import { HeaderActions, HeaderSubtitle } from '@/components/HeaderParts';
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
 import { SectionPanel } from '@/components/design-system/SectionPanel';
 import { Badge } from '@/components/ui/badge';
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -61,6 +74,7 @@ import {
 import { findCatalogSuggestions } from '@/lib/priceCatalogClient';
 import { priceResearchService } from '@/services/priceResearch';
 import { marketSearchService, type MarketSearchResult } from '@/services/marketSearch';
+import { supabase } from '@/lib/supabase';
 
 const METHOD_OPTIONS: Array<{ value: PriceResearchMethod; label: string }> = [
   { value: 'median', label: 'Mediana' },
@@ -155,6 +169,258 @@ export default function PesquisaPrecos() {
     setItems([]);
     setSelectedItemId(undefined);
     setViewMode('wizard');
+  };
+
+  const resolveDirectPncpLinks = async (targetItems: PriceResearchItem[]): Promise<PriceResearchItem[]> => {
+    const keysToLookup: Array<{ uasg: string; numFull: string; numShort: string; candidateId: string; localItemId: string; modalidadeId: number }> = [];
+    
+    const getYearFromCandidate = (c: any, digits: string) => {
+      const dateVal = c.resultDate || c.purchaseDate;
+      if (dateVal && dateVal.length >= 4) {
+        const parsedYear = dateVal.slice(0, 4);
+        if (/^\d{4}$/.test(parsedYear)) {
+          return parsedYear;
+        }
+      }
+      if (digits.length === 15) {
+        return digits.slice(11, 15);
+      } else if (digits.length >= 17) {
+        return digits.slice(13, 17);
+      }
+      return '';
+    };
+
+    targetItems.forEach((item) => {
+      item.candidates.forEach((c) => {
+        if (c.sourceType === 'compras_gov_precos' && c.purchaseId) {
+          const digits = c.purchaseId.replace(/\D/g, '');
+          let uasg = '';
+          let number = '';
+          if (digits.length === 15) {
+            uasg = digits.slice(0, 6);
+            number = digits.slice(6, 11);
+          } else if (digits.length >= 17) {
+            uasg = digits.slice(0, 6);
+            number = digits.slice(8, 13);
+          }
+          const year = getYearFromCandidate(c, digits);
+
+          if (uasg && number && year) {
+            // Mapeia modalidade do SIASG para modalidade do PNCP
+            let modalidadeId = 5; // default: Pregão (5)
+            if (digits.length === 15) {
+              modalidadeId = 1; // Dispensa
+            } else if (digits.length >= 17) {
+              const siasgMod = digits.slice(6, 8);
+              if (siasgMod === '06') {
+                modalidadeId = 1; // Dispensa
+              } else if (siasgMod === '07') {
+                modalidadeId = 2; // Inexigibilidade
+              }
+            }
+
+            keysToLookup.push({
+              localItemId: item.localId,
+              candidateId: c.id,
+              uasg,
+              numFull: `${number}/${year}`,
+              numShort: `${parseInt(number, 10)}/${year}`,
+              modalidadeId
+            });
+          }
+        }
+      });
+    });
+
+    if (keysToLookup.length === 0) return targetItems;
+
+    const getRelativeDateStr = (dateStr: string, offsetDays: number) => {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return null;
+      d.setDate(d.getDate() + offsetDays);
+      return d.toISOString().slice(0, 10);
+    };
+
+    try {
+      const uasgs = Array.from(new Set(keysToLookup.map(k => k.uasg)));
+
+      const { data: pncpRecords, error } = await supabase
+        .from('licitacoes_pncp')
+        .select('numero_controle_pncp, uasg_codigo, numero_compra, ano_compra')
+        .in('uasg_codigo', uasgs);
+
+      if (error) {
+        console.error('Erro ao buscar chaves PNCP no banco local:', error);
+        return targetItems;
+      }
+
+      const pncpMap = new Map<string, string>();
+      if (pncpRecords && pncpRecords.length > 0) {
+        pncpRecords.forEach(r => {
+          if (r.numero_compra) {
+            const cleanNum = r.numero_compra.includes('/') ? r.numero_compra.split('/')[0] : r.numero_compra;
+            const keyFull = `${r.uasg_codigo}_${cleanNum}/${r.ano_compra}`;
+            const keyShort = `${r.uasg_codigo}_${parseInt(cleanNum, 10)}/${r.ano_compra}`;
+            pncpMap.set(keyFull, r.numero_controle_pncp);
+            pncpMap.set(keyShort, r.numero_controle_pncp);
+          }
+        });
+      }
+
+      // Identifica candidatos não mapeados e dispara sincronizações rápidas em background (não bloqueante)
+      const syncRequests: Array<{ uasg: string; number: string; year: string }> = [];
+      const seenSyncKeys = new Set<string>();
+
+      keysToLookup.forEach((k) => {
+        const candidate = targetItems
+          .find(item => item.localId === k.localItemId)
+          ?.candidates.find(c => c.id === k.candidateId);
+        
+        if (candidate) {
+          const keyFull = `${k.uasg}_${k.numFull}`;
+          const keyShort = `${k.uasg}_${k.numShort}`;
+          const isResolved = pncpMap.has(keyFull) || pncpMap.has(keyShort);
+
+          if (!isResolved) {
+            const digits = candidate.purchaseId ? candidate.purchaseId.replace(/\D/g, '') : '';
+            let rawNum = '';
+            if (digits.length === 15) {
+              rawNum = digits.slice(6, 11);
+            } else if (digits.length >= 17) {
+              rawNum = digits.slice(8, 13);
+            }
+            const rawYear = getYearFromCandidate(candidate, digits);
+
+            if (rawNum && rawYear) {
+              const numberShort = parseInt(rawNum, 10).toString();
+              const syncKey = `${k.uasg}_${numberShort}_${rawYear}`;
+              if (!seenSyncKeys.has(syncKey)) {
+                seenSyncKeys.add(syncKey);
+                syncRequests.push({ uasg: k.uasg, number: numberShort, year: rawYear });
+              }
+            }
+          }
+        }
+      });
+
+      if (syncRequests.length > 0) {
+        console.log(`[resolveDirectPncpLinks] Disparando ${syncRequests.length} resoluções rápidas em background (não bloqueante)...`);
+        
+        const runBackgroundSync = async () => {
+          const syncPromises = syncRequests.map(async (req) => {
+            try {
+              await supabase.functions.invoke('sync-licitacoes-pncp', {
+                body: {
+                  resolveIndividual: true,
+                  query: `${req.uasg} ${req.number}/${req.year}`
+                }
+              });
+            } catch (err) {
+              console.warn(`[resolveDirectPncpLinks] Falha na resolução rápida para UASG ${req.uasg}:`, err);
+            }
+          });
+
+          await Promise.all(syncPromises);
+
+          const { data: newPncpRecords, error: newPncpError } = await supabase
+            .from('licitacoes_pncp')
+            .select('numero_controle_pncp, uasg_codigo, numero_compra, ano_compra')
+            .in('uasg_codigo', uasgs);
+
+          if (!newPncpError && newPncpRecords) {
+            const updatedPncpMap = new Map<string, string>();
+            newPncpRecords.forEach(r => {
+              if (r.numero_compra) {
+                const cleanNum = r.numero_compra.includes('/') ? r.numero_compra.split('/')[0] : r.numero_compra;
+                const keyFull = `${r.uasg_codigo}_${cleanNum}/${r.ano_compra}`;
+                const keyShort = `${r.uasg_codigo}_${parseInt(cleanNum, 10)}/${r.ano_compra}`;
+                updatedPncpMap.set(keyFull, r.numero_controle_pncp);
+                updatedPncpMap.set(keyShort, r.numero_controle_pncp);
+              }
+            });
+
+            // Atualiza o estado de itens de forma reativa
+            setItems((currentItems) => currentItems.map((item) => {
+              const updatedCandidates = item.candidates.map((c) => {
+                if (c.sourceType === 'compras_gov_precos' && c.purchaseId) {
+                  const digits = c.purchaseId.replace(/\D/g, '');
+                  let uasg = '';
+                  let number = '';
+                  if (digits.length === 15) {
+                    uasg = digits.slice(0, 6);
+                    number = digits.slice(6, 11);
+                  } else if (digits.length >= 17) {
+                    uasg = digits.slice(0, 6);
+                    number = digits.slice(8, 13);
+                  }
+                  const year = getYearFromCandidate(c, digits);
+
+                  if (uasg && number && year) {
+                    const keyFull = `${uasg}_${number}/${year}`;
+                    const keyShort = `${uasg}_${parseInt(number, 10)}/${year}`;
+                    const ctrlNum = updatedPncpMap.get(keyFull) || updatedPncpMap.get(keyShort);
+                    if (ctrlNum) {
+                      const match = ctrlNum.match(/^(\d{14})-\d+-(\d+)\/(\d{4})/);
+                      if (match) {
+                        return {
+                          ...c,
+                          pncpSearchUrl: `https://pncp.gov.br/app/editais/${match[1]}/${match[3]}/${parseInt(match[2], 10)}`
+                        };
+                      }
+                    }
+                  }
+                }
+                return c;
+              });
+              return { ...item, candidates: updatedCandidates };
+            }));
+            console.log('[resolveDirectPncpLinks] Links do PNCP atualizados reativamente via background sync!');
+          }
+        };
+
+        // Executa sem dar await para não travar a UI
+        void runBackgroundSync();
+      }
+
+      return targetItems.map((item) => {
+        const updatedCandidates = item.candidates.map((c) => {
+          if (c.sourceType === 'compras_gov_precos' && c.purchaseId) {
+            const digits = c.purchaseId.replace(/\D/g, '');
+            let uasg = '';
+            let number = '';
+            if (digits.length === 15) {
+              uasg = digits.slice(0, 6);
+              number = digits.slice(6, 11);
+            } else if (digits.length >= 17) {
+              uasg = digits.slice(0, 6);
+              number = digits.slice(8, 13);
+            }
+            const year = getYearFromCandidate(c, digits);
+
+            if (uasg && number && year) {
+              const keyFull = `${uasg}_${number}/${year}`;
+              const keyShort = `${uasg}_${parseInt(number, 10)}/${year}`;
+              const ctrlNum = pncpMap.get(keyFull) || pncpMap.get(keyShort);
+              if (ctrlNum) {
+                const match = ctrlNum.match(/^(\d{14})-\d+-(\d+)\/(\d{4})/);
+                if (match) {
+                  return {
+                    ...c,
+                    pncpSearchUrl: `https://pncp.gov.br/app/editais/${match[1]}/${match[3]}/${parseInt(match[2], 10)}`
+                  };
+                }
+              }
+            }
+          }
+          return c;
+        });
+        return { ...item, candidates: updatedCandidates };
+      });
+    } catch (err) {
+      console.error('Erro ao resolver links diretos do PNCP:', err);
+    }
+
+    return targetItems;
   };
 
   const { data: recentResearches = [], isFetching: isFetchingRecent } = useQuery({
@@ -291,7 +557,7 @@ export default function PesquisaPrecos() {
     try {
       const results = await priceResearchService.search(items);
       const resultMap = new Map(results.map((result) => [result.localId, result]));
-      setItems((current) => current.map((item) => {
+      const searchResultItems = items.map((item) => {
         const result = resultMap.get(item.localId);
         return {
           ...item,
@@ -299,7 +565,9 @@ export default function PesquisaPrecos() {
           searchStatus: result?.error ? 'error' : 'success',
           searchError: result?.error,
         };
-      }));
+      });
+      const resolvedItems = await resolveDirectPncpLinks(searchResultItems);
+      setItems(resolvedItems);
       const found = results.reduce((total, result) => total + result.candidates.length, 0);
       toast.success(`${found} referência(s) oficial(is) encontrada(s).`);
       // Avança para a curadoria automaticamente ao buscar preços com sucesso (Passo 4)
@@ -620,7 +888,8 @@ export default function PesquisaPrecos() {
       setMethodologyJustification(record.methodologyJustification);
       setNotes(record.notes);
       setSourceFile(record.sourceFile);
-      setItems(record.items);
+      const resolvedItems = await resolveDirectPncpLinks(record.items);
+      setItems(resolvedItems);
       setSelectedItemId(record.items[0]?.localId);
       
       // Define a etapa adequada
@@ -833,98 +1102,119 @@ export default function PesquisaPrecos() {
         </div>
       ) : (
         <div className="space-y-6 animate-in fade-in duration-300">
-          {/* Voltar para a lista */}
-          <div className="flex items-center">
-            <Button
-              type="button"
-              variant="outline"
-              className="gap-1.5 text-xs text-text-secondary hover:text-sebrae-blue border-border-default hover:border-sebrae-blue/30 font-semibold px-3 h-8 rounded-md transition-all"
-              onClick={() => {
-                setViewMode('list');
-                void queryClient.invalidateQueries({ queryKey: ['price-researches'] });
-              }}
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Voltar para a Lista
-            </Button>
-          </div>
-
-          {/* Visual Stepper Wizard (4 Etapas) - Timeline Progress Style */}
-      <div className="w-full py-4 mb-6">
-        <div className="max-w-4xl mx-auto space-y-3">
-          {/* Grid of Columns for Labels */}
-          <div className="grid grid-cols-4 text-center text-xs md:text-sm font-ui">
-            {[
-              { wizardNumber: 1, label: '1. Identificação', targetSteps: [1] },
-              { wizardNumber: 2, label: '2. Catálogo', targetSteps: [2] },
-              { wizardNumber: 3, label: '3. Curadoria', targetSteps: [3, 4] },
-              { wizardNumber: 4, label: '4. Relatório', targetSteps: [5] },
-            ].map((step) => {
-              const isCompleted = Math.min(...step.targetSteps) < activeStep && !step.targetSteps.includes(activeStep);
-              const isActive = step.targetSteps.includes(activeStep);
+          {/* Breadcrumb e Wizard Card Unificado */}
+          <div className="bg-surface-card border border-border-subtle/70 rounded-radius-xl p-6 shadow-soft space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                {/* Breadcrumb */}
+                <Breadcrumb>
+                  <BreadcrumbList>
+                    <BreadcrumbItem>
+                      <BreadcrumbLink
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setViewMode('list');
+                          void queryClient.invalidateQueries({ queryKey: ['price-researches'] });
+                        }}
+                        className="font-ui text-xs text-text-secondary hover:text-sebrae-blue transition-colors"
+                      >
+                        Pesquisas de Preços
+                      </BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      <BreadcrumbPage className="font-ui text-xs font-bold text-text-primary">
+                        {researchId ? (objectDescription ? `Editar: ${objectDescription.slice(0, 45)}${objectDescription.length > 45 ? '...' : ''}` : 'Editar Pesquisa') : 'Nova Pesquisa'}
+                      </BreadcrumbPage>
+                    </BreadcrumbItem>
+                  </BreadcrumbList>
+                </Breadcrumb>
+              </div>
               
-              // Determina se pode clicar diretamente no botão
-              let isSelectable = false;
-              if (step.wizardNumber === 1) {
-                isSelectable = true;
-              } else if (step.wizardNumber === 2) {
-                isSelectable = items.length > 0;
-              } else if (step.wizardNumber === 3) {
-                isSelectable = items.length > 0 && items.every(i => i.catalogCode);
-              } else if (step.wizardNumber === 4) {
-                isSelectable = items.length > 0 && items.every(i => i.catalogCode) && items.every(i => i.searchStatus !== 'idle');
-              }
+              <div className="text-right shrink-0 bg-surface-subtle/30 px-3 py-1.5 rounded-lg border border-border-default/40">
+                <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Etapa Atual</span>
+                <span className="text-sm font-black text-sebrae-blue">{activeStep} de 5</span>
+              </div>
+            </div>
 
-              const handleWizardClick = () => {
-                if (step.wizardNumber === 3) {
-                  // Se o usuário clicar em "Curadoria":
-                  // Se a busca já foi feita (nenhum item 'idle'), vai direto para a etapa 4.
-                  // Se a busca não foi feita, vai para a etapa 3 (transição/busca) para disparar a busca!
-                  const hasSearch = items.every(item => item.searchStatus !== 'idle');
-                  goToStep(hasSearch ? 4 : 3);
-                } else if (step.wizardNumber === 4) {
-                  goToStep(5);
-                } else {
-                  goToStep(step.wizardNumber);
-                }
-              };
+            {/* Visual Stepper Wizard (4 Etapas) - Timeline Progress Style */}
+            <div className="w-full py-2 border-t border-border-default/40 pt-4">
+              <div className="max-w-4xl mx-auto space-y-3">
+                {/* Grid of Columns for Labels */}
+                <div className="grid grid-cols-4 text-center text-xs md:text-sm font-ui">
+                  {[
+                    { wizardNumber: 1, label: '1. Identificação', targetSteps: [1] },
+                    { wizardNumber: 2, label: '2. Catálogo', targetSteps: [2] },
+                    { wizardNumber: 3, label: '3. Curadoria', targetSteps: [3, 4] },
+                    { wizardNumber: 4, label: '4. Relatório', targetSteps: [5] },
+                  ].map((step) => {
+                    const isCompleted = Math.min(...step.targetSteps) < activeStep && !step.targetSteps.includes(activeStep);
+                    const isActive = step.targetSteps.includes(activeStep);
+                    
+                    // Determina se pode clicar diretamente no botão
+                    let isSelectable = false;
+                    if (step.wizardNumber === 1) {
+                      isSelectable = true;
+                    } else if (step.wizardNumber === 2) {
+                      isSelectable = items.length > 0;
+                    } else if (step.wizardNumber === 3) {
+                      isSelectable = items.length > 0 && items.every(i => i.catalogCode);
+                    } else if (step.wizardNumber === 4) {
+                      isSelectable = items.length > 0 && items.every(i => i.catalogCode) && items.every(i => i.searchStatus !== 'idle');
+                    }
 
-              return (
-                <button
-                  key={step.wizardNumber}
-                  type="button"
-                  disabled={!isSelectable}
-                  onClick={handleWizardClick}
-                  className={`font-sans text-xs md:text-sm font-bold transition-all px-1 truncate ${
-                    isActive
-                      ? 'text-sebrae-blue font-extrabold text-[13px] md:text-[14px]'
-                      : isCompleted
-                      ? 'text-sebrae-blue/80 hover:text-sebrae-navy font-semibold'
-                      : 'text-slate-400 font-semibold'
-                  } ${isSelectable ? 'cursor-pointer hover:opacity-90' : 'cursor-not-allowed'}`}
-                >
-                  {step.label}
-                </button>
-              );
-            })}
-          </div>
+                    const handleWizardClick = () => {
+                      if (step.wizardNumber === 3) {
+                        // Se o usuário clicar em "Curadoria":
+                        // Se a busca já foi feita (nenhum item 'idle'), vai direto para a etapa 4.
+                        // Se a busca não foi feita, vai para a etapa 3 (transição/busca) para disparar a busca!
+                        const hasSearch = items.every(item => item.searchStatus !== 'idle');
+                        goToStep(hasSearch ? 4 : 3);
+                      } else if (step.wizardNumber === 4) {
+                        goToStep(5);
+                      } else {
+                        goToStep(step.wizardNumber);
+                      }
+                    };
 
-          {/* Continuous Progress Bar aligned with column centers */}
-          <div className="relative w-full">
-            <div className="w-full h-[6px] bg-slate-200/60 rounded-full overflow-hidden relative">
-              <div
-                className="absolute top-0 left-0 h-full bg-sebrae-blue rounded-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-sm"
-                style={{
-                  width: activeStep === 1 ? '12.5%' :
-                         activeStep === 2 ? '37.5%' :
-                         activeStep === 3 || activeStep === 4 ? '62.5%' :
-                         '100%'
-                }}
-              />
+                    return (
+                      <button
+                        key={step.wizardNumber}
+                        type="button"
+                        disabled={!isSelectable}
+                        onClick={handleWizardClick}
+                        className={`font-sans text-xs md:text-sm font-bold transition-all px-1 truncate ${
+                          isActive
+                            ? 'text-sebrae-blue font-extrabold text-[13px] md:text-[14px]'
+                            : isCompleted
+                            ? 'text-sebrae-blue/80 hover:text-sebrae-navy font-semibold'
+                            : 'text-slate-400 font-semibold'
+                        } ${isSelectable ? 'cursor-pointer hover:opacity-90' : 'cursor-not-allowed'}`}
+                      >
+                        {step.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Continuous Progress Bar aligned with column centers */}
+                <div className="relative w-full">
+                  <div className="w-full h-[6px] bg-slate-200/60 rounded-full overflow-hidden relative">
+                    <div
+                      className="absolute top-0 left-0 h-full bg-sebrae-blue rounded-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-sm"
+                      style={{
+                        width: activeStep === 1 ? '12.5%' :
+                               activeStep === 2 ? '37.5%' :
+                               activeStep === 3 || activeStep === 4 ? '62.5%' :
+                               '100%'
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
 
       {/* Global Actions Header */}
       <HeaderActions>
@@ -1077,37 +1367,42 @@ export default function PesquisaPrecos() {
         <div className="space-y-6 animate-in fade-in duration-200">
           <div className="grid gap-6 lg:grid-cols-4">
             {/* Sidebar de Itens */}
-            <div className="lg:col-span-1 space-y-2 border-r border-border-default pr-4 max-h-[600px] overflow-y-auto">
-              <p className="font-ui text-xs font-semibold text-text-muted uppercase tracking-wider px-1">Itens Importados ({items.length})</p>
-              {items.map((item) => {
-                const hasCode = !!item.catalogCode;
-                const isSelected = selectedItemId === item.localId;
-                return (
-                  <button
-                    key={item.localId}
-                    type="button"
-                    onClick={() => setSelectedItemId(item.localId)}
-                    className={`w-full rounded-radius-lg border p-3 text-left transition-colors flex flex-col gap-1.5 ${
-                      isSelected
-                        ? 'border-primary bg-primary/[0.04] shadow-sm'
-                        : 'border-border-default bg-surface-card hover:bg-surface-subtle'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-ui text-xs font-bold text-text-primary">Item {item.itemNumber}</span>
-                      {hasCode ? (
-                        <Badge variant="outline" className="border-primary/25 bg-primary/5 text-primary text-[10px] py-0 px-1.5">Mapeado</Badge>
-                      ) : (
-                        <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 text-[10px] py-0 px-1.5">Falta código</Badge>
-                      )}
-                    </div>
-                    <p className="line-clamp-2 font-ui text-xs text-text-secondary leading-normal">{item.description}</p>
-                    <p className="font-mono text-[10px] text-text-muted mt-1 leading-none">
-                      {item.catalogType === 'material' ? 'CATMAT' : 'CATSER'}: <span className="font-bold">{item.catalogCode || 'Pendente'}</span>
-                    </p>
-                  </button>
-                );
-              })}
+            <div className="lg:col-span-1 bg-surface-card border border-border-default rounded-radius-xl p-4 shadow-soft space-y-3 max-h-[600px] overflow-y-auto">
+              <div className="pb-2 border-b border-border-default/60">
+                <p className="font-ui text-xs font-bold text-sebrae-navy uppercase tracking-wider">Itens Importados ({items.length})</p>
+                <p className="text-[10px] text-text-muted mt-0.5">Selecione o item para parametrizar</p>
+              </div>
+              <div className="space-y-2">
+                {items.map((item) => {
+                  const hasCode = !!item.catalogCode;
+                  const isSelected = selectedItemId === item.localId;
+                  return (
+                    <button
+                      key={item.localId}
+                      type="button"
+                      onClick={() => setSelectedItemId(item.localId)}
+                      className={`w-full rounded-radius-lg border p-3 text-left transition-colors flex flex-col gap-1.5 ${
+                        isSelected
+                          ? 'border-primary bg-primary/[0.04] shadow-sm'
+                          : 'border-border-default bg-surface-card hover:bg-surface-subtle'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-ui text-xs font-bold text-text-primary">Item {item.itemNumber}</span>
+                        {hasCode ? (
+                          <Badge variant="outline" className="border-primary/25 bg-primary/5 text-primary text-[10px] py-0 px-1.5">Mapeado</Badge>
+                        ) : (
+                          <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 text-[10px] py-0 px-1.5">Falta código</Badge>
+                        )}
+                      </div>
+                      <p className="line-clamp-2 font-ui text-xs text-text-secondary leading-normal">{item.description}</p>
+                      <p className="font-mono text-[10px] text-text-muted mt-1 leading-none">
+                        {item.catalogType === 'material' ? 'CATMAT' : 'CATSER'}: <span className="font-bold">{item.catalogCode || 'Pendente'}</span>
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Painel Central do Item */}
@@ -1374,39 +1669,44 @@ export default function PesquisaPrecos() {
         <div className="space-y-6 animate-in fade-in duration-200">
           <div className="grid gap-6 lg:grid-cols-4">
             {/* Sidebar de Seleção de Item */}
-            <div className="lg:col-span-1 space-y-2 border-r border-border-default pr-4 max-h-[600px] overflow-y-auto">
-              <p className="font-ui text-xs font-semibold text-text-muted uppercase tracking-wider px-1">Selecione o Item</p>
-              {items.map((item) => {
-                const selectedCount = item.candidates.filter((c) => c.selected).length;
-                const isSufficient = selectedCount >= 3;
-                const isSelected = selectedItemId === item.localId;
-                return (
-                  <button
-                    key={item.localId}
-                    type="button"
-                    onClick={() => setSelectedItemId(item.localId)}
-                    className={`w-full rounded-radius-lg border p-3 text-left transition-colors flex flex-col gap-1.5 ${
-                      isSelected
-                        ? 'border-primary bg-primary/[0.04] shadow-sm'
-                        : 'border-border-default bg-surface-card hover:bg-surface-subtle'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-ui text-xs font-bold text-text-primary">Item {item.itemNumber}</span>
-                      {isSufficient ? (
-                        <Badge variant="outline" className="border-primary/20 bg-primary/5 text-primary text-[10px] py-0 px-1.5">
-                          {selectedCount} selecionados
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 text-[10px] py-0 px-1.5">
-                          {selectedCount}/3 preços
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="line-clamp-2 font-ui text-xs text-text-secondary leading-normal">{item.description}</p>
-                  </button>
-                );
-              })}
+            <div className="lg:col-span-1 bg-surface-card border border-border-default rounded-radius-xl p-4 shadow-soft space-y-3 max-h-[600px] overflow-y-auto">
+              <div className="pb-2 border-b border-border-default/60">
+                <p className="font-ui text-xs font-bold text-sebrae-navy uppercase tracking-wider">Selecione o Item</p>
+                <p className="text-[10px] text-text-muted mt-0.5">Analise e homologue a cesta de preços</p>
+              </div>
+              <div className="space-y-2">
+                {items.map((item) => {
+                  const selectedCount = item.candidates.filter((c) => c.selected).length;
+                  const isSufficient = selectedCount >= 3;
+                  const isSelected = selectedItemId === item.localId;
+                  return (
+                    <button
+                      key={item.localId}
+                      type="button"
+                      onClick={() => setSelectedItemId(item.localId)}
+                      className={`w-full rounded-radius-lg border p-3 text-left transition-colors flex flex-col gap-1.5 ${
+                        isSelected
+                          ? 'border-primary bg-primary/[0.04] shadow-sm'
+                          : 'border-border-default bg-surface-card hover:bg-surface-subtle'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-ui text-xs font-bold text-text-primary">Item {item.itemNumber}</span>
+                        {isSufficient ? (
+                          <Badge variant="outline" className="border-primary/20 bg-primary/5 text-primary text-[10px] py-0 px-1.5">
+                            {selectedCount} selecionados
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 text-[10px] py-0 px-1.5">
+                            {selectedCount}/3 preços
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="line-clamp-2 font-ui text-xs text-text-secondary leading-normal">{item.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Detalhes de Cotações do Item */}
@@ -1415,18 +1715,82 @@ export default function PesquisaPrecos() {
                 <>
                   {/* Estatísticas Individuais do Item */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                    {[
-                      ['Amostra', selectedStatistics?.count ?? 0],
-                      ['Média', formatCurrency(selectedStatistics?.mean ?? 0)],
-                      ['Mediana', formatCurrency(selectedStatistics?.median ?? 0)],
-                      ['CV', `${(selectedStatistics?.coefficientOfVariation ?? 0).toFixed(2)}%`],
-                      ['Preço Estimado', formatCurrency(selectedEstimatedPrice)],
-                    ].map(([label, value]) => (
-                      <div key={label} className="rounded-radius-lg border border-border-default bg-surface-card p-3 shadow-soft hover:shadow-md transition-shadow">
-                        <p className="font-ui text-[10px] font-semibold uppercase tracking-wider text-text-muted leading-none">{label}</p>
-                        <p className="mt-1.5 font-mono text-base font-bold text-text-primary truncate">{value}</p>
+                    {/* Amostra */}
+                    <div className="rounded-radius-lg border border-border-default bg-surface-card p-3.5 shadow-soft hover:shadow-md transition-all flex flex-col justify-between">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-ui text-[10px] font-bold uppercase tracking-wider text-text-muted">Amostra</p>
+                        <Layers className="h-3.5 w-3.5 text-text-muted shrink-0" />
                       </div>
-                    ))}
+                      <div className="mt-2.5">
+                        <p className="font-mono text-base font-black text-text-primary">
+                          {selectedStatistics?.count ?? 0} <span className="text-[10px] font-sans font-normal text-text-muted">cotizações</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Média */}
+                    <div className="rounded-radius-lg border border-border-default bg-surface-card p-3.5 shadow-soft hover:shadow-md transition-all flex flex-col justify-between">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-ui text-[10px] font-bold uppercase tracking-wider text-text-muted">Média</p>
+                        <TrendingUp className="h-3.5 w-3.5 text-text-muted shrink-0" />
+                      </div>
+                      <div className="mt-2.5">
+                        <p className="font-mono text-base font-bold text-text-primary truncate">
+                          {formatCurrency(selectedStatistics?.mean ?? 0)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Mediana */}
+                    <div className="rounded-radius-lg border border-border-default bg-surface-card p-3.5 shadow-soft hover:shadow-md transition-all flex flex-col justify-between">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-ui text-[10px] font-bold uppercase tracking-wider text-text-muted">Mediana</p>
+                        <Calculator className="h-3.5 w-3.5 text-text-muted shrink-0" />
+                      </div>
+                      <div className="mt-2.5">
+                        <p className="font-mono text-base font-bold text-text-primary truncate">
+                          {formatCurrency(selectedStatistics?.median ?? 0)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* CV (Coeficiente de Variação) */}
+                    {(() => {
+                      const cv = selectedStatistics?.coefficientOfVariation ?? 0;
+                      const isHigh = cv > 25;
+                      return (
+                        <div className={`rounded-radius-lg border p-3.5 shadow-soft hover:shadow-md transition-all flex flex-col justify-between ${
+                          isHigh ? 'border-amber-200 bg-amber-50/15' : 'border-border-default bg-surface-card'
+                        }`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-ui text-[10px] font-bold uppercase tracking-wider text-text-muted">Desvio (CV)</p>
+                            <Percent className={`h-3.5 w-3.5 shrink-0 ${isHigh ? 'text-amber-500' : 'text-text-muted'}`} />
+                          </div>
+                          <div className="mt-2.5 flex items-baseline justify-between gap-1.5">
+                            <p className={`font-mono text-base font-bold ${isHigh ? 'text-amber-600' : 'text-emerald-600'}`}>
+                              {cv.toFixed(2)}%
+                            </p>
+                            <span className={`inline-block h-1.5 w-1.5 rounded-full ${isHigh ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Preço Estimado */}
+                    <div className="rounded-radius-lg border border-primary/20 bg-primary/[0.04] p-3.5 shadow-soft hover:shadow-md transition-all flex flex-col justify-between col-span-2 sm:col-span-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-ui text-[10px] font-black uppercase tracking-wider text-primary">Preço Estimado</p>
+                        <DollarSign className="h-3.5 w-3.5 text-primary shrink-0" />
+                      </div>
+                      <div className="mt-2.5">
+                        <p className="font-mono text-base font-black text-primary truncate">
+                          {formatCurrency(selectedEstimatedPrice)}
+                        </p>
+                        <span className="text-[9px] font-sans font-semibold text-text-muted block mt-0.5 capitalize">
+                          Ref: {METHOD_LABELS[method]}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Alerta de Cotações Insuficientes */}
@@ -1502,7 +1866,6 @@ export default function PesquisaPrecos() {
                             </TableRow>
                           ) : (
                             selectedItem.candidates.map((candidate) => {
-                              const status = candidateStatus(candidate);
                               const isExcludedWithoutReason = !candidate.selected && !candidate.exclusionReason.trim();
                               return (
                                 <TableRow key={candidate.id} className={candidate.selected ? 'bg-primary/[0.01]' : 'opacity-85'}>
@@ -1526,27 +1889,60 @@ export default function PesquisaPrecos() {
                                         />
                                       )}
                                       <div className="space-y-1.5 flex-1">
-                                        <div className="flex flex-wrap items-center gap-1.5">
-                                          <Badge variant="outline" className={`text-[10px] ${status.className}`}>{status.label}</Badge>
-                                          <Badge variant="secondary" className="gap-0.5 text-[10px] font-mono">
-                                            <Bot className="h-2.5 w-2.5" />
-                                            {candidate.aiScore}
-                                          </Badge>
-                                        </div>
-                                        <p className="font-ui text-[10px] text-text-secondary leading-normal">{candidate.aiReason}</p>
+                                        {candidate.aiReason &&
+                                          candidate.aiReason !== 'Descrição e unidade comparável avaliadas por critérios objetivos.' &&
+                                          candidate.aiReason !== 'Descrição e unidade compatíveis.' && (
+                                            <p className="font-ui text-[10px] text-text-secondary leading-normal">{candidate.aiReason}</p>
+                                          )}
                                         <p className="line-clamp-2 font-ui text-[10px] text-text-muted leading-relaxed" title={candidate.description}>{candidate.description}</p>
                                         <div className="flex gap-2">
-                                          <a href={candidate.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-bold text-primary hover:underline">
-                                            {candidate.sourceType !== 'compras_gov_precos' && candidate.sourceType !== 'custom'
-                                              ? `Acessar no ${candidate.sourceLabel}`
-                                              : 'Fonte Oficial'}{' '}
-                                            <ExternalLink className="h-2.5 w-2.5" />
-                                          </a>
-                                          {candidate.pncpSearchUrl && (
-                                            <a href={candidate.pncpSearchUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-bold text-sebrae-blue hover:underline">
-                                              PNCP <ExternalLink className="h-2.5 w-2.5" />
+                                          {candidate.sourceType !== 'compras_gov_precos' && candidate.sourceType !== 'custom' && (
+                                            <a href={candidate.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-bold text-primary hover:underline">
+                                              Acessar no {candidate.sourceLabel} <ExternalLink className="h-2.5 w-2.5" />
                                             </a>
                                           )}
+                                          {candidate.pncpSearchUrl && (() => {
+                                             let href = candidate.pncpSearchUrl;
+                                             const purchaseId = candidate.purchaseId || '';
+                                             const pncpMatch = purchaseId.match(/^(\d{14})-\d+-(\d+)\/(\d{4})/);
+                                             if (pncpMatch) {
+                                               const cnpj = pncpMatch[1];
+                                               const num = parseInt(pncpMatch[2], 10);
+                                               const year = pncpMatch[3];
+                                               href = `https://pncp.gov.br/app/editais/${cnpj}/${year}/${num}`;
+                                             } else {
+                                               try {
+                                                 const url = new URL(href);
+                                                 const q = url.searchParams.get('q');
+                                                 if (q) {
+                                                   const qMatch = q.match(/^(\d{6})\s+0*(\d+)\/(\d{4})$/);
+                                                   if (qMatch) {
+                                                     url.searchParams.set('q', `${qMatch[1]} ${qMatch[2]}/${qMatch[3]}`);
+                                                     url.searchParams.delete('pagina');
+                                                     href = url.toString();
+                                                   }
+                                                 }
+                                               } catch {}
+                                             }
+                                             return (
+                                               <a 
+                                                 href={href} 
+                                                 target="_blank" 
+                                                 rel="noreferrer" 
+                                                 onClick={() => {
+                                                   console.log('[PNCP Link Diagnostics]', {
+                                                     candidateId: candidate.id,
+                                                     purchaseId,
+                                                     statePncpUrl: candidate.pncpSearchUrl,
+                                                     renderedHref: href
+                                                   });
+                                                 }}
+                                                 className="inline-flex items-center gap-0.5 text-[10px] font-bold text-sebrae-blue hover:underline"
+                                               >
+                                                 PNCP <ExternalLink className="h-2.5 w-2.5" />
+                                               </a>
+                                             );
+                                           })()}
                                         </div>
                                       </div>
                                     </div>

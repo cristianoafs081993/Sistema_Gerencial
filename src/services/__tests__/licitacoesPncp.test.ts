@@ -37,6 +37,23 @@ describe('licitacoesPncpService helpers', () => {
     }));
   });
 
+  it('normaliza linha de licitacao PNCP com CNPJ, ano e sequencial nulos ou ausentes', () => {
+    const mapped = mapLicitacaoPncpRow({
+      id: 'lic-2',
+      numero_controle_pncp: '10877412000168-1-000198/2025-short',
+      cnpj_orgao: null,
+      ano_compra: null,
+      sequencial_compra: null,
+      raw_data: {},
+      compras_gov_data: {},
+      updated_at: '2026-05-04T12:00:00.000Z',
+    });
+
+    expect(mapped.cnpjOrgao).toBe('10877412000168');
+    expect(mapped.anoCompra).toBe(2025);
+    expect(mapped.sequencialCompra).toBe(198);
+  });
+
   it('deriva status de propostas e links externos', () => {
     const row = mapLicitacaoPncpRow({
       id: 'lic-1',
