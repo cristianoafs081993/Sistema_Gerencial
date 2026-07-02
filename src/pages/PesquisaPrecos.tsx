@@ -16,6 +16,9 @@ import {
   FolderOpen,
   Globe,
   Image,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
   Loader2,
   MapPin,
   Pencil,
@@ -119,6 +122,21 @@ export default function PesquisaPrecos() {
   const [sourceFile, setSourceFile] = useState('');
   const [items, setItems] = useState<PriceResearchItem[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string>();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  const currentIndex = items.findIndex((item) => item.localId === selectedItemId);
+
+  const handlePrevItem = () => {
+    if (currentIndex > 0) {
+      setSelectedItemId(items[currentIndex - 1].localId);
+    }
+  };
+
+  const handleNextItem = () => {
+    if (currentIndex >= 0 && currentIndex < items.length - 1) {
+      setSelectedItemId(items[currentIndex + 1].localId);
+    }
+  };
   const [isParsing, setIsParsing] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -1367,21 +1385,70 @@ export default function PesquisaPrecos() {
         <div className="space-y-6 animate-in fade-in duration-200">
           <div className="grid gap-6 lg:grid-cols-4">
             {/* Sidebar de Itens */}
-            <div className="lg:col-span-1 bg-surface-card border border-border-default rounded-radius-xl p-4 shadow-soft space-y-3 max-h-[600px] overflow-y-auto">
-              <div className="pb-2 border-b border-border-default/60">
-                <p className="font-ui text-xs font-bold text-sebrae-navy uppercase tracking-wider">Itens Importados ({items.length})</p>
-                <p className="text-[10px] text-text-muted mt-0.5">Selecione o item para parametrizar</p>
+            <div className={`transition-all duration-300 ${
+              isSidebarOpen ? 'lg:col-span-1' : 'lg:col-span-px w-14 p-2'
+            } bg-surface-card border border-border-default rounded-radius-xl p-4 shadow-soft space-y-4 max-h-[600px] overflow-y-auto flex flex-col`}>
+              <div className="flex items-center justify-between pb-2 border-b border-border-default/60">
+                {isSidebarOpen ? (
+                  <>
+                    <div>
+                      <p className="font-ui text-xs font-bold text-sebrae-navy uppercase tracking-wider">Itens ({items.length})</p>
+                      <p className="text-[10px] text-text-muted mt-0.5">Selecione para parametrizar</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setIsSidebarOpen(false)}
+                      title="Recolher menu"
+                      className="h-8 w-8 text-text-muted hover:text-text-primary"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsSidebarOpen(true)}
+                    title="Expandir menu"
+                    className="h-8 w-8 mx-auto text-text-muted hover:text-text-primary"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
-              <div className="space-y-2">
+              
+              <div className="space-y-2 flex-1 overflow-y-auto">
                 {items.map((item) => {
                   const hasCode = !!item.catalogCode;
                   const isSelected = selectedItemId === item.localId;
+                  
+                  if (!isSidebarOpen) {
+                    return (
+                      <button
+                        key={item.localId}
+                        type="button"
+                        onClick={() => setSelectedItemId(item.localId)}
+                        title={`Item ${item.itemNumber}: ${item.description}`}
+                        className={`w-9 h-9 mx-auto rounded-full flex items-center justify-center font-ui text-xs font-bold transition-all border ${
+                          isSelected
+                            ? 'bg-primary text-white border-primary shadow-sm scale-110'
+                            : hasCode
+                              ? 'border-primary/40 bg-primary/5 text-primary hover:bg-primary/10'
+                              : 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
+                        }`}
+                      >
+                        {item.itemNumber}
+                      </button>
+                    );
+                  }
+                  
                   return (
                     <button
                       key={item.localId}
                       type="button"
                       onClick={() => setSelectedItemId(item.localId)}
-                      className={`w-full rounded-radius-lg border p-3 text-left transition-colors flex flex-col gap-1.5 ${
+                      className={`w-full rounded-radius-lg border p-3.5 text-left transition-all flex flex-col gap-2 ${
                         isSelected
                           ? 'border-primary bg-primary/[0.04] shadow-sm'
                           : 'border-border-default bg-surface-card hover:bg-surface-subtle'
@@ -1390,12 +1457,12 @@ export default function PesquisaPrecos() {
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-ui text-xs font-bold text-text-primary">Item {item.itemNumber}</span>
                         {hasCode ? (
-                          <Badge variant="outline" className="border-primary/25 bg-primary/5 text-primary text-[10px] py-0 px-1.5">Mapeado</Badge>
+                          <Badge variant="outline" className="border-primary/25 bg-primary/5 text-primary text-[10px] py-0.5 px-2">Mapeado</Badge>
                         ) : (
-                          <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 text-[10px] py-0 px-1.5">Falta código</Badge>
+                          <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 text-[10px] py-0.5 px-2">Pendente</Badge>
                         )}
                       </div>
-                      <p className="line-clamp-2 font-ui text-xs text-text-secondary leading-normal">{item.description}</p>
+                      <p className="line-clamp-2 font-ui text-sm font-medium text-text-secondary leading-normal">{item.description}</p>
                       <p className="font-mono text-[10px] text-text-muted mt-1 leading-none">
                         {item.catalogType === 'material' ? 'CATMAT' : 'CATSER'}: <span className="font-bold">{item.catalogCode || 'Pendente'}</span>
                       </p>
@@ -1406,10 +1473,10 @@ export default function PesquisaPrecos() {
             </div>
 
             {/* Painel Central do Item */}
-            <div className="lg:col-span-3 space-y-4">
+            <div className={`${isSidebarOpen ? 'lg:col-span-3' : 'lg:col-span-4'} space-y-4 transition-all duration-300`}>
               {selectedItem ? (
                 <SectionPanel
-                  title={`Configuração do Item ${selectedItem.itemNumber}`}
+                  title={`Configuração do Item ${selectedItem.itemNumber}: ${selectedItem.description}`}
                   description="Preencha o código CATMAT/CATSER e as especificações para refinar a pesquisa."
                 >
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -1669,22 +1736,71 @@ export default function PesquisaPrecos() {
         <div className="space-y-6 animate-in fade-in duration-200">
           <div className="grid gap-6 lg:grid-cols-4">
             {/* Sidebar de Seleção de Item */}
-            <div className="lg:col-span-1 bg-surface-card border border-border-default rounded-radius-xl p-4 shadow-soft space-y-3 max-h-[600px] overflow-y-auto">
-              <div className="pb-2 border-b border-border-default/60">
-                <p className="font-ui text-xs font-bold text-sebrae-navy uppercase tracking-wider">Selecione o Item</p>
-                <p className="text-[10px] text-text-muted mt-0.5">Analise e homologue a cesta de preços</p>
+            <div className={`transition-all duration-300 ${
+              isSidebarOpen ? 'lg:col-span-1' : 'lg:col-span-px w-14 p-2'
+            } bg-surface-card border border-border-default rounded-radius-xl p-4 shadow-soft space-y-4 max-h-[600px] overflow-y-auto flex flex-col`}>
+              <div className="flex items-center justify-between pb-2 border-b border-border-default/60">
+                {isSidebarOpen ? (
+                  <>
+                    <div>
+                      <p className="font-ui text-xs font-bold text-sebrae-navy uppercase tracking-wider">Itens ({items.length})</p>
+                      <p className="text-[10px] text-text-muted mt-0.5">Analise a cesta de preços</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setIsSidebarOpen(false)}
+                      title="Recolher menu"
+                      className="h-8 w-8 text-text-muted hover:text-text-primary"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsSidebarOpen(true)}
+                    title="Expandir menu"
+                    className="h-8 w-8 mx-auto text-text-muted hover:text-text-primary"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
-              <div className="space-y-2">
+              
+              <div className="space-y-2 flex-1 overflow-y-auto">
                 {items.map((item) => {
                   const selectedCount = item.candidates.filter((c) => c.selected).length;
                   const isSufficient = selectedCount >= 3;
                   const isSelected = selectedItemId === item.localId;
+                  
+                  if (!isSidebarOpen) {
+                    return (
+                      <button
+                        key={item.localId}
+                        type="button"
+                        onClick={() => setSelectedItemId(item.localId)}
+                        title={`Item ${item.itemNumber}: ${item.description} (${selectedCount} selecionados)`}
+                        className={`w-9 h-9 mx-auto rounded-full flex items-center justify-center font-ui text-xs font-bold transition-all border ${
+                          isSelected
+                            ? 'bg-primary text-white border-primary shadow-sm scale-110'
+                            : isSufficient
+                              ? 'border-primary/40 bg-primary/5 text-primary hover:bg-primary/10'
+                              : 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
+                        }`}
+                      >
+                        {item.itemNumber}
+                      </button>
+                    );
+                  }
+                  
                   return (
                     <button
                       key={item.localId}
                       type="button"
                       onClick={() => setSelectedItemId(item.localId)}
-                      className={`w-full rounded-radius-lg border p-3 text-left transition-colors flex flex-col gap-1.5 ${
+                      className={`w-full rounded-radius-lg border p-3.5 text-left transition-all flex flex-col gap-2 ${
                         isSelected
                           ? 'border-primary bg-primary/[0.04] shadow-sm'
                           : 'border-border-default bg-surface-card hover:bg-surface-subtle'
@@ -1693,16 +1809,16 @@ export default function PesquisaPrecos() {
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-ui text-xs font-bold text-text-primary">Item {item.itemNumber}</span>
                         {isSufficient ? (
-                          <Badge variant="outline" className="border-primary/20 bg-primary/5 text-primary text-[10px] py-0 px-1.5">
+                          <Badge variant="outline" className="border-primary/20 bg-primary/5 text-primary text-[10px] py-0.5 px-2">
                             {selectedCount} selecionados
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 text-[10px] py-0 px-1.5">
+                          <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 text-[10px] py-0.5 px-2">
                             {selectedCount}/3 preços
                           </Badge>
                         )}
                       </div>
-                      <p className="line-clamp-2 font-ui text-xs text-text-secondary leading-normal">{item.description}</p>
+                      <p className="line-clamp-2 font-ui text-sm font-medium text-text-secondary leading-normal">{item.description}</p>
                     </button>
                   );
                 })}
@@ -1710,7 +1826,7 @@ export default function PesquisaPrecos() {
             </div>
 
             {/* Detalhes de Cotações do Item */}
-            <div className="lg:col-span-3 space-y-6">
+            <div className={`${isSidebarOpen ? 'lg:col-span-3' : 'lg:col-span-4'} space-y-6 transition-all duration-300`}>
               {selectedItem ? (
                 <>
                   {/* Estatísticas Individuais do Item */}
