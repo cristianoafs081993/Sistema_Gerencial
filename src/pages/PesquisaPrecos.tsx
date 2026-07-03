@@ -616,6 +616,32 @@ export default function PesquisaPrecos() {
     }
   }, [selectedItemId, selectedItem?.description]);
 
+  useEffect(() => {
+    if (curadoriaTab === 'market' && selectedItem) {
+      const defaultSearchTerm = selectedItem.marketSearchTerm ?? selectedItem.description;
+      const hasResults = selectedItem.marketSearchResults && selectedItem.marketSearchResults.length > 0;
+      if (!hasResults && defaultSearchTerm.trim()) {
+        const triggerAutoSearch = async () => {
+          if (selectedMarketProviders.length === 0) return;
+          setIsSearchingMarket(true);
+          try {
+            const results = await marketSearchService.search(defaultSearchTerm, selectedMarketProviders);
+            setMarketResults(results);
+            updateItem(selectedItem.localId, {
+              marketSearchTerm: defaultSearchTerm,
+              marketSearchResults: results,
+            });
+          } catch (error) {
+            console.error('Erro na busca automática de e-commerce:', error);
+          } finally {
+            setIsSearchingMarket(false);
+          }
+        };
+        void triggerAutoSearch();
+      }
+    }
+  }, [curadoriaTab, selectedItemId]);
+
   function parseMarketPrice(priceStr: string): number {
     if (!priceStr) return 0;
     let clean = priceStr.replace(/[R$\s]/gi, '');
