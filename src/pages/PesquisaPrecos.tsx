@@ -1958,13 +1958,19 @@ export default function PesquisaPrecos() {
                   variant="outline"
                   size="sm"
                   onClick={() => setSelectedItemId(undefined)}
-                  className="text-xs gap-1.5 border-border-default text-text-secondary hover:bg-surface-subtle"
+                  className="text-xs gap-1.5 border-border-default text-text-secondary hover:bg-surface-subtle shrink-0"
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />
                   Voltar para a Lista de Itens
                 </Button>
+
+                <div className="hidden sm:block flex-1 text-center px-4 overflow-hidden max-w-[50%] mx-auto">
+                  <p className="text-sm font-bold text-sebrae-navy truncate" title={selectedItem?.description}>
+                    {selectedItem?.description}
+                  </p>
+                </div>
                 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <span className="text-xs text-text-muted font-medium mr-1.5">Item {selectedItem?.itemNumber} de {items.length}</span>
                   <Button
                     type="button"
