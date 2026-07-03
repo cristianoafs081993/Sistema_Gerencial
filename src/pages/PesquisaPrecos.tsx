@@ -1427,45 +1427,8 @@ export default function PesquisaPrecos() {
                   {isParsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                   Substituir planilha
                 </Button>
-                <Button type="button" className="gap-2 bg-primary text-primary-foreground" onClick={() => goToStep(2)}>
-                  Avançar para Itens
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
               </div>
             </div>
-          )}
-
-          {recentResearches.length > 0 && (
-            <SectionPanel
-              title="Pesquisas recentes"
-              description="Carregue rascunhos salvos anteriormente para continuar a trabalhar."
-              actions={isFetchingRecent ? <RefreshCw className="h-4 w-4 animate-spin text-text-muted" /> : null}
-            >
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {recentResearches.map((research) => (
-                  <button
-                    key={research.id}
-                    type="button"
-                    onClick={() => void loadResearch(research.id)}
-                    className="rounded-radius-lg border border-border-default bg-surface-card p-4 text-left transition-colors hover:bg-surface-subtle flex flex-col justify-between"
-                  >
-                    <div className="w-full">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="line-clamp-1 font-ui text-sm font-bold text-text-primary">{research.title}</p>
-                        {loadingResearchId === research.id ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : null}
-                      </div>
-                      <p className="mt-1 line-clamp-2 font-ui text-xs text-text-secondary leading-normal">{research.objectDescription || 'Sem objeto descrito'}</p>
-                    </div>
-                    <div className="mt-4 flex items-center justify-between w-full border-t border-border-default/50 pt-3">
-                      <Badge variant="outline" className={research.status === 'completed' ? 'border-primary/20 bg-primary/5 text-primary' : 'border-amber-300 bg-amber-50 text-amber-800'}>
-                        {research.status === 'completed' ? 'Concluída' : 'Em revisão'}
-                      </Badge>
-                      <span className="font-ui text-[10px] text-text-muted">{formatDate(research.updatedAt)}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </SectionPanel>
           )}
         </div>
       )}
