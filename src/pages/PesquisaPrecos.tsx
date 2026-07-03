@@ -1253,8 +1253,8 @@ export default function PesquisaPrecos() {
                 <div className="grid grid-cols-4 text-center text-xs md:text-sm font-ui">
                   {[
                     { wizardNumber: 1, label: '1. Identificação', targetSteps: [1] },
-                    { wizardNumber: 2, label: '2. Catálogo', targetSteps: [2] },
-                    { wizardNumber: 3, label: '3. Curadoria', targetSteps: [3, 4] },
+                    { wizardNumber: 2, label: '2. Itens', targetSteps: [2] },
+                    { wizardNumber: 3, label: '3. Cotações', targetSteps: [3, 4] },
                     { wizardNumber: 4, label: '4. Relatório', targetSteps: [5] },
                   ].map((step) => {
                     const isCompleted = Math.min(...step.targetSteps) < activeStep && !step.targetSteps.includes(activeStep);
@@ -1428,7 +1428,7 @@ export default function PesquisaPrecos() {
                   Substituir planilha
                 </Button>
                 <Button type="button" className="gap-2 bg-primary text-primary-foreground" onClick={() => goToStep(2)}>
-                  Avançar para Catálogo
+                  Avançar para Itens
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -1840,7 +1840,7 @@ export default function PesquisaPrecos() {
                   </div>
                 </div>
                 <Button type="button" className="gap-1.5 text-xs bg-sebrae-blue text-white hover:bg-sebrae-navy" onClick={() => goToStep(4)}>
-                  Avançar para Curadoria
+                  Avançar para Cotações
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Button>
               </div>
