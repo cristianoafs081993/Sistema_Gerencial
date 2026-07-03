@@ -1384,7 +1384,7 @@ export default function PesquisaPrecos() {
       {activeStep === 2 && (
         <div className="space-y-6 animate-in fade-in duration-200">
           <SectionPanel
-            title={`Itens Importados (${items.length})`}
+            title="Itens Importados"
             description="Selecione um item na lista abaixo clicando nele para configurar seu código CATMAT/CATSER e especificações."
           >
             <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
@@ -1395,7 +1395,6 @@ export default function PesquisaPrecos() {
                     <th className="py-3 px-4">Descrição Técnico-Comercial</th>
                     <th className="py-3 px-4 w-32">Tipo</th>
                     <th className="py-3 px-4 w-40">Código do Catálogo</th>
-                    <th className="py-3 px-4 w-32">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-default/60">
@@ -1421,13 +1420,6 @@ export default function PesquisaPrecos() {
                         </td>
                         <td className="py-3.5 px-4 font-mono font-bold text-text-primary">
                           {item.catalogCode || <span className="text-text-muted font-normal italic">Pendente</span>}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          {hasCode ? (
-                            <Badge className="border-primary/25 bg-primary/5 text-primary text-[10px] hover:bg-primary/5">Mapeado</Badge>
-                          ) : (
-                            <Badge className="border-amber-300 bg-amber-50 text-amber-800 text-[10px] hover:bg-amber-50">Falta código</Badge>
-                          )}
                         </td>
                       </tr>
                     );
