@@ -146,13 +146,21 @@ export default function PesquisaPrecos() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
 
-  const [curadoriaTab, setCuradoriaTab] = useState<'basket' | 'market'>('basket');
+  const [curadoriaTab, setCuradoriaTab] = useState<'basket' | 'market' | 'local'>('basket');
   const [marketSearchTerm, setMarketSearchTerm] = useState('');
   const [selectedMarketProviders, setSelectedMarketProviders] = useState<string[]>(['amazon', 'magalu', 'americanas']);
   const [marketResults, setMarketResults] = useState<MarketSearchResult[]>([]);
   const [isSearchingMarket, setIsSearchingMarket] = useState(false);
   const [capturingUrls, setCapturingUrls] = useState<Set<string>>(new Set());
   const [freightCep, setFreightCep] = useState<string>(() => localStorage.getItem('pp_freight_cep') || '');
+
+  // Fornecedores Locais State
+  const [localSupplierName, setLocalSupplierName] = useState('');
+  const [localSupplierDoc, setLocalSupplierDoc] = useState('');
+  const [localPrice, setLocalPrice] = useState('');
+  const [localFreight, setLocalFreight] = useState('');
+  const [localUnit, setLocalUnit] = useState('');
+  const [localQuoteDate, setLocalQuoteDate] = useState(() => new Date().toISOString().split('T')[0]);
 
   const [capturingCandidateId, setCapturingCandidateId] = useState<string | null>(null);
   const [previewCandidate, setPreviewCandidate] = useState<PriceResearchCandidate | null>(null);
@@ -492,6 +500,50 @@ export default function PesquisaPrecos() {
     toast.success("Item removido da pesquisa.");
   };
 
+  const handleAddLocalCandidate = () => {
+    if (!selectedItem) return;
+    if (!localSupplierName.trim()) {
+      toast.error('Informe o nome do fornecedor.');
+      return;
+    }
+    const priceNum = parseFloat(localPrice);
+    if (isNaN(priceNum) || priceNum <= 0) {
+      toast.error('Informe um preço unitário válido maior que zero.');
+      return;
+    }
+
+    const freightNum = localFreight ? parseFloat(localFreight) : 0;
+    const newCandidate: PriceResearchCandidate = {
+      id: `local-${Date.now()}`,
+      purchaseItemId: `local-${Date.now()}`,
+      description: selectedItem.description,
+      originalUnitPrice: priceNum,
+      comparableUnitPrice: priceNum + (isNaN(freightNum) ? 0 : freightNum),
+      originalUnitLabel: localUnit.trim() || selectedItem.unit || 'UN',
+      quantity: selectedItem.quantity,
+      supplierName: localSupplierName.trim(),
+      supplierDocument: localSupplierDoc.trim(),
+      agencyName: 'Fornecedor Local',
+      purchaseDate: localQuoteDate || new Date().toISOString().split('T')[0],
+      sourceType: 'custom',
+      sourceLabel: 'Fornecedor Local',
+      selected: true,
+      exclusionReason: '',
+      freightCost: localFreight ? freightNum : undefined,
+    };
+
+    updateItem(selectedItem.localId, {
+      candidates: [...selectedItem.candidates, newCandidate],
+    });
+
+    toast.success('Cotação de fornecedor local adicionada com sucesso!');
+
+    setLocalSupplierName('');
+    setLocalSupplierDoc('');
+    setLocalPrice('');
+    setLocalFreight('');
+  };
+
   const updateCandidate = (localId: string, candidateId: string, patch: Partial<PriceResearchCandidate>) => {
     setItems((current) => current.map((item) => {
       if (item.localId !== localId) return item;
@@ -613,6 +665,13 @@ export default function PesquisaPrecos() {
       setMarketSearchTerm(selectedItem.marketSearchTerm ?? selectedItem.description);
       setMarketResults(selectedItem.marketSearchResults ?? []);
       setCuradoriaTab('basket');
+      // Inicializa estados do fornecedor local
+      setLocalSupplierName('');
+      setLocalSupplierDoc('');
+      setLocalPrice('');
+      setLocalFreight('');
+      setLocalUnit(selectedItem.unit || 'UN');
+      setLocalQuoteDate(new Date().toISOString().split('T')[0]);
     }
   }, [selectedItemId, selectedItem?.description]);
 
@@ -2050,10 +2109,22 @@ export default function PesquisaPrecos() {
                         <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
                       )}
                     </button>
+                    <button
+                      type="button"
+                      className={`pb-3 text-sm font-semibold transition-all relative ${
+                        curadoriaTab === 'local' ? 'text-primary' : 'text-text-muted hover:text-text-primary'
+                      }`}
+                      onClick={() => setCuradoriaTab('local')}
+                    >
+                      Fornecedores Locais
+                      {curadoriaTab === 'local' && (
+                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
+                      )}
+                    </button>
                   </div>
 
                   {/* Exibição da Aba Ativa */}
-                  {curadoriaTab === 'basket' ? (
+                  {curadoriaTab === 'basket' && (
                     <DataTablePanel
                       title={`Cesta de Preços - Item ${selectedItem.itemNumber}`}
                       description="Selecione as referências mais compatíveis tecnicamente. Exclusões precisam de justificativa descritiva."
@@ -2278,7 +2349,9 @@ export default function PesquisaPrecos() {
                         </TableBody>
                       </Table>
                     </DataTablePanel>
-                  ) : (
+                  )}
+
+                  {curadoriaTab === 'market' && (
                     <div className="space-y-6">
                       {/* Painel de busca e provedores */}
                       <div className="p-5 border border-border-default bg-surface-card rounded-radius-lg shadow-soft space-y-4">
@@ -2474,6 +2547,166 @@ export default function PesquisaPrecos() {
                           })}
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {curadoriaTab === 'local' && (
+                    <div className="space-y-6 animate-in fade-in duration-200">
+                      <div className="p-5 border border-border-default bg-surface-card rounded-radius-lg shadow-soft space-y-4">
+                        <div className="space-y-1">
+                          <h4 className="font-ui text-sm font-bold text-text-primary">Cadastrar Cotação de Fornecedor Local</h4>
+                          <p className="font-ui text-xs text-text-muted">Insira os dados da cotação recebida por e-mail, telefone ou visita presencial de fornecedores da sua região.</p>
+                        </div>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="space-y-1.5">
+                            <Label htmlFor="local-supplier-name">Fornecedor (Razão Social / Nome Fantasia) <span className="text-destructive">*</span></Label>
+                            <Input
+                              id="local-supplier-name"
+                              type="text"
+                              value={localSupplierName}
+                              onChange={(e) => setLocalSupplierName(e.target.value)}
+                              placeholder="Ex: Comercial de Alimentos S.A."
+                              className="h-10 text-sm"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <Label htmlFor="local-supplier-doc">CNPJ / CPF</Label>
+                            <Input
+                              id="local-supplier-doc"
+                              type="text"
+                              value={localSupplierDoc}
+                              onChange={(e) => setLocalSupplierDoc(e.target.value)}
+                              placeholder="Ex: 00.000.000/0000-00"
+                              className="h-10 text-sm"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <Label htmlFor="local-price">Preço Unitário (R$) <span className="text-destructive">*</span></Label>
+                            <Input
+                              id="local-price"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={localPrice}
+                              onChange={(e) => setLocalPrice(e.target.value)}
+                              placeholder="0,00"
+                              className="h-10 text-sm font-mono"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <Label htmlFor="local-freight">Custo de Frete (R$) - Opcional</Label>
+                            <Input
+                              id="local-freight"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={localFreight}
+                              onChange={(e) => setLocalFreight(e.target.value)}
+                              placeholder="0,00"
+                              className="h-10 text-sm font-mono"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <Label htmlFor="local-unit">Unidade de Medida</Label>
+                            <Input
+                              id="local-unit"
+                              type="text"
+                              value={localUnit}
+                              onChange={(e) => setLocalUnit(e.target.value)}
+                              placeholder="Ex: UN, CAIXA, KG, PAR..."
+                              className="h-10 text-sm"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <Label htmlFor="local-date">Data da Cotação</Label>
+                            <Input
+                              id="local-date"
+                              type="date"
+                              value={localQuoteDate}
+                              onChange={(e) => setLocalQuoteDate(e.target.value)}
+                              className="h-10 text-sm font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="pt-2 flex justify-end">
+                          <Button
+                            type="button"
+                            onClick={handleAddLocalCandidate}
+                            className="bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-sm h-10 px-6 gap-2"
+                          >
+                            <Plus className="h-4 w-4" />
+                            Adicionar à Cesta
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Lista de cotações manuais já inseridas */}
+                      <DataTablePanel
+                        title="Cotações Locais Cadastradas"
+                        description="Veja abaixo as cotações de fornecedores locais que você inseriu manualmente para este item."
+                      >
+                        {selectedItem.candidates.filter(c => c.sourceType === 'custom').length === 0 ? (
+                          <div className="text-center py-8 text-text-muted text-xs">
+                            Nenhuma cotação de fornecedor local cadastrada para este item.
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
+                            <table className="w-full border-collapse text-left font-ui text-sm">
+                              <thead>
+                                <tr className="border-b border-border-default bg-surface-subtle text-text-muted font-bold">
+                                  <th className="py-3 px-4">Fornecedor</th>
+                                  <th className="py-3 px-4 w-40">CNPJ / CPF</th>
+                                  <th className="py-3 px-4 w-32 text-right">Preço Unitário</th>
+                                  <th className="py-3 px-4 w-32 text-right">Frete</th>
+                                  <th className="py-3 px-4 w-32 text-right">Preço Comp.</th>
+                                  <th className="py-3 px-4 w-32">Data</th>
+                                  <th className="py-3 px-4 text-center w-24">Excluir</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border-default/60">
+                                {selectedItem.candidates
+                                  .filter(c => c.sourceType === 'custom')
+                                  .map((candidate) => {
+                                    return (
+                                      <tr key={candidate.id} className="hover:bg-surface-subtle/50 transition-colors">
+                                        <td className="py-3.5 px-4 font-bold text-text-primary">{candidate.supplierName}</td>
+                                        <td className="py-3.5 px-4 font-mono text-xs text-text-secondary">{candidate.supplierDocument || '-'}</td>
+                                        <td className="py-3.5 px-4 text-right font-mono text-xs">{formatCurrency(candidate.originalUnitPrice)}</td>
+                                        <td className="py-3.5 px-4 text-right font-mono text-xs">{candidate.freightCost ? formatCurrency(candidate.freightCost) : '-'}</td>
+                                        <td className="py-3.5 px-4 text-right font-mono text-xs font-bold text-text-primary">{formatCurrency(candidate.comparableUnitPrice)}</td>
+                                        <td className="py-3.5 px-4 font-mono text-xs">{formatDate(candidate.purchaseDate)}</td>
+                                        <td className="py-3.5 px-4 text-center">
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            title="Excluir cotação local"
+                                            onClick={() => {
+                                              updateItem(selectedItem.localId, {
+                                                candidates: selectedItem.candidates.filter(c => c.id !== candidate.id),
+                                              });
+                                              toast.success('Cotação local removida.');
+                                            }}
+                                            className="h-8 w-8 text-destructive hover:text-white hover:bg-destructive rounded-full transition-all"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </DataTablePanel>
                     </div>
                   )}
                 </>
