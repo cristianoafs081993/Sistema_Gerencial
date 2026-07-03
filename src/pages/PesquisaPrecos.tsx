@@ -1383,12 +1383,12 @@ export default function PesquisaPrecos() {
       {/* STEP 2: CÓDIGOS DE CATÁLOGO */}
       {activeStep === 2 && (
         <div className="space-y-6 animate-in fade-in duration-200">
-          <div className="grid gap-6 lg:grid-cols-4">
+          <div className="flex gap-6 items-start">
             {/* Sidebar de Itens */}
-            <div className={`transition-all duration-300 ${
-              isSidebarOpen ? 'lg:col-span-1' : 'lg:col-span-px w-14 p-2'
-            } bg-surface-card border border-border-default rounded-radius-xl p-4 shadow-soft space-y-4 max-h-[600px] overflow-y-auto flex flex-col`}>
-              <div className="flex items-center justify-between pb-2 border-b border-border-default/60">
+            <div className={`transition-all duration-300 shrink-0 ${
+              isSidebarOpen ? 'w-80 p-4' : 'w-14 p-2'
+            } bg-surface-card border border-border-default rounded-radius-xl shadow-soft space-y-4 max-h-[600px] overflow-y-auto flex flex-col`}>
+              <div className={`flex items-center justify-between pb-2 ${isSidebarOpen ? 'border-b border-border-default/60' : ''}`}>
                 {isSidebarOpen ? (
                   <>
                     <div>
@@ -1473,7 +1473,7 @@ export default function PesquisaPrecos() {
             </div>
 
             {/* Painel Central do Item */}
-            <div className={`${isSidebarOpen ? 'lg:col-span-3' : 'lg:col-span-4'} space-y-4 transition-all duration-300`}>
+            <div className="flex-1 min-w-0 space-y-4">
               {selectedItem ? (
                 <SectionPanel
                   title={`Configuração do Item ${selectedItem.itemNumber}: ${selectedItem.description}`}
@@ -1734,12 +1734,12 @@ export default function PesquisaPrecos() {
       {/* STEP 4: CURADORIA DE COTAÇÕES */}
       {activeStep === 4 && (
         <div className="space-y-6 animate-in fade-in duration-200">
-          <div className="grid gap-6 lg:grid-cols-4">
+          <div className="flex gap-6 items-start">
             {/* Sidebar de Seleção de Item */}
-            <div className={`transition-all duration-300 ${
-              isSidebarOpen ? 'lg:col-span-1' : 'lg:col-span-px w-14 p-2'
-            } bg-surface-card border border-border-default rounded-radius-xl p-4 shadow-soft space-y-4 max-h-[600px] overflow-y-auto flex flex-col`}>
-              <div className="flex items-center justify-between pb-2 border-b border-border-default/60">
+            <div className={`transition-all duration-300 shrink-0 ${
+              isSidebarOpen ? 'w-80 p-4' : 'w-14 p-2'
+            } bg-surface-card border border-border-default rounded-radius-xl shadow-soft space-y-4 max-h-[600px] overflow-y-auto flex flex-col`}>
+              <div className={`flex items-center justify-between pb-2 ${isSidebarOpen ? 'border-b border-border-default/60' : ''}`}>
                 {isSidebarOpen ? (
                   <>
                     <div>
@@ -1826,7 +1826,7 @@ export default function PesquisaPrecos() {
             </div>
 
             {/* Detalhes de Cotações do Item */}
-            <div className={`${isSidebarOpen ? 'lg:col-span-3' : 'lg:col-span-4'} space-y-6 transition-all duration-300`}>
+            <div className="flex-1 min-w-0 space-y-6">
               {selectedItem ? (
                 <>
                   {/* Estatísticas Individuais do Item */}
