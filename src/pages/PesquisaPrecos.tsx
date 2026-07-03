@@ -2049,13 +2049,13 @@ export default function PesquisaPrecos() {
                             <TableHead className="text-right w-24">Frete (R$)</TableHead>
                             <TableHead className="text-right">Preço Comp.</TableHead>
                             <TableHead className="text-center w-28">Evidência</TableHead>
-                            <TableHead className="min-w-[160px]">Exclusão</TableHead>
+                            <TableHead className="text-center w-20">Excluir</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {selectedItem.candidates.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={8} className="text-center py-8 text-text-muted text-xs">
+                              <TableCell colSpan={9} className="text-center py-8 text-text-muted text-xs">
                                 Nenhuma cotação adicionada. Use a aba "Pesquisa de Mercado (Internet)" para complementar os preços com buscas em e-commerces.
                               </TableCell>
                             </TableRow>
@@ -2087,9 +2087,9 @@ export default function PesquisaPrecos() {
                                         {candidate.aiReason &&
                                           candidate.aiReason !== 'Descrição e unidade comparável avaliadas por critérios objetivos.' &&
                                           candidate.aiReason !== 'Descrição e unidade compatíveis.' && (
-                                            <p className="font-ui text-[10px] text-text-secondary leading-normal">{candidate.aiReason}</p>
+                                            <p className="font-ui text-xs text-text-primary leading-normal font-semibold">{candidate.aiReason}</p>
                                           )}
-                                        <p className="line-clamp-2 font-ui text-[10px] text-text-muted leading-relaxed" title={candidate.description}>{candidate.description}</p>
+                                        <p className="line-clamp-3 font-ui text-xs text-text-secondary leading-relaxed font-bold" title={candidate.description}>{candidate.description}</p>
                                         <div className="flex gap-2">
                                           {candidate.sourceType !== 'compras_gov_precos' && candidate.sourceType !== 'custom' && (
                                             <a href={candidate.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-bold text-primary hover:underline">
@@ -2139,18 +2139,32 @@ export default function PesquisaPrecos() {
                                              );
                                            })()}
                                         </div>
+                                        {!candidate.selected && (
+                                          <div className="mt-2.5 relative flex items-center max-w-[280px]">
+                                            <Input
+                                              aria-label={`Justificativa para desconsiderar ${candidate.purchaseItemId}`}
+                                              value={candidate.exclusionReason}
+                                              onChange={(event) => updateCandidate(selectedItem.localId, candidate.id, { exclusionReason: event.target.value })}
+                                              placeholder="Justifique a exclusão..."
+                                              className={`h-7 text-xs pr-8 ${isExcludedWithoutReason ? 'border-amber-300 focus:border-amber-500 bg-amber-50/20' : ''}`}
+                                            />
+                                            {isExcludedWithoutReason && (
+                                              <AlertTriangle className="absolute right-2.5 h-3 w-3 text-amber-500" title="Justificativa obrigatória" />
+                                            )}
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                   </TableCell>
                                   <TableCell className="min-w-[180px]">
-                                    <p className="font-mono text-[10px] font-bold text-text-primary">{candidate.agencyCode || '-'}</p>
-                                    <p className="font-ui text-[10px] text-text-secondary truncate max-w-[160px]" title={candidate.agencyName || ''}>{candidate.agencyName || '-'}</p>
-                                    <p className="mt-1.5 font-ui text-[10px] font-bold text-text-primary truncate max-w-[160px]" title={candidate.supplierName || ''}>{candidate.supplierName || '-'}</p>
-                                    <p className="font-mono text-[9px] text-text-muted leading-none mt-0.5">{candidate.supplierDocument || '-'}</p>
-                                    <p className="font-ui text-[9px] text-text-muted mt-1 leading-none">{formatDate(candidate.resultDate || candidate.purchaseDate)}</p>
+                                    <p className="font-mono text-xs font-bold text-text-primary">{candidate.agencyCode || '-'}</p>
+                                    <p className="font-ui text-xs text-text-secondary truncate max-w-[160px]" title={candidate.agencyName || ''}>{candidate.agencyName || '-'}</p>
+                                    <p className="mt-1.5 font-ui text-xs font-bold text-text-primary truncate max-w-[160px]" title={candidate.supplierName || ''}>{candidate.supplierName || '-'}</p>
+                                    <p className="font-mono text-[10px] text-text-secondary leading-none mt-0.5">{candidate.supplierDocument || '-'}</p>
+                                    <p className="font-ui text-[10px] text-text-secondary mt-1 leading-none">{formatDate(candidate.resultDate || candidate.purchaseDate)}</p>
                                   </TableCell>
-                                  <TableCell className="font-mono text-[11px]">{candidate.originalUnitLabel}</TableCell>
-                                  <TableCell className="text-right font-mono text-[11px]">{formatCurrency(candidate.originalUnitPrice)}</TableCell>
+                                  <TableCell className="font-mono text-xs">{candidate.originalUnitLabel}</TableCell>
+                                  <TableCell className="text-right font-mono text-xs">{formatCurrency(candidate.originalUnitPrice)}</TableCell>
                                   <TableCell className="text-right w-24">
                                     {candidate.sourceType !== 'compras_gov_precos' ? (
                                       <Input
@@ -2159,7 +2173,7 @@ export default function PesquisaPrecos() {
                                         step="0.01"
                                         placeholder="0,00"
                                         aria-label="Frete"
-                                        className="h-7 text-right font-mono text-[11px] w-20 ml-auto px-1.5"
+                                        className="h-7 text-right font-mono text-xs w-20 ml-auto px-1.5"
                                         value={candidate.freightCost ?? ''}
                                         onChange={(e) => {
                                           const freight = e.target.value === '' ? undefined : Math.max(0, parseFloat(e.target.value) || 0);
@@ -2170,10 +2184,10 @@ export default function PesquisaPrecos() {
                                         }}
                                       />
                                     ) : (
-                                      <span className="text-[10px] text-text-muted font-mono">-</span>
+                                      <span className="text-xs text-text-muted font-mono">-</span>
                                     )}
                                   </TableCell>
-                                  <TableCell className="text-right font-mono text-[11px] font-bold">{formatCurrency(candidate.comparableUnitPrice)}</TableCell>
+                                  <TableCell className="text-right font-mono text-xs font-bold">{formatCurrency(candidate.comparableUnitPrice)}</TableCell>
                                   <TableCell className="text-center">
                                     {candidate.selected && candidate.sourceType !== 'compras_gov_precos' ? (
                                       candidate.evidenceImage && candidate.evidenceImage.startsWith('http') ? (
@@ -2181,7 +2195,7 @@ export default function PesquisaPrecos() {
                                           type="button"
                                           variant="outline"
                                           size="sm"
-                                          className="h-8 px-2.5 text-[10px] gap-1 border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 transition-all font-semibold"
+                                          className="h-8 px-2.5 text-xs gap-1 border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 transition-all font-semibold"
                                           onClick={() => setPreviewCandidate(candidate)}
                                           title="Visualizar print da evidência"
                                         >
@@ -2193,7 +2207,7 @@ export default function PesquisaPrecos() {
                                           type="button"
                                           variant="outline"
                                           size="sm"
-                                          className="h-8 px-2.5 text-[10px] gap-1 border-border-default hover:border-primary/30 text-text-secondary hover:text-primary transition-all font-semibold"
+                                          className="h-8 px-2.5 text-xs gap-1 border-border-default hover:border-primary/30 text-text-secondary hover:text-primary transition-all font-semibold"
                                           onClick={() => void handleCaptureEvidence(candidate.id, candidate.sourceUrl, candidate.originalUnitPrice)}
                                           disabled={capturingCandidateId === candidate.id}
                                           title="Capturar print da página em tempo real"
@@ -2207,26 +2221,29 @@ export default function PesquisaPrecos() {
                                         </Button>
                                       )
                                     ) : (
-                                      <span className="text-[10px] text-text-muted">-</span>
+                                      <span className="text-xs text-text-muted">-</span>
                                     )}
                                   </TableCell>
-                                  <TableCell>
-                                    {candidate.selected ? (
-                                      <span className="font-ui text-[10px] text-primary font-medium">Incluído</span>
-                                    ) : (
-                                      <div className="relative flex items-center">
-                                        <Input
-                                          aria-label={`Justificativa para desconsiderar ${candidate.purchaseItemId}`}
-                                          value={candidate.exclusionReason}
-                                          onChange={(event) => updateCandidate(selectedItem.localId, candidate.id, { exclusionReason: event.target.value })}
-                                          placeholder="Justifique a exclusão..."
-                                          className={`h-8 text-xs pr-8 ${isExcludedWithoutReason ? 'border-amber-300 focus:border-amber-500 bg-amber-50/20' : ''}`}
-                                        />
-                                        {isExcludedWithoutReason && (
-                                          <AlertTriangle className="absolute right-2.5 h-3.5 w-3.5 text-amber-500" title="Justificativa obrigatória" />
-                                        )}
-                                      </div>
-                                    )}
+                                  <TableCell className="text-center">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      title="Desconsiderar cotação"
+                                      disabled={!candidate.selected}
+                                      onClick={() => {
+                                        updateCandidate(selectedItem.localId, candidate.id, {
+                                          selected: false,
+                                        });
+                                      }}
+                                      className={`h-8 w-8 rounded-full transition-all ${
+                                        candidate.selected
+                                          ? 'text-destructive hover:bg-destructive hover:text-white'
+                                          : 'text-text-muted cursor-not-allowed opacity-40'
+                                      }`}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
                                   </TableCell>
                                 </TableRow>
                               );
