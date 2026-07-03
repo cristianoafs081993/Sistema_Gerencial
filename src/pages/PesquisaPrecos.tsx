@@ -1383,115 +1383,85 @@ export default function PesquisaPrecos() {
       {/* STEP 2: CÓDIGOS DE CATÁLOGO */}
       {activeStep === 2 && (
         <div className="space-y-6 animate-in fade-in duration-200">
-          {!selectedItemId ? (
-            <SectionPanel
-              title={`Itens Importados (${items.length})`}
-              description="Associe cada item importado a um código CATMAT ou CATSER correspondente antes de pesquisar preços."
-            >
-              <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
-                <table className="w-full border-collapse text-left font-ui text-xs">
-                  <thead>
-                    <tr className="border-b border-border-default bg-surface-subtle text-text-muted font-bold">
-                      <th className="py-3 px-4 text-center w-16">Item</th>
-                      <th className="py-3 px-4">Descrição Técnico-Comercial</th>
-                      <th className="py-3 px-4 w-32">Tipo</th>
-                      <th className="py-3 px-4 w-40">Código do Catálogo</th>
-                      <th className="py-3 px-4 w-32">Status</th>
-                      <th className="py-3 px-4 text-center w-28">Ação</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-default/60">
-                    {items.map((item) => {
-                      const hasCode = !!item.catalogCode;
-                      return (
-                        <tr key={item.localId} className="hover:bg-surface-subtle/50 transition-colors">
-                          <td className="py-3.5 px-4 text-center font-bold text-text-primary">{item.itemNumber}</td>
-                          <td className="py-3.5 px-4 font-medium text-text-secondary leading-normal">{item.description}</td>
-                          <td className="py-3.5 px-4">
-                            {hasCode ? (
-                              <Badge variant="secondary" className="font-mono text-[10px]">
-                                {item.catalogType === 'material' ? 'CATMAT' : 'CATSER'}
-                              </Badge>
-                            ) : (
-                              <span className="text-text-muted font-mono">-</span>
-                            )}
-                          </td>
-                          <td className="py-3.5 px-4 font-mono font-bold text-text-primary">
-                            {item.catalogCode || <span className="text-text-muted font-normal italic">Pendente</span>}
-                          </td>
-                          <td className="py-3.5 px-4">
-                            {hasCode ? (
-                              <Badge className="border-primary/25 bg-primary/5 text-primary text-[10px] hover:bg-primary/5">Mapeado</Badge>
-                            ) : (
-                              <Badge className="border-amber-300 bg-amber-50 text-amber-800 text-[10px] hover:bg-amber-50">Falta código</Badge>
-                            )}
-                          </td>
-                          <td className="py-3.5 px-4 text-center">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setSelectedItemId(item.localId)}
-                              className="text-xs gap-1 border-primary/20 text-primary hover:bg-primary/5"
-                            >
-                              <Pencil className="h-3 w-3" />
-                              Mapear
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </SectionPanel>
-          ) : (
-            <div className="space-y-6">
-              {/* Barra de Ações Superior (Voltar + Navegar) */}
-              <div className="flex items-center justify-between gap-4 bg-surface-card border border-border-default rounded-radius-xl p-4 shadow-soft">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSelectedItemId(undefined)}
-                  className="text-xs gap-1.5 border-border-default text-text-secondary hover:bg-surface-subtle"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                  Voltar para a Lista de Itens
-                </Button>
-                
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-text-muted font-medium mr-1.5">Item {selectedItem?.itemNumber} de {items.length}</span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={handlePrevItem}
-                    disabled={currentIndex === 0}
-                    title="Item anterior"
-                    className="h-8 w-8 shrink-0"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={handleNextItem}
-                    disabled={currentIndex === items.length - 1}
-                    title="Próximo item"
-                    className="h-8 w-8 shrink-0"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+          <SectionPanel
+            title={`Itens Importados (${items.length})`}
+            description="Selecione um item na lista abaixo clicando nele para configurar seu código CATMAT/CATSER e especificações."
+          >
+            <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
+              <table className="w-full border-collapse text-left font-ui text-xs">
+                <thead>
+                  <tr className="border-b border-border-default bg-surface-subtle text-text-muted font-bold select-none">
+                    <th className="py-3 px-4 text-center w-16">Item</th>
+                    <th className="py-3 px-4">Descrição Técnico-Comercial</th>
+                    <th className="py-3 px-4 w-32">Tipo</th>
+                    <th className="py-3 px-4 w-40">Código do Catálogo</th>
+                    <th className="py-3 px-4 w-32">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-default/60">
+                  {items.map((item) => {
+                    const hasCode = !!item.catalogCode;
+                    return (
+                      <tr
+                        key={item.localId}
+                        onClick={() => setSelectedItemId(item.localId)}
+                        className="hover:bg-surface-subtle/50 transition-colors cursor-pointer"
+                        title="Clique para configurar este item"
+                      >
+                        <td className="py-3.5 px-4 text-center font-bold text-text-primary">{item.itemNumber}</td>
+                        <td className="py-3.5 px-4 font-medium text-text-secondary leading-normal">{item.description}</td>
+                        <td className="py-3.5 px-4">
+                          {hasCode ? (
+                            <Badge variant="secondary" className="font-mono text-[10px]">
+                              {item.catalogType === 'material' ? 'CATMAT' : 'CATSER'}
+                            </Badge>
+                          ) : (
+                            <span className="text-text-muted font-mono">-</span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 font-mono font-bold text-text-primary">
+                          {item.catalogCode || <span className="text-text-muted font-normal italic">Pendente</span>}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          {hasCode ? (
+                            <Badge className="border-primary/25 bg-primary/5 text-primary text-[10px] hover:bg-primary/5">Mapeado</Badge>
+                          ) : (
+                            <Badge className="border-amber-300 bg-amber-50 text-amber-800 text-[10px] hover:bg-amber-50">Falta código</Badge>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </SectionPanel>
 
-              {selectedItem ? (
-                <SectionPanel
-                  title={`Configuração do Item ${selectedItem.itemNumber}: ${selectedItem.description}`}
-                  description="Preencha o código CATMAT/CATSER e as especificações para refinar a pesquisa."
-                >
+          {/* Modal de Configuração do Item */}
+          {selectedItemId && selectedItem && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="relative w-full max-w-4xl bg-surface-card border border-border-default rounded-radius-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+                {/* Modal Header */}
+                <div className="px-6 py-4 border-b border-border-default flex items-center justify-between bg-surface-subtle/50">
+                  <div>
+                    <h3 className="text-sm font-bold text-sebrae-navy">
+                      Configuração do Item {selectedItem.itemNumber}
+                    </h3>
+                    <p className="text-[11px] text-text-muted mt-0.5 truncate max-w-[600px]">
+                      {selectedItem.description}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="h-8 w-8 rounded-full p-0 flex items-center justify-center text-text-secondary hover:bg-slate-100 hover:text-text-primary"
+                    onClick={() => setSelectedItemId(undefined)}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Modal Body */}
+                <div className="flex-1 overflow-auto p-6 space-y-4">
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     <div className="space-y-2 md:col-span-2 lg:col-span-3">
                       <Label>Descrição Técnico-Comercial do Item</Label>
@@ -1626,8 +1596,45 @@ export default function PesquisaPrecos() {
                       {selectedItem.searchError}
                     </div>
                   )}
-                </SectionPanel>
-              ) : null}
+                </div>
+
+                {/* Modal Footer */}
+                <div className="px-6 py-3.5 border-t border-border-default bg-surface-subtle/50 flex justify-between items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-text-muted font-medium">Item {selectedItem.itemNumber} de {items.length}</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={handlePrevItem}
+                      disabled={currentIndex === 0}
+                      title="Item anterior"
+                      className="h-8 w-8 shrink-0"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={handleNextItem}
+                      disabled={currentIndex === items.length - 1}
+                      title="Próximo item"
+                      className="h-8 w-8 shrink-0"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  <Button
+                    type="button"
+                    className="bg-sebrae-blue hover:bg-sebrae-navy text-white text-xs font-semibold h-9 px-4 rounded-lg shadow-sm"
+                    onClick={() => setSelectedItemId(undefined)}
+                  >
+                    Confirmar e Voltar
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
         </div>

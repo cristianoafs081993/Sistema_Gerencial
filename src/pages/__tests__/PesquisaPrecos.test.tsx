@@ -179,7 +179,7 @@ describe('PesquisaPrecos', () => {
       target: { files: [new File(['xlsx'], 'custos.xlsx')] },
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: /Mapear/i }));
+    fireEvent.click(await screen.findByText('Café torrado e moído, pacote de 500 g'));
 
     await waitFor(() => {
       expect(mockedCatalogMatcher).toHaveBeenCalledWith(
