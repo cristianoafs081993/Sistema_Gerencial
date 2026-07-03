@@ -151,7 +151,7 @@ describe('PesquisaPrecos', () => {
         expect.objectContaining({ catalogCode: '606523', catalogType: 'material' }),
       ]);
     });
-    fireEvent.click(await screen.findByRole('button', { name: /Curar Preços/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Editar Cotações/i }));
     expect(await screen.findByText('Fornecedor')).toBeInTheDocument();
     expect(screen.getAllByText('R$ 20,00').length).toBeGreaterThanOrEqual(2);
   });
@@ -199,7 +199,7 @@ describe('PesquisaPrecos', () => {
     });
     await screen.findAllByText('Café torrado e moído, pacote de 500 g');
     fireEvent.click(screen.getByRole('button', { name: /Avançar/i }));
-    fireEvent.click(await screen.findByRole('button', { name: /Curar Preços/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Editar Cotações/i }));
     await screen.findByText('Fornecedor');
 
     fireEvent.click(screen.getByRole('checkbox', { name: /Usar preço 1/i }));
@@ -244,7 +244,7 @@ describe('PesquisaPrecos', () => {
 
     await screen.findAllByText('Café torrado e moído, pacote de 500 g');
     fireEvent.click(screen.getByRole('button', { name: /Avançar/i }));
-    fireEvent.click(await screen.findByRole('button', { name: /Curar Preços/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Editar Cotações/i }));
     await screen.findByText('Fornecedor');
 
     // Verifica que o link do PNCP montado no front-end aponta para o ano correto (2026) e tem o CNPJ resolvido

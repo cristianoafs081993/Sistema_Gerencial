@@ -1817,27 +1817,39 @@ export default function PesquisaPrecos() {
         <div className="space-y-6 animate-in fade-in duration-200">
           {!selectedItemId ? (
             <SectionPanel
-              title="Curadoria da Cesta de Preços por Item"
-              description="Examine as cotações encontradas para cada item. Selecione no mínimo 3 referências compatíveis para homologar o preço estimado."
+              title="Cotações Consolidadas por Item"
+              description="Examine as cotações consolidadas das três fontes oficiais e privadas por item para homologar a estimativa de preços."
             >
               <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
-                <table className="w-full border-collapse text-left font-ui text-xs">
+                <table className="w-full border-collapse text-left font-ui text-[11px]">
                   <thead>
                     <tr className="border-b border-border-default bg-surface-subtle text-text-muted font-bold">
-                      <th className="py-3 px-4 text-center w-16">Item</th>
-                      <th className="py-3 px-4">Descrição Técnico-Comercial</th>
-                      <th className="py-3 px-4 w-40">Código do Catálogo</th>
-                      <th className="py-3 px-4 text-center w-36">Cotações Selecionadas</th>
-                      <th className="py-3 px-4 text-right w-36">Preço Estimado</th>
-                      <th className="py-3 px-4 text-center w-32">Status</th>
-                      <th className="py-3 px-4 text-center w-36">Ação</th>
+                      <th className="py-3 px-4 text-center w-12">Item</th>
+                      <th className="py-3 px-4 min-w-[200px]">Descrição</th>
+                      <th className="py-3 px-4 text-center w-12">Qtd.</th>
+                      <th className="py-3 px-4 w-44">PNCP</th>
+                      <th className="py-3 px-4 w-44">Internet</th>
+                      <th className="py-3 px-4 w-44">Fornecedores Locais</th>
+                      <th className="py-3 px-4 text-right w-28">Preço Estimado</th>
+                      <th className="py-3 px-4 text-right w-28">Total Estimado</th>
+                      <th className="py-3 px-4 text-center w-24">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-default/60">
                     {items.map((item) => {
                       const selectedCandidates = item.candidates.filter(c => c.selected);
-                      const selectedCount = selectedCandidates.length;
-                      const isSufficient = selectedCount >= 3;
+                      
+                      const pncpPrices = selectedCandidates
+                        .filter(c => c.sourceType !== 'market' && c.sourceType !== 'custom')
+                        .map(c => c.comparableUnitPrice);
+                        
+                      const internetPrices = selectedCandidates
+                        .filter(c => c.sourceType === 'market')
+                        .map(c => c.comparableUnitPrice);
+                        
+                      const localPrices = selectedCandidates
+                        .filter(c => c.sourceType === 'custom')
+                        .map(c => c.comparableUnitPrice);
                       
                       const prices = selectedCandidates.map(c => c.precoRestituido || c.precoUnitario);
                       let estimatedPrice = 0;
@@ -1853,42 +1865,68 @@ export default function PesquisaPrecos() {
                         }
                       }
                       
+                      const totalEstimated = estimatedPrice * item.quantity;
+                      
                       return (
                         <tr key={item.localId} className="hover:bg-surface-subtle/50 transition-colors">
-                          <td className="py-3.5 px-4 text-center font-bold text-text-primary">{item.itemNumber}</td>
-                          <td className="py-3.5 px-4 font-medium text-text-secondary leading-normal">{item.description}</td>
-                          <td className="py-3.5 px-4">
-                            <span className="font-mono text-[10px] bg-surface-subtle border border-border-default px-1.5 py-0.5 rounded text-text-secondary">
-                              {item.catalogType === 'material' ? 'CATMAT' : 'CATSER'} {item.catalogCode}
-                            </span>
+                          <td className="py-3 px-4 text-center font-bold text-text-primary">{item.itemNumber}</td>
+                          <td className="py-3 px-4 font-medium text-text-secondary leading-normal">
+                            <div>{item.description}</div>
+                            <div className="mt-0.5">
+                              <span className="font-mono text-[9px] bg-surface-subtle border border-border-default px-1 py-0.5 rounded text-text-secondary">
+                                {item.catalogType === 'material' ? 'CATMAT' : 'CATSER'} {item.catalogCode}
+                              </span>
+                            </div>
                           </td>
-                          <td className="py-3.5 px-4 text-center">
-                            <span className={`font-mono font-bold ${isSufficient ? 'text-primary' : 'text-amber-800'}`}>
-                              {selectedCount} cotações
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-right font-mono font-bold text-text-primary">
-                            {estimatedPrice > 0 ? (
-                              `R$ ${estimatedPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          <td className="py-3 px-4 text-center font-mono">{item.quantity}</td>
+                          <td className="py-3 px-4 leading-relaxed font-mono text-[10px] text-text-secondary">
+                            {pncpPrices.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {pncpPrices.map((p, idx) => (
+                                  <span key={idx} className="bg-slate-100 px-1 py-0.5 rounded border border-slate-200">{formatCurrency(p)}</span>
+                                ))}
+                              </div>
                             ) : (
-                              <span className="text-text-muted font-normal italic">Pendente</span>
+                              <span className="text-text-muted italic text-[10px]">-</span>
                             )}
                           </td>
-                          <td className="py-3.5 px-4 text-center">
-                            {isSufficient ? (
-                              <Badge className="border-primary/25 bg-primary/5 text-primary text-[10px] hover:bg-primary/5">Pronto</Badge>
+                          <td className="py-3 px-4 leading-relaxed font-mono text-[10px] text-text-secondary">
+                            {internetPrices.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {internetPrices.map((p, idx) => (
+                                  <span key={idx} className="bg-slate-100 px-1 py-0.5 rounded border border-slate-200">{formatCurrency(p)}</span>
+                                ))}
+                              </div>
                             ) : (
-                              <Badge className="border-amber-300 bg-amber-50 text-amber-800 text-[10px] hover:bg-amber-50">Incompleto</Badge>
+                              <span className="text-text-muted italic text-[10px]">-</span>
                             )}
                           </td>
-                          <td className="py-3.5 px-4 text-center">
+                          <td className="py-3 px-4 leading-relaxed font-mono text-[10px] text-text-secondary">
+                            {localPrices.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {localPrices.map((p, idx) => (
+                                  <span key={idx} className="bg-slate-100 px-1 py-0.5 rounded border border-slate-200">{formatCurrency(p)}</span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-text-muted italic text-[10px]">-</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-bold text-text-primary">
+                            {estimatedPrice > 0 ? formatCurrency(estimatedPrice) : <span className="text-text-muted font-normal italic">-</span>}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-bold text-text-primary">
+                            {totalEstimated > 0 ? formatCurrency(totalEstimated) : <span className="text-text-muted font-normal italic">-</span>}
+                          </td>
+                          <td className="py-3 px-4 text-center">
                             <div className="flex gap-1 justify-center items-center">
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => setSelectedItemId(item.localId)}
-                                title="Curar Preços"
+                                title="Editar Cotações"
+                                aria-label="Editar Cotações"
                                 className="h-8 w-8 text-sebrae-blue hover:text-white hover:bg-sebrae-blue rounded-full transition-all"
                               >
                                 <Pencil className="h-4 w-4" />
@@ -1898,6 +1936,7 @@ export default function PesquisaPrecos() {
                                 variant="ghost"
                                 size="icon"
                                 title="Remover Item"
+                                aria-label="Remover Item"
                                 onClick={() => deleteItem(item.localId)}
                                 className="h-8 w-8 text-destructive hover:text-white hover:bg-destructive rounded-full transition-all"
                               >
@@ -2061,7 +2100,7 @@ export default function PesquisaPrecos() {
                       }`}
                       onClick={() => setCuradoriaTab('basket')}
                     >
-                      Cesta de Preços ({selectedItem.candidates.length})
+                      PNCP ({selectedItem.candidates.filter(c => c.sourceType !== 'market' && c.sourceType !== 'custom').length})
                       {curadoriaTab === 'basket' && (
                         <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
                       )}
@@ -2095,8 +2134,8 @@ export default function PesquisaPrecos() {
                   {/* Exibição da Aba Ativa */}
                   {curadoriaTab === 'basket' && (
                     <DataTablePanel
-                      title={`Cesta de Preços - Item ${selectedItem.itemNumber}`}
-                      description="Selecione as referências mais compatíveis tecnicamente. Exclusões precisam de justificativa descritiva."
+                      title={`Cotações do PNCP - Item ${selectedItem.itemNumber}`}
+                      description="Selecione as referências oficiais do PNCP mais compatíveis tecnicamente. Exclusões precisam de justificativa descritiva."
                       actions={(
                         <Button type="button" variant="outline" className="gap-2 h-9 text-xs" onClick={() => void exportPriceResearchWorkbook(reportData)}>
                           <Download className="h-3.5 w-3.5" />
@@ -2119,14 +2158,16 @@ export default function PesquisaPrecos() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {selectedItem.candidates.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={9} className="text-center py-8 text-text-muted text-xs">
-                                Nenhuma cotação adicionada. Use a aba "Pesquisa de Mercado (Internet)" para complementar os preços com buscas em e-commerces.
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            selectedItem.candidates.map((candidate) => {
+                          {(() => {
+                            const pncpCandidates = selectedItem.candidates.filter(c => c.sourceType !== 'market' && c.sourceType !== 'custom');
+                            return pncpCandidates.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={9} className="text-center py-8 text-text-muted text-xs">
+                                  Nenhuma cotação do PNCP localizada para este item.
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              pncpCandidates.map((candidate) => {
                               const isExcludedWithoutReason = !candidate.selected && !candidate.exclusionReason.trim();
                               return (
                                 <TableRow key={candidate.id} className={candidate.selected ? 'bg-primary/[0.01]' : 'opacity-85'}>
@@ -2314,7 +2355,8 @@ export default function PesquisaPrecos() {
                                 </TableRow>
                               );
                             })
-                          )}
+                          );
+                        })()}
                         </TableBody>
                       </Table>
                     </DataTablePanel>
@@ -2516,6 +2558,86 @@ export default function PesquisaPrecos() {
                           })}
                         </div>
                       )}
+                      
+                      {/* Cotações de Internet Adicionadas */}
+                      <DataTablePanel
+                        title="Cotações de Internet Adicionadas"
+                        description="Veja abaixo as cotações de canais privados de internet que foram incluídas para este item."
+                      >
+                        {selectedItem.candidates.filter(c => c.sourceType === 'market').length === 0 ? (
+                          <div className="text-center py-8 text-text-muted text-xs">
+                            Nenhuma cotação de internet adicionada para este item. Use o buscador acima para incluir preços.
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
+                            <table className="w-full border-collapse text-left font-ui text-sm">
+                              <thead>
+                                <tr className="border-b border-border-default bg-surface-subtle text-text-muted font-bold">
+                                  <th className="py-3 px-4">Produto</th>
+                                  <th className="py-3 px-4 w-40">Provedor</th>
+                                  <th className="py-3 px-4 w-32 text-right">Preço Unitário</th>
+                                  <th className="py-3 px-4 w-32 text-right">Frete</th>
+                                  <th className="py-3 px-4 w-32 text-right">Preço Comp.</th>
+                                  <th className="py-3 px-4 text-center w-24">Excluir</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border-default/60">
+                                {selectedItem.candidates
+                                  .filter(c => c.sourceType === 'market')
+                                  .map((candidate) => {
+                                    return (
+                                      <tr key={candidate.id} className="hover:bg-surface-subtle/50 transition-colors">
+                                        <td className="py-3.5 px-4 font-medium text-text-secondary">
+                                          <div className="flex gap-3 items-center">
+                                            {candidate.thumbnailLink && (
+                                              <img
+                                                src={candidate.thumbnailLink}
+                                                alt="Thumbnail"
+                                                className="h-10 w-10 object-contain rounded border border-border-default bg-white p-0.5 shrink-0"
+                                              />
+                                            )}
+                                            <div className="space-y-1">
+                                              <a
+                                                href={candidate.sourceUrl}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="font-bold text-text-primary hover:text-sebrae-blue hover:underline line-clamp-2 leading-tight flex items-center gap-1"
+                                              >
+                                                {candidate.description}
+                                                <ExternalLink className="h-3.5 w-3.5 text-text-muted shrink-0" />
+                                              </a>
+                                            </div>
+                                          </div>
+                                        </td>
+                                        <td className="py-3.5 px-4 capitalize font-semibold text-text-secondary">{candidate.sourceLabel}</td>
+                                        <td className="py-3.5 px-4 text-right font-mono text-xs">{formatCurrency(candidate.originalUnitPrice)}</td>
+                                        <td className="py-3.5 px-4 text-right font-mono text-xs">{candidate.freightCost ? formatCurrency(candidate.freightCost) : '-'}</td>
+                                        <td className="py-3.5 px-4 text-right font-mono text-xs font-bold text-text-primary">{formatCurrency(candidate.comparableUnitPrice)}</td>
+                                        <td className="py-3.5 px-4 text-center">
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            title="Excluir cotação de internet"
+                                            onClick={() => {
+                                              updateItem(selectedItem.localId, {
+                                                candidates: selectedItem.candidates.filter(c => c.id !== candidate.id),
+                                              });
+                                              toast.success('Cotação de internet removida.');
+                                            }}
+                                            className="h-8 w-8 text-destructive hover:text-white hover:bg-destructive rounded-full transition-all"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </DataTablePanel>
                     </div>
                   )}
 
