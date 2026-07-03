@@ -538,7 +538,7 @@ export default function PesquisaPrecos() {
     try {
       const parsed = await parsePriceResearchFile(file);
       setItems(parsed);
-      setSelectedItemId(parsed[0]?.localId);
+      setSelectedItemId(undefined);
       setSourceFile(file.name);
       setResearchId(undefined);
       toast.success(`${parsed.length} item(ns) importado(s).`);
@@ -908,7 +908,7 @@ export default function PesquisaPrecos() {
       setSourceFile(record.sourceFile);
       const resolvedItems = await resolveDirectPncpLinks(record.items);
       setItems(resolvedItems);
-      setSelectedItemId(record.items[0]?.localId);
+      setSelectedItemId(undefined);
       
       // Define a etapa adequada
       const hasSearch = record.items.every(item => item.searchStatus !== 'idle');
@@ -1383,97 +1383,110 @@ export default function PesquisaPrecos() {
       {/* STEP 2: CÓDIGOS DE CATÁLOGO */}
       {activeStep === 2 && (
         <div className="space-y-6 animate-in fade-in duration-200">
-          <div className="flex gap-6 items-start">
-            {/* Sidebar de Itens */}
-            <div className={`transition-all duration-300 shrink-0 ${
-              isSidebarOpen ? 'w-80 p-4' : 'w-14 p-2'
-            } bg-surface-card border border-border-default rounded-radius-xl shadow-soft space-y-4 max-h-[600px] overflow-y-auto flex flex-col`}>
-              <div className={`flex items-center justify-between pb-2 ${isSidebarOpen ? 'border-b border-border-default/60' : ''}`}>
-                {isSidebarOpen ? (
-                  <>
-                    <div>
-                      <p className="font-ui text-xs font-bold text-sebrae-navy uppercase tracking-wider">Itens ({items.length})</p>
-                      <p className="text-[10px] text-text-muted mt-0.5">Selecione para parametrizar</p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setIsSidebarOpen(false)}
-                      title="Recolher menu"
-                      className="h-8 w-8 text-text-muted hover:text-text-primary"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                  </>
-                ) : (
+          {!selectedItemId ? (
+            <SectionPanel
+              title={`Itens Importados (${items.length})`}
+              description="Associe cada item importado a um código CATMAT ou CATSER correspondente antes de pesquisar preços."
+            >
+              <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
+                <table className="w-full border-collapse text-left font-ui text-xs">
+                  <thead>
+                    <tr className="border-b border-border-default bg-surface-subtle text-text-muted font-bold">
+                      <th className="py-3 px-4 text-center w-16">Item</th>
+                      <th className="py-3 px-4">Descrição Técnico-Comercial</th>
+                      <th className="py-3 px-4 w-32">Tipo</th>
+                      <th className="py-3 px-4 w-40">Código do Catálogo</th>
+                      <th className="py-3 px-4 w-32">Status</th>
+                      <th className="py-3 px-4 text-center w-28">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-default/60">
+                    {items.map((item) => {
+                      const hasCode = !!item.catalogCode;
+                      return (
+                        <tr key={item.localId} className="hover:bg-surface-subtle/50 transition-colors">
+                          <td className="py-3.5 px-4 text-center font-bold text-text-primary">{item.itemNumber}</td>
+                          <td className="py-3.5 px-4 font-medium text-text-secondary leading-normal">{item.description}</td>
+                          <td className="py-3.5 px-4">
+                            {hasCode ? (
+                              <Badge variant="secondary" className="font-mono text-[10px]">
+                                {item.catalogType === 'material' ? 'CATMAT' : 'CATSER'}
+                              </Badge>
+                            ) : (
+                              <span className="text-text-muted font-mono">-</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 font-mono font-bold text-text-primary">
+                            {item.catalogCode || <span className="text-text-muted font-normal italic">Pendente</span>}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            {hasCode ? (
+                              <Badge className="border-primary/25 bg-primary/5 text-primary text-[10px] hover:bg-primary/5">Mapeado</Badge>
+                            ) : (
+                              <Badge className="border-amber-300 bg-amber-50 text-amber-800 text-[10px] hover:bg-amber-50">Falta código</Badge>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedItemId(item.localId)}
+                              className="text-xs gap-1 border-primary/20 text-primary hover:bg-primary/5"
+                            >
+                              <Pencil className="h-3 w-3" />
+                              Mapear
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </SectionPanel>
+          ) : (
+            <div className="space-y-6">
+              {/* Barra de Ações Superior (Voltar + Navegar) */}
+              <div className="flex items-center justify-between gap-4 bg-surface-card border border-border-default rounded-radius-xl p-4 shadow-soft">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedItemId(undefined)}
+                  className="text-xs gap-1.5 border-border-default text-text-secondary hover:bg-surface-subtle"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  Voltar para a Lista de Itens
+                </Button>
+                
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-text-muted font-medium mr-1.5">Item {selectedItem?.itemNumber} de {items.length}</span>
                   <Button
-                    variant="ghost"
+                    type="button"
+                    variant="outline"
                     size="icon"
-                    onClick={() => setIsSidebarOpen(true)}
-                    title="Expandir menu"
-                    className="h-8 w-8 mx-auto text-text-muted hover:text-text-primary"
+                    onClick={handlePrevItem}
+                    disabled={currentIndex === 0}
+                    title="Item anterior"
+                    className="h-8 w-8 shrink-0"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleNextItem}
+                    disabled={currentIndex === items.length - 1}
+                    title="Próximo item"
+                    className="h-8 w-8 shrink-0"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
-                )}
+                </div>
               </div>
-              
-              <div className="space-y-2 flex-1 overflow-y-auto">
-                {items.map((item) => {
-                  const hasCode = !!item.catalogCode;
-                  const isSelected = selectedItemId === item.localId;
-                  
-                  if (!isSidebarOpen) {
-                    return (
-                      <button
-                        key={item.localId}
-                        type="button"
-                        onClick={() => setSelectedItemId(item.localId)}
-                        title={`Item ${item.itemNumber}: ${item.description}`}
-                        className={`w-9 h-9 mx-auto rounded-full flex items-center justify-center font-ui text-xs font-bold transition-all border ${
-                          isSelected
-                            ? 'bg-primary text-white border-primary shadow-sm scale-110'
-                            : hasCode
-                              ? 'border-primary/40 bg-primary/5 text-primary hover:bg-primary/10'
-                              : 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
-                        }`}
-                      >
-                        {item.itemNumber}
-                      </button>
-                    );
-                  }
-                  
-                  return (
-                    <button
-                      key={item.localId}
-                      type="button"
-                      onClick={() => setSelectedItemId(item.localId)}
-                      className={`w-full rounded-radius-lg border p-3.5 text-left transition-all flex flex-col gap-2 ${
-                        isSelected
-                          ? 'border-primary bg-primary/[0.04] shadow-sm'
-                          : 'border-border-default bg-surface-card hover:bg-surface-subtle'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-ui text-xs font-bold text-text-primary">Item {item.itemNumber}</span>
-                        {hasCode ? (
-                          <Badge variant="outline" className="border-primary/25 bg-primary/5 text-primary text-[10px] py-0.5 px-2">Mapeado</Badge>
-                        ) : (
-                          <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 text-[10px] py-0.5 px-2">Pendente</Badge>
-                        )}
-                      </div>
-                      <p className="line-clamp-2 font-ui text-sm font-medium text-text-secondary leading-normal">{item.description}</p>
-                      <p className="font-mono text-[10px] text-text-muted mt-1 leading-none">
-                        {item.catalogType === 'material' ? 'CATMAT' : 'CATSER'}: <span className="font-bold">{item.catalogCode || 'Pendente'}</span>
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
 
-            {/* Painel Central do Item */}
-            <div className="flex-1 min-w-0 space-y-4">
               {selectedItem ? (
                 <SectionPanel
                   title={`Configuração do Item ${selectedItem.itemNumber}: ${selectedItem.description}`}
@@ -1614,13 +1627,9 @@ export default function PesquisaPrecos() {
                     </div>
                   )}
                 </SectionPanel>
-              ) : (
-                <div className="text-center py-12 border border-dashed border-border-default rounded-radius-lg text-text-muted bg-surface-card">
-                  Selecione um item no menu à esquerda para configurar.
-                </div>
-              )}
+              ) : null}
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -1734,99 +1743,133 @@ export default function PesquisaPrecos() {
       {/* STEP 4: CURADORIA DE COTAÇÕES */}
       {activeStep === 4 && (
         <div className="space-y-6 animate-in fade-in duration-200">
-          <div className="flex gap-6 items-start">
-            {/* Sidebar de Seleção de Item */}
-            <div className={`transition-all duration-300 shrink-0 ${
-              isSidebarOpen ? 'w-80 p-4' : 'w-14 p-2'
-            } bg-surface-card border border-border-default rounded-radius-xl shadow-soft space-y-4 max-h-[600px] overflow-y-auto flex flex-col`}>
-              <div className={`flex items-center justify-between pb-2 ${isSidebarOpen ? 'border-b border-border-default/60' : ''}`}>
-                {isSidebarOpen ? (
-                  <>
-                    <div>
-                      <p className="font-ui text-xs font-bold text-sebrae-navy uppercase tracking-wider">Itens ({items.length})</p>
-                      <p className="text-[10px] text-text-muted mt-0.5">Analise a cesta de preços</p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setIsSidebarOpen(false)}
-                      title="Recolher menu"
-                      className="h-8 w-8 text-text-muted hover:text-text-primary"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                  </>
-                ) : (
+          {!selectedItemId ? (
+            <SectionPanel
+              title="Curadoria da Cesta de Preços por Item"
+              description="Examine as cotações encontradas para cada item. Selecione no mínimo 3 referências compatíveis para homologar o preço estimado."
+            >
+              <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
+                <table className="w-full border-collapse text-left font-ui text-xs">
+                  <thead>
+                    <tr className="border-b border-border-default bg-surface-subtle text-text-muted font-bold">
+                      <th className="py-3 px-4 text-center w-16">Item</th>
+                      <th className="py-3 px-4">Descrição Técnico-Comercial</th>
+                      <th className="py-3 px-4 w-40">Código do Catálogo</th>
+                      <th className="py-3 px-4 text-center w-36">Cotações Selecionadas</th>
+                      <th className="py-3 px-4 text-right w-36">Preço Estimado</th>
+                      <th className="py-3 px-4 text-center w-32">Status</th>
+                      <th className="py-3 px-4 text-center w-36">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-default/60">
+                    {items.map((item) => {
+                      const selectedCandidates = item.candidates.filter(c => c.selected);
+                      const selectedCount = selectedCandidates.length;
+                      const isSufficient = selectedCount >= 3;
+                      
+                      const prices = selectedCandidates.map(c => c.precoRestituido || c.precoUnitario);
+                      let estimatedPrice = 0;
+                      if (prices.length > 0) {
+                        if (method === 'median') {
+                          const sorted = [...prices].sort((a, b) => a - b);
+                          const mid = Math.floor(sorted.length / 2);
+                          estimatedPrice = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+                        } else if (method === 'average') {
+                          estimatedPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
+                        } else {
+                          estimatedPrice = Math.min(...prices);
+                        }
+                      }
+                      
+                      return (
+                        <tr key={item.localId} className="hover:bg-surface-subtle/50 transition-colors">
+                          <td className="py-3.5 px-4 text-center font-bold text-text-primary">{item.itemNumber}</td>
+                          <td className="py-3.5 px-4 font-medium text-text-secondary leading-normal">{item.description}</td>
+                          <td className="py-3.5 px-4">
+                            <span className="font-mono text-[10px] bg-surface-subtle border border-border-default px-1.5 py-0.5 rounded text-text-secondary">
+                              {item.catalogType === 'material' ? 'CATMAT' : 'CATSER'} {item.catalogCode}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <span className={`font-mono font-bold ${isSufficient ? 'text-primary' : 'text-amber-800'}`}>
+                              {selectedCount} cotações
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-mono font-bold text-text-primary">
+                            {estimatedPrice > 0 ? (
+                              `R$ ${estimatedPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            ) : (
+                              <span className="text-text-muted font-normal italic">Pendente</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            {isSufficient ? (
+                              <Badge className="border-primary/25 bg-primary/5 text-primary text-[10px] hover:bg-primary/5">Pronto</Badge>
+                            ) : (
+                              <Badge className="border-amber-300 bg-amber-50 text-amber-800 text-[10px] hover:bg-amber-50">Incompleto</Badge>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedItemId(item.localId)}
+                              className="text-xs gap-1 border-primary/20 text-primary hover:bg-primary/5"
+                            >
+                              <Pencil className="h-3 w-3" />
+                              Curar Preços
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </SectionPanel>
+          ) : (
+            <div className="space-y-6">
+              {/* Barra de Ações Superior (Voltar + Navegar) */}
+              <div className="flex items-center justify-between gap-4 bg-surface-card border border-border-default rounded-radius-xl p-4 shadow-soft">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedItemId(undefined)}
+                  className="text-xs gap-1.5 border-border-default text-text-secondary hover:bg-surface-subtle"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  Voltar para a Lista de Itens
+                </Button>
+                
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-text-muted font-medium mr-1.5">Item {selectedItem?.itemNumber} de {items.length}</span>
                   <Button
-                    variant="ghost"
+                    type="button"
+                    variant="outline"
                     size="icon"
-                    onClick={() => setIsSidebarOpen(true)}
-                    title="Expandir menu"
-                    className="h-8 w-8 mx-auto text-text-muted hover:text-text-primary"
+                    onClick={handlePrevItem}
+                    disabled={currentIndex === 0}
+                    title="Item anterior"
+                    className="h-8 w-8 shrink-0"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleNextItem}
+                    disabled={currentIndex === items.length - 1}
+                    title="Próximo item"
+                    className="h-8 w-8 shrink-0"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
-                )}
+                </div>
               </div>
-              
-              <div className="space-y-2 flex-1 overflow-y-auto">
-                {items.map((item) => {
-                  const selectedCount = item.candidates.filter((c) => c.selected).length;
-                  const isSufficient = selectedCount >= 3;
-                  const isSelected = selectedItemId === item.localId;
-                  
-                  if (!isSidebarOpen) {
-                    return (
-                      <button
-                        key={item.localId}
-                        type="button"
-                        onClick={() => setSelectedItemId(item.localId)}
-                        title={`Item ${item.itemNumber}: ${item.description} (${selectedCount} selecionados)`}
-                        className={`w-9 h-9 mx-auto rounded-full flex items-center justify-center font-ui text-xs font-bold transition-all border ${
-                          isSelected
-                            ? 'bg-primary text-white border-primary shadow-sm scale-110'
-                            : isSufficient
-                              ? 'border-primary/40 bg-primary/5 text-primary hover:bg-primary/10'
-                              : 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
-                        }`}
-                      >
-                        {item.itemNumber}
-                      </button>
-                    );
-                  }
-                  
-                  return (
-                    <button
-                      key={item.localId}
-                      type="button"
-                      onClick={() => setSelectedItemId(item.localId)}
-                      className={`w-full rounded-radius-lg border p-3.5 text-left transition-all flex flex-col gap-2 ${
-                        isSelected
-                          ? 'border-primary bg-primary/[0.04] shadow-sm'
-                          : 'border-border-default bg-surface-card hover:bg-surface-subtle'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-ui text-xs font-bold text-text-primary">Item {item.itemNumber}</span>
-                        {isSufficient ? (
-                          <Badge variant="outline" className="border-primary/20 bg-primary/5 text-primary text-[10px] py-0.5 px-2">
-                            {selectedCount} selecionados
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 text-[10px] py-0.5 px-2">
-                            {selectedCount}/3 preços
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="line-clamp-2 font-ui text-sm font-medium text-text-secondary leading-normal">{item.description}</p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
 
-            {/* Detalhes de Cotações do Item */}
-            <div className="flex-1 min-w-0 space-y-6">
               {selectedItem ? (
                 <>
                   {/* Estatísticas Individuais do Item */}
@@ -2355,13 +2398,9 @@ export default function PesquisaPrecos() {
                     </div>
                   )}
                 </>
-              ) : (
-                <div className="text-center py-16 border border-dashed border-border-default rounded-radius-lg bg-surface-card text-text-muted">
-                  Selecione um item na lista de navegação lateral para revisar as cotações.
-                </div>
-              )}
+              ) : null}
             </div>
-          </div>
+          )}
         </div>
       )}
 
