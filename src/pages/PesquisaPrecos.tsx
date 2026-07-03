@@ -1388,12 +1388,14 @@ export default function PesquisaPrecos() {
             description="Selecione um item na lista abaixo clicando nele para configurar seu código CATMAT/CATSER e especificações."
           >
             <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
-              <table className="w-full border-collapse text-left font-ui text-xs">
+              <table className="w-full border-collapse text-left font-ui text-sm">
                 <thead>
                   <tr className="border-b border-border-default bg-surface-subtle text-text-muted font-bold select-none">
                     <th className="py-3 px-4 text-center w-16">Item</th>
                     <th className="py-3 px-4">Descrição Técnico-Comercial</th>
-                    <th className="py-3 px-4 w-32">Tipo</th>
+                    <th className="py-3 px-4 w-28 text-right">Qtd.</th>
+                    <th className="py-3 px-4 w-32">Unidade</th>
+                    <th className="py-3 px-4 w-28">Tipo</th>
                     <th className="py-3 px-4 w-40">Código do Catálogo</th>
                   </tr>
                 </thead>
@@ -1409,9 +1411,11 @@ export default function PesquisaPrecos() {
                       >
                         <td className="py-3.5 px-4 text-center font-bold text-text-primary">{item.itemNumber}</td>
                         <td className="py-3.5 px-4 font-medium text-text-secondary leading-normal">{item.description}</td>
+                        <td className="py-3.5 px-4 text-right font-mono font-semibold text-text-primary">{item.quantity}</td>
+                        <td className="py-3.5 px-4 font-medium text-text-secondary">{item.unit || <span className="text-text-muted italic">-</span>}</td>
                         <td className="py-3.5 px-4">
                           {hasCode ? (
-                            <Badge variant="secondary" className="font-mono text-[10px]">
+                            <Badge variant="secondary" className="font-mono text-xs">
                               {item.catalogType === 'material' ? 'CATMAT' : 'CATSER'}
                             </Badge>
                           ) : (
