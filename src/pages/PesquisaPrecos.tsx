@@ -1817,39 +1817,27 @@ export default function PesquisaPrecos() {
         <div className="space-y-6 animate-in fade-in duration-200">
           {!selectedItemId ? (
             <SectionPanel
-              title="Cotações Consolidadas por Item"
-              description="Examine as cotações consolidadas das três fontes oficiais e privadas por item para homologar a estimativa de preços."
+              title="Curadoria da Cesta de Preços por Item"
+              description="Examine as cotações encontradas para cada item. Selecione no mínimo 3 referências compatíveis para homologar o preço estimado."
             >
               <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
-                <table className="w-full border-collapse text-left font-ui text-[11px]">
+                <table className="w-full border-collapse text-left font-ui text-xs">
                   <thead>
                     <tr className="border-b border-border-default bg-surface-subtle text-text-muted font-bold">
-                      <th className="py-3 px-4 text-center w-12">Item</th>
-                      <th className="py-3 px-4 min-w-[200px]">Descrição</th>
-                      <th className="py-3 px-4 text-center w-12">Qtd.</th>
-                      <th className="py-3 px-4 w-44">PNCP</th>
-                      <th className="py-3 px-4 w-44">Internet</th>
-                      <th className="py-3 px-4 w-44">Fornecedores Locais</th>
-                      <th className="py-3 px-4 text-right w-28">Preço Estimado</th>
-                      <th className="py-3 px-4 text-right w-28">Total Estimado</th>
-                      <th className="py-3 px-4 text-center w-24">Ações</th>
+                      <th className="py-3 px-4 text-center w-16">Item</th>
+                      <th className="py-3 px-4">Descrição Técnico-Comercial</th>
+                      <th className="py-3 px-4 w-40">Código do Catálogo</th>
+                      <th className="py-3 px-4 text-center w-36">Cotações Selecionadas</th>
+                      <th className="py-3 px-4 text-right w-36">Preço Estimado</th>
+                      <th className="py-3 px-4 text-center w-32">Status</th>
+                      <th className="py-3 px-4 text-center w-36">Ação</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-default/60">
                     {items.map((item) => {
                       const selectedCandidates = item.candidates.filter(c => c.selected);
-                      
-                      const pncpPrices = selectedCandidates
-                        .filter(c => c.sourceType !== 'market' && c.sourceType !== 'custom')
-                        .map(c => c.comparableUnitPrice);
-                        
-                      const internetPrices = selectedCandidates
-                        .filter(c => c.sourceType === 'market')
-                        .map(c => c.comparableUnitPrice);
-                        
-                      const localPrices = selectedCandidates
-                        .filter(c => c.sourceType === 'custom')
-                        .map(c => c.comparableUnitPrice);
+                      const selectedCount = selectedCandidates.length;
+                      const isSufficient = selectedCount >= 3;
                       
                       const prices = selectedCandidates.map(c => c.precoRestituido || c.precoUnitario);
                       let estimatedPrice = 0;
@@ -1865,60 +1853,35 @@ export default function PesquisaPrecos() {
                         }
                       }
                       
-                      const totalEstimated = estimatedPrice * item.quantity;
-                      
                       return (
                         <tr key={item.localId} className="hover:bg-surface-subtle/50 transition-colors">
-                          <td className="py-3 px-4 text-center font-bold text-text-primary">{item.itemNumber}</td>
-                          <td className="py-3 px-4 font-medium text-text-secondary leading-normal">
-                            <div>{item.description}</div>
-                            <div className="mt-0.5">
-                              <span className="font-mono text-[9px] bg-surface-subtle border border-border-default px-1 py-0.5 rounded text-text-secondary">
-                                {item.catalogType === 'material' ? 'CATMAT' : 'CATSER'} {item.catalogCode}
-                              </span>
-                            </div>
+                          <td className="py-3.5 px-4 text-center font-bold text-text-primary">{item.itemNumber}</td>
+                          <td className="py-3.5 px-4 font-medium text-text-secondary leading-normal">{item.description}</td>
+                          <td className="py-3.5 px-4">
+                            <span className="font-mono text-[10px] bg-surface-subtle border border-border-default px-1.5 py-0.5 rounded text-text-secondary">
+                              {item.catalogType === 'material' ? 'CATMAT' : 'CATSER'} {item.catalogCode}
+                            </span>
                           </td>
-                          <td className="py-3 px-4 text-center font-mono">{item.quantity}</td>
-                          <td className="py-3 px-4 leading-relaxed font-mono text-[10px] text-text-secondary">
-                            {pncpPrices.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {pncpPrices.map((p, idx) => (
-                                  <span key={idx} className="bg-slate-100 px-1 py-0.5 rounded border border-slate-200">{formatCurrency(p)}</span>
-                                ))}
-                              </div>
+                          <td className="py-3.5 px-4 text-center">
+                            <span className={`font-mono font-bold ${isSufficient ? 'text-primary' : 'text-amber-800'}`}>
+                              {selectedCount} cotações
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-mono font-bold text-text-primary">
+                            {estimatedPrice > 0 ? (
+                              `R$ ${estimatedPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                             ) : (
-                              <span className="text-text-muted italic text-[10px]">-</span>
+                              <span className="text-text-muted font-normal italic">Pendente</span>
                             )}
                           </td>
-                          <td className="py-3 px-4 leading-relaxed font-mono text-[10px] text-text-secondary">
-                            {internetPrices.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {internetPrices.map((p, idx) => (
-                                  <span key={idx} className="bg-slate-100 px-1 py-0.5 rounded border border-slate-200">{formatCurrency(p)}</span>
-                                ))}
-                              </div>
+                          <td className="py-3.5 px-4 text-center">
+                            {isSufficient ? (
+                              <Badge className="border-primary/25 bg-primary/5 text-primary text-[10px] hover:bg-primary/5">Pronto</Badge>
                             ) : (
-                              <span className="text-text-muted italic text-[10px]">-</span>
+                              <Badge className="border-amber-300 bg-amber-50 text-amber-800 text-[10px] hover:bg-amber-50">Incompleto</Badge>
                             )}
                           </td>
-                          <td className="py-3 px-4 leading-relaxed font-mono text-[10px] text-text-secondary">
-                            {localPrices.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {localPrices.map((p, idx) => (
-                                  <span key={idx} className="bg-slate-100 px-1 py-0.5 rounded border border-slate-200">{formatCurrency(p)}</span>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-text-muted italic text-[10px]">-</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 text-right font-mono font-bold text-text-primary">
-                            {estimatedPrice > 0 ? formatCurrency(estimatedPrice) : <span className="text-text-muted font-normal italic">-</span>}
-                          </td>
-                          <td className="py-3 px-4 text-right font-mono font-bold text-text-primary">
-                            {totalEstimated > 0 ? formatCurrency(totalEstimated) : <span className="text-text-muted font-normal italic">-</span>}
-                          </td>
-                          <td className="py-3 px-4 text-center">
+                          <td className="py-3.5 px-4 text-center">
                             <div className="flex gap-1 justify-center items-center">
                               <Button
                                 type="button"
@@ -2810,6 +2773,116 @@ export default function PesquisaPrecos() {
       {/* STEP 5: VALIDAÇÃO & RELATÓRIO FINAL */}
       {activeStep === 5 && (
         <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Tabela de Consolidação por Item */}
+          <SectionPanel
+            title="Consolidação das Cotações por Item"
+            description="Detalhamento das cotações selecionadas divididas pelas fontes PNCP, Internet e Fornecedores Locais."
+          >
+            <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
+              <table className="w-full border-collapse text-left font-ui text-[11px]">
+                <thead>
+                  <tr className="border-b border-border-default bg-surface-subtle text-text-muted font-bold">
+                    <th className="py-3 px-4 text-center w-12">Item</th>
+                    <th className="py-3 px-4 min-w-[200px]">Descrição</th>
+                    <th className="py-3 px-4 text-center w-12">Qtd.</th>
+                    <th className="py-3 px-4 w-48">PNCP</th>
+                    <th className="py-3 px-4 w-48">Internet</th>
+                    <th className="py-3 px-4 w-48">Fornecedores Locais</th>
+                    <th className="py-3 px-4 text-right w-28">Preço Estimado</th>
+                    <th className="py-3 px-4 text-right w-28">Total Estimado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-default/60">
+                  {items.map((item) => {
+                    const selectedCandidates = item.candidates.filter(c => c.selected);
+                    
+                    const pncpPrices = selectedCandidates
+                      .filter(c => c.sourceType !== 'market' && c.sourceType !== 'custom')
+                      .map(c => c.comparableUnitPrice);
+                      
+                    const internetPrices = selectedCandidates
+                      .filter(c => c.sourceType === 'market')
+                      .map(c => c.comparableUnitPrice);
+                      
+                    const localPrices = selectedCandidates
+                      .filter(c => c.sourceType === 'custom')
+                      .map(c => c.comparableUnitPrice);
+                    
+                    const prices = selectedCandidates.map(c => c.precoRestituido || c.precoUnitario);
+                    let estimatedPrice = 0;
+                    if (prices.length > 0) {
+                      if (method === 'median') {
+                        const sorted = [...prices].sort((a, b) => a - b);
+                        const mid = Math.floor(sorted.length / 2);
+                        estimatedPrice = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+                      } else if (method === 'average') {
+                        estimatedPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
+                      } else {
+                        estimatedPrice = Math.min(...prices);
+                      }
+                    }
+                    
+                    const totalEstimated = estimatedPrice * item.quantity;
+                    
+                    return (
+                      <tr key={item.localId} className="hover:bg-surface-subtle/50 transition-colors">
+                        <td className="py-3 px-4 text-center font-bold text-text-primary">{item.itemNumber}</td>
+                        <td className="py-3 px-4 font-medium text-text-secondary leading-normal">
+                          <div>{item.description}</div>
+                          <div className="mt-0.5">
+                            <span className="font-mono text-[9px] bg-surface-subtle border border-border-default px-1 py-0.5 rounded text-text-secondary">
+                              {item.catalogType === 'material' ? 'CATMAT' : 'CATSER'} {item.catalogCode}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-center font-mono">{item.quantity}</td>
+                        <td className="py-3 px-4 leading-relaxed font-mono text-[10px] text-text-secondary">
+                          {pncpPrices.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {pncpPrices.map((p, idx) => (
+                                <span key={idx} className="bg-slate-100 px-1 py-0.5 rounded border border-slate-200">{formatCurrency(p)}</span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-text-muted italic text-[10px]">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 leading-relaxed font-mono text-[10px] text-text-secondary">
+                          {internetPrices.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {internetPrices.map((p, idx) => (
+                                <span key={idx} className="bg-slate-100 px-1 py-0.5 rounded border border-slate-200">{formatCurrency(p)}</span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-text-muted italic text-[10px]">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 leading-relaxed font-mono text-[10px] text-text-secondary">
+                          {localPrices.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {localPrices.map((p, idx) => (
+                                <span key={idx} className="bg-slate-100 px-1 py-0.5 rounded border border-slate-200">{formatCurrency(p)}</span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-text-muted italic text-[10px]">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-text-primary">
+                          {estimatedPrice > 0 ? formatCurrency(estimatedPrice) : <span className="text-text-muted font-normal italic">-</span>}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-text-primary">
+                          {totalEstimated > 0 ? formatCurrency(totalEstimated) : <span className="text-text-muted font-normal italic">-</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </SectionPanel>
+
           <div className="grid gap-6 md:grid-cols-2">
             {/* Resumo Consolidado */}
             <SectionPanel
