@@ -5,20 +5,27 @@ import {
   Building2,
   Check,
   CheckCircle2,
+  ChevronDown,
   Copy,
   ExternalLink,
   FileDown,
   FileText,
+  Inbox,
   Landmark,
   Loader2,
   PanelRightOpen,
+  Plus,
   ReceiptText,
+  RefreshCw,
   Save,
+  Send,
+  Settings,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
   Trash2,
   Upload,
+  Users,
   Wallet,
   Wand2,
 } from 'lucide-react';
@@ -38,7 +45,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { type ContractPdfAnalysis, type ContractTemplateCandidate } from '@/lib/contractProcessPdf';
 import { applyDocxTemplatePlan, type DocxTemplateExportPlan } from '@/lib/docxDocumentTemplate';
@@ -1487,6 +1513,56 @@ export default function EditorDocumentos() {
   const [preliminaryStudySupplementalAnalyses, setPreliminaryStudySupplementalAnalyses] = useState<PreliminaryStudySupplementalAttachmentAnalysis[]>([]);
   const [isAnalyzingPreliminaryStudySupplementalAttachment, setIsAnalyzingPreliminaryStudySupplementalAttachment] = useState(false);
 
+  // Registered caixas states
+  const { session } = useAuth();
+  const [isCaixasDialogOpen, setIsCaixasDialogOpen] = useState(false);
+  const [newCaixaNome, setNewCaixaNome] = useState('');
+  const [newCaixaUrl, setNewCaixaUrl] = useState('');
+  const [isAddingCaixa, setIsAddingCaixa] = useState(false);
+
+  const {
+    data: registeredCaixas = [],
+    isLoading: isCaixasLoading,
+    refetch: refetchCaixas,
+  } = useQuery({
+    queryKey: ['suap-caixas'],
+    queryFn: suapProcessosService.getRegisteredCaixas,
+    enabled: !!session,
+  });
+
+  const handleAddCaixa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCaixaNome.trim() || !newCaixaUrl.trim()) {
+      toast.error('Preencha o nome e o link da caixa.');
+      return;
+    }
+    setIsAddingCaixa(true);
+    try {
+      await suapProcessosService.addRegisteredCaixa(newCaixaNome.trim(), newCaixaUrl.trim());
+      toast.success('Caixa cadastrada com sucesso.');
+      setNewCaixaNome('');
+      setNewCaixaUrl('');
+      void refetchCaixas();
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : 'Falha ao cadastrar caixa.');
+    } finally {
+      setIsAddingCaixa(false);
+    }
+  };
+
+  const handleDeleteCaixa = async (id: string) => {
+    const loadingToast = toast.loading('Removendo caixa...');
+    try {
+      await suapProcessosService.deleteRegisteredCaixa(id);
+      toast.success('Caixa removida.', { id: loadingToast });
+      void refetchCaixas();
+    } catch (err) {
+      console.error(err);
+      toast.error('Falha ao remover caixa.', { id: loadingToast });
+    }
+  };
+
   const resources = useMemo(
     () => ({ empenhos, contratos, contratosEmpenhos }),
     [empenhos, contratos, contratosEmpenhos],
@@ -1517,6 +1593,8 @@ export default function EditorDocumentos() {
     data: syncedProcesses = [],
     isLoading: isLoadingSyncedProcesses,
     isError: isSyncedProcessesError,
+    refetch: refetchSyncedProcesses,
+    isFetching: isFetchingSyncedProcesses,
   } = useQuery({
     queryKey: ['suap-processos', 'editor-exemplos'],
     queryFn: suapProcessosService.getAll,
@@ -3641,16 +3719,94 @@ export default function EditorDocumentos() {
   return (
     <div className="-m-4 min-h-[calc(100vh-4rem)] w-[calc(100%+2rem)] bg-surface-page lg:-m-8 lg:w-[calc(100%+4rem)]">
       <HeaderActions>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-space-9 gap-space-2 border-border-default bg-white text-foreground shadow-shadow-sm hover:bg-[hsl(var(--secondary))]"
-          onClick={() => window.open(suapExtensionGithubUrl, '_blank', 'noopener,noreferrer')}
-        >
-          <ExternalLink className="h-4 w-4" />
-          Baixar extensão
-        </Button>
+        <div className="flex items-center gap-2">
+          {session ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void refetchSyncedProcesses()}
+                disabled={isFetchingSyncedProcesses}
+                className="h-9 gap-2 border-border-default bg-white text-slate-700 shadow-shadow-sm hover:bg-[hsl(var(--secondary))]"
+              >
+                <RefreshCw className={cn('h-4 w-4 text-emerald-600', isFetchingSyncedProcesses && 'animate-spin')} />
+                <span>{isFetchingSyncedProcesses ? 'Sincronizando...' : 'Sincronizar'}</span>
+              </Button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 gap-2 border-border-default bg-white text-slate-700 shadow-shadow-sm hover:bg-[hsl(var(--secondary))]"
+                  >
+                    <Settings className="h-4 w-4 text-slate-500" />
+                    <span>Gerenciar Caixas</span>
+                    <ChevronDown className="h-3 w-3 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  <DropdownMenuLabel className="text-xs text-muted-foreground font-ui">
+                    Abrir caixa no SUAP:
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {registeredCaixas.length === 0 ? (
+                    <div className="py-3 px-2 text-center text-xs text-muted-foreground font-ui">
+                      Nenhuma caixa cadastrada
+                    </div>
+                  ) : (
+                    registeredCaixas.map((caixa) => {
+                      const normalized = caixa.nome.toLowerCase();
+                      let IconComponent = FileText;
+                      let colorClass = 'text-slate-500';
+                      if (normalized.includes('entrada') || normalized.includes('recebido')) {
+                        IconComponent = Inbox;
+                        colorClass = 'text-emerald-600';
+                      } else if (normalized.includes('meus') || normalized.includes('criado')) {
+                        IconComponent = FileText;
+                        colorClass = 'text-sky-600';
+                      } else if (normalized.includes('interessado')) {
+                        IconComponent = Users;
+                        colorClass = 'text-violet-600';
+                      } else if (normalized.includes('aguardando') || normalized.includes('envio') || normalized.includes('saida')) {
+                        IconComponent = Send;
+                        colorClass = 'text-amber-600';
+                      }
+                      return (
+                        <DropdownMenuItem
+                          key={caixa.id}
+                          onClick={() => {
+                            const separator = caixa.url.includes('?') ? '&' : '?';
+                            window.open(`${caixa.url}${separator}suap-auto-sync=true`, '_blank', 'noopener,noreferrer');
+                          }}
+                          className="flex items-center gap-2 cursor-pointer py-2 text-sm"
+                        >
+                          <IconComponent className={cn('h-4 w-4', colorClass)} />
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-text-primary text-xs">{caixa.nome}</span>
+                            <span className="text-[10px] text-muted-foreground truncate max-w-[200px]" title={caixa.url}>
+                              {caixa.url}
+                            </span>
+                          </div>
+                        </DropdownMenuItem>
+                      );
+                    })
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setIsCaixasDialogOpen(true)}
+                    className="flex items-center gap-2 cursor-pointer py-2 text-sm font-semibold text-primary hover:bg-slate-50"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Configurar caixas...
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          ) : null}
+        </div>
       </HeaderActions>
 
       <div className="mx-auto flex max-w-[1560px] flex-col gap-5 px-4 py-5 lg:px-8 lg:py-6">
@@ -3667,21 +3823,73 @@ export default function EditorDocumentos() {
                         </p>
                       </div>
 
-                      <div className="rounded-radius-xl border border-border-default/70 bg-surface-subtle/35 p-2">
-                        <div>
-                          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
-                          {exampleProcesses.map((example) => (
-                            <ExampleProcessRow
-                              key={example.id}
-                              processo={example.processo}
-                              beneficiario={example.beneficiario}
-                              isSelected={generationProcessIds.includes(example.id)}
-                              onPreview={() => setSelectedProcessId(example.id)}
-                              onSelect={() => handleSelectGenerationProcess(example.processoCompleto)}
-                              selectTitle={`Selecionar processo ${example.processo}`}
-                            />
-                          ))}
-                          </div>
+                      <div className="rounded-radius-xl border border-border-default/70 bg-surface-card overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader className="bg-surface-subtle/50">
+                              <TableRow className="hover:bg-transparent">
+                                <TableHead className="w-16 text-center font-ui text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                                  Selecionar
+                                </TableHead>
+                                <TableHead className="w-48 font-ui text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                                  Processo
+                                </TableHead>
+                                <TableHead className="font-ui text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                                  Beneficiário / Assunto
+                                </TableHead>
+                                <TableHead className="w-32 text-right font-ui text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                                  Ações
+                                </TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {exampleProcesses.map((example) => {
+                                const isSelected = generationProcessIds.includes(example.id);
+                                const cleanBeneficiario = stripHtml(example.beneficiario || 'Sincronizado no SUAP');
+                                return (
+                                  <TableRow
+                                    key={example.id}
+                                    className={cn(
+                                      'transition-colors duration-150',
+                                      isSelected
+                                        ? 'bg-primary/[0.04] hover:bg-primary/[0.08]'
+                                        : 'hover:bg-surface-subtle/40'
+                                    )}
+                                  >
+                                    <TableCell className="text-center py-2.5">
+                                      <div className="flex justify-center">
+                                        <Checkbox
+                                          checked={isSelected}
+                                          onCheckedChange={() => handleSelectGenerationProcess(example.processoCompleto)}
+                                          aria-label={`Selecionar processo ${example.processo}`}
+                                          title={`Selecionar processo ${example.processo}`}
+                                          className="h-5 w-5 rounded-[4px] border-border-default bg-surface-card shadow-xs transition-colors data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                                        />
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="font-mono text-[12px] font-semibold text-text-primary py-2.5">
+                                      {example.processo}
+                                    </TableCell>
+                                    <TableCell className="text-sm text-text-secondary py-2.5 max-w-[400px] truncate" title={cleanBeneficiario}>
+                                      {cleanBeneficiario}
+                                    </TableCell>
+                                    <TableCell className="text-right py-2.5">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setSelectedProcessId(example.id)}
+                                        className="h-8 gap-1.5 font-ui text-xs text-primary hover:text-primary-active hover:bg-primary/[0.06] transition-colors"
+                                      >
+                                        <PanelRightOpen className="h-3.5 w-3.5" />
+                                        Ver detalhes
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
                         </div>
                       </div>
                     </div>
@@ -4753,6 +4961,100 @@ export default function EditorDocumentos() {
               </DialogFooter>
             </>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCaixasDialogOpen} onOpenChange={setIsCaixasDialogOpen}>
+        <DialogContent className="w-[95vw] sm:max-w-lg bg-surface-card border-border-default overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="font-ui text-lg text-text-primary">
+              Gerenciar Caixas do SUAP
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6 py-2 w-full min-w-0 overflow-hidden">
+            <form onSubmit={handleAddCaixa} className="space-y-3 border-b border-border-default/60 pb-5 w-full min-w-0">
+              <h4 className="font-ui text-xs font-semibold text-text-secondary uppercase tracking-[0.1em]">
+                Cadastrar Nova Caixa
+              </h4>
+              <div className="grid gap-3 sm:grid-cols-2 w-full min-w-0">
+                <div className="space-y-1 min-w-0">
+                  <label className="text-[11px] font-medium text-text-secondary">Nome da Caixa</label>
+                  <Input
+                    value={newCaixaNome}
+                    onChange={(e) => setNewCaixaNome(e.target.value)}
+                    placeholder="Ex: Caixa de Entrada"
+                    className="h-9 bg-white w-full"
+                  />
+                </div>
+                <div className="space-y-1 min-w-0">
+                  <label className="text-[11px] font-medium text-text-secondary">Link (URL) do SUAP</label>
+                  <Input
+                    value={newCaixaUrl}
+                    onChange={(e) => setNewCaixaUrl(e.target.value)}
+                    placeholder="https://suap.ifrn.edu.br/..."
+                    className="h-9 bg-white w-full"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button type="submit" size="sm" disabled={isAddingCaixa} className="h-9 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">
+                  <Plus className="h-4 w-4" />
+                  Adicionar Caixa
+                </Button>
+              </div>
+            </form>
+
+            <div className="space-y-3 w-full min-w-0">
+              <h4 className="font-ui text-xs font-semibold text-text-secondary uppercase tracking-[0.1em]">
+                Caixas Cadastradas
+              </h4>
+              {isCaixasLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              ) : registeredCaixas.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">Nenhuma caixa cadastrada.</p>
+              ) : (
+                <div className="max-h-60 overflow-y-auto border border-border-default/50 rounded-xl divide-y divide-border-default/50 bg-white w-full min-w-0">
+                  {registeredCaixas.map((caixa) => (
+                    <div key={caixa.id} className="flex items-center justify-between p-3 hover:bg-slate-50/50 transition-colors w-full min-w-0">
+                      <div className="space-y-0.5 min-w-0 flex-1 pr-4">
+                        <p className="text-xs font-bold text-text-primary truncate">{caixa.nome}</p>
+                        <p className="text-[10px] text-muted-foreground truncate block" title={caixa.url}>{caixa.url}</p>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            const separator = caixa.url.includes('?') ? '&' : '?';
+                            window.open(`${caixa.url}${separator}suap-auto-sync=true`, '_blank', 'noopener,noreferrer');
+                          }}
+                          title="Sincronizar esta caixa"
+                          className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => void handleDeleteCaixa(caixa.id)}
+                          title="Excluir caixa"
+                          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -49,7 +49,14 @@ vi.mock('@/services/suapProcessos', () => ({
   suapProcessosService: {
     getAll: vi.fn(),
     getPdfSignedUrl: vi.fn(),
+    getRegisteredCaixas: vi.fn().mockResolvedValue([]),
   },
+}));
+
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({
+    session: { user: { email: 'test@test.com', id: 'test-user-id' } },
+  }),
 }));
 
 vi.mock('@/services/contractDrafts', () => ({
