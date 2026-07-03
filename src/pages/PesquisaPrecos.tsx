@@ -487,6 +487,11 @@ export default function PesquisaPrecos() {
     setItems((current) => current.map((item) => item.localId === localId ? { ...item, ...patch } : item));
   };
 
+  const deleteItem = (localId: string) => {
+    setItems((current) => current.filter((item) => item.localId !== localId));
+    toast.success("Item removido da pesquisa.");
+  };
+
   const updateCandidate = (localId: string, candidateId: string, patch: Partial<PriceResearchCandidate>) => {
     setItems((current) => current.map((item) => {
       if (item.localId !== localId) return item;
@@ -1397,6 +1402,7 @@ export default function PesquisaPrecos() {
                     <th className="py-3 px-4 w-32">Unidade</th>
                     <th className="py-3 px-4 w-28">Tipo</th>
                     <th className="py-3 px-4 w-40">Código do Catálogo</th>
+                    <th className="py-3 px-4 text-center w-20">Ação</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-default/60">
@@ -1424,6 +1430,21 @@ export default function PesquisaPrecos() {
                         </td>
                         <td className="py-3.5 px-4 font-mono font-bold text-text-primary">
                           {item.catalogCode || <span className="text-text-muted font-normal italic">Pendente</span>}
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            title="Remover Item"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteItem(item.localId);
+                            }}
+                            className="h-8 w-8 text-destructive hover:text-white hover:bg-destructive rounded-full transition-all"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </td>
                       </tr>
                     );
@@ -1813,16 +1834,28 @@ export default function PesquisaPrecos() {
                             )}
                           </td>
                           <td className="py-3.5 px-4 text-center">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setSelectedItemId(item.localId)}
-                              className="text-xs gap-1 border-primary/20 text-primary hover:bg-primary/5"
-                            >
-                              <Pencil className="h-3 w-3" />
-                              Curar Preços
-                            </Button>
+                            <div className="flex gap-1 justify-center items-center">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setSelectedItemId(item.localId)}
+                                title="Curar Preços"
+                                className="h-8 w-8 text-sebrae-blue hover:text-white hover:bg-sebrae-blue rounded-full transition-all"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                title="Remover Item"
+                                onClick={() => deleteItem(item.localId)}
+                                className="h-8 w-8 text-destructive hover:text-white hover:bg-destructive rounded-full transition-all"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       );
