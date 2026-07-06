@@ -875,7 +875,7 @@ const totalB = b.liquidado + b.saldoEmpenhos;
 
                         {/* Indicadores de Teto e Vigência */}
                         {(item.isCapped || item.exceedsValiditySugestion) && (
-                          <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-2 text-[10px] font-semibold text-text-secondary leading-relaxed">
+                          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2 text-[10px] font-semibold text-text-secondary leading-relaxed">
                             {item.isCapped && !item.isRenewalAllowed && (
                               <div className="rounded-lg bg-amber-50 px-2 py-1 border border-amber-200/40 text-amber-700">
                                 ⚠️ Projeção limitada ao valor vigente do contrato ({formatCurrency(item.valorTotalContrato)}).
@@ -892,6 +892,23 @@ const totalB = b.liquidado + b.saldoEmpenhos;
                                 <span className="font-bold">{item.coberturaMes || 'N/D'}</span> devido ao encerramento do contrato em{' '}
                                 <span className="font-bold">{formatTraceDate(item.vigenciaFim ?? null)}</span>.
                               </div>
+                            )}
+                            {onToggleContractRenewal && (
+                              item.prorrogavel === 'Sim' ? (
+                                <label className="rounded-lg bg-slate-100 hover:bg-slate-200/80 px-2.5 py-1 border border-slate-300/40 text-slate-700 flex items-center gap-2 cursor-pointer select-none font-ui text-[10px] font-semibold transition-colors">
+                                  <input
+                                    type="checkbox"
+                                    checked={item.isRenewalAllowed}
+                                    onChange={() => onToggleContractRenewal(item.id)}
+                                    className="h-3.5 w-3.5 rounded border-slate-300 text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer"
+                                  />
+                                  <span>Simular renovação (ignorar limite)</span>
+                                </label>
+                              ) : (
+                                <div className="rounded-lg bg-slate-50 px-2 py-1 border border-slate-200/30 text-text-muted text-[10px] font-bold flex items-center gap-1.5">
+                                  🚫 Renovação indisponível (não prorrogável)
+                                </div>
+                              )
                             )}
                           </div>
                         )}
