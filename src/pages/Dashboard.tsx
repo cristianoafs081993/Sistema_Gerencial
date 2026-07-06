@@ -681,12 +681,10 @@ export const buildContractProjectionBullets = (
       }
 
       const vigenciaFimStr = contrato.vigencia_fim_derivada ?? contrato.vigencia_fim;
+      const vigenciaFim = vigenciaFimStr ? toValidDate(vigenciaFimStr) : null;
       let exceedsValiditySugestion = false;
-      if (vigenciaFimStr) {
-        const vigenciaFim = toValidDate(vigenciaFimStr);
-        if (vigenciaFim && options.endDate.getTime() > vigenciaFim.getTime()) {
-          exceedsValiditySugestion = true;
-        }
+      if (vigenciaFim && options.endDate.getTime() > vigenciaFim.getTime()) {
+        exceedsValiditySugestion = true;
       }
 
       let empenhosTrace: ContractProjectionEmpenhoTrace[] = [];
@@ -819,7 +817,10 @@ export const buildContractProjectionBullets = (
       let coberturaMes: string | null = null;
       if (gastoMensalMedio > 0) {
         const totalMeses = (liquidado + saldoEmpenhos) / gastoMensalMedio;
-        const targetDate = addMonths(options.startDate, Math.max(0, totalMeses - 0.001));
+        let targetDate = addMonths(options.startDate, Math.max(0, totalMeses - 0.001));
+        if (vigenciaFim && !isRenewalAllowed && targetDate > vigenciaFim) {
+          targetDate = vigenciaFim;
+        }
         const mes = format(targetDate, 'MMMM', { locale: ptBR });
         const ano = format(targetDate, 'yy', { locale: ptBR });
         coberturaMes = `${mes.charAt(0).toUpperCase() + mes.slice(1)}/${ano}`;
