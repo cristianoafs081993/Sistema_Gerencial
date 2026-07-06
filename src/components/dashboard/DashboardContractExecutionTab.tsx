@@ -552,7 +552,7 @@ const totalB = b.liquidado + b.saldoEmpenhos;
                                     <span className="font-bold text-text-primary">{formatCurrency(totalCapacidade)}</span>
                                   </div>
                                   <div className="flex justify-between items-center text-xs mt-1.5 pt-1.5 border-t border-slate-200/60">
-                                    <span className="text-text-muted font-semibold">Projetado Anual</span>
+                                    <span className="text-text-muted font-semibold">Projetado</span>
                                     <span className="font-bold text-text-primary">{formatCurrency(item.projetado)}</span>
                                   </div>
                                 </div>
@@ -867,14 +867,14 @@ const totalB = b.liquidado + b.saldoEmpenhos;
                               <p className="font-bold text-text-primary mt-0.5">{formatCurrency(item.saldoEmpenhos)}</p>
                             </div>
                             <div>
-                              <span className="text-[10px] font-semibold text-text-muted uppercase">Projetado Anual</span>
+                              <span className="text-[10px] font-semibold text-text-muted uppercase">Projetado</span>
                               <p className="font-bold text-text-primary mt-0.5">{formatCurrency(item.projetado)}</p>
                             </div>
                           </div>
                         </div>
 
-                        {/* Indicadores de Teto e Vigência */}
-                        {(item.isCapped || item.exceedsValiditySugestion) && (
+                        {/* Indicadores de Teto, Vigência e Necessidade */}
+                        {(item.isCapped || item.exceedsValiditySugestion || item.necessidadeEmpenho > 0) && (
                           <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2 text-[10px] font-semibold text-text-secondary leading-relaxed">
                             {item.isCapped && !item.isRenewalAllowed && (
                               <div className="rounded-lg bg-amber-50 px-2 py-1 border border-amber-200/40 text-amber-700">
@@ -891,6 +891,11 @@ const totalB = b.liquidado + b.saldoEmpenhos;
                                 💡 Cobertura provável até:{' '}
                                 <span className="font-bold">{item.coberturaMes || 'N/D'}</span> devido ao encerramento do contrato em{' '}
                                 <span className="font-bold">{formatTraceDate(item.vigenciaFim ?? null)}</span>.
+                              </div>
+                            )}
+                            {item.necessidadeEmpenho > 0 && (
+                              <div className="rounded-lg bg-rose-50 px-2 py-1 border border-rose-200/45 text-rose-700">
+                                🚨 Necessidade de empenho complementar: {formatCurrency(item.necessidadeEmpenho)}.
                               </div>
                             )}
                             {onToggleContractRenewal && (
