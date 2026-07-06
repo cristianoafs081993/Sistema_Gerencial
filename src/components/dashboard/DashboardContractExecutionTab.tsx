@@ -836,6 +836,7 @@ const totalB = b.liquidado + b.saldoEmpenhos;
                               {statusText}
                             </span>
                             <span className="font-ui text-lg font-black tracking-tight text-text-primary">{ratio.toFixed(1)}%</span>
+                            <ContractProjectionTraceHover item={item} targetMonths={projectionTargetMonths} />
                           </div>
                         </div>
 
