@@ -335,6 +335,16 @@ const countProjectionMonths = (startDate: Date, endDate: Date, today = new Date(
   );
 };
 
+const countMonthsBetween = (start: Date, end: Date) => {
+  if (end.getTime() < start.getTime()) return 0;
+  return (
+    (end.getUTCFullYear() - start.getUTCFullYear()) * 12 +
+    end.getUTCMonth() -
+    start.getUTCMonth() +
+    1
+  );
+};
+
 const addEmptyMonthlyBuckets = (
   buckets: Map<string, MonthlyExecutionBucket>,
   startDate: Date | null,
@@ -671,20 +681,25 @@ export const buildContractProjectionBullets = (
         valorTotal = Math.max(contrato.valor_acumulado ?? 0, contrato.valor_global ?? 0);
       }
 
-      const targetMonths = options.projectionTargetMonths ?? 12;
-      const isRenewalAllowed = options.allowedRenewalContractIds?.includes(contratoId) ?? false;
-      const rawProjetado = elapsedMonths > 0 ? (liquidado / elapsedMonths) * targetMonths : liquidado;
-      const isCapped = valorTotal > 0 && rawProjetado > valorTotal;
-      let projetado = rawProjetado;
-      if (valorTotal > 0 && !isRenewalAllowed) {
-        projetado = Math.min(rawProjetado, valorTotal);
-      }
-
       const vigenciaFimStr = contrato.vigencia_fim_derivada ?? contrato.vigencia_fim;
       const vigenciaFim = vigenciaFimStr ? toValidDate(vigenciaFimStr) : null;
       let exceedsValiditySugestion = false;
       if (vigenciaFim && options.endDate.getTime() > vigenciaFim.getTime()) {
         exceedsValiditySugestion = true;
+      }
+
+      const targetMonths = options.projectionTargetMonths ?? 12;
+      const isRenewalAllowed = options.allowedRenewalContractIds?.includes(contratoId) ?? false;
+      
+      const contractTargetMonths = (vigenciaFim && !isRenewalAllowed)
+        ? Math.max(elapsedMonths, Math.min(targetMonths, countMonthsBetween(options.startDate, vigenciaFim)))
+        : targetMonths;
+
+      const rawProjetado = elapsedMonths > 0 ? (liquidado / elapsedMonths) * contractTargetMonths : liquidado;
+      const isCapped = valorTotal > 0 && rawProjetado > valorTotal;
+      let projetado = rawProjetado;
+      if (valorTotal > 0 && !isRenewalAllowed) {
+        projetado = Math.min(rawProjetado, valorTotal);
       }
 
       let empenhosTrace: ContractProjectionEmpenhoTrace[] = [];
