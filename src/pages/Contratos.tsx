@@ -263,7 +263,7 @@ export default function Contratos() {
           numero: localContrato?.numero ?? apiContrato.numero,
           contratada: apiContrato.fornecedor_nome || localContrato?.contratada || 'Fornecedor nao informado',
           cnpj: localContrato?.cnpj,
-          valor: localContrato?.valor ?? apiContrato.valor_acumulado ?? apiContrato.valor_global ?? 0,
+          valor: Math.max(localContrato?.valor ?? 0, apiContrato.valor_acumulado ?? 0, apiContrato.valor_global ?? 0),
           data_inicio: apiContrato.vigencia_inicio_derivada ?? apiContrato.vigencia_inicio ?? localContrato?.data_inicio ?? null,
           data_termino: apiContrato.vigencia_fim_derivada ?? apiContrato.vigencia_fim ?? localContrato?.data_termino ?? null,
           apiContrato,

@@ -666,9 +666,9 @@ export const buildContractProjectionBullets = (
           if (shouldIgnoreContratoNumero(c.numero)) return false;
           return normalizeContratoNumero(c.numero) === normalizeContratoNumero(contrato.numero);
         });
-        valorTotal = localContrato?.valor ?? contrato.valor_acumulado ?? contrato.valor_global ?? 0;
+        valorTotal = Math.max(localContrato?.valor ?? 0, contrato.valor_acumulado ?? 0, contrato.valor_global ?? 0);
       } else {
-        valorTotal = contrato.valor_acumulado ?? contrato.valor_global ?? 0;
+        valorTotal = Math.max(contrato.valor_acumulado ?? 0, contrato.valor_global ?? 0);
       }
 
       const targetMonths = options.projectionTargetMonths ?? 12;
