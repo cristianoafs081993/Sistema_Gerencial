@@ -532,16 +532,22 @@ describe('Dashboard', () => {
     expect(bullets[0]).toMatchObject({
       id: 'c1',
       empenhado: 1000,
-      liquidado: 150,
-      projetado: 600,
+      liquidado: 1050,
+      projetado: 4200,
       saldoEmpenhos: 830,
       mesesConsiderados: 3,
-      percentualLiquidado: expect.closeTo(18.07, 1),
-      percentualProjetado: expect.closeTo(72.29, 1),
-      coberturaMes: 'Agosto/27',
-      necessidadeEmpenho: 0,
+      percentualLiquidado: expect.closeTo(126.51, 1),
+      percentualProjetado: expect.closeTo(506.02, 1),
+      coberturaMes: 'Junho/26',
+      necessidadeEmpenho: 2320,
     });
     expect(bullets[0].liquidacoes).toEqual([
+      expect.objectContaining({
+        id: 'f3-pendente',
+        numeroInstrumento: 'Sem instrumento',
+        situacao: 'Em analise',
+        valor: 900,
+      }),
       expect.objectContaining({
         id: 'f2',
         numeroInstrumento: 'Sem instrumento',

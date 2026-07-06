@@ -618,8 +618,7 @@ export const buildContractProjectionBullets = (
     if (
       !date ||
       value <= 0 ||
-      !isDateInsideOptionalRange(date, options.startDate, options.endDate) ||
-      getContractExpenseStatus(fatura.situacao) !== 'executado'
+      !isDateInsideOptionalRange(date, options.startDate, options.endDate)
     ) {
       return;
     }
