@@ -82,3 +82,10 @@ Antes de concluir uma correcao de bug ou nova funcionalidade:
 - rode `npm test` quando a mudanca tocar comportamento compartilhado ou area critica
 - informe no fechamento quais testes foram executados
 - informe qualquer teste que nao tenha sido possivel executar e o motivo
+
+Almoxarifado:
+
+- regras puras devem cobrir situação do saldo e requisitos de origem/destino;
+- integração deve cobrir idempotência, concorrência, saldo negativo, bloqueio e isolamento RLS;
+- o fluxo deve proteger entrada, saída, transferência e custo médio da origem;
+- a UI deve cobrir estado vazio, filtros, cadastro de item e lançamento de movimento.

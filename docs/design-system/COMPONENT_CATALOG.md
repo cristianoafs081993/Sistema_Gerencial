@@ -70,3 +70,5 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 - Secao: `SectionPanel`.
 - Grafico: `ChartPanel`.
 - KPI: `StatCard` com `tone` ou `stitchColor` legado.
+
+- Almoxarifado: página operacional que combina HeaderActions, StatCard, FilterPanel, DataTablePanel, Tabs e Dialog para catálogo, saldos e movimentos, com estados explícitos de estoque crítico.

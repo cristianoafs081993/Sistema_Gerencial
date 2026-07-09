@@ -41,6 +41,11 @@ Este indice organiza a documentacao operacional do repositorio por dominio.
 
 - [TESTING.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/TESTING.md)
 
+## Planejamento de produto e licitações
+
+- [LICITACAO_SEVERIANO_MELO_2026.md](planning/LICITACAO_SEVERIANO_MELO_2026.md)
+- [FASE_4_PATRIMONIO_ALMOXARIFADO_FROTA_OBRAS.md](planning/FASE_4_PATRIMONIO_ALMOXARIFADO_FROTA_OBRAS.md)
+
 ## Frontend e design system
 
 - [DATA_FLOW.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/frontend/DATA_FLOW.md)

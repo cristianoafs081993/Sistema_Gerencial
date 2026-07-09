@@ -70,6 +70,8 @@ Para mudancas sensiveis, confirme sempre nas migrations em [supabase/migrations]
 - view `atas_registro_precos_resumo`
 - `price_researches`
 - `price_research_items`
+- `price_research_suppliers`
+- `price_research_email_dispatches`
 
 ### Importacoes auxiliares
 

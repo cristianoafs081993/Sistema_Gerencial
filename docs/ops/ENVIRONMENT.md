@@ -380,6 +380,20 @@ Observações operacionais:
 - `supabase/config.toml` deve manter `verify_jwt = true` para `pesquisar-precos`;
 - a function depende da disponibilidade pública de `dadosabertos.compras.gov.br`.
 
+### `disparar-cotacao-email`
+
+Necessárias no ambiente do Supabase:
+
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `RESEND_API_KEY` — Chave da API do provedor Resend (resend.com)
+- `EMAIL_FROM` — Endereço de e-mail remetente verificado no Resend
+
+Opcionais:
+
+- `EMAIL_REPLY_TO` — Endereço de e-mail padrão para respostas dos fornecedores
+
 ### Consultor
 
 O frontend chama a function `consultor`, mas a implementacao nao foi localizada neste repo nesta rodada.

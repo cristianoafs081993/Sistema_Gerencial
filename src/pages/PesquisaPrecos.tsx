@@ -20,6 +20,7 @@ import {
   ChevronRight,
   ChevronDown,
   Loader2,
+  Mail,
   MapPin,
   Pencil,
   Plus,
@@ -78,6 +79,8 @@ import { findCatalogSuggestions } from '@/lib/priceCatalogClient';
 import { priceResearchService } from '@/services/priceResearch';
 import { marketSearchService, type MarketSearchResult } from '@/services/marketSearch';
 import { supabase } from '@/lib/supabase';
+import { SupplierEmailDialog } from '@/components/price-research/SupplierEmailDialog';
+import { SupplierEmailHistory } from '@/components/price-research/SupplierEmailHistory';
 
 const METHOD_OPTIONS: Array<{ value: PriceResearchMethod; label: string }> = [
   { value: 'median', label: 'Mediana' },
@@ -145,6 +148,9 @@ export default function PesquisaPrecos() {
   const [viewMode, setViewMode] = useState<'list' | 'wizard'>('list');
   const [searchTerm, setSearchTerm] = useState('');
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
+
+  // Email dialog
+  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
 
   const [curadoriaTab, setCuradoriaTab] = useState<'basket' | 'market' | 'local'>('basket');
   const [marketSearchTerm, setMarketSearchTerm] = useState('');
@@ -1338,11 +1344,34 @@ export default function PesquisaPrecos() {
           {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Salvar rascunho
         </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="gap-2 border-blue-300 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
+          onClick={() => setIsEmailDialogOpen(true)}
+          disabled={items.length === 0}
+          title="Solicitar cotação de preços por e-mail para fornecedores"
+        >
+          <Mail className="h-4 w-4" />
+          Solicitar Cotação
+        </Button>
         <Button type="button" className="gap-2 bg-primary hover:bg-primary-hover text-primary-foreground" onClick={() => void printReport()} disabled={items.length === 0 || isSaving}>
           <Printer className="h-4 w-4" />
           Gerar relatório
         </Button>
       </HeaderActions>
+
+      {/* Email Quotation Dialog */}
+      <SupplierEmailDialog
+        open={isEmailDialogOpen}
+        onClose={() => setIsEmailDialogOpen(false)}
+        researchId={researchId ?? ''}
+        objectDescription={objectDescription}
+        processNumber={processNumber}
+        responsibleName={responsibleName}
+        items={items}
+        onSent={() => void queryClient.invalidateQueries({ queryKey: ['price-researches'] })}
+      />
 
       <input
         ref={fileInputRef}
@@ -3058,6 +3087,11 @@ export default function PesquisaPrecos() {
         </div>
       </div>
       </div>
+      )}
+
+      {/* Histórico de Disparos de E-mail */}
+      {researchId && (
+        <SupplierEmailHistory researchId={researchId} />
       )}
 
       {/* Modal de Visualização de Evidência */}

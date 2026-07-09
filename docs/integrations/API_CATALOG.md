@@ -243,16 +243,20 @@ Uso:
 
 - lista operacional de pregoes por qualquer UASG, periodo, objeto especifico e item PNCP materializado
 - base futura para preenchimento de metadados em artefatos de licitacao
+- consulta em tempo real de empenhos vinculados à licitação e cálculo do saldo restante de cada item via API do Portal da Transparência (`/api-de-dados/licitacoes/empenhos` e `/api-de-dados/despesas/itens-de-empenho`)
 
 Fonte primaria:
 
 - `https://pncp.gov.br/api/consulta`
+- `https://api.portaldatransparencia.gov.br` (consulta de empenhos e itens de empenho)
 
-Endpoints PNCP usados:
+Endpoints PNCP e CGU usados:
 
 - `/v1/contratacoes/publicacao`
 - `/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}`
 - `/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}/itens`
+- `/api-de-dados/licitacoes/empenhos` (Portal da Transparência)
+- `/api-de-dados/despesas/itens-de-empenho` (Portal da Transparência)
 
 Parametros operacionais:
 

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ExternalLink, Loader2, RefreshCw, RotateCw, Search } from 'lucide-react';
 import { toast } from 'sonner';
@@ -126,6 +126,38 @@ function DetailItem({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
+function formatLicitacaoNumero(numeroCompra: string | null | undefined, anoCompra: number | null | undefined): string {
+  if (!numeroCompra || !anoCompra) return '';
+  const cleanNum = numeroCompra.replace(/\D/g, '');
+  const paddedNum = cleanNum.padStart(5, '0');
+  return `${paddedNum}${anoCompra}`;
+}
+
+function getTransparencyModalidadeCode(pncpModalidadeId: number | null | undefined): string {
+  if (!pncpModalidadeId) return '5';
+  if (pncpModalidadeId === 5 || pncpModalidadeId === 6) {
+    return '5';
+  }
+  return String(pncpModalidadeId);
+}
+
+function normalizeText(val: string | null | undefined): string {
+  return String(val ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
+function parseNumeric(val: any): number {
+  if (val === null || val === undefined) return 0;
+  if (typeof val === 'number') return val;
+  const clean = String(val)
+    .replace(/\./g, '')
+    .replace(',', '.');
+  return Number(clean) || 0;
+}
+
 function LicitacaoDetailsSheet({
   licitacao,
   onOpenChange,
@@ -134,6 +166,142 @@ function LicitacaoDetailsSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const links = licitacao ? getLicitacaoLinks(licitacao) : null;
+  const [empenhos, setEmpenhos] = useState<any[]>([]);
+  const [loadingEmpenhos, setLoadingEmpenhos] = useState(false);
+  const [empenhosError, setEmpenhosError] = useState<string | null>(null);
+  const [committedValues, setCommittedValues] = useState<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    if (!licitacao) {
+      setEmpenhos([]);
+      setCommittedValues(new Map());
+      setEmpenhosError(null);
+      return;
+    }
+
+    let isMounted = true;
+    const fetchEmpenhosAndItems = async () => {
+      setLoadingEmpenhos(true);
+      setEmpenhosError(null);
+      try {
+        const uasg = licitacao.uasgCodigo;
+        if (!uasg) {
+          throw new Error('Código UASG não disponível para esta licitação.');
+        }
+
+        const formattedNumero = formatLicitacaoNumero(licitacao.numeroCompra, licitacao.anoCompra);
+        const modalidadeCode = getTransparencyModalidadeCode(licitacao.modalidadeId);
+
+        if (!formattedNumero) {
+          throw new Error('Número da licitação não disponível ou inválido.');
+        }
+
+        const origin = typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null'
+          ? window.location.origin
+          : 'http://localhost:5173';
+
+        const res = await fetch(
+          `${origin}/api-transparencia/api-de-dados/licitacoes/empenhos?codigoUG=${uasg}&numero=${formattedNumero}&codigoModalidade=${modalidadeCode}&pagina=1`,
+          {
+            headers: {
+              'accept': 'application/json',
+              'chave-api-dados': '931d4d57337bef94e775337c318342e9',
+            }
+          }
+        );
+
+        if (!res.ok) {
+          throw new Error(`Portal da Transparência retornou HTTP ${res.status}`);
+        }
+
+        const empenhosData = await res.json();
+        const empenhosList = Array.isArray(empenhosData) ? empenhosData : [];
+
+        if (!isMounted) return;
+        setEmpenhos(empenhosList);
+
+        if (empenhosList.length === 0) {
+          setLoadingEmpenhos(false);
+          return;
+        }
+
+        const itemsPromises = empenhosList.map(async (emp) => {
+          const uasgEmitente = emp.unidadeGestora?.codigo || uasg;
+          const codigoDocumento = `${uasgEmitente}26435${emp.numeroEmpenho}`;
+          try {
+            const itemRes = await fetch(
+              `${origin}/api-transparencia/api-de-dados/despesas/itens-de-empenho?codigoDocumento=${codigoDocumento}&pagina=1`,
+              {
+                headers: {
+                  'accept': 'application/json',
+                  'chave-api-dados': '931d4d57337bef94e775337c318342e9',
+                }
+              }
+            );
+            if (!itemRes.ok) return [];
+            const itemsData = await itemRes.json();
+            return (Array.isArray(itemsData) ? itemsData : []).map(item => ({
+              ...item,
+              empenhoNumero: emp.numeroEmpenho,
+            }));
+          } catch (e) {
+            console.error(`Erro ao buscar itens do empenho ${emp.numeroEmpenho}:`, e);
+            return [];
+          }
+        });
+
+        const allEmpenhoItems = (await Promise.all(itemsPromises)).flat();
+        
+        if (!isMounted) return;
+
+        const pregaoItens = getPncpItems(licitacao.rawData);
+        const map = new Map<string, number>();
+
+        allEmpenhoItems.forEach((empItem) => {
+          if (!empItem) return;
+          const empenhoItemDesc = empItem.descricao || '';
+          const empenhoItemSequencial = Number(empItem.sequencial);
+          const empenhoItemValor = parseNumeric(empItem.valorAtual);
+
+          let matchedItem = pregaoItens.find((item) => {
+            const num = Number(getPncpItemNumber(item));
+            return num === empenhoItemSequencial;
+          });
+
+          if (!matchedItem) {
+            const normEmp = normalizeText(empenhoItemDesc);
+            matchedItem = pregaoItens.find((item) => {
+              const desc = normalizeText(getPncpItemDescription(item));
+              return desc && (normEmp.includes(desc) || desc.includes(normEmp));
+            });
+          }
+
+          if (matchedItem) {
+            const itemNum = getPncpItemNumber(matchedItem);
+            const currentVal = map.get(itemNum) || 0;
+            map.set(itemNum, currentVal + empenhoItemValor);
+          }
+        });
+
+        setCommittedValues(map);
+      } catch (e) {
+        console.error('Erro ao carregar empenhos e saldos:', e);
+        if (isMounted) {
+          setEmpenhosError(e instanceof Error ? e.message : 'Não foi possível carregar os empenhos.');
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingEmpenhos(false);
+        }
+      }
+    };
+
+    fetchEmpenhosAndItems();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [licitacao]);
 
   return (
     <Sheet open={Boolean(licitacao)} onOpenChange={onOpenChange}>
@@ -164,12 +332,17 @@ function LicitacaoDetailsSheet({
                 <div className="mt-3 space-y-2">
                   {getPncpItems(licitacao.rawData).map((item, index) => {
                     const unitValue = rawNumber(item.valorUnitarioEstimado ?? item.valorUnitario);
+                    const itemNum = getPncpItemNumber(item);
+                    const origValue = rawNumber(item.valorTotal ?? item.valorTotalEstimado) || 0;
+                    const committedVal = committedValues.get(itemNum) || 0;
+                    const balance = origValue - committedVal;
+
                     return (
-                      <div key={`${getPncpItemNumber(item)}-${index}`} className="rounded-radius-md border border-border-default/70 bg-surface-subtle/60 p-3">
+                      <div key={`${itemNum}-${index}`} className="rounded-radius-md border border-border-default/70 bg-surface-subtle/60 p-3">
                         <div className="flex flex-wrap items-start justify-between gap-2">
-                          <p className="font-ui text-sm font-semibold text-text-primary">Item {getPncpItemNumber(item)}</p>
+                          <p className="font-ui text-sm font-semibold text-text-primary">Item {itemNum}</p>
                           <p className="font-mono text-xs font-semibold text-text-primary">
-                            {formatCurrency(rawNumber(item.valorTotal ?? item.valorTotalEstimado))}
+                            Valor Estimado: {formatCurrency(origValue)}
                           </p>
                         </div>
                         <p className="mt-1 font-ui text-sm text-text-secondary">{getPncpItemDescription(item)}</p>
@@ -177,12 +350,77 @@ function LicitacaoDetailsSheet({
                           Qtd. {rawText(item.quantidade) ?? '-'} {rawText(item.unidadeMedida) ?? ''}
                           {unitValue !== null ? ` | Unit. ${formatCurrency(unitValue)}` : ''}
                         </p>
+                        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border-default/50 pt-2 text-xs">
+                          <div>
+                            <span className="text-text-muted block">Já Empenhado</span>
+                            <span className="font-semibold text-action-primary block mt-0.5">
+                              {loadingEmpenhos ? 'Carregando...' : formatCurrency(committedVal)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-text-muted block">Saldo Restante</span>
+                            <span className={`font-semibold block mt-0.5 ${balance <= 0 ? 'text-status-error' : 'text-status-success'}`}>
+                              {loadingEmpenhos ? 'Carregando...' : formatCurrency(balance)}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     );
                   })}
                 </div>
               </div>
             ) : null}
+
+            <div className="rounded-radius-lg border border-border-default p-4">
+              <div className="flex items-center justify-between">
+                <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">
+                  Empenhos da Licitação (Portal da Transparência)
+                </p>
+                {empenhos.length > 0 && !loadingEmpenhos ? (
+                  <Badge variant="outline" className="text-xs bg-action-primary/5 text-action-primary border-action-primary/20">
+                    {empenhos.length} empenho(s)
+                  </Badge>
+                ) : null}
+              </div>
+
+              {loadingEmpenhos ? (
+                <div className="flex items-center justify-center gap-2 py-8 text-sm text-text-secondary">
+                  <Loader2 className="h-4 w-4 animate-spin text-action-primary" />
+                  Buscando empenhos no Portal da Transparência...
+                </div>
+              ) : empenhosError ? (
+                <div className="mt-3 rounded-radius-md border border-status-error/20 bg-status-error/5 p-3 text-xs text-status-error">
+                  Aviso: Não foi possível obter dados em tempo real do Portal da Transparência.
+                  <p className="mt-1 font-mono text-[10px] opacity-80">{empenhosError}</p>
+                </div>
+              ) : empenhos.length === 0 ? (
+                <div className="py-6 text-center text-xs text-text-secondary border border-dashed border-border-default/60 rounded-radius-md mt-3">
+                  Nenhum empenho registrado para esta licitação no Portal da Transparência.
+                </div>
+              ) : (
+                <div className="mt-3 space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                  {empenhos.map((emp, index) => (
+                    <div key={`${emp.numeroEmpenho}-${index}`} className="rounded-radius-md border border-border-default/50 bg-surface-subtle/40 p-2.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono font-semibold text-text-primary">{emp.numeroEmpenho}</span>
+                        <span className="font-semibold text-text-primary">{formatCurrency(parseNumeric(emp.valor))}</span>
+                      </div>
+                      <div className="mt-1 text-text-muted flex flex-wrap gap-x-2 gap-y-0.5">
+                        <span>Emissão: {formatDate(emp.dataEmissao)}</span>
+                        <span>|</span>
+                        <span>Emitente: UG {emp.unidadeGestora?.codigo} {emp.unidadeGestora?.nome ? `(${emp.unidadeGestora.nome})` : ''}</span>
+                      </div>
+                      {emp.credor?.nome ? (
+                        <div className="mt-1 text-text-secondary truncate">
+                          Favorecido: <span className="font-medium">{emp.credor.nome}</span>
+                          {emp.credor.cpfCnpjFormatado ? ` (${emp.credor.cpfCnpjFormatado})` : ''}
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <DetailItem label="Processo" value={licitacao.processo} />

@@ -315,3 +315,9 @@ Mostrar a linhagem operacional dos dados de forma curta:
   - busca: RPC `buscar_normativos`
   - consumidor frontend: [ConsultorSessions.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/ConsultorSessions.tsx)
   - backlog: [NORMATIVOS_CONSULTOR_INGESTION.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/integrations/NORMATIVOS_CONSULTOR_INGESTION.md)
+
+### Almoxarifado
+
+App.tsx → Almoxarifado.tsx → inventoryService → post_stock_movement → stock_movements / stock_movement_items → stock_balances.
+
+Cadastros seguem inventoryService → operational_entities / measurement_units / catalog_items / warehouses. O saldo é sempre derivado do razão; não existe edição direta.

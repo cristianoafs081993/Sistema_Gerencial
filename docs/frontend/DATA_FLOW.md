@@ -408,3 +408,9 @@ Observações:
 - parte do fluxo depende de imports manuais, nao so de query
 - fallback REST pode mascarar diferencas de schema e permissao
 - views e Edge Functions devem ser confirmadas no banco quando nao estiverem versionadas no repo
+
+### Almoxarifado
+
+App.tsx → Almoxarifado.tsx → inventoryService → tabelas operacionais e RPC post_stock_movement.
+
+A página carrega contexto e workspace em consultas separadas; os dados independentes do workspace são buscados em paralelo. O cadastro de itens é restrito a gestores e a postagem de movimentos é validada novamente no banco.
