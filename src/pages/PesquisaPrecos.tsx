@@ -16,6 +16,7 @@ import {
   FolderOpen,
   Globe,
   Image,
+  Info,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -34,11 +35,6 @@ import {
   Trash2,
   Upload,
   User,
-  Calculator,
-  TrendingUp,
-  Layers,
-  Percent,
-  DollarSign,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -61,6 +57,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   buildPriceResearchReportHtml,
   createPriceResearchTemplate,
@@ -84,9 +81,9 @@ import { SupplierEmailDialog } from '@/components/price-research/SupplierEmailDi
 import { SupplierEmailHistory } from '@/components/price-research/SupplierEmailHistory';
 
 const METHOD_OPTIONS: Array<{ value: PriceResearchMethod; label: string }> = [
-  { value: 'median', label: 'Mediana' },
-  { value: 'mean', label: 'Média' },
   { value: 'minimum', label: 'Menor preço' },
+  { value: 'mean', label: 'Média' },
+  { value: 'median', label: 'Mediana' },
 ];
 
 function today() {
@@ -508,7 +505,8 @@ export default function PesquisaPrecos() {
 
   const selectedItem = items.find((item) => item.localId === selectedItemId) ?? items[0];
   const selectedStatistics = selectedItem ? getSelectedStatistics(selectedItem) : null;
-  const selectedEstimatedPrice = selectedItem ? getEstimatedUnitPrice(selectedItem, method) : 0;
+  const selectedCoefficientOfVariation = selectedStatistics?.coefficientOfVariation ?? 0;
+  const selectedHasHighDispersion = selectedCoefficientOfVariation > 25;
   const completedItems = items.filter((item) => item.candidates.length > 0).length;
   const selectedQuotesCount = items.reduce(
     (total, item) => total + item.candidates.filter((candidate) => candidate.selected).length,
@@ -2038,124 +2036,125 @@ export default function PesquisaPrecos() {
 
               {selectedItem ? (
                 <>
-                   {/* Estatísticas Individuais do Item */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-                    {/* Amostra */}
-                    <div className="rounded-radius-lg border border-border-default bg-surface-card p-3.5 shadow-soft hover:shadow-md transition-all flex flex-col justify-between">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="font-ui text-[10px] font-bold uppercase tracking-wider text-text-muted">Amostra</p>
-                        <Layers className="h-3.5 w-3.5 text-text-muted shrink-0" />
-                      </div>
-                      <div className="mt-2.5">
-                        <p className="font-mono text-base font-black text-text-primary">
-                          {selectedStatistics?.count ?? 0} <span className="text-[10px] font-sans font-normal text-text-muted">cotizações</span>
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Média */}
-                    <div className="rounded-radius-lg border border-border-default bg-surface-card p-3.5 shadow-soft hover:shadow-md transition-all flex flex-col justify-between">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="font-ui text-[10px] font-bold uppercase tracking-wider text-text-muted">Média</p>
-                        <TrendingUp className="h-3.5 w-3.5 text-text-muted shrink-0" />
-                      </div>
-                      <div className="mt-2.5">
-                        <p className="font-mono text-base font-bold text-text-primary truncate">
-                          {formatCurrency(selectedStatistics?.mean ?? 0)}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Mediana */}
-                    <div className="rounded-radius-lg border border-border-default bg-surface-card p-3.5 shadow-soft hover:shadow-md transition-all flex flex-col justify-between">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="font-ui text-[10px] font-bold uppercase tracking-wider text-text-muted">Mediana</p>
-                        <Calculator className="h-3.5 w-3.5 text-text-muted shrink-0" />
-                      </div>
-                      <div className="mt-2.5">
-                        <p className="font-mono text-base font-bold text-text-primary truncate">
-                          {formatCurrency(selectedStatistics?.median ?? 0)}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Média Ponderada */}
-                    <div className="rounded-radius-lg border border-border-default bg-surface-card p-3.5 shadow-soft hover:shadow-md transition-all flex flex-col justify-between">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="font-ui text-[10px] font-bold uppercase tracking-wider text-text-muted">Média ponderada</p>
-                        <Layers className="h-3.5 w-3.5 text-text-muted shrink-0" />
-                      </div>
-                      <div className="mt-2.5">
-                        <p className="font-mono text-base font-bold text-text-primary truncate">
-                          {formatCurrency(selectedStatistics?.weightedMean ?? 0)}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Média Saneada */}
-                    <div className="rounded-radius-lg border border-border-default bg-surface-card p-3.5 shadow-soft hover:shadow-md transition-all flex flex-col justify-between">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="font-ui text-[10px] font-bold uppercase tracking-wider text-text-muted">Média saneada</p>
-                        <Calculator className="h-3.5 w-3.5 text-text-muted shrink-0" />
-                      </div>
-                      <div className="mt-2.5">
-                        <p className="font-mono text-base font-bold text-text-primary truncate">
-                          {formatCurrency(selectedStatistics?.sanitizedMean ?? 0)}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* CV (Coeficiente de Variação) */}
-                    {(() => {
-                      const cv = selectedStatistics?.coefficientOfVariation ?? 0;
-                      const isHigh = cv > 25;
-                      return (
-                        <div className={`rounded-radius-lg border p-3.5 shadow-soft hover:shadow-md transition-all flex flex-col justify-between ${
-                          isHigh ? 'border-amber-200 bg-amber-50/15' : 'border-border-default bg-surface-card'
-                        }`}>
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="font-ui text-[10px] font-bold uppercase tracking-wider text-text-muted">Desvio (CV)</p>
-                            <Percent className={`h-3.5 w-3.5 shrink-0 ${isHigh ? 'text-amber-500' : 'text-text-muted'}`} />
+                  <TooltipProvider delayDuration={120}>
+                    <section className="rounded-radius-xl border border-border-default bg-surface-card p-4 shadow-soft">
+                      <div className="grid gap-5 xl:grid-cols-12 xl:items-stretch">
+                        <div className="min-w-0 xl:col-span-9">
+                          <div className="mb-4 flex items-center gap-2">
+                            <h4 className="font-ui text-sm font-bold text-text-primary">Métodos de cálculo</h4>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="inline-flex h-5 w-5 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/[0.08]"
+                                  aria-label="Informações sobre os métodos de cálculo"
+                                >
+                                  <Info className="h-4 w-4" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs text-xs leading-relaxed">
+                                Escolha o método que será usado como preço estimado do item. Os demais indicadores ficam disponíveis para conferência da amostra.
+                              </TooltipContent>
+                            </Tooltip>
                           </div>
-                          <div className="mt-2.5 flex items-baseline justify-between gap-1.5">
-                            <p className={`font-mono text-base font-bold ${isHigh ? 'text-amber-600' : 'text-emerald-600'}`}>
-                              {cv.toFixed(2)}%
-                            </p>
-                            <span className={`inline-block h-1.5 w-1.5 rounded-full ${isHigh ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+
+                          <div role="radiogroup" aria-label="Métodos de cálculo" className="grid gap-4 md:grid-cols-3">
+                            {METHOD_OPTIONS.map((option) => {
+                              const value = option.value === 'minimum'
+                                ? selectedStatistics?.minimum ?? 0
+                                : option.value === 'mean'
+                                  ? selectedStatistics?.mean ?? 0
+                                  : selectedStatistics?.median ?? 0;
+                              const isSelected = method === option.value;
+
+                              return (
+                                <label
+                                  key={option.value}
+                                  className={`group flex min-h-[82px] cursor-pointer flex-col justify-between rounded-radius-lg border p-3 transition-colors ${
+                                    isSelected
+                                      ? 'border-primary/30 bg-primary/[0.04]'
+                                      : 'border-transparent hover:border-border-default hover:bg-surface-subtle/60'
+                                  }`}
+                                >
+                                  <span className="flex items-center gap-2 font-ui text-sm text-text-secondary">
+                                    <input
+                                      type="radio"
+                                      name={`price-method-${selectedItem.localId}`}
+                                      value={option.value}
+                                      checked={isSelected}
+                                      onChange={() => setMethod(option.value)}
+                                      className="h-4 w-4 accent-primary"
+                                    />
+                                    <span className={isSelected ? 'font-bold text-primary' : 'font-medium'}>{option.label}</span>
+                                  </span>
+                                  <span className={`mt-2 block font-mono text-lg leading-none ${isSelected ? 'font-black text-primary' : 'font-bold text-text-primary'}`}>
+                                    {formatCurrency(value)}
+                                  </span>
+                                  {isSelected ? (
+                                    <span className="mt-1 block font-ui text-[10px] font-semibold text-text-muted">preço estimado atual</span>
+                                  ) : null}
+                                </label>
+                              );
+                            })}
                           </div>
                         </div>
-                      );
-                    })()}
 
-                    {/* Excluídos */}
-                    <div className="rounded-radius-lg border border-border-default bg-surface-card p-3.5 shadow-soft hover:shadow-md transition-all flex flex-col justify-between">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="font-ui text-[10px] font-bold uppercase tracking-wider text-text-muted">Excluídos</p>
-                        <AlertTriangle className="h-3.5 w-3.5 text-text-muted shrink-0" />
+                        <aside
+                          className={`flex min-h-[112px] w-full flex-col justify-between rounded-radius-lg border p-3 xl:col-span-3 ${
+                            selectedHasHighDispersion
+                              ? 'border-red-200 bg-red-50/40 text-red-700'
+                              : 'border-border-default bg-surface-subtle/40 text-text-secondary'
+                          }`}
+                        >
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <p className="font-ui text-[10px] font-black uppercase tracking-wider">Dispersão da amostra</p>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="inline-flex h-5 w-5 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/[0.08]"
+                                  aria-label="Informações sobre dispersão da amostra"
+                                >
+                                  <Info className="h-4 w-4" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs text-xs leading-relaxed">
+                                Indicadores de dispersão ajudam a identificar valores extremos e necessidade de justificativa técnica.
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <dl className="space-y-1.5 font-ui text-xs">
+                            <div className="flex items-center justify-between gap-3">
+                              <dt>Coeficiente de variação</dt>
+                              <dd className="font-mono font-bold">{selectedCoefficientOfVariation.toFixed(2)}%</dd>
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <dt>Desvio padrão</dt>
+                              <dd className="font-mono font-bold">{formatCurrency(selectedStatistics?.standardDeviation ?? 0)}</dd>
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <dt>Maior preço</dt>
+                              <dd className="font-mono font-bold">{formatCurrency(selectedStatistics?.maximum ?? 0)}</dd>
+                            </div>
+                          </dl>
+                        </aside>
                       </div>
-                      <div className="mt-2.5">
-                        <p className="font-mono text-base font-bold text-text-primary truncate">
-                          {selectedStatistics?.excludedCount ?? 0} <span className="text-[10px] font-sans font-normal text-text-muted">preços</span>
-                        </p>
-                      </div>
-                    </div>
 
-                    {/* Preço Estimado */}
-                    <div className="rounded-radius-lg border border-primary/20 bg-primary/[0.04] p-3.5 shadow-soft hover:shadow-md transition-all flex flex-col justify-between">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="font-ui text-[10px] font-black uppercase tracking-wider text-primary">Preço Estimado</p>
-                        <DollarSign className="h-3.5 w-3.5 text-primary shrink-0" />
+                      <div className="mt-4 grid gap-2 border-t border-border-default/70 pt-3 sm:grid-cols-2 xl:grid-cols-4">
+                        {[
+                          ['Amostra', `${selectedStatistics?.count ?? 0} cotação(ões)`],
+                          ['Média ponderada', formatCurrency(selectedStatistics?.weightedMean ?? 0)],
+                          ['Média saneada', formatCurrency(selectedStatistics?.sanitizedMean ?? 0)],
+                          ['Preços excluídos', String(selectedStatistics?.excludedCount ?? 0)],
+                        ].map(([label, value]) => (
+                          <div key={label} className="flex items-center justify-between gap-3 rounded-radius-sm bg-surface-subtle/50 px-3 py-2">
+                            <span className="font-ui text-[10px] font-black uppercase tracking-wider text-text-muted">{label}</span>
+                            <span className="min-w-0 truncate text-right font-mono text-xs font-bold text-text-primary">{value}</span>
+                          </div>
+                        ))}
                       </div>
-                      <div className="mt-2.5">
-                        <p className="font-mono text-base font-black text-primary truncate">
-                          {formatCurrency(selectedEstimatedPrice)}
-                        </p>
-                        <span className="text-[9px] font-sans font-semibold text-text-muted block mt-0.5 capitalize">
-                          Ref: {METHOD_LABELS[method]}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                    </section>
+                  </TooltipProvider>
 
                   {/* Alerta de Cotações Insuficientes */}
                   {selectedItem.candidates.filter(c => c.selected).length < 3 && (
