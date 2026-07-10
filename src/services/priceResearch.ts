@@ -5,6 +5,7 @@ import type {
   PriceResearchItem,
   PriceResearchMethod,
   PriceResearchReportData,
+  PriceResearchReportServer,
 } from '@/lib/priceResearch';
 
 export type PriceResearchSearchItem = Pick<
@@ -32,6 +33,11 @@ export type PriceResearchRecord = {
   processNumber: string;
   objectDescription: string;
   responsibleName: string;
+  institutionName: string;
+  institutionUnit: string;
+  institutionDetails: string;
+  institutionLogo: string;
+  reportServers: PriceResearchReportServer[];
   researchDate: string;
   method: PriceResearchMethod;
   methodologyJustification: string;
@@ -43,12 +49,37 @@ export type PriceResearchRecord = {
   updatedAt: string;
 };
 
+export type PriceResearchValidationResult = {
+  found: boolean;
+  isValid: boolean;
+  expectedHash?: string;
+  providedHash?: string;
+  error?: string;
+  research?: {
+    id: string;
+    processNumber: string;
+    objectDescription: string;
+    responsibleName: string;
+    institutionName: string;
+    institutionUnit: string;
+    researchDate: string;
+    status: PriceResearchRecord['status'];
+    updatedAt: string;
+    itemsCount: number;
+  };
+};
+
 type DbResearchRow = {
   id: string;
   title: string;
   process_number: string | null;
   object_description: string;
   responsible_name: string;
+  institution_name: string | null;
+  institution_unit: string | null;
+  institution_details: string | null;
+  institution_logo: string | null;
+  report_servers: PriceResearchReportServer[] | null;
   research_date: string;
   calculation_method: PriceResearchMethod;
   methodology_justification: string | null;
@@ -82,6 +113,11 @@ const RESEARCH_SELECT = [
   'process_number',
   'object_description',
   'responsible_name',
+  'institution_name',
+  'institution_unit',
+  'institution_details',
+  'institution_logo',
+  'report_servers',
   'research_date',
   'calculation_method',
   'methodology_justification',
@@ -118,6 +154,11 @@ function mapResearchRow(row: DbResearchRow, items: PriceResearchItem[] = []): Pr
     processNumber: row.process_number || '',
     objectDescription: row.object_description,
     responsibleName: row.responsible_name,
+    institutionName: row.institution_name || '',
+    institutionUnit: row.institution_unit || '',
+    institutionDetails: row.institution_details || '',
+    institutionLogo: row.institution_logo || '',
+    reportServers: Array.isArray(row.report_servers) ? row.report_servers : [],
     researchDate: row.research_date,
     method: row.calculation_method,
     methodologyJustification: row.methodology_justification || '',
@@ -176,6 +217,17 @@ export const priceResearchService = {
     );
   },
 
+  async validateAuthentication(id: string, auth: string): Promise<PriceResearchValidationResult> {
+    const { data, error } = await supabase.functions.invoke('validar-pesquisa-precos', {
+      body: { id, auth },
+    });
+
+    if (error) throw error;
+    const result = data as PriceResearchValidationResult;
+    if (result?.error && !result.found) return result;
+    return result;
+  },
+
   async save(
     data: PriceResearchReportData,
     options: { id?: string; status?: PriceResearchRecord['status'] } = {},
@@ -185,6 +237,11 @@ export const priceResearchService = {
       process_number: data.processNumber || null,
       object_description: data.objectDescription,
       responsible_name: data.responsibleName,
+      institution_name: data.institutionName || null,
+      institution_unit: data.institutionUnit || null,
+      institution_details: data.institutionDetails || null,
+      institution_logo: data.institutionLogo || null,
+      report_servers: data.reportServers ?? [],
       research_date: data.researchDate,
       calculation_method: data.method,
       methodology_justification: data.methodologyJustification || null,

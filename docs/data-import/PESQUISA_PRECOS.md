@@ -107,13 +107,26 @@ O relatório exige:
 
 - objeto da contratação;
 - agente responsável;
+- identificação institucional opcional para cabeçalho, com nome, unidade/setor, dados complementares e logotipo;
+- servidores responsáveis ou equipe de apoio que devem constar no relatório;
 - identificação CATMAT/CATSER;
 - ao menos três preços selecionados por item;
 - justificativa para cada preço excluído;
 - justificativa do método estatístico;
 - memória de cálculo e identificação das fontes.
 
+O relatório gerencial consolidado também inclui:
+
+- sumário executivo com total estimado, quantidade de itens, cotações selecionadas/excluídas e composição por tipo de fonte;
+- cabeçalho personalizado com logotipo da instituição, identificação da unidade e tabela de servidores informados;
+- curva ABC calculada pelo valor total estimado de cada item (`quantidade * preço estimado`), com classes A/B/C por participação acumulada;
+- mapa comparativo item x fonte/cotação, com fornecedor, órgão/UASG, localidade, data, status, preço, desvio percentual e justificativa de exclusão;
+- QR Code de autenticação contendo hash determinístico do snapshot revisado, versão do relatório e URL de conferência em `/pesquisa-precos/validar?id=<pesquisa>&auth=<hash>`;
+- exportação em PDF/impressão, HTML, XLSX e CSV. No XLSX e CSV, instituição e servidores também são exportados em abas/arquivos próprios.
+
 O módulo exibe média aritmética, mediana, menor preço, média ponderada, média saneada e preços excluídos do cálculo. A média ponderada usa a quantidade registrada na referência de preço como peso, quando disponível. A média saneada corresponde à média dos preços mantidos na cesta após as exclusões justificadas pelo usuário. Ao desconsiderar uma cotação, a interface exige justificativa objetiva antes de gravar a exclusão. A mediana é o método padrão inicial para o preço estimado. O uso de menos de três preços não é automatizado neste corte; casos excepcionais devem seguir justificativa e aprovação da autoridade competente fora do fluxo automático.
+
+Na aba PNCP da curadoria, cotações oficiais não exibem colunas de frete nem de evidência. Quando a atualização monetária global é ativada pelo usuário, o espaço antes usado para frete passa a exibir somente o valor numérico do índice de atualização monetária aplicado a cada cotação. As abas de cotações de internet e fornecedores locais continuam exibindo frete, pois esse custo pode compor o preço comparável dessas fontes.
 
 Referência normativa principal:
 
@@ -139,10 +152,14 @@ Regras cobertas neste corte:
 
 ## Persistência
 
-- `price_researches`: metadados, responsável, método, observações, arquivo de origem e status.
+- `price_researches`: metadados, responsável, método, observações, arquivo de origem, status, identificação institucional, logotipo e servidores do relatório.
 - `price_research_items`: snapshot dos itens e candidatos oficiais usados na análise.
 
 As políticas RLS permitem ao usuário autenticado acessar suas próprias pesquisas. Superadministradores podem acessar todos os registros.
+
+## Validação por QR Code
+
+O QR Code do relatório aponta para `/pesquisa-precos/validar`. A tela chama a Edge Function `validar-pesquisa-precos`, que carrega a pesquisa salva pelo `id` com service role, recompõe o mesmo snapshot usado no relatório e compara o hash recalculado com o parâmetro `auth`. O resultado mostra relatório autenticado quando os hashes coincidem e hash divergente quando o registro salvo foi alterado ou o link não corresponde à pesquisa. A function retorna apenas metadados mínimos e não expõe a cesta completa de preços.
 
 ## Implementação
 

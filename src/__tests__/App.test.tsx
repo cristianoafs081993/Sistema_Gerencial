@@ -91,6 +91,10 @@ vi.mock('@/pages/EditorDocumentos', () => ({
   default: () => <div>editor-page</div>,
 }));
 
+vi.mock('@/pages/PriceResearchValidation', () => ({
+  default: () => <div>price-research-validation-page</div>,
+}));
+
 vi.mock('@/pages/energia/EnergiaCampus', () => ({
   default: () => <div>energia-page</div>,
 }));
@@ -182,6 +186,14 @@ describe('App routes', () => {
     render(<App />);
 
     expect(await screen.findByText('economia-tempo-page')).toBeInTheDocument();
+  });
+
+  it('renderiza a rota de validacao da pesquisa de precos', async () => {
+    window.history.pushState({}, '', '/pesquisa-precos/validar?id=abc&auth=123');
+
+    render(<App />);
+
+    expect(await screen.findByText('price-research-validation-page')).toBeInTheDocument();
   });
 
   it('renderiza as rotas do painel de energia', async () => {

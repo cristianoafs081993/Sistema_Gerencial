@@ -49,3 +49,6 @@ verify_jwt = false
 [functions.pesquisar-precos]
 verify_jwt = true
 
+[functions.validar-pesquisa-precos]
+verify_jwt = false
+

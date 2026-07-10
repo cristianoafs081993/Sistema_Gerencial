@@ -283,9 +283,13 @@ describe('PesquisaPrecos', () => {
     // Verifica que existe o checkbox de reajuste global
     const globalAdjustCheckbox = screen.getByRole('checkbox', { name: /Ativar atualização monetária global/i });
     expect(globalAdjustCheckbox).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /Frete/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /Evidência/i })).not.toBeInTheDocument();
 
     // Ativa o reajuste global
     fireEvent.click(globalAdjustCheckbox);
+    expect(screen.getByRole('columnheader', { name: /Índice de atualização monetária/i })).toBeInTheDocument();
+    expect(screen.getByText(/1,\d{4}/)).toBeInTheDocument();
 
     // O select de índice de reajuste deve aparecer
     const indexSelect = screen.getByLabelText(/Índice ou Método/i);

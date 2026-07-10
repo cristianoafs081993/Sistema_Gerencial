@@ -583,6 +583,30 @@ Observações:
 - não usa service role e não grava no banco;
 - limites: 25 itens por chamada e 15 candidatos por item.
 
+### `validar-pesquisa-precos`
+
+Local:
+
+- `supabase/functions/validar-pesquisa-precos/index.ts`
+
+Uso:
+
+- recebe `id` da pesquisa e hash `auth` vindo do QR Code do relatório;
+- lê `price_researches` e `price_research_items` com service role;
+- recompõe o snapshot auditável usado no relatório;
+- compara o hash recalculado com o hash informado;
+- retorna apenas metadados mínimos da pesquisa, hash informado, hash recalculado e status de validação.
+
+Dependências:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Observações:
+
+- publicada com `verify_jwt = false`, porque o QR Code pode ser aberto fora da sessão dona do registro;
+- não retorna a cesta completa de preços nem os candidatos da pesquisa.
+
 ### `disparar-cotacao-email`
 
 Local:

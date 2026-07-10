@@ -29,6 +29,7 @@ const GeradorDocumentos = lazy(() => import('./pages/GeradorDocumentos'));
 const EditorDocumentos = lazy(() => import('./pages/EditorDocumentos'));
 const ArtefatosLicitacao = lazy(() => import('./pages/ArtefatosLicitacao'));
 const PesquisaPrecos = lazy(() => import('./pages/PesquisaPrecos'));
+const PriceResearchValidation = lazy(() => import('./pages/PriceResearchValidation'));
 const LicitacoesPregoes = lazy(() => import('./pages/LicitacoesPregoes'));
 const AtasRegistroPrecos = lazy(() => import('./pages/AtasRegistroPrecos'));
 const EnergiaCampus = lazy(() => import('./pages/energia/EnergiaCampus'));
@@ -75,6 +76,7 @@ const App = () => (
               <Route path="/suap-callback" element={<SuapCallback />} />
               <Route element={<AppShell />}>
                 <Route path="/suap" element={<Suap />} />
+                <Route path="/pesquisa-precos/validar" element={<PriceResearchValidation />} />
               </Route>
               <Route element={<ProtectedRoute />}>
                 <Route element={<AppShell />}>

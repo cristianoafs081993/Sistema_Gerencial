@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preview Dashboard - SIGORC (Estilo Sebrae BaSe)</title>
+    
+    <!-- Google Fonts: Figtree (Interface) + IBM Plex Mono (Dados) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons (SVG) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* ============================================================
+           TOKENS DE DESIGN (Extraídos do site do Sebrae e adaptados)
+           ============================================================ */
+        :root {
+            /* Cores de Marca (30%) */
+            --primary: #2A4FDA;          /* Azul Sebrae */
+            --primary-hover: #1e3fa8;
+            --primary-light: rgba(42, 79, 218, 0.08);
+            --accent: #E7F79E;           /* Amarelo-Lima */
+            --accent-hover: #c9db7f;
+            --accent-text: #1b244b;
+            --navy-dark: #121A36;        /* Deep Navy para Sidebar */
+            
+            /* Neutros e Superfícies (60%) */
+            --bg-app: #F4F7FC;           /* Cinza Azulado Suave */
+            --bg-card: #FFFFFF;          /* Branco Puro */
+            --border-light: #E2E9FC;     /* Divisor com Matiz Azul */
+            --text-main: #1B244B;        /* Deep Navy para Alta Leitura */
+            --text-muted: #687499;       /* Slate Blue */
+            
+            /* Status Semânticos (Sebrae) */
+            --success-bg: #caf8db;
+            --success-text: #02983e;
+            --warning-bg: #FEF3C7;
+            --warning-text: #B45309;
+            --danger-bg: #FEE2E2;
+            --danger-text: #DC2626;
+            --info-bg: #E0F2FE;
+            --info-text: #0369A1;
+
+            /* Sombras Premium com Pigmentação Azul */
+            --shadow-sm: 0px 2px 8px rgba(20, 46, 82, 0.06);
+            --shadow-md: 0px 10px 32px -4px rgba(0, 94, 184, 0.08), 0px 6px 14px -6px rgba(0, 94, 184, 0.12);
+            --shadow-lg: 0px 18px 24px -4px rgba(0, 94, 184, 0.12), 0px 8px 16px -6px rgba(0, 94, 184, 0.08);
+            --shadow-glow: 0 0 0 4px rgba(42, 79, 218, 0.15);
+
+            --radius-btn: 8px;
+            --radius-card: 12px;
+            --radius-lg: 16px;
+        }
+
+        /* Modo Escuro */
+        .dark {
+            --bg-app: #0A0F1D;
+            --bg-card: #121829;
+            --border-light: #1E294B;
+            --text-main: #F1F5F9;
+            --text-muted: #94A3B8;
+            --shadow-sm: 0px 2px 8px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0px 10px 32px -4px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0px 18px 24px -4px rgba(0, 0, 0, 0.5);
+            --shadow-glow: 0 0 0 4px rgba(42, 79, 218, 0.3);
+            --primary-light: rgba(42, 79, 218, 0.2);
+            --navy-dark: #070B14;
+        }
+
+        /* ============================================================
+           ESTILOS GERAIS E ESTRUTURA
+           ============================================================ */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+        }
+
+        body {
+            font-family: 'Figtree', sans-serif;
+            background-color: var(--bg-app);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* ============================================================
+           SIDEBAR (Navegação Esquerda) - Branca (Estilo Sebrae BaSe)
+           ============================================================ */
+        aside {
+            width: 260px;
+            background-color: var(--bg-card);
+            border-right: 1px solid var(--border-light);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            flex-shrink: 0;
+            z-index: 40;
+        }
+
+        .sidebar-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+        }
+
+        .sidebar-header {
+            height: 70px;
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        /* Nova Logo do SIGORC (Azul/Verde) */
+        .logo-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+
+        .logo-hexagon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #2A4FDA 0%, #2f9e41 100%);
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 6px rgba(42, 79, 218, 0.2);
+        }
+
+        .logo-hexagon-inner {
+            width: 18px;
+            height: 18px;
+            background: var(--bg-card);
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-bar {
+            width: 3px;
+            background: #2A4FDA;
+            border-radius: 1px;
+        }
+        .logo-bar.left { height: 6px; }
+        .logo-bar.mid { height: 10px; background: #2A4FDA; }
+        .logo-bar.right { height: 8px; background: #2f9e41; }
+
+        .logo-text {
+            color: var(--text-main);
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            display: flex;
+            flex-direction: column;
+            font-family: 'Campuni', 'Figtree', sans-serif;
+        }
+
+        .logo-subtext {
+            font-size: 8px;
+            font-weight: 600;
+            color: #2f9e41;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin-top: -2px;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 24px 12px;
+            overflow-y: auto;
+        }
+
+        .nav-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            margin: 16px 0 8px 12px;
+            opacity: 0.8;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            position: relative;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .nav-item i {
+            width: 18px;
+            height: 18px;
+            opacity: 0.8;
+        }
+
+        .nav-item:hover {
+            color: var(--primary);
+            background-color: var(--primary-light);
+        }
+
+        /* Item Ativo com Borda de Destaque Vertical Amarela (Sebrae Style) */
+        .nav-item.active {
+            color: var(--primary);
+            background-color: var(--primary-light);
+            font-weight: 600;
+        }
+
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 10px;
+            bottom: 10px;
+            width: 4px;
+            background-color: #f59e0b; /* Amarelo Sebrae para realce */
+            border-radius: 0 4px 4px 0;
+        }
+
+        .sidebar-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: var(--primary);
+            color: #FFFFFF;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+            border: 2px solid var(--border-light);
+        }
+
+        .user-info {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .user-name {
+            color: var(--text-main);
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .user-role {
+            color: var(--text-muted);
+            font-size: 10px;
+            font-weight: 500;
+        }
+
+        h1, h2, h3, .panel-title {
+            font-family: 'Campuni', 'Figtree', sans-serif;
+        }
+
+        /* ============================================================
+           MAIN WORKSPACE
+           ============================================================ */
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* ============================================================
+           TOPBAR (Cabeçalho Superior com Glassmorphism)
+           ============================================================ */
+        header {
+            height: 70px;
+            background-color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px) saturate(140%);
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            z-index: 30;
+        }
+
+        .dark header {
+            background-color: rgba(18, 24, 41, 0.85);
+        }
+
+        .header-title-section h1 {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-main);
+            letter-spacing: -0.5px;
+        }
+
+        .header-title-section p {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        /* Busca Avançada */
+        .search-container {
+            position: relative;
+            width: 280px;
+        }
+
+        .search-container input {
+            width: 100%;
+            background-color: var(--bg-app);
+            border: 2px solid var(--border-light);
+            padding: 8px 16px 8px 40px;
+            border-radius: 8px;
+            font-family: 'Figtree', sans-serif;
+            font-size: 13px;
+            color: var(--text-main);
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .search-container i {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+
+        .search-container input:focus {
+            border-color: var(--primary);
+            background-color: var(--bg-card);
+            box-shadow: var(--shadow-glow);
+        }
+
+        /* Botões de Controle */
+        .theme-toggle-btn {
+            background: none;
+            border: 2px solid var(--border-light);
+            width: 38px;
+            height: 38px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-main);
+            cursor: pointer;
+            outline: none;
+        }
+
+        .theme-toggle-btn:hover {
+            background-color: var(--primary-light);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        /* ============================================================
+           SCROLLABLE PAGE CONTENT
+           ============================================================ */
+        .page-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 32px;
+            max-width: 1600px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        /* ============================================================
+           TABS (Filtro Superior)
+           ============================================================ */
+        .tabs-container {
+            display: flex;
+            gap: 8px;
+            background-color: rgba(226, 233, 252, 0.4);
+            padding: 4px;
+            border-radius: 10px;
+            width: fit-content;
+            margin-bottom: 28px;
+        }
+
+        .dark .tabs-container {
+            background-color: rgba(30, 41, 75, 0.4);
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 8px 20px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            border-radius: 8px;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background-color: var(--bg-card);
+            color: var(--primary);
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* ============================================================
+           STAT CARDS GRID (Com Indicadores de Cor e Elevação Física)
+           ============================================================ */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background-color: var(--bg-card);
+            border-radius: var(--radius-card);
+            border: 1px solid var(--border-light);
+            padding: 24px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            flex-direction: column;
+            cursor: pointer;
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s;
+        }
+
+        /* Elevação física no hover */
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-md);
+            border-color: rgba(42, 79, 218, 0.2);
+        }
+
+        /* Barra lateral de cor no card */
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+        }
+
+        .stat-card.blue::before { background-color: var(--primary); }
+        .stat-card.purple::before { background-color: #a855f7; }
+        .stat-card.yellow::before { background-color: #f59e0b; }
+        .stat-card.green::before { background-color: var(--success-text); }
+
+        .stat-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .stat-card-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .stat-card-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stat-card.blue .stat-card-icon { background-color: rgba(42, 79, 218, 0.08); color: var(--primary); }
+        .stat-card.purple .stat-card-icon { background-color: rgba(168, 85, 247, 0.08); color: #a855f7; }
+        .stat-card.yellow .stat-card-icon { background-color: rgba(245, 158, 11, 0.08); color: #f59e0b; }
+        .stat-card.green .stat-card-icon { background-color: rgba(2, 152, 62, 0.08); color: var(--success-text); }
+
+        .stat-card-value {
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: var(--text-main);
+            margin-bottom: 8px;
+        }
+
+        .stat-card-progress {
+            width: 100%;
+            height: 6px;
+            background-color: var(--bg-app);
+            border-radius: 99px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .stat-card-progress-bar {
+            height: 100%;
+            border-radius: 99px;
+        }
+
+        .stat-card.blue .stat-card-progress-bar { background-color: var(--primary); }
+        .stat-card.purple .stat-card-progress-bar { background-color: #a855f7; }
+        .stat-card.yellow .stat-card-progress-bar { background-color: #f59e0b; }
+        .stat-card.green .stat-card-progress-bar { background-color: var(--success-text); }
+
+        /* ============================================================
+           DASHBOARD CONTENT GRID
+           ============================================================ */
+        .content-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 32px;
+            align-items: start;
+        }
+
+        @media (max-width: 1024px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel-card {
+            background-color: var(--bg-card);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-light);
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+            margin-bottom: 32px;
+        }
+
+        .panel-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-main);
+            letter-spacing: -0.2px;
+        }
+
+        .panel-subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .panel-body {
+            padding: 24px;
+        }
+
+        /* ============================================================
+           TABELAS DE DADOS (Zebra, Headers Clean, Row Hover)
+           ============================================================ */
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        thead tr {
+            background-color: var(--bg-app);
+            border-bottom: 2px solid var(--border-light);
+        }
+
+        th {
+            padding: 12px 16px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+        }
+
+        td {
+            padding: 14px 16px;
+            font-size: 14px;
+            color: var(--text-main);
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        /* Zebra Striping */
+        tbody tr:nth-child(even) {
+            background-color: rgba(244, 247, 252, 0.3);
+        }
+
+        .dark tbody tr:nth-child(even) {
+            background-color: rgba(255, 255, 255, 0.01);
+        }
+
+        /* Hover de Linha */
+        tbody tr:hover {
+            background-color: rgba(42, 79, 218, 0.04) !important;
+            cursor: pointer;
+        }
+
+        .font-tabular {
+            font-family: 'IBM Plex Mono', monospace;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .align-right {
+            text-align: right;
+        }
+
+        /* ============================================================
+           BADGES DE STATUS (Pills com Cores Semânticas)
+           ============================================================ */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 99px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid transparent;
+        }
+
+        .badge.success {
+            background-color: var(--success-bg);
+            color: var(--success-text);
+            border-color: rgba(2, 152, 62, 0.15);
+        }
+
+        .badge.warning {
+            background-color: var(--warning-bg);
+            color: var(--warning-text);
+            border-color: rgba(180, 83, 9, 0.15);
+        }
+
+        .badge.danger {
+            background-color: var(--danger-bg);
+            color: var(--danger-text);
+            border-color: rgba(220, 38, 38, 0.15);
+        }
+
+        .badge.info {
+            background-color: var(--info-bg);
+            color: var(--info-text);
+            border-color: rgba(3, 105, 161, 0.15);
+        }
+
+        /* ============================================================
+           BOTÕES (Estilo Sebrae)
+           ============================================================ */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 18px;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: var(--radius-btn);
+            border: 2px solid transparent;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        /* Botão de Destaque Amarelo-Lima (Sebrae Accent CTA) */
+        .btn-accent {
+            background-color: var(--accent);
+            color: var(--accent-text);
+            border-color: var(--accent);
+        }
+
+        .btn-accent:hover {
+            background-color: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+
+        /* Botão Primário Azul Sebrae */
+        .btn-primary {
+            background-color: var(--primary);
+            color: #FFFFFF;
+            border-color: var(--primary);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+            border-color: var(--primary-hover);
+        }
+
+        /* Botão Secundário / Outline */
+        .btn-secondary {
+            background-color: var(--bg-card);
+            color: var(--text-muted);
+            border-color: var(--border-light);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--bg-app);
+            border-color: var(--text-muted);
+            color: var(--text-main);
+        }
+
+        /* ============================================================
+           DRAG AND DROP FILE IMPORT
+           ============================================================ */
+        .upload-area {
+            border: 2px dashed var(--border-light);
+            border-radius: var(--radius-card);
+            padding: 40px 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background-color: rgba(244, 247, 252, 0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .dark .upload-area {
+            background-color: rgba(255, 255, 255, 0.01);
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary);
+            background-color: var(--primary-light);
+        }
+
+        .upload-icon-wrapper {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background-color: var(--primary-light);
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        .upload-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 4px;
+        }
+
+        .upload-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+
+        /* ============================================================
+           GRAFICOS / EVOLUÇÃO (Simulação com SVG e Gradientes)
+           ============================================================ */
+        .chart-legend {
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .legend-color {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 260px;
+            position: relative;
+            margin-top: 24px;
+        }
+
+        .chart-svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* ============================================================
+           LISTAGEM AUXILIAR (Origens)
+           ============================================================ */
+        .origin-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .origin-item-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 4px;
+        }
+
+        .origin-progress-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .origin-progress-bar-bg {
+            width: 100%;
+            height: 6px;
+            background-color: var(--bg-app);
+            border-radius: 99px;
+            overflow: hidden;
+        }
+
+        .origin-progress-bar-fill {
+            height: 100%;
+            border-radius: 99px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="sidebar-container" style="display: flex; flex-direction: row; width: 100%; height: 100%;">
+        <!-- SIDEBAR -->
+        <aside>
+            <div class="sidebar-container">
+                <div class="sidebar-header">
+                    <a href="#" class="logo-wrapper">
+                        <div class="logo-hexagon">
+                            <div class="logo-hexagon-inner">
+                                <div class="logo-bar left"></div>
+                                <div class="logo-bar mid"></div>
+                                <div class="logo-bar right"></div>
+                            </div>
+                        </div>
+                        <div class="logo-text">
+                            SIGORC
+                            <span class="logo-subtext">Gestão Integrada</span>
+                        </div>
+                    </a>
+                </div>
+
+                <nav class="sidebar-nav">
+                    <div class="nav-label">Geral</div>
+                    <a href="#" class="nav-item active">
+                        <i data-lucide="layout-dashboard"></i>
+                        Dashboard
+                    </a>
+                    <a href="#" class="nav-item">
+                        <i data-lucide="landmark"></i>
+                        Orçamentário
+                    </a>
+                    <a href="#" class="nav-item">
+                        <i data-lucide="banknote"></i>
+                        Financeiro
+                    </a>
+                    
+                    <div class="nav-label">Documentos</div>
+                    <a href="#" class="nav-item">
+                        <i data-lucide="file-stack"></i>
+                        Empenhos
+                    </a>
+                    <a href="#" class="nav-item">
+                        <i data-lucide="file-text"></i>
+                        Editor de Documentos
+                    </a>
+
+                    <div class="nav-label">Configurações</div>
+                    <a href="#" class="nav-item">
+                        <i data-lucide="settings"></i>
+                        Ajustes do Sistema
+                    </a>
+                </nav>
+
+                <div class="sidebar-footer">
+                    <div class="user-avatar">CD</div>
+                    <div class="user-info">
+                        <span class="user-name">Cristiano De Souza</span>
+                        <span class="user-role">Gestor de Orçamento</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN WORKSPACE -->
+        <main>
+            <!-- TOPBAR -->
+            <header>
+                <div class="header-title-section">
+                    <h1>Dashboard Gerencial</h1>
+                    <p>Controle financeiro e execução orçamentária do IFRN</p>
+                </div>
+
+                <div class="header-actions">
+                    <div class="search-container">
+                        <i data-lucide="search"></i>
+                        <input type="text" placeholder="Buscar por Nota de Empenho (NE)...">
+                    </div>
+
+                    <button class="theme-toggle-btn" onclick="toggleTheme()" title="Alternar Tema (Claro/Escuro)">
+                        <i data-lucide="sun" id="theme-icon"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- PAGE CONTENT -->
+            <div class="page-content">
+                
+                <!-- TOP TAB CONTROL -->
+                <div class="tabs-container">
+                    <button class="tab-btn active">Exercício Atual (2026)</button>
+                    <button class="tab-btn">Restos a Pagar (RAP)</button>
+                </div>
+
+                <!-- STAT CARDS (Com realce lateral e efeito físico de elevação) -->
+                <div class="stats-grid">
+                    <div class="stat-card blue">
+                        <div class="stat-card-header">
+                            <span class="stat-card-label">Planejado</span>
+                            <div class="stat-card-icon"><i data-lucide="compass"></i></div>
+                        </div>
+                        <div class="stat-card-value font-tabular">R$ 12.450.000</div>
+                        <div class="stat-card-label" style="color: var(--success-text); display: flex; align-items: center; gap: 4px; font-size: 11px;">
+                            <i data-lucide="trending-up" style="width: 12px; height: 12px;"></i> +12% vs último ano
+                        </div>
+                    </div>
+
+                    <div class="stat-card purple">
+                        <div class="stat-card-header">
+                            <span class="stat-card-label">Empenhado</span>
+                            <div class="stat-card-icon"><i data-lucide="lock"></i></div>
+                        </div>
+                        <div class="stat-card-value font-tabular">R$ 8.200.000</div>
+                        <div class="origin-progress-info" style="margin-top: 4px;">
+                            <span>Percentual</span>
+                            <span>65%</span>
+                        </div>
+                        <div class="stat-card-progress">
+                            <div class="stat-card-progress-bar" style="width: 65%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card yellow">
+                        <div class="stat-card-header">
+                            <span class="stat-card-label">Liquidado</span>
+                            <div class="stat-card-icon"><i data-lucide="file-check-2"></i></div>
+                        </div>
+                        <div class="stat-card-value font-tabular">R$ 5.100.000</div>
+                        <div class="origin-progress-info" style="margin-top: 4px;">
+                            <span>Percentual</span>
+                            <span>41%</span>
+                        </div>
+                        <div class="stat-card-progress">
+                            <div class="stat-card-progress-bar" style="width: 41%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card green">
+                        <div class="stat-card-header">
+                            <span class="stat-card-label">Pago</span>
+                            <div class="stat-card-icon"><i data-lucide="check-circle-2"></i></div>
+                        </div>
+                        <div class="stat-card-value font-tabular">R$ 4.900.000</div>
+                        <div class="origin-progress-info" style="margin-top: 4px;">
+                            <span>Percentual</span>
+                            <span>96%</span>
+                        </div>
+                        <div class="stat-card-progress">
+                            <div class="stat-card-progress-bar" style="width: 96%;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MAIN INTERACTION AREA (Grid) -->
+                <div class="content-grid">
+                    
+                    <!-- LEFT COLUMN: CHART & TABLE -->
+                    <div class="left-col">
+                        
+                        <!-- EVOLUÇÃO DA EXECUÇÃO (CARD DE GRÁFICO) -->
+                        <div class="panel-card">
+                            <div class="panel-header">
+                                <div>
+                                    <h2 class="panel-title">Evolução da Execução Orçamentária</h2>
+                                    <p class="panel-subtitle">Planejado vs Empenhado vs Pago (Valores Acumulados)</p>
+                                </div>
+                                <div class="chart-legend">
+                                    <div class="legend-item">
+                                        <span class="legend-color" style="background-color: var(--primary);"></span> Planejado
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-color" style="background-color: #a855f7;"></span> Empenhado
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-color" style="background-color: var(--success-text);"></span> Pago
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="panel-body">
+                                <div class="chart-container">
+                                    <!-- Simulação de Gráfico de Linha Exclusivo Sebrae -->
+                                    <svg class="chart-svg" viewBox="0 0 500 200" preserveAspectRatio="none">
+                                        <defs>
+                                            <!-- Gradiente Azul Sebrae -->
+                                            <linearGradient id="gradient-blue" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stop-color="var(--primary)" stop-opacity="0.15" />
+                                                <stop offset="100%" stop-color="var(--primary)" stop-opacity="0.0" />
+                                            </linearGradient>
+                                            <!-- Gradiente Verde Sebrae -->
+                                            <linearGradient id="gradient-green" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stop-color="var(--success-text)" stop-opacity="0.15" />
+                                                <stop offset="100%" stop-color="var(--success-text)" stop-opacity="0.0" />
+                                            </linearGradient>
+                                        </defs>
+
+                                        <!-- Linhas horizontais do grid -->
+                                        <line x1="0" y1="50" x2="500" y2="50" stroke="var(--border-light)" stroke-width="1" />
+                                        <line x1="0" y1="100" x2="500" y2="100" stroke="var(--border-light)" stroke-width="1" />
+                                        <line x1="0" y1="150" x2="500" y2="150" stroke="var(--border-light)" stroke-width="1" />
+
+                                        <!-- Áreas preenchidas (Gradientes) -->
+                                        <path d="M0,150 Q100,100 200,80 T400,40 T500,20 L500,200 L0,200 Z" fill="url(#gradient-blue)" />
+                                        <path d="M0,190 Q100,160 200,130 T400,90 T500,70 L500,200 L0,200 Z" fill="url(#gradient-green)" />
+
+                                        <!-- Linhas de Gráficos -->
+                                        <!-- Planejado (Dotted) -->
+                                        <line x1="0" y1="20" x2="500" y2="20" stroke="var(--primary)" stroke-width="2" stroke-dasharray="4" />
+                                        
+                                        <!-- Empenhado -->
+                                        <path d="M0,150 Q100,100 200,80 T400,40 T500,20" fill="none" stroke="#a855f7" stroke-width="3" />
+                                        
+                                        <!-- Pago -->
+                                        <path d="M0,190 Q100,160 200,130 T400,90 T500,70" fill="none" stroke="var(--success-text)" stroke-width="3" />
+                                        
+                                        <!-- Pontos focais ativos -->
+                                        <circle cx="200" cy="80" r="5" fill="#a855f7" stroke="#FFF" stroke-width="2" />
+                                        <circle cx="200" cy="130" r="5" fill="var(--success-text)" stroke="#FFF" stroke-width="2" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- TABELA DE DADOS (LISTAGEM DE EMPENHOS) -->
+                        <div class="panel-card">
+                            <div class="panel-header">
+                                <div>
+                                    <h2 class="panel-title">Lista de Empenhos Recentes</h2>
+                                    <p class="panel-subtitle">Controle de liquidação e favorecidos por nota</p>
+                                </div>
+                                <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 11px;">Ver Todos</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Nota de Empenho (NE)</th>
+                                            <th>Favorecido</th>
+                                            <th class="align-right">Valor (R$)</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td style="font-weight: 700;">2026NE000123</td>
+                                            <td style="color: var(--text-muted);">TECH CORP SOLUCOES LTDA</td>
+                                            <td class="font-tabular align-right" style="font-weight: 600;">150.000,00</td>
+                                            <td><span class="badge success">Pago</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-weight: 700;">2026NE000456</td>
+                                            <td style="color: var(--text-muted);">CONSTRUTORA ALFA LTDA</td>
+                                            <td class="font-tabular align-right" style="font-weight: 600;">32.450,50</td>
+                                            <td><span class="badge warning">Pendente</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-weight: 700;">2026NE000789</td>
+                                            <td style="color: var(--text-muted);">SERVICOS GERAIS ME</td>
+                                            <td class="font-tabular align-right" style="font-weight: 600;">8.900,00</td>
+                                            <td><span class="badge danger">A Liquidar</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-weight: 700;">2026NE000911</td>
+                                            <td style="color: var(--text-muted);">DISTRIBUIDORA DE PAPEL EIRELI</td>
+                                            <td class="font-tabular align-right" style="font-weight: 600;">4.120,00</td>
+                                            <td><span class="badge info">Empenhado</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- RIGHT COLUMN: UPLOAD & AUXILIARY LIST -->
+                    <div class="right-col">
+                        
+                        <!-- IMPORTAÇÃO DRAG & DROP (CTA REALÇADO COM AMARELO SEBRAE) -->
+                        <div class="panel-card">
+                            <div class="panel-header">
+                                <h2 class="panel-title">Importar Arquivos</h2>
+                            </div>
+                            <div class="panel-body">
+                                <div class="upload-area">
+                                    <div class="upload-icon-wrapper">
+                                        <i data-lucide="cloud-upload" style="width: 28px; height: 28px;"></i>
+                                    </div>
+                                    <h3 class="upload-title">Arraste seus arquivos CSV aqui</h3>
+                                    <p class="upload-desc">Arquivos exportados do Tesouro Gerencial</p>
+                                    <button class="btn btn-accent">
+                                        <i data-lucide="plus-circle" style="width: 16px; height: 16px;"></i>
+                                        Selecionar Arquivo
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- LISTAGEM POR ORIGEM DE RECURSO -->
+                        <div class="panel-card">
+                            <div class="panel-header">
+                                <h2 class="panel-title">Detalhamento por Origem</h2>
+                            </div>
+                            <div class="panel-body">
+                                <div class="origin-list">
+                                    <!-- Item 1 -->
+                                    <div>
+                                        <div class="origin-item-header">
+                                            <span>Origem 231796 (Ensino)</span>
+                                            <span class="font-tabular">R$ 1.250.000</span>
+                                        </div>
+                                        <div class="origin-progress-info">
+                                            <span>Executado</span>
+                                            <span>85%</span>
+                                        </div>
+                                        <div class="origin-progress-bar-bg">
+                                            <div class="origin-progress-bar-fill" style="width: 85%; background-color: var(--primary);"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Item 2 -->
+                                    <div>
+                                        <div class="origin-item-header">
+                                            <span>Origem 261941 (Pesquisa)</span>
+                                            <span class="font-tabular">R$ 800.000</span>
+                                        </div>
+                                        <div class="origin-progress-info">
+                                            <span>Executado</span>
+                                            <span>40%</span>
+                                        </div>
+                                        <div class="origin-progress-bar-bg">
+                                            <div class="origin-progress-bar-fill" style="width: 40%; background-color: #f59e0b;"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Item 3 -->
+                                    <div>
+                                        <div class="origin-item-header">
+                                            <span>Origem 100000 (Geral)</span>
+                                            <span class="font-tabular">R$ 2.400.000</span>
+                                        </div>
+                                        <div class="origin-progress-info">
+                                            <span>Executado</span>
+                                            <span>100%</span>
+                                        </div>
+                                        <div class="origin-progress-bar-bg">
+                                            <div class="origin-progress-bar-fill" style="width: 100%; background-color: var(--success-text);"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- SCRIPT DE INTERAÇÃO -->
+    <script>
+        // Inicializa os ícones do Lucide
+        lucide.createIcons();
+
+        // Controle do Tema (Light / Dark)
+        function toggleTheme() {
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            
+            if (html.classList.contains('light')) {
+                html.classList.remove('light');
+                html.classList.add('dark');
+                icon.setAttribute('data-lucide', 'moon');
+                localStorage.setItem('theme', 'dark');
+            } else {
+                html.classList.remove('dark');
+                html.classList.add('light');
+                icon.setAttribute('data-lucide', 'sun');
+                localStorage.setItem('theme', 'light');
+            }
+            // Recarrega os ícones para aplicar as alterações de visual
+            lucide.createIcons();
+        }
+
+        // Aplica o tema salvo no localStorage, se existir
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            if (savedTheme === 'dark') {
+                html.classList.remove('light');
+                html.classList.add('dark');
+                icon.setAttribute('data-lucide', 'moon');
+            } else {
+                html.classList.remove('dark');
+                html.classList.add('light');
+                icon.setAttribute('data-lucide', 'sun');
+            }
+            lucide.createIcons();
+        }
+    </script>
+</body>
+
+</html>

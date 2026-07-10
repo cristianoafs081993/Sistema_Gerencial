@@ -90,6 +90,17 @@ Necessarias no ambiente do Supabase:
 - `OPENAI_API_KEY`
 - opcional: `OPENAI_VISION_MODEL`
 
+### `validar-pesquisa-precos`
+
+Necessarias no ambiente do Supabase:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Observacoes operacionais:
+
+- a function usa service role para validar QR Code de relatório contra o snapshot salvo sem depender da RLS do usuário que abriu o link
+- não exige nova variável no frontend
+
 ### `gerar-contrato-licitacao`
 
 Necessarias no ambiente do Supabase:

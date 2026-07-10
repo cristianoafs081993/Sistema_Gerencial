@@ -61,7 +61,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   buildPriceResearchReportHtml,
+  buildPriceResearchAbcCurve,
+  buildPriceResearchAuthenticationPayload,
+  buildPriceResearchManagementSummary,
   createPriceResearchTemplate,
+  exportPriceResearchCsvBundle,
+  exportPriceResearchHtml,
   exportPriceResearchWorkbook,
   getEstimatedUnitPrice,
   getSelectedStatistics,
@@ -74,6 +79,7 @@ import {
   type PriceResearchItem,
   type PriceResearchMethod,
   type PriceResearchReportData,
+  type PriceResearchReportServer,
 } from '@/lib/priceResearch';
 import { findCatalogSuggestions } from '@/lib/priceCatalogClient';
 import { priceResearchService } from '@/services/priceResearch';
@@ -82,6 +88,14 @@ import { supabase } from '@/lib/supabase';
 import { calculateIndexFactor, type InflationIndexType } from '@/lib/monetaryAdjustment';
 import { SupplierEmailDialog } from '@/components/price-research/SupplierEmailDialog';
 import { SupplierEmailHistory } from '@/components/price-research/SupplierEmailHistory';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const METHOD_OPTIONS: Array<{ value: PriceResearchMethod; label: string }> = [
   { value: 'minimum', label: 'Menor preço' },
@@ -121,6 +135,15 @@ function isMarketCandidate(candidate: PriceResearchCandidate) {
   return !isOfficialCandidate(candidate) && !isLocalCandidate(candidate);
 }
 
+function formatMonetaryAdjustmentIndex(candidate: PriceResearchCandidate) {
+  if (!candidate.monetaryAdjustmentEnabled) return '-';
+
+  return (candidate.monetaryAdjustmentFactor ?? 1).toLocaleString('pt-BR', {
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4,
+  });
+}
+
 const COMPLIANCE_SEVERITY_LABELS: Record<PriceResearchComplianceFinding['severity'], string> = {
   error: 'Bloqueantes',
   warning: 'Alertas',
@@ -133,14 +156,30 @@ const COMPLIANCE_SEVERITY_STYLES: Record<PriceResearchComplianceFinding['severit
   info: 'border-slate-200 bg-slate-50 text-slate-800',
 };
 
+function createReportServer(): PriceResearchReportServer {
+  return {
+    id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `server-${Date.now()}`,
+    name: '',
+    role: '',
+    registration: '',
+    email: '',
+  };
+}
+
 export default function PesquisaPrecos() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
   const [researchId, setResearchId] = useState<string>();
   const [activeStep, setActiveStep] = useState(1);
   const [processNumber, setProcessNumber] = useState('');
   const [objectDescription, setObjectDescription] = useState('');
   const [responsibleName, setResponsibleName] = useState('');
+  const [institutionName, setInstitutionName] = useState('Instituto Federal do Rio Grande do Norte');
+  const [institutionUnit, setInstitutionUnit] = useState('Campus Currais Novos');
+  const [institutionDetails, setInstitutionDetails] = useState('');
+  const [institutionLogo, setInstitutionLogo] = useState('');
+  const [reportServers, setReportServers] = useState<PriceResearchReportServer[]>([]);
   const [researchDate, setResearchDate] = useState(today);
   const [method, setMethod] = useState<PriceResearchMethod>('median');
   const [methodologyJustification, setMethodologyJustification] = useState(
@@ -283,6 +322,11 @@ export default function PesquisaPrecos() {
     setProcessNumber('');
     setObjectDescription('');
     setResponsibleName('');
+    setInstitutionName('Instituto Federal do Rio Grande do Norte');
+    setInstitutionUnit('Campus Currais Novos');
+    setInstitutionDetails('');
+    setInstitutionLogo('');
+    setReportServers([]);
     setResearchDate(today());
     setGlobalAdjustmentEnabled(false);
     setGlobalAdjustmentIndex('IPCA');
@@ -297,6 +341,33 @@ export default function PesquisaPrecos() {
     setSelectedItemId(undefined);
     setCandidateExclusionDraft(null);
     setViewMode('wizard');
+  };
+
+  const handleInstitutionLogoFile = (file?: File) => {
+    if (!file) return;
+    const isAccepted = file.type.startsWith('image/') || file.name.toLowerCase().endsWith('.svg');
+    if (!isAccepted) {
+      toast.error('Use uma imagem PNG, JPG, WebP ou SVG para o logotipo.');
+      return;
+    }
+    if (file.size > 1_000_000) {
+      toast.error('O logotipo deve ter no máximo 1 MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setInstitutionLogo(String(reader.result || ''));
+      toast.success('Logotipo adicionado ao relatório.');
+    };
+    reader.onerror = () => toast.error('Não foi possível ler o arquivo do logotipo.');
+    reader.readAsDataURL(file);
+  };
+
+  const updateReportServer = (id: string, patch: Partial<PriceResearchReportServer>) => {
+    setReportServers((current) => current.map((server) => (
+      server.id === id ? { ...server, ...patch } : server
+    )));
   };
 
   const resolveDirectPncpLinks = async (targetItems: PriceResearchItem[]): Promise<PriceResearchItem[]> => {
@@ -576,6 +647,11 @@ export default function PesquisaPrecos() {
     processNumber,
     objectDescription,
     responsibleName,
+    institutionName,
+    institutionUnit,
+    institutionDetails,
+    institutionLogo,
+    reportServers,
     researchDate,
     method,
     methodologyJustification,
@@ -584,15 +660,36 @@ export default function PesquisaPrecos() {
     items,
   }), [
     items,
+    institutionDetails,
+    institutionLogo,
+    institutionName,
+    institutionUnit,
     method,
     methodologyJustification,
     notes,
     objectDescription,
     processNumber,
+    reportServers,
     researchDate,
     responsibleName,
     sourceFile,
   ]);
+
+  const managementSummary = useMemo(
+    () => buildPriceResearchManagementSummary(reportData),
+    [reportData],
+  );
+  const abcCurve = useMemo(
+    () => buildPriceResearchAbcCurve(reportData),
+    [reportData],
+  );
+  const authenticationPayload = useMemo(
+    () => buildPriceResearchAuthenticationPayload(reportData, {
+      origin: typeof window !== 'undefined' ? window.location.origin : '',
+      researchId: researchId ?? undefined,
+    }),
+    [reportData, researchId],
+  );
 
   const updateItem = (localId: string, patch: Partial<PriceResearchItem>) => {
     setItems((current) => current.map((item) => {
@@ -1208,7 +1305,10 @@ export default function PesquisaPrecos() {
       toast.error('O navegador bloqueou a abertura do relatório.');
       return;
     }
-    printWindow.document.write(buildPriceResearchReportHtml(reportDataWithEmbeddedImages));
+    printWindow.document.write(buildPriceResearchReportHtml(reportDataWithEmbeddedImages, {
+      researchId: saved,
+      authenticationData: reportData,
+    }));
     printWindow.document.close();
     printWindow.focus();
     window.setTimeout(() => printWindow.print(), 500);
@@ -1224,6 +1324,11 @@ export default function PesquisaPrecos() {
       setProcessNumber(record.processNumber);
       setObjectDescription(record.objectDescription);
       setResponsibleName(record.responsibleName);
+      setInstitutionName(record.institutionName || 'Instituto Federal do Rio Grande do Norte');
+      setInstitutionUnit(record.institutionUnit || 'Campus Currais Novos');
+      setInstitutionDetails(record.institutionDetails || '');
+      setInstitutionLogo(record.institutionLogo || '');
+      setReportServers(record.reportServers || []);
       setResearchDate(record.researchDate);
       setMethod(record.method);
       setMethodologyJustification(record.methodologyJustification);
@@ -1584,6 +1689,35 @@ export default function PesquisaPrecos() {
           <Mail className="h-4 w-4" />
           Solicitar Cotação
         </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button type="button" variant="outline" className="gap-2" disabled={items.length === 0 || isSaving}>
+              <Download className="h-4 w-4" />
+              Exportar
+              <ChevronDown className="h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>Formatos</DropdownMenuLabel>
+            <DropdownMenuItem onSelect={(event) => { event.preventDefault(); void printReport(); }} className="gap-2">
+              <Printer className="h-4 w-4" />
+              PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => exportPriceResearchHtml(reportData, { researchId: researchId ?? undefined })} className="gap-2">
+              <Globe className="h-4 w-4" />
+              HTML
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void exportPriceResearchWorkbook(reportData, { researchId: researchId ?? undefined })} className="gap-2">
+              <FileSpreadsheet className="h-4 w-4" />
+              Excel
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => exportPriceResearchCsvBundle(reportData, { researchId: researchId ?? undefined })} className="gap-2">
+              <FileDown className="h-4 w-4" />
+              CSV
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button type="button" className="gap-2 bg-primary hover:bg-primary-hover text-primary-foreground" onClick={() => void printReport()} disabled={items.length === 0 || isSaving}>
           <Printer className="h-4 w-4" />
           Gerar relatório
@@ -1608,6 +1742,16 @@ export default function PesquisaPrecos() {
         accept=".xlsx,.xls,.csv,.pdf,application/pdf"
         className="hidden"
         onChange={(event) => void handleFile(event.target.files?.[0])}
+      />
+      <input
+        ref={logoInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/svg+xml"
+        className="hidden"
+        onChange={(event) => {
+          handleInstitutionLogoFile(event.target.files?.[0]);
+          event.currentTarget.value = '';
+        }}
       />
 
       {/* STEP 1: IDENTIFICAÇÃO & PLANILHA */}
@@ -1653,6 +1797,160 @@ export default function PesquisaPrecos() {
                 <Label htmlFor="methodology">Justificativa da Metodologia Adotada</Label>
                 <Textarea id="methodology" value={methodologyJustification} onChange={(event) => setMethodologyJustification(event.target.value)} rows={2} />
               </div>
+            </div>
+          </SectionPanel>
+
+          <SectionPanel
+            title="Personalização do relatório"
+            description="Logotipo, identificação institucional e servidores exibidos no cabeçalho e nas exportações."
+          >
+            <div className="grid gap-5 lg:grid-cols-[1fr_240px]">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="institution-name">Instituição</Label>
+                  <Input
+                    id="institution-name"
+                    value={institutionName}
+                    onChange={(event) => setInstitutionName(event.target.value)}
+                    placeholder="Nome da instituição"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="institution-unit">Unidade/Setor</Label>
+                  <Input
+                    id="institution-unit"
+                    value={institutionUnit}
+                    onChange={(event) => setInstitutionUnit(event.target.value)}
+                    placeholder="Campus, secretaria, departamento ou setor"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="institution-details">Dados complementares</Label>
+                  <Textarea
+                    id="institution-details"
+                    rows={3}
+                    value={institutionDetails}
+                    onChange={(event) => setInstitutionDetails(event.target.value)}
+                    placeholder="Endereço, telefone, CNPJ, e-mail institucional..."
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-radius-lg border border-border-default bg-surface-subtle/40 p-4">
+                <div className="flex h-28 items-center justify-center rounded-radius-md border border-dashed border-border-default bg-white p-3">
+                  {institutionLogo ? (
+                    <img
+                      src={institutionLogo}
+                      alt="Logotipo da instituição"
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  ) : (
+                    <span className="font-ui text-xs font-semibold text-text-muted">Sem logotipo</span>
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-3 w-full gap-2"
+                  onClick={() => logoInputRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4" />
+                  Enviar logotipo
+                </Button>
+                {institutionLogo ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="mt-2 w-full text-destructive hover:text-destructive"
+                    onClick={() => setInstitutionLogo('')}
+                  >
+                    Remover logotipo
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h4 className="font-ui text-sm font-bold text-text-primary">Servidores</h4>
+                  <p className="font-ui text-xs text-text-muted">
+                    Nome, função no processo, matrícula/SIAPE e e-mail exibidos no relatório.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 self-start"
+                  onClick={() => setReportServers((current) => [...current, createReportServer()])}
+                >
+                  <Plus className="h-4 w-4" />
+                  Adicionar servidor
+                </Button>
+              </div>
+
+              {reportServers.length === 0 ? (
+                <div className="rounded-radius-lg border border-dashed border-border-default bg-white px-4 py-5 text-center font-ui text-xs text-text-muted">
+                  Nenhum servidor adicional informado.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {reportServers.map((server, index) => (
+                    <div key={server.id} className="grid gap-3 rounded-radius-lg border border-border-default bg-white p-4 lg:grid-cols-[1.2fr_1fr_0.8fr_1fr_auto]">
+                      <div className="space-y-2">
+                        <Label htmlFor={`server-name-${server.id}`}>Nome</Label>
+                        <Input
+                          id={`server-name-${server.id}`}
+                          value={server.name}
+                          onChange={(event) => updateReportServer(server.id, { name: event.target.value })}
+                          placeholder={`Servidor ${index + 1}`}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`server-role-${server.id}`}>Função</Label>
+                        <Input
+                          id={`server-role-${server.id}`}
+                          value={server.role}
+                          onChange={(event) => updateReportServer(server.id, { role: event.target.value })}
+                          placeholder="Responsável, apoio, fiscal..."
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`server-registration-${server.id}`}>Matrícula/SIAPE</Label>
+                        <Input
+                          id={`server-registration-${server.id}`}
+                          value={server.registration}
+                          onChange={(event) => updateReportServer(server.id, { registration: event.target.value })}
+                          placeholder="0000000"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`server-email-${server.id}`}>E-mail</Label>
+                        <Input
+                          id={`server-email-${server.id}`}
+                          type="email"
+                          value={server.email ?? ''}
+                          onChange={(event) => updateReportServer(server.id, { email: event.target.value })}
+                          placeholder="nome@instituicao.gov.br"
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-10 w-10 text-destructive hover:text-destructive"
+                          onClick={() => setReportServers((current) => current.filter((entry) => entry.id !== server.id))}
+                          aria-label={`Remover servidor ${index + 1}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </SectionPanel>
 
@@ -2492,7 +2790,7 @@ export default function PesquisaPrecos() {
                       title={`Cotações do PNCP - Item ${selectedItem.itemNumber}`}
                       description="Selecione as referências oficiais do PNCP mais compatíveis tecnicamente. Exclusões precisam de justificativa descritiva."
                       actions={(
-                        <Button type="button" variant="outline" className="gap-2 h-9 text-xs" onClick={() => void exportPriceResearchWorkbook(reportData)}>
+                        <Button type="button" variant="outline" className="gap-2 h-9 text-xs" onClick={() => void exportPriceResearchWorkbook(reportData, { researchId: researchId ?? undefined })}>
                           <Download className="h-3.5 w-3.5" />
                           Exportar XLSX
                         </Button>
@@ -2506,14 +2804,15 @@ export default function PesquisaPrecos() {
                             <TableHead>Órgão e Fornecedor</TableHead>
                             <TableHead>Unidade</TableHead>
                             <TableHead className="text-right">Preço Original</TableHead>
-                            <TableHead className="text-right w-24">Frete (R$)</TableHead>
+                            {globalAdjustmentEnabled && (
+                              <TableHead className="text-right w-44">Índice de atualização monetária</TableHead>
+                            )}
                             {!globalAdjustmentEnabled ? (
                               <TableHead className="text-right">Preço Base</TableHead>
                             ) : (
                               <TableHead className="text-right">Preço Ajustado</TableHead>
                             )}
                             <TableHead className="text-right">Divergência (%)</TableHead>
-                            <TableHead className="text-center w-28">Evidência</TableHead>
                             <TableHead className="text-center w-20">Excluir</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -2522,7 +2821,7 @@ export default function PesquisaPrecos() {
                             const pncpCandidates = selectedItem.candidates.filter(isOfficialCandidate);
                             return pncpCandidates.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={12} className="text-center py-8 text-text-muted text-xs">
+                                <TableCell colSpan={globalAdjustmentEnabled ? 9 : 8} className="text-center py-8 text-text-muted text-xs">
                                   Nenhuma cotação do PNCP localizada para este item.
                                 </TableCell>
                               </TableRow>
@@ -2640,28 +2939,11 @@ export default function PesquisaPrecos() {
                                   </TableCell>
                                   <TableCell className="font-mono text-xs">{candidate.originalUnitLabel}</TableCell>
                                   <TableCell className="text-right font-mono text-xs">{formatCurrency(candidate.originalUnitPrice)}</TableCell>
-                                  <TableCell className="text-right w-24">
-                                    {!isOfficialCandidate(candidate) ? (
-                                      <Input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        placeholder="0,00"
-                                        aria-label="Frete"
-                                        className="h-7 text-right font-mono text-xs w-20 ml-auto px-1.5"
-                                        value={candidate.freightCost ?? ''}
-                                        onChange={(e) => {
-                                          const freight = e.target.value === '' ? undefined : Math.max(0, parseFloat(e.target.value) || 0);
-                                          updateCandidate(selectedItem.localId, candidate.id, {
-                                            freightCost: freight,
-                                            comparableUnitPrice: candidate.originalUnitPrice + (freight ?? 0),
-                                          });
-                                        }}
-                                      />
-                                    ) : (
-                                      <span className="text-xs text-text-muted font-mono">-</span>
-                                    )}
-                                  </TableCell>
+                                  {globalAdjustmentEnabled && (
+                                    <TableCell className="text-right font-mono text-[11px] text-text-secondary">
+                                      {formatMonetaryAdjustmentIndex(candidate)}
+                                    </TableCell>
+                                  )}
                                   {!globalAdjustmentEnabled ? (
                                     <TableCell className="text-right font-mono text-xs">{formatCurrency(candidate.comparableUnitPrice)}</TableCell>
                                   ) : (
@@ -2689,42 +2971,6 @@ export default function PesquisaPrecos() {
                                       }
                                       return <span className="text-text-muted">0.0%</span>;
                                     })()}
-                                  </TableCell>
-                                  <TableCell className="text-center">
-                                    {candidate.selected && !isOfficialCandidate(candidate) ? (
-                                      candidate.evidenceImage && candidate.evidenceImage.startsWith('http') ? (
-                                        <Button
-                                          type="button"
-                                          variant="outline"
-                                          size="sm"
-                                          className="h-8 px-2.5 text-xs gap-1 border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 transition-all font-semibold"
-                                          onClick={() => setPreviewCandidate(candidate)}
-                                          title="Visualizar print da evidência"
-                                        >
-                                          <Image className="h-3.5 w-3.5" />
-                                          Ver Print
-                                        </Button>
-                                      ) : (
-                                        <Button
-                                          type="button"
-                                          variant="outline"
-                                          size="sm"
-                                          className="h-8 px-2.5 text-xs gap-1 border-border-default hover:border-primary/30 text-text-secondary hover:text-primary transition-all font-semibold"
-                                          onClick={() => void handleCaptureEvidence(candidate.id, candidate.sourceUrl, candidate.originalUnitPrice)}
-                                          disabled={capturingCandidateId === candidate.id}
-                                          title="Capturar print da página em tempo real"
-                                        >
-                                          {capturingCandidateId === candidate.id ? (
-                                            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                                          ) : (
-                                            <Camera className="h-3.5 w-3.5 text-primary" />
-                                          )}
-                                          Tirar Print
-                                        </Button>
-                                      )
-                                    ) : (
-                                      <span className="text-xs text-text-muted">-</span>
-                                    )}
                                   </TableCell>
                                   <TableCell className="text-center">
                                     <Button
@@ -3307,6 +3553,71 @@ export default function PesquisaPrecos() {
                       </tr>
                     );
                   })}
+                </tbody>
+              </table>
+            </div>
+          </SectionPanel>
+
+          <SectionPanel
+            title="Relatório gerencial e autenticação"
+            description="Consolidação executiva, curva ABC e QR Code gerados a partir do snapshot revisado."
+          >
+            <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  ['Estimativa geral', formatCurrency(managementSummary.estimatedTotal)],
+                  ['Selecionadas', managementSummary.selectedQuotesCount.toString()],
+                  ['Excluídas', managementSummary.excludedQuotesCount.toString()],
+                  ['Classe A/B/C', `${managementSummary.abcClassTotals.A}/${managementSummary.abcClassTotals.B}/${managementSummary.abcClassTotals.C}`],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-radius-lg border border-border-default bg-surface-subtle/40 p-4">
+                    <p className="font-ui text-[10px] font-semibold uppercase tracking-wider text-text-muted leading-none">{label}</p>
+                    <p className="mt-2 truncate font-ui text-lg font-bold text-text-primary leading-none">{value}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-radius-lg border border-border-default bg-white p-4">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={authenticationPayload.qrCodeUrl}
+                    alt="QR Code de autenticação do relatório"
+                    className="h-24 w-24 shrink-0 rounded-radius-sm border border-border-default bg-white p-1"
+                  />
+                  <div className="min-w-0">
+                    <p className="font-ui text-[10px] font-bold uppercase tracking-wider text-text-muted">Hash do snapshot</p>
+                    <p className="mt-1 break-all font-mono text-[11px] font-bold text-text-primary">{authenticationPayload.snapshotHash}</p>
+                    <p className="mt-2 truncate font-ui text-[10px] text-text-muted">{authenticationPayload.reportVersion}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
+              <table className="w-full border-collapse text-left font-ui text-[11px]">
+                <thead>
+                  <tr className="border-b border-border-default bg-surface-subtle text-text-muted font-bold">
+                    <th className="py-3 px-4 w-16">Classe</th>
+                    <th className="py-3 px-4 w-16">Item</th>
+                    <th className="py-3 px-4 min-w-[220px]">Descrição</th>
+                    <th className="py-3 px-4 text-right w-32">Participação</th>
+                    <th className="py-3 px-4 text-right w-32">Acumulado</th>
+                    <th className="py-3 px-4 text-right w-36">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-default/60">
+                  {abcCurve.slice(0, 8).map((row) => (
+                    <tr key={row.itemId} className="hover:bg-surface-subtle/50 transition-colors">
+                      <td className="py-3 px-4">
+                        <Badge variant="outline" className="bg-white font-mono text-[10px]">ABC {row.abcClass}</Badge>
+                      </td>
+                      <td className="py-3 px-4 font-mono font-bold">{row.itemNumber}</td>
+                      <td className="py-3 px-4 text-text-secondary">{row.description}</td>
+                      <td className="py-3 px-4 text-right font-mono">{row.participationPercentage.toFixed(2)}%</td>
+                      <td className="py-3 px-4 text-right font-mono">{row.accumulatedPercentage.toFixed(2)}%</td>
+                      <td className="py-3 px-4 text-right font-mono font-bold">{formatCurrency(row.estimatedTotal)}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

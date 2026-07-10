@@ -57,6 +57,28 @@ Observacao:
 - ao perder a sessao, qualquer rota protegida redireciona novamente para `/auth`
 - botoes de upload/importacao no frontend so aparecem para o superadministrador autenticado
 
+## 1B. Validação de relatório de pesquisa de preços
+
+Uso:
+
+- validação do QR Code emitido nos relatórios de pesquisa de preços
+
+Arquivos:
+
+- [PriceResearchValidation.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/PriceResearchValidation.tsx)
+- [priceResearch.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/priceResearch.ts)
+- [validar-pesquisa-precos/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/validar-pesquisa-precos/index.ts)
+
+Contrato:
+
+- o frontend chama a Edge Function `validar-pesquisa-precos` com `id` e `auth`
+- a function usa service role para ler o snapshot salvo, recalcular o hash e devolver somente o resultado da conferência
+- a rota `/pesquisa-precos/validar` não exige que o usuário autenticado seja o dono da pesquisa
+
+Credenciais necessárias:
+
+- `SUPABASE_SERVICE_ROLE_KEY` no ambiente da Edge Function
+
 ## 2. Supabase REST fallback
 
 Uso:

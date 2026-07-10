@@ -3,6 +3,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   analyzePriceResearchCompliance,
+  buildPriceResearchAbcCurve,
+  buildPriceResearchAuthenticationPayload,
+  buildPriceResearchComparisonMap,
+  buildPriceResearchReportHtml,
+  buildPriceResearchManagementSummary,
   calculatePriceStatistics,
   getEstimatedUnitPrice,
   getSelectedStatistics,
@@ -319,5 +324,79 @@ describe('priceResearch', () => {
 
     // O preço original (comparableUnitPrice) deve permanecer intacto (100)
     expect(item.candidates[0].comparableUnitPrice).toBe(100);
+  });
+
+  it('gera resumo gerencial, curva ABC, mapa comparativo e hash de autenticacao', () => {
+    const firstItem = createItem();
+    firstItem.quantity = 10;
+    firstItem.candidates.forEach((entry) => {
+      entry.comparableUnitPrice = 100;
+      entry.originalUnitPrice = 100;
+    });
+
+    const secondItem = createItem();
+    secondItem.localId = 'item-2';
+    secondItem.itemNumber = '2';
+    secondItem.description = 'Acucar cristal';
+    secondItem.quantity = 2;
+    secondItem.candidates.forEach((entry) => {
+      entry.id = `item-2-${entry.id}`;
+      entry.comparableUnitPrice = 50;
+      entry.originalUnitPrice = 50;
+    });
+    secondItem.candidates[2].selected = false;
+    secondItem.candidates[2].exclusionReason = 'Preco desconsiderado por baixa comparabilidade.';
+
+    const report = createReport(firstItem, {
+      items: [firstItem, secondItem],
+      institutionName: 'IFRN',
+      institutionUnit: 'Campus Currais Novos',
+      institutionDetails: 'CNPJ 00.000.000/0001-00',
+      institutionLogo: 'data:image/png;base64,logo',
+      reportServers: [{
+        id: 'server-1',
+        name: 'Maria Silva',
+        role: 'Equipe de apoio',
+        registration: '1234567',
+        email: 'maria.silva@ifrn.edu.br',
+      }],
+    });
+    const summary = buildPriceResearchManagementSummary(report);
+    const abc = buildPriceResearchAbcCurve(report);
+    const map = buildPriceResearchComparisonMap(report);
+    const authentication = buildPriceResearchAuthenticationPayload(report, {
+      origin: 'https://app.example.test',
+      researchId: 'research-1',
+      generatedAt: '2026-07-10T12:00:00.000Z',
+    });
+
+    expect(summary).toMatchObject({
+      itemsCount: 2,
+      selectedQuotesCount: 5,
+      excludedQuotesCount: 1,
+      officialQuotesCount: 6,
+      estimatedTotal: 1100,
+    });
+    expect(abc.map((row) => [row.itemNumber, row.abcClass])).toEqual([
+      ['1', 'A'],
+      ['2', 'B'],
+    ]);
+    expect(map).toHaveLength(6);
+    expect(map[0]).toMatchObject({
+      itemNumber: '1',
+      selected: true,
+      estimatedUnitPrice: 100,
+      deviationPercentage: 0,
+    });
+    expect(authentication.snapshotHash).toMatch(/^[0-9a-f]{16}$/);
+    expect(authentication.verificationUrl).toContain('https://app.example.test/pesquisa-precos/validar?auth=');
+    expect(authentication.verificationUrl).toContain('&id=research-1');
+    expect(authentication.qrCodeUrl).toContain('api.qrserver.com');
+
+    const html = buildPriceResearchReportHtml(report);
+    expect(html).toContain('IFRN');
+    expect(html).toContain('Campus Currais Novos');
+    expect(html).toContain('Maria Silva');
+    expect(html).toContain('data:image/png;base64,logo');
   });
 });

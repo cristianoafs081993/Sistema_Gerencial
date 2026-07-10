@@ -105,11 +105,82 @@ export type PriceResearchStatistics = {
   amplitudeDivergence: number;
 };
 
+export type PriceResearchManagementSummary = {
+  itemsCount: number;
+  selectedQuotesCount: number;
+  excludedQuotesCount: number;
+  officialQuotesCount: number;
+  marketQuotesCount: number;
+  localQuotesCount: number;
+  estimatedTotal: number;
+  abcClassTotals: Record<PriceResearchAbcClass, number>;
+};
+
+export type PriceResearchAbcClass = 'A' | 'B' | 'C';
+
+export type PriceResearchAbcRow = {
+  itemId: string;
+  itemNumber: string;
+  description: string;
+  quantity: number;
+  estimatedUnitPrice: number;
+  estimatedTotal: number;
+  accumulatedTotal: number;
+  accumulatedPercentage: number;
+  participationPercentage: number;
+  abcClass: PriceResearchAbcClass;
+};
+
+export type PriceResearchComparisonRow = {
+  itemNumber: string;
+  itemDescription: string;
+  source: string;
+  supplier: string;
+  agency: string;
+  state: string;
+  municipality: string;
+  purchaseDate: string | null;
+  selected: boolean;
+  unitCompatible: boolean;
+  unitPrice: number;
+  estimatedUnitPrice: number;
+  deviationPercentage: number;
+  exclusionReason: string;
+};
+
+export type PriceResearchAuthenticationPayload = {
+  snapshotHash: string;
+  verificationUrl: string;
+  qrCodeUrl: string;
+  generatedAt: string;
+  reportVersion: string;
+};
+
+export type PriceResearchAuthenticationOptions = {
+  origin?: string;
+  researchId?: string;
+  generatedAt?: string;
+  authenticationData?: PriceResearchReportData;
+};
+
+export type PriceResearchReportServer = {
+  id: string;
+  name: string;
+  role: string;
+  registration: string;
+  email?: string;
+};
+
 export type PriceResearchReportData = {
   title: string;
   processNumber: string;
   objectDescription: string;
   responsibleName: string;
+  institutionName?: string;
+  institutionUnit?: string;
+  institutionDetails?: string;
+  institutionLogo?: string;
+  reportServers?: PriceResearchReportServer[];
   researchDate: string;
   method: PriceResearchMethod;
   methodologyJustification: string;
@@ -564,6 +635,189 @@ export function getEstimatedUnitPrice(item: PriceResearchItem, method: PriceRese
   return statistics.median;
 }
 
+function getCandidateEffectivePrice(candidate: PriceResearchCandidate) {
+  return candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice;
+}
+
+export function buildPriceResearchAbcCurve(data: PriceResearchReportData): PriceResearchAbcRow[] {
+  const rows = data.items
+    .map((item) => {
+      const estimatedUnitPrice = getEstimatedUnitPrice(item, data.method);
+      return {
+        itemId: item.localId,
+        itemNumber: item.itemNumber,
+        description: item.description,
+        quantity: item.quantity,
+        estimatedUnitPrice,
+        estimatedTotal: estimatedUnitPrice * item.quantity,
+      };
+    })
+    .sort((left, right) => right.estimatedTotal - left.estimatedTotal);
+
+  const grandTotal = rows.reduce((total, row) => total + row.estimatedTotal, 0);
+  let accumulatedTotal = 0;
+
+  return rows.map((row) => {
+    const previousAccumulatedPercentage = grandTotal > 0 ? (accumulatedTotal / grandTotal) * 100 : 0;
+    accumulatedTotal += row.estimatedTotal;
+    const accumulatedPercentage = grandTotal > 0 ? (accumulatedTotal / grandTotal) * 100 : 0;
+    const participationPercentage = grandTotal > 0 ? (row.estimatedTotal / grandTotal) * 100 : 0;
+    const abcClass: PriceResearchAbcClass = previousAccumulatedPercentage < 80
+      ? 'A'
+      : previousAccumulatedPercentage < 95
+        ? 'B'
+        : 'C';
+
+    return {
+      ...row,
+      accumulatedTotal,
+      accumulatedPercentage,
+      participationPercentage,
+      abcClass,
+    };
+  });
+}
+
+export function buildPriceResearchComparisonMap(data: PriceResearchReportData): PriceResearchComparisonRow[] {
+  return data.items.flatMap((item) => {
+    const estimatedUnitPrice = getEstimatedUnitPrice(item, data.method);
+    return item.candidates.map((candidate) => {
+      const unitPrice = getCandidateEffectivePrice(candidate);
+      return {
+        itemNumber: item.itemNumber,
+        itemDescription: item.description,
+        source: candidate.sourceLabel,
+        supplier: candidate.supplierName || '-',
+        agency: [candidate.agencyCode, candidate.agencyName].filter(Boolean).join(' - ') || '-',
+        state: candidate.state || '-',
+        municipality: candidate.municipality || '-',
+        purchaseDate: candidate.resultDate || candidate.purchaseDate,
+        selected: candidate.selected,
+        unitCompatible: candidate.unitCompatible,
+        unitPrice,
+        estimatedUnitPrice,
+        deviationPercentage: estimatedUnitPrice > 0 ? ((unitPrice - estimatedUnitPrice) / estimatedUnitPrice) * 100 : 0,
+        exclusionReason: candidate.exclusionReason,
+      };
+    });
+  });
+}
+
+export function buildPriceResearchManagementSummary(data: PriceResearchReportData): PriceResearchManagementSummary {
+  const abcRows = buildPriceResearchAbcCurve(data);
+  const allCandidates = data.items.flatMap((item) => item.candidates);
+  return {
+    itemsCount: data.items.length,
+    selectedQuotesCount: allCandidates.filter((candidate) => candidate.selected).length,
+    excludedQuotesCount: allCandidates.filter((candidate) => !candidate.selected).length,
+    officialQuotesCount: allCandidates.filter((candidate) => candidate.sourceType === 'compras_gov_precos').length,
+    marketQuotesCount: allCandidates.filter((candidate) => candidate.sourceType !== 'compras_gov_precos' && candidate.sourceType !== 'custom').length,
+    localQuotesCount: allCandidates.filter((candidate) => candidate.sourceType === 'custom').length,
+    estimatedTotal: abcRows.reduce((total, row) => total + row.estimatedTotal, 0),
+    abcClassTotals: {
+      A: abcRows.filter((row) => row.abcClass === 'A').length,
+      B: abcRows.filter((row) => row.abcClass === 'B').length,
+      C: abcRows.filter((row) => row.abcClass === 'C').length,
+    },
+  };
+}
+
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function createStableHash(value: string) {
+  let hash = 0xcbf29ce484222325n;
+  const prime = 0x100000001b3n;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= BigInt(value.charCodeAt(index));
+    hash = BigInt.asUintN(64, hash * prime);
+  }
+  return hash.toString(16).padStart(16, '0');
+}
+
+export function buildPriceResearchAuthenticationPayload(
+  data: PriceResearchReportData,
+  options: PriceResearchAuthenticationOptions = {},
+): PriceResearchAuthenticationPayload {
+  const generatedAt = options.generatedAt ?? new Date().toISOString();
+  const snapshot = {
+    title: data.title,
+    processNumber: data.processNumber,
+    objectDescription: data.objectDescription,
+    responsibleName: data.responsibleName,
+    institutionName: data.institutionName,
+    institutionUnit: data.institutionUnit,
+    institutionDetails: data.institutionDetails,
+    institutionLogo: data.institutionLogo,
+    reportServers: data.reportServers,
+    researchDate: data.researchDate,
+    method: data.method,
+    methodologyJustification: data.methodologyJustification,
+    notes: data.notes,
+    sourceFile: data.sourceFile,
+    items: data.items.map((item) => ({
+      localId: item.localId,
+      itemNumber: item.itemNumber,
+      description: item.description,
+      catalogType: item.catalogType,
+      catalogCode: item.catalogCode,
+      quantity: item.quantity,
+      unit: item.unit,
+      targetCapacity: item.targetCapacity,
+      targetMeasureUnit: item.targetMeasureUnit,
+      referenceUnitCost: item.referenceUnitCost,
+      candidates: item.candidates.map((candidate) => ({
+        id: candidate.id,
+        sourceType: candidate.sourceType,
+        sourceLabel: candidate.sourceLabel,
+        sourceUrl: candidate.sourceUrl,
+        purchaseId: candidate.purchaseId,
+        purchaseItemId: candidate.purchaseItemId,
+        purchaseDate: candidate.purchaseDate,
+        resultDate: candidate.resultDate,
+        supplierDocument: candidate.supplierDocument,
+        supplierName: candidate.supplierName,
+        agencyCode: candidate.agencyCode,
+        agencyName: candidate.agencyName,
+        state: candidate.state,
+        municipality: candidate.municipality,
+        description: candidate.description,
+        quantity: candidate.quantity,
+        originalUnitPrice: candidate.originalUnitPrice,
+        comparableUnitPrice: candidate.comparableUnitPrice,
+        monetaryAdjustedPrice: candidate.monetaryAdjustedPrice,
+        originalUnitLabel: candidate.originalUnitLabel,
+        unitCompatible: candidate.unitCompatible,
+        selected: candidate.selected,
+        exclusionReason: candidate.exclusionReason,
+      })),
+    })),
+  };
+  const snapshotHash = createStableHash(stableStringify(snapshot));
+  const origin = options.origin || '';
+  const verificationPath = `/pesquisa-precos/validar?auth=${encodeURIComponent(snapshotHash)}${options.researchId ? `&id=${encodeURIComponent(options.researchId)}` : ''}`;
+  const verificationUrl = origin ? `${origin}${verificationPath}` : verificationPath;
+  const qrData = `Pesquisa de precos\nHash: ${snapshotHash}\nProcesso: ${data.processNumber || '-'}\nObjeto: ${data.objectDescription}\nURL: ${verificationUrl}`;
+
+  return {
+    snapshotHash,
+    verificationUrl,
+    qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrData)}`,
+    generatedAt,
+    reportVersion: 'price-research-management-v1',
+  };
+}
+
 function parseDate(value?: string | null) {
   if (!value) return null;
   const date = new Date(value.length <= 10 ? `${value.slice(0, 10)}T12:00:00` : value);
@@ -953,8 +1207,35 @@ function complianceSeverityLabel(severity: PriceResearchComplianceSeverity) {
   return 'Informativo';
 }
 
-export function buildPriceResearchReportHtml(data: PriceResearchReportData) {
+export function buildPriceResearchReportHtml(data: PriceResearchReportData, options: PriceResearchAuthenticationOptions = {}) {
   const complianceFindings = analyzePriceResearchCompliance(data);
+  const managementSummary = buildPriceResearchManagementSummary(data);
+  const abcRows = buildPriceResearchAbcCurve(data);
+  const comparisonRows = buildPriceResearchComparisonMap(data);
+  const reportServers = (data.reportServers ?? []).filter((server) => server.name.trim());
+  const institutionHeader = `
+    <div class="report-header">
+      ${data.institutionLogo ? `<img class="institution-logo" src="${escapeHtml(data.institutionLogo)}" alt="Logotipo da instituicao" />` : ''}
+      <div>
+        <div class="institution-name">${escapeHtml(data.institutionName || 'Instituicao nao informada')}</div>
+        ${data.institutionUnit ? `<div class="institution-unit">${escapeHtml(data.institutionUnit)}</div>` : ''}
+        ${data.institutionDetails ? `<div class="institution-details">${escapeHtml(data.institutionDetails).replace(/\n/g, '<br />')}</div>` : ''}
+      </div>
+    </div>
+  `;
+  const serverRows = reportServers.map((server) => `
+    <tr>
+      <td>${escapeHtml(server.name)}</td>
+      <td>${escapeHtml(server.role || '-')}</td>
+      <td>${escapeHtml(server.registration || '-')}</td>
+      <td>${escapeHtml(server.email || '-')}</td>
+    </tr>
+  `).join('');
+  const authentication = buildPriceResearchAuthenticationPayload(options.authenticationData ?? data, {
+    origin: typeof window !== 'undefined' ? window.location.origin : '',
+    ...options,
+    authenticationData: undefined,
+  });
   const complianceRows = complianceFindings.map((finding) => `
     <tr>
       <td>${escapeHtml(complianceSeverityLabel(finding.severity))}</td>
@@ -963,6 +1244,47 @@ export function buildPriceResearchReportHtml(data: PriceResearchReportData) {
       <td>${escapeHtml(finding.message)}</td>
       <td>${escapeHtml(finding.evidence)}</td>
       <td>${escapeHtml(finding.recommendedAction)}</td>
+    </tr>
+  `).join('');
+
+  const summaryRows = [
+    ['Itens', managementSummary.itemsCount],
+    ['Cotacoes selecionadas', managementSummary.selectedQuotesCount],
+    ['Cotacoes excluidas', managementSummary.excludedQuotesCount],
+    ['Fontes oficiais', managementSummary.officialQuotesCount],
+    ['Pesquisa de mercado', managementSummary.marketQuotesCount],
+    ['Fornecedores locais', managementSummary.localQuotesCount],
+    ['Classe A', managementSummary.abcClassTotals.A],
+    ['Estimativa geral', formatCurrency(managementSummary.estimatedTotal)],
+  ].map(([label, value]) => `
+    <div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>
+  `).join('');
+
+  const abcHtmlRows = abcRows.map((row) => `
+    <tr>
+      <td>${escapeHtml(row.itemNumber)}</td>
+      <td>${escapeHtml(row.description)}</td>
+      <td class="number">${formatCurrency(row.estimatedUnitPrice)}</td>
+      <td class="number">${formatCurrency(row.estimatedTotal)}</td>
+      <td class="number">${row.participationPercentage.toFixed(2)}%</td>
+      <td class="number">${row.accumulatedPercentage.toFixed(2)}%</td>
+      <td><strong>${row.abcClass}</strong></td>
+    </tr>
+  `).join('');
+
+  const comparisonHtmlRows = comparisonRows.map((row) => `
+    <tr>
+      <td>${escapeHtml(row.itemNumber)}</td>
+      <td>${escapeHtml(row.source)}</td>
+      <td>${escapeHtml(row.supplier)}</td>
+      <td>${escapeHtml(row.agency)}</td>
+      <td>${escapeHtml([row.municipality, row.state].filter((entry) => entry && entry !== '-').join(' / ') || '-')}</td>
+      <td>${formatDate(row.purchaseDate)}</td>
+      <td>${row.selected ? 'Selecionada' : 'Excluida'}</td>
+      <td class="number">${formatCurrency(row.unitPrice)}</td>
+      <td class="number">${formatCurrency(row.estimatedUnitPrice)}</td>
+      <td class="number">${row.deviationPercentage.toFixed(2)}%</td>
+      <td>${escapeHtml(row.exclusionReason || '-')}</td>
     </tr>
   `).join('');
 
@@ -1137,6 +1459,11 @@ export function buildPriceResearchReportHtml(data: PriceResearchReportData) {
         h1 { font-size: 20px; margin: 0 0 4px; color: #1f6f32; }
         h2 { font-size: 14px; margin: 24px 0 8px; color: #1f6f32; }
         h3 { font-size: 12px; margin: 16px 0 6px; }
+        .report-header { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; border-bottom: 2px solid #1f6f32; padding-bottom: 10px; margin-bottom: 12px; }
+        .institution-logo { width: 82px; max-height: 82px; object-fit: contain; }
+        .institution-name { font-size: 16px; font-weight: 700; color: #1f6f32; }
+        .institution-unit { margin-top: 2px; font-size: 12px; font-weight: 700; color: #333; }
+        .institution-details { margin-top: 4px; font-size: 10px; color: #555; line-height: 1.35; }
         .meta { border: 1px solid #d9dfd9; background: #f6faf6; padding: 10px; margin: 12px 0; }
         table { width: 100%; border-collapse: collapse; margin-top: 8px; }
         th, td { border: 1px solid #d7d7d7; padding: 5px; vertical-align: top; }
@@ -1147,10 +1474,14 @@ export function buildPriceResearchReportHtml(data: PriceResearchReportData) {
         .summary span { display: block; color: #666; font-size: 9px; }
         .summary strong { display: block; margin-top: 2px; }
         .footer { margin-top: 24px; border-top: 1px solid #ccc; padding-top: 8px; color: #555; }
+        .auth { display: grid; grid-template-columns: 1fr 190px; gap: 16px; align-items: center; border: 1px solid #d9dfd9; background: #fbfdfb; padding: 12px; margin: 12px 0; }
+        .auth img { width: 160px; height: 160px; object-fit: contain; }
+        .hash { font-family: monospace; word-break: break-all; }
         a { color: #1f5e9c; }
       </style>
     </head>
     <body>
+      ${institutionHeader}
       <h1>${escapeHtml(data.title || 'Relatório de Pesquisa de Preços')}</h1>
       <p>Pesquisa elaborada conforme a Lei nº 14.133/2021 e a IN SEGES/ME nº 65/2021.</p>
       <div class="meta">
@@ -1163,7 +1494,53 @@ export function buildPriceResearchReportHtml(data: PriceResearchReportData) {
         <strong>Justificativa da metodologia:</strong> ${escapeHtml(data.methodologyJustification || 'Método aplicado sobre a série de preços comparáveis selecionados após análise crítica.')}
       </div>
       <p><strong>Caracterização das fontes:</strong> preços homologados disponibilizados pela API oficial de Pesquisa de Preços do Compras.gov.br, com rastreabilidade por compra, item, órgão, UASG, fornecedor e data. O PNCP é apresentado como consulta complementar quando disponível.</p>
+      <section>
+        <h2>Servidores responsaveis e equipe de apoio</h2>
+        <table>
+          <thead><tr><th>Nome</th><th>Funcao no processo</th><th>Matricula/SIAPE</th><th>E-mail</th></tr></thead>
+          <tbody>${serverRows || '<tr><td colspan="4">Nenhum servidor adicional informado.</td></tr>'}</tbody>
+        </table>
+      </section>
+      <div class="auth">
+        <div>
+          <h2 style="margin-top:0">Autenticacao do relatorio</h2>
+          <p>Este QR Code registra a impressao digital do snapshot revisado da pesquisa. A validacao deve comparar o hash abaixo com o hash gerado a partir dos dados salvos.</p>
+          <p><strong>Hash:</strong> <span class="hash">${escapeHtml(authentication.snapshotHash)}</span></p>
+          <p><strong>Gerado em:</strong> ${escapeHtml(new Date(authentication.generatedAt).toLocaleString('pt-BR'))}<br />
+          <strong>Versao:</strong> ${escapeHtml(authentication.reportVersion)}<br />
+          <strong>URL:</strong> <a href="${escapeHtml(authentication.verificationUrl)}">${escapeHtml(authentication.verificationUrl)}</a></p>
+        </div>
+        <div style="text-align:center">
+          <img src="${escapeHtml(authentication.qrCodeUrl)}" alt="QR Code de autenticacao do relatorio" />
+        </div>
+      </div>
+      <section>
+        <h2>Relatorio gerencial consolidado</h2>
+        <div class="summary">${summaryRows}</div>
+      </section>
       ${itemSections}
+      <section>
+        <h2>Curva ABC</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th><th>Descricao</th><th>Preco estimado</th><th>Total estimado</th><th>Participacao</th><th>Acumulado</th><th>Classe</th>
+            </tr>
+          </thead>
+          <tbody>${abcHtmlRows || '<tr><td colspan="7">Nenhum item calculado.</td></tr>'}</tbody>
+        </table>
+      </section>
+      <section>
+        <h2>Mapa comparativo</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th><th>Fonte</th><th>Fornecedor</th><th>Orgao/UASG</th><th>Localidade</th><th>Data</th><th>Status</th><th>Preco</th><th>Estimado</th><th>Divergencia</th><th>Justificativa</th>
+            </tr>
+          </thead>
+          <tbody>${comparisonHtmlRows || '<tr><td colspan="11">Nenhuma cotacao disponivel.</td></tr>'}</tbody>
+        </table>
+      </section>
       <section>
         <h2>Verificação automática de irregularidades</h2>
         <p>A verificação automática usa a IN SEGES/ME nº 65/2021 como apoio técnico e não substitui a análise do agente responsável.</p>
@@ -1207,7 +1584,38 @@ export function createPriceResearchTemplate() {
   XLSX.writeFile(workbook, 'modelo-pesquisa-precos.xlsx');
 }
 
-export async function exportPriceResearchWorkbook(data: PriceResearchReportData) {
+export async function exportPriceResearchWorkbook(data: PriceResearchReportData, options: PriceResearchAuthenticationOptions = {}) {
+  const managementSummary = buildPriceResearchManagementSummary(data);
+  const abcRows = buildPriceResearchAbcCurve(data);
+  const comparisonRows = buildPriceResearchComparisonMap(data);
+  const authentication = buildPriceResearchAuthenticationPayload(data, {
+    origin: typeof window !== 'undefined' ? window.location.origin : '',
+    ...options,
+  });
+  const managementRows = [
+    { Indicador: 'Itens', Valor: managementSummary.itemsCount },
+    { Indicador: 'Cotacoes selecionadas', Valor: managementSummary.selectedQuotesCount },
+    { Indicador: 'Cotacoes excluidas', Valor: managementSummary.excludedQuotesCount },
+    { Indicador: 'Fontes oficiais', Valor: managementSummary.officialQuotesCount },
+    { Indicador: 'Pesquisa de mercado', Valor: managementSummary.marketQuotesCount },
+    { Indicador: 'Fornecedores locais', Valor: managementSummary.localQuotesCount },
+    { Indicador: 'Itens classe A', Valor: managementSummary.abcClassTotals.A },
+    { Indicador: 'Itens classe B', Valor: managementSummary.abcClassTotals.B },
+    { Indicador: 'Itens classe C', Valor: managementSummary.abcClassTotals.C },
+    { Indicador: 'Estimativa geral', Valor: managementSummary.estimatedTotal },
+  ];
+  const institutionRows = [
+    { Campo: 'Instituicao', Valor: data.institutionName || '' },
+    { Campo: 'Unidade/Setor', Valor: data.institutionUnit || '' },
+    { Campo: 'Dados complementares', Valor: data.institutionDetails || '' },
+    { Campo: 'Logotipo informado', Valor: data.institutionLogo ? 'Sim' : 'Nao' },
+  ];
+  const serverSheetRows = (data.reportServers ?? []).map((server) => ({
+    Nome: server.name,
+    Funcao: server.role,
+    MatriculaSiape: server.registration,
+    Email: server.email || '',
+  }));
   const summaryRows = data.items.map((item) => {
     const stats = getSelectedStatistics(item);
     const estimatedUnitPrice = getEstimatedUnitPrice(item, data.method);
@@ -1275,9 +1683,216 @@ export async function exportPriceResearchWorkbook(data: PriceResearchReportData)
     'Ação recomendada': finding.recommendedAction,
   }));
 
+  const abcSheetRows = abcRows.map((row) => ({
+    Item: row.itemNumber,
+    Descricao: row.description,
+    Quantidade: row.quantity,
+    'Preco unitario estimado': row.estimatedUnitPrice,
+    'Valor total estimado': row.estimatedTotal,
+    'Participacao (%)': row.participationPercentage,
+    'Acumulado (%)': row.accumulatedPercentage,
+    Classe: row.abcClass,
+  }));
+
+  const comparisonSheetRows = comparisonRows.map((row) => ({
+    Item: row.itemNumber,
+    Descricao: row.itemDescription,
+    Fonte: row.source,
+    Fornecedor: row.supplier,
+    'Orgao/UASG': row.agency,
+    UF: row.state,
+    Municipio: row.municipality,
+    Data: row.purchaseDate,
+    Selecionado: row.selected ? 'Sim' : 'Nao',
+    'Unidade compativel': row.unitCompatible ? 'Sim' : 'Nao',
+    Preco: row.unitPrice,
+    'Preco estimado': row.estimatedUnitPrice,
+    'Divergencia (%)': row.deviationPercentage,
+    'Justificativa de exclusao': row.exclusionReason,
+  }));
+
+  const authenticationRows = [
+    { Campo: 'Hash do snapshot', Valor: authentication.snapshotHash },
+    { Campo: 'URL de verificacao', Valor: authentication.verificationUrl },
+    { Campo: 'QR Code', Valor: authentication.qrCodeUrl },
+    { Campo: 'Gerado em', Valor: authentication.generatedAt },
+    { Campo: 'Versao do relatorio', Valor: authentication.reportVersion },
+  ];
+
   const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(institutionRows), 'Instituicao');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(serverSheetRows), 'Servidores');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(managementRows), 'Gerencial');
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(summaryRows), 'Resumo');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(abcSheetRows), 'Curva ABC');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(comparisonSheetRows), 'Mapa Comparativo');
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(quoteRows), 'Cotações');
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(complianceRows), 'Conformidade');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(authenticationRows), 'Autenticacao');
   XLSX.writeFile(workbook, 'relatorio-pesquisa-precos.xlsx');
+}
+
+function csvEscape(value: unknown) {
+  const text = String(value ?? '');
+  return /[;"\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function rowsToCsv(rows: Array<Record<string, unknown>>) {
+  if (rows.length === 0) return '';
+  const headers = Object.keys(rows[0]);
+  return [
+    headers.map(csvEscape).join(';'),
+    ...rows.map((row) => headers.map((header) => csvEscape(row[header])).join(';')),
+  ].join('\r\n');
+}
+
+function downloadTextFile(fileName: string, content: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+export function exportPriceResearchHtml(data: PriceResearchReportData, options: PriceResearchAuthenticationOptions = {}) {
+  downloadTextFile(
+    'relatorio-pesquisa-precos.html',
+    buildPriceResearchReportHtml(data, options),
+    'text/html;charset=utf-8',
+  );
+}
+
+export function exportPriceResearchCsvBundle(data: PriceResearchReportData, options: PriceResearchAuthenticationOptions = {}) {
+  const managementSummary = buildPriceResearchManagementSummary(data);
+  const managementRows = [
+    { Indicador: 'Itens', Valor: managementSummary.itemsCount },
+    { Indicador: 'Cotacoes selecionadas', Valor: managementSummary.selectedQuotesCount },
+    { Indicador: 'Cotacoes excluidas', Valor: managementSummary.excludedQuotesCount },
+    { Indicador: 'Fontes oficiais', Valor: managementSummary.officialQuotesCount },
+    { Indicador: 'Pesquisa de mercado', Valor: managementSummary.marketQuotesCount },
+    { Indicador: 'Fornecedores locais', Valor: managementSummary.localQuotesCount },
+    { Indicador: 'Itens classe A', Valor: managementSummary.abcClassTotals.A },
+    { Indicador: 'Itens classe B', Valor: managementSummary.abcClassTotals.B },
+    { Indicador: 'Itens classe C', Valor: managementSummary.abcClassTotals.C },
+    { Indicador: 'Estimativa geral', Valor: managementSummary.estimatedTotal },
+  ];
+  const institutionRows = [
+    { Campo: 'Instituicao', Valor: data.institutionName || '' },
+    { Campo: 'Unidade/Setor', Valor: data.institutionUnit || '' },
+    { Campo: 'Dados complementares', Valor: data.institutionDetails || '' },
+    { Campo: 'Logotipo informado', Valor: data.institutionLogo ? 'Sim' : 'Nao' },
+  ];
+  const serverRows = (data.reportServers ?? []).map((server) => ({
+    Nome: server.name,
+    Funcao: server.role,
+    MatriculaSiape: server.registration,
+    Email: server.email || '',
+  }));
+  const summaryRows = data.items.map((item) => {
+    const stats = getSelectedStatistics(item);
+    const estimatedUnitPrice = getEstimatedUnitPrice(item, data.method);
+    return {
+      Item: item.itemNumber,
+      Descricao: item.description,
+      Catalogo: item.catalogType === 'material' ? 'CATMAT' : 'CATSER',
+      Codigo: item.catalogCode,
+      Quantidade: item.quantity,
+      Unidade: item.unit,
+      PrecosSelecionados: stats.count,
+      Media: stats.mean,
+      Mediana: stats.median,
+      MenorPreco: stats.minimum,
+      DesvioPadrao: stats.standardDeviation,
+      CoeficienteVariacaoPercentual: stats.coefficientOfVariation,
+      Metodo: METHOD_LABELS[data.method],
+      PrecoUnitarioEstimado: estimatedUnitPrice,
+      ValorTotalEstimado: estimatedUnitPrice * item.quantity,
+    };
+  });
+  const quoteRows = data.items.flatMap((item) => {
+    const estimatedPrice = getEstimatedUnitPrice(item, data.method);
+    return item.candidates.map((candidate) => {
+      const adjustedPrice = candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice;
+      return {
+        Item: item.itemNumber,
+        Selecionado: candidate.selected ? 'Sim' : 'Nao',
+        MotivoExclusao: candidate.exclusionReason,
+        Fonte: candidate.sourceLabel,
+        Compra: candidate.purchaseId,
+        ItemCompra: candidate.purchaseItemId,
+        Data: candidate.resultDate || candidate.purchaseDate,
+        UASG: candidate.agencyCode,
+        Orgao: candidate.agencyName,
+        Fornecedor: candidate.supplierName,
+        DocumentoFornecedor: candidate.supplierDocument,
+        Descricao: candidate.description,
+        UnidadeOriginal: candidate.originalUnitLabel,
+        PrecoOriginal: candidate.originalUnitPrice,
+        PrecoComparavel: candidate.comparableUnitPrice,
+        PrecoAjustado: adjustedPrice,
+        DivergenciaPercentual: estimatedPrice > 0 ? ((adjustedPrice - estimatedPrice) / estimatedPrice) * 100 : 0,
+        UrlFonte: candidate.sourceUrl,
+        BuscaPncp: candidate.pncpSearchUrl,
+      };
+    });
+  });
+  const complianceRows = analyzePriceResearchCompliance(data).map((finding) => ({
+    Severidade: complianceSeverityLabel(finding.severity),
+    Escopo: finding.scope === 'research' ? 'Pesquisa' : finding.itemNumber ? `Item ${finding.itemNumber}` : finding.scope,
+    Regra: finding.ruleLabel,
+    Achado: finding.message,
+    Evidencia: finding.evidence,
+    AcaoRecomendada: finding.recommendedAction,
+  }));
+  const abcRows = buildPriceResearchAbcCurve(data).map((row) => ({
+    Item: row.itemNumber,
+    Descricao: row.description,
+    Quantidade: row.quantity,
+    PrecoEstimado: row.estimatedUnitPrice,
+    TotalEstimado: row.estimatedTotal,
+    ParticipacaoPercentual: row.participationPercentage,
+    AcumuladoPercentual: row.accumulatedPercentage,
+    Classe: row.abcClass,
+  }));
+  const comparisonRows = buildPriceResearchComparisonMap(data).map((row) => ({
+    Item: row.itemNumber,
+    Descricao: row.itemDescription,
+    Fonte: row.source,
+    Fornecedor: row.supplier,
+    OrgaoUasg: row.agency,
+    UF: row.state,
+    Municipio: row.municipality,
+    Data: row.purchaseDate,
+    Selecionado: row.selected ? 'Sim' : 'Nao',
+    UnidadeCompativel: row.unitCompatible ? 'Sim' : 'Nao',
+    Preco: row.unitPrice,
+    PrecoEstimado: row.estimatedUnitPrice,
+    DivergenciaPercentual: row.deviationPercentage,
+    JustificativaExclusao: row.exclusionReason,
+  }));
+  const authentication = buildPriceResearchAuthenticationPayload(data, {
+    origin: typeof window !== 'undefined' ? window.location.origin : '',
+    ...options,
+  });
+  const authenticationRows = [
+    { Campo: 'Hash do snapshot', Valor: authentication.snapshotHash },
+    { Campo: 'URL de verificacao', Valor: authentication.verificationUrl },
+    { Campo: 'QR Code', Valor: authentication.qrCodeUrl },
+    { Campo: 'Gerado em', Valor: authentication.generatedAt },
+    { Campo: 'Versao do relatorio', Valor: authentication.reportVersion },
+  ];
+
+  downloadTextFile('relatorio-pesquisa-precos-instituicao.csv', rowsToCsv(institutionRows), 'text/csv;charset=utf-8');
+  downloadTextFile('relatorio-pesquisa-precos-servidores.csv', rowsToCsv(serverRows), 'text/csv;charset=utf-8');
+  downloadTextFile('relatorio-pesquisa-precos-gerencial.csv', rowsToCsv(managementRows), 'text/csv;charset=utf-8');
+  downloadTextFile('relatorio-pesquisa-precos-resumo.csv', rowsToCsv(summaryRows), 'text/csv;charset=utf-8');
+  downloadTextFile('relatorio-pesquisa-precos-cotacoes.csv', rowsToCsv(quoteRows), 'text/csv;charset=utf-8');
+  downloadTextFile('relatorio-pesquisa-precos-curva-abc.csv', rowsToCsv(abcRows), 'text/csv;charset=utf-8');
+  downloadTextFile('relatorio-pesquisa-precos-mapa-comparativo.csv', rowsToCsv(comparisonRows), 'text/csv;charset=utf-8');
+  downloadTextFile('relatorio-pesquisa-precos-conformidade.csv', rowsToCsv(complianceRows), 'text/csv;charset=utf-8');
+  downloadTextFile('relatorio-pesquisa-precos-autenticacao.csv', rowsToCsv(authenticationRows), 'text/csv;charset=utf-8');
 }

@@ -527,6 +527,11 @@ Campos-chave:
 - `id`
 - `object_description`
 - `responsible_name`
+- `institution_name`
+- `institution_unit`
+- `institution_details`
+- `institution_logo`
+- `report_servers`
 - `research_date`
 - `calculation_method`
 - `methodology_justification`
@@ -536,6 +541,7 @@ Campos-chave:
 Observações operacionais:
 
 - os métodos aceitos são `median`, `mean` e `minimum`
+- `institution_logo` guarda data URL do logotipo para exportação local; `report_servers` guarda JSONB com nome, função, matrícula/SIAPE e e-mail dos servidores exibidos no relatório
 - a RLS restringe a pesquisa ao proprietário, com acesso global para superadministrador
 - o status pode ser `draft`, `review` ou `completed`
 

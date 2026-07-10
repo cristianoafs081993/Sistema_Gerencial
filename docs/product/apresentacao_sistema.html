@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apresentação Gerencial - GovAnalytics</title>
+  <!-- Google Fonts: Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+  
+  <style>
+    /* Design System Tokens */
+    :root {
+      --font-primary: 'Inter', sans-serif;
+      --font-display: 'Outfit', sans-serif;
+      
+      --color-bg: #f8fafc;
+      --color-card-bg: rgba(255, 255, 255, 0.85);
+      --color-primary: #1e40af; /* Royal Blue */
+      --color-primary-light: #3b82f6;
+      --color-secondary: #0f172a; /* Slate 900 */
+      --color-text-main: #334155; /* Slate 700 */
+      --color-text-muted: #64748b; /* Slate 500 */
+      --color-border: #e2e8f0;
+      
+      --shadow-soft: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 8px -1px rgba(15, 23, 42, 0.03);
+      --shadow-lifted: 0 20px 25px -5px rgba(15, 23, 42, 0.08), 0 10px 10px -5px rgba(15, 23, 42, 0.04);
+      --radius-lg: 16px;
+      --radius-md: 10px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-primary);
+      background-color: var(--color-bg);
+      color: var(--color-text-main);
+      line-height: 1.6;
+      padding: 40px 20px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    /* Outer Container */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* Print styling: slide/page structure */
+    .page {
+      background: var(--color-card-bg);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: 60px;
+      margin-bottom: 50px;
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(12px);
+      position: relative;
+      overflow: hidden;
+      min-height: 750px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    /* Cover Page Specific */
+    .cover-page {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+      color: #ffffff;
+      border: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 80px 40px;
+    }
+
+    .cover-badge {
+      background: rgba(59, 130, 246, 0.2);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      padding: 8px 16px;
+      border-radius: 30px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #60a5fa;
+      margin-bottom: 30px;
+    }
+
+    .cover-title {
+      font-family: var(--font-display);
+      font-size: 3.5rem;
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 20px;
+      background: linear-gradient(to right, #ffffff, #93c5fd);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .cover-subtitle {
+      font-size: 1.4rem;
+      font-weight: 300;
+      max-width: 700px;
+      margin-bottom: 60px;
+      color: #94a3b8;
+    }
+
+    .cover-footer {
+      font-size: 0.9rem;
+      color: #64748b;
+      margin-top: auto;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      padding-top: 20px;
+      width: 100%;
+      display: flex;
+      justify-content: space-around;
+    }
+
+    /* Standard Page Headers */
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid var(--color-border);
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+    }
+
+    .page-title {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      color: var(--color-secondary);
+      font-weight: 700;
+    }
+
+    .system-badge {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--color-primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* Page Content Grid */
+    .page-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 40px;
+      align-items: start;
+      flex-grow: 1;
+    }
+
+    .info-column {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .section-description {
+      font-size: 1.1rem;
+      color: var(--color-text-main);
+      font-weight: 400;
+    }
+
+    .feature-list {
+      list-style-type: none;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .feature-item {
+      position: relative;
+      padding-left: 28px;
+    }
+
+    .feature-item::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      top: 2px;
+      color: var(--color-primary-light);
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
+
+    .feature-item-title {
+      font-weight: 600;
+      color: var(--color-secondary);
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .feature-item-desc {
+      font-size: 0.9rem;
+      color: var(--color-text-muted);
+    }
+
+    /* Screenshot Container */
+    .screenshot-frame {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: #f1f5f9;
+      box-shadow: var(--shadow-lifted);
+      overflow: hidden;
+      position: relative;
+      aspect-ratio: 16/10;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .screenshot-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* Placeholder graphic when screenshot is missing */
+    .screenshot-placeholder {
+      padding: 40px;
+      text-align: center;
+      color: var(--color-text-muted);
+    }
+
+    .screenshot-placeholder-icon {
+      font-size: 2.5rem;
+      margin-bottom: 15px;
+      color: #94a3b8;
+    }
+
+    /* Footer styling */
+    .page-footer {
+      border-top: 1px solid var(--color-border);
+      padding-top: 15px;
+      margin-top: 30px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--color-text-muted);
+    }
+
+    /* Print Media Overrides */
+    @media print {
+      body {
+        padding: 0;
+        background: #ffffff;
+      }
+      .page {
+        margin: 0;
+        border: none;
+        box-shadow: none;
+        page-break-before: always;
+        height: 100vh;
+        max-height: 100vh;
+        border-radius: 0;
+        padding: 40px;
+      }
+      .page:first-child {
+        page-break-before: avoid;
+      }
+      .cover-page {
+        background: #0f172a !important; /* Force darker background in PDF */
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .screenshot-frame {
+        box-shadow: none;
+        border: 1px solid #94a3b8;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- SLIDE 1: COVER -->
+    <div class="page cover-page">
+      <div class="cover-badge">Projeto de Inovação Tecnológica</div>
+      <h1 class="cover-title">GovAnalytics</h1>
+      <p class="cover-subtitle">Inteligência de dados, governança orçamentária e transparência ativa para a administração pública federal</p>
+      
+      <div style="margin-top: 30px; font-weight: 500; font-size: 1.1rem; color: #38bdf8;">
+        Estudo de Caso & Homologação: IFRN Campus Currais Novos
+      </div>
+
+      <div class="cover-footer">
+        <div><strong>Desenvolvimento:</strong> Cristiano A. F. Silva (PROFIAP)</div>
+        <div><strong>Público:</strong> Núcleo de Inovação Tecnológica - NIT</div>
+        <div><strong>Ano:</strong> 2026</div>
+      </div>
+    </div>
+
+    <!-- SLIDE 2: INTRODUÇÃO E O PROBLEMA -->
+    <div class="page">
+      <div class="page-header">
+        <h2 class="page-title">A Lacuna Gerencial Pública</h2>
+        <span class="system-badge">O Problema</span>
+      </div>
+      
+      <div class="page-grid">
+        <div class="info-column">
+          <p class="section-description">
+            Os sistemas oficiais de planejamento e orçamento na Administração Pública Federal falham em oferecer uma visão gerencial integrada para a tomada de decisões imediatas.
+          </p>
+          <ul class="feature-list">
+            <li class="feature-item">
+              <span class="feature-item-title">Sistemas Focados em Registro Burocrático</span>
+              <span class="feature-item-desc">Plataformas como o SIAFI e o próprio SUAP funcionam como registros formais e trâmites de processos, mas não oferecem gráficos, dashboards ou cruzamento de saldos orçamentários dinâmicos.</span>
+            </li>
+            <li class="feature-item">
+              <span class="feature-item-title">Fragmentação de Informações</span>
+              <span class="feature-item-desc">Os dados de planejamento anual residem separados da execução real dos limites financeiros, forçando os servidores ao retrabalho diário de cruzar planilhas manuais.</span>
+            </li>
+            <li class="feature-item">
+              <span class="feature-item-title">Falta de Integração ao PDI</span>
+              <span class="feature-item-desc">Não há canal automático de verificação se os empenhos e liquidações cotidianos estão realmente alinhados com o Plano de Desenvolvimento Institucional (PDI).</span>
+            </li>
+          </ul>
+        </div>
+        
+        <div class="screenshot-frame">
+          <!-- SUBSTUTUA A IMAGEM ABAIXO PELO SEU PRINT -->
+          <img src="screenshots/tela_problema.png" class="screenshot-img" alt="Tela de Análise Orçamentária" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+          <div class="screenshot-placeholder" style="display:none;">
+            <div class="screenshot-placeholder-icon">📊</div>
+            <p><strong>Print do Dashboard Principal</strong></p>
+            <p style="font-size: 0.8rem;">Substitua o arquivo em <code>screenshots/tela_problema.png</code> para exibir a imagem real do sistema aqui.</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="page-footer">
+        <span>GovAnalytics - Inteligência Gerencial</span>
+        <span>Página 2</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 3: O SISTEMA GOVANALYTICS -->
+    <div class="page">
+      <div class="page-header">
+        <h2 class="page-title">A Solução Unificada</h2>
+        <span class="system-badge">A Solução</span>
+      </div>
+      
+      <div class="page-grid">
+        <div class="info-column">
+          <p class="section-description">
+            O <strong>GovAnalytics</strong> atua como uma camada inteligente que agrupa dados de múltiplas fontes, reduz burocracia e dá clareza para a tomada de decisão estratégica.
+          </p>
+          <ul class="feature-list">
+            <li class="feature-item">
+              <span class="feature-item-title">Consolidação em Tempo Real</span>
+              <span class="feature-item-desc">Agrupa dados de APIs governamentais (Comprasnet, Portal da Transparência, PNCP), planilhas locais e dados históricos.</span>
+            </li>
+            <li class="feature-item">
+              <span class="feature-item-title">Rastreabilidade Completa</span>
+              <span class="feature-item-desc">Acompanhamento contínuo de <strong>empenhos</strong>, <strong>contratos</strong>, e <strong>descentralizações</strong> orçamentárias correlacionados aos planos de ação.</span>
+            </li>
+            <li class="feature-item">
+              <span class="feature-item-title">Foco em Accountability</span>
+              <span class="feature-item-desc">Gera transparência ativa imediata de toda a execução das ações institucionais para auditorias (CGU, TCU) e comunidade acadêmica.</span>
+            </li>
+          </ul>
+        </div>
+        
+        <div class="screenshot-frame">
+          <img src="screenshots/tela_solucao.png" class="screenshot-img" alt="Painel Geral de Recursos" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+          <div class="screenshot-placeholder" style="display:none;">
+            <div class="screenshot-placeholder-icon">💡</div>
+            <p><strong>Print do Painel de Saldos e Limites</strong></p>
+            <p style="font-size: 0.8rem;">Substitua o arquivo em <code>screenshots/tela_solucao.png</code> para exibir a imagem real do sistema aqui.</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="page-footer">
+        <span>GovAnalytics - Inteligência Gerencial</span>
+        <span>Página 3</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 4: CONTROLE DE EMPENHOS E DESCENTRALIZAÇÕES -->
+    <div class="page">
+      <div class="page-header">
+        <h2 class="page-title">Empenhos e Descentralizações</h2>
+        <span class="system-badge">Módulo Orçamento</span>
+      </div>
+      
+      <div class="page-grid">
+        <div class="info-column">
+          <p class="section-description">
+            Monitoramento de créditos disponíveis e distribuição interna de recursos para evitar perdas ou ineficiências na aplicação orçamentária.
+          </p>
+          <ul class="feature-list">
+            <li class="feature-item">
+              <span class="feature-item-title">Visão Multi-Escopo</span>
+              <span class="feature-item-desc">Painel gerencial com divisão das ações do <strong>Campus</strong>, demandas <strong>Sistêmicas</strong> e execução de <strong>Emendas Parlamentares</strong>.</span>
+            </li>
+            <li class="feature-item">
+              <span class="feature-item-title">Controle de RAP (Restos a Pagar)</span>
+              <span class="feature-item-desc">Diferenciação clara entre o orçamento do exercício vigente e os empenhos herdados de anos anteriores, prevenindo perdas financeiras.</span>
+            </li>
+            <li class="feature-item">
+              <span class="feature-item-title">Rastreamento de Descentralizações</span>
+              <span class="feature-item-desc">Controle preciso da movimentação financeira entre a Reitoria e as unidades do campus para alocação rápida baseada em prioridades estratégicas.</span>
+            </li>
+          </ul>
+        </div>
+        
+        <div class="screenshot-frame">
+          <img src="screenshots/tela_empenhos.png" class="screenshot-img" alt="Tela de Empenhos e Descentralizações" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+          <div class="screenshot-placeholder" style="display:none;">
+            <div class="screenshot-placeholder-icon">📈</div>
+            <p><strong>Print do Controle de Empenhos e RAP</strong></p>
+            <p style="font-size: 0.8rem;">Substitua o arquivo em <code>screenshots/tela_empenhos.png</code> para exibir a imagem real do sistema aqui.</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="page-footer">
+        <span>GovAnalytics - Inteligência Gerencial</span>
+        <span>Página 4</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 5: INTEGRAÇÃO AO SUAP E ALINHAMENTO AO PDI -->
+    <div class="page">
+      <div class="page-header">
+        <h2 class="page-title">Sinergia SUAP e Alinhamento Estratégico</h2>
+        <span class="system-badge">Alinhamento ao Planejado</span>
+      </div>
+      
+      <div class="page-grid">
+        <div class="info-column">
+          <p class="section-description">
+            O maior diferencial do sistema é sua adequação para Instituições Federais que utilizam o SUAP, criando uma ponte invisível entre o planejado e o gasto executado.
+          </p>
+          <ul class="feature-list">
+            <li class="feature-item">
+              <span class="feature-item-title">Sincronização de Planos de Atividades</span>
+              <span class="feature-item-desc">A plataforma lê as metas cadastradas no SUAP/PDI e as correlaciona às notas de empenho reais liquidadas.</span>
+            </li>
+            <li class="feature-item">
+              <span class="feature-item-title">Combate ao Descolamento Tático</span>
+              <span class="feature-item-desc">Os diretores conseguem visualizar instantaneamente se os recursos discricionários estão sendo empenhados nos objetivos estratégicos de longo prazo ou apenas na rotina imediata.</span>
+            </li>
+            <li class="feature-item">
+              <span class="feature-item-title">Histórico e Previsibilidade</span>
+              <span class="feature-item-desc">Cria uma base histórica de custos de planos anteriores para facilitar a modelagem de orçamentos futuros.</span>
+            </li>
+          </ul>
+        </div>
+        
+        <div class="screenshot-frame">
+          <img src="screenshots/tela_suap.png" class="screenshot-img" alt="Tela de Integração ao SUAP" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+          <div class="screenshot-placeholder" style="display:none;">
+            <div class="screenshot-placeholder-icon">🔗</div>
+            <p><strong>Print do Módulo SUAP / Planejamento</strong></p>
+            <p style="font-size: 0.8rem;">Substitua o arquivo em <code>screenshots/tela_suap.png</code> para exibir a imagem real do sistema aqui.</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="page-footer">
+        <span>GovAnalytics - Inteligência Gerencial</span>
+        <span>Página 5</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 6: USO DE INTELIGÊNCIA ARTIFICIAL -->
+    <div class="page">
+      <div class="page-header">
+        <h2 class="page-title">Assistente Gerencial Inteligente</h2>
+        <span class="system-badge">Inteligência Artificial</span>
+      </div>
+      
+      <div class="page-grid">
+        <div class="info-column">
+          <p class="section-description">
+            O GovAnalytics incorpora IA generativa para tornar as informações contábeis complexas acessíveis em linguagem natural aos tomadores de decisão.
+          </p>
+          <ul class="feature-list">
+            <li class="feature-item">
+              <span class="feature-item-title">Consultas em Linguagem Natural</span>
+              <span class="feature-item-desc">Gestores e diretores podem perguntar a situação de despesas ("Qual o saldo do contrato de vigilância?") e obter respostas diretas em segundos.</span>
+            </li>
+            <li class="feature-item">
+              <span class="feature-item-title">Base Semântica de Normativos</span>
+              <span class="feature-item-desc">A IA realiza buscas semânticas em portarias, normativos e resoluções do IFRN, instruindo o gestor sobre as regras internas corretas.</span>
+            </li>
+            <li class="feature-item">
+              <span class="feature-item-title">Decisão Apoiada em Evidências</span>
+              <span class="feature-item-desc">Fornece respostas fundamentadas em dados reais de empenhos do próprio banco de dados integrado, evitando suposições.</span>
+            </li>
+          </ul>
+        </div>
+        
+        <div class="screenshot-frame">
+          <img src="screenshots/tela_ia.png" class="screenshot-img" alt="Tela do Assistente IA" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+          <div class="screenshot-placeholder" style="display:none;">
+            <div class="screenshot-placeholder-icon">🤖</div>
+            <p><strong>Print do Assistente Gerencial IA</strong></p>
+            <p style="font-size: 0.8rem;">Substitua o arquivo em <code>screenshots/tela_ia.png</code> para exibir a imagem real do sistema aqui.</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="page-footer">
+        <span>GovAnalytics - Inteligência Gerencial</span>
+        <span>Página 6</span>
+      </div>
+    </div>
+
+    <!-- SLIDE 7: PORTABILIDADE, USO PRÁTICO E EXPANSÃO -->
+    <div class="page">
+      <div class="page-header">
+        <h2 class="page-title">Estudo de Caso & Expansão Sistêmica</h2>
+        <span class="system-badge">Implantação</span>
+      </div>
+      
+      <div class="page-grid">
+        <div class="info-column">
+          <p class="section-description">
+            O software já provou sua eficiência na prática e está pronto para ser escalado para toda a instituição e outras entidades da administração pública federal.
+          </p>
+          <ul class="feature-list">
+            <li class="feature-item">
+              <span class="feature-item-title">Compatibilidade Universal (SIAFI & Comprasnet)</span>
+              <span class="feature-item-desc">Desenvolvido de forma modular, o sistema pode ser utilizado por qualquer órgão federal que opere sob as regras do SIAFI e utilize o Comprasnet.</span>
+            </li>
+            <li class="feature-item">
+              <span class="feature-item-title">Em Efetivo Uso: Campus Currais Novos</span>
+              <span class="feature-item-desc">Validado em ambiente real, atuando diretamente no alinhamento das ações locais e gerando visível economia de tempo de trabalho administrativo.</span>
+            </li>
+            <li class="feature-item">
+              <span class="feature-item-title">Expansão para todo o IFRN</span>
+              <span class="feature-item-desc">Tratativas formais em andamento com a <strong>Pró-Reitoria de Administração (PROAD)</strong> para homologação sistêmica e implantação da plataforma em todos os campi da rede.</span>
+            </li>
+          </ul>
+        </div>
+        
+        <div class="screenshot-frame">
+          <img src="screenshots/tela_expansao.png" class="screenshot-img" alt="Tela de Configurações / Unidades" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+          <div class="screenshot-placeholder" style="display:none;">
+            <div class="screenshot-placeholder-icon">🚀</div>
+            <p><strong>Print do Painel de Controle de Unidades</strong></p>
+            <p style="font-size: 0.8rem;">Substitua o arquivo em <code>screenshots/tela_expansao.png</code> para exibir a imagem real do sistema aqui.</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="page-footer">
+        <span>GovAnalytics - Inteligência Gerencial</span>
+        <span>Página 7</span>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>
