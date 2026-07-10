@@ -33,6 +33,7 @@ import {
   ShoppingBag,
   Sparkles,
   Trash2,
+  TrendingUp,
   Upload,
   User,
 } from 'lucide-react';
@@ -200,48 +201,66 @@ export default function PesquisaPrecos() {
     reason: string;
   } | null>(null);
 
-  const [monetaryAdjustmentDraft, setMonetaryAdjustmentDraft] = useState<{
-    itemId: string;
-    candidate: PriceResearchCandidate;
-    enabled: boolean;
-    index: InflationIndexType | 'manual';
-    manualRate: string;
-    fromDate: string;
-    toDate: string;
-  } | null>(null);
+  const [globalAdjustmentEnabled, setGlobalAdjustmentEnabled] = useState(false);
+  const [globalAdjustmentIndex, setGlobalAdjustmentIndex] = useState<InflationIndexType | 'manual'>('IPCA');
+  const [globalAdjustmentManualRate, setGlobalAdjustmentManualRate] = useState('0');
 
-  const confirmMonetaryAdjustment = () => {
-    if (!monetaryAdjustmentDraft) return;
-    const { itemId, candidate, enabled, index, manualRate, fromDate, toDate } = monetaryAdjustmentDraft;
-    
-    let factor = 1;
-    let adjustedPrice = candidate.comparableUnitPrice;
+  const applyGlobalAdjustmentToItems = (
+    itemsList: PriceResearchItem[],
+    enabled: boolean,
+    index: InflationIndexType | 'manual',
+    manualRate: string,
+    targetResearchDate: string
+  ): PriceResearchItem[] => {
+    return itemsList.map((item) => {
+      const updatedCandidates = item.candidates.map((candidate) => {
+        let factor = 1;
+        let adjustedPrice = candidate.comparableUnitPrice;
 
-    if (enabled) {
-      if (index === 'manual') {
-        const rate = parseFloat(manualRate) || 0;
-        factor = 1 + (rate / 100);
-      } else {
-        const calculated = calculateIndexFactor(index, fromDate, toDate);
-        if (calculated === null) {
-          toast.error('Período de correção fora do intervalo suportado (01/2024 a 07/2026).');
-          return;
+        if (enabled) {
+          if (index === 'manual') {
+            const rate = parseFloat(manualRate) || 0;
+            factor = 1 + (rate / 100);
+          } else {
+            const dateVal = candidate.resultDate || candidate.purchaseDate || new Date().toISOString().split('T')[0];
+            const fromDate = dateVal.slice(0, 7);
+            const toDate = targetResearchDate.slice(0, 7);
+            const calculated = calculateIndexFactor(index, fromDate, toDate);
+            factor = calculated !== null ? calculated : 1;
+          }
+          adjustedPrice = candidate.comparableUnitPrice * factor;
         }
-        factor = calculated;
-      }
-      adjustedPrice = candidate.comparableUnitPrice * factor;
-    }
 
-    updateCandidate(itemId, candidate.id, {
-      monetaryAdjustmentEnabled: enabled,
-      monetaryAdjustmentIndex: index,
-      monetaryAdjustmentFactor: factor,
-      monetaryAdjustmentManualRate: index === 'manual' ? (parseFloat(manualRate) || 0) : undefined,
-      monetaryAdjustedPrice: adjustedPrice,
+        return {
+          ...candidate,
+          monetaryAdjustmentEnabled: enabled,
+          monetaryAdjustmentIndex: enabled ? index : undefined,
+          monetaryAdjustmentFactor: enabled ? factor : undefined,
+          monetaryAdjustmentManualRate: enabled && index === 'manual' ? (parseFloat(manualRate) || 0) : undefined,
+          monetaryAdjustedPrice: enabled ? adjustedPrice : undefined,
+        };
+      });
+
+      return {
+        ...item,
+        candidates: updatedCandidates,
+      };
     });
+  };
 
-    setMonetaryAdjustmentDraft(null);
-    toast.success('Atualização monetária configurada com sucesso!');
+  const updateGlobalAdjustment = (
+    enabled: boolean,
+    index: InflationIndexType | 'manual',
+    rateStr: string,
+    rDate?: string
+  ) => {
+    setGlobalAdjustmentEnabled(enabled);
+    setGlobalAdjustmentIndex(index);
+    setGlobalAdjustmentManualRate(rateStr);
+    
+    setItems((currentItems) =>
+      applyGlobalAdjustmentToItems(currentItems, enabled, index, rateStr, rDate || researchDate)
+    );
   };
 
   const deleteResearch = async (id: string) => {
@@ -265,6 +284,9 @@ export default function PesquisaPrecos() {
     setObjectDescription('');
     setResponsibleName('');
     setResearchDate(today());
+    setGlobalAdjustmentEnabled(false);
+    setGlobalAdjustmentIndex('IPCA');
+    setGlobalAdjustmentManualRate('0');
     setMethod('median');
     setMethodologyJustification(
       'A mediana foi adotada por reduzir o efeito de valores extremos, após análise crítica da comparabilidade das especificações, unidades e quantidades.',
@@ -573,7 +595,41 @@ export default function PesquisaPrecos() {
   ]);
 
   const updateItem = (localId: string, patch: Partial<PriceResearchItem>) => {
-    setItems((current) => current.map((item) => item.localId === localId ? { ...item, ...patch } : item));
+    setItems((current) => current.map((item) => {
+      if (item.localId !== localId) return item;
+      const mergedItem = { ...item, ...patch };
+      
+      if (patch.candidates && globalAdjustmentEnabled) {
+        const adjustedCandidates = mergedItem.candidates.map((candidate) => {
+          let factor = 1;
+          let adjustedPrice = candidate.comparableUnitPrice;
+          
+          if (globalAdjustmentIndex === 'manual') {
+            const rate = parseFloat(globalAdjustmentManualRate) || 0;
+            factor = 1 + (rate / 100);
+          } else {
+            const dateVal = candidate.resultDate || candidate.purchaseDate || new Date().toISOString().split('T')[0];
+            const fromDate = dateVal.slice(0, 7);
+            const toDate = researchDate.slice(0, 7);
+            const calculated = calculateIndexFactor(globalAdjustmentIndex, fromDate, toDate);
+            factor = calculated !== null ? calculated : 1;
+          }
+          adjustedPrice = candidate.comparableUnitPrice * factor;
+          
+          return {
+            ...candidate,
+            monetaryAdjustmentEnabled: true,
+            monetaryAdjustmentIndex: globalAdjustmentIndex,
+            monetaryAdjustmentFactor: factor,
+            monetaryAdjustmentManualRate: globalAdjustmentIndex === 'manual' ? (parseFloat(globalAdjustmentManualRate) || 0) : undefined,
+            monetaryAdjustedPrice: adjustedPrice,
+          };
+        });
+        mergedItem.candidates = adjustedCandidates;
+      }
+      
+      return mergedItem;
+    }));
   };
 
   const deleteItem = (localId: string) => {
@@ -630,9 +686,42 @@ export default function PesquisaPrecos() {
       if (item.localId !== localId) return item;
       return {
         ...item,
-        candidates: item.candidates.map((candidate) => (
-          candidate.id === candidateId ? { ...candidate, ...patch } : candidate
-        )),
+        candidates: item.candidates.map((candidate) => {
+          if (candidate.id !== candidateId) return candidate;
+          
+          const mergedCandidate = { ...candidate, ...patch };
+          
+          if (globalAdjustmentEnabled) {
+            let factor = 1;
+            let adjustedPrice = mergedCandidate.comparableUnitPrice;
+            
+            if (globalAdjustmentIndex === 'manual') {
+              const rate = parseFloat(globalAdjustmentManualRate) || 0;
+              factor = 1 + (rate / 100);
+            } else {
+              const dateVal = mergedCandidate.resultDate || mergedCandidate.purchaseDate || new Date().toISOString().split('T')[0];
+              const fromDate = dateVal.slice(0, 7);
+              const toDate = researchDate.slice(0, 7);
+              const calculated = calculateIndexFactor(globalAdjustmentIndex, fromDate, toDate);
+              factor = calculated !== null ? calculated : 1;
+            }
+            adjustedPrice = mergedCandidate.comparableUnitPrice * factor;
+            
+            mergedCandidate.monetaryAdjustmentEnabled = true;
+            mergedCandidate.monetaryAdjustmentIndex = globalAdjustmentIndex;
+            mergedCandidate.monetaryAdjustmentFactor = factor;
+            mergedCandidate.monetaryAdjustmentManualRate = globalAdjustmentIndex === 'manual' ? (parseFloat(globalAdjustmentManualRate) || 0) : undefined;
+            mergedCandidate.monetaryAdjustedPrice = adjustedPrice;
+          } else {
+            mergedCandidate.monetaryAdjustmentEnabled = false;
+            mergedCandidate.monetaryAdjustmentIndex = undefined;
+            mergedCandidate.monetaryAdjustmentFactor = undefined;
+            mergedCandidate.monetaryAdjustmentManualRate = undefined;
+            mergedCandidate.monetaryAdjustedPrice = undefined;
+          }
+          
+          return mergedCandidate;
+        }),
       };
     }));
   };
@@ -728,7 +817,7 @@ export default function PesquisaPrecos() {
     setIsParsing(true);
     try {
       const parsed = await parsePriceResearchFile(file);
-      setItems(parsed);
+      setItems(globalAdjustmentEnabled ? applyGlobalAdjustmentToItems(parsed, true, globalAdjustmentIndex, globalAdjustmentManualRate, researchDate) : parsed);
       setSelectedItemId(undefined);
       setSourceFile(file.name);
       setResearchId(undefined);
@@ -776,7 +865,7 @@ export default function PesquisaPrecos() {
         };
       });
       const resolvedItems = await resolveDirectPncpLinks(searchResultItems);
-      setItems(resolvedItems);
+      setItems(globalAdjustmentEnabled ? applyGlobalAdjustmentToItems(resolvedItems, true, globalAdjustmentIndex, globalAdjustmentManualRate, researchDate) : resolvedItems);
       const found = results.reduce((total, result) => total + result.candidates.length, 0);
       toast.success(`${found} referência(s) oficial(is) encontrada(s).`);
       // Avança para a curadoria automaticamente ao buscar preços com sucesso (Passo 4)
@@ -1141,7 +1230,30 @@ export default function PesquisaPrecos() {
       setNotes(record.notes);
       setSourceFile(record.sourceFile);
       const resolvedItems = await resolveDirectPncpLinks(record.items);
-      setItems(resolvedItems);
+      
+      // Detect global monetary adjustment settings from loaded candidates
+      let enabledVal = false;
+      let indexVal: InflationIndexType | 'manual' = 'IPCA';
+      let manualRateVal = '0';
+      
+      for (const item of resolvedItems) {
+        const adjustedCandidate = item.candidates.find(c => c.monetaryAdjustmentEnabled);
+        if (adjustedCandidate) {
+          enabledVal = true;
+          indexVal = adjustedCandidate.monetaryAdjustmentIndex ?? 'IPCA';
+          manualRateVal = adjustedCandidate.monetaryAdjustmentManualRate?.toString() ?? '0';
+          break;
+        }
+      }
+      setGlobalAdjustmentEnabled(enabledVal);
+      setGlobalAdjustmentIndex(indexVal);
+      setGlobalAdjustmentManualRate(manualRateVal);
+      
+      const finalItems = enabledVal 
+        ? applyGlobalAdjustmentToItems(resolvedItems, true, indexVal, manualRateVal, record.researchDate)
+        : resolvedItems;
+        
+      setItems(finalItems);
       setSelectedItemId(undefined);
       setCandidateExclusionDraft(null);
       
@@ -1512,7 +1624,13 @@ export default function PesquisaPrecos() {
               </div>
               <div className="space-y-2 xl:col-span-2">
                 <Label htmlFor="research-date">Data da Pesquisa</Label>
-                <Input id="research-date" type="date" value={researchDate} onChange={(event) => setResearchDate(event.target.value)} />
+                <Input id="research-date" type="date" value={researchDate} onChange={(event) => {
+                  const newDate = event.target.value;
+                  setResearchDate(newDate);
+                  if (globalAdjustmentEnabled) {
+                    setItems((currentItems) => applyGlobalAdjustmentToItems(currentItems, globalAdjustmentEnabled, globalAdjustmentIndex, globalAdjustmentManualRate, newDate));
+                  }
+                }} />
               </div>
               <div className="space-y-2 xl:col-span-4">
                 <Label htmlFor="research-object">Objeto da Contratação</Label>
@@ -2173,15 +2291,9 @@ export default function PesquisaPrecos() {
                           </div>
                         </div>
 
-                        <aside
-                          className={`flex min-h-[112px] w-full flex-col justify-between rounded-radius-lg border p-3 xl:col-span-3 ${
-                            selectedHasHighDispersion
-                              ? 'border-red-200 bg-red-50/40 text-red-700'
-                              : 'border-border-default bg-surface-subtle/40 text-text-secondary'
-                          }`}
-                        >
-                          <div className="mb-2 flex items-center justify-between gap-2">
-                            <p className="font-ui text-[10px] font-black uppercase tracking-wider">Dispersão da amostra</p>
+                        <div className="min-w-0 xl:col-span-3 flex flex-col">
+                          <div className="mb-4 flex items-center gap-2">
+                            <h4 className="font-ui text-sm font-bold text-text-primary">Dispersão da amostra</h4>
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <button
@@ -2197,21 +2309,115 @@ export default function PesquisaPrecos() {
                               </TooltipContent>
                             </Tooltip>
                           </div>
-                          <dl className="space-y-1.5 font-ui text-xs">
-                            <div className="flex items-center justify-between gap-3">
-                              <dt>Coeficiente de variação</dt>
-                              <dd className="font-mono font-bold">{selectedCoefficientOfVariation.toFixed(2)}%</dd>
+
+                          <aside
+                            className={`flex flex-1 flex-col justify-between rounded-radius-lg border p-3 ${
+                              selectedHasHighDispersion
+                                ? 'border-red-200 bg-red-50/40 text-red-700'
+                                : 'border-border-default bg-surface-subtle/40 text-text-secondary'
+                            }`}
+                          >
+                            <dl className="space-y-1.5 font-ui text-xs my-auto">
+                              <div className="flex items-center justify-between gap-3">
+                                <dt>Coeficiente de variação</dt>
+                                <dd className="font-mono font-bold">{selectedCoefficientOfVariation.toFixed(2)}%</dd>
+                              </div>
+                              <div className="flex items-center justify-between gap-3">
+                                <dt>Desvio padrão</dt>
+                                <dd className="font-mono font-bold">{formatCurrency(selectedStatistics?.standardDeviation ?? 0)}</dd>
+                              </div>
+                              <div className="flex items-center justify-between gap-3">
+                                <dt>Maior preço</dt>
+                                <dd className="font-mono font-bold">{formatCurrency(selectedStatistics?.maximum ?? 0)}</dd>
+                              </div>
+                            </dl>
+                          </aside>
+                        </div>
+                      </div>
+
+                      <div className="my-4 border-t border-border-default/50" />
+
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <TrendingUp className="h-4 w-4 text-primary" />
+                            <span className="font-ui text-xs font-bold text-text-primary">Atualização Monetária (IN 65/2021)</span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="inline-flex h-5 w-5 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/[0.08]"
+                                  aria-label="Informações sobre a atualização monetária"
+                                >
+                                  <Info className="h-3.5 w-3.5" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs text-xs leading-relaxed">
+                                Permite atualizar preços de contratações anteriores com base em índices oficiais de inflação ou reajuste manual, aplicando-se a todos os itens da pesquisa.
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="global-monetary-adjust-enable"
+                              checked={globalAdjustmentEnabled}
+                              onCheckedChange={(checked) => {
+                                updateGlobalAdjustment(checked === true, globalAdjustmentIndex, globalAdjustmentManualRate);
+                              }}
+                            />
+                            <label
+                              htmlFor="global-monetary-adjust-enable"
+                              className="text-xs font-semibold text-text-primary cursor-pointer select-none"
+                            >
+                              Ativar atualização monetária global
+                            </label>
+                          </div>
+                        </div>
+
+                        {globalAdjustmentEnabled && (
+                          <div className="grid gap-4 sm:grid-cols-2 bg-surface-subtle/30 rounded-radius-lg border border-border-default/50 p-4 transition-all duration-300 animate-in fade-in slide-in-from-top-1">
+                            <div className="space-y-1.5">
+                              <label htmlFor="global-monetary-adjust-index" className="text-[11px] font-bold text-text-secondary">Índice ou Método</label>
+                              <select
+                                id="global-monetary-adjust-index"
+                                className="w-full rounded-md border border-border-default bg-surface-card px-3 py-1.5 text-xs text-text-primary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
+                                value={globalAdjustmentIndex}
+                                onChange={(e) => {
+                                  const newIndex = e.target.value as InflationIndexType | 'manual';
+                                  updateGlobalAdjustment(true, newIndex, globalAdjustmentManualRate);
+                                }}
+                              >
+                                <option value="IPCA">IPCA (IBGE)</option>
+                                <option value="IGP-M">IGP-M (FGV)</option>
+                                <option value="INPC">INPC (IBGE)</option>
+                                <option value="manual">Manual (%)</option>
+                              </select>
                             </div>
-                            <div className="flex items-center justify-between gap-3">
-                              <dt>Desvio padrão</dt>
-                              <dd className="font-mono font-bold">{formatCurrency(selectedStatistics?.standardDeviation ?? 0)}</dd>
-                            </div>
-                            <div className="flex items-center justify-between gap-3">
-                              <dt>Maior preço</dt>
-                              <dd className="font-mono font-bold">{formatCurrency(selectedStatistics?.maximum ?? 0)}</dd>
-                            </div>
-                          </dl>
-                        </aside>
+
+                            {globalAdjustmentIndex === 'manual' ? (
+                              <div className="space-y-1.5 animate-in fade-in duration-200">
+                                <label className="text-[11px] font-bold text-text-secondary">Taxa de Reajuste (%)</label>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  placeholder="Ex: 5.5"
+                                  className="h-8 text-xs font-mono"
+                                  value={globalAdjustmentManualRate}
+                                  onChange={(e) => {
+                                    const newRate = e.target.value;
+                                    updateGlobalAdjustment(true, 'manual', newRate);
+                                  }}
+                                />
+                              </div>
+                            ) : (
+                              <div className="flex flex-col justify-end text-[11px] text-text-muted leading-relaxed pb-1 animate-in fade-in duration-200">
+                                <p>
+                                  O reajuste de inflação será calculado individualmente de acordo com o mês da contratação original até o mês da pesquisa (<strong>{researchDate.slice(0, 7)}</strong>).
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       <div className="mt-4 grid gap-2 border-t border-border-default/70 pt-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -2301,9 +2507,11 @@ export default function PesquisaPrecos() {
                             <TableHead>Unidade</TableHead>
                             <TableHead className="text-right">Preço Original</TableHead>
                             <TableHead className="text-right w-24">Frete (R$)</TableHead>
-                            <TableHead className="text-right">Preço Base</TableHead>
-                            <TableHead className="text-center w-24">Ajuste</TableHead>
-                            <TableHead className="text-right">Preço Ajustado</TableHead>
+                            {!globalAdjustmentEnabled ? (
+                              <TableHead className="text-right">Preço Base</TableHead>
+                            ) : (
+                              <TableHead className="text-right">Preço Ajustado</TableHead>
+                            )}
                             <TableHead className="text-right">Divergência (%)</TableHead>
                             <TableHead className="text-center w-28">Evidência</TableHead>
                             <TableHead className="text-center w-20">Excluir</TableHead>
@@ -2454,45 +2662,13 @@ export default function PesquisaPrecos() {
                                       <span className="text-xs text-text-muted font-mono">-</span>
                                     )}
                                   </TableCell>
-                                  <TableCell className="text-right font-mono text-xs">{formatCurrency(candidate.comparableUnitPrice)}</TableCell>
-                                  <TableCell className="text-center">
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      className={`h-7 px-2 text-xs gap-1 transition-all ${
-                                        candidate.monetaryAdjustmentEnabled
-                                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold'
-                                          : 'border-border-default hover:border-primary/30 text-text-secondary hover:text-primary'
-                                      }`}
-                                      onClick={() => {
-                                        const dateVal = candidate.resultDate || candidate.purchaseDate || new Date().toISOString().split('T')[0];
-                                        setMonetaryAdjustmentDraft({
-                                          itemId: selectedItem.localId,
-                                          candidate,
-                                          enabled: candidate.monetaryAdjustmentEnabled ?? false,
-                                          index: candidate.monetaryAdjustmentIndex ?? 'IPCA',
-                                          manualRate: candidate.monetaryAdjustmentManualRate?.toString() ?? '0',
-                                          fromDate: dateVal.slice(0, 7),
-                                          toDate: researchDate.slice(0, 7),
-                                        });
-                                      }}
-                                      title="Configurar atualização monetária"
-                                    >
-                                      {candidate.monetaryAdjustmentEnabled ? (
-                                        <span>
-                                          {candidate.monetaryAdjustmentIndex === 'manual'
-                                            ? 'Manual'
-                                            : candidate.monetaryAdjustmentIndex}
-                                        </span>
-                                      ) : (
-                                        <span>Ajustar</span>
-                                      )}
-                                    </Button>
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono text-xs font-bold">
-                                    {formatCurrency(candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice)}
-                                  </TableCell>
+                                  {!globalAdjustmentEnabled ? (
+                                    <TableCell className="text-right font-mono text-xs">{formatCurrency(candidate.comparableUnitPrice)}</TableCell>
+                                  ) : (
+                                    <TableCell className="text-right font-mono text-xs font-bold">
+                                      {formatCurrency(candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice)}
+                                    </TableCell>
+                                  )}
                                   <TableCell className="text-right font-mono text-xs font-bold">
                                     {(() => {
                                       const itemEstimatedPrice = getEstimatedUnitPrice(selectedItem, method);
@@ -2792,9 +2968,11 @@ export default function PesquisaPrecos() {
                                   <th className="py-3 px-4 w-40">Provedor</th>
                                   <th className="py-3 px-4 w-32 text-right">Preço Unitário</th>
                                   <th className="py-3 px-4 w-32 text-right">Frete</th>
-                                  <th className="py-3 px-4 w-32 text-right">Preço Base</th>
-                                  <th className="py-3 px-4 text-center w-24">Ajuste</th>
-                                  <th className="py-3 px-4 w-32 text-right">Preço Ajustado</th>
+                                  {!globalAdjustmentEnabled ? (
+                                    <th className="py-3 px-4 w-32 text-right">Preço Base</th>
+                                  ) : (
+                                    <th className="py-3 px-4 w-32 text-right">Preço Ajustado</th>
+                                  )}
                                   <th className="py-3 px-4 w-32 text-right">Divergência (%)</th>
                                   <th className="py-3 px-4 text-center w-24">Excluir</th>
                                 </tr>
@@ -2830,45 +3008,13 @@ export default function PesquisaPrecos() {
                                         <td className="py-3.5 px-4 capitalize font-semibold text-text-secondary">{candidate.sourceLabel}</td>
                                         <td className="py-3.5 px-4 text-right font-mono text-xs">{formatCurrency(candidate.originalUnitPrice)}</td>
                                         <td className="py-3.5 px-4 text-right font-mono text-xs">{candidate.freightCost ? formatCurrency(candidate.freightCost) : '-'}</td>
-                                        <td className="py-3.5 px-4 text-right font-mono text-xs text-text-secondary">{formatCurrency(candidate.comparableUnitPrice)}</td>
-                                        <td className="py-3.5 px-4 text-center">
-                                          <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            className={`h-7 px-2 text-xs gap-1 transition-all ${
-                                              candidate.monetaryAdjustmentEnabled
-                                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold'
-                                                : 'border-border-default hover:border-primary/30 text-text-secondary hover:text-primary'
-                                            }`}
-                                            onClick={() => {
-                                              const dateVal = candidate.resultDate || candidate.purchaseDate || new Date().toISOString().split('T')[0];
-                                              setMonetaryAdjustmentDraft({
-                                                itemId: selectedItem.localId,
-                                                candidate,
-                                                enabled: candidate.monetaryAdjustmentEnabled ?? false,
-                                                index: candidate.monetaryAdjustmentIndex ?? 'IPCA',
-                                                manualRate: candidate.monetaryAdjustmentManualRate?.toString() ?? '0',
-                                                fromDate: dateVal.slice(0, 7),
-                                                toDate: researchDate.slice(0, 7),
-                                              });
-                                            }}
-                                            title="Configurar atualização monetária"
-                                          >
-                                            {candidate.monetaryAdjustmentEnabled ? (
-                                              <span>
-                                                {candidate.monetaryAdjustmentIndex === 'manual'
-                                                  ? 'Manual'
-                                                  : candidate.monetaryAdjustmentIndex}
-                                              </span>
-                                            ) : (
-                                              <span>Ajustar</span>
-                                            )}
-                                          </Button>
-                                        </td>
-                                        <td className="py-3.5 px-4 text-right font-mono text-xs font-bold text-text-primary">
-                                          {formatCurrency(candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice)}
-                                        </td>
+                                        {!globalAdjustmentEnabled ? (
+                                          <td className="py-3.5 px-4 text-right font-mono text-xs text-text-secondary">{formatCurrency(candidate.comparableUnitPrice)}</td>
+                                        ) : (
+                                          <td className="py-3.5 px-4 text-right font-mono text-xs font-bold text-text-primary">
+                                            {formatCurrency(candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice)}
+                                          </td>
+                                        )}
                                         <td className="py-3.5 px-4 text-right font-mono text-xs font-bold text-text-primary">
                                           {(() => {
                                             const itemEstimatedPrice = getEstimatedUnitPrice(selectedItem, method);
@@ -3033,9 +3179,11 @@ export default function PesquisaPrecos() {
                                   <th className="py-3 px-4 w-40">CNPJ / CPF</th>
                                   <th className="py-3 px-4 w-32 text-right">Preço Unitário</th>
                                   <th className="py-3 px-4 w-32 text-right">Frete</th>
-                                  <th className="py-3 px-4 w-32 text-right">Preço Base</th>
-                                  <th className="py-3 px-4 text-center w-24">Ajuste</th>
-                                  <th className="py-3 px-4 w-32 text-right">Preço Ajustado</th>
+                                  {!globalAdjustmentEnabled ? (
+                                    <th className="py-3 px-4 w-32 text-right">Preço Base</th>
+                                  ) : (
+                                    <th className="py-3 px-4 w-32 text-right">Preço Ajustado</th>
+                                  )}
                                   <th className="py-3 px-4 w-32 text-right">Divergência (%)</th>
                                   <th className="py-3 px-4 w-32">Data</th>
                                   <th className="py-3 px-4 text-center w-24">Excluir</th>
@@ -3051,45 +3199,13 @@ export default function PesquisaPrecos() {
                                         <td className="py-3.5 px-4 font-mono text-xs text-text-secondary">{candidate.supplierDocument || '-'}</td>
                                         <td className="py-3.5 px-4 text-right font-mono text-xs">{formatCurrency(candidate.originalUnitPrice)}</td>
                                         <td className="py-3.5 px-4 text-right font-mono text-xs">{candidate.freightCost ? formatCurrency(candidate.freightCost) : '-'}</td>
-                                        <td className="py-3.5 px-4 text-right font-mono text-xs text-text-secondary">{formatCurrency(candidate.comparableUnitPrice)}</td>
-                                        <td className="py-3.5 px-4 text-center">
-                                          <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            className={`h-7 px-2 text-xs gap-1 transition-all ${
-                                              candidate.monetaryAdjustmentEnabled
-                                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold'
-                                                : 'border-border-default hover:border-primary/30 text-text-secondary hover:text-primary'
-                                            }`}
-                                            onClick={() => {
-                                              const dateVal = candidate.resultDate || candidate.purchaseDate || new Date().toISOString().split('T')[0];
-                                              setMonetaryAdjustmentDraft({
-                                                itemId: selectedItem.localId,
-                                                candidate,
-                                                enabled: candidate.monetaryAdjustmentEnabled ?? false,
-                                                index: candidate.monetaryAdjustmentIndex ?? 'IPCA',
-                                                manualRate: candidate.monetaryAdjustmentManualRate?.toString() ?? '0',
-                                                fromDate: dateVal.slice(0, 7),
-                                                toDate: researchDate.slice(0, 7),
-                                              });
-                                            }}
-                                            title="Configurar atualização monetária"
-                                          >
-                                            {candidate.monetaryAdjustmentEnabled ? (
-                                              <span>
-                                                {candidate.monetaryAdjustmentIndex === 'manual'
-                                                  ? 'Manual'
-                                                  : candidate.monetaryAdjustmentIndex}
-                                              </span>
-                                            ) : (
-                                              <span>Ajustar</span>
-                                            )}
-                                          </Button>
-                                        </td>
-                                        <td className="py-3.5 px-4 text-right font-mono text-xs font-bold text-text-primary">
-                                          {formatCurrency(candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice)}
-                                        </td>
+                                        {!globalAdjustmentEnabled ? (
+                                          <td className="py-3.5 px-4 text-right font-mono text-xs text-text-secondary">{formatCurrency(candidate.comparableUnitPrice)}</td>
+                                        ) : (
+                                          <td className="py-3.5 px-4 text-right font-mono text-xs font-bold text-text-primary">
+                                            {formatCurrency(candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice)}
+                                          </td>
+                                        )}
                                         <td className="py-3.5 px-4 text-right font-mono text-xs font-bold text-text-primary">
                                           {(() => {
                                             const itemEstimatedPrice = getEstimatedUnitPrice(selectedItem, method);
@@ -3462,165 +3578,7 @@ export default function PesquisaPrecos() {
         </div>
       )}
 
-      {/* Dialog de Atualização Monetária */}
-      {monetaryAdjustmentDraft && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs transition-all animate-none p-4">
-          <div className="bg-surface-card border border-border-default rounded-radius-xl w-full max-w-lg shadow-premium flex flex-col overflow-hidden max-h-[90vh]">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-border-default flex justify-between items-center bg-surface-subtle">
-              <div>
-                <h3 className="text-sm font-bold text-sebrae-navy capitalize">
-                  Atualização Monetária
-                </h3>
-                <p className="text-[11px] text-text-muted mt-0.5">
-                  Ajuste o valor da cotação com base em índices de inflação ou reajuste manual.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="h-8 w-8 rounded-full p-0 flex items-center justify-center text-text-secondary hover:bg-slate-100 hover:text-text-primary"
-                onClick={() => setMonetaryAdjustmentDraft(null)}
-              >
-                ✕
-              </button>
-            </div>
 
-            {/* Modal Body */}
-            <div className="p-6 space-y-4 overflow-y-auto">
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-md space-y-1">
-                <p className="text-xs text-text-secondary">
-                  <strong>Fornecedor:</strong> {monetaryAdjustmentDraft.candidate.supplierName || monetaryAdjustmentDraft.candidate.sourceLabel || '-'}
-                </p>
-                <p className="text-xs text-text-secondary">
-                  <strong>Preço Base Original:</strong> {formatCurrency(monetaryAdjustmentDraft.candidate.comparableUnitPrice)}
-                </p>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="monetary-adjust-enable"
-                  checked={monetaryAdjustmentDraft.enabled}
-                  onCheckedChange={(checked) =>
-                    setMonetaryAdjustmentDraft({
-                      ...monetaryAdjustmentDraft,
-                      enabled: checked === true,
-                    })
-                  }
-                />
-                <label
-                  htmlFor="monetary-adjust-enable"
-                  className="text-xs font-semibold text-text-primary cursor-pointer"
-                >
-                  Ativar Atualização Monetária para esta cotação
-                </label>
-              </div>
-
-              {monetaryAdjustmentDraft.enabled && (
-                <div className="space-y-4 pt-2 border-t border-border-default/60">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-text-secondary">Índice ou Método</label>
-                    <select
-                      className="w-full rounded-md border border-border-default bg-surface-card px-3 py-1.5 text-xs text-text-primary focus:border-primary focus:outline-none"
-                      value={monetaryAdjustmentDraft.index}
-                      onChange={(e) =>
-                        setMonetaryAdjustmentDraft({
-                          ...monetaryAdjustmentDraft,
-                          index: e.target.value as InflationIndexType | 'manual',
-                        })
-                      }
-                    >
-                      <option value="IPCA">IPCA (IBGE)</option>
-                      <option value="IGP-M">IGP-M (FGV)</option>
-                      <option value="INPC">INPC (IBGE)</option>
-                      <option value="manual">Manual (%)</option>
-                    </select>
-                  </div>
-
-                  {monetaryAdjustmentDraft.index === 'manual' ? (
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-text-secondary">Taxa de Reajuste (%)</label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="Ex: 5.5"
-                        value={monetaryAdjustmentDraft.manualRate}
-                        onChange={(e) =>
-                          setMonetaryAdjustmentDraft({
-                            ...monetaryAdjustmentDraft,
-                            manualRate: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-text-secondary">Mês Inicial (A-M)</label>
-                        <input
-                          type="month"
-                          className="w-full rounded-md border border-border-default bg-surface-card px-3 py-1.5 text-xs text-text-primary focus:border-primary focus:outline-none"
-                          value={monetaryAdjustmentDraft.fromDate}
-                          min="2024-01"
-                          max="2026-07"
-                          onChange={(e) =>
-                            setMonetaryAdjustmentDraft({
-                              ...monetaryAdjustmentDraft,
-                              fromDate: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-text-secondary">Mês Final (A-M)</label>
-                        <input
-                          type="month"
-                          className="w-full rounded-md border border-border-default bg-surface-card px-3 py-1.5 text-xs text-text-primary focus:border-primary focus:outline-none"
-                          value={monetaryAdjustmentDraft.toDate}
-                          min="2024-01"
-                          max="2026-07"
-                          onChange={(e) =>
-                            setMonetaryAdjustmentDraft({
-                              ...monetaryAdjustmentDraft,
-                              toDate: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {monetaryAdjustmentDraft.index !== 'manual' && (
-                    <div className="p-3 bg-blue-50 border border-blue-100 rounded text-[11px] text-blue-700 leading-normal">
-                      O reajuste será calculado proporcionalmente com base na tabela histórica oficial carregada no sistema (Janeiro/2024 a Julho/2026).
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="px-6 py-3.5 border-t border-border-default bg-surface-subtle flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="text-xs h-9 font-semibold"
-                onClick={() => setMonetaryAdjustmentDraft(null)}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                className="bg-primary text-primary-foreground text-xs h-9 font-semibold"
-                onClick={confirmMonetaryAdjustment}
-              >
-                Aplicar Reajuste
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

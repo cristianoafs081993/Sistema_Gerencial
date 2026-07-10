@@ -208,8 +208,17 @@ describe('PesquisaPrecos', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Editar Cotações/i }));
     await screen.findByText('Fornecedor');
 
+    // Clica no checkbox para desconsiderar o preço
     fireEvent.click(screen.getByRole('checkbox', { name: /Usar preço 1/i }));
 
+    // O modal deve aparecer exigindo justificativa
+    const textarea = await screen.findByPlaceholderText(/Ex\.: unidade de fornecimento/i);
+    fireEvent.change(textarea, { target: { value: 'Justificativa válida com mais de 10 caracteres' } });
+    
+    // Confirma a exclusão no modal
+    fireEvent.click(screen.getByText('Desconsiderar cotação'));
+
+    // Agora, o preço foi desconsiderado e a justificativa inline deve estar visível
     expect(screen.getByLabelText(/Justificativa para desconsiderar 1/i)).toBeInTheDocument();
   });
 
@@ -259,5 +268,36 @@ describe('PesquisaPrecos', () => {
       'href',
       'https://pncp.gov.br/app/editais/51792919000104/2026/52',
     );
+  });
+
+  it('permite configurar atualização monetária global pelo card de métodos de cálculo', async () => {
+    const { container } = renderPage();
+    fireEvent.change(container.querySelector('input[type="file"]') as HTMLInputElement, {
+      target: { files: [new File(['xlsx'], 'custos.xlsx')] },
+    });
+    await screen.findAllByText('Café torrado e moído, pacote de 500 g');
+    fireEvent.click(screen.getByRole('button', { name: /Avançar/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Editar Cotações/i }));
+    await screen.findByText('Fornecedor');
+
+    // Verifica que existe o checkbox de reajuste global
+    const globalAdjustCheckbox = screen.getByRole('checkbox', { name: /Ativar atualização monetária global/i });
+    expect(globalAdjustCheckbox).toBeInTheDocument();
+
+    // Ativa o reajuste global
+    fireEvent.click(globalAdjustCheckbox);
+
+    // O select de índice de reajuste deve aparecer
+    const indexSelect = screen.getByLabelText(/Índice ou Método/i);
+    expect(indexSelect).toBeInTheDocument();
+    expect(indexSelect).toHaveValue('IPCA');
+
+    // Altera para manual
+    fireEvent.change(indexSelect, { target: { value: 'manual' } });
+
+    // O input de taxa de reajuste manual deve aparecer
+    const manualRateInput = screen.getByPlaceholderText(/Ex: 5.5/i);
+    expect(manualRateInput).toBeInTheDocument();
+    fireEvent.change(manualRateInput, { target: { value: '10' } });
   });
 });
