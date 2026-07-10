@@ -59,7 +59,7 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 - `DashboardContractExecutionTab`: aba analitica dedicada a contratos no dashboard, com seletor global por bolhas clicaveis, grafico mensal de faturas e bullet chart de projecao anual frente ao empenhado com hover de rastreabilidade.
 - `DashboardRapAnnualEvolutionPanel`: painel da aba RAP com `ChartPanel`, seletor de UG, upload CSV restrito a superadmin, grafico anual combinado e tabela resumida do historico agregado.
 - `EnergiaCampus`: pagina analitica-operacional que combina `StatCard`, `ChartPanel`, `SectionPanel`, `DataTablePanel`, filtros no `HeaderActions` e upload XLSX restrito a superadmin.
-- `PesquisaPrecos`: fluxo operacional em etapas que combina `HeaderActions`, `SectionPanel`, KPIs compactos, seletor horizontal de itens, sugestões CATMAT/CATSER confirmáveis e `DataTablePanel` para revisar até 15 referências, com estados explícitos de aderência, seleção e exclusão.
+- `PesquisaPrecos`: fluxo operacional em etapas que combina `HeaderActions`, `SectionPanel`, painel compacto de métodos de cálculo, seletor horizontal de itens, sugestões CATMAT/CATSER confirmáveis e `DataTablePanel` para revisar até 15 referências, com estados explícitos de aderência, seleção e exclusão.
 - `RequisicaoCompra`: pagina operacional que apresenta "Gestão de Requisições de Compra" no header global por meio de `HeaderSubtitle`, sem repetir o titulo na area de conteudo.
 - `Layout`: sidebar global compacta com campo de busca visual, grupos expansivos, submenus expansivos, indicador ativo lateral e drawer mobile.
 

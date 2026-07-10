@@ -8,8 +8,9 @@ O módulo `/pesquisa-precos` transforma uma planilha de itens em uma cesta audit
 2. consulta preços homologados dos últimos 12 meses;
 3. apresenta até 15 referências por item;
 4. permite seleção e exclusão com justificativa;
-5. calcula média, mediana, mínimo, máximo, desvio padrão e coeficiente de variação;
-6. salva a pesquisa e gera relatório com memória de cálculo.
+5. calcula média aritmética, mediana, menor preço, média ponderada, média saneada, mínimo, máximo, desvio padrão, coeficiente de variação e quantidade de preços excluídos;
+6. verifica automaticamente indícios objetivos de irregularidade com base apenas na IN SEGES/ME nº 65/2021;
+7. salva a pesquisa e gera relatório com memória de cálculo.
 
 A IA apenas reordena candidatos pela aderência técnica. Ela não cria valores, não altera preços oficiais e não substitui a análise crítica do agente responsável.
 
@@ -112,11 +113,29 @@ O relatório exige:
 - justificativa do método estatístico;
 - memória de cálculo e identificação das fontes.
 
-O módulo oferece média, mediana e menor preço. A mediana é o padrão inicial. O uso de menos de três preços não é automatizado neste corte; casos excepcionais devem seguir justificativa e aprovação da autoridade competente fora do fluxo automático.
+O módulo exibe média aritmética, mediana, menor preço, média ponderada, média saneada e preços excluídos do cálculo. A média ponderada usa a quantidade registrada na referência de preço como peso, quando disponível. A média saneada corresponde à média dos preços mantidos na cesta após as exclusões justificadas pelo usuário. Ao desconsiderar uma cotação, a interface exige justificativa objetiva antes de gravar a exclusão. A mediana é o método padrão inicial para o preço estimado. O uso de menos de três preços não é automatizado neste corte; casos excepcionais devem seguir justificativa e aprovação da autoridade competente fora do fluxo automático.
 
 Referência normativa principal:
 
 - IN SEGES/ME nº 65, de 7 de julho de 2021, especialmente arts. 3º a 6º.
+
+## Verificação automática de irregularidades
+
+O módulo executa uma análise determinística de apoio técnico sobre os dados disponíveis na própria pesquisa, sem consultar processos externos e sem substituir a revisão do agente responsável.
+
+A verificação usa somente a IN SEGES/ME nº 65/2021 e gera achados estruturados com severidade, regra aplicada, evidência e ação recomendada. Achados bloqueantes impedem a conclusão do relatório; alertas podem permanecer quando houver justificativa registrada pelo usuário. Para pesquisas antigas com cotações já excluídas sem motivo, o achado de exclusão sem justificativa direciona o usuário para registrar a justificativa pendente.
+
+Regras cobertas neste corte:
+
+- ausência de objeto, responsável, fontes, série de preços, método, memória de cálculo ou justificativa metodológica;
+- menos de três preços selecionados sem justificativa excepcional;
+- exclusões sem justificativa;
+- preços oficiais fora da janela de 1 ano;
+- fontes de internet sem data/hora de acesso ou com mais de 6 meses;
+- fornecedor direto sem dados mínimos ou justificativa de escolha;
+- ausência de priorização de sistemas oficiais/contratações públicas sem justificativa;
+- preço estimado acima da mediana quando a cesta selecionada usa somente sistema oficial;
+- grande variação entre preços, preço outlier sem justificativa, unidade incompatível selecionada e busca oficial não executada.
 
 ## Persistência
 

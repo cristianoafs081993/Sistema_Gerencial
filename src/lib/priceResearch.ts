@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import * as pdfWorkerAsset from 'pdfjs-dist/build/pdf.worker.min.js?url';
 import type { PriceCatalogSuggestion } from '@/lib/priceCatalog';
+import { calculateIndexFactor, type InflationIndexType } from './monetaryAdjustment';
 
 async function getFileArrayBuffer(file: File | Blob): Promise<ArrayBuffer> {
   if (typeof file.arrayBuffer === 'function') {
@@ -62,6 +63,11 @@ export type PriceResearchCandidate = {
   selected: boolean;
   exclusionReason: string;
   rawData: Record<string, unknown>;
+  monetaryAdjustmentEnabled?: boolean;
+  monetaryAdjustmentIndex?: InflationIndexType | 'manual';
+  monetaryAdjustmentFactor?: number;
+  monetaryAdjustmentManualRate?: number;
+  monetaryAdjustedPrice?: number;
 };
 
 export type PriceResearchItem = {
@@ -91,8 +97,12 @@ export type PriceResearchStatistics = {
   median: number;
   minimum: number;
   maximum: number;
+  weightedMean: number;
+  sanitizedMean: number;
+  excludedCount: number;
   standardDeviation: number;
   coefficientOfVariation: number;
+  amplitudeDivergence: number;
 };
 
 export type PriceResearchReportData = {
@@ -106,6 +116,21 @@ export type PriceResearchReportData = {
   notes: string;
   sourceFile: string;
   items: PriceResearchItem[];
+};
+
+export type PriceResearchComplianceSeverity = 'error' | 'warning' | 'info';
+
+export type PriceResearchComplianceFinding = {
+  id: string;
+  severity: PriceResearchComplianceSeverity;
+  scope: 'research' | 'item' | 'candidate';
+  itemId?: string;
+  itemNumber?: string;
+  candidateId?: string;
+  ruleLabel: string;
+  message: string;
+  evidence: string;
+  recommendedAction: string;
 };
 
 const HEADER_ALIASES = {
@@ -469,8 +494,16 @@ function median(values: number[]) {
     : sorted[middle];
 }
 
-export function calculatePriceStatistics(values: number[]): PriceResearchStatistics {
-  const valid = values.filter((value) => Number.isFinite(value) && value > 0);
+function normalizeStatisticWeight(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+export function calculatePriceStatistics(values: number[], weights: Array<number | null | undefined> = []): PriceResearchStatistics {
+  const valid = values
+    .map((value, index) => ({ value, weight: normalizeStatisticWeight(weights[index]) }))
+    .filter((entry) => Number.isFinite(entry.value) && entry.value > 0);
+    
   if (valid.length === 0) {
     return {
       count: 0,
@@ -478,32 +511,50 @@ export function calculatePriceStatistics(values: number[]): PriceResearchStatist
       median: 0,
       minimum: 0,
       maximum: 0,
+      weightedMean: 0,
+      sanitizedMean: 0,
+      excludedCount: 0,
       standardDeviation: 0,
       coefficientOfVariation: 0,
+      amplitudeDivergence: 0,
     };
   }
 
-  const mean = valid.reduce((total, value) => total + value, 0) / valid.length;
-  const variance = valid.reduce((total, value) => total + ((value - mean) ** 2), 0) / valid.length;
+  const validValues = valid.map((entry) => entry.value);
+  const mean = validValues.reduce((total, value) => total + value, 0) / validValues.length;
+  const totalWeight = valid.reduce((total, entry) => total + entry.weight, 0);
+  const weightedMean = totalWeight > 0
+    ? valid.reduce((total, entry) => total + (entry.value * entry.weight), 0) / totalWeight
+    : mean;
+  const variance = validValues.reduce((total, value) => total + ((value - mean) ** 2), 0) / validValues.length;
   const standardDeviation = Math.sqrt(variance);
+  const minimum = Math.min(...validValues);
+  const maximum = Math.max(...validValues);
 
   return {
-    count: valid.length,
+    count: validValues.length,
     mean,
-    median: median(valid),
-    minimum: Math.min(...valid),
-    maximum: Math.max(...valid),
+    median: median(validValues),
+    minimum,
+    maximum,
+    weightedMean,
+    sanitizedMean: mean,
+    excludedCount: 0,
     standardDeviation,
     coefficientOfVariation: mean > 0 ? (standardDeviation / mean) * 100 : 0,
+    amplitudeDivergence: minimum > 0 ? ((maximum - minimum) / minimum) * 100 : 0,
   };
 }
 
 export function getSelectedStatistics(item: PriceResearchItem) {
-  return calculatePriceStatistics(
-    item.candidates
-      .filter((candidate) => candidate.selected)
-      .map((candidate) => candidate.comparableUnitPrice),
-  );
+  const selected = item.candidates.filter((candidate) => candidate.selected);
+  return {
+    ...calculatePriceStatistics(
+      selected.map((candidate) => candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice),
+      selected.map((candidate) => candidate.quantity),
+    ),
+    excludedCount: item.candidates.filter((candidate) => !candidate.selected).length,
+  };
 }
 
 export function getEstimatedUnitPrice(item: PriceResearchItem, method: PriceResearchMethod) {
@@ -513,25 +564,368 @@ export function getEstimatedUnitPrice(item: PriceResearchItem, method: PriceRese
   return statistics.median;
 }
 
-export function validatePriceResearchReport(data: PriceResearchReportData) {
-  const errors: string[] = [];
-  if (!data.objectDescription.trim()) errors.push('Informe o objeto da contratação.');
-  if (!data.responsibleName.trim()) errors.push('Informe o agente responsável pela pesquisa.');
-  if (!data.methodologyJustification.trim()) errors.push('Justifique o método estatístico adotado.');
-  if (data.items.length === 0) errors.push('Importe ao menos um item.');
+function parseDate(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value.length <= 10 ? `${value.slice(0, 10)}T12:00:00` : value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function differenceInDays(left: Date, right: Date) {
+  return Math.floor((left.getTime() - right.getTime()) / 86400000);
+}
+
+function hasMeaningfulJustification(value: unknown) {
+  return String(value ?? '').trim().length >= 10;
+}
+
+function isOfficialPrice(candidate: PriceResearchCandidate) {
+  return candidate.sourceType === 'compras_gov_precos';
+}
+
+function isDirectSupplierPrice(candidate: PriceResearchCandidate) {
+  return candidate.sourceType === 'custom';
+}
+
+function isInternetPrice(candidate: PriceResearchCandidate) {
+  return !isOfficialPrice(candidate) && !isDirectSupplierPrice(candidate);
+}
+
+export function analyzePriceResearchCompliance(data: PriceResearchReportData): PriceResearchComplianceFinding[] {
+  const findings: PriceResearchComplianceFinding[] = [];
+  const researchDate = parseDate(data.researchDate) ?? new Date();
+
+  const addFinding = (finding: Omit<PriceResearchComplianceFinding, 'id'>) => {
+    findings.push({
+      ...finding,
+      id: [
+        finding.severity,
+        finding.scope,
+        finding.itemId ?? 'research',
+        finding.candidateId ?? '',
+        findings.length + 1,
+      ].filter(Boolean).join(':'),
+    });
+  };
+
+  if (!data.objectDescription.trim()) {
+    addFinding({
+      severity: 'error',
+      scope: 'research',
+      ruleLabel: 'IN 65/2021, art. 3º, I',
+      message: 'Descrição do objeto não informada.',
+      evidence: 'Campo de objeto vazio.',
+      recommendedAction: 'Informe a descrição do objeto a ser contratado antes de concluir a pesquisa.',
+    });
+  }
+  if (!data.responsibleName.trim()) {
+    addFinding({
+      severity: 'error',
+      scope: 'research',
+      ruleLabel: 'IN 65/2021, art. 3º, II',
+      message: 'Agente responsável não informado.',
+      evidence: 'Campo de responsável vazio.',
+      recommendedAction: 'Identifique o agente ou a equipe responsável pela pesquisa.',
+    });
+  }
+  if (!data.methodologyJustification.trim()) {
+    addFinding({
+      severity: 'error',
+      scope: 'research',
+      ruleLabel: 'IN 65/2021, art. 3º, V e VI',
+      message: 'Justificativa da metodologia não preenchida.',
+      evidence: `Método selecionado: ${METHOD_LABELS[data.method]}.`,
+      recommendedAction: 'Registre por que o método estatístico escolhido é adequado para a cesta de preços.',
+    });
+  }
+  if (data.items.length === 0) {
+    addFinding({
+      severity: 'error',
+      scope: 'research',
+      ruleLabel: 'IN 65/2021, art. 3º, III, IV e VII',
+      message: 'Nenhum item importado para formar série de preços e memória de cálculo.',
+      evidence: 'A pesquisa não possui itens.',
+      recommendedAction: 'Importe ao menos um item e realize a coleta de preços antes de concluir.',
+    });
+  }
+
+  const allCandidates = data.items.flatMap((item) => item.candidates);
+  if (data.items.length > 0 && allCandidates.length === 0) {
+    addFinding({
+      severity: 'error',
+      scope: 'research',
+      ruleLabel: 'IN 65/2021, art. 3º, III, IV e VII',
+      message: 'Fontes consultadas e série de preços não registradas.',
+      evidence: 'Nenhuma cotação foi associada aos itens da pesquisa.',
+      recommendedAction: 'Execute a busca oficial ou registre cotações válidas antes de gerar o relatório.',
+    });
+  }
 
   for (const item of data.items) {
-    if (!item.catalogCode) errors.push(`Item ${item.itemNumber}: informe o código CATMAT/CATSER.`);
     const selected = item.candidates.filter((candidate) => candidate.selected);
-    if (selected.length < 3) errors.push(`Item ${item.itemNumber}: selecione ao menos três preços ou registre justificativa excepcional nos autos.`);
+    const statistics = getSelectedStatistics(item);
+    const selectedOfficial = selected.filter(isOfficialPrice);
+    const selectedInternet = selected.filter(isInternetPrice);
+    const selectedDirectSupplier = selected.filter(isDirectSupplierPrice);
+    const selectedPrices = selected.map((candidate) => candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice).filter((value) => value > 0);
+    const selectedMedian = selectedPrices.length > 0 ? median(selectedPrices) : 0;
+
+    if (!item.catalogCode) {
+      addFinding({
+        severity: 'error',
+        scope: 'item',
+        itemId: item.localId,
+        itemNumber: item.itemNumber,
+        ruleLabel: 'IN 65/2021, art. 3º, VII',
+        message: `Item ${item.itemNumber}: código CATMAT/CATSER ausente.`,
+        evidence: 'O item não possui código de catálogo confirmado.',
+        recommendedAction: 'Confirme um CATMAT/CATSER antes de consultar e documentar os preços.',
+      });
+    }
+
+    if (item.searchStatus === 'idle' && item.catalogCode) {
+      addFinding({
+        severity: 'error',
+        scope: 'item',
+        itemId: item.localId,
+        itemNumber: item.itemNumber,
+        ruleLabel: 'IN 65/2021, art. 5º, I e II',
+        message: `Item ${item.itemNumber}: busca oficial não executada.`,
+        evidence: `CATMAT/CATSER ${item.catalogCode} informado sem coleta oficial registrada.`,
+        recommendedAction: 'Execute a busca de preços oficiais para priorizar sistemas oficiais e contratações públicas.',
+      });
+    }
+
+    if (item.candidates.length === 0) {
+      addFinding({
+        severity: 'error',
+        scope: 'item',
+        itemId: item.localId,
+        itemNumber: item.itemNumber,
+        ruleLabel: 'IN 65/2021, art. 3º, III e IV',
+        message: `Item ${item.itemNumber}: nenhuma fonte de preço registrada.`,
+        evidence: 'O item não possui cotações candidatas.',
+        recommendedAction: 'Colete preços para formar a série de preços do item.',
+      });
+    }
+
+    if (selected.length === 0 && item.candidates.length > 0) {
+      addFinding({
+        severity: 'error',
+        scope: 'item',
+        itemId: item.localId,
+        itemNumber: item.itemNumber,
+        ruleLabel: 'IN 65/2021, art. 3º, IV e VII',
+        message: `Item ${item.itemNumber}: nenhum preço selecionado para a memória de cálculo.`,
+        evidence: `${item.candidates.length} cotação(ões) disponível(is), nenhuma selecionada.`,
+        recommendedAction: 'Selecione preços comparáveis ou registre as justificativas de exclusão.',
+      });
+    }
+
+    if (selected.length > 0 && selected.length < 3 && !hasMeaningfulJustification(data.notes)) {
+      addFinding({
+        severity: 'error',
+        scope: 'item',
+        itemId: item.localId,
+        itemNumber: item.itemNumber,
+        ruleLabel: 'IN 65/2021, art. 6º, caput e § 5º',
+        message: `Item ${item.itemNumber}: menos de três preços selecionados sem justificativa excepcional.`,
+        evidence: `${selected.length} preço(s) selecionado(s).`,
+        recommendedAction: 'Selecione ao menos três preços ou registre justificativa excepcional nas observações.',
+      });
+    }
+
     const exclusionsWithoutReason = item.candidates.filter(
       (candidate) => !candidate.selected && !candidate.exclusionReason.trim(),
     );
     if (exclusionsWithoutReason.length > 0) {
-      errors.push(`Item ${item.itemNumber}: justifique todas as exclusões.`);
+      addFinding({
+        severity: 'error',
+        scope: 'item',
+        itemId: item.localId,
+        itemNumber: item.itemNumber,
+        ruleLabel: 'IN 65/2021, art. 3º, VI e art. 6º, § 3º',
+        message: `Item ${item.itemNumber}: preços excluídos sem justificativa.`,
+        evidence: `${exclusionsWithoutReason.length} cotação(ões) desconsiderada(s) sem motivo registrado.`,
+        recommendedAction: 'Justifique cada desconsideração de valor inexequível, inconsistente ou excessivamente elevado.',
+      });
+    }
+
+    if (selected.length > 0 && selectedOfficial.length === 0 && !hasMeaningfulJustification(data.notes)) {
+      addFinding({
+        severity: 'warning',
+        scope: 'item',
+        itemId: item.localId,
+        itemNumber: item.itemNumber,
+        ruleLabel: 'IN 65/2021, art. 5º, § 1º',
+        message: `Item ${item.itemNumber}: sistemas oficiais ou contratações públicas não foram priorizados.`,
+        evidence: 'A cesta selecionada usa apenas internet ou fornecedores diretos.',
+        recommendedAction: 'Registre a impossibilidade de usar sistemas oficiais/contratações públicas ou inclua fontes oficiais.',
+      });
+    }
+
+    if (selectedOfficial.length === selected.length && selected.length > 0) {
+      const estimatedUnitPrice = getEstimatedUnitPrice(item, data.method);
+      if (statistics.median > 0 && estimatedUnitPrice > statistics.median) {
+        addFinding({
+          severity: 'error',
+          scope: 'item',
+          itemId: item.localId,
+          itemNumber: item.itemNumber,
+          ruleLabel: 'IN 65/2021, art. 6º, § 6º',
+          message: `Item ${item.itemNumber}: preço estimado acima da mediana em base composta somente por sistema oficial.`,
+          evidence: `Estimado ${formatCurrency(estimatedUnitPrice)}; mediana ${formatCurrency(statistics.median)}.`,
+          recommendedAction: 'Use valor menor ou igual à mediana, ou complemente a cesta com outros parâmetros válidos e justifique.',
+        });
+      }
+    }
+
+    if (statistics.count >= 3 && statistics.coefficientOfVariation > 25) {
+      addFinding({
+        severity: 'warning',
+        scope: 'item',
+        itemId: item.localId,
+        itemNumber: item.itemNumber,
+        ruleLabel: 'IN 65/2021, art. 6º, § 4º',
+        message: statistics.coefficientOfVariation > 50
+          ? `Item ${item.itemNumber}: variação crítica entre os preços selecionados.`
+          : `Item ${item.itemNumber}: grande variação entre os preços selecionados.`,
+        evidence: `Coeficiente de variação de ${statistics.coefficientOfVariation.toFixed(2)}%.`,
+        recommendedAction: 'Revise a comparabilidade da cesta e justifique a manutenção ou exclusão dos valores extremos.',
+      });
+    }
+
+    for (const candidate of selected) {
+      const candidateDate = parseDate(candidate.resultDate || candidate.purchaseDate);
+      const candidateLabel = candidate.sourceLabel || candidate.purchaseItemId || candidate.id;
+      const candidatePrice = candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice;
+
+      if (!candidate.unitCompatible) {
+        addFinding({
+          severity: 'error',
+          scope: 'candidate',
+          itemId: item.localId,
+          itemNumber: item.itemNumber,
+          candidateId: candidate.id,
+          ruleLabel: 'IN 65/2021, art. 4º e art. 6º, § 4º',
+          message: `Item ${item.itemNumber}: preço com unidade incompatível foi selecionado.`,
+          evidence: `${candidateLabel}; unidade original ${candidate.originalUnitLabel}.`,
+          recommendedAction: 'Desmarque a cotação ou registre conversão/comparabilidade verificável.',
+        });
+      }
+
+      if (isOfficialPrice(candidate)) {
+        if (!candidateDate) {
+          addFinding({
+            severity: 'error',
+            scope: 'candidate',
+            itemId: item.localId,
+            itemNumber: item.itemNumber,
+            candidateId: candidate.id,
+            ruleLabel: 'IN 65/2021, art. 5º, II',
+            message: `Item ${item.itemNumber}: preço oficial selecionado sem data rastreável.`,
+            evidence: `${candidateLabel}; compra ${candidate.purchaseId || '-'}.`,
+            recommendedAction: 'Use referência com data de compra/resultado ou substitua a cotação.',
+          });
+        } else if (differenceInDays(researchDate, candidateDate) > 365) {
+          addFinding({
+            severity: 'error',
+            scope: 'candidate',
+            itemId: item.localId,
+            itemNumber: item.itemNumber,
+            candidateId: candidate.id,
+            ruleLabel: 'IN 65/2021, art. 5º, II',
+            message: `Item ${item.itemNumber}: preço oficial fora do período de até 1 ano.`,
+            evidence: `${candidateLabel}; data ${formatDate(candidateDate.toISOString())}.`,
+            recommendedAction: 'Substitua por contratação similar dentro da janela normativa ou registre justificativa excepcional aplicável.',
+          });
+        }
+      }
+
+      if (isInternetPrice(candidate)) {
+        const evidenceDate = parseDate(candidate.evidenceCapturedAt || candidate.resultDate || candidate.purchaseDate);
+        if (!evidenceDate) {
+          addFinding({
+            severity: 'error',
+            scope: 'candidate',
+            itemId: item.localId,
+            itemNumber: item.itemNumber,
+            candidateId: candidate.id,
+            ruleLabel: 'IN 65/2021, art. 5º, III',
+            message: `Item ${item.itemNumber}: fonte de internet sem data/hora de acesso.`,
+            evidence: `${candidateLabel}; URL ${candidate.sourceUrl || '-'}.`,
+            recommendedAction: 'Capture evidência com data/hora de acesso ou remova a cotação da cesta.',
+          });
+        } else if (differenceInDays(researchDate, evidenceDate) > 183) {
+          addFinding({
+            severity: 'error',
+            scope: 'candidate',
+            itemId: item.localId,
+            itemNumber: item.itemNumber,
+            candidateId: candidate.id,
+            ruleLabel: 'IN 65/2021, art. 5º, III',
+            message: `Item ${item.itemNumber}: fonte de internet com mais de 6 meses.`,
+            evidence: `${candidateLabel}; data ${formatDate(evidenceDate.toISOString())}.`,
+            recommendedAction: 'Atualize a captura ou substitua por referência dentro da janela de 6 meses.',
+          });
+        }
+      }
+
+      if (isDirectSupplierPrice(candidate)) {
+        if (!candidate.supplierName?.trim() || !candidate.supplierDocument?.trim() || !candidateDate) {
+          addFinding({
+            severity: 'error',
+            scope: 'candidate',
+            itemId: item.localId,
+            itemNumber: item.itemNumber,
+            candidateId: candidate.id,
+            ruleLabel: 'IN 65/2021, art. 5º, § 2º, II',
+            message: `Item ${item.itemNumber}: cotação direta com fornecedor sem dados mínimos.`,
+            evidence: `Fornecedor ${candidate.supplierName || '-'}; CPF/CNPJ ${candidate.supplierDocument || '-'}; data ${candidate.purchaseDate || '-'}.`,
+            recommendedAction: 'Informe fornecedor, CPF/CNPJ e data de emissão da proposta formal.',
+          });
+        }
+        if (!hasMeaningfulJustification(data.notes)) {
+          addFinding({
+            severity: 'warning',
+            scope: 'candidate',
+            itemId: item.localId,
+            itemNumber: item.itemNumber,
+            candidateId: candidate.id,
+            ruleLabel: 'IN 65/2021, art. 3º, VIII e art. 5º, IV',
+            message: `Item ${item.itemNumber}: pesquisa direta com fornecedor sem justificativa de escolha registrada.`,
+            evidence: `Fornecedor ${candidate.supplierName || '-'}.`,
+            recommendedAction: 'Registre nas observações a justificativa da escolha dos fornecedores consultados.',
+          });
+        }
+      }
+
+      if (
+        selectedMedian > 0 &&
+        (candidatePrice > selectedMedian * 1.5 || candidatePrice < selectedMedian * 0.5) &&
+        !hasMeaningfulJustification(data.notes)
+      ) {
+        addFinding({
+          severity: 'warning',
+          scope: 'candidate',
+          itemId: item.localId,
+          itemNumber: item.itemNumber,
+          candidateId: candidate.id,
+          ruleLabel: 'IN 65/2021, art. 6º, § 3º e § 4º',
+          message: `Item ${item.itemNumber}: preço selecionado muito distante da mediana sem justificativa.`,
+          evidence: `${candidateLabel}; preço ${formatCurrency(candidatePrice)}; mediana ${formatCurrency(selectedMedian)}.`,
+          recommendedAction: 'Justifique a manutenção do preço ou desconsidere o valor extremo com critério fundamentado.',
+        });
+      }
     }
   }
-  return errors;
+
+  return findings;
+}
+
+export function validatePriceResearchReport(data: PriceResearchReportData) {
+  return analyzePriceResearchCompliance(data)
+    .filter((finding) => finding.severity === 'error')
+    .map((finding) => finding.message);
 }
 
 function escapeHtml(value: unknown) {
@@ -561,23 +955,41 @@ export function buildPriceResearchReportHtml(data: PriceResearchReportData) {
     const estimatedUnitPrice = getEstimatedUnitPrice(item, data.method);
     const estimatedTotal = estimatedUnitPrice * item.quantity;
 
-    const selectedRows = selected.map((candidate, index) => `
-      <tr>
-        <td>${index + 1}</td>
-        <td>${escapeHtml(candidate.agencyCode || '-')} - ${escapeHtml(candidate.agencyName || '-')}</td>
-        <td>${escapeHtml(candidate.supplierName || '-')}</td>
-        <td>
-          ${escapeHtml(candidate.purchaseId)} / item ${escapeHtml(candidate.purchaseItemId)}<br />
-          <a href="${escapeHtml(candidate.sourceUrl)}">Fonte oficial</a>
-          ${candidate.pncpSearchUrl ? ` | <a href="${escapeHtml(candidate.pncpSearchUrl)}">PNCP</a>` : ''}
-        </td>
-        <td>${formatDate(candidate.resultDate || candidate.purchaseDate)}</td>
-        <td>${escapeHtml(candidate.originalUnitLabel)}</td>
-        <td class="number">${formatCurrency(candidate.originalUnitPrice)}</td>
-        <td class="number">${formatCurrency(candidate.comparableUnitPrice)}</td>
-        <td>${escapeHtml(candidate.aiReason)}</td>
-      </tr>
-    `).join('');
+    const selectedRows = selected.map((candidate, index) => {
+      const adjustedPrice = candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice;
+      const dev = estimatedUnitPrice > 0 ? ((adjustedPrice - estimatedUnitPrice) / estimatedUnitPrice) * 100 : 0;
+      const devStr = dev > 0 ? `+${dev.toFixed(1)}%` : `${dev.toFixed(1)}%`;
+      
+      let adjustmentInfo = 'Sem reajuste';
+      if (candidate.monetaryAdjustmentEnabled) {
+        if (candidate.monetaryAdjustmentIndex === 'manual') {
+          adjustmentInfo = `Manual (${candidate.monetaryAdjustmentManualRate ?? 0}%)`;
+        } else {
+          adjustmentInfo = `${candidate.monetaryAdjustmentIndex} (Fator: ${(candidate.monetaryAdjustmentFactor ?? 1).toFixed(4)})`;
+        }
+      }
+
+      return `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${escapeHtml(candidate.agencyCode || '-')} - ${escapeHtml(candidate.agencyName || '-')}</td>
+          <td>${escapeHtml(candidate.supplierName || '-')}</td>
+          <td>
+            ${escapeHtml(candidate.purchaseId)} / item ${escapeHtml(candidate.purchaseItemId)}<br />
+            <a href="${escapeHtml(candidate.sourceUrl)}">Fonte oficial</a>
+            ${candidate.pncpSearchUrl ? ` | <a href="${escapeHtml(candidate.pncpSearchUrl)}">PNCP</a>` : ''}
+          </td>
+          <td>${formatDate(candidate.resultDate || candidate.purchaseDate)}</td>
+          <td>${escapeHtml(candidate.originalUnitLabel)}</td>
+          <td class="number">${formatCurrency(candidate.originalUnitPrice)}</td>
+          <td class="number">${formatCurrency(candidate.comparableUnitPrice)}</td>
+          <td>${escapeHtml(adjustmentInfo)}</td>
+          <td class="number font-bold">${formatCurrency(adjustedPrice)}</td>
+          <td class="number font-bold text-primary">${devStr}</td>
+          <td>${escapeHtml(candidate.aiReason)}</td>
+        </tr>
+      `;
+    }).join('');
 
     const excludedRows = excluded.map((candidate) => `
       <tr>
@@ -597,10 +1009,10 @@ export function buildPriceResearchReportHtml(data: PriceResearchReportData) {
           <thead>
             <tr>
               <th>#</th><th>Órgão/UASG</th><th>Fornecedor</th><th>Compra e fonte</th><th>Data</th><th>Unidade original</th>
-              <th>Preço original</th><th>Preço comparável</th><th>Análise de aderência</th>
+              <th>Preço original</th><th>Preço comparável</th><th>Ajuste monetário</th><th>Preço ajustado</th><th>Divergência</th><th>Análise de aderência</th>
             </tr>
           </thead>
-          <tbody>${selectedRows || '<tr><td colspan="9">Nenhum preço selecionado.</td></tr>'}</tbody>
+          <tbody>${selectedRows || '<tr><td colspan="12">Nenhum preço selecionado.</td></tr>'}</tbody>
         </table>
         <div class="summary">
           <div><span>Amostra</span><strong>${statistics.count}</strong></div>
@@ -608,6 +1020,7 @@ export function buildPriceResearchReportHtml(data: PriceResearchReportData) {
           <div><span>Mediana</span><strong>${formatCurrency(statistics.median)}</strong></div>
           <div><span>Menor</span><strong>${formatCurrency(statistics.minimum)}</strong></div>
           <div><span>CV</span><strong>${statistics.coefficientOfVariation.toFixed(2)}%</strong></div>
+          <div><span>Amplitude Div.</span><strong>${statistics.amplitudeDivergence.toFixed(2)}%</strong></div>
           <div><span>Preço estimado</span><strong>${formatCurrency(estimatedUnitPrice)}</strong></div>
           <div><span>Total estimado</span><strong>${formatCurrency(estimatedTotal)}</strong></div>
         </div>
@@ -711,7 +1124,7 @@ export function buildPriceResearchReportHtml(data: PriceResearchReportData) {
         th, td { border: 1px solid #d7d7d7; padding: 5px; vertical-align: top; }
         th { background: #edf6ef; text-align: left; }
         .number { text-align: right; white-space: nowrap; }
-        .summary { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 8px; }
+        .summary { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-top: 8px; }
         .summary div { border: 1px solid #d9dfd9; padding: 6px; }
         .summary span { display: block; color: #666; font-size: 9px; }
         .summary strong { display: block; margin-top: 2px; }
@@ -780,33 +1193,47 @@ export async function exportPriceResearchWorkbook(data: PriceResearchReportData)
       'Menor preço': stats.minimum,
       'Desvio padrão': stats.standardDeviation,
       'Coeficiente de variação (%)': stats.coefficientOfVariation,
+      'Amplitude Divergência (%)': stats.amplitudeDivergence,
       Método: METHOD_LABELS[data.method],
       'Preço unitário estimado': estimatedUnitPrice,
       'Valor total estimado': estimatedUnitPrice * item.quantity,
     };
   });
 
-  const quoteRows = data.items.flatMap((item) => item.candidates.map((candidate) => ({
-    Item: item.itemNumber,
-    Selecionado: candidate.selected ? 'Sim' : 'Não',
-    'Motivo da exclusão': candidate.exclusionReason,
-    Fonte: candidate.sourceLabel,
-    Compra: candidate.purchaseId,
-    'Item da compra': candidate.purchaseItemId,
-    Data: candidate.resultDate || candidate.purchaseDate,
-    UASG: candidate.agencyCode,
-    Órgão: candidate.agencyName,
-    Fornecedor: candidate.supplierName,
-    'CPF/CNPJ': candidate.supplierDocument,
-    Descrição: candidate.description,
-    'Unidade original': candidate.originalUnitLabel,
-    'Preço original': candidate.originalUnitPrice,
-    'Preço comparável': candidate.comparableUnitPrice,
-    'Aderência IA': candidate.aiScore,
-    'Justificativa IA': candidate.aiReason,
-    'URL da fonte': candidate.sourceUrl,
-    'Busca PNCP': candidate.pncpSearchUrl,
-  })));
+  const quoteRows = data.items.flatMap((item) => {
+    const estimatedPrice = getEstimatedUnitPrice(item, data.method);
+    return item.candidates.map((candidate) => {
+      const adjustedPrice = candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice;
+      const dev = estimatedPrice > 0 ? ((adjustedPrice - estimatedPrice) / estimatedPrice) * 100 : 0;
+      return {
+        Item: item.itemNumber,
+        Selecionado: candidate.selected ? 'Sim' : 'Não',
+        'Motivo da exclusão': candidate.exclusionReason,
+        Fonte: candidate.sourceLabel,
+        Compra: candidate.purchaseId,
+        'Item da compra': candidate.purchaseItemId,
+        Data: candidate.resultDate || candidate.purchaseDate,
+        UASG: candidate.agencyCode,
+        Órgão: candidate.agencyName,
+        Fornecedor: candidate.supplierName,
+        'CPF/CNPJ': candidate.supplierDocument,
+        Descrição: candidate.description,
+        'Unidade original': candidate.originalUnitLabel,
+        'Preço original': candidate.originalUnitPrice,
+        'Preço comparável': candidate.comparableUnitPrice,
+        'Atualização Monetária Ativa': candidate.monetaryAdjustmentEnabled ? 'Sim' : 'Não',
+        'Índice de Correção': candidate.monetaryAdjustmentIndex || '-',
+        'Fator de Correção': candidate.monetaryAdjustmentFactor || 1,
+        'Taxa Manual (%)': candidate.monetaryAdjustmentManualRate || 0,
+        'Preço Ajustado': adjustedPrice,
+        'Divergência (%)': dev,
+        'Aderência IA': candidate.aiScore,
+        'Justificativa IA': candidate.aiReason,
+        'URL da fonte': candidate.sourceUrl,
+        'Busca PNCP': candidate.pncpSearchUrl,
+      };
+    });
+  });
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(summaryRows), 'Resumo');

@@ -154,6 +154,9 @@ describe('PesquisaPrecos', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Editar Cotações/i }));
     expect(await screen.findByText('Fornecedor')).toBeInTheDocument();
     expect(screen.getAllByText('R$ 20,00').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText(/Média ponderada/i)).toBeInTheDocument();
+    expect(screen.getByText(/Média saneada/i)).toBeInTheDocument();
+    expect(screen.getByText(/Excluídos/i)).toBeInTheDocument();
   });
 
   it('permite selecionar arquivo PDF pesquisável', () => {
