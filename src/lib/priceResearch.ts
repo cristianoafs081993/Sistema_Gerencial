@@ -947,7 +947,25 @@ function formatDate(value?: string | null) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('pt-BR');
 }
 
+function complianceSeverityLabel(severity: PriceResearchComplianceSeverity) {
+  if (severity === 'error') return 'Bloqueante';
+  if (severity === 'warning') return 'Alerta';
+  return 'Informativo';
+}
+
 export function buildPriceResearchReportHtml(data: PriceResearchReportData) {
+  const complianceFindings = analyzePriceResearchCompliance(data);
+  const complianceRows = complianceFindings.map((finding) => `
+    <tr>
+      <td>${escapeHtml(complianceSeverityLabel(finding.severity))}</td>
+      <td>${escapeHtml(finding.scope === 'research' ? 'Pesquisa' : finding.itemNumber ? `Item ${finding.itemNumber}` : finding.scope)}</td>
+      <td>${escapeHtml(finding.ruleLabel)}</td>
+      <td>${escapeHtml(finding.message)}</td>
+      <td>${escapeHtml(finding.evidence)}</td>
+      <td>${escapeHtml(finding.recommendedAction)}</td>
+    </tr>
+  `).join('');
+
   const itemSections = data.items.map((item) => {
     const selected = item.candidates.filter((candidate) => candidate.selected);
     const excluded = item.candidates.filter((candidate) => !candidate.selected);
@@ -1146,6 +1164,18 @@ export function buildPriceResearchReportHtml(data: PriceResearchReportData) {
       </div>
       <p><strong>Caracterização das fontes:</strong> preços homologados disponibilizados pela API oficial de Pesquisa de Preços do Compras.gov.br, com rastreabilidade por compra, item, órgão, UASG, fornecedor e data. O PNCP é apresentado como consulta complementar quando disponível.</p>
       ${itemSections}
+      <section>
+        <h2>Verificação automática de irregularidades</h2>
+        <p>A verificação automática usa a IN SEGES/ME nº 65/2021 como apoio técnico e não substitui a análise do agente responsável.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Severidade</th><th>Escopo</th><th>Regra</th><th>Achado</th><th>Evidência</th><th>Ação recomendada</th>
+            </tr>
+          </thead>
+          <tbody>${complianceRows || '<tr><td colspan="6">Nenhum indício objetivo de irregularidade identificado.</td></tr>'}</tbody>
+        </table>
+      </section>
       <div class="footer">
         <strong>Observações:</strong> ${escapeHtml(data.notes || 'Sem observações adicionais.')}<br />
         A classificação assistida por IA apenas ordena a aderência descritiva. A seleção, as exclusões e o método de cálculo permanecem sob responsabilidade do agente público.
@@ -1171,6 +1201,7 @@ export function createPriceResearchTemplate() {
     [1, 'Café torrado e moído, pacote de 500 g', 100, 'PCT', 606523, '', 500, 'G', ''],
     [2, 'Descrição do serviço', 12, 'MÊS', '', '00000', 1, 'MÊS', ''],
   ]);
+
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Itens');
   XLSX.writeFile(workbook, 'modelo-pesquisa-precos.xlsx');
@@ -1235,8 +1266,18 @@ export async function exportPriceResearchWorkbook(data: PriceResearchReportData)
     });
   });
 
+  const complianceRows = analyzePriceResearchCompliance(data).map((finding) => ({
+    Severidade: complianceSeverityLabel(finding.severity),
+    Escopo: finding.scope === 'research' ? 'Pesquisa' : finding.itemNumber ? `Item ${finding.itemNumber}` : finding.scope,
+    Regra: finding.ruleLabel,
+    Achado: finding.message,
+    Evidência: finding.evidence,
+    'Ação recomendada': finding.recommendedAction,
+  }));
+
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(summaryRows), 'Resumo');
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(quoteRows), 'Cotações');
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(complianceRows), 'Conformidade');
   XLSX.writeFile(workbook, 'relatorio-pesquisa-precos.xlsx');
 }

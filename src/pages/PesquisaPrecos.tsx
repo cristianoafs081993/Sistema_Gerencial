@@ -64,10 +64,12 @@ import {
   exportPriceResearchWorkbook,
   getEstimatedUnitPrice,
   getSelectedStatistics,
+  analyzePriceResearchCompliance,
   METHOD_LABELS,
   parsePriceResearchFile,
   validatePriceResearchReport,
   type PriceResearchCandidate,
+  type PriceResearchComplianceFinding,
   type PriceResearchItem,
   type PriceResearchMethod,
   type PriceResearchReportData,
@@ -105,6 +107,30 @@ function candidateStatus(candidate: PriceResearchCandidate) {
   if (candidate.aiScore >= 60) return { label: 'Aderente', className: 'border-sebrae-blue/25 bg-sebrae-blue/[0.08] text-sebrae-blue' };
   return { label: 'Revisar descrição', className: 'border-slate-300 bg-slate-50 text-slate-700' };
 }
+
+function isOfficialCandidate(candidate: PriceResearchCandidate) {
+  return candidate.sourceType === 'compras_gov_precos';
+}
+
+function isLocalCandidate(candidate: PriceResearchCandidate) {
+  return candidate.sourceType === 'custom';
+}
+
+function isMarketCandidate(candidate: PriceResearchCandidate) {
+  return !isOfficialCandidate(candidate) && !isLocalCandidate(candidate);
+}
+
+const COMPLIANCE_SEVERITY_LABELS: Record<PriceResearchComplianceFinding['severity'], string> = {
+  error: 'Bloqueantes',
+  warning: 'Alertas',
+  info: 'Informativos',
+};
+
+const COMPLIANCE_SEVERITY_STYLES: Record<PriceResearchComplianceFinding['severity'], string> = {
+  error: 'border-red-200 bg-red-50 text-red-900',
+  warning: 'border-amber-200 bg-amber-50 text-amber-950',
+  info: 'border-slate-200 bg-slate-50 text-slate-800',
+};
 
 export default function PesquisaPrecos() {
   const queryClient = useQueryClient();
@@ -168,6 +194,11 @@ export default function PesquisaPrecos() {
 
   const [capturingCandidateId, setCapturingCandidateId] = useState<string | null>(null);
   const [previewCandidate, setPreviewCandidate] = useState<PriceResearchCandidate | null>(null);
+  const [candidateExclusionDraft, setCandidateExclusionDraft] = useState<{
+    itemId: string;
+    candidate: PriceResearchCandidate;
+    reason: string;
+  } | null>(null);
 
   const [monetaryAdjustmentDraft, setMonetaryAdjustmentDraft] = useState<{
     itemId: string;
@@ -242,6 +273,7 @@ export default function PesquisaPrecos() {
     setSourceFile('');
     setItems([]);
     setSelectedItemId(undefined);
+    setCandidateExclusionDraft(null);
     setViewMode('wizard');
   };
 
@@ -603,6 +635,59 @@ export default function PesquisaPrecos() {
         )),
       };
     }));
+  };
+
+  const requestCandidateExclusion = (itemId: string, candidate: PriceResearchCandidate) => {
+    setCandidateExclusionDraft({
+      itemId,
+      candidate,
+      reason: candidate.exclusionReason,
+    });
+  };
+
+  const confirmCandidateExclusion = () => {
+    if (!candidateExclusionDraft) return;
+    const reason = candidateExclusionDraft.reason.trim();
+    if (reason.length < 10) {
+      toast.error('Informe uma justificativa objetiva para desconsiderar a cotação.');
+      return;
+    }
+    updateCandidate(candidateExclusionDraft.itemId, candidateExclusionDraft.candidate.id, {
+      selected: false,
+      exclusionReason: reason,
+    });
+    setCandidateExclusionDraft(null);
+  };
+
+  const openMissingExclusionReason = (itemId: string) => {
+    const item = items.find((currentItem) => currentItem.localId === itemId);
+    const candidate = item?.candidates.find((currentCandidate) => (
+      !currentCandidate.selected && !currentCandidate.exclusionReason.trim()
+    ));
+
+    if (!candidate) return false;
+
+    setSelectedItemId(itemId);
+    setCuradoriaTab('basket');
+    setActiveStep(4);
+    requestCandidateExclusion(itemId, candidate);
+    return true;
+  };
+
+  const handleComplianceFindingClick = (finding: PriceResearchComplianceFinding) => {
+    if (!finding.itemId) return;
+
+    if (
+      finding.message.toLowerCase().includes('exclu')
+      && finding.message.includes('sem justificativa')
+      && openMissingExclusionReason(finding.itemId)
+    ) {
+      return;
+    }
+
+    setSelectedItemId(finding.itemId);
+    setCuradoriaTab('basket');
+    setActiveStep(4);
   };
 
   const suggestCatalogForItem = async (item: PriceResearchItem) => {
@@ -976,6 +1061,16 @@ export default function PesquisaPrecos() {
   const printReport = async () => {
     const errors = validatePriceResearchReport(reportData);
     if (errors.length > 0) {
+      const firstBlockingFinding = analyzePriceResearchCompliance(reportData).find((finding) => finding.severity === 'error');
+      if (
+        firstBlockingFinding?.itemId
+        && firstBlockingFinding.message.toLowerCase().includes('exclu')
+        && firstBlockingFinding.message.includes('sem justificativa')
+        && openMissingExclusionReason(firstBlockingFinding.itemId)
+      ) {
+        toast.error('Justifique a cotação desconsiderada para concluir o relatório.');
+        return;
+      }
       toast.error(errors[0]);
       return;
     }
@@ -1048,6 +1143,7 @@ export default function PesquisaPrecos() {
       const resolvedItems = await resolveDirectPncpLinks(record.items);
       setItems(resolvedItems);
       setSelectedItemId(undefined);
+      setCandidateExclusionDraft(null);
       
       // Define a etapa adequada
       const hasSearch = record.items.every(item => item.searchStatus !== 'idle');
@@ -1069,34 +1165,12 @@ export default function PesquisaPrecos() {
     }
   };
 
-  // Compila erros de validação da IN 65/2021
-  const validationErrors = useMemo(() => {
-    const errors: Array<{ type: string; message: string; itemId?: string }> = [];
-    if (!processNumber.trim()) errors.push({ type: 'meta', message: 'Número do processo não informado.' });
-    if (!responsibleName.trim()) errors.push({ type: 'meta', message: 'Agente responsável não informado.' });
-    if (!objectDescription.trim()) errors.push({ type: 'meta', message: 'Descrição do objeto não informada.' });
-    if (!methodologyJustification.trim()) errors.push({ type: 'meta', message: 'Justificativa da metodologia não preenchida.' });
-
-    for (const item of items) {
-      if (!item.catalogCode) {
-        errors.push({ type: 'catalog', message: `Item ${item.itemNumber}: código CATMAT/CATSER ausente.`, itemId: item.localId });
-      }
-      if (item.searchStatus === 'idle') {
-        errors.push({ type: 'search', message: `Item ${item.itemNumber}: busca de preços não executada.`, itemId: item.localId });
-      }
-      const selected = item.candidates.filter((candidate) => candidate.selected);
-      if (item.candidates.length > 0 && selected.length < 3) {
-        errors.push({ type: 'quotes', message: `Item ${item.itemNumber}: menos de 3 cotações selecionadas (Mínimo recomendado pela IN 65/2021).`, itemId: item.localId });
-      }
-      const exclusionsWithoutReason = item.candidates.filter(
-        (candidate) => !candidate.selected && !candidate.exclusionReason.trim(),
-      );
-      if (exclusionsWithoutReason.length > 0) {
-        errors.push({ type: 'justification', message: `Item ${item.itemNumber}: possui ${exclusionsWithoutReason.length} cotação(ões) desconsiderada(s) sem justificativa.`, itemId: item.localId });
-      }
-    }
-    return errors;
-  }, [items, processNumber, responsibleName, objectDescription, methodologyJustification]);
+  const complianceFindings = useMemo(() => analyzePriceResearchCompliance(reportData), [reportData]);
+  const complianceCounts = useMemo(() => ({
+    error: complianceFindings.filter((finding) => finding.severity === 'error').length,
+    warning: complianceFindings.filter((finding) => finding.severity === 'warning').length,
+    info: complianceFindings.filter((finding) => finding.severity === 'info').length,
+  }), [complianceFindings]);
 
   const totalCount = recentResearches.length;
   const reviewCount = recentResearches.filter((r) => r.status !== 'completed').length;
@@ -2175,7 +2249,7 @@ export default function PesquisaPrecos() {
                       }`}
                       onClick={() => setCuradoriaTab('basket')}
                     >
-                      PNCP ({selectedItem.candidates.filter(c => c.sourceType !== 'market' && c.sourceType !== 'custom').length})
+                      PNCP ({selectedItem.candidates.filter(isOfficialCandidate).length})
                       {curadoriaTab === 'basket' && (
                         <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
                       )}
@@ -2237,7 +2311,7 @@ export default function PesquisaPrecos() {
                         </TableHeader>
                         <TableBody>
                           {(() => {
-                            const pncpCandidates = selectedItem.candidates.filter(c => c.sourceType !== 'market' && c.sourceType !== 'custom');
+                            const pncpCandidates = selectedItem.candidates.filter(isOfficialCandidate);
                             return pncpCandidates.length === 0 ? (
                               <TableRow>
                                 <TableCell colSpan={12} className="text-center py-8 text-text-muted text-xs">
@@ -2253,10 +2327,16 @@ export default function PesquisaPrecos() {
                                     <Checkbox
                                       aria-label={`Usar preço ${candidate.purchaseItemId}`}
                                       checked={candidate.selected}
-                                      onCheckedChange={(checked) => updateCandidate(selectedItem.localId, candidate.id, {
-                                        selected: checked === true,
-                                        exclusionReason: checked === true ? '' : candidate.exclusionReason,
-                                      })}
+                                      onCheckedChange={(checked) => {
+                                        if (checked === true) {
+                                          updateCandidate(selectedItem.localId, candidate.id, {
+                                            selected: true,
+                                            exclusionReason: '',
+                                          });
+                                          return;
+                                        }
+                                        requestCandidateExclusion(selectedItem.localId, candidate);
+                                      }}
                                     />
                                   </TableCell>
                                   <TableCell className="min-w-[220px]">
@@ -2276,7 +2356,7 @@ export default function PesquisaPrecos() {
                                           )}
                                         <p className="line-clamp-3 font-ui text-xs text-text-secondary leading-relaxed font-bold" title={candidate.description}>{candidate.description}</p>
                                         <div className="flex gap-2">
-                                          {candidate.sourceType !== 'compras_gov_precos' && candidate.sourceType !== 'custom' && (
+                                          {isMarketCandidate(candidate) && (
                                             <a href={candidate.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-bold text-primary hover:underline">
                                               Acessar no {candidate.sourceLabel} <ExternalLink className="h-2.5 w-2.5" />
                                             </a>
@@ -2302,7 +2382,9 @@ export default function PesquisaPrecos() {
                                                      href = url.toString();
                                                    }
                                                  }
-                                               } catch {}
+                                               } catch {
+                                                 // Mantém o link original quando a URL complementar do PNCP não puder ser normalizada.
+                                               }
                                              }
                                              return (
                                                <a 
@@ -2351,7 +2433,7 @@ export default function PesquisaPrecos() {
                                   <TableCell className="font-mono text-xs">{candidate.originalUnitLabel}</TableCell>
                                   <TableCell className="text-right font-mono text-xs">{formatCurrency(candidate.originalUnitPrice)}</TableCell>
                                   <TableCell className="text-right w-24">
-                                    {candidate.sourceType !== 'compras_gov_precos' ? (
+                                    {!isOfficialCandidate(candidate) ? (
                                       <Input
                                         type="number"
                                         min="0"
@@ -2433,7 +2515,7 @@ export default function PesquisaPrecos() {
                                     })()}
                                   </TableCell>
                                   <TableCell className="text-center">
-                                    {candidate.selected && candidate.sourceType !== 'compras_gov_precos' ? (
+                                    {candidate.selected && !isOfficialCandidate(candidate) ? (
                                       candidate.evidenceImage && candidate.evidenceImage.startsWith('http') ? (
                                         <Button
                                           type="button"
@@ -2475,11 +2557,7 @@ export default function PesquisaPrecos() {
                                       size="icon"
                                       title="Desconsiderar cotação"
                                       disabled={!candidate.selected}
-                                      onClick={() => {
-                                        updateCandidate(selectedItem.localId, candidate.id, {
-                                          selected: false,
-                                        });
-                                      }}
+                                      onClick={() => requestCandidateExclusion(selectedItem.localId, candidate)}
                                       className={`h-8 w-8 rounded-full transition-all ${
                                         candidate.selected
                                           ? 'text-destructive hover:bg-destructive hover:text-white'
@@ -2701,7 +2779,7 @@ export default function PesquisaPrecos() {
                         title="Cotações de Internet Adicionadas"
                         description="Veja abaixo as cotações de canais privados de internet que foram incluídas para este item."
                       >
-                        {selectedItem.candidates.filter(c => c.sourceType === 'market').length === 0 ? (
+                        {selectedItem.candidates.filter(isMarketCandidate).length === 0 ? (
                           <div className="text-center py-8 text-text-muted text-xs">
                             Nenhuma cotação de internet adicionada para este item. Use o buscador acima para incluir preços.
                           </div>
@@ -2723,7 +2801,7 @@ export default function PesquisaPrecos() {
                               </thead>
                               <tbody className="divide-y divide-border-default/60">
                                 {selectedItem.candidates
-                                  .filter(c => c.sourceType === 'market')
+                                  .filter(isMarketCandidate)
                                   .map((candidate) => {
                                     return (
                                       <tr key={candidate.id} className="hover:bg-surface-subtle/50 transition-colors">
@@ -2942,7 +3020,7 @@ export default function PesquisaPrecos() {
                         title="Cotações Locais Cadastradas"
                         description="Veja abaixo as cotações de fornecedores locais que você inseriu manualmente para este item."
                       >
-                        {selectedItem.candidates.filter(c => c.sourceType === 'custom').length === 0 ? (
+                        {selectedItem.candidates.filter(isLocalCandidate).length === 0 ? (
                           <div className="text-center py-8 text-text-muted text-xs">
                             Nenhuma cotação de fornecedor local cadastrada para este item.
                           </div>
@@ -2965,7 +3043,7 @@ export default function PesquisaPrecos() {
                               </thead>
                               <tbody className="divide-y divide-border-default/60">
                                 {selectedItem.candidates
-                                  .filter(c => c.sourceType === 'custom')
+                                  .filter(isLocalCandidate)
                                   .map((candidate) => {
                                     return (
                                       <tr key={candidate.id} className="hover:bg-surface-subtle/50 transition-colors">
@@ -3074,7 +3152,7 @@ export default function PesquisaPrecos() {
           {/* Tabela de Consolidação por Item */}
           <SectionPanel
             title="Consolidação das Cotações por Item"
-            description="Detalhamento das cotações selecionadas divididas pelas fontes PNCP, Internet e Fornecedores Locais."
+            description="Resumo dos métodos estatísticos e da estimativa final por item."
           >
             <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
               <table className="w-full border-collapse text-left font-ui text-[11px]">
@@ -3083,43 +3161,13 @@ export default function PesquisaPrecos() {
                     <th className="py-3 px-4 text-center w-12">Item</th>
                     <th className="py-3 px-4 min-w-[200px]">Descrição</th>
                     <th className="py-3 px-4 text-center w-12">Qtd.</th>
-                    <th className="py-3 px-4 w-48">PNCP</th>
-                    <th className="py-3 px-4 w-48">Internet</th>
-                    <th className="py-3 px-4 w-48">Fornecedores Locais</th>
                     <th className="py-3 px-4 text-right w-28">Preço Estimado</th>
                     <th className="py-3 px-4 text-right w-28">Total Estimado</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-default/60">
                   {items.map((item) => {
-                    const selectedCandidates = item.candidates.filter(c => c.selected);
-                    
-                    const pncpPrices = selectedCandidates
-                      .filter(c => c.sourceType !== 'market' && c.sourceType !== 'custom')
-                      .map(c => c.comparableUnitPrice);
-                      
-                    const internetPrices = selectedCandidates
-                      .filter(c => c.sourceType === 'market')
-                      .map(c => c.comparableUnitPrice);
-                      
-                    const localPrices = selectedCandidates
-                      .filter(c => c.sourceType === 'custom')
-                      .map(c => c.comparableUnitPrice);
-                    
-                    const prices = selectedCandidates.map(c => c.precoRestituido || c.precoUnitario);
-                    let estimatedPrice = 0;
-                    if (prices.length > 0) {
-                      if (method === 'median') {
-                        const sorted = [...prices].sort((a, b) => a - b);
-                        const mid = Math.floor(sorted.length / 2);
-                        estimatedPrice = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-                      } else if (method === 'average') {
-                        estimatedPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
-                      } else {
-                        estimatedPrice = Math.min(...prices);
-                      }
-                    }
-                    
+                    const estimatedPrice = getEstimatedUnitPrice(item, method);
                     const totalEstimated = estimatedPrice * item.quantity;
                     
                     return (
@@ -3134,39 +3182,6 @@ export default function PesquisaPrecos() {
                           </div>
                         </td>
                         <td className="py-3 px-4 text-center font-mono">{item.quantity}</td>
-                        <td className="py-3 px-4 leading-relaxed font-mono text-[10px] text-text-secondary">
-                          {pncpPrices.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {pncpPrices.map((p, idx) => (
-                                <span key={idx} className="bg-slate-100 px-1 py-0.5 rounded border border-slate-200">{formatCurrency(p)}</span>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-text-muted italic text-[10px]">-</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 leading-relaxed font-mono text-[10px] text-text-secondary">
-                          {internetPrices.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {internetPrices.map((p, idx) => (
-                                <span key={idx} className="bg-slate-100 px-1 py-0.5 rounded border border-slate-200">{formatCurrency(p)}</span>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-text-muted italic text-[10px]">-</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 leading-relaxed font-mono text-[10px] text-text-secondary">
-                          {localPrices.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {localPrices.map((p, idx) => (
-                                <span key={idx} className="bg-slate-100 px-1 py-0.5 rounded border border-slate-200">{formatCurrency(p)}</span>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-text-muted italic text-[10px]">-</span>
-                          )}
-                        </td>
                         <td className="py-3 px-4 text-right font-mono font-bold text-text-primary">
                           {estimatedPrice > 0 ? formatCurrency(estimatedPrice) : <span className="text-text-muted font-normal italic">-</span>}
                         </td>
@@ -3202,98 +3217,54 @@ export default function PesquisaPrecos() {
               </div>
             </SectionPanel>
 
-            {/* Checklist de Conformidade */}
             <SectionPanel
-              title="Validação (Instrução Normativa ME nº 65/2021)"
-              description="Análise preventiva de possíveis inconsistências jurídicas na cesta de preços."
+              title="Irregularidades e conformidade"
+              description="Achados automáticos com base na IN SEGES/ME nº 65/2021."
             >
-              <div className="space-y-3.5">
-                {/* 1. Identificação Geral */}
-                <div className="flex items-start gap-3">
-                  {validationErrors.filter(e => e.type === 'meta').length === 0 ? (
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">✓</span>
-                  ) : (
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">!</span>
-                  )}
-                  <div>
-                    <h5 className="font-ui text-xs font-bold text-text-primary">Metadados da Contratação</h5>
-                    <p className="font-ui text-[11px] text-text-secondary mt-0.5">Título, processo, responsável e justificativa estatística preenchidos.</p>
+              <div className="grid grid-cols-3 gap-3">
+                {(['error', 'warning', 'info'] as const).map((severity) => (
+                  <div key={severity} className={`rounded-radius-lg border p-3 ${COMPLIANCE_SEVERITY_STYLES[severity]}`}>
+                    <p className="font-ui text-[10px] font-bold uppercase tracking-wider leading-none">
+                      {COMPLIANCE_SEVERITY_LABELS[severity]}
+                    </p>
+                    <p className="mt-2 font-mono text-xl font-bold leading-none">{complianceCounts[severity]}</p>
                   </div>
-                </div>
-
-                {/* 2. Código do Catálogo */}
-                <div className="flex items-start gap-3">
-                  {validationErrors.filter(e => e.type === 'catalog').length === 0 ? (
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">✓</span>
-                  ) : (
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">!</span>
-                  )}
-                  <div>
-                    <h5 className="font-ui text-xs font-bold text-text-primary">Mapeamento CATMAT/CATSER</h5>
-                    <p className="font-ui text-[11px] text-text-secondary mt-0.5">Todos os itens da planilha possuem código de catálogo válido.</p>
-                  </div>
-                </div>
-
-                {/* 3. Mapeamento de preços executado */}
-                <div className="flex items-start gap-3">
-                  {validationErrors.filter(e => e.type === 'search').length === 0 ? (
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">✓</span>
-                  ) : (
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">!</span>
-                  )}
-                  <div>
-                    <h5 className="font-ui text-xs font-bold text-text-primary">Busca Executada</h5>
-                    <p className="font-ui text-[11px] text-text-secondary mt-0.5">A consulta de preços oficiais foi executada na etapa de busca.</p>
-                  </div>
-                </div>
-
-                {/* 4. Mínimo 3 Cotações */}
-                <div className="flex items-start gap-3">
-                  {validationErrors.filter(e => e.type === 'quotes').length === 0 ? (
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">✓</span>
-                  ) : (
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">!</span>
-                  )}
-                  <div>
-                    <h5 className="font-ui text-xs font-bold text-text-primary">Número Mínimo de Amostras</h5>
-                    <p className="font-ui text-[11px] text-text-secondary mt-0.5">Cada item possui ao menos 3 preços selecionados na cesta.</p>
-                  </div>
-                </div>
-
-                {/* 5. Justificativa de Exclusão */}
-                <div className="flex items-start gap-3">
-                  {validationErrors.filter(e => e.type === 'justification').length === 0 ? (
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">✓</span>
-                  ) : (
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">!</span>
-                  )}
-                  <div>
-                    <h5 className="font-ui text-xs font-bold text-text-primary">Justificativa de Desconsideração</h5>
-                    <p className="font-ui text-[11px] text-text-secondary mt-0.5">Preços desmarcados justificados adequadamente na planilha.</p>
-                  </div>
-                </div>
+                ))}
               </div>
 
-              {validationErrors.length === 0 ? (
+              {complianceFindings.length === 0 ? (
                 <div className="mt-5 flex gap-2.5 rounded-radius-lg border border-primary/20 bg-primary/[0.03] p-4 text-primary">
                   <ShieldCheck className="h-5 w-5 shrink-0 text-primary" />
                   <p className="font-ui text-xs leading-normal">
-                    <span className="font-bold">Análise OK:</span> A pesquisa atende integralmente a estrutura burocrática recomendada pela IN SEGES/ME 65/2021. Pronto para exportação definitiva.
+                    <span className="font-bold">Análise OK:</span> nenhum indício objetivo de irregularidade foi identificado pela verificação automática da IN SEGES/ME nº 65/2021.
                   </p>
                 </div>
               ) : (
-                <div className="mt-5 space-y-2 max-h-[140px] overflow-y-auto border border-amber-200 bg-amber-50/30 rounded-radius-md p-3">
-                  <p className="font-ui text-xs font-bold text-amber-950 flex items-center gap-1.5">
-                    <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                    Pendências de Conformidade ({validationErrors.length})
-                  </p>
-                  <ul className="list-disc list-inside space-y-1">
-                    {validationErrors.map((err, idx) => (
-                      <li key={idx} className="font-ui text-[10px] text-amber-900 leading-normal">
-                        {err.message}
-                      </li>
-                    ))}
-                  </ul>
+                <div className="mt-5 max-h-[280px] space-y-2 overflow-y-auto pr-1">
+                  {complianceFindings.map((finding) => (
+                    <button
+                      key={finding.id}
+                      type="button"
+                      className={`w-full rounded-radius-md border p-3 text-left transition-colors hover:bg-surface-subtle ${COMPLIANCE_SEVERITY_STYLES[finding.severity]}`}
+                      onClick={() => handleComplianceFindingClick(finding)}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-ui text-xs font-bold leading-snug text-current">{finding.message}</p>
+                          <p className="mt-1 font-ui text-[10px] font-semibold text-current/75">{finding.ruleLabel}</p>
+                        </div>
+                        {finding.itemNumber ? (
+                          <Badge variant="outline" className="shrink-0 bg-white/60 text-[10px]">Item {finding.itemNumber}</Badge>
+                        ) : null}
+                      </div>
+                      <p className="mt-2 font-ui text-[10px] leading-normal text-current/80">
+                        <span className="font-bold">Evidência:</span> {finding.evidence}
+                      </p>
+                      <p className="mt-1 font-ui text-[10px] leading-normal text-current/80">
+                        <span className="font-bold">Ação:</span> {finding.recommendedAction}
+                      </p>
+                    </button>
+                  ))}
                 </div>
               )}
             </SectionPanel>
@@ -3361,6 +3332,62 @@ export default function PesquisaPrecos() {
       {/* Histórico de Disparos de E-mail */}
       {researchId && (
         <SupplierEmailHistory researchId={researchId} />
+      )}
+
+      {candidateExclusionDraft && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-lg rounded-radius-xl border border-border-default bg-surface-card shadow-xl animate-in zoom-in-95 duration-200">
+            <div className="border-b border-border-default px-5 py-4">
+              <h3 className="font-ui text-sm font-bold text-text-primary">Justificar desconsideração</h3>
+              <p className="mt-1 font-ui text-xs text-text-secondary">
+                A IN SEGES/ME nº 65/2021 exige critério fundamentado para desconsiderar valores da cesta.
+              </p>
+            </div>
+            <div className="space-y-4 px-5 py-4">
+              <div className="rounded-radius-md border border-border-default bg-surface-subtle/45 p-3">
+                <p className="line-clamp-2 font-ui text-xs font-bold text-text-primary" title={candidateExclusionDraft.candidate.description}>
+                  {candidateExclusionDraft.candidate.description}
+                </p>
+                <p className="mt-1 font-ui text-[10px] text-text-secondary">
+                  {candidateExclusionDraft.candidate.sourceLabel} | {candidateExclusionDraft.candidate.supplierName || candidateExclusionDraft.candidate.agencyName || 'Fonte sem fornecedor'} | {formatCurrency(candidateExclusionDraft.candidate.comparableUnitPrice)}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="candidate-exclusion-reason">Justificativa obrigatória</Label>
+                <Textarea
+                  id="candidate-exclusion-reason"
+                  value={candidateExclusionDraft.reason}
+                  onChange={(event) => setCandidateExclusionDraft((current) => (
+                    current ? { ...current, reason: event.target.value } : current
+                  ))}
+                  rows={4}
+                  autoFocus
+                  placeholder="Ex.: unidade de fornecimento incompatível; descrição divergente; preço excessivamente elevado frente à mediana; registro sem comparabilidade técnica..."
+                />
+                <p className="font-ui text-[10px] text-text-muted">
+                  Use uma justificativa objetiva. Mínimo operacional: 10 caracteres.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-border-default px-5 py-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="text-xs"
+                onClick={() => setCandidateExclusionDraft(null)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90 text-xs"
+                onClick={confirmCandidateExclusion}
+              >
+                Desconsiderar cotação
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal de Visualização de Evidência */}
