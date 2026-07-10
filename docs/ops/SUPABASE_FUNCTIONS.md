@@ -583,6 +583,37 @@ Observações:
 - não usa service role e não grava no banco;
 - limites: 25 itens por chamada e 15 candidatos por item.
 
+### `disparar-cotacao-email`
+
+Local:
+
+- `supabase/functions/disparar-cotacao-email/index.ts`
+
+Uso:
+
+- recebe lista de destinatários (fornecedores), itens e metadados da pesquisa;
+- monta o HTML do e-mail de cotação no backend;
+- dispara cada e-mail via Resend API;
+- grava registro de auditoria em `price_research_email_dispatches`;
+- suporta modalidades: `direct`, `express`, `batch`, `custom`, `manual`.
+
+Dependências:
+
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (para gravar dispatches e ler dados da pesquisa)
+- `RESEND_API_KEY` — chave da API do provedor Resend (resend.com)
+- `EMAIL_FROM` — endereço remetente verificado no Resend (ex: conta Gmail configurada)
+- opcional `EMAIL_REPLY_TO` — endereço padrão de resposta; sobrescrevível por chamada
+
+Observações:
+
+- publicada com `verify_jwt = true`;
+- valida também ownership da pesquisa (criador ou superadmin);
+- o `EMAIL_FROM` precisa ser verificado no painel do Resend antes do primeiro envio;
+- para Gmail pessoal como remetente, o Resend exige verificação do domínio ou uso de subdomínio;
+- erros de envio por destinatário são registrados no banco sem interromper os demais.
+
 ## Functions chamadas pelo frontend, mas nao localizadas neste repo
 
 ### `consultor`

@@ -16,7 +16,9 @@ import {
   ScrollText,
   ShieldAlert,
   UserCog,
+  Users,
   Wand2,
+  Warehouse,
   Zap,
 } from 'lucide-react';
 
@@ -28,6 +30,7 @@ export type AppScreenGroupId =
   | 'energia'
   | 'documentos'
   | 'automacoes'
+  | 'operacoes'
   | 'administracao';
 
 export type AppScreenGroup = {
@@ -55,6 +58,7 @@ export const appScreenGroups: AppScreenGroup[] = [
   { id: 'contratos', name: 'Contratos', sortOrder: 30 },
   { id: 'licitacoes', name: 'Licitações', sortOrder: 35 },
   { id: 'energia', name: 'Energia', sortOrder: 37 },
+  { id: 'operacoes', name: 'Operações', sortOrder: 38 },
   { id: 'documentos', name: 'Documentos', sortOrder: 40 },
   { id: 'automacoes', name: 'Automações', sortOrder: 50 },
   { id: 'administracao', name: 'Administração', sortOrder: 90 },
@@ -78,6 +82,7 @@ export const appScreens: AppScreen[] = [
   { id: 'pesquisa-precos', groupId: 'licitacoes', name: 'Pesquisa de Preços', path: '/pesquisa-precos', icon: SearchCheck, sortOrder: 5 },
   { id: 'licitacoes-pregoes', groupId: 'licitacoes', name: 'Pregões por UASG', path: '/licitacoes-pregoes', icon: ScrollText, sortOrder: 10 },
   { id: 'atas-registro-precos', groupId: 'licitacoes', name: 'Atas e ARP', path: '/atas-registro-precos', icon: ClipboardList, sortOrder: 20 },
+  { id: 'cadastro-fornecedores', groupId: 'licitacoes', name: 'Cadastro de Fornecedores', path: '/cadastro-fornecedores', icon: Users, sortOrder: 30, hiddenFromNavigation: true },
   { id: 'energia-visao-geral', groupId: 'energia', name: 'Visão Geral', path: '/energia', icon: Zap, sortOrder: 10 },
   { id: 'energia-cosern', groupId: 'energia', name: 'COSERN', path: '/energia/cosern', icon: Zap, sortOrder: 20 },
   { id: 'energia-mercatto', groupId: 'energia', name: 'Mercatto', path: '/energia/mercatto', icon: Zap, sortOrder: 30 },
@@ -91,6 +96,7 @@ export const appScreens: AppScreen[] = [
   { id: 'consultor', groupId: 'documentos', name: 'Consultor Jurídico', path: '/consultor', icon: MessageSquare, sortOrder: 30 },
   { id: 'suap', groupId: 'documentos', name: 'SUAP', path: '/suap', icon: FileStack, sortOrder: 40 },
   { id: 'economia-tempo', groupId: 'automacoes', name: 'Economia de Tempo', path: '/economia-tempo', icon: Clock3, sortOrder: 10 },
+  { id: 'almoxarifado', groupId: 'operacoes', name: 'Almoxarifado', path: '/almoxarifado', icon: Warehouse, sortOrder: 10 },
   {
     id: ADMIN_USERS_SCREEN_ID,
     groupId: 'administracao',

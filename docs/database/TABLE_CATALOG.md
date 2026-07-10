@@ -1202,3 +1202,16 @@ Observações operacionais e RLS:
 - **UPDATE**: Atualização permitida para o próprio usuário autenticado dono da pasta (RLS `Tenant can update their own PDFs`), essencial para a funcionalidade de `upsert` na sincronização.
 - **DELETE**: Remoção permitida para o próprio usuário autenticado dono da pasta (RLS `Tenant can delete their own PDFs`).
 
+## Fundação operacional e Almoxarifado
+
+A migration 20260706110000 cria cadastros compartilhados e o razão imutável de estoque.
+
+- operational_entities / operational_entity_memberships: instituição operacional, papel e isolamento RLS.
+- operational_units, cost_centers e physical_locations: estrutura comum da Fase 4.
+- measurement_units e catalog_items: catálogo único de consumo, permanente e serviços.
+- warehouses e warehouse_items: depósitos, estoque mínimo e bloqueio.
+- stock_movements e stock_movement_items: eventos imutáveis de entrada, saída, transferência, ajuste e devolução.
+- stock_balances: view derivada com quantidade e valor por depósito/item.
+- post_stock_movement: RPC idempotente que valida entidade, depósito, bloqueio e saldo; saídas usam custo médio da origem.
+
+Consumido por src/services/inventory.ts e src/pages/Almoxarifado.tsx.

@@ -14,6 +14,7 @@ import {
   Search,
   Settings2,
   ShieldCheck,
+  Warehouse,
   Zap,
   X,
 } from 'lucide-react';
@@ -55,6 +56,7 @@ const groupIcons: Record<AppScreenGroupId, React.ComponentType<{ className?: str
   energia: Zap,
   documentos: FileText,
   automacoes: Clock3,
+  operacoes: Warehouse,
   administracao: Settings2,
 };
 
@@ -70,6 +72,10 @@ const nestedNavigation: Record<string, NavigationLeaf[]> = {
     { name: 'Mapa de Risco', href: '/editor-documentos/mapa-riscos-licitacao', screenId: 'editor-documentos-mapa-riscos' },
     { name: 'Termo de Referência', href: '/editor-documentos/termo-referencia-compras', screenId: 'editor-documentos-termo' },
     { name: 'Contrato de Serviço IFRN', href: '/editor-documentos/contrato-servico-ifrn', screenId: 'editor-documentos-contrato' },
+  ],
+  'pesquisa-precos': [
+    { name: 'Cotações', href: '/pesquisa-precos', screenId: 'pesquisa-precos-cotacoes' },
+    { name: 'Cadastro de Fornecedores', href: '/cadastro-fornecedores', screenId: 'cadastro-fornecedores' },
   ],
 };
 

@@ -18,6 +18,7 @@ const Empenhos = lazy(() => import('./pages/Empenhos'));
 const Contratos = lazy(() => import('./pages/Contratos'));
 const RequisicaoCompra = lazy(() => import('./pages/RequisicaoCompra'));
 const CadastroTerceirizados = lazy(() => import('./pages/CadastroTerceirizados'));
+const CadastroFornecedores = lazy(() => import('./pages/CadastroFornecedores'));
 const LiquidacoesPagamentos = lazy(() => import('./pages/LiquidacoesPagamentos'));
 const Financeiro = lazy(() => import('./pages/Financeiro'));
 const LCPage = lazy(() => import('./pages/LC'));
@@ -39,6 +40,7 @@ const ControleUsuarios = lazy(() => import('./pages/ControleUsuarios'));
 const ModelosDocumentos = lazy(() => import('./pages/ModelosDocumentos'));
 const DesignSystemPreview = lazy(() => import('./pages/DesignSystemPreview'));
 const ManutencaoAdmin = lazy(() => import('./pages/ManutencaoAdmin'));
+const Almoxarifado = lazy(() => import('./pages/Almoxarifado'));
 const PublicFeedback = lazy(() => import('./pages/PublicFeedback'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
@@ -99,6 +101,7 @@ const App = () => (
                   <Route path="/pesquisa-precos" element={<PesquisaPrecos />} />
                   <Route path="/licitacoes-pregoes" element={<LicitacoesPregoes />} />
                   <Route path="/atas-registro-precos" element={<AtasRegistroPrecos />} />
+                  <Route path="/cadastro-fornecedores" element={<CadastroFornecedores />} />
                   <Route path="/energia" element={<EnergiaCampus />} />
                   <Route path="/energia/cosern" element={<EnergiaCampus />} />
                   <Route path="/energia/mercatto" element={<EnergiaCampus />} />
@@ -112,6 +115,7 @@ const App = () => (
                   <Route path="/modelos-documentos" element={<ModelosDocumentos />} />
                   <Route path="/design-system-preview" element={<DesignSystemPreview />} />
                   <Route path="/manutencao" element={<ManutencaoAdmin />} />
+                  <Route path="/almoxarifado" element={<Almoxarifado />} />
                   <Route path="*" element={<NotFound />} />
                 </Route>
               </Route>
