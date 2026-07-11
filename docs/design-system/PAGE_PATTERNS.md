@@ -77,7 +77,7 @@ Usado em processos com IA e decisão humana, como pesquisa de preços:
 2. uma faixa inicial explica etapas, fonte e limite da automação;
 3. metadados obrigatórios aparecem antes da execução;
 4. itens são revisados individualmente antes da chamada externa;
-5. um painel compacto de métodos de cálculo destaca o método estimado e deixa indicadores auxiliares em menor hierarquia visual;
+5. um painel compacto de métodos de cálculo destaca o método estimado, deixa indicadores auxiliares em menor hierarquia visual e mantém configurações secundárias, como atualização monetária, no rodapé discreto do painel;
 6. `DataTablePanel` mantém fonte, valor original, valor comparável, aderência e justificativa visíveis;
 7. a ação final valida pendências e salva o snapshot antes de gerar o relatório.
 

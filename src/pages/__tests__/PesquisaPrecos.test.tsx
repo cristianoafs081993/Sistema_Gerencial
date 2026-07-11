@@ -7,6 +7,8 @@ import PesquisaPrecos from '@/pages/PesquisaPrecos';
 import { findCatalogSuggestions } from '@/lib/priceCatalogClient';
 import { parsePriceResearchFile } from '@/lib/priceResearch';
 import { priceResearchService } from '@/services/priceResearch';
+import { priceResearchEmailService } from '@/services/priceResearchEmail';
+import { toast } from 'sonner';
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
@@ -45,6 +47,32 @@ vi.mock('@/services/priceResearch', () => ({
   },
 }));
 
+vi.mock('@/services/priceResearchEmail', () => ({
+  MODALITY_LABELS: {
+    direct: 'Cotacao Segmentada (Direta)',
+    express: 'Cotacao Urgente (Expressa)',
+    batch: 'Cotacao em Lote',
+    custom: 'Mensagem Customizada (Personalizada)',
+    manual: 'Envio Avulso (Por E-mail)',
+  },
+  MODALITY_DESCRIPTIONS: {
+    direct: 'Envia a cada fornecedor apenas os itens especificos que ele comercializa.',
+    express: 'Disparo rapido com prazo curto de resposta.',
+    batch: 'Dispara a lista completa para todos os fornecedores.',
+    custom: 'Permite alterar o texto e o assunto individualmente.',
+    manual: 'Permite cotar digitando qualquer e-mail na hora.',
+  },
+  priceResearchEmailService: {
+    listSuppliers: vi.fn(),
+    listDispatches: vi.fn(),
+    searchGlobalSuppliers: vi.fn(),
+    saveSupplier: vi.fn(),
+    linkSupplierToResearch: vi.fn(),
+    deleteSupplier: vi.fn(),
+    sendQuotation: vi.fn(),
+  },
+}));
+
 vi.mock('@/lib/priceCatalogClient', () => ({
   findCatalogSuggestions: vi.fn(),
 }));
@@ -59,6 +87,7 @@ vi.mock('sonner', () => ({
 
 const mockedParser = vi.mocked(parsePriceResearchFile);
 const mockedService = vi.mocked(priceResearchService);
+const mockedEmailService = vi.mocked(priceResearchEmailService);
 const mockedCatalogMatcher = vi.mocked(findCatalogSuggestions);
 
 const importedItem = {
@@ -131,6 +160,37 @@ describe('PesquisaPrecos', () => {
       { localId: 'item-1', candidates: [candidate] },
     ]);
     mockedService.save.mockResolvedValue('research-1');
+    mockedEmailService.listSuppliers.mockResolvedValue([]);
+    mockedEmailService.listDispatches.mockResolvedValue([
+      {
+        id: 'dispatch-sent',
+        researchId: 'research-1',
+        supplierId: 'supplier-1',
+        modality: 'batch',
+        recipientEmail: 'fornecedor@example.com',
+        recipientName: 'Fornecedor',
+        subject: 'Solicitacao de cotacao',
+        status: 'sent',
+        errorMessage: null,
+        sentAt: '2026-07-10T10:00:00Z',
+        createdAt: '2026-07-10T10:00:00Z',
+      },
+      {
+        id: 'dispatch-failed',
+        researchId: 'research-1',
+        supplierId: 'supplier-2',
+        modality: 'batch',
+        recipientEmail: 'falha@example.com',
+        recipientName: 'Fornecedor com falha',
+        subject: 'Solicitacao de cotacao',
+        status: 'failed',
+        errorMessage: 'Erro de envio',
+        sentAt: null,
+        createdAt: '2026-07-10T10:01:00Z',
+      },
+    ]);
+    mockedEmailService.searchGlobalSuppliers.mockResolvedValue([]);
+    mockedEmailService.sendQuotation.mockResolvedValue({ results: [], summary: { sent: 0, failed: 0 } });
     mockedParser.mockResolvedValue([importedItem]);
     mockedCatalogMatcher.mockResolvedValue([]);
   });
@@ -151,6 +211,8 @@ describe('PesquisaPrecos', () => {
     });
     fireEvent.click(await screen.findByRole('button', { name: /Ver Cotações/i }));
     expect(await screen.findByText('Fornecedor')).toBeInTheDocument();
+    expect(screen.queryByText(/unidade e quantidade compat/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/descri..o e unidade compat/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Item 1 de 1')).not.toBeInTheDocument();
     expect(screen.getByTitle(importedItem.description)).toHaveTextContent(importedItem.description);
     expect(screen.queryByRole('button', { name: /Voltar para a Lista de Itens/i })).not.toBeInTheDocument();
@@ -188,9 +250,38 @@ describe('PesquisaPrecos', () => {
 
     expect(await screen.findByRole('button', { name: /Ver Cotações/i })).toBeInTheDocument();
     expect(screen.queryByText('Fornecedor')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Avançar/i }));
+    expect(await screen.findByText('Alertas e conformidade')).toBeInTheDocument();
+    expect(screen.queryByText('Irregularidades e conformidade')).not.toBeInTheDocument();
+    expect(screen.queryByText(/An.lise OK/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/nenhum alerta objetivo/i)).not.toBeInTheDocument();
   });
 
-  it('sugere e permite confirmar CATMAT quando o arquivo não informa código', async () => {
+  it('abre o historico de e-mails em modal acionado pelo rodape da solicitacao de cotacao', async () => {
+    const { container } = renderPage();
+
+    fireEvent.change(container.querySelector('input[type="file"]') as HTMLInputElement, {
+      target: { files: [new File(['xlsx'], 'custos.xlsx')] },
+    });
+
+    await screen.findByRole('button', { name: /Ver Cota..es/i });
+    expect(screen.queryByText(/Hist.rico de Disparos de E-mail/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Rascunho/i }));
+    await waitFor(() => expect(mockedService.save).toHaveBeenCalled());
+
+    fireEvent.click(await screen.findByRole('button', { name: /Solicitar Cota..o/i }));
+    expect(mockedEmailService.listDispatches).not.toHaveBeenCalled();
+    expect(screen.queryByText('1 enviado(s)')).not.toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole('button', { name: /Hist.rico de e-mails/i }));
+
+    expect(await screen.findByText('1 enviado(s)')).toBeInTheDocument();
+    expect(screen.getByText('1 falha(s)')).toBeInTheDocument();
+    expect(mockedEmailService.listDispatches).toHaveBeenCalledWith('research-1');
+  });
+
+  it('sugere e permite confirmar CATMAT quando o arquivo nao informa codigo', async () => {
     mockedParser.mockResolvedValue([{ ...importedItem, catalogCode: '' }]);
     mockedCatalogMatcher.mockResolvedValue([
       {
@@ -293,6 +384,9 @@ describe('PesquisaPrecos', () => {
 
   it('permite configurar atualização monetária global pelo card de métodos de cálculo', async () => {
     const { container } = renderPage();
+    fireEvent.change(screen.getByLabelText(/Data da Pesquisa/i), {
+      target: { value: '2026-06-09' },
+    });
     fireEvent.change(container.querySelector('input[type="file"]') as HTMLInputElement, {
       target: { files: [new File(['xlsx'], 'custos.xlsx')] },
     });
@@ -305,11 +399,24 @@ describe('PesquisaPrecos', () => {
     expect(globalAdjustCheckbox).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /Frete/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /Evidência/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/O reajuste de inflação/i)).not.toBeInTheDocument();
+
+    const sampleSummary = screen.getByText('Amostra');
+    const adjustmentTitle = screen.getByText('Atualização Monetária (IN 65/2021)');
+    expect(sampleSummary.compareDocumentPosition(adjustmentTitle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     // Ativa o reajuste global
     fireEvent.click(globalAdjustCheckbox);
     expect(screen.getByRole('columnheader', { name: /Índice de atualização monetária/i })).toBeInTheDocument();
     expect(screen.getByText(/1,\d{4}/)).toBeInTheDocument();
+    expect(toast.info).toHaveBeenCalledWith(
+      expect.stringContaining(`mês atual (${new Date().toISOString().slice(0, 7)})`),
+      { duration: 4000 },
+    );
+    expect(toast.info).not.toHaveBeenCalledWith(
+      expect.stringContaining('2026-06'),
+      expect.anything(),
+    );
 
     // O select de índice de reajuste deve aparecer
     const indexSelect = screen.getByLabelText(/Índice ou Método/i);

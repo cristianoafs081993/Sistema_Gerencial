@@ -9,7 +9,7 @@ O módulo `/pesquisa-precos` transforma uma planilha de itens em uma cesta audit
 3. apresenta até 15 referências por item;
 4. permite seleção e exclusão com justificativa;
 5. calcula média aritmética, mediana, menor preço, média ponderada, média saneada, mínimo, máximo, desvio padrão, coeficiente de variação e quantidade de preços excluídos;
-6. verifica automaticamente indícios objetivos de irregularidade com base apenas na IN SEGES/ME nº 65/2021;
+6. verifica automaticamente alertas objetivos com base apenas na IN SEGES/ME nº 65/2021;
 7. salva a pesquisa e gera relatório com memória de cálculo.
 
 A IA apenas reordena candidatos pela aderência técnica. Ela não cria valores, não altera preços oficiais e não substitui a análise crítica do agente responsável.
@@ -126,17 +126,17 @@ O relatório gerencial consolidado também inclui:
 
 O módulo exibe média aritmética, mediana, menor preço, média ponderada, média saneada e preços excluídos do cálculo. A média ponderada usa a quantidade registrada na referência de preço como peso, quando disponível. A média saneada corresponde à média dos preços mantidos na cesta após as exclusões justificadas pelo usuário. Ao desconsiderar uma cotação, a interface exige justificativa objetiva antes de gravar a exclusão. A mediana é o método padrão inicial para o preço estimado. O uso de menos de três preços não é automatizado neste corte; casos excepcionais devem seguir justificativa e aprovação da autoridade competente fora do fluxo automático.
 
-Na aba PNCP da curadoria, cotações oficiais não exibem colunas de frete nem de evidência. Quando a atualização monetária global é ativada pelo usuário, o espaço antes usado para frete passa a exibir somente o valor numérico do índice de atualização monetária aplicado a cada cotação. As abas de cotações de internet e fornecedores locais continuam exibindo frete, pois esse custo pode compor o preço comparável dessas fontes.
+Na aba PNCP da curadoria, cotações oficiais não exibem colunas de frete nem de evidência. Quando a atualização monetária global é ativada pelo usuário, o espaço antes usado para frete passa a exibir somente o valor numérico do índice de atualização monetária aplicado a cada cotação. O cálculo usa o mês atual de execução como competência final, não a data antiga eventualmente salva na pesquisa. As abas de cotações de internet e fornecedores locais continuam exibindo frete, pois esse custo pode compor o preço comparável dessas fontes.
 
 Referência normativa principal:
 
 - IN SEGES/ME nº 65, de 7 de julho de 2021, especialmente arts. 3º a 6º.
 
-## Verificação automática de irregularidades
+## Verificação automática de alertas
 
 O módulo executa uma análise determinística de apoio técnico sobre os dados disponíveis na própria pesquisa, sem consultar processos externos e sem substituir a revisão do agente responsável.
 
-A verificação usa somente a IN SEGES/ME nº 65/2021 e gera achados estruturados com severidade, regra aplicada, evidência e ação recomendada. Achados bloqueantes impedem a conclusão do relatório; alertas podem permanecer quando houver justificativa registrada pelo usuário. Para pesquisas antigas com cotações já excluídas sem motivo, o achado de exclusão sem justificativa direciona o usuário para registrar a justificativa pendente.
+A verificação usa somente a IN SEGES/ME nº 65/2021 e gera alertas estruturados com severidade, regra aplicada, evidência e ação recomendada. Achados bloqueantes impedem a conclusão do relatório; alertas podem permanecer quando houver justificativa registrada pelo usuário. Para pesquisas antigas com cotações já excluídas sem motivo, o alerta de exclusão sem justificativa direciona o usuário para registrar a justificativa pendente. A seção de verificação automática não é incluída no relatório HTML/PDF exportado.
 
 Regras cobertas neste corte:
 

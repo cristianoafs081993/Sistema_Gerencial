@@ -1208,7 +1208,6 @@ function complianceSeverityLabel(severity: PriceResearchComplianceSeverity) {
 }
 
 export function buildPriceResearchReportHtml(data: PriceResearchReportData, options: PriceResearchAuthenticationOptions = {}) {
-  const complianceFindings = analyzePriceResearchCompliance(data);
   const managementSummary = buildPriceResearchManagementSummary(data);
   const abcRows = buildPriceResearchAbcCurve(data);
   const comparisonRows = buildPriceResearchComparisonMap(data);
@@ -1236,17 +1235,6 @@ export function buildPriceResearchReportHtml(data: PriceResearchReportData, opti
     ...options,
     authenticationData: undefined,
   });
-  const complianceRows = complianceFindings.map((finding) => `
-    <tr>
-      <td>${escapeHtml(complianceSeverityLabel(finding.severity))}</td>
-      <td>${escapeHtml(finding.scope === 'research' ? 'Pesquisa' : finding.itemNumber ? `Item ${finding.itemNumber}` : finding.scope)}</td>
-      <td>${escapeHtml(finding.ruleLabel)}</td>
-      <td>${escapeHtml(finding.message)}</td>
-      <td>${escapeHtml(finding.evidence)}</td>
-      <td>${escapeHtml(finding.recommendedAction)}</td>
-    </tr>
-  `).join('');
-
   const summaryRows = [
     ['Itens', managementSummary.itemsCount],
     ['Cotacoes selecionadas', managementSummary.selectedQuotesCount],
@@ -1539,18 +1527,6 @@ export function buildPriceResearchReportHtml(data: PriceResearchReportData, opti
             </tr>
           </thead>
           <tbody>${comparisonHtmlRows || '<tr><td colspan="11">Nenhuma cotacao disponivel.</td></tr>'}</tbody>
-        </table>
-      </section>
-      <section>
-        <h2>Verificação automática de irregularidades</h2>
-        <p>A verificação automática usa a IN SEGES/ME nº 65/2021 como apoio técnico e não substitui a análise do agente responsável.</p>
-        <table>
-          <thead>
-            <tr>
-              <th>Severidade</th><th>Escopo</th><th>Regra</th><th>Achado</th><th>Evidência</th><th>Ação recomendada</th>
-            </tr>
-          </thead>
-          <tbody>${complianceRows || '<tr><td colspan="6">Nenhum indício objetivo de irregularidade identificado.</td></tr>'}</tbody>
         </table>
       </section>
       <div class="footer">

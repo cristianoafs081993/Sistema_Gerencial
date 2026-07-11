@@ -33,6 +33,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 
@@ -46,6 +47,7 @@ import {
   type Supplier,
 } from '@/services/priceResearchEmail';
 import type { PriceResearchItem } from '@/lib/priceResearch';
+import { SupplierEmailHistory } from './SupplierEmailHistory';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -107,6 +109,7 @@ export function SupplierEmailDialog({
 }: Props) {
   const [step, setStep] = useState(0);
   const [modality, setModality] = useState<QuotationModality>('batch');
+  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
 
   // Suppliers from DB
   const [dbSuppliers, setDbSuppliers] = useState<PriceResearchSupplier[]>([]);
@@ -929,25 +932,32 @@ export function SupplierEmailDialog({
   // Render
   // ---------------------------------------------------------------------------
 
+  const handleClose = () => {
+    setIsHistoryDialogOpen(false);
+    onClose();
+  };
+
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Mail className="w-5 h-5 text-primary" />
+    <>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
+      <DialogContent className="flex w-[calc(100vw-2rem)] max-w-4xl max-h-[90vh] flex-col gap-0 overflow-hidden border border-border-default bg-surface-card p-0 text-text-primary shadow-xl sm:rounded-radius-xl">
+        <DialogHeader className="border-b border-border-default bg-surface-subtle/45 px-6 py-4 pr-12">
+          <DialogTitle className="flex items-center gap-2 text-base font-bold text-text-primary">
+            <Mail className="h-5 w-5 text-primary" />
             Solicitar Cotação por E-mail
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-xs text-text-secondary">
             Envie e-mails de cotação diretamente para fornecedores a partir desta pesquisa de preços.
           </DialogDescription>
         </DialogHeader>
 
-        {/* Step indicator */}
-        <div className="flex items-center gap-1 px-1 mt-1">
+        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-5">
+          {/* Step indicator */}
+          <div className="flex items-center gap-1 px-1">
           {STEPS.map((label, idx) => (
-            <div className="flex items-center gap-1 flex-1 min-w-0" key={label}>
+            <div className="flex min-w-0 flex-1 items-center gap-1" key={label}>
               <div
-                className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold shrink-0 transition-all ${
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-all ${
                   idx < step
                     ? 'bg-primary text-primary-foreground'
                     : idx === step
@@ -955,33 +965,34 @@ export function SupplierEmailDialog({
                     : 'bg-muted text-muted-foreground'
                 }`}
               >
-                {idx < step ? <CheckCircle2 className="w-3.5 h-3.5" /> : idx + 1}
+                {idx < step ? <CheckCircle2 className="h-3.5 w-3.5" /> : idx + 1}
               </div>
               <span
-                className={`text-xs truncate hidden sm:block ${
-                  idx === step ? 'text-primary font-medium' : 'text-muted-foreground'
+                className={`hidden truncate text-xs sm:block ${
+                  idx === step ? 'font-medium text-primary' : 'text-muted-foreground'
                 }`}
               >
                 {label}
               </span>
               {idx < STEPS.length - 1 && (
                 <div
-                  className={`h-0.5 flex-1 mx-1 rounded-full transition-all ${
+                  className={`mx-1 h-0.5 flex-1 rounded-full transition-all ${
                     idx < step ? 'bg-primary' : 'bg-muted'
                   }`}
                 />
               )}
             </div>
           ))}
-        </div>
+          </div>
 
-        {/* Step content */}
-        <div className="flex-1 overflow-y-auto px-1 py-2">
-          {renderStep()}
+          {/* Step content */}
+          <div className="min-h-0 flex-1">
+            {renderStep()}
+          </div>
         </div>
 
         {/* Footer navigation */}
-        <div className="flex items-center justify-between pt-4 border-t">
+        <div className="flex items-center justify-between border-t border-border-default bg-surface-subtle/45 px-6 py-3.5">
           <Button
             variant="ghost"
             size="sm"
@@ -995,6 +1006,19 @@ export function SupplierEmailDialog({
           </Button>
 
           <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setIsHistoryDialogOpen(true)}
+              disabled={!researchId}
+              className="gap-1.5"
+              title={researchId ? 'Abrir histórico de e-mails' : 'Salve a pesquisa para consultar o histórico de e-mails'}
+              type="button"
+            >
+              <Clock className="h-4 w-4" />
+              Histórico de e-mails
+            </Button>
+
             {step < 3 && (
               <Button
                 size="sm"
@@ -1033,5 +1057,28 @@ export function SupplierEmailDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    <Dialog open={isHistoryDialogOpen} onOpenChange={setIsHistoryDialogOpen}>
+      <DialogContent className="flex w-[calc(100vw-2rem)] max-w-3xl max-h-[85vh] flex-col gap-0 overflow-hidden border border-border-default bg-surface-card p-0 text-text-primary shadow-xl sm:rounded-radius-xl">
+        <DialogHeader className="border-b border-border-default bg-surface-subtle/45 px-6 py-4 pr-12">
+          <DialogTitle className="flex items-center gap-2 text-base font-bold text-text-primary">
+            <Clock className="h-5 w-5 text-primary" />
+            Histórico de e-mails
+          </DialogTitle>
+          <DialogDescription className="text-xs text-text-secondary">
+            Consulte os envios de solicitação de cotação registrados para esta pesquisa.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+          <SupplierEmailHistory researchId={researchId} defaultExpanded showEmptyState />
+        </div>
+        <DialogFooter className="border-t border-border-default bg-surface-subtle/45 px-6 py-3.5">
+          <Button size="sm" variant="outline" onClick={() => setIsHistoryDialogOpen(false)} type="button">
+            Fechar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

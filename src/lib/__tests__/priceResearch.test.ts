@@ -398,5 +398,7 @@ describe('priceResearch', () => {
     expect(html).toContain('Campus Currais Novos');
     expect(html).toContain('Maria Silva');
     expect(html).toContain('data:image/png;base64,logo');
+    expect(html).not.toContain('Verificação automática de irregularidades');
+    expect(html).not.toContain('Nenhum indício objetivo de irregularidade identificado.');
   });
 });

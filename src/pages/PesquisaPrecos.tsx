@@ -29,7 +29,6 @@ import {
   RefreshCw,
   Save,
   Search,
-  ShieldCheck,
   ShoppingBag,
   Sparkles,
   Trash2,
@@ -87,7 +86,6 @@ import { marketSearchService, type MarketSearchResult } from '@/services/marketS
 import { supabase } from '@/lib/supabase';
 import { calculateIndexFactor, type InflationIndexType } from '@/lib/monetaryAdjustment';
 import { SupplierEmailDialog } from '@/components/price-research/SupplierEmailDialog';
-import { SupplierEmailHistory } from '@/components/price-research/SupplierEmailHistory';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -137,6 +135,10 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function currentYearMonth() {
+  return today().slice(0, 7);
+}
+
 function formatCurrency(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
@@ -172,6 +174,26 @@ function formatMonetaryAdjustmentIndex(candidate: PriceResearchCandidate) {
     minimumFractionDigits: 4,
     maximumFractionDigits: 4,
   });
+}
+
+function shouldShowCandidateAiReason(reason?: string | null) {
+  if (!reason) return false;
+
+  const normalized = reason
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+  const nonActionableReasons = [
+    'descricao e unidade comparavel avaliadas por criterios objetivos',
+    'descricao e unidade compativeis',
+    'unidade e quantidade compativeis com o item solicitado',
+    'compativel com o item solicitado',
+    'compativeis com o item solicitado',
+  ];
+
+  return !nonActionableReasons.some((text) => normalized.includes(text));
 }
 
 const COMPLIANCE_SEVERITY_LABELS: Record<PriceResearchComplianceFinding['severity'], string> = {
@@ -291,6 +313,17 @@ export default function PesquisaPrecos() {
   const [globalAdjustmentEnabled, setGlobalAdjustmentEnabled] = useState(false);
   const [globalAdjustmentIndex, setGlobalAdjustmentIndex] = useState<InflationIndexType | 'manual'>('IPCA');
   const [globalAdjustmentManualRate, setGlobalAdjustmentManualRate] = useState('0');
+  const monetaryAdjustmentReferenceDate = today();
+  const monetaryAdjustmentReferenceMonth = currentYearMonth();
+
+  const showMonetaryAdjustmentReferenceToast = (index: InflationIndexType | 'manual') => {
+    if (index === 'manual') return;
+
+    toast.info(
+      `O reajuste será calculado da contratação original até o mês atual (${monetaryAdjustmentReferenceMonth}).`,
+      { duration: 4000 },
+    );
+  };
 
   const applyGlobalAdjustmentToItems = (
     itemsList: PriceResearchItem[],
@@ -346,7 +379,7 @@ export default function PesquisaPrecos() {
     setGlobalAdjustmentManualRate(rateStr);
     
     setItems((currentItems) =>
-      applyGlobalAdjustmentToItems(currentItems, enabled, index, rateStr, rDate || researchDate)
+      applyGlobalAdjustmentToItems(currentItems, enabled, index, rateStr, rDate || monetaryAdjustmentReferenceDate)
     );
   };
 
@@ -761,7 +794,7 @@ export default function PesquisaPrecos() {
           } else {
             const dateVal = candidate.resultDate || candidate.purchaseDate || new Date().toISOString().split('T')[0];
             const fromDate = dateVal.slice(0, 7);
-            const toDate = researchDate.slice(0, 7);
+            const toDate = monetaryAdjustmentReferenceMonth;
             const calculated = calculateIndexFactor(globalAdjustmentIndex, fromDate, toDate);
             factor = calculated !== null ? calculated : 1;
           }
@@ -916,7 +949,7 @@ export default function PesquisaPrecos() {
             } else {
               const dateVal = mergedCandidate.resultDate || mergedCandidate.purchaseDate || new Date().toISOString().split('T')[0];
               const fromDate = dateVal.slice(0, 7);
-              const toDate = researchDate.slice(0, 7);
+              const toDate = monetaryAdjustmentReferenceMonth;
               const calculated = calculateIndexFactor(globalAdjustmentIndex, fromDate, toDate);
               factor = calculated !== null ? calculated : 1;
             }
@@ -1034,7 +1067,7 @@ export default function PesquisaPrecos() {
     setIsParsing(true);
     try {
       const parsed = await parsePriceResearchFile(file);
-      setItems(globalAdjustmentEnabled ? applyGlobalAdjustmentToItems(parsed, true, globalAdjustmentIndex, globalAdjustmentManualRate, researchDate) : parsed);
+      setItems(globalAdjustmentEnabled ? applyGlobalAdjustmentToItems(parsed, true, globalAdjustmentIndex, globalAdjustmentManualRate, monetaryAdjustmentReferenceDate) : parsed);
       setSelectedItemId(undefined);
       setSourceFile(file.name);
       setResearchId(undefined);
@@ -1083,7 +1116,7 @@ export default function PesquisaPrecos() {
         };
       });
       const resolvedItems = await resolveDirectPncpLinks(searchResultItems);
-      setItems(globalAdjustmentEnabled ? applyGlobalAdjustmentToItems(resolvedItems, true, globalAdjustmentIndex, globalAdjustmentManualRate, researchDate) : resolvedItems);
+      setItems(globalAdjustmentEnabled ? applyGlobalAdjustmentToItems(resolvedItems, true, globalAdjustmentIndex, globalAdjustmentManualRate, monetaryAdjustmentReferenceDate) : resolvedItems);
       const found = results.reduce((total, result) => total + result.candidates.length, 0);
       toast.success(`${found} referência(s) oficial(is) encontrada(s).`);
       // Avança para a curadoria automaticamente ao buscar preços com sucesso (Passo 4)
@@ -1479,7 +1512,7 @@ export default function PesquisaPrecos() {
       setGlobalAdjustmentManualRate(manualRateVal);
       
       const finalItems = enabledVal 
-        ? applyGlobalAdjustmentToItems(resolvedItems, true, indexVal, manualRateVal, record.researchDate)
+        ? applyGlobalAdjustmentToItems(resolvedItems, true, indexVal, manualRateVal, monetaryAdjustmentReferenceDate)
         : resolvedItems;
         
       setItems(finalItems);
@@ -1858,7 +1891,7 @@ export default function PesquisaPrecos() {
                   const newDate = event.target.value;
                   setResearchDate(newDate);
                   if (globalAdjustmentEnabled) {
-                    setItems((currentItems) => applyGlobalAdjustmentToItems(currentItems, globalAdjustmentEnabled, globalAdjustmentIndex, globalAdjustmentManualRate, newDate));
+                    setItems((currentItems) => applyGlobalAdjustmentToItems(currentItems, globalAdjustmentEnabled, globalAdjustmentIndex, globalAdjustmentManualRate, monetaryAdjustmentReferenceDate));
                   }
                 }} />
               </div>
@@ -2730,13 +2763,25 @@ export default function PesquisaPrecos() {
                         </div>
                       </div>
 
-                      <div className="my-4 border-t border-border-default/50" />
+                      <div className="mt-4 grid gap-2 border-t border-border-default/70 pt-3 sm:grid-cols-2 xl:grid-cols-4">
+                        {[
+                          ['Amostra', `${selectedStatistics?.count ?? 0} cotação(ões)`],
+                          ['Média ponderada', formatCurrency(selectedStatistics?.weightedMean ?? 0)],
+                          ['Média saneada', formatCurrency(selectedStatistics?.sanitizedMean ?? 0)],
+                          ['Preços excluídos', String(selectedStatistics?.excludedCount ?? 0)],
+                        ].map(([label, value]) => (
+                          <div key={label} className="flex items-center justify-between gap-3 rounded-radius-sm bg-surface-subtle/50 px-3 py-2">
+                            <span className="font-ui text-[10px] font-black uppercase tracking-wider text-text-muted">{label}</span>
+                            <span className="min-w-0 truncate text-right font-mono text-xs font-bold text-text-primary">{value}</span>
+                          </div>
+                        ))}
+                      </div>
 
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
+                      <div className="mt-3 border-t border-border-default/50 pt-3">
+                        <div className="flex flex-col gap-3 rounded-radius-sm bg-surface-subtle/30 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
                           <div className="flex items-center gap-2">
-                            <TrendingUp className="h-4 w-4 text-primary" />
-                            <span className="font-ui text-xs font-bold text-text-primary">Atualização Monetária (IN 65/2021)</span>
+                            <TrendingUp className="h-4 w-4 text-text-muted" />
+                            <span className="font-ui text-xs font-bold text-text-secondary">Atualização Monetária (IN 65/2021)</span>
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <button
@@ -2757,7 +2802,11 @@ export default function PesquisaPrecos() {
                               id="global-monetary-adjust-enable"
                               checked={globalAdjustmentEnabled}
                               onCheckedChange={(checked) => {
-                                updateGlobalAdjustment(checked === true, globalAdjustmentIndex, globalAdjustmentManualRate);
+                                const enabled = checked === true;
+                                updateGlobalAdjustment(enabled, globalAdjustmentIndex, globalAdjustmentManualRate);
+                                if (enabled) {
+                                  showMonetaryAdjustmentReferenceToast(globalAdjustmentIndex);
+                                }
                               }}
                             />
                             <label
@@ -2770,16 +2819,17 @@ export default function PesquisaPrecos() {
                         </div>
 
                         {globalAdjustmentEnabled && (
-                          <div className="grid gap-4 sm:grid-cols-2 bg-surface-subtle/30 rounded-radius-lg border border-border-default/50 p-4 transition-all duration-300 animate-in fade-in slide-in-from-top-1">
+                          <div className="mt-2 grid gap-3 rounded-radius-sm border border-border-default/50 bg-surface-card/60 p-3 transition-all duration-300 animate-in fade-in slide-in-from-top-1 sm:grid-cols-2">
                             <div className="space-y-1.5">
                               <label htmlFor="global-monetary-adjust-index" className="text-[11px] font-bold text-text-secondary">Índice ou Método</label>
                               <select
                                 id="global-monetary-adjust-index"
-                                className="w-full rounded-md border border-border-default bg-surface-card px-3 py-1.5 text-xs text-text-primary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
+                                className="h-8 w-full rounded-md border border-border-default bg-surface-card px-3 text-xs text-text-primary shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                                 value={globalAdjustmentIndex}
                                 onChange={(e) => {
                                   const newIndex = e.target.value as InflationIndexType | 'manual';
                                   updateGlobalAdjustment(true, newIndex, globalAdjustmentManualRate);
+                                  showMonetaryAdjustmentReferenceToast(newIndex);
                                 }}
                               >
                                 <option value="IPCA">IPCA (IBGE)</option>
@@ -2804,29 +2854,9 @@ export default function PesquisaPrecos() {
                                   }}
                                 />
                               </div>
-                            ) : (
-                              <div className="flex flex-col justify-end text-[11px] text-text-muted leading-relaxed pb-1 animate-in fade-in duration-200">
-                                <p>
-                                  O reajuste de inflação será calculado individualmente de acordo com o mês da contratação original até o mês da pesquisa (<strong>{researchDate.slice(0, 7)}</strong>).
-                                </p>
-                              </div>
-                            )}
+                            ) : null}
                           </div>
                         )}
-                      </div>
-
-                      <div className="mt-4 grid gap-2 border-t border-border-default/70 pt-3 sm:grid-cols-2 xl:grid-cols-4">
-                        {[
-                          ['Amostra', `${selectedStatistics?.count ?? 0} cotação(ões)`],
-                          ['Média ponderada', formatCurrency(selectedStatistics?.weightedMean ?? 0)],
-                          ['Média saneada', formatCurrency(selectedStatistics?.sanitizedMean ?? 0)],
-                          ['Preços excluídos', String(selectedStatistics?.excludedCount ?? 0)],
-                        ].map(([label, value]) => (
-                          <div key={label} className="flex items-center justify-between gap-3 rounded-radius-sm bg-surface-subtle/50 px-3 py-2">
-                            <span className="font-ui text-[10px] font-black uppercase tracking-wider text-text-muted">{label}</span>
-                            <span className="min-w-0 truncate text-right font-mono text-xs font-bold text-text-primary">{value}</span>
-                          </div>
-                        ))}
                       </div>
                     </section>
                   </TooltipProvider>
@@ -2945,11 +2975,9 @@ export default function PesquisaPrecos() {
                                         />
                                       )}
                                       <div className="space-y-1.5 flex-1">
-                                        {candidate.aiReason &&
-                                          candidate.aiReason !== 'Descrição e unidade comparável avaliadas por critérios objetivos.' &&
-                                          candidate.aiReason !== 'Descrição e unidade compatíveis.' && (
-                                            <p className="font-ui text-xs text-text-primary leading-normal font-semibold">{candidate.aiReason}</p>
-                                          )}
+                                        {shouldShowCandidateAiReason(candidate.aiReason) && (
+                                          <p className="font-ui text-xs text-text-primary leading-normal font-semibold">{candidate.aiReason}</p>
+                                        )}
                                         <p className="line-clamp-3 font-ui text-xs text-text-secondary leading-relaxed font-bold" title={candidate.description}>{candidate.description}</p>
                                         <div className="flex gap-2">
                                           {isMarketCandidate(candidate) && (
@@ -3734,8 +3762,8 @@ export default function PesquisaPrecos() {
             </SectionPanel>
 
             <SectionPanel
-              title="Irregularidades e conformidade"
-              description="Achados automáticos com base na IN SEGES/ME nº 65/2021."
+              title="Alertas e conformidade"
+              description="Alertas automáticos com base na IN SEGES/ME nº 65/2021."
             >
               <div className="grid grid-cols-3 gap-3">
                 {(['error', 'warning', 'info'] as const).map((severity) => (
@@ -3748,14 +3776,7 @@ export default function PesquisaPrecos() {
                 ))}
               </div>
 
-              {complianceFindings.length === 0 ? (
-                <div className="mt-5 flex gap-2.5 rounded-radius-lg border border-primary/20 bg-primary/[0.03] p-4 text-primary">
-                  <ShieldCheck className="h-5 w-5 shrink-0 text-primary" />
-                  <p className="font-ui text-xs leading-normal">
-                    <span className="font-bold">Análise OK:</span> nenhum indício objetivo de irregularidade foi identificado pela verificação automática da IN SEGES/ME nº 65/2021.
-                  </p>
-                </div>
-              ) : (
+              {complianceFindings.length > 0 && (
                 <div className="mt-5 max-h-[280px] space-y-2 overflow-y-auto pr-1">
                   {complianceFindings.map((finding) => (
                     <button
@@ -3890,11 +3911,6 @@ export default function PesquisaPrecos() {
         </div>
       </div>
       </div>
-      )}
-
-      {/* Histórico de Disparos de E-mail */}
-      {researchId && (
-        <SupplierEmailHistory researchId={researchId} />
       )}
 
       {candidateExclusionDraft && (
