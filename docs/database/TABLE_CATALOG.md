@@ -574,6 +574,53 @@ Consumido por:
 - `src/services/priceResearch.ts`
 - `src/pages/PesquisaPrecos.tsx`
 
+### `suppliers`
+
+Finalidade:
+
+- cadastro global de fornecedores para cotação, envio de e-mails e mapa de regularidade
+
+Campos-chave:
+
+- `id`
+- `name`
+- `document`
+- `email`
+- `phone`
+- `contact_name`
+- `notes`
+- `city`
+- `uf`
+- `status_regularidade`
+
+Consumido por:
+
+- `src/services/priceResearchEmail.ts`
+- `src/pages/CadastroFornecedores.tsx`
+
+### `supplier_certificates`
+
+Finalidade:
+
+- histórico de certidões e consultas de regularidade/idoneidade de fornecedores (TCU, CNJ, CEIS, CNEP, RFB, FGTS, CNDT, Falência)
+
+Campos-chave:
+
+- `id`
+- `supplier_id`
+- `tipo_certidao`
+- `numero_certidao`
+- `situacao`
+- `data_emissao`
+- `data_validade`
+- `pdf_url`
+- `detalhes_sancao`
+
+Consumido por:
+
+- `src/services/supplierCompliance.ts`
+- `src/pages/CadastroFornecedores.tsx`
+
 ### `financeiro_fonte_vinculacao`
 
 - saldo financeiro por fonte/vinculacao carregado por arquivo

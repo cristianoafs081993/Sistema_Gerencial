@@ -319,7 +319,7 @@ export function Layout({ children }: LayoutProps) {
                   {section.items.map((item) => {
                     const active = isItemActive(location.pathname, item);
                     const parentDirectlyActive = item.children?.length
-                      ? location.pathname === item.href
+                      ? location.pathname === item.href && !item.children.some(child => isPathActive(location.pathname, child.href))
                       : active;
                     const submenuExpanded = expandedSubmenus[item.screenId] ?? false;
                     const ItemIcon = item.icon;

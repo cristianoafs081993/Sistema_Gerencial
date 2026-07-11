@@ -144,14 +144,12 @@ describe('PesquisaPrecos', () => {
     });
 
     expect((await screen.findAllByText('Café torrado e moído, pacote de 500 g'))[0]).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Avançar/i }));
-
     await waitFor(() => {
       expect(mockedService.search).toHaveBeenCalledWith([
         expect.objectContaining({ catalogCode: '606523', catalogType: 'material' }),
       ]);
     });
-    fireEvent.click(await screen.findByRole('button', { name: /Editar Cotações/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Ver Cotações/i }));
     expect(await screen.findByText('Fornecedor')).toBeInTheDocument();
     expect(screen.getAllByText('R$ 20,00').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText(/Métodos de cálculo/i)).toBeInTheDocument();
@@ -185,7 +183,7 @@ describe('PesquisaPrecos', () => {
       target: { files: [new File(['xlsx'], 'custos.xlsx')] },
     });
 
-    fireEvent.click(await screen.findByText('Café torrado e moído, pacote de 500 g'));
+    fireEvent.click(await screen.findByRole('button', { name: /Configurar Item/i }));
 
     await waitFor(() => {
       expect(mockedCatalogMatcher).toHaveBeenCalledWith(
@@ -204,8 +202,7 @@ describe('PesquisaPrecos', () => {
       target: { files: [new File(['xlsx'], 'custos.xlsx')] },
     });
     await screen.findAllByText('Café torrado e moído, pacote de 500 g');
-    fireEvent.click(screen.getByRole('button', { name: /Avançar/i }));
-    fireEvent.click(await screen.findByRole('button', { name: /Editar Cotações/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Ver Cotações/i }));
     await screen.findByText('Fornecedor');
 
     // Clica no checkbox para desconsiderar o preço
@@ -258,8 +255,7 @@ describe('PesquisaPrecos', () => {
     });
 
     await screen.findAllByText('Café torrado e moído, pacote de 500 g');
-    fireEvent.click(screen.getByRole('button', { name: /Avançar/i }));
-    fireEvent.click(await screen.findByRole('button', { name: /Editar Cotações/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Ver Cotações/i }));
     await screen.findByText('Fornecedor');
 
     // Verifica que o link do PNCP montado no front-end aponta para o ano correto (2026) e tem o CNPJ resolvido
@@ -276,8 +272,7 @@ describe('PesquisaPrecos', () => {
       target: { files: [new File(['xlsx'], 'custos.xlsx')] },
     });
     await screen.findAllByText('Café torrado e moído, pacote de 500 g');
-    fireEvent.click(screen.getByRole('button', { name: /Avançar/i }));
-    fireEvent.click(await screen.findByRole('button', { name: /Editar Cotações/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Ver Cotações/i }));
     await screen.findByText('Fornecedor');
 
     // Verifica que existe o checkbox de reajuste global
@@ -303,5 +298,62 @@ describe('PesquisaPrecos', () => {
     const manualRateInput = screen.getByPlaceholderText(/Ex: 5.5/i);
     expect(manualRateInput).toBeInTheDocument();
     fireEvent.change(manualRateInput, { target: { value: '10' } });
+  });
+
+  it('permite adicionar itens manualmente na etapa 2, e os reordena sequencialmente ao remover', async () => {
+    const { container } = renderPage();
+
+    // Avança para a Etapa 2
+    fireEvent.click(screen.getByRole('button', { name: /Avançar/i }));
+
+    // Passo 2: Verifica o botão de adição manual
+    const addManualBtn = await screen.findByRole('button', { name: /Adicionar item manualmente/i });
+    expect(addManualBtn).toBeInTheDocument();
+
+    // Clica para iniciar manualmente
+    fireEvent.click(addManualBtn);
+
+    // O modal de configuração de item deve abrir
+    expect(screen.getByText(/Configuração do Item 1/i)).toBeInTheDocument();
+
+    // Altera a descrição do primeiro item
+    const descriptionTextarea = screen.getByLabelText(/Descrição Técnico-Comercial do Item/i);
+    fireEvent.change(descriptionTextarea, { target: { value: 'Item Manual Teste 1' } });
+
+    // Confirma e volta
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar e Voltar/i }));
+
+    // O item deve estar visível na tabela do Passo 2
+    expect(screen.getByText('Item Manual Teste 1')).toBeInTheDocument();
+
+    // Adiciona um segundo item manualmente no Passo 2
+    const addAnotherManualBtn = screen.getByRole('button', { name: /Adicionar item manualmente/i });
+    fireEvent.click(addAnotherManualBtn);
+
+    // Deve abrir a configuração do Item 2
+    expect(screen.getByText(/Configuração do Item 2/i)).toBeInTheDocument();
+
+    // Altera a descrição do segundo item
+    const descriptionTextarea2 = screen.getByLabelText(/Descrição Técnico-Comercial do Item/i);
+    fireEvent.change(descriptionTextarea2, { target: { value: 'Item Manual Teste 2' } });
+
+    // Confirma e volta
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar e Voltar/i }));
+
+    // Ambos devem estar visíveis
+    expect(screen.getByText('Item Manual Teste 1')).toBeInTheDocument();
+    expect(screen.getByText('Item Manual Teste 2')).toBeInTheDocument();
+
+    // Remove o primeiro item
+    const removeButtons = screen.getAllByRole('button', { name: /Remover Item/i });
+    expect(removeButtons).toHaveLength(2);
+    fireEvent.click(removeButtons[0]);
+
+    // O Item Manual Teste 1 deve ter sumido
+    expect(screen.queryByText('Item Manual Teste 1')).not.toBeInTheDocument();
+    // O Item Manual Teste 2 deve continuar, e seu número sequencial deve ter atualizado para 1
+    expect(screen.getByText('Item Manual Teste 2')).toBeInTheDocument();
+    const row = screen.getByText('Item Manual Teste 2').closest('tr');
+    expect(row?.querySelector('td')).toHaveTextContent('1'); // O número do item agora é 1
   });
 });

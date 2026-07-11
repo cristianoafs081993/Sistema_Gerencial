@@ -32,6 +32,9 @@ export type Supplier = {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  city?: string;
+  uf?: string;
+  statusRegularidade?: string;
 };
 
 // Kept for backward compatibility with existing dialog fields
@@ -110,6 +113,9 @@ type DbSupplierRow = {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  city?: string | null;
+  uf?: string | null;
+  status_regularidade?: string | null;
 };
 
 type DbDispatchRow = {
@@ -137,6 +143,9 @@ function mapSupplierRow(row: DbSupplierRow): Supplier {
     notes: row.notes ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    city: row.city ?? undefined,
+    uf: row.uf ?? undefined,
+    statusRegularidade: row.status_regularidade ?? undefined,
   };
 }
 
@@ -216,6 +225,9 @@ export const priceResearchEmailService = {
       phone: supplier.phone || null,
       contact_name: supplier.contactName || null,
       notes: supplier.notes || null,
+      city: supplier.city || null,
+      uf: supplier.uf || null,
+      status_regularidade: supplier.statusRegularidade || null,
     };
     if (id) {
       const { data, error } = await supabase

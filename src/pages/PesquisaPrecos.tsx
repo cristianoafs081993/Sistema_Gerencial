@@ -189,6 +189,7 @@ export default function PesquisaPrecos() {
   const [sourceFile, setSourceFile] = useState('');
   const [items, setItems] = useState<PriceResearchItem[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string>();
+  const [itemPanelMode, setItemPanelMode] = useState<'config' | 'curation'>('config');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const currentIndex = items.findIndex((item) => item.localId === selectedItemId);
@@ -730,9 +731,73 @@ export default function PesquisaPrecos() {
   };
 
   const deleteItem = (localId: string) => {
-    setItems((current) => current.filter((item) => item.localId !== localId));
+    setItems((current) => {
+      const filtered = current.filter((item) => item.localId !== localId);
+      return filtered.map((item, index) => ({
+        ...item,
+        itemNumber: (index + 1).toString(),
+      }));
+    });
     toast.success("Item removido da pesquisa.");
   };
+
+  const handleStartManualItems = () => {
+    const newItem: PriceResearchItem = {
+      localId: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `item-${Date.now()}`,
+      itemNumber: '1',
+      description: '',
+      catalogType: 'material',
+      catalogCode: '',
+      quantity: 1,
+      unit: 'UN',
+      targetCapacity: null,
+      targetMeasureUnit: null,
+      referenceUnitCost: null,
+      candidates: [],
+      searchStatus: 'idle',
+      catalogMatchStatus: 'idle',
+      catalogSuggestions: [],
+    };
+    setItems([newItem]);
+    setSelectedItemId(newItem.localId);
+    setItemPanelMode('config');
+    setSourceFile('Inserido manualmente');
+    setActiveStep(2);
+  };
+
+  const handleAddNewItem = () => {
+    const nextItemNumber = (items.length + 1).toString();
+    const newItem: PriceResearchItem = {
+      localId: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `item-${Date.now()}`,
+      itemNumber: nextItemNumber,
+      description: '',
+      catalogType: 'material',
+      catalogCode: '',
+      quantity: 1,
+      unit: 'UN',
+      targetCapacity: null,
+      targetMeasureUnit: null,
+      referenceUnitCost: null,
+      candidates: [],
+      searchStatus: 'idle',
+      catalogMatchStatus: 'idle',
+      catalogSuggestions: [],
+    };
+    setItems((current) => [...current, newItem]);
+    setSelectedItemId(newItem.localId);
+    setItemPanelMode('config');
+  };
+
+  const openItemConfig = (localId: string) => {
+    setSelectedItemId(localId);
+    setItemPanelMode('config');
+  };
+
+  const openItemCuration = (localId: string) => {
+    setSelectedItemId(localId);
+    setItemPanelMode('curation');
+  };
+
 
   const handleAddLocalCandidate = () => {
     if (!selectedItem) return;
@@ -855,7 +920,8 @@ export default function PesquisaPrecos() {
 
     setSelectedItemId(itemId);
     setCuradoriaTab('basket');
-    setActiveStep(4);
+    setItemPanelMode('curation');
+    setActiveStep(2);
     requestCandidateExclusion(itemId, candidate);
     return true;
   };
@@ -873,7 +939,8 @@ export default function PesquisaPrecos() {
 
     setSelectedItemId(finding.itemId);
     setCuradoriaTab('basket');
-    setActiveStep(4);
+    setItemPanelMode('curation');
+    setActiveStep(2);
   };
 
   const suggestCatalogForItem = async (item: PriceResearchItem) => {
@@ -966,7 +1033,7 @@ export default function PesquisaPrecos() {
       const found = results.reduce((total, result) => total + result.candidates.length, 0);
       toast.success(`${found} referência(s) oficial(is) encontrada(s).`);
       // Avança para a curadoria automaticamente ao buscar preços com sucesso (Passo 4)
-      setActiveStep(4);
+      setActiveStep(2);
     } catch (error) {
       setItems((current) => current.map((item) => ({
         ...item,
@@ -1161,23 +1228,21 @@ export default function PesquisaPrecos() {
   const hasTriggeredSearch = useRef(false);
 
   useEffect(() => {
-    if (activeStep === 3) {
-      // Se todos os itens já foram buscados com sucesso, avança imediatamente para a etapa 4
-      const allSuccess = items.length > 0 && items.every((item) => item.searchStatus === 'success');
-      if (allSuccess) {
-        setActiveStep(4);
-        return;
-      }
+    const allHaveCodes = items.length > 0 && items.every(i => /^\d{4,9}$/.test(i.catalogCode));
+    const anyIdle = items.some(i => i.searchStatus === 'idle');
+    const anyError = items.some(i => i.searchStatus === 'error');
 
-      const hasPendingSearch = items.some((item) => item.searchStatus === 'idle' || item.searchStatus === 'error');
-      if (hasPendingSearch && !isSearching && !hasTriggeredSearch.current) {
-        hasTriggeredSearch.current = true;
-        void searchPrices();
-      }
-    } else {
+    if (allHaveCodes && (anyIdle || anyError) && !isSearching && !hasTriggeredSearch.current) {
+      hasTriggeredSearch.current = true;
+      // Dispara em background sem bloquear a UI
+      void searchPrices();
+    }
+
+    // Reset do gatilho se os códigos mudarem (novo item ou código alterado)
+    if (!allHaveCodes) {
       hasTriggeredSearch.current = false;
     }
-  }, [activeStep, items, isSearching]);
+  }, [items, isSearching]);
 
   const saveResearch = async (status: 'review' | 'completed' = 'review', silent = false) => {
     if (items.length === 0) {
@@ -1217,12 +1282,12 @@ export default function PesquisaPrecos() {
 
   const goToStep = (step: number) => {
     if (step === activeStep) return;
-    if (step > 1 && items.length === 0) {
-      toast.error('Importe um arquivo de itens antes de prosseguir.');
+    if (step >= 3 && items.length === 0) {
+      toast.error('Adicione itens antes de prosseguir.');
       return;
     }
 
-    // Regra 1: Bloquear Passo 3 ou superior se houver itens sem código CATMAT/CATSER
+    // Bloquear Relatório (step 3) se houver itens sem código CATMAT/CATSER
     if (step >= 3) {
       const itemsWithoutCode = items.filter((item) => !item.catalogCode);
       if (itemsWithoutCode.length > 0) {
@@ -1231,11 +1296,11 @@ export default function PesquisaPrecos() {
       }
     }
 
-    // Regra 2: Bloquear Passo 4 ou superior se a busca de preços ainda estiver pendente (idle)
-    if (step >= 4) {
+    // Bloquear Relatório (step 3) se a busca de preços ainda estiver pendente (idle)
+    if (step >= 3) {
       const itemsNotSearched = items.filter((item) => item.searchStatus === 'idle');
       if (itemsNotSearched.length > 0) {
-        toast.error(`Busca de preços pendente: realize a busca de preços oficiais (Passo 3) antes de prosseguir.`);
+        toast.error('Realize a busca de preços oficiais antes de prosseguir para o Relatório.');
         return;
       }
     }
@@ -1363,15 +1428,7 @@ export default function PesquisaPrecos() {
       setCandidateExclusionDraft(null);
       
       // Define a etapa adequada
-      const hasSearch = record.items.every(item => item.searchStatus !== 'idle');
-      const hasCodes = record.items.every(item => item.catalogCode);
-      if (hasSearch) {
-        setActiveStep(4); // Vai para a curadoria se a busca já foi executada
-      } else if (hasCodes) {
-        setActiveStep(3); // Vai para o console de busca se já tem códigos
-      } else {
-        setActiveStep(2); // Vai para catalogação se faltam códigos
-      }
+      setActiveStep(2);
 
       setViewMode('wizard');
       toast.success('Pesquisa carregada com sucesso.');
@@ -1582,7 +1639,7 @@ export default function PesquisaPrecos() {
               
               <div className="text-right shrink-0 bg-surface-subtle/30 px-3 py-1.5 rounded-lg border border-border-default/40">
                 <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Etapa Atual</span>
-                <span className="text-sm font-black text-sebrae-blue">{activeStep} de 5</span>
+                <span className="text-sm font-black text-sebrae-blue">{activeStep} de 3</span>
               </div>
             </div>
 
@@ -1590,12 +1647,11 @@ export default function PesquisaPrecos() {
             <div className="w-full py-2 border-t border-border-default/40 pt-4">
               <div className="max-w-4xl mx-auto space-y-3">
                 {/* Grid of Columns for Labels */}
-                <div className="grid grid-cols-4 text-center text-xs md:text-sm font-ui">
+                <div className="grid grid-cols-3 text-center text-xs md:text-sm font-ui">
                   {[
                     { wizardNumber: 1, label: '1. Identificação', targetSteps: [1] },
                     { wizardNumber: 2, label: '2. Itens', targetSteps: [2] },
-                    { wizardNumber: 3, label: '3. Cotações', targetSteps: [3, 4] },
-                    { wizardNumber: 4, label: '4. Relatório', targetSteps: [5] },
+                    { wizardNumber: 3, label: '3. Relatório', targetSteps: [3] },
                   ].map((step) => {
                     const isCompleted = Math.min(...step.targetSteps) < activeStep && !step.targetSteps.includes(activeStep);
                     const isActive = step.targetSteps.includes(activeStep);
@@ -1605,25 +1661,13 @@ export default function PesquisaPrecos() {
                     if (step.wizardNumber === 1) {
                       isSelectable = true;
                     } else if (step.wizardNumber === 2) {
-                      isSelectable = items.length > 0;
+                      isSelectable = true;
                     } else if (step.wizardNumber === 3) {
-                      isSelectable = items.length > 0 && items.every(i => i.catalogCode);
-                    } else if (step.wizardNumber === 4) {
                       isSelectable = items.length > 0 && items.every(i => i.catalogCode) && items.every(i => i.searchStatus !== 'idle');
                     }
 
                     const handleWizardClick = () => {
-                      if (step.wizardNumber === 3) {
-                        // Se o usuário clicar em "Curadoria":
-                        // Se a busca já foi feita (nenhum item 'idle'), vai direto para a etapa 4.
-                        // Se a busca não foi feita, vai para a etapa 3 (transição/busca) para disparar a busca!
-                        const hasSearch = items.every(item => item.searchStatus !== 'idle');
-                        goToStep(hasSearch ? 4 : 3);
-                      } else if (step.wizardNumber === 4) {
-                        goToStep(5);
-                      } else {
-                        goToStep(step.wizardNumber);
-                      }
+                      goToStep(step.wizardNumber);
                     };
 
                     return (
@@ -1652,9 +1696,8 @@ export default function PesquisaPrecos() {
                     <div
                       className="absolute top-0 left-0 h-full bg-sebrae-blue rounded-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-sm"
                       style={{
-                        width: activeStep === 1 ? '12.5%' :
-                               activeStep === 2 ? '37.5%' :
-                               activeStep === 3 || activeStep === 4 ? '62.5%' :
+                        width: activeStep === 1 ? '16.5%' :
+                               activeStep === 2 ? '50%' :
                                '100%'
                       }}
                     />
@@ -1954,24 +1997,15 @@ export default function PesquisaPrecos() {
             </div>
           </SectionPanel>
 
-          {items.length === 0 ? (
-            <SectionPanel
-              title="Arquivo de custos"
-              description="Forneça a lista de itens a serem orçados em formato Excel ou PDF legível."
-            >
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex w-full flex-col items-center justify-center rounded-radius-xl border-2 border-dashed border-primary/25 bg-primary/[0.02] px-6 py-16 text-center transition-colors hover:bg-primary/[0.05]"
-              >
-                <FileSpreadsheet className="h-10 w-10 text-primary animate-pulse" />
-                <span className="mt-4 font-ui text-base font-semibold text-text-primary">Clique para importar planilha ou PDF de custos</span>
-                <span className="mt-1 max-w-xl font-ui text-sm text-text-secondary">
-                  Formatos XLSX, XLS, CSV ou PDF pesquisável. O arquivo deve conter colunas de descrição, quantidade, unidade e idealmente código CATMAT ou CATSER.
-                </span>
-              </button>
-            </SectionPanel>
-          ) : (
+        </div>
+      )}
+
+      {/* STEP 2: CÓDIGOS DE CATÁLOGO */}
+      {/* STEP 2: ITENS + COTAÇÕES */}
+      {activeStep === 2 && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Planilha de Itens Carregada (se houver items e sourceFile) */}
+          {!selectedItemId && items.length > 0 && sourceFile && (
             <div className="rounded-radius-lg border border-primary/20 bg-primary/[0.02] p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-primary/10 rounded-full text-primary">
@@ -1992,390 +2026,398 @@ export default function PesquisaPrecos() {
               </div>
             </div>
           )}
-        </div>
-      )}
 
-      {/* STEP 2: CÓDIGOS DE CATÁLOGO */}
-      {activeStep === 2 && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          <SectionPanel
-            title="Itens Importados"
-            description="Selecione um item na lista abaixo clicando nele para configurar seu código CATMAT/CATSER e especificações."
-          >
-            <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
-              <table className="w-full border-collapse text-left font-ui text-sm">
-                <thead>
-                  <tr className="border-b border-border-default bg-surface-subtle text-text-muted font-bold select-none">
-                    <th className="py-3 px-4 text-center w-16">Item</th>
-                    <th className="py-3 px-4">Descrição Técnico-Comercial</th>
-                    <th className="py-3 px-4 w-28 text-right">Qtd.</th>
-                    <th className="py-3 px-4 w-32">Unidade</th>
-                    <th className="py-3 px-4 w-28">Tipo</th>
-                    <th className="py-3 px-4 w-40">Código do Catálogo</th>
-                    <th className="py-3 px-4 text-center w-20">Ação</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-default/60">
-                  {items.map((item) => {
-                    const hasCode = !!item.catalogCode;
-                    return (
-                      <tr
-                        key={item.localId}
-                        onClick={() => setSelectedItemId(item.localId)}
-                        className="hover:bg-surface-subtle/50 transition-colors cursor-pointer"
-                        title="Clique para configurar este item"
-                      >
-                        <td className="py-3.5 px-4 text-center font-bold text-text-primary">{item.itemNumber}</td>
-                        <td className="py-3.5 px-4 font-medium text-text-secondary leading-normal">{item.description}</td>
-                        <td className="py-3.5 px-4 text-right font-mono font-semibold text-text-primary">{item.quantity}</td>
-                        <td className="py-3.5 px-4 font-medium text-text-secondary">{item.unit || <span className="text-text-muted italic">-</span>}</td>
-                        <td className="py-3.5 px-4">
-                          {hasCode ? (
-                            <Badge variant="secondary" className="font-mono text-xs">
-                              {item.catalogType === 'material' ? 'CATMAT' : 'CATSER'}
-                            </Badge>
-                          ) : (
-                            <span className="text-text-muted font-mono">-</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4 font-mono font-bold text-text-primary">
-                          {item.catalogCode || <span className="text-text-muted font-normal italic">Pendente</span>}
-                        </td>
-                        <td className="py-3.5 px-4 text-center">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            title="Remover Item"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteItem(item.localId);
-                            }}
-                            className="h-8 w-8 text-destructive hover:text-white hover:bg-destructive rounded-full transition-all"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </SectionPanel>
-
-          {/* Modal de Configuração do Item */}
-          {selectedItemId && selectedItem && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-200">
-              <div className="relative w-full max-w-4xl bg-surface-card border border-border-default rounded-radius-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-                {/* Modal Header */}
-                <div className="px-6 py-4 border-b border-border-default flex items-center justify-between bg-surface-subtle/50">
+          {/* Banner de busca de preços */}
+          {!selectedItemId && items.length > 0 && (
+            <div className="flex items-center justify-between gap-4 rounded-radius-xl border border-border-default bg-surface-card p-4 shadow-soft">
+              <div className="flex items-center gap-3">
+                {isSearching ? (
+                  <><Loader2 className="h-5 w-5 animate-spin text-sebrae-blue shrink-0" />
                   <div>
-                    <h3 className="text-sm font-bold text-sebrae-navy">
-                      Configuração do Item {selectedItem.itemNumber}
-                    </h3>
-                    <p className="text-[11px] text-text-muted mt-0.5 truncate max-w-[600px]">
-                      {selectedItem.description}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="h-8 w-8 rounded-full p-0 flex items-center justify-center text-text-secondary hover:bg-slate-100 hover:text-text-primary"
-                    onClick={() => setSelectedItemId(undefined)}
-                  >
-                    ✕
-                  </button>
+                    <p className="font-ui text-sm font-bold text-sebrae-navy">Buscando cotações oficiais...</p>
+                    <p className="font-ui text-xs text-text-muted mt-0.5">Consultando a API de Compras do Governo Federal. Aguarde.</p>
+                  </div></>
+                ) : items.every(i => i.searchStatus === 'success') ? (
+                  <><CheckCircle2 className="h-5 w-5 text-ifrn-green shrink-0" />
+                  <div>
+                    <p className="font-ui text-sm font-bold text-ifrn-green">Busca concluída com sucesso</p>
+                    <p className="font-ui text-xs text-text-muted mt-0.5">{items.reduce((t, i) => t + i.candidates.length, 0)} cotações oficiais encontradas no total.</p>
+                  </div></>
+                ) : items.some(i => i.searchStatus === 'error') ? (
+                  <><AlertTriangle className="h-5 w-5 text-red-500 shrink-0" />
+                  <div>
+                    <p className="font-ui text-sm font-bold text-red-950">Algumas consultas falharam</p>
+                    <p className="font-ui text-xs text-red-700 mt-0.5">Tente novamente ou adicione cotações manuais.</p>
+                  </div></>
+                ) : (
+                  <><Search className="h-5 w-5 text-text-muted shrink-0" />
+                  <div>
+                    <p className="font-ui text-sm font-bold text-text-primary">Busca de preços oficiais</p>
+                    <p className="font-ui text-xs text-text-muted mt-0.5">Consulta ao Compras.gov com base nos códigos CATMAT/CATSER mapeados.</p>
+                  </div></>
+                )}
+              </div>
+              <Button
+                type="button"
+                className="shrink-0 gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-xs h-9 px-4 rounded-lg shadow-sm"
+                disabled={isSearching || items.length === 0 || items.every(i => !i.catalogCode)}
+                onClick={() => void searchPrices()}
+              >
+                {isSearching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                {items.some(i => i.searchStatus !== 'idle') ? 'Rebuscar Preços' : 'Buscar Preços Oficiais'}
+              </Button>
+            </div>
+          )}
+
+          {items.length === 0 ? (
+            <SectionPanel
+              title="Arquivo de custos"
+              description="Forneça a lista de itens a serem orçados em formato Excel ou PDF legível."
+            >
+              <div className="flex flex-col gap-4">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex w-full flex-col items-center justify-center rounded-radius-xl border-2 border-dashed border-primary/25 bg-primary/[0.02] px-6 py-16 text-center transition-colors hover:bg-primary/[0.05]"
+                >
+                  <FileSpreadsheet className="h-10 w-10 text-primary animate-pulse" />
+                  <span className="mt-4 font-ui text-base font-semibold text-text-primary">Clique para importar planilha ou PDF de custos</span>
+                  <span className="mt-1 max-w-xl font-ui text-sm text-text-secondary">
+                    Formatos XLSX, XLS, CSV ou PDF pesquisável. O arquivo deve conter colunas de descrição, quantidade, unidade e idealmente código CATMAT ou CATSER.
+                  </span>
+                </button>
+                <div className="flex items-center justify-center gap-3 py-1">
+                  <span className="h-px flex-1 bg-border-default max-w-[120px]"></span>
+                  <span className="font-ui text-xs font-semibold text-text-muted">OU</span>
+                  <span className="h-px flex-1 bg-border-default max-w-[120px]"></span>
                 </div>
-
-                {/* Modal Body */}
-                <div className="flex-1 overflow-auto p-6 space-y-4">
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    <div className="space-y-2 md:col-span-2 lg:col-span-3">
-                      <Label>Descrição Técnico-Comercial do Item</Label>
-                      <Textarea
-                        value={selectedItem.description}
-                        onChange={(event) => updateItem(selectedItem.localId, {
-                          description: event.target.value,
-                          catalogMatchStatus: 'idle',
-                          catalogSuggestions: [],
-                          catalogMatchError: undefined,
-                        })}
-                        rows={3}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Tipo de Catálogo</Label>
-                      <Select value={selectedItem.catalogType} onValueChange={(value) => updateItem(selectedItem.localId, {
-                        catalogType: value as PriceResearchItem['catalogType'],
-                        catalogCode: '',
-                        catalogMatchStatus: 'idle',
-                        catalogSuggestions: [],
-                        catalogMatchError: undefined,
-                        candidates: [],
-                        searchStatus: 'idle',
-                      })}>
-                        <SelectTrigger aria-label="Tipo de catálogo"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="material">CATMAT (Materiais)</SelectItem>
-                          <SelectItem value="service">CATSER (Serviços)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Código do Item</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          value={selectedItem.catalogCode}
-                          onChange={(event) => updateItem(selectedItem.localId, {
-                            catalogCode: event.target.value.replace(/\D/g, ''),
-                            candidates: [],
-                            searchStatus: 'idle',
-                          })}
-                          placeholder="Ex: 606523"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          aria-label="Sugerir código"
-                          title="Sugerir códigos similares"
-                          onClick={() => void suggestCatalogForItem(selectedItem)}
-                          disabled={selectedItem.catalogMatchStatus === 'searching'}
-                        >
-                          {selectedItem.catalogMatchStatus === 'searching'
-                            ? <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                            : <Sparkles className="h-4 w-4 text-primary" />}
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Quantidade do Termo</Label>
-                      <Input type="number" min="0" step="any" value={selectedItem.quantity} onChange={(event) => updateItem(selectedItem.localId, { quantity: Number(event.target.value) })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Unidade de Fornecimento</Label>
-                      <Input value={selectedItem.unit} onChange={(event) => updateItem(selectedItem.localId, { unit: event.target.value.toUpperCase() })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Capacidade Comparável</Label>
-                      <Input type="number" min="0" step="any" value={selectedItem.targetCapacity ?? ''} onChange={(event) => updateItem(selectedItem.localId, { targetCapacity: event.target.value ? Number(event.target.value) : null })} placeholder="Ex: 500" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Medida Comparável</Label>
-                      <Input value={selectedItem.targetMeasureUnit ?? ''} onChange={(event) => updateItem(selectedItem.localId, { targetMeasureUnit: event.target.value.toUpperCase() || null })} placeholder="G, KG, ML, L, UN..." />
-                    </div>
-                  </div>
-
-                  {selectedItem.catalogMatchStatus === 'searching' && (
-                    <div className="mt-4 flex items-center gap-2 rounded-radius-md border border-sebrae-blue/20 bg-sebrae-blue/5 p-4 font-ui text-sm text-sebrae-navy">
-                      <Loader2 className="h-4 w-4 animate-spin text-sebrae-blue" />
-                      Pesquisando correspondências no catálogo de referência de IA...
-                    </div>
-                  )}
-
-                  {selectedItem.catalogSuggestions && selectedItem.catalogSuggestions.length > 0 && (
-                    <div className="mt-4 space-y-3 rounded-radius-lg border border-sebrae-blue/20 bg-sebrae-blue/[0.04] p-4">
-                      <div>
-                        <h4 className="font-ui text-sm font-semibold text-sebrae-navy">Códigos Semelhantes Identificados no Catálogo</h4>
-                        <p className="font-ui text-xs text-sebrae-blue">Selecione uma das opções para usá-la como filtro da consulta.</p>
-                      </div>
-                      <div className="grid gap-3 md:grid-cols-2">
-                        {selectedItem.catalogSuggestions.map((suggestion) => {
-                          const isActive = selectedItem.catalogCode === suggestion.code;
-                          return (
-                            <div key={suggestion.code} className="rounded-radius-md border border-border-default bg-surface-card p-3 flex flex-col justify-between gap-3 shadow-sm hover:border-primary/45 transition-colors">
-                              <div>
-                                <div className="flex items-center gap-1.5">
-                                  <Badge variant="outline" className="text-xs">{suggestion.code}</Badge>
-                                  <Badge variant="secondary" className="text-[10px]">{suggestion.score}% aderente</Badge>
-                                </div>
-                                <p className="mt-2 font-ui text-xs font-bold text-text-primary leading-relaxed">{suggestion.description}</p>
-                                <p className="mt-1 font-ui text-[10px] text-text-muted leading-relaxed">{suggestion.reason}</p>
-                              </div>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant={isActive ? 'secondary' : 'outline'}
-                                onClick={() => updateItem(selectedItem.localId, {
-                                  catalogType: suggestion.catalogType,
-                                  catalogCode: suggestion.code,
-                                  candidates: [],
-                                  searchStatus: 'idle',
-                                  searchError: undefined,
-                                })}
-                              >
-                                {isActive ? 'Código Ativo' : 'Usar este código'}
-                              </Button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedItem.catalogMatchError && (
-                    <div className="mt-4 rounded-radius-md border border-amber-200 bg-amber-50 p-3.5 font-ui text-xs text-amber-900 leading-normal">
-                      {selectedItem.catalogMatchError}
-                    </div>
-                  )}
-
-                  {selectedItem.searchError && (
-                    <div className="mt-4 rounded-radius-md border border-destructive/20 bg-destructive/5 p-3.5 font-ui text-xs text-destructive">
-                      {selectedItem.searchError}
-                    </div>
-                  )}
-                </div>
-
-                {/* Modal Footer */}
-                <div className="px-6 py-3.5 border-t border-border-default bg-surface-subtle/50 flex justify-between items-center gap-3">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-text-muted font-medium">Item {selectedItem.itemNumber} de {items.length}</span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={handlePrevItem}
-                      disabled={currentIndex === 0}
-                      title="Item anterior"
-                      className="h-8 w-8 shrink-0"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={handleNextItem}
-                      disabled={currentIndex === items.length - 1}
-                      title="Próximo item"
-                      className="h-8 w-8 shrink-0"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  
+                <div className="flex justify-center pb-2">
                   <Button
                     type="button"
-                    className="bg-sebrae-blue hover:bg-sebrae-navy text-white text-xs font-semibold h-9 px-4 rounded-lg shadow-sm"
-                    onClick={() => setSelectedItemId(undefined)}
+                    variant="outline"
+                    className="gap-2"
+                    onClick={handleStartManualItems}
                   >
-                    Confirmar e Voltar
+                    <Plus className="h-4 w-4 text-primary" />
+                    Adicionar item manualmente
                   </Button>
                 </div>
               </div>
-            </div>
+            </SectionPanel>
+          ) : (
+            <>
+              {(!selectedItemId || itemPanelMode === 'config') && (
+                <SectionPanel
+                  title="Curadoria da Cesta de Preços por Item"
+                  description="Examine as cotações encontradas para cada item. Selecione no mínimo 3 referências compatíveis para homologar o preço estimado."
+                  actions={
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={handleAddNewItem}
+                    >
+                      <Plus className="h-4 w-4 text-primary" />
+                      Adicionar item manualmente
+                    </Button>
+                  }
+                >
+                  <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
+                    <table className="w-full border-collapse text-left font-ui text-xs">
+                      <thead>
+                        <tr className="border-b border-border-default bg-surface-subtle text-text-muted font-bold select-none">
+                          <th className="py-3 px-4 text-center w-16">Item</th>
+                          <th className="py-3 px-4">Descrição Técnico-Comercial</th>
+                          <th className="py-3 px-4 w-40">Mapeamento</th>
+                          <th className="py-3 px-4 text-center w-36">Cotações Selecionadas</th>
+                          <th className="py-3 px-4 text-right w-36">Preço Estimado</th>
+                          <th className="py-3 px-4 text-center w-28">Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border-default/60">
+                        {items.map((item) => {
+                          const candidates = item.candidates || [];
+                          const selectedCount = candidates.filter((c) => c.selected).length;
+                          const isSufficient = selectedCount >= 3;
+                          const estimatedPrice = item.estimatedPrice || 0;
+                          const currentIndex = items.findIndex((i) => i.localId === item.localId);
+
+                          return (
+                            <tr key={item.localId} className="hover:bg-surface-subtle/50 transition-colors">
+                              <td className="py-3.5 px-4 text-center font-bold text-text-primary">{item.itemNumber}</td>
+                              <td className="py-3.5 px-4 font-medium text-text-secondary leading-normal">{item.description}</td>
+                              <td className="py-3.5 px-4">
+                                <span className="font-mono text-[10px] bg-surface-subtle border border-border-default px-1.5 py-0.5 rounded text-text-secondary">
+                                  {item.catalogType === 'material' ? 'CATMAT' : 'CATSER'} {item.catalogCode || 'Pendente'}
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 text-center">
+                                <span className={`font-mono font-bold ${isSufficient ? 'text-primary' : 'text-amber-800'}`}>
+                                  {selectedCount} cotações
+                                </span>
+                              </td>
+                              <td className="py-3.5 px-4 text-right font-mono font-bold text-text-primary">
+                                {estimatedPrice > 0 ? (
+                                  `R$ ${estimatedPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                ) : (
+                                  <span className="text-text-muted font-normal italic">Pendente</span>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-4 text-center">
+                                <div className="flex gap-1 justify-center items-center">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => openItemConfig(item.localId)}
+                                    title="Configurar item (descrição, CATMAT/CATSER, quantidade)"
+                                    aria-label="Configurar item"
+                                    className="h-8 w-8 text-sebrae-blue hover:text-white hover:bg-sebrae-blue rounded-full transition-all"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => openItemCuration(item.localId)}
+                                    title="Ver e curar cotações deste item"
+                                    aria-label="Ver cotações"
+                                    className="h-8 w-8 text-slate-600 hover:text-white hover:bg-slate-600 rounded-full transition-all"
+                                  >
+                                    <ShoppingBag className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    title="Remover Item"
+                                    aria-label="Remover Item"
+                                    onClick={() => deleteItem(item.localId)}
+                                    className="h-8 w-8 text-destructive hover:text-white hover:bg-destructive rounded-full transition-all"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </SectionPanel>
+              )}
+
+              {/* Modal de Configuração do Item */}
+              {selectedItemId && selectedItem && itemPanelMode === 'config' && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-200">
+                  <div className="relative w-full max-w-4xl bg-surface-card border border-border-default rounded-radius-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+                    {/* Modal Header */}
+                    <div className="px-6 py-4 border-b border-border-default flex items-center justify-between bg-surface-subtle/50">
+                      <div>
+                        <h3 className="text-sm font-bold text-sebrae-navy">
+                          Configuração do Item {selectedItem.itemNumber}
+                        </h3>
+                        <p className="text-[11px] text-text-muted mt-0.5 truncate max-w-[600px]">
+                          {selectedItem.description}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="h-8 w-8 rounded-full p-0 flex items-center justify-center text-text-secondary hover:bg-slate-100 hover:text-text-primary"
+                        onClick={() => setSelectedItemId(undefined)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {/* Modal Body */}
+                    <div className="flex-1 overflow-auto p-6 space-y-4">
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        <div className="space-y-2 md:col-span-2 lg:col-span-3">
+                          <Label htmlFor="item-description-config">Descrição Técnico-Comercial do Item</Label>
+                          <Textarea
+                            id="item-description-config"
+                            value={selectedItem.description}
+                            onChange={(event) => updateItem(selectedItem.localId, {
+                              description: event.target.value,
+                              catalogMatchStatus: 'idle',
+                              catalogSuggestions: [],
+                              catalogMatchError: undefined,
+                            })}
+                            rows={3}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Tipo de Catálogo</Label>
+                          <Select value={selectedItem.catalogType} onValueChange={(value) => updateItem(selectedItem.localId, {
+                            catalogType: value as PriceResearchItem['catalogType'],
+                            catalogCode: '',
+                            catalogMatchStatus: 'idle',
+                            catalogSuggestions: [],
+                            catalogMatchError: undefined,
+                            candidates: [],
+                            searchStatus: 'idle',
+                          })}>
+                            <SelectTrigger aria-label="Tipo de catálogo"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="material">CATMAT (Materiais)</SelectItem>
+                              <SelectItem value="service">CATSER (Serviços)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Código do Item</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              value={selectedItem.catalogCode}
+                              onChange={(event) => updateItem(selectedItem.localId, {
+                                catalogCode: event.target.value.replace(/\D/g, ''),
+                                candidates: [],
+                                searchStatus: 'idle',
+                              })}
+                              placeholder="Ex: 606523"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              aria-label="Sugerir código"
+                              title="Sugerir códigos similares"
+                              onClick={() => void suggestCatalogForItem(selectedItem)}
+                              disabled={selectedItem.catalogMatchStatus === 'searching'}
+                            >
+                              {selectedItem.catalogMatchStatus === 'searching'
+                                ? <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                : <Sparkles className="h-4 w-4 text-primary" />}
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Quantidade do Termo</Label>
+                          <Input type="number" min="0" step="any" value={selectedItem.quantity} onChange={(event) => updateItem(selectedItem.localId, { quantity: Number(event.target.value) })} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Unidade de Fornecimento</Label>
+                          <Input value={selectedItem.unit} onChange={(event) => updateItem(selectedItem.localId, { unit: event.target.value.toUpperCase() })} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Capacidade Comparável</Label>
+                          <Input type="number" min="0" step="any" value={selectedItem.targetCapacity ?? ''} onChange={(event) => updateItem(selectedItem.localId, { targetCapacity: event.target.value ? Number(event.target.value) : null })} placeholder="Ex: 500" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Medida Comparável</Label>
+                          <Input value={selectedItem.targetMeasureUnit ?? ''} onChange={(event) => updateItem(selectedItem.localId, { targetMeasureUnit: event.target.value.toUpperCase() || null })} placeholder="G, KG, ML, L, UN..." />
+                        </div>
+                      </div>
+
+                      {selectedItem.catalogMatchStatus === 'searching' && (
+                        <div className="mt-4 flex items-center gap-2 rounded-radius-md border border-sebrae-blue/20 bg-sebrae-blue/5 p-4 font-ui text-sm text-sebrae-navy">
+                          <Loader2 className="h-4 w-4 animate-spin text-sebrae-blue" />
+                          Pesquisando correspondências no catálogo de referência de IA...
+                        </div>
+                      )}
+
+                      {selectedItem.catalogSuggestions && selectedItem.catalogSuggestions.length > 0 && (
+                        <div className="mt-4 space-y-3 rounded-radius-lg border border-sebrae-blue/20 bg-sebrae-blue/[0.04] p-4">
+                          <div>
+                            <h4 className="font-ui text-sm font-semibold text-sebrae-navy">Códigos Semelhantes Identificados no Catálogo</h4>
+                            <p className="font-ui text-xs text-sebrae-blue">Selecione uma das opções para usá-la como filtro da consulta.</p>
+                          </div>
+                          <div className="grid gap-3 md:grid-cols-2">
+                            {selectedItem.catalogSuggestions.map((suggestion) => {
+                              const isActive = selectedItem.catalogCode === suggestion.code;
+                              return (
+                                <div key={suggestion.code} className="rounded-radius-md border border-border-default bg-surface-card p-3 flex flex-col justify-between gap-3 shadow-sm hover:border-primary/45 transition-colors">
+                                  <div>
+                                    <div className="flex items-center gap-1.5">
+                                      <Badge variant="outline" className="text-xs">{suggestion.code}</Badge>
+                                      <Badge variant="secondary" className="text-[10px]">{suggestion.score}% aderente</Badge>
+                                    </div>
+                                    <p className="mt-2 font-ui text-xs font-bold text-text-primary leading-relaxed">{suggestion.description}</p>
+                                    <p className="mt-1 font-ui text-[10px] text-text-muted leading-relaxed">{suggestion.reason}</p>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={isActive ? 'secondary' : 'outline'}
+                                    onClick={() => updateItem(selectedItem.localId, {
+                                      catalogType: suggestion.catalogType,
+                                      catalogCode: suggestion.code,
+                                      candidates: [],
+                                      searchStatus: 'idle',
+                                      searchError: undefined,
+                                    })}
+                                  >
+                                    {isActive ? 'Código Ativo' : 'Usar este código'}
+                                  </Button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedItem.catalogMatchError && (
+                        <div className="mt-4 rounded-radius-md border border-amber-200 bg-amber-50 p-3.5 font-ui text-xs text-amber-900 leading-normal">
+                          {selectedItem.catalogMatchError}
+                        </div>
+                      )}
+
+                      {selectedItem.searchError && (
+                        <div className="mt-4 rounded-radius-md border border-destructive/20 bg-destructive/5 p-3.5 font-ui text-xs text-destructive">
+                          {selectedItem.searchError}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Modal Footer */}
+                    <div className="px-6 py-3.5 border-t border-border-default bg-surface-subtle/50 flex justify-between items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-text-muted font-medium">Item {selectedItem.itemNumber} de {items.length}</span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={handlePrevItem}
+                          disabled={currentIndex === 0}
+                          title="Item anterior"
+                          className="h-8 w-8 shrink-0"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={handleNextItem}
+                          disabled={currentIndex === items.length - 1}
+                          title="Próximo item"
+                          className="h-8 w-8 shrink-0"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      
+                      <Button
+                        type="button"
+                        className="bg-sebrae-blue hover:bg-sebrae-navy text-white text-xs font-semibold h-9 px-4 rounded-lg shadow-sm"
+                        onClick={() => setSelectedItemId(undefined)}
+                      >
+                        Confirmar e Voltar
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
 
-      {/* STEP 3: BUSCA DE PREÇOS */}
-      {activeStep === 3 && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          <SectionPanel
-            title="Consulta de Preços Homologados"
-            description="A consulta à API de Compras do Governo Federal (últimos 12 meses) é disparada automaticamente com base nos códigos CATMAT/CATSER mapeados."
-          >
-            <div className="space-y-3">
-              <p className="font-ui text-xs font-semibold text-slate-500 uppercase tracking-wider px-1">Progresso da Busca por Item</p>
-              {items.map((item) => (
-                <div key={item.localId} className="flex items-center justify-between p-3.5 rounded-xl border border-border-light bg-white shadow-sm hover:border-slate-300 transition-all">
-                  <div className="flex items-center gap-3">
-                    <span className="font-ui text-xs font-bold text-sebrae-navy">Item {item.itemNumber}</span>
-                    <p className="font-ui text-xs text-slate-700 truncate max-w-[320px]" title={item.description}>{item.description}</p>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <Badge variant="outline" className="text-xs font-semibold border-slate-200 text-slate-600 bg-slate-50">
-                      {item.catalogType === 'material' ? 'CATMAT' : 'CATSER'} {item.catalogCode}
-                    </Badge>
-                    {item.searchStatus === 'searching' && (
-                      <div className="flex items-center gap-1.5 text-xs text-sebrae-blue font-semibold">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-sebrae-blue" />
-                        Consultando API...
-                      </div>
-                    )}
-                    {item.searchStatus === 'success' && (
-                      <div className="flex items-center gap-1.5 text-xs text-ifrn-green font-bold">
-                        <span className="text-ifrn-green font-extrabold text-sm">✓</span>
-                        {item.candidates.length} cotações encontradas
-                      </div>
-                    )}
-                    {item.searchStatus === 'error' && (
-                      <div className="flex items-center gap-1.5 text-xs text-red-600 font-semibold" title={item.searchError}>
-                        <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
-                        Falhou
-                      </div>
-                    )}
-                    {item.searchStatus === 'idle' && (
-                      <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                        <span className="h-2 w-2 rounded-full bg-slate-300 animate-pulse"></span>
-                        Aguardando disparo
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Dynamic Search Feedback Panel */}
-            {isSearching ? (
-              <div className="mt-6 border border-[#E2E8F0] bg-white rounded-xl p-5 flex items-center gap-4 shadow-sm animate-pulse">
-                <Loader2 className="h-6 h-6 animate-spin text-sebrae-blue" />
-                <div>
-                  <h4 className="font-ui text-sm font-bold text-sebrae-navy">Pesquisa em Andamento</h4>
-                  <p className="font-ui text-xs text-slate-500 mt-0.5">Buscando cotações oficiais no Compras.gov... Por favor, aguarde de 5 a 15 segundos.</p>
-                </div>
-              </div>
-            ) : items.some((item) => item.searchStatus === 'error') ? (
-              <div className="mt-6 border border-red-200 bg-red-50/30 rounded-xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <AlertTriangle className="h-6 w-6 text-red-600 shrink-0" />
-                  <div>
-                    <h4 className="font-ui text-sm font-bold text-red-950">Algumas consultas falharam</h4>
-                    <p className="font-ui text-xs text-red-800 mt-0.5">Houve uma instabilidade ao conectar com a API oficial. Você pode tentar novamente.</p>
-                  </div>
-                </div>
-                <Button
-                  type="button"
-                  className="gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-xs h-9 px-4 rounded-lg shadow-sm"
-                  onClick={() => {
-                    hasTriggeredSearch.current = true;
-                    void searchPrices();
-                  }}
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Tentar Novamente
-                </Button>
-              </div>
-            ) : items.every((item) => item.searchStatus === 'idle') ? (
-              <div className="mt-6 border border-border-light bg-white rounded-xl p-5 flex items-center gap-4 shadow-sm">
-                <Loader2 className="h-5 h-5 animate-spin text-slate-400" />
-                <div>
-                  <h4 className="font-ui text-sm font-bold text-slate-700">Inicializando busca...</h4>
-                  <p className="font-ui text-xs text-slate-500 mt-0.5">Aguardando início da consulta automatizada.</p>
-                </div>
-              </div>
-            ) : null}
-
-            {/* Banner de Sucesso pós Busca */}
-            {items.length > 0 && items.every((i) => i.searchStatus === 'success') && (
-              <div className="mt-6 rounded-xl border border-ifrn-green/20 bg-ifrn-green/[0.02] p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex gap-2.5 text-ifrn-green text-xs leading-normal">
-                  <CheckCircle2 className="h-5 w-5 shrink-0 text-ifrn-green mt-0.5" />
-                  <div>
-                    <span className="font-bold">Pesquisa Finalizada com Sucesso!</span> Todas as cotações oficiais foram baixadas e analisadas.
-                  </div>
-                </div>
-                <Button type="button" className="gap-1.5 text-xs bg-sebrae-blue text-white hover:bg-sebrae-navy" onClick={() => goToStep(4)}>
-                  Avançar para Cotações
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            )}
-          </SectionPanel>
-        </div>
-      )}
-
-      {/* STEP 4: CURADORIA DE COTAÇÕES */}
-      {activeStep === 4 && (
+      {/* STEP 2 CURATION: curadoria panel (inline, shows when selectedItemId is set and mode is curation) */}
+      {activeStep === 2 && selectedItemId && itemPanelMode === 'curation' && (
         <div className="space-y-6 animate-in fade-in duration-200">
           {!selectedItemId ? (
             <SectionPanel
@@ -2449,7 +2491,7 @@ export default function PesquisaPrecos() {
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => setSelectedItemId(item.localId)}
+                                onClick={() => openItemCuration(item.localId)}
                                 title="Editar Cotações"
                                 aria-label="Editar Cotações"
                                 className="h-8 w-8 text-sebrae-blue hover:text-white hover:bg-sebrae-blue rounded-full transition-all"
@@ -3508,8 +3550,8 @@ export default function PesquisaPrecos() {
         </div>
       )}
 
-      {/* STEP 5: VALIDAÇÃO & RELATÓRIO FINAL */}
-      {activeStep === 5 && (
+      {/* STEP 3: VALIDAÇÃO & RELATÓRIO FINAL */}
+      {activeStep === 3 && (
         <div className="space-y-6 animate-in fade-in duration-200">
           {/* Tabela de Consolidação por Item */}
           <SectionPanel
@@ -3717,25 +3759,19 @@ export default function PesquisaPrecos() {
           type="button"
           variant="outline"
           className="gap-2 font-semibold text-xs h-10 hover:text-sebrae-blue hover:border-sebrae-blue/30"
-          onClick={() => {
-            if (activeStep === 4 || activeStep === 3) {
-              goToStep(2);
-            } else {
-              goToStep(activeStep - 1);
-            }
-          }}
+          onClick={() => goToStep(activeStep - 1)}
           disabled={activeStep === 1}
         >
           <ArrowLeft className="h-4 w-4" />
           Voltar
         </Button>
         <div className="flex gap-2">
-          {activeStep < 5 ? (
+          {activeStep < 3 ? (
             <Button
               type="button"
               className="gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-xs h-10 transition-all"
               onClick={() => goToStep(activeStep + 1)}
-              disabled={items.length === 0}
+              disabled={activeStep === 2 && (items.length === 0 || items.some(i => !i.catalogCode) || items.some(i => i.searchStatus === 'idle'))}
             >
               Avançar
               <ArrowRight className="h-4 w-4" />
