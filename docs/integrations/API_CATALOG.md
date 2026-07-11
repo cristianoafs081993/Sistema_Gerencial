@@ -829,7 +829,7 @@ Observacao:
 
 Uso:
 
-- recuperar até 15 referências de preço homologado por item importado;
+- recuperar até 100 referências de preço homologado por item importado;
 - apoiar a pesquisa exigida pela IN SEGES/ME nº 65/2021;
 - ordenar aderência técnica sem modificar valores oficiais.
 

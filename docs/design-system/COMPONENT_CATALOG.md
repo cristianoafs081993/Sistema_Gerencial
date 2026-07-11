@@ -10,7 +10,7 @@ Esta documentacao foi atualizada porque a mudanca altera comportamento visual re
 
 Arquivo: `src/components/design-system/SectionPanel.tsx`
 
-Container padrao para secoes com titulo, descricao, acoes e conteudo. Usa superficie branca, borda clara e radius consistente.
+Container padrão para seções com título, descrição, ações, rodapé opcional e conteúdo. Usa superfície branca, borda clara, rodapé integrado com linha divisória e raio consistente.
 
 ### `FilterPanel`
 

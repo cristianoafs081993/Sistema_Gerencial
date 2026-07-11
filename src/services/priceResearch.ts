@@ -182,7 +182,7 @@ export function normalizePriceResearchFunctionError(error: unknown) {
 export const priceResearchService = {
   async search(items: PriceResearchSearchItem[]): Promise<PriceResearchSearchResult[]> {
     const { data, error } = await supabase.functions.invoke('pesquisar-precos', {
-      body: { items, limit: 15 },
+      body: { items, limit: 100 },
     });
 
     if (error) throw normalizePriceResearchFunctionError(error);

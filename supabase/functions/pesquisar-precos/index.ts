@@ -1,9 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 
 const COMPRAS_API_BASE = 'https://dadosabertos.compras.gov.br';
-const DEFAULT_LIMIT = 15;
+const DEFAULT_LIMIT = 100;
 const MAX_ITEMS = 25;
-const MAX_CANDIDATES_FOR_AI = 40;
+const MAX_CANDIDATES_FOR_AI = 100;
 const REQUEST_TIMEOUT_MS = 60000;
 
 const corsHeaders = {
@@ -626,7 +626,7 @@ Deno.serve(async (request) => {
     const body = await request.json() as SearchRequest;
     const items = Array.isArray(body.items) ? body.items.slice(0, MAX_ITEMS) : [];
     if (items.length === 0) return jsonResponse({ error: 'Envie ao menos um item para pesquisa.' }, 400);
-    const limit = Math.max(3, Math.min(15, Number(body.limit ?? DEFAULT_LIMIT)));
+    const limit = Math.max(3, Math.min(100, Number(body.limit ?? DEFAULT_LIMIT)));
 
     const results = [];
     for (let index = 0; index < items.length; index += 3) {

@@ -368,7 +368,7 @@ Observações:
 - o PDF usa a posição dos textos para recompor colunas; arquivos escaneados sem camada de texto ainda não passam por OCR;
 - quando CATMAT/CATSER não vem no arquivo, `priceCatalog.worker.ts` carrega sob demanda o catálogo compactado correspondente e ranqueia até cinco códigos semelhantes sem bloquear a interface;
 - o usuário confirma uma sugestão ou informa manualmente o código antes de chamar a Edge Function;
-- a função retorna até 15 preços homologados por item e preserva fonte, compra, fornecedor e unidade;
+- a função retorna até 100 preços homologados por item e preserva fonte, compra, fornecedor e unidade;
 - a IA é opcional e apenas reordena aderência;
 - seleção, exclusões e justificativas permanecem no estado editável e no snapshot salvo; ao desconsiderar uma cotação, a UI exige justificativa em modal antes de gravar `selected=false`, e achados antigos de exclusão sem justificativa abrem a mesma correção antes de finalizar o relatório;
 - a personalização institucional do relatório permanece no estado editável e é salva em `price_researches`: nome da instituição, unidade/setor, dados complementares, logotipo em data URL e servidores responsáveis/equipe de apoio;

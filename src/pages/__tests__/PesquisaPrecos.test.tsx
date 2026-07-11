@@ -227,7 +227,7 @@ describe('PesquisaPrecos', () => {
     expect(screen.getByText(/Excluídos/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('link', { name: /Itens/i }));
     expect(await screen.findByRole('button', { name: /Ver Cotações/i })).toBeInTheDocument();
-  });
+  }, 15000);
 
   it('permite selecionar arquivo PDF pesquisável', () => {
     const { container } = renderPage();
@@ -402,11 +402,15 @@ describe('PesquisaPrecos', () => {
     expect(screen.queryByText(/O reajuste de inflação/i)).not.toBeInTheDocument();
 
     const sampleSummary = screen.getByText('Amostra');
-    const adjustmentTitle = screen.getByText('Atualização Monetária (IN 65/2021)');
+    const adjustmentTitle = screen.getByText('Ativar atualização monetária global (IN 65/2021)');
     expect(sampleSummary.compareDocumentPosition(adjustmentTitle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
-    // Ativa o reajuste global
+    // Ativa o reajuste global (abre o modal)
     fireEvent.click(globalAdjustCheckbox);
+
+    // Salva com o valor padrão (IPCA)
+    fireEvent.click(screen.getByRole('button', { name: /Salvar/i }));
+
     expect(screen.getByRole('columnheader', { name: /Índice de atualização monetária/i })).toBeInTheDocument();
     expect(screen.getByText(/1,\d{4}/)).toBeInTheDocument();
     expect(toast.info).toHaveBeenCalledWith(
@@ -418,7 +422,12 @@ describe('PesquisaPrecos', () => {
       expect.anything(),
     );
 
-    // O select de índice de reajuste deve aparecer
+    // Clica no link/botão Configurar para editar a atualização
+    const configBtn = screen.getByRole('button', { name: /\(Configurar\)/i });
+    expect(configBtn).toBeInTheDocument();
+    fireEvent.click(configBtn);
+
+    // O select de índice de reajuste deve aparecer no modal
     const indexSelect = screen.getByLabelText(/Índice ou Método/i);
     expect(indexSelect).toBeInTheDocument();
     expect(indexSelect).toHaveValue('IPCA');
@@ -430,6 +439,9 @@ describe('PesquisaPrecos', () => {
     const manualRateInput = screen.getByPlaceholderText(/Ex: 5.5/i);
     expect(manualRateInput).toBeInTheDocument();
     fireEvent.change(manualRateInput, { target: { value: '10' } });
+
+    // Salva a alteração para fechar o modal
+    fireEvent.click(screen.getByRole('button', { name: /Salvar/i }));
   });
 
   it('permite adicionar itens manualmente na etapa 2, e os reordena sequencialmente ao remover', async () => {

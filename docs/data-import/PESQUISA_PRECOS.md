@@ -6,7 +6,7 @@ O módulo `/pesquisa-precos` transforma uma planilha de itens em uma cesta audit
 
 1. importa e normaliza os itens no navegador;
 2. consulta preços homologados dos últimos 12 meses;
-3. apresenta até 15 referências por item;
+3. apresenta até 100 referências por item;
 4. permite seleção e exclusão com justificativa;
 5. calcula média aritmética, mediana, menor preço, média ponderada, média saneada, mínimo, máximo, desvio padrão, coeficiente de variação e quantidade de preços excluídos;
 6. verifica automaticamente alertas objetivos com base apenas na IN SEGES/ME nº 65/2021;
@@ -175,7 +175,7 @@ O QR Code do relatório aponta para `/pesquisa-precos/validar`. A tela chama a E
 ## Limites operacionais
 
 - máximo de 25 itens por chamada;
-- até 15 candidatos por item;
+- até 100 candidatos por item;
 - consultas externas processadas em grupos de três;
 - a consulta de preços depende de código CATMAT/CATSER válido e confirmado; quando ausente, o sistema sugere alternativas;
 - o primeiro carregamento do CATMAT transfere aproximadamente 8,5 MB compactados e fica em cache durante a sessão;

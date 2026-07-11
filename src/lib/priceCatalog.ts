@@ -6,6 +6,7 @@ export type PriceCatalogSuggestion = {
   description: string;
   context: string;
   score: number;
+  rawScore?: number;
   reason: string;
 };
 
@@ -105,7 +106,9 @@ function insertTopSuggestion(
   suggestion: PriceCatalogSuggestion,
   limit: number,
 ) {
-  const index = suggestions.findIndex((current) => suggestion.score > current.score);
+  const index = suggestions.findIndex(
+    (current) => (suggestion.rawScore ?? suggestion.score) > (current.rawScore ?? current.score)
+  );
   if (index < 0) suggestions.push(suggestion);
   else suggestions.splice(index, 0, suggestion);
   if (suggestions.length > limit) suggestions.pop();
@@ -191,6 +194,7 @@ export function rankCatalogEntries(
       description: candidateDescription,
       context,
       score,
+      rawScore,
       reason: `${matchedTerms} de ${queryTokens.length} termos relevantes coincidem.${numericReason}`,
     }, limit);
   }

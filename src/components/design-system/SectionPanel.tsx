@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 interface SectionPanelProps {
   title?: string;
   description?: string;
   actions?: ReactNode;
+  footer?: ReactNode;
   className?: string;
   contentClassName?: string;
   children: ReactNode;
@@ -15,6 +16,7 @@ export function SectionPanel({
   title,
   description,
   actions,
+  footer,
   className,
   contentClassName,
   children,
@@ -35,6 +37,11 @@ export function SectionPanel({
         </CardHeader>
       )}
       <CardContent className={cn('p-0', contentClassName)}>{children}</CardContent>
+      {footer && (
+        <CardFooter className="border-t border-border-default/60 px-0 pb-0 pt-5 mt-5 flex justify-between items-center w-full">
+          {footer}
+        </CardFooter>
+      )}
     </Card>
   );
 }

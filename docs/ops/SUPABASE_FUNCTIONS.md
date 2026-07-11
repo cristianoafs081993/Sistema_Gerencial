@@ -565,7 +565,7 @@ Uso:
 
 - recebe itens com descrição, quantidade, unidade e CATMAT/CATSER;
 - consulta preços homologados dos últimos 12 meses no Compras.gov.br;
-- normaliza unidades determinísticas e retorna até 15 candidatos por item;
+- normaliza unidades determinísticas e retorna até 100 candidatos por item;
 - usa Gemini opcionalmente apenas para reordenar aderência;
 - devolve links da fonte oficial e pesquisa complementar no PNCP.
 
@@ -581,7 +581,7 @@ Observações:
 - publicada com `verify_jwt = true`;
 - também valida o usuário dentro da function;
 - não usa service role e não grava no banco;
-- limites: 25 itens por chamada e 15 candidatos por item.
+- limites: 25 itens por chamada e 100 candidatos por item.
 
 ### `validar-pesquisa-precos`
 

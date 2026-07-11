@@ -87,6 +87,14 @@ import { supabase } from '@/lib/supabase';
 import { calculateIndexFactor, type InflationIndexType } from '@/lib/monetaryAdjustment';
 import { SupplierEmailDialog } from '@/components/price-research/SupplierEmailDialog';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -313,6 +321,9 @@ export default function PesquisaPrecos() {
   const [globalAdjustmentEnabled, setGlobalAdjustmentEnabled] = useState(false);
   const [globalAdjustmentIndex, setGlobalAdjustmentIndex] = useState<InflationIndexType | 'manual'>('IPCA');
   const [globalAdjustmentManualRate, setGlobalAdjustmentManualRate] = useState('0');
+  const [isGlobalAdjustmentModalOpen, setIsGlobalAdjustmentModalOpen] = useState(false);
+  const [tempIndex, setTempIndex] = useState<InflationIndexType | 'manual'>('IPCA');
+  const [tempManualRate, setTempManualRate] = useState('0');
   const monetaryAdjustmentReferenceDate = today();
   const monetaryAdjustmentReferenceMonth = currentYearMonth();
 
@@ -1553,6 +1564,106 @@ export default function PesquisaPrecos() {
     );
   }, [recentResearches, searchTerm]);
 
+  const renderWizardFooter = () => {
+    return (
+      <div className="flex justify-between items-center w-full">
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2 font-semibold text-xs h-10 hover:text-sebrae-blue hover:border-sebrae-blue/30"
+            onClick={() => goToStep(activeStep - 1)}
+            disabled={activeStep === 1}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Voltar
+          </Button>
+
+          {items.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2 font-semibold text-xs h-10"
+              onClick={() => void saveResearch('review')}
+              disabled={isSaving}
+            >
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 text-slate-500" />}
+              Salvar Rascunho
+            </Button>
+          )}
+
+          {items.length > 0 && activeStep <= 2 && (
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2 font-semibold text-xs h-10 border-blue-200 text-blue-700 hover:bg-blue-50/50 hover:text-blue-800"
+              onClick={() => setIsEmailDialogOpen(true)}
+              title="Solicitar cotação de preços por e-mail para fornecedores"
+            >
+              <Mail className="h-4 w-4" />
+              Solicitar Cotação
+            </Button>
+          )}
+        </div>
+
+        <div className="flex gap-2">
+          {items.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant={activeStep < 3 ? 'outline' : 'default'}
+                  className={`gap-2 font-semibold text-xs h-10 transition-all shadow-sm ${
+                    activeStep < 3
+                      ? 'border-border-default hover:bg-surface-subtle text-text-primary bg-surface-card'
+                      : 'bg-sebrae-blue hover:bg-sebrae-navy text-white'
+                  }`}
+                  disabled={items.length === 0 || isSaving}
+                >
+                  <Download className="h-4 w-4" />
+                  {activeStep < 3 ? 'Exportar Relatório' : 'Finalizar e Exportar'}
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Formatos</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={(event) => { event.preventDefault(); void printReport(); }} className="gap-2 cursor-pointer">
+                  <Printer className="h-4 w-4 text-slate-500" />
+                  Imprimir PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => exportPriceResearchHtml(reportData, { researchId: researchId ?? undefined })} className="gap-2 cursor-pointer">
+                  <Globe className="h-4 w-4 text-slate-500" />
+                  Página HTML
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void exportPriceResearchWorkbook(reportData, { researchId: researchId ?? undefined })} className="gap-2 cursor-pointer">
+                  <FileSpreadsheet className="h-4 w-4 text-slate-500" />
+                  Planilha Excel
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => exportPriceResearchCsvBundle(reportData, { researchId: researchId ?? undefined })} className="gap-2 cursor-pointer">
+                  <FileDown className="h-4 w-4 text-slate-500" />
+                  Arquivos CSV (PNCP)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
+          {activeStep < 3 && (
+            <Button
+              type="button"
+              className="gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-xs h-10 transition-all shadow-sm"
+              onClick={() => goToStep(activeStep + 1)}
+              disabled={activeStep === 2 && (items.length === 0 || items.some(i => !i.catalogCode) || items.some(i => i.searchStatus === 'idle'))}
+            >
+              Avançar
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6 pb-10">
       <HeaderSubtitle>Pesquisa de preços</HeaderSubtitle>
@@ -1855,6 +1966,80 @@ export default function PesquisaPrecos() {
         onSent={() => void queryClient.invalidateQueries({ queryKey: ['price-researches'] })}
       />
 
+      {/* Dialog para configuração da atualização monetária */}
+      <Dialog open={isGlobalAdjustmentModalOpen} onOpenChange={setIsGlobalAdjustmentModalOpen}>
+        <DialogContent className="sm:max-w-[420px] bg-surface-card border border-border-default shadow-lg p-6">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-sebrae-navy">Atualização Monetária Global</DialogTitle>
+            <DialogDescription className="text-xs text-text-muted">
+              Selecione o índice oficial de inflação ou defina uma taxa de reajuste manual (IN 65/2021).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="modal-monetary-adjust-index" className="text-xs font-bold text-text-secondary">
+                Índice ou Método
+              </label>
+              <select
+                id="modal-monetary-adjust-index"
+                className="h-9 w-full rounded-md border border-border-default bg-surface-card px-3 text-xs text-text-primary shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                value={tempIndex}
+                onChange={(e) => {
+                  setTempIndex(e.target.value as InflationIndexType | 'manual');
+                }}
+              >
+                <option value="IPCA">IPCA (IBGE)</option>
+                <option value="IGP-M">IGP-M (FGV)</option>
+                <option value="INPC">INPC (IBGE)</option>
+                <option value="manual">Manual (%)</option>
+              </select>
+            </div>
+
+            {tempIndex === 'manual' && (
+              <div className="grid gap-2 animate-in fade-in duration-200">
+                <label htmlFor="modal-monetary-adjust-rate" className="text-xs font-bold text-text-secondary">
+                  Taxa de Reajuste (%)
+                </label>
+                <Input
+                  id="modal-monetary-adjust-rate"
+                  type="number"
+                  step="0.01"
+                  placeholder="Ex: 5.5"
+                  className="h-9 text-xs font-mono"
+                  value={tempManualRate}
+                  onChange={(e) => setTempManualRate(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex gap-2 sm:justify-end">
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => {
+                setIsGlobalAdjustmentModalOpen(false);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                updateGlobalAdjustment(true, tempIndex, tempManualRate);
+                if (tempIndex !== 'manual') {
+                  showMonetaryAdjustmentReferenceToast(tempIndex);
+                }
+                setIsGlobalAdjustmentModalOpen(false);
+              }}
+            >
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <input
         ref={fileInputRef}
         type="file"
@@ -1922,6 +2107,7 @@ export default function PesquisaPrecos() {
           <SectionPanel
             title="Personalização do relatório"
             description="Logotipo, identificação institucional e servidores exibidos no cabeçalho e nas exportações."
+            footer={renderWizardFooter()}
           >
             <div className="grid gap-5 lg:grid-cols-[1fr_240px]">
               <div className="grid gap-4 md:grid-cols-2">
@@ -2086,6 +2272,7 @@ export default function PesquisaPrecos() {
             <SectionPanel
               title="Arquivo de custos"
               description="Forneça a lista de itens a serem orçados em formato Excel ou PDF legível."
+              footer={renderWizardFooter()}
             >
               <div className="flex flex-col gap-4">
                 <button
@@ -2166,6 +2353,7 @@ export default function PesquisaPrecos() {
                       </Button>
                     </div>
                   }
+                  footer={renderWizardFooter()}
                 >
                   <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
                     <table className="w-full border-collapse text-left font-ui text-xs">
@@ -2184,7 +2372,7 @@ export default function PesquisaPrecos() {
                           const candidates = item.candidates || [];
                           const selectedCount = candidates.filter((c) => c.selected).length;
                           const isSufficient = selectedCount >= 3;
-                          const estimatedPrice = item.estimatedPrice || 0;
+                          const estimatedPrice = getEstimatedUnitPrice(item, method);
                           const currentIndex = items.findIndex((i) => i.localId === item.localId);
 
                           return (
@@ -2577,19 +2765,7 @@ export default function PesquisaPrecos() {
                       const selectedCount = selectedCandidates.length;
                       const isSufficient = selectedCount >= 3;
                       
-                      const prices = selectedCandidates.map(c => c.precoRestituido || c.precoUnitario);
-                      let estimatedPrice = 0;
-                      if (prices.length > 0) {
-                        if (method === 'median') {
-                          const sorted = [...prices].sort((a, b) => a - b);
-                          const mid = Math.floor(sorted.length / 2);
-                          estimatedPrice = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-                        } else if (method === 'average') {
-                          estimatedPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
-                        } else {
-                          estimatedPrice = Math.min(...prices);
-                        }
-                      }
+                      const estimatedPrice = getEstimatedUnitPrice(item, method);
                       
                       return (
                         <tr key={item.localId} className="hover:bg-surface-subtle/50 transition-colors">
@@ -2777,145 +2953,123 @@ export default function PesquisaPrecos() {
                         ))}
                       </div>
 
-                      <div className="mt-3 border-t border-border-default/50 pt-3">
-                        <div className="flex flex-col gap-3 rounded-radius-sm bg-surface-subtle/30 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="flex items-center gap-2">
-                            <TrendingUp className="h-4 w-4 text-text-muted" />
-                            <span className="font-ui text-xs font-bold text-text-secondary">Atualização Monetária (IN 65/2021)</span>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  className="inline-flex h-5 w-5 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/[0.08]"
-                                  aria-label="Informações sobre a atualização monetária"
-                                >
-                                  <Info className="h-3.5 w-3.5" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent className="max-w-xs text-xs leading-relaxed">
-                                Permite atualizar preços de contratações anteriores com base em índices oficiais de inflação ou reajuste manual, aplicando-se a todos os itens da pesquisa.
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="global-monetary-adjust-enable"
-                              checked={globalAdjustmentEnabled}
-                              onCheckedChange={(checked) => {
-                                const enabled = checked === true;
-                                updateGlobalAdjustment(enabled, globalAdjustmentIndex, globalAdjustmentManualRate);
-                                if (enabled) {
-                                  showMonetaryAdjustmentReferenceToast(globalAdjustmentIndex);
-                                }
+                      <div className="mt-4 flex justify-end items-center gap-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="global-monetary-adjust-enable"
+                            checked={globalAdjustmentEnabled}
+                            onCheckedChange={(checked) => {
+                              const enabled = checked === true;
+                              if (enabled) {
+                                setTempIndex(globalAdjustmentIndex);
+                                setTempManualRate(globalAdjustmentManualRate);
+                                setIsGlobalAdjustmentModalOpen(true);
+                              } else {
+                                updateGlobalAdjustment(false, globalAdjustmentIndex, globalAdjustmentManualRate);
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor="global-monetary-adjust-enable"
+                            className="text-xs font-semibold text-text-primary cursor-pointer select-none"
+                          >
+                            Ativar atualização monetária global (IN 65/2021)
+                          </label>
+                          {globalAdjustmentEnabled && (
+                            <button
+                              type="button"
+                              className="text-xs text-sebrae-blue hover:underline font-bold"
+                              onClick={() => {
+                                setTempIndex(globalAdjustmentIndex);
+                                setTempManualRate(globalAdjustmentManualRate);
+                                setIsGlobalAdjustmentModalOpen(true);
                               }}
-                            />
-                            <label
-                              htmlFor="global-monetary-adjust-enable"
-                              className="text-xs font-semibold text-text-primary cursor-pointer select-none"
                             >
-                              Ativar atualização monetária global
-                            </label>
-                          </div>
+                              (Configurar)
+                            </button>
+                          )}
                         </div>
-
-                        {globalAdjustmentEnabled && (
-                          <div className="mt-2 grid gap-3 rounded-radius-sm border border-border-default/50 bg-surface-card/60 p-3 transition-all duration-300 animate-in fade-in slide-in-from-top-1 sm:grid-cols-2">
-                            <div className="space-y-1.5">
-                              <label htmlFor="global-monetary-adjust-index" className="text-[11px] font-bold text-text-secondary">Índice ou Método</label>
-                              <select
-                                id="global-monetary-adjust-index"
-                                className="h-8 w-full rounded-md border border-border-default bg-surface-card px-3 text-xs text-text-primary shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                                value={globalAdjustmentIndex}
-                                onChange={(e) => {
-                                  const newIndex = e.target.value as InflationIndexType | 'manual';
-                                  updateGlobalAdjustment(true, newIndex, globalAdjustmentManualRate);
-                                  showMonetaryAdjustmentReferenceToast(newIndex);
-                                }}
-                              >
-                                <option value="IPCA">IPCA (IBGE)</option>
-                                <option value="IGP-M">IGP-M (FGV)</option>
-                                <option value="INPC">INPC (IBGE)</option>
-                                <option value="manual">Manual (%)</option>
-                              </select>
-                            </div>
-
-                            {globalAdjustmentIndex === 'manual' ? (
-                              <div className="space-y-1.5 animate-in fade-in duration-200">
-                                <label className="text-[11px] font-bold text-text-secondary">Taxa de Reajuste (%)</label>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  placeholder="Ex: 5.5"
-                                  className="h-8 text-xs font-mono"
-                                  value={globalAdjustmentManualRate}
-                                  onChange={(e) => {
-                                    const newRate = e.target.value;
-                                    updateGlobalAdjustment(true, 'manual', newRate);
-                                  }}
-                                />
-                              </div>
-                            ) : null}
-                          </div>
-                        )}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="inline-flex h-5 w-5 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/[0.08]"
+                              aria-label="Informações sobre a atualização monetária"
+                            >
+                              <Info className="h-3.5 w-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs text-xs leading-relaxed">
+                            Permite atualizar preços de contratações anteriores com base em índices oficiais de inflação ou reajuste manual, aplicando-se a todos os itens da pesquisa.
+                          </TooltipContent>
+                        </Tooltip>
                       </div>
-                    </section>
-                  </TooltipProvider>
+                      </section>
+                    </TooltipProvider>
 
 
 
-                  {/* Tabs de Navegação */}
-                  <div className="flex border-b border-border-default space-x-6">
-                    <button
-                      type="button"
-                      className={`pb-3 text-sm font-semibold transition-all relative ${
-                        curadoriaTab === 'basket' ? 'text-primary' : 'text-text-muted hover:text-text-primary'
-                      }`}
-                      onClick={() => setCuradoriaTab('basket')}
-                    >
-                      PNCP ({selectedItem.candidates.filter(isOfficialCandidate).length})
+                  {/* Container de Card Tab Integrado */}
+                  <div className="relative">
+                    {/* Tabs de Navegação - Layout Folder Tab */}
+                    <div className="flex items-end justify-between px-0 relative -mb-[1px] z-10 w-full gap-4 flex-wrap sm:flex-nowrap">
+                      <div className="flex space-x-1 overflow-x-auto">
+                        <button
+                          type="button"
+                          className={`px-5 py-2.5 text-xs font-bold font-ui transition-all duration-200 border rounded-t-radius-lg whitespace-nowrap ${
+                            curadoriaTab === 'basket'
+                              ? 'bg-surface-card border-border-default/80 border-b-surface-card text-sebrae-blue shadow-sm relative z-20 pb-[11px]'
+                              : 'bg-surface-subtle/30 text-text-muted hover:text-text-primary hover:bg-surface-subtle/60 border-transparent border-b-border-default/80 cursor-pointer relative z-10 pb-2.5'
+                          }`}
+                          onClick={() => setCuradoriaTab('basket')}
+                        >
+                          PNCP ({selectedItem.candidates.filter(isOfficialCandidate).length})
+                        </button>
+                        <button
+                          type="button"
+                          className={`px-5 py-2.5 text-xs font-bold font-ui transition-all duration-200 border rounded-t-radius-lg whitespace-nowrap ${
+                            curadoriaTab === 'market'
+                              ? 'bg-surface-card border-border-default/80 border-b-surface-card text-sebrae-blue shadow-sm relative z-20 pb-[11px]'
+                              : 'bg-surface-subtle/30 text-text-muted hover:text-text-primary hover:bg-surface-subtle/60 border-transparent border-b-border-default/80 cursor-pointer relative z-10 pb-2.5'
+                          }`}
+                          onClick={() => setCuradoriaTab('market')}
+                        >
+                          Pesquisa de Mercado (Internet)
+                        </button>
+                        <button
+                          type="button"
+                          className={`px-5 py-2.5 text-xs font-bold font-ui transition-all duration-200 border rounded-t-radius-lg whitespace-nowrap ${
+                            curadoriaTab === 'local'
+                              ? 'bg-surface-card border-border-default/80 border-b-surface-card text-sebrae-blue shadow-sm relative z-20 pb-[11px]'
+                              : 'bg-surface-subtle/30 text-text-muted hover:text-text-primary hover:bg-surface-subtle/60 border-transparent border-b-border-default/80 cursor-pointer relative z-10 pb-2.5'
+                          }`}
+                          onClick={() => setCuradoriaTab('local')}
+                        >
+                          Fornecedores Locais
+                        </button>
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 h-9 text-xs shrink-0 mb-1 border-primary/30 text-primary hover:bg-primary/5"
+                        onClick={() => void exportPriceResearchWorkbook(reportData, { researchId: researchId ?? undefined })}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Exportar XLSX
+                      </Button>
+                    </div>
+
+                    {/* Card Principal de Conteúdo */}
+                    <div className={`border border-border-default/80 bg-surface-card rounded-b-radius-xl rounded-tr-radius-xl shadow-soft p-6 relative z-0 ${
+                      curadoriaTab === 'basket' ? 'rounded-tl-none' : 'rounded-tl-radius-xl'
+                    }`}>
+                      {/* Conteúdo da Aba PNCP */}
                       {curadoriaTab === 'basket' && (
-                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      className={`pb-3 text-sm font-semibold transition-all relative ${
-                        curadoriaTab === 'market' ? 'text-primary' : 'text-text-muted hover:text-text-primary'
-                      }`}
-                      onClick={() => setCuradoriaTab('market')}
-                    >
-                      Pesquisa de Mercado (Internet)
-                      {curadoriaTab === 'market' && (
-                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      className={`pb-3 text-sm font-semibold transition-all relative ${
-                        curadoriaTab === 'local' ? 'text-primary' : 'text-text-muted hover:text-text-primary'
-                      }`}
-                      onClick={() => setCuradoriaTab('local')}
-                    >
-                      Fornecedores Locais
-                      {curadoriaTab === 'local' && (
-                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Exibição da Aba Ativa */}
-                  {curadoriaTab === 'basket' && (
-                    <DataTablePanel
-                      title={`Cotações do PNCP - Item ${selectedItem.itemNumber}`}
-                      description="Selecione as referências oficiais do PNCP mais compatíveis tecnicamente. Exclusões precisam de justificativa descritiva."
-                      actions={(
-                        <Button type="button" variant="outline" className="gap-2 h-9 text-xs" onClick={() => void exportPriceResearchWorkbook(reportData, { researchId: researchId ?? undefined })}>
-                          <Download className="h-3.5 w-3.5" />
-                          Exportar XLSX
-                        </Button>
-                      )}
-                    >
-                      <Table>
+                        <div className="space-y-4">
+                          <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
+                            <Table>
                         <TableHeader>
                           <TableRow>
                             <TableHead className="w-12">Usar</TableHead>
@@ -2931,7 +3085,7 @@ export default function PesquisaPrecos() {
                             ) : (
                               <TableHead className="text-right">Preço Ajustado</TableHead>
                             )}
-                            <TableHead className="text-right">Divergência (%)</TableHead>
+                            <TableHead className="text-right">Variação (%)</TableHead>
                             <TableHead className="text-center w-20">Excluir</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -3111,15 +3265,17 @@ export default function PesquisaPrecos() {
                             })
                           );
                         })()}
-                        </TableBody>
-                      </Table>
-                    </DataTablePanel>
-                  )}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      )}
 
-                  {curadoriaTab === 'market' && (
-                    <div className="space-y-6">
-                      {/* Painel de busca e provedores */}
-                      <div className="p-5 border border-border-default bg-surface-card rounded-radius-lg shadow-soft space-y-4">
+                      {/* Conteúdo da Aba Market */}
+                      {curadoriaTab === 'market' && (
+                        <div className="space-y-6">
+                          {/* Painel de busca e provedores */}
+                          <div className="p-5 border border-border-default bg-surface-subtle/25 rounded-radius-lg space-y-4">
                         <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
                           <div className="space-y-1">
                             <h4 className="font-ui text-sm font-bold text-text-primary">Buscador de Canais Privados</h4>
@@ -3313,18 +3469,20 @@ export default function PesquisaPrecos() {
                         </div>
                       )}
                       
-                      {/* Cotações de Internet Adicionadas */}
-                      <DataTablePanel
-                        title="Cotações de Internet Adicionadas"
-                        description="Veja abaixo as cotações de canais privados de internet que foram incluídas para este item."
-                      >
-                        {selectedItem.candidates.filter(isMarketCandidate).length === 0 ? (
-                          <div className="text-center py-8 text-text-muted text-xs">
-                            Nenhuma cotação de internet adicionada para este item. Use o buscador acima para incluir preços.
-                          </div>
-                        ) : (
-                          <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
-                            <table className="w-full border-collapse text-left font-ui text-sm">
+                          {/* Cotações de Internet Adicionadas */}
+                          <div className="space-y-4 pt-2">
+                            <div className="border-b border-border-default/40 pb-4">
+                              <h3 className="text-sm font-bold text-sebrae-navy">Cotações de Internet Adicionadas</h3>
+                              <p className="text-xs text-text-muted">Veja abaixo as cotações de canais privados de internet que foram incluídas para este item.</p>
+                            </div>
+                            
+                            {selectedItem.candidates.filter(isMarketCandidate).length === 0 ? (
+                              <div className="text-center py-8 text-text-muted text-xs border border-dashed border-border-default rounded-radius-xl bg-surface-subtle/5">
+                                Nenhuma cotação de internet adicionada para este item. Use o buscador acima para incluir preços.
+                              </div>
+                            ) : (
+                              <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
+                                <table className="w-full border-collapse text-left font-ui text-sm">
                               <thead>
                                 <tr className="border-b border-border-default bg-surface-subtle text-text-muted font-bold">
                                   <th className="py-3 px-4">Produto</th>
@@ -3336,7 +3494,7 @@ export default function PesquisaPrecos() {
                                   ) : (
                                     <th className="py-3 px-4 w-32 text-right">Preço Ajustado</th>
                                   )}
-                                  <th className="py-3 px-4 w-32 text-right">Divergência (%)</th>
+                                  <th className="py-3 px-4 w-32 text-right">Variação (%)</th>
                                   <th className="py-3 px-4 text-center w-24">Excluir</th>
                                 </tr>
                               </thead>
@@ -3420,16 +3578,18 @@ export default function PesquisaPrecos() {
                                     );
                                   })}
                               </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </DataTablePanel>
-                    </div>
-                  )}
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
-                  {curadoriaTab === 'local' && (
-                    <div className="space-y-6 animate-in fade-in duration-200">
-                      <div className="p-5 border border-border-default bg-surface-card rounded-radius-lg shadow-soft space-y-4">
+                      {/* Conteúdo da Aba Local */}
+                      {curadoriaTab === 'local' && (
+                        <div className="space-y-6">
+                          {/* Cadastrar Cotação de Fornecedor Local */}
+                          <div className="p-5 border border-border-default bg-surface-subtle/25 rounded-radius-lg space-y-4">
                         <div className="space-y-1">
                           <h4 className="font-ui text-sm font-bold text-text-primary">Cadastrar Cotação de Fornecedor Local</h4>
                           <p className="font-ui text-xs text-text-muted">Insira os dados da cotação recebida por e-mail, telefone ou visita presencial de fornecedores da sua região.</p>
@@ -3524,18 +3684,20 @@ export default function PesquisaPrecos() {
                         </div>
                       </div>
 
-                      {/* Lista de cotações manuais já inseridas */}
-                      <DataTablePanel
-                        title="Cotações Locais Cadastradas"
-                        description="Veja abaixo as cotações de fornecedores locais que você inseriu manualmente para este item."
-                      >
-                        {selectedItem.candidates.filter(isLocalCandidate).length === 0 ? (
-                          <div className="text-center py-8 text-text-muted text-xs">
-                            Nenhuma cotação de fornecedor local cadastrada para este item.
-                          </div>
-                        ) : (
-                          <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
-                            <table className="w-full border-collapse text-left font-ui text-sm">
+                          {/* Cotações Locais Cadastradas */}
+                          <div className="space-y-4 pt-2">
+                            <div className="border-b border-border-default/40 pb-4">
+                              <h3 className="text-sm font-bold text-sebrae-navy">Cotações Locais Cadastradas</h3>
+                              <p className="text-xs text-text-muted">Veja abaixo as cotações de fornecedores locais que você inseriu manualmente para este item.</p>
+                            </div>
+                            
+                            {selectedItem.candidates.filter(isLocalCandidate).length === 0 ? (
+                              <div className="text-center py-8 text-text-muted text-xs border border-dashed border-border-default rounded-radius-xl bg-surface-subtle/5">
+                                Nenhuma cotação de fornecedor local cadastrada para este item.
+                              </div>
+                            ) : (
+                              <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
+                                <table className="w-full border-collapse text-left font-ui text-sm">
                               <thead>
                                 <tr className="border-b border-border-default bg-surface-subtle text-text-muted font-bold">
                                   <th className="py-3 px-4">Fornecedor</th>
@@ -3547,7 +3709,7 @@ export default function PesquisaPrecos() {
                                   ) : (
                                     <th className="py-3 px-4 w-32 text-right">Preço Ajustado</th>
                                   )}
-                                  <th className="py-3 px-4 w-32 text-right">Divergência (%)</th>
+                                  <th className="py-3 px-4 w-32 text-right">Variação (%)</th>
                                   <th className="py-3 px-4 w-32">Data</th>
                                   <th className="py-3 px-4 text-center w-24">Excluir</th>
                                 </tr>
@@ -3612,12 +3774,17 @@ export default function PesquisaPrecos() {
                                     );
                                   })}
                               </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </DataTablePanel>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    <div className="border-t border-border-default/60 pt-5 mt-5 flex justify-between items-center w-full">
+                      {renderWizardFooter()}
                     </div>
-                  )}
+                  </div>
+                </div>
                 </>
               ) : null}
             </div>
@@ -3810,6 +3977,7 @@ export default function PesquisaPrecos() {
           <SectionPanel
             title="Observações Finais"
             description="Informações complementares sobre prazos de entrega, frete, garantias, marcas e condições da pesquisa."
+            footer={renderWizardFooter()}
           >
             <Textarea
               value={notes}
@@ -3821,95 +3989,7 @@ export default function PesquisaPrecos() {
         </div>
       )}
 
-      {/* WIZARD NAVIGATION FOOTER */}
-      <div className="flex justify-between items-center border-t border-border-light pt-6 mt-6">
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            className="gap-2 font-semibold text-xs h-10 hover:text-sebrae-blue hover:border-sebrae-blue/30"
-            onClick={() => goToStep(activeStep - 1)}
-            disabled={activeStep === 1}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Voltar
-          </Button>
 
-          {items.length > 0 && (
-            <Button
-              type="button"
-              variant="outline"
-              className="gap-2 font-semibold text-xs h-10"
-              onClick={() => void saveResearch('review')}
-              disabled={isSaving}
-            >
-              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 text-slate-500" />}
-              Salvar Rascunho
-            </Button>
-          )}
-
-          {items.length > 0 && activeStep <= 2 && (
-            <Button
-              type="button"
-              variant="outline"
-              className="gap-2 font-semibold text-xs h-10 border-blue-200 text-blue-700 hover:bg-blue-50/50 hover:text-blue-800"
-              onClick={() => setIsEmailDialogOpen(true)}
-              title="Solicitar cotação de preços por e-mail para fornecedores"
-            >
-              <Mail className="h-4 w-4" />
-              Solicitar Cotação
-            </Button>
-          )}
-        </div>
-
-        <div className="flex gap-2">
-          {activeStep < 3 ? (
-            <Button
-              type="button"
-              className="gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-xs h-10 transition-all shadow-sm"
-              onClick={() => goToStep(activeStep + 1)}
-              disabled={activeStep === 2 && (items.length === 0 || items.some(i => !i.catalogCode) || items.some(i => i.searchStatus === 'idle'))}
-            >
-              Avançar
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  className="gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-xs h-10 transition-all shadow-sm"
-                  disabled={items.length === 0 || isSaving}
-                >
-                  <Download className="h-4 w-4" />
-                  Finalizar e Exportar
-                  <ChevronDown className="h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Formatos</DropdownMenuLabel>
-                <DropdownMenuItem onSelect={(event) => { event.preventDefault(); void printReport(); }} className="gap-2 cursor-pointer">
-                  <Printer className="h-4 w-4 text-slate-500" />
-                  Imprimir PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => exportPriceResearchHtml(reportData, { researchId: researchId ?? undefined })} className="gap-2 cursor-pointer">
-                  <Globe className="h-4 w-4 text-slate-500" />
-                  Página HTML
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => void exportPriceResearchWorkbook(reportData, { researchId: researchId ?? undefined })} className="gap-2 cursor-pointer">
-                  <FileSpreadsheet className="h-4 w-4 text-slate-500" />
-                  Planilha Excel
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => exportPriceResearchCsvBundle(reportData, { researchId: researchId ?? undefined })} className="gap-2 cursor-pointer">
-                  <FileDown className="h-4 w-4 text-slate-500" />
-                  Arquivos CSV (PNCP)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-      </div>
       </div>
       )}
 
