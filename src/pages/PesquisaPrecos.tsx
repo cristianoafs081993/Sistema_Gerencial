@@ -39,7 +39,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { HeaderActions, HeaderSubtitle } from '@/components/HeaderParts';
+import { HeaderSubtitle } from '@/components/HeaderParts';
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
 import { SectionPanel } from '@/components/design-system/SectionPanel';
 import { Badge } from '@/components/ui/badge';
@@ -101,6 +101,36 @@ const METHOD_OPTIONS: Array<{ value: PriceResearchMethod; label: string }> = [
   { value: 'minimum', label: 'Menor preço' },
   { value: 'mean', label: 'Média' },
   { value: 'median', label: 'Mediana' },
+];
+
+const UNIT_OPTIONS = [
+  { value: 'UN', label: 'UN (Unidade)' },
+  { value: 'PCT', label: 'PCT (Pacote)' },
+  { value: 'CX', label: 'CX (Caixa)' },
+  { value: 'L', label: 'L (Litro)' },
+  { value: 'ML', label: 'ML (Mililitro)' },
+  { value: 'KG', label: 'KG (Quilograma)' },
+  { value: 'G', label: 'G (Grama)' },
+  { value: 'M', label: 'M (Metro)' },
+  { value: 'M2', label: 'M² (Metro Quadrado)' },
+  { value: 'M3', label: 'M³ (Metro Cúbico)' },
+  { value: 'KM', label: 'KM (Quilômetro)' },
+  { value: 'H', label: 'H (Hora)' },
+  { value: 'MES', label: 'MÊS (Mês)' },
+  { value: 'DIA', label: 'DIA (Dia)' },
+  { value: 'KIT', label: 'KIT (Kit)' },
+  { value: 'RES', label: 'RES (Resma)' },
+  { value: 'RL', label: 'RL (Rolo)' },
+  { value: 'FL', label: 'FL (Folha)' },
+  { value: 'PAR', label: 'PAR (Par)' },
+  { value: 'DOZ', label: 'DOZ (Dúzia)' },
+  { value: 'SERVICO', label: 'SERVIÇO (Serviço)' },
+  { value: 'CJ', label: 'CJ (Conjunto)' },
+  { value: 'GL', label: 'GL (Galão)' },
+  { value: 'FR', label: 'FR (Frasco)' },
+  { value: 'AMP', label: 'AMP (Ampola)' },
+  { value: 'TUBO', label: 'TUBO (Tubo)' },
+  { value: 'LOTE', label: 'LOTE (Lote)' },
 ];
 
 function today() {
@@ -191,16 +221,33 @@ export default function PesquisaPrecos() {
   const [selectedItemId, setSelectedItemId] = useState<string>();
   const [itemPanelMode, setItemPanelMode] = useState<'config' | 'curation'>('config');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
 
   const currentIndex = items.findIndex((item) => item.localId === selectedItemId);
 
+  const validateCurrentItem = () => {
+    const currentItem = items.find((item) => item.localId === selectedItemId);
+    if (!currentItem) return true;
+    if (!currentItem.description?.trim()) {
+      toast.error('A descrição do item é obrigatória.');
+      return false;
+    }
+    if (!currentItem.catalogCode?.trim()) {
+      toast.error('O código CATMAT/CATSER é obrigatório.');
+      return false;
+    }
+    return true;
+  };
+
   const handlePrevItem = () => {
+    if (!validateCurrentItem()) return;
     if (currentIndex > 0) {
       setSelectedItemId(items[currentIndex - 1].localId);
     }
   };
 
   const handleNextItem = () => {
+    if (!validateCurrentItem()) return;
     if (currentIndex >= 0 && currentIndex < items.length - 1) {
       setSelectedItemId(items[currentIndex + 1].localId);
     }
@@ -630,6 +677,12 @@ export default function PesquisaPrecos() {
   });
 
   const selectedItem = items.find((item) => item.localId === selectedItemId) ?? items[0];
+  const researchBreadcrumbLabel = researchId
+    ? (objectDescription ? `Editar: ${objectDescription.slice(0, 45)}${objectDescription.length > 45 ? '...' : ''}` : 'Editar Pesquisa')
+    : 'Nova Pesquisa';
+  const selectedItemBreadcrumbLabel = selectedItemId && selectedItem
+    ? selectedItem.description
+    : null;
   const selectedStatistics = selectedItem ? getSelectedStatistics(selectedItem) : null;
   const selectedCoefficientOfVariation = selectedStatistics?.coefficientOfVariation ?? 0;
   const selectedHasHighDispersion = selectedCoefficientOfVariation > 25;
@@ -993,6 +1046,7 @@ export default function PesquisaPrecos() {
       }
       // Avança automaticamente para o Passo 2 após importar
       setActiveStep(2);
+      setIsBatchModalOpen(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Não foi possível ler a planilha.');
     } finally {
@@ -1305,6 +1359,11 @@ export default function PesquisaPrecos() {
       }
     }
 
+    if (step === 2) {
+      setSelectedItemId(undefined);
+      setItemPanelMode('curation');
+    }
+
     setActiveStep(step);
     void autoSaveResearch();
   };
@@ -1463,7 +1522,7 @@ export default function PesquisaPrecos() {
 
   return (
     <div className="space-y-6 pb-10">
-      <HeaderSubtitle>Pesquisa de preços com fontes oficiais e revisão humana</HeaderSubtitle>
+      <HeaderSubtitle>Pesquisa de preços</HeaderSubtitle>
 
       {viewMode === 'list' ? (
         <div className="space-y-6 animate-in fade-in duration-300">
@@ -1610,7 +1669,7 @@ export default function PesquisaPrecos() {
           {/* Breadcrumb e Wizard Card Unificado */}
           <div className="bg-surface-card border border-border-subtle/70 rounded-radius-xl p-6 shadow-soft space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
+              <div className="min-w-0">
                 {/* Breadcrumb */}
                 <Breadcrumb>
                   <BreadcrumbList>
@@ -1628,11 +1687,53 @@ export default function PesquisaPrecos() {
                       </BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbSeparator />
-                    <BreadcrumbItem>
-                      <BreadcrumbPage className="font-ui text-xs font-bold text-text-primary">
-                        {researchId ? (objectDescription ? `Editar: ${objectDescription.slice(0, 45)}${objectDescription.length > 45 ? '...' : ''}` : 'Editar Pesquisa') : 'Nova Pesquisa'}
-                      </BreadcrumbPage>
-                    </BreadcrumbItem>
+                    {selectedItemBreadcrumbLabel ? (
+                      <>
+                        <BreadcrumbItem>
+                          <BreadcrumbLink
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setSelectedItemId(undefined);
+                              setActiveStep(1);
+                            }}
+                            className="font-ui text-xs font-semibold text-text-secondary hover:text-sebrae-blue transition-colors"
+                          >
+                            {researchBreadcrumbLabel}
+                          </BreadcrumbLink>
+                        </BreadcrumbItem>
+                        <BreadcrumbSeparator />
+                        <BreadcrumbItem>
+                          <BreadcrumbLink
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setSelectedItemId(undefined);
+                              setItemPanelMode('curation');
+                              setActiveStep(2);
+                            }}
+                            className="font-ui text-xs font-semibold text-text-secondary hover:text-sebrae-blue transition-colors"
+                          >
+                            Itens
+                          </BreadcrumbLink>
+                        </BreadcrumbItem>
+                        <BreadcrumbSeparator />
+                        <BreadcrumbItem>
+                          <BreadcrumbPage
+                            className="inline-block max-w-[420px] truncate align-bottom font-ui text-xs font-bold text-text-primary"
+                            title={selectedItemBreadcrumbLabel}
+                          >
+                            {selectedItemBreadcrumbLabel}
+                          </BreadcrumbPage>
+                        </BreadcrumbItem>
+                      </>
+                    ) : (
+                      <BreadcrumbItem>
+                        <BreadcrumbPage className="font-ui text-xs font-bold text-text-primary">
+                          {researchBreadcrumbLabel}
+                        </BreadcrumbPage>
+                      </BreadcrumbItem>
+                    )}
                   </BreadcrumbList>
                 </Breadcrumb>
               </div>
@@ -1707,65 +1808,7 @@ export default function PesquisaPrecos() {
             </div>
           </div>
 
-      {/* Global Actions Header */}
-      <HeaderActions>
-        <Button type="button" variant="outline" className="gap-2" onClick={createPriceResearchTemplate}>
-          <FileDown className="h-4 w-4" />
-          Baixar modelo
-        </Button>
-        <Button type="button" variant="outline" className="gap-2" onClick={() => fileInputRef.current?.click()} disabled={isParsing}>
-          {isParsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-          Importar arquivo
-        </Button>
-        <Button type="button" variant="outline" className="gap-2" onClick={() => void saveResearch('review')} disabled={isSaving || items.length === 0}>
-          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Salvar rascunho
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="gap-2 border-blue-300 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
-          onClick={() => setIsEmailDialogOpen(true)}
-          disabled={items.length === 0}
-          title="Solicitar cotação de preços por e-mail para fornecedores"
-        >
-          <Mail className="h-4 w-4" />
-          Solicitar Cotação
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button type="button" variant="outline" className="gap-2" disabled={items.length === 0 || isSaving}>
-              <Download className="h-4 w-4" />
-              Exportar
-              <ChevronDown className="h-3.5 w-3.5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>Formatos</DropdownMenuLabel>
-            <DropdownMenuItem onSelect={(event) => { event.preventDefault(); void printReport(); }} className="gap-2">
-              <Printer className="h-4 w-4" />
-              PDF
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => exportPriceResearchHtml(reportData, { researchId: researchId ?? undefined })} className="gap-2">
-              <Globe className="h-4 w-4" />
-              HTML
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => void exportPriceResearchWorkbook(reportData, { researchId: researchId ?? undefined })} className="gap-2">
-              <FileSpreadsheet className="h-4 w-4" />
-              Excel
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => exportPriceResearchCsvBundle(reportData, { researchId: researchId ?? undefined })} className="gap-2">
-              <FileDown className="h-4 w-4" />
-              CSV
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <Button type="button" className="gap-2 bg-primary hover:bg-primary-hover text-primary-foreground" onClick={() => void printReport()} disabled={items.length === 0 || isSaving}>
-          <Printer className="h-4 w-4" />
-          Gerar relatório
-        </Button>
-      </HeaderActions>
+
 
       {/* Email Quotation Dialog */}
       <SupplierEmailDialog
@@ -2004,70 +2047,7 @@ export default function PesquisaPrecos() {
       {/* STEP 2: ITENS + COTAÇÕES */}
       {activeStep === 2 && (
         <div className="space-y-6 animate-in fade-in duration-200">
-          {/* Planilha de Itens Carregada (se houver items e sourceFile) */}
-          {!selectedItemId && items.length > 0 && sourceFile && (
-            <div className="rounded-radius-lg border border-primary/20 bg-primary/[0.02] p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-primary/10 rounded-full text-primary">
-                  <FileSpreadsheet className="h-6 w-6" />
-                </div>
-                <div>
-                  <h4 className="font-ui text-sm font-semibold text-text-primary">Planilha de Itens Carregada</h4>
-                  <p className="font-ui text-xs text-text-secondary mt-0.5">
-                    Arquivo: <span className="font-semibold">{sourceFile}</span> | Total: <span className="font-semibold">{items.length} itens</span>
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" className="gap-2" onClick={() => fileInputRef.current?.click()} disabled={isParsing}>
-                  {isParsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                  Substituir planilha
-                </Button>
-              </div>
-            </div>
-          )}
 
-          {/* Banner de busca de preços */}
-          {!selectedItemId && items.length > 0 && (
-            <div className="flex items-center justify-between gap-4 rounded-radius-xl border border-border-default bg-surface-card p-4 shadow-soft">
-              <div className="flex items-center gap-3">
-                {isSearching ? (
-                  <><Loader2 className="h-5 w-5 animate-spin text-sebrae-blue shrink-0" />
-                  <div>
-                    <p className="font-ui text-sm font-bold text-sebrae-navy">Buscando cotações oficiais...</p>
-                    <p className="font-ui text-xs text-text-muted mt-0.5">Consultando a API de Compras do Governo Federal. Aguarde.</p>
-                  </div></>
-                ) : items.every(i => i.searchStatus === 'success') ? (
-                  <><CheckCircle2 className="h-5 w-5 text-ifrn-green shrink-0" />
-                  <div>
-                    <p className="font-ui text-sm font-bold text-ifrn-green">Busca concluída com sucesso</p>
-                    <p className="font-ui text-xs text-text-muted mt-0.5">{items.reduce((t, i) => t + i.candidates.length, 0)} cotações oficiais encontradas no total.</p>
-                  </div></>
-                ) : items.some(i => i.searchStatus === 'error') ? (
-                  <><AlertTriangle className="h-5 w-5 text-red-500 shrink-0" />
-                  <div>
-                    <p className="font-ui text-sm font-bold text-red-950">Algumas consultas falharam</p>
-                    <p className="font-ui text-xs text-red-700 mt-0.5">Tente novamente ou adicione cotações manuais.</p>
-                  </div></>
-                ) : (
-                  <><Search className="h-5 w-5 text-text-muted shrink-0" />
-                  <div>
-                    <p className="font-ui text-sm font-bold text-text-primary">Busca de preços oficiais</p>
-                    <p className="font-ui text-xs text-text-muted mt-0.5">Consulta ao Compras.gov com base nos códigos CATMAT/CATSER mapeados.</p>
-                  </div></>
-                )}
-              </div>
-              <Button
-                type="button"
-                className="shrink-0 gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-xs h-9 px-4 rounded-lg shadow-sm"
-                disabled={isSearching || items.length === 0 || items.every(i => !i.catalogCode)}
-                onClick={() => void searchPrices()}
-              >
-                {isSearching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                {items.some(i => i.searchStatus !== 'idle') ? 'Rebuscar Preços' : 'Buscar Preços Oficiais'}
-              </Button>
-            </div>
-          )}
 
           {items.length === 0 ? (
             <SectionPanel
@@ -2091,7 +2071,26 @@ export default function PesquisaPrecos() {
                   <span className="font-ui text-xs font-semibold text-text-muted">OU</span>
                   <span className="h-px flex-1 bg-border-default max-w-[120px]"></span>
                 </div>
-                <div className="flex justify-center pb-2">
+                <div className="flex justify-center gap-3 pb-2 flex-wrap">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={createPriceResearchTemplate}
+                  >
+                    <FileDown className="h-4 w-4" />
+                    Baixar modelo
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isParsing}
+                  >
+                    {isParsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                    Importar arquivo
+                  </Button>
                   <Button
                     type="button"
                     variant="outline"
@@ -2108,19 +2107,31 @@ export default function PesquisaPrecos() {
             <>
               {(!selectedItemId || itemPanelMode === 'config') && (
                 <SectionPanel
-                  title="Curadoria da Cesta de Preços por Item"
-                  description="Examine as cotações encontradas para cada item. Selecione no mínimo 3 referências compatíveis para homologar o preço estimado."
+                  title="Cesta de Preços por Item"
+                  description="Selecione no mínimo 3 referências compatíveis para homologar o preço estimado."
                   actions={
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="gap-2"
-                      onClick={handleAddNewItem}
-                    >
-                      <Plus className="h-4 w-4 text-primary" />
-                      Adicionar item manualmente
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={handleAddNewItem}
+                      >
+                        <Plus className="h-4 w-4 text-primary" />
+                        Adicionar item manualmente
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 border-primary/30 text-primary hover:bg-primary/5"
+                        onClick={() => setIsBatchModalOpen(true)}
+                      >
+                        <FileSpreadsheet className="h-4 w-4" />
+                        Adicionar em lote
+                      </Button>
+                    </div>
                   }
                 >
                   <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
@@ -2227,7 +2238,9 @@ export default function PesquisaPrecos() {
                       <button
                         type="button"
                         className="h-8 w-8 rounded-full p-0 flex items-center justify-center text-text-secondary hover:bg-slate-100 hover:text-text-primary"
-                        onClick={() => setSelectedItemId(undefined)}
+                        onClick={() => {
+                          if (validateCurrentItem()) setSelectedItemId(undefined);
+                        }}
                       >
                         ✕
                       </button>
@@ -2295,12 +2308,31 @@ export default function PesquisaPrecos() {
                           </div>
                         </div>
                         <div className="space-y-2">
-                          <Label>Quantidade do Termo</Label>
+                          <Label>Quantidade</Label>
                           <Input type="number" min="0" step="any" value={selectedItem.quantity} onChange={(event) => updateItem(selectedItem.localId, { quantity: Number(event.target.value) })} />
                         </div>
                         <div className="space-y-2">
                           <Label>Unidade de Fornecimento</Label>
-                          <Input value={selectedItem.unit} onChange={(event) => updateItem(selectedItem.localId, { unit: event.target.value.toUpperCase() })} />
+                          <Select
+                            value={selectedItem.unit}
+                            onValueChange={(value) => updateItem(selectedItem.localId, { unit: value })}
+                          >
+                            <SelectTrigger aria-label="Unidade de fornecimento">
+                              <SelectValue placeholder="Selecione a unidade" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {selectedItem.unit && !UNIT_OPTIONS.some((opt) => opt.value === selectedItem.unit) && (
+                                <SelectItem value={selectedItem.unit}>
+                                  {selectedItem.unit} (Personalizado)
+                                </SelectItem>
+                              )}
+                              {UNIT_OPTIONS.map((opt) => (
+                                <SelectItem key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                         <div className="space-y-2">
                           <Label>Capacidade Comparável</Label>
@@ -2403,9 +2435,11 @@ export default function PesquisaPrecos() {
                       <Button
                         type="button"
                         className="bg-sebrae-blue hover:bg-sebrae-navy text-white text-xs font-semibold h-9 px-4 rounded-lg shadow-sm"
-                        onClick={() => setSelectedItemId(undefined)}
+                        onClick={() => {
+                          if (validateCurrentItem()) setSelectedItemId(undefined);
+                        }}
                       >
-                        Confirmar e Voltar
+                        Confirmar
                       </Button>
                     </div>
                   </div>
@@ -2413,6 +2447,73 @@ export default function PesquisaPrecos() {
               )}
             </>
           )}
+
+        </div>
+      )}
+
+      {/* Modal Adicionar em Lote */}
+      {isBatchModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-lg bg-surface-card border border-border-default rounded-radius-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-border-default flex items-center justify-between bg-surface-subtle/50">
+              <div>
+                <h3 className="text-sm font-bold text-sebrae-navy">
+                  Adicionar Itens em Lote
+                </h3>
+                <p className="text-[11px] text-text-muted mt-0.5">
+                  Importe a planilha de custos ou atualize o lote de itens atual.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="h-8 w-8 rounded-full p-0 flex items-center justify-center text-text-secondary hover:bg-slate-100 hover:text-text-primary"
+                onClick={() => setIsBatchModalOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
+              <div className="rounded-radius-lg border border-primary/20 bg-primary/[0.02] p-6 flex flex-col items-center justify-center gap-4 text-center">
+                <div className="p-3.5 bg-primary/10 rounded-full text-primary">
+                  <FileSpreadsheet className="h-7 w-7 animate-pulse" />
+                </div>
+                <div>
+                  <h4 className="font-ui text-sm font-bold text-text-primary">Planilha de Itens Carregada</h4>
+                  <p className="font-ui text-xs text-text-secondary mt-1">
+                    Arquivo: <span className="font-semibold">{sourceFile || 'Inserido manualmente'}</span>
+                  </p>
+                  <p className="font-ui text-xs text-text-secondary mt-0.5">
+                    Total: <span className="font-semibold">{items.length} itens</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-3.5 border-t border-border-default bg-surface-subtle/50 flex justify-end items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-2 text-xs h-9"
+                onClick={createPriceResearchTemplate}
+              >
+                <FileDown className="h-4 w-4" />
+                Baixar modelo
+              </Button>
+              <Button
+                type="button"
+                className="gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white text-xs font-semibold h-9 px-4 rounded-lg shadow-sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isParsing}
+              >
+                {isParsing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Substituir planilha
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -2421,8 +2522,8 @@ export default function PesquisaPrecos() {
         <div className="space-y-6 animate-in fade-in duration-200">
           {!selectedItemId ? (
             <SectionPanel
-              title="Curadoria da Cesta de Preços por Item"
-              description="Examine as cotações encontradas para cada item. Selecione no mínimo 3 referências compatíveis para homologar o preço estimado."
+              title="Cesta de Preços por Item"
+              description="Selecione no mínimo 3 referências compatíveis para homologar o preço estimado."
             >
               <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
                 <table className="w-full border-collapse text-left font-ui text-xs">
@@ -2520,52 +2621,6 @@ export default function PesquisaPrecos() {
             </SectionPanel>
           ) : (
             <div className="space-y-6">
-              {/* Barra de Ações Superior (Voltar + Navegar) */}
-              <div className="flex items-center justify-between gap-4 bg-surface-card border border-border-default rounded-radius-xl p-4 shadow-soft">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSelectedItemId(undefined)}
-                  className="text-xs gap-1.5 border-border-default text-text-secondary hover:bg-surface-subtle shrink-0"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                  Voltar para a Lista de Itens
-                </Button>
-
-                <div className="hidden sm:block flex-1 text-center px-4 overflow-hidden max-w-[50%] mx-auto">
-                  <p className="text-sm font-bold text-sebrae-navy truncate" title={selectedItem?.description}>
-                    {selectedItem?.description}
-                  </p>
-                </div>
-                
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="text-xs text-text-muted font-medium mr-1.5">Item {selectedItem?.itemNumber} de {items.length}</span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={handlePrevItem}
-                    disabled={currentIndex === 0}
-                    title="Item anterior"
-                    className="h-8 w-8 shrink-0"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={handleNextItem}
-                    disabled={currentIndex === items.length - 1}
-                    title="Próximo item"
-                    className="h-8 w-8 shrink-0"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
               {selectedItem ? (
                 <>
                   <TooltipProvider delayDuration={120}>
@@ -2776,15 +2831,7 @@ export default function PesquisaPrecos() {
                     </section>
                   </TooltipProvider>
 
-                  {/* Alerta de Cotações Insuficientes */}
-                  {selectedItem.candidates.filter(c => c.selected).length < 3 && (
-                    <div className="flex gap-2.5 rounded-radius-lg border border-amber-200 bg-amber-50/50 p-4 text-amber-900 shadow-sm">
-                      <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
-                      <div className="font-ui text-xs leading-normal">
-                        <span className="font-bold">Aviso legal da IN 65/2021:</span> Selecione no mínimo 3 preços homologados para compom a estimativa do item. Casos excepcionais exigem justificativa formal anexa ao processo.
-                      </div>
-                    </div>
-                  )}
+
 
                   {/* Tabs de Navegação */}
                   <div className="flex border-b border-border-default space-x-6">
@@ -3755,21 +3802,50 @@ export default function PesquisaPrecos() {
 
       {/* WIZARD NAVIGATION FOOTER */}
       <div className="flex justify-between items-center border-t border-border-light pt-6 mt-6">
-        <Button
-          type="button"
-          variant="outline"
-          className="gap-2 font-semibold text-xs h-10 hover:text-sebrae-blue hover:border-sebrae-blue/30"
-          onClick={() => goToStep(activeStep - 1)}
-          disabled={activeStep === 1}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Voltar
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2 font-semibold text-xs h-10 hover:text-sebrae-blue hover:border-sebrae-blue/30"
+            onClick={() => goToStep(activeStep - 1)}
+            disabled={activeStep === 1}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Voltar
+          </Button>
+
+          {items.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2 font-semibold text-xs h-10"
+              onClick={() => void saveResearch('review')}
+              disabled={isSaving}
+            >
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 text-slate-500" />}
+              Salvar Rascunho
+            </Button>
+          )}
+
+          {items.length > 0 && activeStep <= 2 && (
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2 font-semibold text-xs h-10 border-blue-200 text-blue-700 hover:bg-blue-50/50 hover:text-blue-800"
+              onClick={() => setIsEmailDialogOpen(true)}
+              title="Solicitar cotação de preços por e-mail para fornecedores"
+            >
+              <Mail className="h-4 w-4" />
+              Solicitar Cotação
+            </Button>
+          )}
+        </div>
+
         <div className="flex gap-2">
           {activeStep < 3 ? (
             <Button
               type="button"
-              className="gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-xs h-10 transition-all"
+              className="gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-xs h-10 transition-all shadow-sm"
               onClick={() => goToStep(activeStep + 1)}
               disabled={activeStep === 2 && (items.length === 0 || items.some(i => !i.catalogCode) || items.some(i => i.searchStatus === 'idle'))}
             >
@@ -3777,15 +3853,39 @@ export default function PesquisaPrecos() {
               <ArrowRight className="h-4 w-4" />
             </Button>
           ) : (
-            <Button
-              type="button"
-              className="gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-xs h-10 transition-all"
-              onClick={() => void printReport()}
-              disabled={items.length === 0 || isSaving}
-            >
-              <Printer className="h-4 w-4" />
-              Finalizar e Imprimir
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  className="gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-xs h-10 transition-all shadow-sm"
+                  disabled={items.length === 0 || isSaving}
+                >
+                  <Download className="h-4 w-4" />
+                  Finalizar e Exportar
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Formatos</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={(event) => { event.preventDefault(); void printReport(); }} className="gap-2 cursor-pointer">
+                  <Printer className="h-4 w-4 text-slate-500" />
+                  Imprimir PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => exportPriceResearchHtml(reportData, { researchId: researchId ?? undefined })} className="gap-2 cursor-pointer">
+                  <Globe className="h-4 w-4 text-slate-500" />
+                  Página HTML
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void exportPriceResearchWorkbook(reportData, { researchId: researchId ?? undefined })} className="gap-2 cursor-pointer">
+                  <FileSpreadsheet className="h-4 w-4 text-slate-500" />
+                  Planilha Excel
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => exportPriceResearchCsvBundle(reportData, { researchId: researchId ?? undefined })} className="gap-2 cursor-pointer">
+                  <FileDown className="h-4 w-4 text-slate-500" />
+                  Arquivos CSV (PNCP)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </div>

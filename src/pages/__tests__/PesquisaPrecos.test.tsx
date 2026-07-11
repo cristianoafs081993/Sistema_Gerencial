@@ -151,6 +151,11 @@ describe('PesquisaPrecos', () => {
     });
     fireEvent.click(await screen.findByRole('button', { name: /Ver Cotações/i }));
     expect(await screen.findByText('Fornecedor')).toBeInTheDocument();
+    expect(screen.queryByText('Item 1 de 1')).not.toBeInTheDocument();
+    expect(screen.getByTitle(importedItem.description)).toHaveTextContent(importedItem.description);
+    expect(screen.queryByRole('button', { name: /Voltar para a Lista de Itens/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Item anterior/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /ximo item/i })).not.toBeInTheDocument();
     expect(screen.getAllByText('R$ 20,00').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText(/Métodos de cálculo/i)).toBeInTheDocument();
     expect(screen.getByText(/Dispersão da amostra/i)).toBeInTheDocument();
@@ -158,11 +163,31 @@ describe('PesquisaPrecos', () => {
     expect(screen.getByText(/Média ponderada/i)).toBeInTheDocument();
     expect(screen.getByText(/Média saneada/i)).toBeInTheDocument();
     expect(screen.getByText(/Excluídos/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('link', { name: /Itens/i }));
+    expect(await screen.findByRole('button', { name: /Ver Cotações/i })).toBeInTheDocument();
   });
 
   it('permite selecionar arquivo PDF pesquisável', () => {
     const { container } = renderPage();
     expect(container.querySelector('input[type="file"]')).toHaveAttribute('accept', expect.stringContaining('.pdf'));
+  });
+
+  it('ao avançar da identificação para itens, abre a lista de itens em vez das cotações do item selecionado', async () => {
+    const { container } = renderPage();
+
+    fireEvent.change(container.querySelector('input[type="file"]') as HTMLInputElement, {
+      target: { files: [new File(['xlsx'], 'custos.xlsx')] },
+    });
+
+    await screen.findAllByText('Café torrado e moído, pacote de 500 g');
+    fireEvent.click(await screen.findByRole('button', { name: /Ver Cotações/i }));
+    expect(await screen.findByText('Fornecedor')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /1\. Identificação/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Avançar/i }));
+
+    expect(await screen.findByRole('button', { name: /Ver Cotações/i })).toBeInTheDocument();
+    expect(screen.queryByText('Fornecedor')).not.toBeInTheDocument();
   });
 
   it('sugere e permite confirmar CATMAT quando o arquivo não informa código', async () => {
@@ -320,8 +345,17 @@ describe('PesquisaPrecos', () => {
     const descriptionTextarea = screen.getByLabelText(/Descrição Técnico-Comercial do Item/i);
     fireEvent.change(descriptionTextarea, { target: { value: 'Item Manual Teste 1' } });
 
+    // Preenche o código CATMAT/CATSER
+    const codeInput = screen.getByPlaceholderText(/Ex: 606523/i);
+    fireEvent.change(codeInput, { target: { value: '123456' } });
+
     // Confirma e volta
-    fireEvent.click(screen.getByRole('button', { name: /Confirmar e Voltar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }));
+
+    // Aguarda o modal fechar para evitar múltiplos elementos com o mesmo texto
+    await waitFor(() => {
+      expect(screen.queryByText(/Configuração do Item 1/i)).not.toBeInTheDocument();
+    });
 
     // O item deve estar visível na tabela do Passo 2
     expect(screen.getByText('Item Manual Teste 1')).toBeInTheDocument();
@@ -337,8 +371,17 @@ describe('PesquisaPrecos', () => {
     const descriptionTextarea2 = screen.getByLabelText(/Descrição Técnico-Comercial do Item/i);
     fireEvent.change(descriptionTextarea2, { target: { value: 'Item Manual Teste 2' } });
 
+    // Preenche o código CATMAT/CATSER
+    const codeInput2 = screen.getByPlaceholderText(/Ex: 606523/i);
+    fireEvent.change(codeInput2, { target: { value: '654321' } });
+
     // Confirma e volta
-    fireEvent.click(screen.getByRole('button', { name: /Confirmar e Voltar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }));
+
+    // Aguarda o modal fechar
+    await waitFor(() => {
+      expect(screen.queryByText(/Configuração do Item 2/i)).not.toBeInTheDocument();
+    });
 
     // Ambos devem estar visíveis
     expect(screen.getByText('Item Manual Teste 1')).toBeInTheDocument();
