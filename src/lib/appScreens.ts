@@ -156,6 +156,22 @@ export const appScreens: AppScreen[] = [
   },
 ];
 
+const impliedScreenAccess: Record<string, string[]> = {
+  'pesquisa-precos': ['cadastro-fornecedores'],
+};
+
+export function expandScreenAccessIds(screenIds: string[]) {
+  const expanded = new Set(screenIds);
+
+  for (const screenId of screenIds) {
+    for (const impliedScreenId of impliedScreenAccess[screenId] || []) {
+      expanded.add(impliedScreenId);
+    }
+  }
+
+  return Array.from(expanded);
+}
+
 export function getScreenForPath(pathname: string) {
   if (pathname.startsWith('/planejamento') || pathname.startsWith('/atividades')) {
     return appScreens.find((screen) => screen.id === 'planejamento') || null;

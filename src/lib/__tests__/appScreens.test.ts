@@ -1,4 +1,4 @@
-import { ADMIN_USERS_SCREEN_ID, appScreens, getScreenForPath, isProductionScreen } from '@/lib/appScreens';
+import { ADMIN_USERS_SCREEN_ID, appScreens, expandScreenAccessIds, getScreenForPath, isProductionScreen } from '@/lib/appScreens';
 
 describe('app screen registry', () => {
   it('mapeia rotas diretas e escopos de planejamento para telas cadastradas', () => {
@@ -10,8 +10,16 @@ describe('app screen registry', () => {
     expect(getScreenForPath('/artefatos-licitacao')?.id).toBe('artefatos-licitacao');
     expect(getScreenForPath('/licitacoes-pregoes')?.id).toBe('licitacoes-pregoes');
     expect(getScreenForPath('/atas-registro-precos')?.id).toBe('atas-registro-precos');
+    expect(getScreenForPath('/cadastro-fornecedores')?.id).toBe('cadastro-fornecedores');
     expect(getScreenForPath('/energia')?.id).toBe('energia-visao-geral');
     expect(getScreenForPath('/energia/esg')?.id).toBe('energia-esg');
+  });
+
+  it('expande subpaginas funcionais de modulos autorizados', () => {
+    expect(expandScreenAccessIds(['pesquisa-precos'])).toEqual([
+      'pesquisa-precos',
+      'cadastro-fornecedores',
+    ]);
   });
 
   it('mantem controle de usuarios fora das telas de producao dos diretores', () => {

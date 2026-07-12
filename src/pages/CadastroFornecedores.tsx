@@ -160,7 +160,7 @@ export default function CadastroFornecedoresPage() {
 
   // Delete Supplier
   const handleDelete = async (id: string) => {
-    if (!confirm('Deseja realmente remover este fornecedor do cadastro global?')) {
+    if (!confirm('Deseja realmente remover este fornecedor do cadastro do órgão?')) {
       return;
     }
 
@@ -264,7 +264,7 @@ export default function CadastroFornecedoresPage() {
         <div className="space-y-1">
           <h3 className="text-xl font-bold text-sebrae-navy">Cadastro e Mapa de Fornecedores</h3>
           <p className="text-sm text-text-muted">
-            Base integrada de fornecedores, controle de certidões negativas e consultas de idoneidade (TCU, CNJ, CEIS, CNEP).
+            Base de fornecedores do órgão, controle de certidões negativas e consultas de idoneidade (TCU, CNJ, CEIS, CNEP).
           </p>
         </div>
         <Button
@@ -508,7 +508,7 @@ export default function CadastroFornecedoresPage() {
               {editingId ? 'Editar Fornecedor' : 'Novo Fornecedor'}
             </DialogTitle>
             <DialogDescription>
-              {editingId ? 'Altere as informações do fornecedor.' : 'Adicione um novo fornecedor à base do sistema.'}
+              {editingId ? 'Altere as informações do fornecedor.' : 'Adicione um novo fornecedor à base do órgão.'}
             </DialogDescription>
           </DialogHeader>
 

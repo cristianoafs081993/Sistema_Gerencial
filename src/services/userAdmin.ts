@@ -45,12 +45,18 @@ export type AdminUsersState = {
 export type CreateDirectUserInput = {
   email: string;
   groupId: string;
+  password: string;
 };
 
 export type InviteAdminUserInput = {
   email: string;
   groupId: string;
   redirectTo: string;
+};
+
+export type UpdateAdminUserPasswordInput = {
+  userId: string;
+  password: string;
 };
 
 export type UpsertUserGroupInput = {
@@ -64,6 +70,8 @@ type AdminUsersAction =
   | { action: 'list' }
   | ({ action: 'create-user' } & CreateDirectUserInput)
   | ({ action: 'invite-user' } & InviteAdminUserInput)
+  | ({ action: 'update-user-password' } & UpdateAdminUserPasswordInput)
+  | { action: 'delete-user'; userId: string; email: string }
   | ({ action: 'upsert-group' } & UpsertUserGroupInput)
   | { action: 'set-user-groups'; userId: string; email: string; groupIds: string[] };
 
@@ -143,6 +151,14 @@ export function createDirectUser(input: CreateDirectUserInput) {
 
 export function inviteAdminUser(input: InviteAdminUserInput) {
   return invokeAdminUsers<AdminUsersState>({ action: 'invite-user', ...input });
+}
+
+export function updateAdminUserPassword(input: UpdateAdminUserPasswordInput) {
+  return invokeAdminUsers<AdminUsersState>({ action: 'update-user-password', ...input });
+}
+
+export function deleteAdminUser(input: { userId: string; email: string }) {
+  return invokeAdminUsers<AdminUsersState>({ action: 'delete-user', ...input });
 }
 
 export function upsertUserGroup(input: UpsertUserGroupInput) {

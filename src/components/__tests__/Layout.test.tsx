@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -31,10 +31,12 @@ vi.mock('@/components/ui/tooltip', () => ({
 
 const mockedUseAuth = vi.mocked(useAuth);
 const mockedToast = vi.mocked(toast);
+const updatePasswordMock = vi.fn();
 
 describe('Layout', () => {
   beforeEach(() => {
     mockedToast.warning.mockReset();
+    updatePasswordMock.mockReset();
     mockedUseAuth.mockReturnValue({
       session: {
         user: {
@@ -61,10 +63,16 @@ describe('Layout', () => {
       canManageUsers: true,
       userGroups: [],
       screenAccessIds: [],
+      userOrg: {
+        id: 'org-1',
+        slug: 'ifrn-cn',
+        name: 'IFRN Campus Currais Novos',
+        role: 'member',
+      },
       canAccessScreen: vi.fn(() => true),
       canAccessPath: vi.fn(() => true),
       signInWithPassword: vi.fn(),
-      updatePassword: vi.fn(),
+      updatePassword: updatePasswordMock,
       requestPasswordReset: vi.fn(),
       signOut: vi.fn(),
     });
@@ -82,6 +90,54 @@ describe('Layout', () => {
     expect(mockedToast.warning).toHaveBeenCalledWith(
       'Sua conta foi criada com a senha padrão "ifrn". Recomenda-se trocar a senha no próximo acesso.',
     );
+  });
+
+  it('mostra o orgao do usuario autenticado na sidebar', () => {
+    mockedUseAuth.mockReturnValue({
+      ...mockedUseAuth(),
+      userOrg: {
+        id: 'org-2',
+        slug: 'ifrn-reitoria',
+        name: 'IFRN Reitoria',
+        role: 'member',
+      },
+    });
+
+    render(
+      <MemoryRouter>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('IFRN Reitoria')).toBeInTheDocument();
+    expect(screen.queryByText('IFRN Campus Currais Novos')).not.toBeInTheDocument();
+  });
+
+  it('permite alterar a senha pelo menu do usuario', async () => {
+    updatePasswordMock.mockResolvedValue(null);
+
+    render(
+      <MemoryRouter>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByTitle('Alterar senha'));
+    fireEvent.change(screen.getByLabelText('Nova senha'), {
+      target: { value: 'nova-senha-123' },
+    });
+    fireEvent.change(screen.getByLabelText('Confirmar senha'), {
+      target: { value: 'nova-senha-123' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /salvar nova senha/i }));
+
+    await waitFor(() => {
+      expect(updatePasswordMock).toHaveBeenCalledWith('nova-senha-123');
+    });
   });
 
   it('mostra controle de usuarios quando a tela esta permitida', () => {

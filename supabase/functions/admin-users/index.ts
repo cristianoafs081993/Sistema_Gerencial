@@ -1,6 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 
-const DEFAULT_PASSWORD = 'ifrn';
 const SUPERADMIN_EMAIL = 'cristiano.cnrn@gmail.com';
 
 const corsHeaders = {
@@ -17,8 +16,10 @@ const corsHeaders = {
 type AdminUsersRequest =
   // Usuários
   | { action: 'list' }
-  | { action: 'create-user'; email?: string; groupId?: string }
+  | { action: 'create-user'; email?: string; groupId?: string; password?: string }
   | { action: 'invite-user'; email?: string; groupId?: string; redirectTo?: string }
+  | { action: 'update-user-password'; userId?: string; password?: string }
+  | { action: 'delete-user'; userId?: string; email?: string }
   | { action: 'upsert-group'; id?: string; name?: string; description?: string; screenIds?: string[] }
   | { action: 'set-user-groups'; userId?: string; email?: string; groupIds?: string[] }
   // Órgãos (multi-tenant)
@@ -40,6 +41,7 @@ type AuthUserLike = {
 };
 
 type AuthUserForAdminCheck = {
+  id?: string | null;
   email?: string | null;
   app_metadata?: { role?: string; is_superadmin?: boolean };
 };
@@ -114,6 +116,15 @@ function slugify(value: string) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 64);
+}
+
+function assertValidPassword(password: string, message = 'A senha deve ter pelo menos 8 caracteres.') {
+  if (password.length < 8) {
+    throw new Response(JSON.stringify({ error: message }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
 }
 
 async function assertAllowedAdmin(supabase: ReturnType<typeof createClient>, accessToken: string) {
@@ -236,12 +247,15 @@ async function createDirectUser(supabase: ReturnType<typeof createClient>, reque
   if (request.action !== 'create-user') return;
   const email = normalizeEmail(assertString(request.email, 'Informe o e-mail do usuario.'));
   const groupId = assertString(request.groupId, 'Informe o grupo do usuario.');
+  const password = assertString(request.password, 'Informe a senha inicial do usuario.');
   assertValidEmail(email);
+  assertValidPassword(password, 'A senha inicial deve ter pelo menos 8 caracteres.');
+
   const { data, error } = await supabase.auth.admin.createUser({
     email,
-    password: DEFAULT_PASSWORD,
+    password,
     email_confirm: true,
-    user_metadata: { uses_default_password: true },
+    user_metadata: { uses_default_password: false, initial_password_set_by_admin: true },
   });
   if (error) throw error;
   if (!data.user?.id) throw new Error('Usuario criado sem identificador retornado pelo Supabase.');
@@ -272,6 +286,70 @@ async function inviteUser(
   if (error) throw error;
   if (!data.user?.id) throw new Error('Convite enviado sem identificador de usuario retornado.');
   await assignUserGroups(supabase, data.user.id, email, [groupId]);
+}
+
+async function updateUserPassword(supabase: ReturnType<typeof createClient>, request: AdminUsersRequest) {
+  if (request.action !== 'update-user-password') return;
+  const userId = assertString(request.userId, 'Informe o usuario.');
+  const password = assertString(request.password, 'Informe a nova senha do usuario.');
+  assertValidPassword(password, 'A nova senha deve ter pelo menos 8 caracteres.');
+
+  const { data: currentUserData, error: currentUserError } = await supabase.auth.admin.getUserById(userId);
+  if (currentUserError) throw currentUserError;
+  if (!currentUserData.user?.id) {
+    throw new Response(JSON.stringify({ error: 'Usuario nao encontrado.' }), {
+      status: 404,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  const { error } = await supabase.auth.admin.updateUserById(userId, {
+    password,
+    user_metadata: {
+      ...(currentUserData.user.user_metadata || {}),
+      uses_default_password: false,
+      password_reset_by_admin_at: new Date().toISOString(),
+    },
+  });
+  if (error) throw error;
+}
+
+async function deleteUser(
+  supabase: ReturnType<typeof createClient>,
+  request: AdminUsersRequest,
+  adminUserId?: string | null,
+) {
+  if (request.action !== 'delete-user') return;
+  const userId = assertString(request.userId, 'Informe o usuario.');
+  const email = normalizeEmail(assertString(request.email, 'Informe o e-mail do usuario.'));
+
+  if (adminUserId && userId === adminUserId) {
+    throw new Response(JSON.stringify({ error: 'Nao e permitido excluir o proprio superadministrador autenticado.' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  const { data: currentUserData, error: currentUserError } = await supabase.auth.admin.getUserById(userId);
+  if (currentUserError) throw currentUserError;
+  if (!currentUserData.user?.id || normalizeEmail(currentUserData.user.email) !== email) {
+    throw new Response(JSON.stringify({ error: 'Usuario nao encontrado para exclusao.' }), {
+      status: 404,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  const { error: deleteAuthError } = await supabase.auth.admin.deleteUser(userId);
+  if (deleteAuthError) throw deleteAuthError;
+
+  const cleanupResults = await Promise.all([
+    supabase.from('user_group_memberships').delete().eq('user_id', userId),
+    supabase.from('terceirizado_permissions').delete().eq('user_id', userId),
+  ]);
+
+  for (const result of cleanupResults) {
+    if (result.error) throw result.error;
+  }
 }
 
 async function upsertGroup(supabase: ReturnType<typeof createClient>, request: AdminUsersRequest) {
@@ -497,6 +575,14 @@ Deno.serve(async (request) => {
     }
     if (body.action === 'invite-user') {
       await inviteUser(supabase, body, normalizeEmail(admin.email));
+      return jsonResponse(await listState(supabase));
+    }
+    if (body.action === 'update-user-password') {
+      await updateUserPassword(supabase, body);
+      return jsonResponse(await listState(supabase));
+    }
+    if (body.action === 'delete-user') {
+      await deleteUser(supabase, body, admin.id);
       return jsonResponse(await listState(supabase));
     }
     if (body.action === 'upsert-group') {

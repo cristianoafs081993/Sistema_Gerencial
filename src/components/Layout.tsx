@@ -7,7 +7,9 @@ import {
   Clock3,
   FileStack,
   FileText,
+  KeyRound,
   Landmark,
+  Loader2,
   LogOut,
   Menu,
   ScrollText,
@@ -25,6 +27,8 @@ import { appScreenGroups, appScreens, type AppScreenGroupId } from '@/lib/appScr
 import { APP_BRAND } from '@/lib/brand';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { LogoIcon } from './Logo';
 
 interface LayoutProps {
@@ -115,9 +119,13 @@ function isItemActive(pathname: string, item: NavigationItem) {
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
-  const { isLoading: isAuthLoading, session, signOut, canAccessScreen } = useAuth();
+  const { isAccessLoading, session, signOut, updatePassword, canAccessScreen, userOrg } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [navigationSearch, setNavigationSearch] = useState('');
   const navigationSections = useMemo(() => {
     const sections = buildNavigationSections(canAccessScreen);
@@ -156,6 +164,7 @@ export function Layout({ children }: LayoutProps) {
   });
   const isConsultor = location.pathname === '/consultor';
   const userEmail = session?.user?.email || null;
+  const orgLabel = isAccessLoading ? 'Carregando órgão...' : userOrg?.name || 'Órgão não vinculado';
 
   useEffect(() => {
     const userId = session?.user?.id || null;
@@ -228,6 +237,35 @@ export function Layout({ children }: LayoutProps) {
     }
   };
 
+  const handleChangePassword = async () => {
+    if (newPassword.length < 8) {
+      toast.error('Use uma senha com pelo menos 8 caracteres.');
+      return;
+    }
+
+    if (newPassword !== newPasswordConfirmation) {
+      toast.error('As senhas digitadas não coincidem.');
+      return;
+    }
+
+    setIsUpdatingPassword(true);
+
+    try {
+      const error = await updatePassword(newPassword);
+      if (error) throw error;
+
+      setNewPassword('');
+      setNewPasswordConfirmation('');
+      setIsPasswordDialogOpen(false);
+      toast.success('Senha alterada com sucesso.');
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : 'Falha ao alterar a senha.');
+    } finally {
+      setIsUpdatingPassword(false);
+    }
+  };
+
   const toggleSection = (title: string) => {
     setExpandedSections((current) => ({ ...current, [title]: !current[title] }));
   };
@@ -279,7 +317,7 @@ export function Layout({ children }: LayoutProps) {
 
           <div className="mt-3 py-1.5 px-3 bg-white rounded-md border border-slate-200/80 text-[11px] text-slate-700 flex items-center gap-1.5 shadow-sm">
             <span className="w-2 h-2 rounded-full bg-ifrn-green animate-pulse"></span>
-            <span>IFRN Campus Currais Novos</span>
+            <span className="min-w-0 truncate" title={orgLabel}>{orgLabel}</span>
           </div>
         </div>
 
@@ -500,9 +538,17 @@ export function Layout({ children }: LayoutProps) {
                 </div>
                 <button
                   type="button"
+                  onClick={() => setIsPasswordDialogOpen(true)}
+                  className="p-1.5 text-slate-400 hover:text-sebrae-blue hover:bg-slate-100 rounded-lg transition-colors ml-1 hidden sm:block"
+                  title="Alterar senha"
+                >
+                  <KeyRound className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
                   disabled={isSigningOut}
                   onClick={() => void handleSignOut()}
-                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors ml-1 hidden sm:block"
+                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors hidden sm:block"
                   title="Sair do sistema"
                 >
                   <LogOut className="w-4 h-4" />
@@ -516,6 +562,69 @@ export function Layout({ children }: LayoutProps) {
           <div className={cn('mx-auto w-full max-w-[1600px]', isConsultor && 'max-w-none')}>{children}</div>
         </main>
       </div>
+
+      <Dialog
+        open={isPasswordDialogOpen}
+        onOpenChange={(open) => {
+          setIsPasswordDialogOpen(open);
+          if (!open) {
+            setNewPassword('');
+            setNewPasswordConfirmation('');
+          }
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Alterar senha</DialogTitle>
+            <DialogDescription>Defina uma nova senha de acesso com pelo menos 8 caracteres.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="layout-new-password" className="text-sm font-medium text-foreground">
+                Nova senha
+              </label>
+              <Input
+                id="layout-new-password"
+                type="password"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                placeholder="Mínimo de 8 caracteres"
+                autoComplete="new-password"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="layout-new-password-confirmation" className="text-sm font-medium text-foreground">
+                Confirmar senha
+              </label>
+              <Input
+                id="layout-new-password-confirmation"
+                type="password"
+                value={newPasswordConfirmation}
+                onChange={(event) => setNewPasswordConfirmation(event.target.value)}
+                placeholder="Repita a senha"
+                autoComplete="new-password"
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    void handleChangePassword();
+                  }
+                }}
+              />
+            </div>
+
+            <Button
+              type="button"
+              className="w-full"
+              disabled={isUpdatingPassword}
+              onClick={() => void handleChangePassword()}
+            >
+              {isUpdatingPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+              {isUpdatingPassword ? 'Salvando...' : 'Salvar nova senha'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -578,11 +578,12 @@ Consumido por:
 
 Finalidade:
 
-- cadastro global de fornecedores para cotação, envio de e-mails e mapa de regularidade
+- cadastro de fornecedores por órgão para cotação, envio de e-mails e mapa de regularidade
 
 Campos-chave:
 
 - `id`
+- `org_id`
 - `name`
 - `document`
 - `email`
@@ -597,6 +598,11 @@ Consumido por:
 
 - `src/services/priceResearchEmail.ts`
 - `src/pages/CadastroFornecedores.tsx`
+
+Observações operacionais:
+
+- fornecedores são isolados por `org_id`; usuários de um órgão não veem fornecedores cadastrados por outro órgão
+- a migration `20260712193000_scope_suppliers_by_org.sql` migra registros antigos para o órgão padrão `ifrn-cn` e troca a unicidade de `document` para o escopo `(org_id, document)`
 
 ### `supplier_certificates`
 
@@ -620,6 +626,10 @@ Consumido por:
 
 - `src/services/supplierCompliance.ts`
 - `src/pages/CadastroFornecedores.tsx`
+
+Observações operacionais:
+
+- o acesso herda o escopo do fornecedor vinculado em `suppliers`
 
 ### `financeiro_fonte_vinculacao`
 

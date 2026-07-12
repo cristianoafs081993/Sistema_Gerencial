@@ -55,13 +55,18 @@ describe('userAdmin service', () => {
 
     const { createDirectUser } = await import('@/services/userAdmin');
 
-    await createDirectUser({ email: 'diretor@ifrn.edu.br', groupId: 'grupo-diretores' });
+    await createDirectUser({
+      email: 'diretor@ifrn.edu.br',
+      groupId: 'grupo-diretores',
+      password: 'senha-inicial-123',
+    });
 
     expect(invoke).toHaveBeenCalledWith('admin-users', {
       body: {
         action: 'create-user',
         email: 'diretor@ifrn.edu.br',
         groupId: 'grupo-diretores',
+        password: 'senha-inicial-123',
       },
       headers: {
         Authorization: 'Bearer token-123',
@@ -134,6 +139,98 @@ describe('userAdmin service', () => {
       },
       headers: {
         Authorization: 'Bearer fresh-token',
+      },
+    });
+  });
+
+  it('envia redefinicao de senha de usuario existente para a edge function', async () => {
+    getSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: 'token-123',
+        },
+      },
+      error: null,
+    });
+    getUser.mockResolvedValue({
+      data: {
+        user: {
+          id: 'user-123',
+        },
+      },
+      error: null,
+    });
+    invoke.mockResolvedValue({
+      data: {
+        users: [],
+        groups: [],
+        screens: [],
+        screenGroups: [],
+      },
+      error: null,
+    });
+
+    const { updateAdminUserPassword } = await import('@/services/userAdmin');
+
+    await updateAdminUserPassword({
+      userId: 'target-user',
+      password: 'nova-senha-123',
+    });
+
+    expect(invoke).toHaveBeenCalledWith('admin-users', {
+      body: {
+        action: 'update-user-password',
+        userId: 'target-user',
+        password: 'nova-senha-123',
+      },
+      headers: {
+        Authorization: 'Bearer token-123',
+      },
+    });
+  });
+
+  it('envia exclusao de usuario para a edge function', async () => {
+    getSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: 'token-123',
+        },
+      },
+      error: null,
+    });
+    getUser.mockResolvedValue({
+      data: {
+        user: {
+          id: 'user-123',
+        },
+      },
+      error: null,
+    });
+    invoke.mockResolvedValue({
+      data: {
+        users: [],
+        groups: [],
+        screens: [],
+        screenGroups: [],
+      },
+      error: null,
+    });
+
+    const { deleteAdminUser } = await import('@/services/userAdmin');
+
+    await deleteAdminUser({
+      userId: 'target-user',
+      email: 'diretor@ifrn.edu.br',
+    });
+
+    expect(invoke).toHaveBeenCalledWith('admin-users', {
+      body: {
+        action: 'delete-user',
+        userId: 'target-user',
+        email: 'diretor@ifrn.edu.br',
+      },
+      headers: {
+        Authorization: 'Bearer token-123',
       },
     });
   });

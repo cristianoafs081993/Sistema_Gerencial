@@ -1,6 +1,6 @@
 import type { User } from '@supabase/supabase-js';
 
-import { appScreens } from '@/lib/appScreens';
+import { appScreens, expandScreenAccessIds } from '@/lib/appScreens';
 import { supabase } from '@/lib/supabase';
 import { getAuthUserMatricula } from '@/lib/terceirizadoIdentity';
 
@@ -128,10 +128,12 @@ async function fetchOrgEnabledScreenIds(orgId: string): Promise<string[] | null>
 
 export async function fetchUserAccess(user: User, isSuperAdmin: boolean): Promise<UserAccess> {
   if (isSuperAdmin) {
+    const org = await fetchUserOrg(user.id);
+
     return {
       groups: [{ id: 'superadmin', name: 'Superadministrador', slug: 'superadmin' }],
-      screenIds: appScreens.map((screen) => screen.id),
-      org: null,
+      screenIds: expandScreenAccessIds(appScreens.map((screen) => screen.id)),
+      org,
     };
   }
 
@@ -166,13 +168,13 @@ export async function fetchUserAccess(user: User, isSuperAdmin: boolean): Promis
   if (isRefeitorioTerceirizado) {
     return {
       groups: groups.filter((group) => group.slug === 'terceirizado'),
-      screenIds: ['requisicao-compra'],
+      screenIds: expandScreenAccessIds(['requisicao-compra']),
       org: orgResult,
     };
   }
 
   if (groupIds.length === 0) {
-    return { groups, screenIds: [], org: orgResult };
+    return { groups, screenIds: expandScreenAccessIds([]), org: orgResult };
   }
 
   // Permissões de tela pelo grupo de usuário
@@ -202,5 +204,5 @@ export async function fetchUserAccess(user: User, isSuperAdmin: boolean): Promis
     }
   }
 
-  return { groups, screenIds, org: orgResult };
+  return { groups, screenIds: expandScreenAccessIds(screenIds), org: orgResult };
 }

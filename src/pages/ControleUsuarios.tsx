@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, MailPlus, Plus, RefreshCw, Save, UserPlus } from 'lucide-react';
+import { KeyRound, Loader2, MailPlus, Plus, RefreshCw, Save, Trash2, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { HeaderActions } from '@/components/HeaderParts';
@@ -9,6 +9,14 @@ import { SectionPanel } from '@/components/design-system/SectionPanel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -16,9 +24,11 @@ import { buildInviteRedirectUrl, isLocalAuthRedirectUrl, resolveAuthRedirectOrig
 import { env } from '@/lib/env';
 import {
   createDirectUser,
+  deleteAdminUser,
   inviteAdminUser,
   listAdminUsersState,
   setAdminUserGroups,
+  updateAdminUserPassword,
   upsertUserGroup,
   type AdminScreen,
   type AdminScreenGroup,
@@ -26,8 +36,6 @@ import {
   type AdminUserGroup,
   type AdminUsersState,
 } from '@/services/userAdmin';
-
-const DEFAULT_PASSWORD = 'ifrn';
 
 function screenGroupName(screenGroups: AdminScreenGroup[], groupId: string) {
   return screenGroups.find((group) => group.id === groupId)?.name || groupId;
@@ -48,7 +56,12 @@ export default function ControleUsuarios() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createEmail, setCreateEmail] = useState('');
+  const [createPassword, setCreatePassword] = useState('');
+  const [createPasswordConfirmation, setCreatePasswordConfirmation] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
+  const [passwordTargetUser, setPasswordTargetUser] = useState<AdminUser | null>(null);
+  const [existingUserPassword, setExistingUserPassword] = useState('');
+  const [existingUserPasswordConfirmation, setExistingUserPasswordConfirmation] = useState('');
   const [selectedCreateGroupId, setSelectedCreateGroupId] = useState('');
   const [selectedInviteGroupId, setSelectedInviteGroupId] = useState('');
   const [editingGroupId, setEditingGroupId] = useState<string>('new');
@@ -114,11 +127,23 @@ export default function ControleUsuarios() {
       return;
     }
 
+    if (createPassword.length < 8) {
+      toast.error('Informe uma senha inicial com pelo menos 8 caracteres.');
+      return;
+    }
+
+    if (createPassword !== createPasswordConfirmation) {
+      toast.error('As senhas digitadas não coincidem.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const nextState = await createDirectUser({ email, groupId: selectedCreateGroupId });
+      const nextState = await createDirectUser({ email, groupId: selectedCreateGroupId, password: createPassword });
       setCreateEmail('');
-      applyState(nextState, `Usuário criado com a senha padrão "${DEFAULT_PASSWORD}".`);
+      setCreatePassword('');
+      setCreatePasswordConfirmation('');
+      applyState(nextState, 'Usuário criado com a senha inicial definida.');
     } catch (error) {
       console.error(error);
       toast.error(error instanceof Error ? error.message : 'Falha ao criar usuário.');
@@ -148,6 +173,58 @@ export default function ControleUsuarios() {
     } catch (error) {
       console.error(error);
       toast.error(error instanceof Error ? error.message : 'Falha ao enviar convite.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const closePasswordDialog = () => {
+    setPasswordTargetUser(null);
+    setExistingUserPassword('');
+    setExistingUserPasswordConfirmation('');
+  };
+
+  const handleUpdateExistingUserPassword = async () => {
+    if (!passwordTargetUser) return;
+
+    if (existingUserPassword.length < 8) {
+      toast.error('Informe uma nova senha com pelo menos 8 caracteres.');
+      return;
+    }
+
+    if (existingUserPassword !== existingUserPasswordConfirmation) {
+      toast.error('As senhas digitadas nao coincidem.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const nextState = await updateAdminUserPassword({
+        userId: passwordTargetUser.id,
+        password: existingUserPassword,
+      });
+      setState(nextState);
+      closePasswordDialog();
+      toast.success('Senha do usuario atualizada.');
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : 'Falha ao alterar senha do usuario.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteUser = async (user: AdminUser) => {
+    if (!window.confirm(`Excluir o usuario ${user.email}? Esta acao nao pode ser desfeita.`)) return;
+
+    setIsSubmitting(true);
+    try {
+      const nextState = await deleteAdminUser({ userId: user.id, email: user.email });
+      setState(nextState);
+      toast.success('Usuario excluido.');
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : 'Falha ao excluir usuario.');
     } finally {
       setIsSubmitting(false);
     }
@@ -264,8 +341,29 @@ export default function ControleUsuarios() {
                   Criar
                 </Button>
               </div>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <Input
+                  type="password"
+                  value={createPassword}
+                  onChange={(event) => setCreatePassword(event.target.value)}
+                  placeholder="Senha inicial"
+                  autoComplete="new-password"
+                />
+                <Input
+                  type="password"
+                  value={createPasswordConfirmation}
+                  onChange={(event) => setCreatePasswordConfirmation(event.target.value)}
+                  placeholder="Confirmar senha inicial"
+                  autoComplete="new-password"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      void handleCreateDirectUser();
+                    }
+                  }}
+                />
+              </div>
               <p className="mt-3 text-xs text-[#858481]">
-                Usuários criados por aqui entram com a senha padrão "{DEFAULT_PASSWORD}" e recebem um aviso para trocar a senha.
+                A senha inicial deve ter pelo menos 8 caracteres. O usuário poderá alterá-la depois de entrar.
               </p>
             </FilterPanel>
 
@@ -305,6 +403,7 @@ export default function ControleUsuarios() {
                   {state.groups.map((group) => (
                     <TableHead key={group.id}>{group.name}</TableHead>
                   ))}
+                  <TableHead className="w-[120px] text-right">Acoes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -327,6 +426,33 @@ export default function ControleUsuarios() {
                         />
                       </TableCell>
                     ))}
+                    <TableCell>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setPasswordTargetUser(user)}
+                          disabled={isSubmitting}
+                          title="Alterar senha"
+                        >
+                          <KeyRound className="h-4 w-4" />
+                          <span className="sr-only">Alterar senha de {user.email}</span>
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => void handleDeleteUser(user)}
+                          disabled={isSubmitting}
+                          title="Excluir usuario"
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">Excluir {user.email}</span>
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -420,6 +546,54 @@ export default function ControleUsuarios() {
           </SectionPanel>
         </>
       ) : null}
+
+      <Dialog
+        open={Boolean(passwordTargetUser)}
+        onOpenChange={(open) => {
+          if (!open) closePasswordDialog();
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Alterar senha</DialogTitle>
+            <DialogDescription>
+              Defina uma nova senha para {passwordTargetUser?.email}. Ela deve ter pelo menos 8 caracteres.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <Input
+              type="password"
+              value={existingUserPassword}
+              onChange={(event) => setExistingUserPassword(event.target.value)}
+              placeholder="Nova senha"
+              autoComplete="new-password"
+            />
+            <Input
+              type="password"
+              value={existingUserPasswordConfirmation}
+              onChange={(event) => setExistingUserPasswordConfirmation(event.target.value)}
+              placeholder="Confirmar nova senha"
+              autoComplete="new-password"
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  void handleUpdateExistingUserPassword();
+                }
+              }}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={closePasswordDialog} disabled={isSubmitting}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={() => void handleUpdateExistingUserPassword()} disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
+              Salvar senha
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -33,9 +33,21 @@ Esse fluxo agora concentra:
 
 ### Controle de usuarios
 
-A tela `/controle-usuarios` e exclusiva do superadministrador. Ela usa a Edge Function `admin-users` para listar usuarios do Supabase Auth, criar usuarios com senha padrao `ifrn`, enviar convites, criar grupos e gravar permissoes por tela.
+A tela `/controle-usuarios` e exclusiva do superadministrador. Ela usa a Edge Function `admin-users` para listar usuarios do Supabase Auth, criar usuarios com senha inicial definida pelo superadministrador, redefinir senha de usuarios existentes, excluir usuarios, enviar convites, criar grupos e gravar permissoes por tela.
 
 O grupo inicial `Diretores` recebe acesso as telas de producao e nao recebe acesso ao controle de usuarios. Uploads e importacoes continuam dependentes de `isSuperAdmin`, portanto o grupo `Diretores` nao libera botoes de upload.
+
+Usuarios autenticados podem trocar a propria senha pelo botao de chave no cabecalho global. Ao trocar a senha, o metadado `uses_default_password` e limpo no Supabase Auth para encerrar o aviso de senha padrao em contas antigas.
+
+### Controle de orgaos e identificacao no layout
+
+A tela `/controle-orgaos` usa a mesma Edge Function `admin-users` para cadastrar orgaos, habilitar modulos por orgao e vincular usuarios em `org_users`.
+
+O `AuthContext` carrega o orgao primario do usuario autenticado via `fetchUserAccess`. O chip institucional da sidebar em `Layout.tsx` exibe `userOrg.name`, inclusive para superadministrador; quando nao houver vinculo cadastrado, exibe estado neutro de orgao nao vinculado em vez de assumir um campus fixo.
+
+Permissoes de modulo podem incluir subpaginas funcionais derivadas pelo catalogo `appScreens`. Atualmente, autorizar `pesquisa-precos` tambem libera `cadastro-fornecedores`, porque o cadastro e uma subpagina operacional do modulo Pesquisa de Precos e nao deve exigir marcacao separada no controle de orgaos.
+
+O cadastro de fornecedores do modulo Pesquisa de Precos usa `suppliers` e `supplier_certificates` com isolamento por `org_id`. Fornecedores cadastrados por um orgao nao devem aparecer para outro orgao; registros legados anteriores ao isolamento ficam associados ao orgao padrao `ifrn-cn`.
 
 ## Camada 2: origem do dado
 

@@ -33,13 +33,13 @@ Retorna o `org_id` do usuário autenticado. Usada em **todas** as policies de is
 `contratos`, `requisicoes_compra`, `financeiro_fonte_vinculacao`, `lc_credores`,
 `retencoes_efd_reinf`, `energia_import_runs`, `energia_consumo_faturas`,
 `energia_solar_geracao`, `energia_contratos`, `energia_contrato_execucoes`,
-`price_researches`
+`price_researches`, `suppliers`, `supplier_certificates`
 
 ### Tabelas globais/compartilhadas (sem org_id)
 
 `contratos_api*`, `licitacoes_pncp*`, `atas_registro_precos*`, `normativos*`,
 `document_templates`, `dimensoes`, `componentes_funcionais`, `naturezas_despesa`,
-`origens_recurso`, `suppliers`, `supplier_certificates`
+`origens_recurso`
 
 ---
 
