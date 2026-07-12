@@ -1,5 +1,13 @@
 import * as XLSX from 'xlsx';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('xlsx', async () => {
+  const actual = await vi.importActual<typeof import('xlsx')>('xlsx');
+  return {
+    ...actual,
+    writeFile: vi.fn(),
+  };
+});
 
 import {
   analyzePriceResearchCompliance,
@@ -9,6 +17,8 @@ import {
   buildPriceResearchReportHtml,
   buildPriceResearchManagementSummary,
   calculatePriceStatistics,
+  exportPriceResearchCsvBundle,
+  exportPriceResearchWorkbook,
   getEstimatedUnitPrice,
   getSelectedStatistics,
   parsePriceResearchFile,
@@ -401,5 +411,56 @@ describe('priceResearch', () => {
     expect(html).toContain('data:image/png;base64,logo');
     expect(html).not.toContain('Verificação automática de irregularidades');
     expect(html).not.toContain('Nenhum indício objetivo de irregularidade identificado.');
+  });
+
+  it('gera a mesma autenticação no HTML quando o snapshot e as opções são mantidos', () => {
+    const report = createReport();
+    const options = {
+      origin: 'https://app.example.test',
+      researchId: 'research-1',
+      generatedAt: '2026-07-12T12:00:00.000Z',
+    };
+
+    const previewHtml = buildPriceResearchReportHtml(report, options);
+    const exportedHtml = buildPriceResearchReportHtml(report, options);
+
+    expect(previewHtml).toBe(exportedHtml);
+    expect(previewHtml).toContain('price-research-management-v1');
+  });
+
+  it('não inclui conformidade nas exportações XLSX e CSV', async () => {
+    const report = createReport();
+    const writeFileMock = vi.mocked(XLSX.writeFile);
+    writeFileMock.mockClear();
+    const originalCreateObjectUrl = Object.getOwnPropertyDescriptor(URL, 'createObjectURL');
+    const originalRevokeObjectUrl = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL');
+    const downloadedFiles: string[] = [];
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function captureDownload() {
+      downloadedFiles.push(this.download);
+    });
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn(() => 'blob:price-research'),
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: vi.fn(),
+    });
+
+    try {
+      await exportPriceResearchWorkbook(report, { generatedAt: '2026-07-12T12:00:00.000Z' });
+      const workbook = writeFileMock.mock.calls[0]?.[0];
+      expect(workbook?.SheetNames).not.toContain('Conformidade');
+
+      exportPriceResearchCsvBundle(report, { generatedAt: '2026-07-12T12:00:00.000Z' });
+      expect(downloadedFiles).not.toContain('relatorio-pesquisa-precos-conformidade.csv');
+      expect(downloadedFiles).toContain('relatorio-pesquisa-precos-autenticacao.csv');
+    } finally {
+      clickSpy.mockRestore();
+      if (originalCreateObjectUrl) Object.defineProperty(URL, 'createObjectURL', originalCreateObjectUrl);
+      else delete (URL as { createObjectURL?: typeof URL.createObjectURL }).createObjectURL;
+      if (originalRevokeObjectUrl) Object.defineProperty(URL, 'revokeObjectURL', originalRevokeObjectUrl);
+      else delete (URL as { revokeObjectURL?: typeof URL.revokeObjectURL }).revokeObjectURL;
+    }
   });
 });

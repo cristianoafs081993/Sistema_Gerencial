@@ -36,6 +36,12 @@ Arquivo: `src/components/design-system/TableSkeletonRows.tsx`
 
 Skeleton reutilizavel para linhas tabulares.
 
+### `RouteLoadingFallback`
+
+Arquivo: `src/components/design-system/RouteLoadingFallback.tsx`
+
+Fallback acessivel para rotas carregadas sob demanda. O modo `screen` ocupa a viewport em paginas publicas e o modo `content` preserva o shell global nas paginas autenticadas. Ambos exibem mensagem visivel e anunciam o carregamento com `role="status"`, `aria-live="polite"` e `aria-busy`.
+
 ### `TablePagination`
 
 Arquivo: `src/components/design-system/TablePagination.tsx`
@@ -59,7 +65,7 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 - `DashboardContractExecutionTab`: aba analitica dedicada a contratos no dashboard, com seletor global por bolhas clicaveis, grafico mensal de faturas e bullet chart de projecao anual frente ao empenhado com hover de rastreabilidade.
 - `DashboardRapAnnualEvolutionPanel`: painel da aba RAP com `ChartPanel`, seletor de UG, upload CSV restrito a superadmin, grafico anual combinado e tabela resumida do historico agregado.
 - `EnergiaCampus`: pagina analitica-operacional que combina `StatCard`, `ChartPanel`, `SectionPanel`, `DataTablePanel`, filtros no `HeaderActions` e upload XLSX restrito a superadmin.
-- `PesquisaPrecos`: fluxo operacional em etapas que combina breadcrumb contextual clicavel com wizard, menu de exportacao, `SectionPanel`, painel de personalizacao institucional do relatorio, painel compacto de metodos de calculo, seletor horizontal de itens, sugestoes CATMAT/CATSER confirmaveis, `DataTablePanel` para revisar ate 15 referencias e previa gerencial com curva ABC/QR Code, com estados explicitos de aderencia, selecao e exclusao; quando um item esta aberto, o topo exibe `Itens > Nome do item`, o link `Itens` retorna a lista, a entrada normal na etapa Itens sempre abre a lista antes das cotacoes, motivos positivos da IA ou estados sem alerta nao geram cards ou avisos visuais, e a atualizacao monetaria global fica no rodape discreto do painel de metodos com aviso transitorio sobre o mes atual.
+- `PesquisaPrecos`: fluxo operacional em etapas que combina breadcrumb contextual clicavel com wizard, menu de exportacao, `SectionPanel`, painel de personalizacao institucional do relatorio, painel compacto de metodos de calculo, seletor horizontal de itens, sugestoes CATMAT/CATSER confirmaveis, `DataTablePanel` para revisar ate 100 referencias e previa integral do documento PDF/HTML em `iframe` isolado; `Observacoes` e editado na identificacao, enquanto `Alertas e conformidade` permanece como painel operacional externo e ausente de todas as exportacoes. Quando um item esta aberto, o topo exibe `Itens > Nome do item`, o link `Itens` retorna a lista, a entrada normal na etapa Itens sempre abre a lista antes das cotacoes, a busca oficial pendente preserva a estrutura com skeletons e bloqueia acoes dependentes, falhas oferecem nova tentativa, motivos positivos da IA ou estados sem alerta nao geram cards ou avisos visuais, e a atualizacao monetaria global fica no rodape discreto do painel de metodos com aviso transitorio sobre o mes atual.
 - `SupplierEmailDialog`: modal de solicitacao de cotacao de `PesquisaPrecos`, com cabecalho, corpo e rodape no mesmo padrao dos modais operacionais; o rodape oferece a acao secundaria `Historico de e-mails`, que abre um modal dedicado com os disparos registrados da pesquisa.
 - `PriceResearchValidation`: tela operacional de validação do QR Code da pesquisa de preços, baseada em `HeaderSubtitle`, `SectionPanel`, badges de status e blocos compactos para comparar hash informado e hash recalculado.
 - `RequisicaoCompra`: pagina operacional que apresenta "Gestão de Requisições de Compra" no header global por meio de `HeaderSubtitle`, sem repetir o titulo na area de conteudo.

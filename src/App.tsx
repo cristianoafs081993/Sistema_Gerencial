@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { RouteLoadingFallback } from '@/components/design-system/RouteLoadingFallback';
 import { Layout } from '@/components/Layout';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { Toaster } from '@/components/ui/toaster';
@@ -52,7 +53,7 @@ const queryClient = new QueryClient();
 const AppShell = () => (
   <DataProvider>
     <Layout>
-      <Suspense fallback={null}>
+      <Suspense fallback={<RouteLoadingFallback mode="content" />}>
         <Outlet />
       </Suspense>
     </Layout>
@@ -71,7 +72,7 @@ const App = () => (
             v7_relativeSplatPath: true,
           }}
         >
-          <Suspense fallback={null}>
+          <Suspense fallback={<RouteLoadingFallback mode="screen" />}>
             <Routes>
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/feedback-ambiente/:codigo" element={<PublicFeedback />} />

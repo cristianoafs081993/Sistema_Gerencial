@@ -90,6 +90,8 @@ Fonte primária de preços:
 
 Esses endpoints fornecem preços praticados/homologados por código de catálogo. O PNCP é apresentado como link complementar de rastreabilidade da compra. Não se deve substituir o preço homologado por valor meramente estimado de item publicado no PNCP.
 
+Durante a consulta oficial, a curadoria preserva a estrutura da etapa e substitui temporariamente métricas e linhas por skeletons, acompanhados da mensagem acessível `Buscando cotações oficiais...`. A interface não apresenta o estado vazio antes da resposta. Se a consulta falhar, mostra o erro na tabela e oferece `Tentar novamente`; exportação e navegação dependentes das cotações ficam desabilitadas enquanto a requisição estiver pendente.
+
 ## Comparabilidade
 
 O backend tenta normalizar apenas conversões determinísticas:
@@ -124,6 +126,8 @@ O relatório gerencial consolidado também inclui:
 - QR Code de autenticação contendo hash determinístico do snapshot revisado, versão do relatório e URL de conferência em `/pesquisa-precos/validar?id=<pesquisa>&auth=<hash>`;
 - exportação em PDF/impressão, HTML, XLSX e CSV. No XLSX e CSV, instituição e servidores também são exportados em abas/arquivos próprios.
 
+A etapa `Relatório` do wizard exibe, em uma prévia somente leitura, o mesmo documento completo usado nas exportações PDF e HTML. As observações são preenchidas na etapa `Identificação` e aparecem no rodapé dessa prévia e do documento exportado. O painel operacional `Alertas e conformidade` permanece fora da prévia e não é incluído em PDF, HTML, XLSX ou CSV.
+
 O módulo exibe média aritmética, mediana, menor preço, média ponderada, média saneada e preços excluídos do cálculo. A média ponderada usa a quantidade registrada na referência de preço como peso, quando disponível. A média saneada corresponde à média dos preços mantidos na cesta após as exclusões justificadas pelo usuário. Ao desconsiderar uma cotação, a interface exige justificativa objetiva antes de gravar a exclusão. A mediana é o método padrão inicial para o preço estimado. O uso de menos de três preços não é automatizado neste corte; casos excepcionais devem seguir justificativa e aprovação da autoridade competente fora do fluxo automático.
 
 Na aba PNCP da curadoria, cotações oficiais não exibem colunas de frete nem de evidência. Quando a atualização monetária global é ativada pelo usuário, o espaço antes usado para frete passa a exibir somente o valor numérico do índice de atualização monetária aplicado a cada cotação. O cálculo usa o mês atual de execução como competência final, não a data antiga eventualmente salva na pesquisa. As abas de cotações de internet e fornecedores locais continuam exibindo frete, pois esse custo pode compor o preço comparável dessas fontes.
@@ -136,7 +140,7 @@ Referência normativa principal:
 
 O módulo executa uma análise determinística de apoio técnico sobre os dados disponíveis na própria pesquisa, sem consultar processos externos e sem substituir a revisão do agente responsável.
 
-A verificação usa somente a IN SEGES/ME nº 65/2021 e gera alertas estruturados com severidade, regra aplicada, evidência e ação recomendada. Achados bloqueantes impedem a conclusão do relatório; alertas podem permanecer quando houver justificativa registrada pelo usuário. Para pesquisas antigas com cotações já excluídas sem motivo, o alerta de exclusão sem justificativa direciona o usuário para registrar a justificativa pendente. A seção de verificação automática não é incluída no relatório HTML/PDF exportado.
+A verificação usa somente a IN SEGES/ME nº 65/2021 e gera alertas estruturados com severidade, regra aplicada, evidência e ação recomendada. Achados bloqueantes impedem a conclusão do relatório; alertas podem permanecer quando houver justificativa registrada pelo usuário. Para pesquisas antigas com cotações já excluídas sem motivo, o alerta de exclusão sem justificativa direciona o usuário para registrar a justificativa pendente. A seção de verificação automática não é incluída em nenhuma exportação do relatório (PDF, HTML, XLSX ou CSV).
 
 Regras cobertas neste corte:
 

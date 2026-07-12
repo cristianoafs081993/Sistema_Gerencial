@@ -41,6 +41,7 @@ import { toast } from 'sonner';
 import { HeaderSubtitle } from '@/components/HeaderParts';
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
 import { SectionPanel } from '@/components/design-system/SectionPanel';
+import { TableSkeletonRows } from '@/components/design-system/TableSkeletonRows';
 import { Badge } from '@/components/ui/badge';
 import {
   Breadcrumb,
@@ -55,14 +56,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   buildPriceResearchReportHtml,
-  buildPriceResearchAbcCurve,
-  buildPriceResearchAuthenticationPayload,
-  buildPriceResearchManagementSummary,
   createPriceResearchTemplate,
   exportPriceResearchCsvBundle,
   exportPriceResearchHtml,
@@ -79,6 +78,7 @@ import {
   type PriceResearchMethod,
   type PriceResearchReportData,
   type PriceResearchReportServer,
+  type PriceResearchAuthenticationOptions,
 } from '@/lib/priceResearch';
 import { findCatalogSuggestions } from '@/lib/priceCatalogClient';
 import { priceResearchService } from '@/services/priceResearch';
@@ -773,20 +773,18 @@ export default function PesquisaPrecos() {
     sourceFile,
   ]);
 
-  const managementSummary = useMemo(
-    () => buildPriceResearchManagementSummary(reportData),
-    [reportData],
-  );
-  const abcCurve = useMemo(
-    () => buildPriceResearchAbcCurve(reportData),
-    [reportData],
-  );
-  const authenticationPayload = useMemo(
-    () => buildPriceResearchAuthenticationPayload(reportData, {
-      origin: typeof window !== 'undefined' ? window.location.origin : '',
-      researchId: researchId ?? undefined,
-    }),
-    [reportData, researchId],
+  const reportPreviewSnapshot = useMemo(() => ({
+    data: reportData,
+    generatedAt: new Date().toISOString(),
+  }), [reportData]);
+  const reportAuthenticationOptions = useMemo<PriceResearchAuthenticationOptions>(() => ({
+    origin: typeof window !== 'undefined' ? window.location.origin : '',
+    researchId: researchId ?? undefined,
+    generatedAt: reportPreviewSnapshot.generatedAt,
+  }), [reportPreviewSnapshot.generatedAt, researchId]);
+  const reportPreviewHtml = useMemo(
+    () => buildPriceResearchReportHtml(reportPreviewSnapshot.data, reportAuthenticationOptions),
+    [reportAuthenticationOptions, reportPreviewSnapshot.data],
   );
 
   const updateItem = (localId: string, patch: Partial<PriceResearchItem>) => {
@@ -1474,6 +1472,7 @@ export default function PesquisaPrecos() {
       return;
     }
     printWindow.document.write(buildPriceResearchReportHtml(reportDataWithEmbeddedImages, {
+      ...reportAuthenticationOptions,
       researchId: saved,
       authenticationData: reportData,
     }));
@@ -1618,7 +1617,7 @@ export default function PesquisaPrecos() {
                       ? 'border-border-default hover:bg-surface-subtle text-text-primary bg-surface-card'
                       : 'bg-sebrae-blue hover:bg-sebrae-navy text-white'
                   }`}
-                  disabled={items.length === 0 || isSaving}
+                  disabled={items.length === 0 || isSaving || isSearching}
                 >
                   <Download className="h-4 w-4" />
                   {activeStep < 3 ? 'Exportar Relatório' : 'Finalizar e Exportar'}
@@ -1631,16 +1630,16 @@ export default function PesquisaPrecos() {
                   <Printer className="h-4 w-4 text-slate-500" />
                   Imprimir PDF
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => exportPriceResearchHtml(reportData, { researchId: researchId ?? undefined })} className="gap-2 cursor-pointer">
+                <DropdownMenuItem onSelect={() => exportPriceResearchHtml(reportData, reportAuthenticationOptions)} className="gap-2 cursor-pointer">
                   <Globe className="h-4 w-4 text-slate-500" />
                   Página HTML
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => void exportPriceResearchWorkbook(reportData, { researchId: researchId ?? undefined })} className="gap-2 cursor-pointer">
+                <DropdownMenuItem onSelect={() => void exportPriceResearchWorkbook(reportData, reportAuthenticationOptions)} className="gap-2 cursor-pointer">
                   <FileSpreadsheet className="h-4 w-4 text-slate-500" />
                   Planilha Excel
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => exportPriceResearchCsvBundle(reportData, { researchId: researchId ?? undefined })} className="gap-2 cursor-pointer">
+                <DropdownMenuItem onSelect={() => exportPriceResearchCsvBundle(reportData, reportAuthenticationOptions)} className="gap-2 cursor-pointer">
                   <FileDown className="h-4 w-4 text-slate-500" />
                   Arquivos CSV (PNCP)
                 </DropdownMenuItem>
@@ -1653,7 +1652,7 @@ export default function PesquisaPrecos() {
               type="button"
               className="gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-xs h-10 transition-all shadow-sm"
               onClick={() => goToStep(activeStep + 1)}
-              disabled={activeStep === 2 && (items.length === 0 || items.some(i => !i.catalogCode) || items.some(i => i.searchStatus === 'idle'))}
+              disabled={activeStep === 2 && (isSearching || items.length === 0 || items.some(i => !i.catalogCode) || items.some(i => i.searchStatus === 'idle'))}
             >
               Avançar
               <ArrowRight className="h-4 w-4" />
@@ -2100,6 +2099,16 @@ export default function PesquisaPrecos() {
               <div className="space-y-2 md:col-span-2 xl:col-span-4">
                 <Label htmlFor="methodology">Justificativa da Metodologia Adotada</Label>
                 <Textarea id="methodology" value={methodologyJustification} onChange={(event) => setMethodologyJustification(event.target.value)} rows={2} />
+              </div>
+              <div className="space-y-2 md:col-span-2 xl:col-span-4">
+                <Label htmlFor="research-notes">Observações</Label>
+                <Textarea
+                  id="research-notes"
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  rows={4}
+                  placeholder="Descreva prazos e locais de entrega, regras de frete, garantias técnicas, marcas ou outros fatores relevantes para o relatório..."
+                />
               </div>
             </div>
           </SectionPanel>
@@ -2832,8 +2841,22 @@ export default function PesquisaPrecos() {
             <div className="space-y-6">
               {selectedItem ? (
                 <>
+                  {isSearching && (
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      aria-busy="true"
+                      className="flex items-center gap-3 rounded-radius-lg border border-primary/20 bg-primary/[0.04] px-4 py-3 text-primary"
+                    >
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                      <p className="font-ui text-sm font-semibold">Buscando cotações oficiais...</p>
+                    </div>
+                  )}
                   <TooltipProvider delayDuration={120}>
-                    <section className="rounded-radius-xl border border-border-default bg-surface-card p-4 shadow-soft">
+                    <section
+                      aria-busy={isSearching}
+                      className="rounded-radius-xl border border-border-default bg-surface-card p-4 shadow-soft"
+                    >
                       <div className="grid gap-5 xl:grid-cols-12 xl:items-stretch">
                         <div className="min-w-0 xl:col-span-9">
                           <div className="mb-4 flex items-center gap-2">
@@ -2878,13 +2901,14 @@ export default function PesquisaPrecos() {
                                       name={`price-method-${selectedItem.localId}`}
                                       value={option.value}
                                       checked={isSelected}
+                                      disabled={isSearching}
                                       onChange={() => setMethod(option.value)}
                                       className="h-4 w-4 accent-primary"
                                     />
                                     <span className={isSelected ? 'font-bold text-primary' : 'font-medium'}>{option.label}</span>
                                   </span>
                                   <span className={`mt-2 block font-mono text-lg leading-none ${isSelected ? 'font-black text-primary' : 'font-bold text-text-primary'}`}>
-                                    {formatCurrency(value)}
+                                    {isSearching ? <Skeleton className="h-5 w-24" data-testid="curation-metric-skeleton" /> : formatCurrency(value)}
                                   </span>
                                   {isSelected ? (
                                     <span className="mt-1 block font-ui text-[10px] font-semibold text-text-muted">preço estimado atual</span>
@@ -2924,15 +2948,15 @@ export default function PesquisaPrecos() {
                             <dl className="space-y-1.5 font-ui text-xs my-auto">
                               <div className="flex items-center justify-between gap-3">
                                 <dt>Coeficiente de variação</dt>
-                                <dd className="font-mono font-bold">{selectedCoefficientOfVariation.toFixed(2)}%</dd>
+                                <dd className="font-mono font-bold">{isSearching ? <Skeleton className="h-4 w-14" /> : `${selectedCoefficientOfVariation.toFixed(2)}%`}</dd>
                               </div>
                               <div className="flex items-center justify-between gap-3">
                                 <dt>Desvio padrão</dt>
-                                <dd className="font-mono font-bold">{formatCurrency(selectedStatistics?.standardDeviation ?? 0)}</dd>
+                                <dd className="font-mono font-bold">{isSearching ? <Skeleton className="h-4 w-16" /> : formatCurrency(selectedStatistics?.standardDeviation ?? 0)}</dd>
                               </div>
                               <div className="flex items-center justify-between gap-3">
                                 <dt>Maior preço</dt>
-                                <dd className="font-mono font-bold">{formatCurrency(selectedStatistics?.maximum ?? 0)}</dd>
+                                <dd className="font-mono font-bold">{isSearching ? <Skeleton className="h-4 w-16" /> : formatCurrency(selectedStatistics?.maximum ?? 0)}</dd>
                               </div>
                             </dl>
                           </aside>
@@ -2948,7 +2972,9 @@ export default function PesquisaPrecos() {
                         ].map(([label, value]) => (
                           <div key={label} className="flex items-center justify-between gap-3 rounded-radius-sm bg-surface-subtle/50 px-3 py-2">
                             <span className="font-ui text-[10px] font-black uppercase tracking-wider text-text-muted">{label}</span>
-                            <span className="min-w-0 truncate text-right font-mono text-xs font-bold text-text-primary">{value}</span>
+                            <span className="min-w-0 truncate text-right font-mono text-xs font-bold text-text-primary">
+                              {isSearching ? <Skeleton className="h-4 w-20" /> : value}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -2958,6 +2984,7 @@ export default function PesquisaPrecos() {
                           <Checkbox
                             id="global-monetary-adjust-enable"
                             checked={globalAdjustmentEnabled}
+                            disabled={isSearching}
                             onCheckedChange={(checked) => {
                               const enabled = checked === true;
                               if (enabled) {
@@ -2978,6 +3005,7 @@ export default function PesquisaPrecos() {
                           {globalAdjustmentEnabled && (
                             <button
                               type="button"
+                              disabled={isSearching}
                               className="text-xs text-sebrae-blue hover:underline font-bold"
                               onClick={() => {
                                 setTempIndex(globalAdjustmentIndex);
@@ -3054,7 +3082,8 @@ export default function PesquisaPrecos() {
                         variant="outline"
                         size="sm"
                         className="gap-2 h-9 text-xs shrink-0 mb-1 border-primary/30 text-primary hover:bg-primary/5"
-                        onClick={() => void exportPriceResearchWorkbook(reportData, { researchId: researchId ?? undefined })}
+                        onClick={() => void exportPriceResearchWorkbook(reportData, reportAuthenticationOptions)}
+                        disabled={isSearching}
                       >
                         <Download className="h-3.5 w-3.5" />
                         Exportar XLSX
@@ -3092,6 +3121,36 @@ export default function PesquisaPrecos() {
                         <TableBody>
                           {(() => {
                             const pncpCandidates = selectedItem.candidates.filter(isOfficialCandidate);
+                            if (isSearching) {
+                              return (
+                                <TableSkeletonRows
+                                  rows={5}
+                                  columns={globalAdjustmentEnabled ? 9 : 8}
+                                  widths={['w-5', 'w-48', 'w-36', 'w-20', 'w-20', 'w-20', 'w-16', 'w-8', 'w-8']}
+                                />
+                              );
+                            }
+
+                            if (selectedItem.searchStatus === 'error') {
+                              return (
+                                <TableRow>
+                                  <TableCell colSpan={globalAdjustmentEnabled ? 9 : 8} className="py-10 text-center">
+                                    <div role="alert" className="flex flex-col items-center gap-3 text-text-secondary">
+                                      <AlertTriangle className="h-6 w-6 text-destructive" aria-hidden="true" />
+                                      <div>
+                                        <p className="font-ui text-sm font-bold text-text-primary">Não foi possível carregar as cotações oficiais.</p>
+                                        <p className="mt-1 font-ui text-xs text-text-muted">{selectedItem.searchError || 'Tente realizar a busca novamente.'}</p>
+                                      </div>
+                                      <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => void searchPrices()}>
+                                        <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                                        Tentar novamente
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            }
+
                             return pncpCandidates.length === 0 ? (
                               <TableRow>
                                 <TableCell colSpan={globalAdjustmentEnabled ? 9 : 8} className="text-center py-8 text-text-muted text-xs">
@@ -3795,197 +3854,68 @@ export default function PesquisaPrecos() {
       {/* STEP 3: VALIDAÇÃO & RELATÓRIO FINAL */}
       {activeStep === 3 && (
         <div className="space-y-6 animate-in fade-in duration-200">
-          {/* Tabela de Consolidação por Item */}
           <SectionPanel
-            title="Consolidação das Cotações por Item"
-            description="Resumo dos métodos estatísticos e da estimativa final por item."
+            title="Alertas e conformidade"
+            description="Verificação operacional baseada na IN SEGES/ME nº 65/2021. Esta seção não integra o relatório exportado."
           >
-            <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
-              <table className="w-full border-collapse text-left font-ui text-[11px]">
-                <thead>
-                  <tr className="border-b border-border-default bg-surface-subtle text-text-muted font-bold">
-                    <th className="py-3 px-4 text-center w-12">Item</th>
-                    <th className="py-3 px-4 min-w-[200px]">Descrição</th>
-                    <th className="py-3 px-4 text-center w-12">Qtd.</th>
-                    <th className="py-3 px-4 text-right w-28">Preço Estimado</th>
-                    <th className="py-3 px-4 text-right w-28">Total Estimado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-default/60">
-                  {items.map((item) => {
-                    const estimatedPrice = getEstimatedUnitPrice(item, method);
-                    const totalEstimated = estimatedPrice * item.quantity;
-                    
-                    return (
-                      <tr key={item.localId} className="hover:bg-surface-subtle/50 transition-colors">
-                        <td className="py-3 px-4 text-center font-bold text-text-primary">{item.itemNumber}</td>
-                        <td className="py-3 px-4 font-medium text-text-secondary leading-normal">
-                          <div>{item.description}</div>
-                          <div className="mt-0.5">
-                            <span className="font-mono text-[9px] bg-surface-subtle border border-border-default px-1 py-0.5 rounded text-text-secondary">
-                              {item.catalogType === 'material' ? 'CATMAT' : 'CATSER'} {item.catalogCode}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-center font-mono">{item.quantity}</td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-text-primary">
-                          {estimatedPrice > 0 ? formatCurrency(estimatedPrice) : <span className="text-text-muted font-normal italic">-</span>}
-                        </td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-text-primary">
-                          {totalEstimated > 0 ? formatCurrency(totalEstimated) : <span className="text-text-muted font-normal italic">-</span>}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </SectionPanel>
-
-          <SectionPanel
-            title="Relatório gerencial e autenticação"
-            description="Consolidação executiva, curva ABC e QR Code gerados a partir do snapshot revisado."
-          >
-            <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {[
-                  ['Estimativa geral', formatCurrency(managementSummary.estimatedTotal)],
-                  ['Selecionadas', managementSummary.selectedQuotesCount.toString()],
-                  ['Excluídas', managementSummary.excludedQuotesCount.toString()],
-                  ['Classe A/B/C', `${managementSummary.abcClassTotals.A}/${managementSummary.abcClassTotals.B}/${managementSummary.abcClassTotals.C}`],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-radius-lg border border-border-default bg-surface-subtle/40 p-4">
-                    <p className="font-ui text-[10px] font-semibold uppercase tracking-wider text-text-muted leading-none">{label}</p>
-                    <p className="mt-2 truncate font-ui text-lg font-bold text-text-primary leading-none">{value}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="rounded-radius-lg border border-border-default bg-white p-4">
-                <div className="flex items-center gap-3">
-                  <img
-                    src={authenticationPayload.qrCodeUrl}
-                    alt="QR Code de autenticação do relatório"
-                    className="h-24 w-24 shrink-0 rounded-radius-sm border border-border-default bg-white p-1"
-                  />
-                  <div className="min-w-0">
-                    <p className="font-ui text-[10px] font-bold uppercase tracking-wider text-text-muted">Hash do snapshot</p>
-                    <p className="mt-1 break-all font-mono text-[11px] font-bold text-text-primary">{authenticationPayload.snapshotHash}</p>
-                    <p className="mt-2 truncate font-ui text-[10px] text-text-muted">{authenticationPayload.reportVersion}</p>
-                  </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {(['error', 'warning', 'info'] as const).map((severity) => (
+                <div key={severity} className={`rounded-radius-lg border p-3 ${COMPLIANCE_SEVERITY_STYLES[severity]}`}>
+                  <p className="font-ui text-[10px] font-bold uppercase tracking-wider leading-none">
+                    {COMPLIANCE_SEVERITY_LABELS[severity]}
+                  </p>
+                  <p className="mt-2 font-mono text-xl font-bold leading-none">{complianceCounts[severity]}</p>
                 </div>
-              </div>
+              ))}
             </div>
 
-            <div className="mt-4 overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
-              <table className="w-full border-collapse text-left font-ui text-[11px]">
-                <thead>
-                  <tr className="border-b border-border-default bg-surface-subtle text-text-muted font-bold">
-                    <th className="py-3 px-4 w-16">Classe</th>
-                    <th className="py-3 px-4 w-16">Item</th>
-                    <th className="py-3 px-4 min-w-[220px]">Descrição</th>
-                    <th className="py-3 px-4 text-right w-32">Participação</th>
-                    <th className="py-3 px-4 text-right w-32">Acumulado</th>
-                    <th className="py-3 px-4 text-right w-36">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-default/60">
-                  {abcCurve.slice(0, 8).map((row) => (
-                    <tr key={row.itemId} className="hover:bg-surface-subtle/50 transition-colors">
-                      <td className="py-3 px-4">
-                        <Badge variant="outline" className="bg-white font-mono text-[10px]">ABC {row.abcClass}</Badge>
-                      </td>
-                      <td className="py-3 px-4 font-mono font-bold">{row.itemNumber}</td>
-                      <td className="py-3 px-4 text-text-secondary">{row.description}</td>
-                      <td className="py-3 px-4 text-right font-mono">{row.participationPercentage.toFixed(2)}%</td>
-                      <td className="py-3 px-4 text-right font-mono">{row.accumulatedPercentage.toFixed(2)}%</td>
-                      <td className="py-3 px-4 text-right font-mono font-bold">{formatCurrency(row.estimatedTotal)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </SectionPanel>
-
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* Resumo Consolidado */}
-            <SectionPanel
-              title="Resumo Consolidado"
-              description="Acompanhamento geral da estimativa orçamentária calculada."
-            >
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  ['Total de Itens', items.length.toString()],
-                  ['Cotações Ativas', selectedQuotesCount.toString()],
-                  ['Método Estatístico', METHOD_LABELS[method]],
-                  ['Estimativa Geral', formatCurrency(estimatedTotal)],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-radius-lg border border-border-default bg-surface-subtle/40 p-4">
-                    <p className="font-ui text-[10px] font-semibold uppercase tracking-wider text-text-muted leading-none">{label}</p>
-                    <p className="mt-2 font-ui text-lg font-bold text-text-primary leading-none truncate">{value}</p>
-                  </div>
-                ))}
-              </div>
-            </SectionPanel>
-
-            <SectionPanel
-              title="Alertas e conformidade"
-              description="Alertas automáticos com base na IN SEGES/ME nº 65/2021."
-            >
-              <div className="grid grid-cols-3 gap-3">
-                {(['error', 'warning', 'info'] as const).map((severity) => (
-                  <div key={severity} className={`rounded-radius-lg border p-3 ${COMPLIANCE_SEVERITY_STYLES[severity]}`}>
-                    <p className="font-ui text-[10px] font-bold uppercase tracking-wider leading-none">
-                      {COMPLIANCE_SEVERITY_LABELS[severity]}
-                    </p>
-                    <p className="mt-2 font-mono text-xl font-bold leading-none">{complianceCounts[severity]}</p>
-                  </div>
-                ))}
-              </div>
-
-              {complianceFindings.length > 0 && (
-                <div className="mt-5 max-h-[280px] space-y-2 overflow-y-auto pr-1">
-                  {complianceFindings.map((finding) => (
-                    <button
-                      key={finding.id}
-                      type="button"
-                      className={`w-full rounded-radius-md border p-3 text-left transition-colors hover:bg-surface-subtle ${COMPLIANCE_SEVERITY_STYLES[finding.severity]}`}
-                      onClick={() => handleComplianceFindingClick(finding)}
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="font-ui text-xs font-bold leading-snug text-current">{finding.message}</p>
-                          <p className="mt-1 font-ui text-[10px] font-semibold text-current/75">{finding.ruleLabel}</p>
-                        </div>
-                        {finding.itemNumber ? (
-                          <Badge variant="outline" className="shrink-0 bg-white/60 text-[10px]">Item {finding.itemNumber}</Badge>
-                        ) : null}
+            {complianceFindings.length > 0 && (
+              <div className="mt-5 max-h-[280px] space-y-2 overflow-y-auto pr-1">
+                {complianceFindings.map((finding) => (
+                  <button
+                    key={finding.id}
+                    type="button"
+                    className={`w-full rounded-radius-md border p-3 text-left transition-colors hover:bg-surface-subtle ${COMPLIANCE_SEVERITY_STYLES[finding.severity]}`}
+                    onClick={() => handleComplianceFindingClick(finding)}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-ui text-xs font-bold leading-snug text-current">{finding.message}</p>
+                        <p className="mt-1 font-ui text-[10px] font-semibold text-current/75">{finding.ruleLabel}</p>
                       </div>
-                      <p className="mt-2 font-ui text-[10px] leading-normal text-current/80">
-                        <span className="font-bold">Evidência:</span> {finding.evidence}
-                      </p>
-                      <p className="mt-1 font-ui text-[10px] leading-normal text-current/80">
-                        <span className="font-bold">Ação:</span> {finding.recommendedAction}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </SectionPanel>
-          </div>
+                      {finding.itemNumber ? (
+                        <Badge variant="outline" className="shrink-0 bg-white/60 text-[10px]">Item {finding.itemNumber}</Badge>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 font-ui text-[10px] leading-normal text-current/80">
+                      <span className="font-bold">Evidência:</span> {finding.evidence}
+                    </p>
+                    <p className="mt-1 font-ui text-[10px] leading-normal text-current/80">
+                      <span className="font-bold">Ação:</span> {finding.recommendedAction}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </SectionPanel>
 
           <SectionPanel
-            title="Observações Finais"
-            description="Informações complementares sobre prazos de entrega, frete, garantias, marcas e condições da pesquisa."
-            footer={renderWizardFooter()}
+            title="Prévia do relatório"
+            description="Conteúdo completo e somente leitura que será usado nas exportações PDF e HTML."
           >
-            <Textarea
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              rows={4}
-              placeholder="Descreva prazos e locais de entrega, regras de frete, garantias técnicas exigidas, negociação por marcas ou outros fatores de mercado..."
-            />
+            <div className="overflow-hidden rounded-radius-xl border border-border-default bg-surface-subtle p-2 shadow-inner sm:p-4">
+              <iframe
+                title="Prévia completa do relatório de pesquisa de preços"
+                srcDoc={reportPreviewHtml}
+                sandbox=""
+                className="h-[78vh] min-h-[720px] w-full rounded-radius-lg border border-border-default bg-white shadow-soft"
+              />
+            </div>
           </SectionPanel>
+
+          <div className="border-t border-border-default/60 pt-5">
+            {renderWizardFooter()}
+          </div>
         </div>
       )}
 

@@ -8,6 +8,8 @@ As rotas sao lazy-loaded em [App.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/
 
 Cada rota cai em uma pagina em `src/pages`.
 
+Os limites `Suspense` usam `RouteLoadingFallback` em vez de fallback vazio. Rotas publicas exibem o carregamento em tela cheia; rotas dentro do `Layout` preservam o shell e mostram o feedback somente na area de conteudo.
+
 ## Camada 0: sessao e autenticacao
 
 Antes das paginas protegidas ou autenticadas, o app passa por:
@@ -386,7 +388,9 @@ Observações:
 - a personalização institucional do relatório permanece no estado editável e é salva em `price_researches`: nome da instituição, unidade/setor, dados complementares, logotipo em data URL e servidores responsáveis/equipe de apoio;
 - o modal `SupplierEmailDialog` concentra a solicitacao de cotacao por e-mail; o historico de disparos fica em modal secundario aberto pela acao `Historico de e-mails` no rodape, evitando um segundo painel contextual fora do fluxo;
 - a curadoria exibe um painel compacto de métodos de cálculo com menor preço, média e mediana como opções principais, além de média ponderada, média saneada, dispersão e preços excluídos em menor hierarquia visual; a atualização monetária global fica no fim desse painel, usa o mês atual como competência de cálculo e informa essa competência por aviso transitório ao ser ativada;
-- a etapa final executa verificacao automatica de alertas baseada somente na IN SEGES/ME n? 65/2021, agrupando achados por severidade e bloqueando a conclusao apenas quando houver achados `error`; essa secao de alertas nao e incluida no relatorio HTML/PDF exportado e, quando nao houver achados, fica sem card positivo redundante;
+- enquanto a consulta oficial esta pendente, a curadoria mantem breadcrumb, wizard, painel de calculos e tabela visiveis com mensagem acessivel e skeletons; exportacao e avancos dependentes ficam bloqueados, estado vazio so aparece apos sucesso sem cotacoes e falhas exibem nova tentativa inline;
+- a etapa final exibe em `iframe` isolado uma previa somente leitura gerada pelo mesmo HTML usado nas exportacoes PDF e HTML; o campo `Observacoes` e editado na etapa de identificacao e aparece no rodape do documento;
+- a etapa final executa verificacao automatica de alertas baseada somente na IN SEGES/ME n? 65/2021, agrupando achados por severidade e bloqueando a conclusao apenas quando houver achados `error`; essa secao operacional fica fora da previa e nao e incluida em PDF, HTML, XLSX ou CSV;
 - relatório HTML, impressão/PDF, exportação XLSX e arquivos CSV são gerados no navegador a partir da pesquisa revisada;
 - o relatório final inclui cabeçalho institucional personalizado, tabela de servidores, sumário gerencial consolidado, curva ABC, mapa comparativo e QR Code de autenticação com hash determinístico do snapshot revisado;
 - o QR Code abre `/pesquisa-precos/validar?id=<pesquisa>&auth=<hash>`; a tela chama a Edge Function pública `validar-pesquisa-precos`, que usa service role para recalcular o hash do snapshot salvo e retorna apenas metadados mínimos e o resultado autenticado/divergente.

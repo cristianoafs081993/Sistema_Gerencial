@@ -1201,12 +1201,6 @@ function formatDate(value?: string | null) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('pt-BR');
 }
 
-function complianceSeverityLabel(severity: PriceResearchComplianceSeverity) {
-  if (severity === 'error') return 'Bloqueante';
-  if (severity === 'warning') return 'Alerta';
-  return 'Informativo';
-}
-
 export function buildPriceResearchReportHtml(data: PriceResearchReportData, options: PriceResearchAuthenticationOptions = {}) {
   const managementSummary = buildPriceResearchManagementSummary(data);
   const abcRows = buildPriceResearchAbcCurve(data);
@@ -1440,6 +1434,7 @@ export function buildPriceResearchReportHtml(data: PriceResearchReportData, opti
   <html lang="pt-BR">
     <head>
       <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
       <title>${escapeHtml(data.title || 'Relatório de Pesquisa de Preços')}</title>
       <style>
         @page { size: A4 landscape; margin: 14mm; }
@@ -1650,15 +1645,6 @@ export async function exportPriceResearchWorkbook(data: PriceResearchReportData,
     });
   });
 
-  const complianceRows = analyzePriceResearchCompliance(data).map((finding) => ({
-    Severidade: complianceSeverityLabel(finding.severity),
-    Escopo: finding.scope === 'research' ? 'Pesquisa' : finding.itemNumber ? `Item ${finding.itemNumber}` : finding.scope,
-    Regra: finding.ruleLabel,
-    Achado: finding.message,
-    Evidência: finding.evidence,
-    'Ação recomendada': finding.recommendedAction,
-  }));
-
   const abcSheetRows = abcRows.map((row) => ({
     Item: row.itemNumber,
     Descricao: row.description,
@@ -1703,7 +1689,6 @@ export async function exportPriceResearchWorkbook(data: PriceResearchReportData,
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(abcSheetRows), 'Curva ABC');
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(comparisonSheetRows), 'Mapa Comparativo');
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(quoteRows), 'Cotações');
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(complianceRows), 'Conformidade');
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(authenticationRows), 'Autenticacao');
   XLSX.writeFile(workbook, 'relatorio-pesquisa-precos.xlsx');
 }
@@ -1816,14 +1801,6 @@ export function exportPriceResearchCsvBundle(data: PriceResearchReportData, opti
       };
     });
   });
-  const complianceRows = analyzePriceResearchCompliance(data).map((finding) => ({
-    Severidade: complianceSeverityLabel(finding.severity),
-    Escopo: finding.scope === 'research' ? 'Pesquisa' : finding.itemNumber ? `Item ${finding.itemNumber}` : finding.scope,
-    Regra: finding.ruleLabel,
-    Achado: finding.message,
-    Evidencia: finding.evidence,
-    AcaoRecomendada: finding.recommendedAction,
-  }));
   const abcRows = buildPriceResearchAbcCurve(data).map((row) => ({
     Item: row.itemNumber,
     Descricao: row.description,
@@ -1869,6 +1846,5 @@ export function exportPriceResearchCsvBundle(data: PriceResearchReportData, opti
   downloadTextFile('relatorio-pesquisa-precos-cotacoes.csv', rowsToCsv(quoteRows), 'text/csv;charset=utf-8');
   downloadTextFile('relatorio-pesquisa-precos-curva-abc.csv', rowsToCsv(abcRows), 'text/csv;charset=utf-8');
   downloadTextFile('relatorio-pesquisa-precos-mapa-comparativo.csv', rowsToCsv(comparisonRows), 'text/csv;charset=utf-8');
-  downloadTextFile('relatorio-pesquisa-precos-conformidade.csv', rowsToCsv(complianceRows), 'text/csv;charset=utf-8');
   downloadTextFile('relatorio-pesquisa-precos-autenticacao.csv', rowsToCsv(authenticationRows), 'text/csv;charset=utf-8');
 }

@@ -15,6 +15,7 @@ O shell principal em [Layout.tsx](file:///c:/Users/3128880/Desktop/Programação
 7. **Submenus Expansivos**: Subitens com pontos discretos verdes indicando a rota ativa com recuo visual;
 8. **Responsividade**: Drawer lateral acionado via botão hambúrguer para dispositivos móveis;
 9. **Scrollbars**: Rolagem fina com trilha invisível e cantos arredondados na navegação interna.
+10. **Carregamento de Rotas**: Rotas lazy usam `RouteLoadingFallback`; páginas públicas exibem o modo de tela cheia e páginas internas mantêm sidebar/header visíveis enquanto a área de conteúdo carrega.
 
 ## Textos e encoding
 
@@ -80,6 +81,10 @@ Usado em processos com IA e decisão humana, como pesquisa de preços:
 5. um painel compacto de métodos de cálculo destaca o método estimado, deixa indicadores auxiliares em menor hierarquia visual e mantém configurações secundárias, como atualização monetária, no rodapé discreto do painel;
 6. `DataTablePanel` mantém fonte, valor original, valor comparável, aderência e justificativa visíveis;
 7. a ação final valida pendências e salva o snapshot antes de gerar o relatório.
+
+Durante consultas externas, a página deve preservar sua hierarquia e dimensões com skeletons contextuais. Estado vazio só aparece depois de uma resposta bem-sucedida sem registros; falhas mostram mensagem inline e uma ação de nova tentativa. Controles que dependem do resultado permanecem desabilitados enquanto a consulta estiver pendente.
+
+Na etapa final, a prévia deve reutilizar o mesmo documento HTML da exportação em um `iframe` isolado e somente leitura, evitando resumos paralelos que possam divergir do arquivo. Alertas de conformidade permanecem em painel externo claramente identificado e nunca integram as exportações.
 
 ## Antipadrões a evitar
 

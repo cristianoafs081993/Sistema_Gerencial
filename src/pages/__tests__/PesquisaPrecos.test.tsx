@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -89,6 +89,16 @@ const mockedParser = vi.mocked(parsePriceResearchFile);
 const mockedService = vi.mocked(priceResearchService);
 const mockedEmailService = vi.mocked(priceResearchEmailService);
 const mockedCatalogMatcher = vi.mocked(findCatalogSuggestions);
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
 
 const importedItem = {
   localId: 'item-1',
@@ -229,6 +239,67 @@ describe('PesquisaPrecos', () => {
     expect(await screen.findByRole('button', { name: /Ver Cotações/i })).toBeInTheDocument();
   }, 15000);
 
+  it('mostra skeleton contextual enquanto busca cotações e não antecipa o estado vazio', async () => {
+    const search = createDeferred<Array<{ localId: string; candidates: typeof candidate[] }>>();
+    mockedService.search.mockReturnValueOnce(search.promise);
+    const { container } = renderPage();
+
+    fireEvent.change(container.querySelector('input[type="file"]') as HTMLInputElement, {
+      target: { files: [new File(['xlsx'], 'custos.xlsx')] },
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: /Ver Cotações/i }));
+
+    expect(await screen.findByText('Buscando cotações oficiais...')).toBeInTheDocument();
+    expect(screen.getAllByTestId('curation-metric-skeleton')).toHaveLength(3);
+    expect(screen.queryByText('Nenhuma cotação do PNCP localizada para este item.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Exportar XLSX/i })).toBeDisabled();
+
+    await act(async () => {
+      search.resolve([{ localId: 'item-1', candidates: [candidate] }]);
+      await search.promise;
+    });
+
+    expect(await screen.findByText('Fornecedor')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Buscando cotações oficiais...')).not.toBeInTheDocument());
+  });
+
+  it('mostra o estado vazio somente depois que a busca termina sem cotações', async () => {
+    mockedService.search.mockResolvedValueOnce([{ localId: 'item-1', candidates: [] }]);
+    const { container } = renderPage();
+
+    fireEvent.change(container.querySelector('input[type="file"]') as HTMLInputElement, {
+      target: { files: [new File(['xlsx'], 'custos.xlsx')] },
+    });
+
+    await waitFor(() => expect(mockedService.search).toHaveBeenCalled());
+    fireEvent.click(await screen.findByRole('button', { name: /Ver Cotações/i }));
+
+    expect(await screen.findByText('Nenhuma cotação do PNCP localizada para este item.')).toBeInTheDocument();
+    expect(screen.queryByText('Buscando cotações oficiais...')).not.toBeInTheDocument();
+  });
+
+  it('mostra erro inline e permite tentar novamente após falha da busca oficial', async () => {
+    mockedService.search.mockRejectedValueOnce(new Error('Serviço oficial indisponível.'));
+    const { container } = renderPage();
+
+    fireEvent.change(container.querySelector('input[type="file"]') as HTMLInputElement, {
+      target: { files: [new File(['xlsx'], 'custos.xlsx')] },
+    });
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Serviço oficial indisponível.'));
+    fireEvent.click(await screen.findByRole('button', { name: /Ver Cotações/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível carregar as cotações oficiais.');
+    expect(screen.getByText('Serviço oficial indisponível.')).toBeInTheDocument();
+
+    mockedService.search.mockResolvedValueOnce([{ localId: 'item-1', candidates: [candidate] }]);
+    fireEvent.click(screen.getByRole('button', { name: /Tentar novamente/i }));
+
+    expect(await screen.findByText('Fornecedor')).toBeInTheDocument();
+    expect(mockedService.search).toHaveBeenCalledTimes(2);
+  });
+
   it('permite selecionar arquivo PDF pesquisável', () => {
     const { container } = renderPage();
     expect(container.querySelector('input[type="file"]')).toHaveAttribute('accept', expect.stringContaining('.pdf'));
@@ -236,6 +307,10 @@ describe('PesquisaPrecos', () => {
 
   it('ao avançar da identificação para itens, abre a lista de itens em vez das cotações do item selecionado', async () => {
     const { container } = renderPage();
+
+    fireEvent.change(screen.getByLabelText('Observações'), {
+      target: { value: 'Entrega em até 30 dias, com frete incluso.' },
+    });
 
     fireEvent.change(container.querySelector('input[type="file"]') as HTMLInputElement, {
       target: { files: [new File(['xlsx'], 'custos.xlsx')] },
@@ -252,6 +327,17 @@ describe('PesquisaPrecos', () => {
     expect(screen.queryByText('Fornecedor')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Avançar/i }));
     expect(await screen.findByText('Alertas e conformidade')).toBeInTheDocument();
+    expect(screen.getByText(/não integra o relatório exportado/i)).toBeInTheDocument();
+    const reportPreview = screen.getByTitle('Prévia completa do relatório de pesquisa de preços');
+    const reportHtml = reportPreview.getAttribute('srcdoc') ?? '';
+    expect(reportHtml).toContain('Relatorio gerencial consolidado');
+    expect(reportHtml).toContain('Curva ABC');
+    expect(reportHtml).toContain('Mapa comparativo');
+    expect(reportHtml).toContain('Entrega em até 30 dias, com frete incluso.');
+    expect(reportHtml).not.toContain('Alertas e conformidade');
+    expect(screen.queryByText('Consolidação das Cotações por Item')).not.toBeInTheDocument();
+    expect(screen.queryByText('Resumo Consolidado')).not.toBeInTheDocument();
+    expect(screen.queryByText('Observações Finais')).not.toBeInTheDocument();
     expect(screen.queryByText('Irregularidades e conformidade')).not.toBeInTheDocument();
     expect(screen.queryByText(/An.lise OK/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/nenhum alerta objetivo/i)).not.toBeInTheDocument();
