@@ -392,6 +392,7 @@ describe('priceResearch', () => {
     expect(authentication.verificationUrl).toContain('https://app.example.test/pesquisa-precos/validar?auth=');
     expect(authentication.verificationUrl).toContain('&id=research-1');
     expect(authentication.qrCodeUrl).toContain('api.qrserver.com');
+    expect(authentication.qrCodeUrl).toContain(encodeURIComponent(authentication.verificationUrl));
 
     const html = buildPriceResearchReportHtml(report);
     expect(html).toContain('IFRN');

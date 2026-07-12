@@ -42,6 +42,8 @@ const ModelosDocumentos = lazy(() => import('./pages/ModelosDocumentos'));
 const DesignSystemPreview = lazy(() => import('./pages/DesignSystemPreview'));
 const ManutencaoAdmin = lazy(() => import('./pages/ManutencaoAdmin'));
 const Almoxarifado = lazy(() => import('./pages/Almoxarifado'));
+const ControleOrgaos = lazy(() => import('./pages/ControleOrgaos'));
+const AuditLog = lazy(() => import('./pages/AuditLog'));
 const PublicFeedback = lazy(() => import('./pages/PublicFeedback'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
@@ -118,6 +120,9 @@ const App = () => (
                   <Route path="/design-system-preview" element={<DesignSystemPreview />} />
                   <Route path="/manutencao" element={<ManutencaoAdmin />} />
                   <Route path="/almoxarifado" element={<Almoxarifado />} />
+                  {/* Multi-órgão e auditoria — apenas superadmin */}
+                  <Route path="/controle-orgaos" element={<ControleOrgaos />} />
+                  <Route path="/audit-log" element={<AuditLog />} />
                   <Route path="*" element={<NotFound />} />
                 </Route>
               </Route>

@@ -1342,10 +1342,10 @@ export default function PesquisaPrecos() {
     }
   }, [items, isSearching]);
 
-  const saveResearch = async (status: 'review' | 'completed' = 'review', silent = false) => {
+  const saveResearch = async (status: 'review' | 'completed' = 'review', silent = false): Promise<string | null> => {
     if (items.length === 0) {
       if (!silent) toast.error('Importe uma planilha antes de salvar.');
-      return false;
+      return null;
     }
     setIsSaving(true);
     try {
@@ -1355,12 +1355,12 @@ export default function PesquisaPrecos() {
       if (!silent) {
         toast.success(status === 'completed' ? 'Pesquisa concluída e salva.' : 'Pesquisa salva para revisão.');
       }
-      return true;
+      return id;
     } catch (error) {
       if (!silent) {
         toast.error(error instanceof Error ? error.message : 'Não foi possível salvar a pesquisa.');
       }
-      return false;
+      return null;
     } finally {
       setIsSaving(false);
     }

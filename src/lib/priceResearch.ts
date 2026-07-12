@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import * as pdfWorkerAsset from 'pdfjs-dist/build/pdf.worker.min.js?url';
 import type { PriceCatalogSuggestion } from '@/lib/priceCatalog';
+import { env } from '@/lib/env';
 import { calculateIndexFactor, type InflationIndexType } from './monetaryAdjustment';
 
 async function getFileArrayBuffer(file: File | Blob): Promise<ArrayBuffer> {
@@ -804,15 +805,14 @@ export function buildPriceResearchAuthenticationPayload(
     })),
   };
   const snapshotHash = createStableHash(stableStringify(snapshot));
-  const origin = options.origin || '';
+  const origin = options.origin || env.appOrigin || (typeof window !== 'undefined' ? window.location.origin : '');
   const verificationPath = `/pesquisa-precos/validar?auth=${encodeURIComponent(snapshotHash)}${options.researchId ? `&id=${encodeURIComponent(options.researchId)}` : ''}`;
   const verificationUrl = origin ? `${origin}${verificationPath}` : verificationPath;
-  const qrData = `Pesquisa de precos\nHash: ${snapshotHash}\nProcesso: ${data.processNumber || '-'}\nObjeto: ${data.objectDescription}\nURL: ${verificationUrl}`;
 
   return {
     snapshotHash,
     verificationUrl,
-    qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrData)}`,
+    qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(verificationUrl)}`,
     generatedAt,
     reportVersion: 'price-research-management-v1',
   };

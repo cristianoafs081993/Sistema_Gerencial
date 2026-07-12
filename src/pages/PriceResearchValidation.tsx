@@ -43,13 +43,13 @@ export default function PriceResearchValidation() {
       <div>
         <h1 className="font-ui text-2xl font-bold text-text-primary">Validação de relatório de pesquisa de preços</h1>
         <p className="mt-1 font-ui text-sm text-text-secondary">
-          Conferência do QR Code de autenticação pelo hash determinístico do snapshot salvo.
+          Confirmação oficial de integridade e autenticidade das informações consolidadas no documento final.
         </p>
       </div>
 
       <SectionPanel
         title="Resultado da validação"
-        description="O hash informado no QR Code é comparado com o hash calculado a partir dos dados salvos da pesquisa."
+        description="Comparação automática entre a assinatura digital do documento e o registro oficial salvo no sistema."
       >
         {status === 'loading' ? (
           <div className="flex items-center gap-3 rounded-radius-lg border border-border-default bg-surface-subtle/50 p-5 text-text-secondary">
@@ -106,8 +106,8 @@ export default function PriceResearchValidation() {
                   </h3>
                   <p className={`mt-1 font-ui text-sm ${status === 'valid' ? 'text-emerald-800' : 'text-red-800'}`}>
                     {status === 'valid'
-                      ? 'O QR Code corresponde ao snapshot salvo desta pesquisa.'
-                      : 'O hash do QR Code não corresponde aos dados atualmente salvos para esta pesquisa.'}
+                      ? 'Este relatório de pesquisa de preços foi verificado com sucesso. As informações registradas no sistema são autênticas e idênticas às do documento gerado.'
+                      : 'A assinatura do relatório não corresponde aos dados atuais salvos no sistema. Isso pode indicar que o documento foi modificado após sua emissão.'}
                   </p>
                 </div>
               </div>
@@ -139,16 +139,22 @@ export default function PriceResearchValidation() {
             ))}
           </div>
 
-          <div className="mt-5 grid gap-4 lg:grid-cols-2">
-            <div className="rounded-radius-lg border border-border-default bg-surface-subtle/40 p-4">
-              <p className="font-ui text-[10px] font-semibold uppercase tracking-wider text-text-muted">Hash informado</p>
-              <p className="mt-2 break-all font-mono text-xs font-bold text-text-primary">{providedHash}</p>
+          <details className="mt-5 group border border-border-default rounded-radius-lg bg-surface-subtle/25 overflow-hidden">
+            <summary className="flex items-center justify-between p-4 font-ui text-sm font-semibold text-text-secondary cursor-pointer select-none hover:bg-surface-subtle/50 transition-colors">
+              <span>Assinatura e integridade técnica (Metadados)</span>
+              <span className="transition-transform duration-200 group-open:rotate-180 text-text-muted">▼</span>
+            </summary>
+            <div className="p-4 border-t border-border-default bg-white grid gap-4 lg:grid-cols-2">
+              <div className="rounded-radius-lg border border-border-default bg-surface-subtle/40 p-4">
+                <p className="font-ui text-[10px] font-semibold uppercase tracking-wider text-text-muted">Hash informado</p>
+                <p className="mt-2 break-all font-mono text-xs font-bold text-text-primary">{providedHash}</p>
+              </div>
+              <div className="rounded-radius-lg border border-border-default bg-surface-subtle/40 p-4">
+                <p className="font-ui text-[10px] font-semibold uppercase tracking-wider text-text-muted">Hash recalculado</p>
+                <p className="mt-2 break-all font-mono text-xs font-bold text-text-primary">{validation.expectedHash}</p>
+              </div>
             </div>
-            <div className="rounded-radius-lg border border-border-default bg-surface-subtle/40 p-4">
-              <p className="font-ui text-[10px] font-semibold uppercase tracking-wider text-text-muted">Hash recalculado</p>
-              <p className="mt-2 break-all font-mono text-xs font-bold text-text-primary">{validation.expectedHash}</p>
-            </div>
-          </div>
+          </details>
         </SectionPanel>
       ) : null}
 

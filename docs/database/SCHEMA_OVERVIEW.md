@@ -5,6 +5,44 @@
 Este documento e um mapa operacional do schema, nao um dicionario exaustivo de colunas.
 Para mudancas sensiveis, confirme sempre nas migrations em [supabase/migrations](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/migrations).
 
+## Multi-Org (Multi-Tenant) — migration 20260712000000 / 20260712010000
+
+O sistema suporta múltiplos órgãos (tenants) completamente isolados. Cada usuário pertence a exatamente **um** órgão.
+
+### Tabelas de controle de acesso
+
+| Tabela | Descrição |
+|--------|-----------|
+| `orgs` | Cadastro de órgãos/tenants (slug, name, cnpj, is_active) |
+| `org_users` | Vínculo 1:1 usuário ↔ órgão (`UNIQUE user_id`). Campo `role` = admin/member |
+| `org_module_permissions` | Quais telas (screen_id) cada órgão pode acessar. Controlado pelo superadmin |
+| `audit_log` | Trilha de auditoria (login, logout, ações admin). Requisito legal — inciso V |
+
+### Função RLS de isolamento
+
+```sql
+public.current_user_org_id() → uuid
+```
+Retorna o `org_id` do usuário autenticado. Usada em **todas** as policies de isolamento de dados — o frontend não precisa passar `org_id` nas queries; o banco filtra automaticamente.
+
+### Tabelas com isolamento por org_id (RLS automático)
+
+`atividades`, `empenhos`, `descentralizacoes`, `descentralizacoes_conta_saldos`,
+`creditos_disponiveis`, `creditos_disponiveis_detalhes`, `rap_historico_anual`,
+`documentos_habeis`, `retencoes`, `pf_solicitacao`, `pf_aprovacao`, `pf_liberacao`,
+`contratos`, `requisicoes_compra`, `financeiro_fonte_vinculacao`, `lc_credores`,
+`retencoes_efd_reinf`, `energia_import_runs`, `energia_consumo_faturas`,
+`energia_solar_geracao`, `energia_contratos`, `energia_contrato_execucoes`,
+`price_researches`
+
+### Tabelas globais/compartilhadas (sem org_id)
+
+`contratos_api*`, `licitacoes_pncp*`, `atas_registro_precos*`, `normativos*`,
+`document_templates`, `dimensoes`, `componentes_funcionais`, `naturezas_despesa`,
+`origens_recurso`, `suppliers`, `supplier_certificates`
+
+---
+
 ## Grupos principais
 
 ### Orcamento e execucao
