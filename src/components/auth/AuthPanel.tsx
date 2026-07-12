@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GraduationCap, Loader2, LockKeyhole, Mail } from 'lucide-react';
+import { Eye, EyeOff, GraduationCap, Loader2, LockKeyhole, Mail } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -19,6 +19,7 @@ export function AuthPanel({ title, description }: AuthPanelProps) {
   const { signInWithPassword } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchParams] = useSearchParams();
   const requestedNextPath = searchParams.get('next');
@@ -93,18 +94,29 @@ export function AuthPanel({ title, description }: AuthPanelProps) {
             <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input
               id="auth-password"
-              type="password"
+              type={isPasswordVisible ? 'text' : 'password'}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="Sua senha"
               autoComplete="current-password"
-              className="pl-9"
+              className="pl-9 pr-12"
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
                   void handleLogin();
                 }
               }}
             />
+            <button
+              type="button"
+              className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label={isPasswordVisible ? 'Ocultar senha' : 'Mostrar senha'}
+              aria-controls="auth-password"
+              aria-pressed={isPasswordVisible}
+              disabled={isSubmitting}
+              onClick={() => setIsPasswordVisible((current) => !current)}
+            >
+              {isPasswordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
           </div>
         </div>
 
