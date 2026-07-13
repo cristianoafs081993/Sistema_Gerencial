@@ -83,6 +83,7 @@ import {
 import { findCatalogSuggestions } from '@/lib/priceCatalogClient';
 import { priceResearchService } from '@/services/priceResearch';
 import { marketSearchService, type MarketSearchResult } from '@/services/marketSearch';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { calculateIndexFactor, type InflationIndexType } from '@/lib/monetaryAdjustment';
 import { SupplierEmailDialog } from '@/components/price-research/SupplierEmailDialog';
@@ -227,6 +228,7 @@ function createReportServer(): PriceResearchReportServer {
 }
 
 export default function PesquisaPrecos() {
+  const { userOrg } = useAuth();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const logoInputRef = useRef<HTMLInputElement | null>(null);
@@ -1347,7 +1349,7 @@ export default function PesquisaPrecos() {
     }
     setIsSaving(true);
     try {
-      const id = await priceResearchService.save(reportData, { id: researchId, status });
+      const id = await priceResearchService.save(reportData, { id: researchId, status, orgId: userOrg?.id });
       setResearchId(id);
       await queryClient.invalidateQueries({ queryKey: ['price-researches'] });
       if (!silent) {
@@ -1367,7 +1369,7 @@ export default function PesquisaPrecos() {
   const autoSaveResearch = async () => {
     if (items.length === 0) return;
     try {
-      const id = await priceResearchService.save(reportData, { id: researchId, status: 'review' });
+      const id = await priceResearchService.save(reportData, { id: researchId, status: 'review', orgId: userOrg?.id });
       setResearchId(id);
       await queryClient.invalidateQueries({ queryKey: ['price-researches'] });
       toast.success('Rascunho salvo automaticamente.', { id: 'auto-save', duration: 2000 });

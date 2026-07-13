@@ -28,6 +28,13 @@ vi.mock('@/components/HeaderParts', () => ({
   HeaderSubtitle: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({
+    userOrg: { id: 'ifrn-cn', slug: 'ifrn-cn', name: 'Campus Currais Novos' },
+    session: { user: { id: 'user-1' } },
+  }),
+}));
+
 vi.mock('@/lib/priceResearch', async () => {
   const actual = await vi.importActual<typeof import('@/lib/priceResearch')>('@/lib/priceResearch');
   return {

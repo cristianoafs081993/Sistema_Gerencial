@@ -230,9 +230,9 @@ export const priceResearchService = {
 
   async save(
     data: PriceResearchReportData,
-    options: { id?: string; status?: PriceResearchRecord['status'] } = {},
+    options: { id?: string; status?: PriceResearchRecord['status']; orgId?: string } = {},
   ) {
-    const payload = {
+    const payload: Record<string, any> = {
       title: data.title || 'Pesquisa de preços',
       process_number: data.processNumber || null,
       object_description: data.objectDescription,
@@ -250,6 +250,10 @@ export const priceResearchService = {
       status: options.status ?? 'review',
       updated_at: new Date().toISOString(),
     };
+
+    if (options.orgId) {
+      payload.org_id = options.orgId;
+    }
 
     let researchId = options.id;
     if (researchId) {
