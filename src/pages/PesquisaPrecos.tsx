@@ -180,6 +180,8 @@ const BOOLEAN_FILTER_OPTIONS = [
   { value: 'no', label: 'Não' },
 ] as const;
 
+const MARKET_RESULTS_BATCH_SIZE = 10;
+
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -343,8 +345,10 @@ export default function PesquisaPrecos() {
   const [marketSearchTerm, setMarketSearchTerm] = useState('');
   const [selectedMarketProviders, setSelectedMarketProviders] = useState<string[]>(['amazon']);
   const [marketResults, setMarketResults] = useState<MarketSearchResult[]>([]);
+  const [visibleMarketResultsCount, setVisibleMarketResultsCount] = useState(MARKET_RESULTS_BATCH_SIZE);
   const [isSearchingMarket, setIsSearchingMarket] = useState(false);
   const [capturingUrls, setCapturingUrls] = useState<Set<string>>(new Set());
+  const marketResultsLoadMoreRef = useRef<HTMLDivElement | null>(null);
   const [freightCep, setFreightCep] = useState<string>(() => localStorage.getItem('pp_freight_cep') || '');
 
   // Fornecedores Locais State
@@ -852,6 +856,11 @@ export default function PesquisaPrecos() {
     (total, item) => total + (getEstimatedUnitPrice(item, method) * item.quantity),
     0,
   );
+  const visibleMarketResults = useMemo(
+    () => marketResults.slice(0, visibleMarketResultsCount),
+    [marketResults, visibleMarketResultsCount],
+  );
+  const hasMoreMarketResults = visibleMarketResultsCount < marketResults.length;
 
   const reportData = useMemo<PriceResearchReportData>(() => ({
     title: objectDescription || 'Pesquisa de Preços',
@@ -1351,6 +1360,7 @@ export default function PesquisaPrecos() {
       // Restaura o termo e resultados da última busca deste item
       setMarketSearchTerm(selectedItem.marketSearchTerm ?? selectedItem.description);
       setMarketResults(selectedItem.marketSearchResults ?? []);
+      setVisibleMarketResultsCount(MARKET_RESULTS_BATCH_SIZE);
       setCuradoriaTab('basket');
       // Inicializa estados do fornecedor local
       setLocalSupplierName('');
@@ -1363,6 +1373,28 @@ export default function PesquisaPrecos() {
   }, [selectedItemId, selectedItem?.description]);
 
   useEffect(() => {
+    setVisibleMarketResultsCount(MARKET_RESULTS_BATCH_SIZE);
+  }, [marketResults]);
+
+  useEffect(() => {
+    if (!hasMoreMarketResults || curadoriaTab !== 'market' || isSearchingMarket) return;
+    const sentinel = marketResultsLoadMoreRef.current;
+    if (!sentinel || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setVisibleMarketResultsCount((current) => Math.min(current + MARKET_RESULTS_BATCH_SIZE, marketResults.length));
+        }
+      },
+      { rootMargin: '320px 0px' },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [curadoriaTab, hasMoreMarketResults, isSearchingMarket, marketResults.length, visibleMarketResultsCount]);
+
+  useEffect(() => {
     if (curadoriaTab === 'market' && selectedItem) {
       const defaultSearchTerm = selectedItem.marketSearchTerm ?? selectedItem.description;
       const hasResults = selectedItem.marketSearchResults && selectedItem.marketSearchResults.length > 0;
@@ -1373,6 +1405,7 @@ export default function PesquisaPrecos() {
           try {
             const results = await marketSearchService.search(defaultSearchTerm, selectedMarketProviders);
             setMarketResults(results);
+            setVisibleMarketResultsCount(MARKET_RESULTS_BATCH_SIZE);
             updateItem(selectedItem.localId, {
               marketSearchTerm: defaultSearchTerm,
               marketSearchResults: results,
@@ -1413,6 +1446,7 @@ export default function PesquisaPrecos() {
     try {
       const results = await marketSearchService.search(marketSearchTerm, selectedMarketProviders);
       setMarketResults(results);
+      setVisibleMarketResultsCount(MARKET_RESULTS_BATCH_SIZE);
       // Persiste os resultados no item para não perder ao trocar de item
       if (selectedItem) {
         updateItem(selectedItem.localId, {
@@ -3857,12 +3891,18 @@ export default function PesquisaPrecos() {
                           </p>
                         </div>
                       ) : (
-                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                          {marketResults.map((result, idx) => {
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-3 text-xs text-text-muted">
+                            <span>
+                              Exibindo {visibleMarketResults.length} de {marketResults.length} resultado(s).
+                            </span>
+                          </div>
+                          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                          {visibleMarketResults.map((result, idx) => {
                             const isAdded = selectedItem.candidates.some((c) => c.sourceUrl === result.link);
                             return (
                               <div
-                                key={idx}
+                                key={`${result.provider}-${result.link}-${idx}`}
                                 className="flex flex-col justify-between border border-border-default hover:border-primary/45 bg-surface-card rounded-radius-lg p-4 shadow-soft hover:shadow-md transition-all group"
                               >
                                 <div className="space-y-3">
@@ -3936,6 +3976,21 @@ export default function PesquisaPrecos() {
                               </div>
                             );
                           })}
+                          </div>
+                          {hasMoreMarketResults && (
+                            <div ref={marketResultsLoadMoreRef} className="flex justify-center py-2" data-testid="market-results-load-more-sentinel">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="gap-2 text-xs"
+                                onClick={() => setVisibleMarketResultsCount((current) => Math.min(current + MARKET_RESULTS_BATCH_SIZE, marketResults.length))}
+                              >
+                                <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                                Carregar mais resultados
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       )}
 

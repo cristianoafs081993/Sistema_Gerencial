@@ -8,6 +8,7 @@ import { findCatalogSuggestions } from '@/lib/priceCatalogClient';
 import { parsePriceResearchFile } from '@/lib/priceResearch';
 import { priceResearchService } from '@/services/priceResearch';
 import { priceResearchEmailService } from '@/services/priceResearchEmail';
+import { marketSearchService } from '@/services/marketSearch';
 import { toast } from 'sonner';
 
 vi.mock('@/lib/supabase', () => ({
@@ -80,6 +81,13 @@ vi.mock('@/services/priceResearchEmail', () => ({
   },
 }));
 
+vi.mock('@/services/marketSearch', () => ({
+  marketSearchService: {
+    search: vi.fn(),
+    capture: vi.fn(),
+  },
+}));
+
 vi.mock('@/lib/priceCatalogClient', () => ({
   findCatalogSuggestions: vi.fn(),
 }));
@@ -95,6 +103,7 @@ vi.mock('sonner', () => ({
 const mockedParser = vi.mocked(parsePriceResearchFile);
 const mockedService = vi.mocked(priceResearchService);
 const mockedEmailService = vi.mocked(priceResearchEmailService);
+const mockedMarketSearchService = vi.mocked(marketSearchService);
 const mockedCatalogMatcher = vi.mocked(findCatalogSuggestions);
 
 function createDeferred<T>() {
@@ -153,6 +162,18 @@ const candidate = {
   rawData: {},
 };
 
+function createMarketResult(index: number) {
+  return {
+    title: `Oferta ${index.toString().padStart(2, '0')}`,
+    link: `https://amazon.com.br/oferta-${index}`,
+    displayLink: 'amazon.com.br',
+    snippet: `Descricao resumida da oferta ${index}`,
+    thumbnailLink: `https://example.com/oferta-${index}.png`,
+    price: `R$ ${index},00`,
+    provider: 'amazon',
+  };
+}
+
 function renderPage() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -208,6 +229,11 @@ describe('PesquisaPrecos', () => {
     ]);
     mockedEmailService.searchGlobalSuppliers.mockResolvedValue([]);
     mockedEmailService.sendQuotation.mockResolvedValue({ results: [], summary: { sent: 0, failed: 0 } });
+    mockedMarketSearchService.search.mockResolvedValue([]);
+    mockedMarketSearchService.capture.mockResolvedValue({
+      imageUrl: 'https://example.com/evidence.png',
+      freight: { status: 'pending', total: null, cep: '', text: 'Frete não disponível.' },
+    });
     mockedParser.mockResolvedValue([importedItem]);
     mockedCatalogMatcher.mockResolvedValue([]);
   });
@@ -342,6 +368,59 @@ describe('PesquisaPrecos', () => {
 
     expect(await screen.findByText('Fornecedor')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText('Buscando cotações oficiais...')).not.toBeInTheDocument());
+  });
+
+  it('carrega mais resultados de canais privados quando o fim da grade entra na tela', async () => {
+    let triggerIntersection: IntersectionObserverCallback | undefined;
+    const originalIntersectionObserver = globalThis.IntersectionObserver;
+    const observe = vi.fn();
+    const disconnect = vi.fn();
+
+    vi.stubGlobal('IntersectionObserver', vi.fn((callback: IntersectionObserverCallback) => {
+      triggerIntersection = callback;
+      return {
+        observe,
+        unobserve: vi.fn(),
+        disconnect,
+        takeRecords: vi.fn(() => []),
+        root: null,
+        rootMargin: '',
+        thresholds: [],
+      };
+    }));
+
+    mockedMarketSearchService.search.mockResolvedValueOnce(
+      Array.from({ length: 12 }, (_, index) => createMarketResult(index + 1)),
+    );
+
+    const { container } = renderPage();
+    fireEvent.change(container.querySelector('input[type="file"]') as HTMLInputElement, {
+      target: { files: [new File(['xlsx'], 'custos.xlsx')] },
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: /Ver Cota..es/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Pesquisa de Mercado/i }));
+
+    expect(await screen.findByText('Oferta 01')).toBeInTheDocument();
+    expect(screen.getByText(/Exibindo 10 de 12 resultado/i)).toBeInTheDocument();
+    expect(screen.queryByText('Oferta 11')).not.toBeInTheDocument();
+    expect(observe).toHaveBeenCalled();
+
+    await act(async () => {
+      triggerIntersection?.([
+        { isIntersecting: true } as IntersectionObserverEntry,
+      ], {} as IntersectionObserver);
+    });
+
+    expect(await screen.findByText('Oferta 11')).toBeInTheDocument();
+    expect(screen.getByText(/Exibindo 12 de 12 resultado/i)).toBeInTheDocument();
+    expect(disconnect).toHaveBeenCalled();
+
+    if (originalIntersectionObserver) {
+      vi.stubGlobal('IntersectionObserver', originalIntersectionObserver);
+    } else {
+      Reflect.deleteProperty(globalThis, 'IntersectionObserver');
+    }
   });
 
   it('mostra skeleton nas colunas de cotações e preço na tabela de itens enquanto busca cotações', async () => {
