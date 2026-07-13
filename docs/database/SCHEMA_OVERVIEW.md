@@ -37,7 +37,7 @@ Retorna o `org_id` do usuário autenticado. Usada em **todas** as policies de is
 
 ### Tabelas globais/compartilhadas (sem org_id)
 
-`contratos_api*`, `licitacoes_pncp*`, `atas_registro_precos*`, `normativos*`,
+`contratos_api*`, `licitacoes_pncp*`, `atas_registro_precos*`, `price_research_ead_videos`, `normativos*`,
 `document_templates`, `dimensoes`, `componentes_funcionais`, `naturezas_despesa`,
 `origens_recurso`
 
@@ -108,6 +108,7 @@ Retorna o `org_id` do usuário autenticado. Usada em **todas** as policies de is
 - view `atas_registro_precos_resumo`
 - `price_researches`
 - `price_research_items`
+- `price_research_ead_videos`
 - `price_research_suppliers`
 - `price_research_email_dispatches`
 

@@ -47,7 +47,7 @@ A tela `/controle-orgaos` usa a mesma Edge Function `admin-users` para cadastrar
 
 O `AuthContext` carrega o orgao primario do usuario autenticado via `fetchUserAccess`. O chip institucional da sidebar em `Layout.tsx` exibe `userOrg.name`, inclusive para superadministrador; quando nao houver vinculo cadastrado, exibe estado neutro de orgao nao vinculado em vez de assumir um campus fixo.
 
-Permissoes de modulo podem incluir subpaginas funcionais derivadas pelo catalogo `appScreens`. Atualmente, autorizar `pesquisa-precos` tambem libera `cadastro-fornecedores`, porque o cadastro e uma subpagina operacional do modulo Pesquisa de Precos e nao deve exigir marcacao separada no controle de orgaos.
+Permissoes de modulo podem incluir subpaginas funcionais derivadas pelo catalogo `appScreens`. Autorizar `pesquisa-precos` tambem libera `cadastro-fornecedores` e `pesquisa-precos-ead`; essa expansao e aplicada tanto nas permissoes de grupo quanto nas permissoes do orgao, para que paginas filhas operacionais nao exijam marcacao separada no controle de orgaos.
 
 O cadastro de fornecedores do modulo Pesquisa de Precos usa `suppliers` e `supplier_certificates` com isolamento por `org_id`. Fornecedores cadastrados por um orgao nao devem aparecer para outro orgao; registros legados anteriores ao isolamento ficam associados ao orgao padrao `ifrn-cn`.
 
@@ -376,21 +376,26 @@ Persistência:
 
 `PesquisaPrecos.tsx` -> `priceResearchService` -> `price_researches` / `price_research_items`
 
+Capacitação EAD:
+
+`App.tsx` -> `PriceResearchEad.tsx` -> `priceResearchEadService` -> `price_research_ead_videos` -> iframe `youtube-nocookie.com`
+
 Observações:
 
 - XLSX/XLS/CSV ou PDF pesquisável é lido localmente, sem upload do arquivo bruto para Storage;
 - o PDF usa a posição dos textos para recompor colunas; arquivos escaneados sem camada de texto ainda não passam por OCR;
 - quando CATMAT/CATSER não vem no arquivo, `priceCatalog.worker.ts` carrega sob demanda o catálogo compactado correspondente e ranqueia até cinco códigos semelhantes sem bloquear a interface;
 - o usuário confirma uma sugestão ou informa manualmente o código antes de chamar a Edge Function;
+- filtros avancados da pesquisa sao mantidos no estado editavel, enviados a `pesquisar-precos` quando a busca oficial e executada e reaplicados localmente na aba PNCP sem remover candidatos do snapshot;
 - a função retorna até 100 preços homologados por item e preserva fonte, compra, fornecedor e unidade;
 - a IA é opcional e apenas reordena aderência;
 - seleção, exclusões e justificativas permanecem no estado editável e no snapshot salvo; ao desconsiderar uma cotação, a UI exige justificativa em modal antes de gravar `selected=false`, e achados antigos de exclusão sem justificativa abrem a mesma correção antes de finalizar o relatório;
 - a personalização institucional do relatório permanece no estado editável e é salva em `price_researches`: nome da instituição, unidade/setor, dados complementares, logotipo em data URL e servidores responsáveis/equipe de apoio;
-- o modal `SupplierEmailDialog` concentra a solicitacao de cotacao por e-mail; o historico de disparos fica em modal secundario aberto pela acao `Historico de e-mails` no rodape, evitando um segundo painel contextual fora do fluxo;
+- o modal `SupplierEmailDialog` concentra a solicitacao de cotacao por e-mail; nele o usuario configura orgao, unidade, setor responsavel, Reply-To, prazo, observacoes e instrucoes de envio da proposta; os campos institucionais iniciam vazios, usam placeholders e passam a persistir localmente depois do primeiro preenchimento real; o historico de disparos fica em modal secundario aberto pela acao `Historico de e-mails` no rodape, evitando um segundo painel contextual fora do fluxo;
 - a curadoria exibe um painel compacto de métodos de cálculo com menor preço, média e mediana como opções principais, além de média ponderada, média saneada, dispersão e preços excluídos em menor hierarquia visual; a atualização monetária global fica no fim desse painel, usa o mês atual como competência de cálculo e informa essa competência por aviso transitório ao ser ativada;
 - enquanto a consulta oficial esta pendente, a curadoria mantem breadcrumb, wizard, painel de calculos e tabela visiveis com mensagem acessivel e skeletons; exportacao e avancos dependentes ficam bloqueados, estado vazio so aparece apos sucesso sem cotacoes e falhas exibem nova tentativa inline;
 - a etapa final exibe em `iframe` isolado uma previa somente leitura gerada pelo mesmo HTML usado nas exportacoes PDF e HTML; o campo `Observacoes` e editado na etapa de identificacao e aparece no rodape do documento;
-- a etapa final executa verificacao automatica de alertas baseada somente na IN SEGES/ME n? 65/2021, agrupando achados por severidade e bloqueando a conclusao apenas quando houver achados `error`; essa secao operacional fica fora da previa e nao e incluida em PDF, HTML, XLSX ou CSV;
+- a etapa final executa verificacao automatica de alertas baseada somente na IN SEGES/ME n?65/2021, agrupando achados por severidade e bloqueando a conclusao apenas quando houver achados `error`; essa secao operacional fica fora da previa e nao e incluida em PDF, HTML, XLSX ou CSV;
 - relatório HTML, impressão/PDF, exportação XLSX e arquivos CSV são gerados no navegador a partir da pesquisa revisada;
 - o relatório final inclui cabeçalho institucional personalizado, tabela de servidores, sumário gerencial consolidado, curva ABC, mapa comparativo e QR Code de autenticação com hash determinístico do snapshot revisado;
 - o QR Code abre `/pesquisa-precos/validar?id=<pesquisa>&auth=<hash>`; a tela chama a Edge Function pública `validar-pesquisa-precos`, que usa service role para recalcular o hash do snapshot salvo e retorna apenas metadados mínimos e o resultado autenticado/divergente.

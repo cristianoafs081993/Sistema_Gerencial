@@ -197,6 +197,29 @@ describe('Layout', () => {
 
     expect(screen.getByText('Pregões por UASG')).toBeInTheDocument();
     expect(screen.getByText('Atas e ARP')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Pesquisa de Preços'));
+    expect(screen.getByText('Capacitação EAD')).toBeInTheDocument();
+  });
+
+
+
+  it('mantem capacitacao EAD como ultimo subitem e nao marca cotacoes quando EAD esta ativo', () => {
+    render(
+      <MemoryRouter initialEntries={['/pesquisa-precos/ead']}>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    const cotacoes = screen.getByRole('link', { name: 'Cotações' });
+    const cadastro = screen.getByRole('link', { name: 'Cadastro de Fornecedores' });
+    const capacitacao = screen.getByRole('link', { name: 'Capacitação EAD' });
+
+    expect(cotacoes.compareDocumentPosition(cadastro) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(cadastro.compareDocumentPosition(capacitacao) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(cotacoes).not.toHaveClass('font-semibold');
+    expect(capacitacao).toHaveClass('font-semibold');
   });
 
   it('exibe credito disponivel no grupo orcamentario', () => {

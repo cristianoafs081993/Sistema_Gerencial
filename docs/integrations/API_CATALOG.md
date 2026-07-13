@@ -825,6 +825,24 @@ Observacao:
 - a function busca o cenario ativo em `automation_savings_scenarios`, copia os tempos vigentes para o evento e calcula `saved_minutes`
 - `metadata.count` representa execucoes em lote e e aplicado pelo agregador do frontend
 
+## YouTube embeds para EAD de Pesquisa de Precos
+
+Uso:
+
+- exibir aulas do catalogo `/pesquisa-precos/ead` por iframe incorporado
+
+Arquivos:
+
+- `src/pages/PriceResearchEad.tsx`
+- `src/services/priceResearchEad.ts`
+- `src/lib/youtube.ts`
+
+Contrato:
+
+- o sistema valida URLs `youtube.com`, `youtu.be`, Shorts e embed para extrair `youtube_video_id`
+- o player usa `https://www.youtube-nocookie.com/embed/<video_id>`
+- nao ha chamada a API do YouTube nem chave de ambiente
+- metadados das aulas ficam em `price_research_ead_videos`; cadastro e manutencao sao restritos ao superadministrador por RLS
 ## Pesquisa de preços oficial
 
 Uso:
@@ -846,6 +864,7 @@ Parâmetros principais:
 - `dataCompraFim`
 - `pagina`
 - `tamanhoPagina`
+- filtros opcionais enviados pelo frontend; somente `dataCompraInicio` e `dataCompraFim`, alem do codigo de catalogo e paginacao, entram na URL oficial quando informados; demais filtros sao aplicados sobre o payload retornado
 
 Implementação:
 

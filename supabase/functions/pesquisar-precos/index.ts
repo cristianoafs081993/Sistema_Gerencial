@@ -25,9 +25,38 @@ type SearchItem = {
 
 type PriceApiRow = Record<string, unknown>;
 
+type PriceResearchBooleanFilter = '' | 'yes' | 'no';
+
+type SearchFilters = {
+  description?: string;
+  catalogCode?: string;
+  startDate?: string;
+  endDate?: string;
+  purchaseNumber?: string;
+  uasg?: string;
+  agencyName?: string;
+  supplierDocument?: string;
+  quantityMin?: number | null;
+  quantityMax?: number | null;
+  unit?: string;
+  state?: string;
+  region?: string;
+  modality?: string;
+  brand?: string;
+  srp?: PriceResearchBooleanFilter;
+  meEpp?: PriceResearchBooleanFilter;
+  sustainable?: PriceResearchBooleanFilter;
+  adjudicationStartDate?: string;
+  adjudicationEndDate?: string;
+  homologationStartDate?: string;
+  homologationEndDate?: string;
+  rawDataText?: string;
+};
+
 type SearchRequest = {
   items?: SearchItem[];
   limit?: number;
+  filters?: SearchFilters;
 };
 
 class HttpError extends Error {
@@ -110,6 +139,201 @@ function tokenize(value: unknown) {
       .split(' ')
       .filter((token) => token.length > 2),
   );
+}
+const REGION_BY_UF: Record<string, string> = {
+  AC: 'Norte', AP: 'Norte', AM: 'Norte', PA: 'Norte', RO: 'Norte', RR: 'Norte', TO: 'Norte',
+  AL: 'Nordeste', BA: 'Nordeste', CE: 'Nordeste', MA: 'Nordeste', PB: 'Nordeste', PE: 'Nordeste', PI: 'Nordeste', RN: 'Nordeste', SE: 'Nordeste',
+  DF: 'Centro-Oeste', GO: 'Centro-Oeste', MT: 'Centro-Oeste', MS: 'Centro-Oeste',
+  ES: 'Sudeste', MG: 'Sudeste', RJ: 'Sudeste', SP: 'Sudeste',
+  PR: 'Sul', RS: 'Sul', SC: 'Sul',
+};
+
+function normalizeDigits(value: unknown) {
+  return String(value ?? '').replace(/\D/g, '');
+}
+
+function normalizeUasg(value: unknown) {
+  return normalizeDigits(value).slice(0, 6);
+}
+
+function hasFilters(filters?: SearchFilters | null) {
+  if (!filters) return false;
+  return Object.values(filters).some((value) => {
+    if (value === null || value === undefined || value === '') return false;
+    if (typeof value === 'number') return Number.isFinite(value);
+    return true;
+  });
+}
+
+function normalizeFilters(filters?: SearchFilters | null): SearchFilters {
+  if (!filters || typeof filters !== 'object') return {};
+  const date = (value: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(String(value ?? '')) ? String(value) : undefined;
+  const booleanFilter = (value: unknown): PriceResearchBooleanFilter => value === 'yes' || value === 'no' ? value : '';
+  const numberFilter = (value: unknown) => {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  return {
+    description: textOrNull(filters.description) ?? undefined,
+    catalogCode: normalizeDigits(filters.catalogCode) || undefined,
+    startDate: date(filters.startDate),
+    endDate: date(filters.endDate),
+    purchaseNumber: textOrNull(filters.purchaseNumber) ?? undefined,
+    uasg: normalizeUasg(filters.uasg) || undefined,
+    agencyName: textOrNull(filters.agencyName) ?? undefined,
+    supplierDocument: normalizeDigits(filters.supplierDocument) || undefined,
+    quantityMin: numberFilter(filters.quantityMin),
+    quantityMax: numberFilter(filters.quantityMax),
+    unit: textOrNull(filters.unit) ?? undefined,
+    state: textOrNull(filters.state)?.toUpperCase() ?? undefined,
+    region: textOrNull(filters.region) ?? undefined,
+    modality: textOrNull(filters.modality) ?? undefined,
+    brand: textOrNull(filters.brand) ?? undefined,
+    srp: booleanFilter(filters.srp),
+    meEpp: booleanFilter(filters.meEpp),
+    sustainable: booleanFilter(filters.sustainable),
+    adjudicationStartDate: date(filters.adjudicationStartDate),
+    adjudicationEndDate: date(filters.adjudicationEndDate),
+    homologationStartDate: date(filters.homologationStartDate),
+    homologationEndDate: date(filters.homologationEndDate),
+    rawDataText: textOrNull(filters.rawDataText) ?? undefined,
+  };
+}
+
+function rawValueByKeys(rawData: PriceApiRow | null | undefined, keys: string[]) {
+  if (!rawData || typeof rawData !== 'object') return undefined;
+  const normalizedKeys = new Set(keys.map((key) => normalizeText(key).replace(/\s/g, '')));
+  const stack: unknown[] = [rawData];
+  while (stack.length > 0) {
+    const current = stack.shift();
+    if (!current || typeof current !== 'object') continue;
+    for (const [key, value] of Object.entries(current as Record<string, unknown>)) {
+      const normalizedKey = normalizeText(key).replace(/\s/g, '');
+      if (normalizedKeys.has(normalizedKey)) return value;
+      if (value && typeof value === 'object') stack.push(value);
+    }
+  }
+  return undefined;
+}
+
+function stringFromRaw(rawData: PriceApiRow | null | undefined, keys: string[]) {
+  const value = rawValueByKeys(rawData, keys);
+  if (value === null || value === undefined) return '';
+  return String(value);
+}
+
+function dateFromRaw(rawData: PriceApiRow | null | undefined, keys: string[]) {
+  const value = stringFromRaw(rawData, keys).trim();
+  return /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : '';
+}
+
+function booleanFromRaw(rawData: PriceApiRow | null | undefined, keys: string[], positiveHints: string[], negativeHints: string[] = []) {
+  const value = rawValueByKeys(rawData, keys);
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1 ? true : value === 0 ? false : null;
+  const normalized = normalizeText(value);
+  if (['s', 'sim', 'true', '1'].includes(normalized)) return true;
+  if (['n', 'nao', 'false', '0'].includes(normalized)) return false;
+  if (positiveHints.some((hint) => normalized.includes(hint))) return true;
+  if (negativeHints.some((hint) => normalized.includes(hint))) return false;
+  return null;
+}
+
+function parseCandidatePurchaseInfo(candidate: Pick<RankedCandidate, 'purchaseId' | 'rawData'>) {
+  const digits = normalizeDigits(candidate.purchaseId);
+  const rawNumber = stringFromRaw(candidate.rawData, ['numeroCompra', 'numero_compra', 'numeroPregao', 'numero_pregao', 'compra']);
+  const rawYear = stringFromRaw(candidate.rawData, ['anoCompra', 'ano_compra', 'ano']);
+  const rawModality = stringFromRaw(candidate.rawData, ['modalidadeCompra', 'modalidade', 'nomeModalidadeCompra', 'codigoModalidadeCompra']);
+  let uasg = normalizeUasg(stringFromRaw(candidate.rawData, ['codigoUasg', 'uasg', 'codigo_uasg']));
+  let modalityCode = normalizeDigits(rawModality);
+  let number = normalizeDigits(rawNumber);
+  let year = normalizeDigits(rawYear).slice(0, 4);
+  if (!uasg && digits.length >= 6) uasg = digits.slice(0, 6);
+  if (!modalityCode && digits.length >= 8) modalityCode = digits.slice(6, 8);
+  if (!number && digits.length >= 13) number = digits.slice(8, 13).replace(/^0+/, '') || digits.slice(8, 13);
+  if (!year && digits.length >= 17) year = digits.slice(13, 17);
+  if (!year && digits.length >= 15) year = digits.slice(11, 15);
+  const modalityLabel = rawModality || (() => {
+    const code = modalityCode.replace(/^0+/, '');
+    if (code === '5') return 'Pregão';
+    if (code === '6') return 'Dispensa';
+    if (code === '7') return 'Inexigibilidade';
+    return modalityCode;
+  })();
+  return { uasg, number, year, modalityCode, modalityLabel };
+}
+
+function candidateBooleanFlag(candidate: RankedCandidate, flag: 'srp' | 'meEpp' | 'sustainable') {
+  if (flag === 'srp') {
+    return booleanFromRaw(candidate.rawData, ['compraSrp', 'srp', 'sistemaRegistroPrecos', 'registroPreco', 'registroPrecos', 'indicadorSrp'], ['srp', 'registro de preco', 'registro de precos']);
+  }
+  if (flag === 'meEpp') {
+    return booleanFromRaw(candidate.rawData, ['porteFornecedor', 'tipoFornecedor', 'fornecedorPorte', 'indicadorMeEpp', 'microEmpresa', 'microempresa', 'epp'], ['me/epp', 'microempresa', 'empresa de pequeno porte', 'pequeno porte', 'me epp'], ['demais', 'nao']);
+  }
+  return booleanFromRaw(candidate.rawData, ['itemSustentavel', 'sustentavel', 'criterioSustentabilidade', 'possuiCriterioSustentabilidade'], ['sustentavel', 'sustentabilidade']);
+}
+
+function matchesDateRange(value: string | null | undefined, start?: string, end?: string) {
+  const normalized = value?.slice(0, 10) || '';
+  if (!normalized) return !start && !end;
+  if (start && normalized < start) return false;
+  if (end && normalized > end) return false;
+  return true;
+}
+
+function matchesBooleanFilter(value: boolean | null, filter?: PriceResearchBooleanFilter) {
+  if (!filter) return true;
+  if (value === null) return false;
+  return filter === 'yes' ? value === true : value === false;
+}
+
+function candidateMatchesFilters(candidate: RankedCandidate, filters: SearchFilters) {
+  if (!hasFilters(filters)) return true;
+  const purchaseInfo = parseCandidatePurchaseInfo(candidate);
+  const rawText = normalizeText(JSON.stringify(candidate.rawData ?? {}));
+  const candidateText = normalizeText([
+    candidate.description,
+    candidate.detailedDescription,
+    candidate.agencyName,
+    candidate.supplierName,
+    candidate.brand,
+    candidate.purchaseId,
+    candidate.purchaseItemId,
+    rawText,
+  ].join(' '));
+  if (filters.description && !candidateText.includes(normalizeText(filters.description))) return false;
+  if (filters.catalogCode) {
+    const rawCatalogCode = stringFromRaw(candidate.rawData, ['codigoItemCatalogo', 'codigoCatalogo', 'codigoItem', 'catmat', 'catser']);
+    if (!normalizeDigits(rawCatalogCode).includes(normalizeDigits(filters.catalogCode))) return false;
+  }
+  if (!matchesDateRange(candidate.resultDate || candidate.purchaseDate, filters.startDate, filters.endDate)) return false;
+  if (filters.purchaseNumber) {
+    const wanted = normalizeDigits(filters.purchaseNumber);
+    const haystack = normalizeDigits([purchaseInfo.number, purchaseInfo.year, candidate.purchaseId].join(' '));
+    if (!haystack.includes(wanted)) return false;
+  }
+  if (filters.uasg && normalizeUasg(candidate.agencyCode ?? purchaseInfo.uasg) !== normalizeUasg(filters.uasg)) return false;
+  if (filters.agencyName && !normalizeText(candidate.agencyName).includes(normalizeText(filters.agencyName))) return false;
+  if (filters.supplierDocument && !normalizeDigits(candidate.supplierDocument).includes(normalizeDigits(filters.supplierDocument))) return false;
+  if (Number.isFinite(filters.quantityMin ?? NaN) && (candidate.quantity ?? 0) < Number(filters.quantityMin)) return false;
+  if (Number.isFinite(filters.quantityMax ?? NaN) && (candidate.quantity ?? 0) > Number(filters.quantityMax)) return false;
+  if (filters.unit && !normalizeMeasure(candidate.originalUnitLabel).includes(normalizeMeasure(filters.unit))) return false;
+  if (filters.state && String(candidate.state ?? '').toUpperCase() !== filters.state) return false;
+  if (filters.region && REGION_BY_UF[String(candidate.state ?? '').toUpperCase()] !== filters.region) return false;
+  if (filters.modality) {
+    const modalityText = normalizeText([purchaseInfo.modalityCode, purchaseInfo.modalityLabel].join(' '));
+    if (!modalityText.includes(normalizeText(filters.modality))) return false;
+  }
+  if (filters.brand && !normalizeText(candidate.brand).includes(normalizeText(filters.brand))) return false;
+  if (!matchesBooleanFilter(candidateBooleanFlag(candidate, 'srp'), filters.srp)) return false;
+  if (!matchesBooleanFilter(candidateBooleanFlag(candidate, 'meEpp'), filters.meEpp)) return false;
+  if (!matchesBooleanFilter(candidateBooleanFlag(candidate, 'sustainable'), filters.sustainable)) return false;
+  if (!matchesDateRange(dateFromRaw(candidate.rawData, ['dataAdjudicacao', 'data_adjudicacao', 'adjudicacao']), filters.adjudicationStartDate, filters.adjudicationEndDate)) return false;
+  if (!matchesDateRange(dateFromRaw(candidate.rawData, ['dataHomologacao', 'data_homologacao', 'homologacao']), filters.homologationStartDate, filters.homologationEndDate)) return false;
+  if (filters.rawDataText && !rawText.includes(normalizeText(filters.rawDataText))) return false;
+  return true;
 }
 
 function textSimilarity(left: unknown, right: unknown) {
@@ -215,7 +439,7 @@ function comparablePrice(item: SearchItem, row: PriceApiRow) {
   return { price: originalPrice, compatible: true };
 }
 
-function buildPriceApiUrl(item: SearchItem, pageSize = 100) {
+function buildPriceApiUrl(item: SearchItem, pageSize = 100, filters: SearchFilters = {}) {
   const endpoint = item.catalogType === 'service'
     ? '/modulo-pesquisa-preco/3_consultarServico'
     : '/modulo-pesquisa-preco/1_consultarMaterial';
@@ -228,8 +452,8 @@ function buildPriceApiUrl(item: SearchItem, pageSize = 100) {
     pagina: '1',
     tamanhoPagina: String(pageSize),
     codigoItemCatalogo: item.catalogCode,
-    dataCompraInicio: start.toISOString().slice(0, 10),
-    dataCompraFim: end.toISOString().slice(0, 10),
+    dataCompraInicio: filters.startDate || start.toISOString().slice(0, 10),
+    dataCompraFim: filters.endDate || end.toISOString().slice(0, 10),
   });
   return `${COMPRAS_API_BASE}${endpoint}?${params.toString()}`;
 }
@@ -428,17 +652,17 @@ ${JSON.stringify(candidates.slice(0, MAX_CANDIDATES_FOR_AI).map((candidate) => (
   }
 }
 
-async function searchOne(item: SearchItem, limit: number) {
+async function searchOne(item: SearchItem, limit: number, filters: SearchFilters = {}) {
   if (!/^\d{4,9}$/.test(item.catalogCode)) {
     return { localId: item.localId, candidates: [], error: 'Código CATMAT/CATSER inválido.' };
   }
 
-  const sourceUrl = buildPriceApiUrl(item);
+  const sourceUrl = buildPriceApiUrl(item, Math.max(limit, DEFAULT_LIMIT), filters);
   const response = await fetchJson(sourceUrl);
   const unique = new Map<string, RankedCandidate>();
   for (const row of response.resultado ?? []) {
     const candidate = mapCandidate(item, row, sourceUrl);
-    if (candidate && !unique.has(candidate.id)) unique.set(candidate.id, candidate);
+    if (candidate && candidateMatchesFilters(candidate, filters) && !unique.has(candidate.id)) unique.set(candidate.id, candidate);
   }
 
   const initiallyRanked = Array.from(unique.values())
@@ -582,11 +806,12 @@ Deno.serve(async (request) => {
     const items = Array.isArray(body.items) ? body.items.slice(0, MAX_ITEMS) : [];
     if (items.length === 0) return jsonResponse({ error: 'Envie ao menos um item para pesquisa.' }, 400);
     const limit = Math.max(3, Math.min(100, Number(body.limit ?? DEFAULT_LIMIT)));
+    const filters = normalizeFilters(body.filters);
 
     const results = [];
     for (let index = 0; index < items.length; index += 3) {
       results.push(...await Promise.all(
-        items.slice(index, index + 3).map((item) => searchOne(item, limit).catch((error) => ({
+        items.slice(index, index + 3).map((item) => searchOne(item, limit, filters).catch((error) => ({
           localId: item.localId,
           candidates: [],
           error: error instanceof Error ? error.message : String(error),

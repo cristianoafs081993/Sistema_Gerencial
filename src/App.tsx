@@ -30,6 +30,7 @@ const GeradorDocumentos = lazy(() => import('./pages/GeradorDocumentos'));
 const EditorDocumentos = lazy(() => import('./pages/EditorDocumentos'));
 const ArtefatosLicitacao = lazy(() => import('./pages/ArtefatosLicitacao'));
 const PesquisaPrecos = lazy(() => import('./pages/PesquisaPrecos'));
+const PriceResearchEad = lazy(() => import('./pages/PriceResearchEad'));
 const PriceResearchValidation = lazy(() => import('./pages/PriceResearchValidation'));
 const LicitacoesPregoes = lazy(() => import('./pages/LicitacoesPregoes'));
 const AtasRegistroPrecos = lazy(() => import('./pages/AtasRegistroPrecos'));
@@ -104,6 +105,7 @@ const App = () => (
                   <Route path="/editor-documentos/:modelId" element={<EditorDocumentos />} />
                   <Route path="/artefatos-licitacao" element={<ArtefatosLicitacao />} />
                   <Route path="/pesquisa-precos" element={<PesquisaPrecos />} />
+                  <Route path="/pesquisa-precos/ead" element={<PriceResearchEad />} />
                   <Route path="/licitacoes-pregoes" element={<LicitacoesPregoes />} />
                   <Route path="/atas-registro-precos" element={<AtasRegistroPrecos />} />
                   <Route path="/cadastro-fornecedores" element={<CadastroFornecedores />} />

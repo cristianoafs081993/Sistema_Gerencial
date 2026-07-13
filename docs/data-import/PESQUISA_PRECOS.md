@@ -90,6 +90,8 @@ Fonte primária de preços:
 
 Esses endpoints fornecem preços praticados/homologados por código de catálogo. O PNCP é apresentado como link complementar de rastreabilidade da compra. Não se deve substituir o preço homologado por valor meramente estimado de item publicado no PNCP.
 
+Filtros avancados podem restringir a busca e refinar a curadoria por descricao, CATMAT/CATSER, periodo/prazo, numero da compra/pregao, UASG/orgao, CNPJ/CPF do fornecedor, quantidade, unidade, UF, regiao, modalidade, marca, SRP, ME/EPP, sustentabilidade, datas de adjudicacao/homologacao e texto livre nos metadados oficiais preservados. Apenas parametros confirmados da API oficial entram na URL de consulta; os demais criterios sao pos-filtros deterministicos sobre os registros retornados.
+
 Durante a consulta oficial, a curadoria preserva a estrutura da etapa e substitui temporariamente métricas e linhas por skeletons, acompanhados da mensagem acessível `Buscando cotações oficiais...`. A interface não apresenta o estado vazio antes da resposta. Se a consulta falhar, mostra o erro na tabela e oferece `Tentar novamente`; exportação e navegação dependentes das cotações ficam desabilitadas enquanto a requisição estiver pendente.
 
 ## Comparabilidade
@@ -154,10 +156,19 @@ Regras cobertas neste corte:
 - preço estimado acima da mediana quando a cesta selecionada usa somente sistema oficial;
 - grande variação entre preços, preço outlier sem justificativa, unidade incompatível selecionada e busca oficial não executada.
 
-## Persistência
+## Capacitacao EAD
 
-- `price_researches`: metadados, responsável, método, observações, arquivo de origem, status, identificação institucional, logotipo e servidores do relatório.
+A rota `/pesquisa-precos/ead` apresenta aulas de capacitacao por videos do YouTube embedados em iframe. O catalogo e global do modulo, nao fica vinculado a uma pesquisa especifica e nao entra nos relatorios/exportacoes.
+
+Usuarios autenticados com acesso ao modulo visualizam apenas aulas ativas. O cadastro, edicao, ativacao/desativacao, ordenacao e exclusao das aulas ficam restritos ao superadministrador.
+
+O embed usa `youtube-nocookie.com` a partir do ID validado do video. Nao ha uso de chave da API do YouTube neste corte.
+
+## Persistencia
+
+- `price_researches`: metadados, responsável, método, observações, arquivo de origem, status, filtros de busca em `search_filters`, identificacao institucional, logotipo e servidores do relatorio.
 - `price_research_items`: snapshot dos itens e candidatos oficiais usados na análise.
+- `price_research_ead_videos`: catalogo global de aulas EAD com URL do YouTube, ID do video, ordenacao e status ativo/inativo.
 
 As políticas RLS permitem ao usuário autenticado acessar suas próprias pesquisas. Superadministradores podem acessar todos os registros.
 
@@ -173,6 +184,7 @@ O QR Code do relatório aponta para `/pesquisa-precos/validar`. A tela chama a E
 - cliente e processamento em segundo plano: `src/lib/priceCatalogClient.ts` e `src/lib/priceCatalog.worker.ts`
 - geração dos catálogos compactados: `scripts/generate-price-catalogs.mjs`
 - persistência e chamada da function: `src/services/priceResearch.ts`
+- EAD: `src/pages/PriceResearchEad.tsx`, `src/services/priceResearchEad.ts` e `src/lib/youtube.ts`
 - Edge Function: `supabase/functions/pesquisar-precos/index.ts`
 - migration: `supabase/migrations/20260609150000_create_price_research_module.sql`
 

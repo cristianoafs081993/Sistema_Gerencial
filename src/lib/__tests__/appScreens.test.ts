@@ -11,6 +11,7 @@ describe('app screen registry', () => {
     expect(getScreenForPath('/licitacoes-pregoes')?.id).toBe('licitacoes-pregoes');
     expect(getScreenForPath('/atas-registro-precos')?.id).toBe('atas-registro-precos');
     expect(getScreenForPath('/cadastro-fornecedores')?.id).toBe('cadastro-fornecedores');
+    expect(getScreenForPath('/pesquisa-precos/ead')?.id).toBe('pesquisa-precos-ead');
     expect(getScreenForPath('/energia')?.id).toBe('energia-visao-geral');
     expect(getScreenForPath('/energia/esg')?.id).toBe('energia-esg');
   });
@@ -19,6 +20,7 @@ describe('app screen registry', () => {
     expect(expandScreenAccessIds(['pesquisa-precos'])).toEqual([
       'pesquisa-precos',
       'cadastro-fornecedores',
+      'pesquisa-precos-ead',
     ]);
   });
 

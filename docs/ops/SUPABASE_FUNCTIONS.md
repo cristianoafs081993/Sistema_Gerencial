@@ -564,6 +564,7 @@ Local:
 Uso:
 
 - recebe itens com descrição, quantidade, unidade e CATMAT/CATSER;
+- aceita filtros avancados opcionais e aplica pos-filtro deterministico para criterios nao suportados diretamente pela API oficial;
 - consulta preços homologados dos últimos 12 meses no Compras.gov.br;
 - normaliza unidades determinísticas e retorna até 100 candidatos por item;
 - usa Gemini opcionalmente apenas para reordenar aderência;
@@ -615,8 +616,8 @@ Local:
 
 Uso:
 
-- recebe lista de destinatários (fornecedores), itens e metadados da pesquisa;
-- monta o HTML do e-mail de cotação no backend;
+- recebe lista de destinatários (fornecedores), itens, metadados da pesquisa, identificação institucional, setor responsável, instruções customizadas e Reply-To;
+- monta o HTML do e-mail de cotação no backend, com rodapé SIAGES e setor responsável configurável;
 - dispara cada e-mail via Resend API;
 - grava registro de auditoria em `price_research_email_dispatches`;
 - suporta modalidades: `direct`, `express`, `batch`, `custom`, `manual`.

@@ -138,6 +138,15 @@ Mostrar a linhagem operacional dos dados de forma curta:
 - saída
   - relatório HTML imprimível
   - workbook XLSX com resumo e detalhamento das cotações
+
+- capacitacao EAD
+  - pagina: `src/pages/PriceResearchEad.tsx`
+  - service: `src/services/priceResearchEad.ts`
+  - helper: `src/lib/youtube.ts`
+  - tabela: `price_research_ead_videos`
+  - saida: iframe `youtube-nocookie.com` montado localmente a partir do ID validado do video
+  - observacao: nao usa API key do YouTube; cadastro e manutencao ficam restritos ao superadministrador
+
 - API `https://dadosabertos.compras.gov.br`
   - enriquecimento best-effort: `/modulo-uasg/1_consultarUasg`
   - tabela: `licitacoes_pncp_uasgs`
@@ -318,6 +327,6 @@ Mostrar a linhagem operacional dos dados de forma curta:
 
 ### Almoxarifado
 
-App.tsx → Almoxarifado.tsx → inventoryService → post_stock_movement → stock_movements / stock_movement_items → stock_balances.
+App.tsx  Almoxarifado.tsx  inventoryService  post_stock_movement  stock_movements / stock_movement_items  stock_balances.
 
-Cadastros seguem inventoryService → operational_entities / measurement_units / catalog_items / warehouses. O saldo é sempre derivado do razão; não existe edição direta.
+Cadastros seguem inventoryService  operational_entities / measurement_units / catalog_items / warehouses. O saldo é sempre derivado do razão; não existe edição direta.

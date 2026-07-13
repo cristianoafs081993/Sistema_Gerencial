@@ -17,10 +17,13 @@ import {
   buildPriceResearchReportHtml,
   buildPriceResearchManagementSummary,
   calculatePriceStatistics,
+  filterPriceResearchCandidates,
+  getPriceResearchCandidateBooleanFlag,
   exportPriceResearchCsvBundle,
   exportPriceResearchWorkbook,
   getEstimatedUnitPrice,
   getSelectedStatistics,
+  parsePriceResearchPurchaseInfo,
   parsePriceResearchFile,
   parsePriceResearchRows,
   validatePriceResearchReport,
@@ -121,6 +124,67 @@ describe('priceResearch', () => {
     });
   });
 
+
+  it('normaliza e aplica filtros avançados sobre candidatos oficiais', () => {
+    const item = createItem();
+    const candidate = {
+      ...item.candidates[0],
+      purchaseId: '15836605000122026',
+      supplierDocument: '12.345.678/0001-90',
+      agencyCode: '158366',
+      agencyName: 'IFRN Campus Currais Novos',
+      state: 'RN',
+      brand: 'Marca Alfa',
+      quantity: 120,
+      rawData: {
+        codigoItemCatalogo: '606523',
+        modalidadeCompra: 'Pregão Eletrônico',
+        compraSrp: 'Sim',
+        porteFornecedor: 'ME/EPP',
+        itemSustentavel: 'Sim',
+        dataAdjudicacao: '2026-05-03',
+        dataHomologacao: '2026-05-04',
+        observacao: 'Critério técnico adicional',
+      },
+    };
+
+    expect(parsePriceResearchPurchaseInfo(candidate)).toMatchObject({
+      uasg: '158366',
+      number: '12',
+      year: '2026',
+    });
+    expect(getPriceResearchCandidateBooleanFlag(candidate, 'srp')).toBe(true);
+    expect(getPriceResearchCandidateBooleanFlag({ ...candidate, rawData: {} }, 'srp')).toBeNull();
+
+    const result = filterPriceResearchCandidates([candidate], {
+      description: 'currais novos',
+      catalogCode: '606523',
+      startDate: '2026-05-01',
+      endDate: '2026-05-31',
+      purchaseNumber: '12/2026',
+      uasg: '158366',
+      agencyName: 'ifrn',
+      supplierDocument: '12345678000190',
+      quantityMin: 100,
+      quantityMax: 130,
+      unit: 'PCT',
+      state: 'RN',
+      region: 'Nordeste',
+      modality: 'pregão',
+      brand: 'alfa',
+      srp: 'yes',
+      meEpp: 'yes',
+      sustainable: 'yes',
+      adjudicationStartDate: '2026-05-01',
+      adjudicationEndDate: '2026-05-10',
+      homologationStartDate: '2026-05-01',
+      homologationEndDate: '2026-05-10',
+      rawDataText: 'critério técnico',
+    });
+
+    expect(result).toHaveLength(1);
+    expect(filterPriceResearchCandidates([candidate], { state: 'SP' })).toHaveLength(0);
+  });
   it('calcula média, mediana, desvio padrão e coeficiente de variação', () => {
     const result = calculatePriceStatistics([10, 12, 14]);
 

@@ -6,6 +6,7 @@ import type {
   PriceResearchMethod,
   PriceResearchReportData,
   PriceResearchReportServer,
+  PriceResearchSearchFilters,
 } from '@/lib/priceResearch';
 
 export type PriceResearchSearchItem = Pick<
@@ -45,6 +46,7 @@ export type PriceResearchRecord = {
   sourceFile: string;
   status: 'draft' | 'review' | 'completed';
   items: PriceResearchItem[];
+  searchFilters: PriceResearchSearchFilters;
   createdAt: string;
   updatedAt: string;
 };
@@ -85,6 +87,7 @@ type DbResearchRow = {
   methodology_justification: string | null;
   notes: string | null;
   source_file: string | null;
+  search_filters: PriceResearchSearchFilters | null;
   status: PriceResearchRecord['status'];
   created_at: string;
   updated_at: string;
@@ -123,6 +126,7 @@ const RESEARCH_SELECT = [
   'methodology_justification',
   'notes',
   'source_file',
+  'search_filters',
   'status',
   'created_at',
   'updated_at',
@@ -166,6 +170,7 @@ function mapResearchRow(row: DbResearchRow, items: PriceResearchItem[] = []): Pr
     sourceFile: row.source_file || '',
     status: row.status,
     items,
+    searchFilters: row.search_filters && typeof row.search_filters === 'object' ? row.search_filters : {},
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -180,9 +185,9 @@ export function normalizePriceResearchFunctionError(error: unknown) {
 }
 
 export const priceResearchService = {
-  async search(items: PriceResearchSearchItem[]): Promise<PriceResearchSearchResult[]> {
+  async search(items: PriceResearchSearchItem[], filters: PriceResearchSearchFilters = {}): Promise<PriceResearchSearchResult[]> {
     const { data, error } = await supabase.functions.invoke('pesquisar-precos', {
-      body: { items, limit: 100 },
+      body: { items, limit: 100, filters },
     });
 
     if (error) throw normalizePriceResearchFunctionError(error);
@@ -247,6 +252,7 @@ export const priceResearchService = {
       methodology_justification: data.methodologyJustification || null,
       notes: data.notes || null,
       source_file: data.sourceFile || null,
+      search_filters: data.searchFilters ?? {},
       status: options.status ?? 'review',
       updated_at: new Date().toISOString(),
     };

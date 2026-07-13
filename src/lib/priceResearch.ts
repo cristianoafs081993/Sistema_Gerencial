@@ -70,6 +70,33 @@ export type PriceResearchCandidate = {
   monetaryAdjustmentManualRate?: number;
   monetaryAdjustedPrice?: number;
 };
+export type PriceResearchBooleanFilter = '' | 'yes' | 'no';
+
+export type PriceResearchSearchFilters = {
+  description?: string;
+  catalogCode?: string;
+  startDate?: string;
+  endDate?: string;
+  purchaseNumber?: string;
+  uasg?: string;
+  agencyName?: string;
+  supplierDocument?: string;
+  quantityMin?: number | null;
+  quantityMax?: number | null;
+  unit?: string;
+  state?: string;
+  region?: string;
+  modality?: string;
+  brand?: string;
+  srp?: PriceResearchBooleanFilter;
+  meEpp?: PriceResearchBooleanFilter;
+  sustainable?: PriceResearchBooleanFilter;
+  adjudicationStartDate?: string;
+  adjudicationEndDate?: string;
+  homologationStartDate?: string;
+  homologationEndDate?: string;
+  rawDataText?: string;
+};
 
 export type PriceResearchItem = {
   localId: string;
@@ -188,6 +215,7 @@ export type PriceResearchReportData = {
   notes: string;
   sourceFile: string;
   items: PriceResearchItem[];
+  searchFilters?: PriceResearchSearchFilters;
 };
 
 export type PriceResearchComplianceSeverity = 'error' | 'warning' | 'info';
@@ -243,7 +271,254 @@ const MEASURE_ALIASES: Record<string, string> = {
   HR: 'H',
   HORA: 'H',
   HORAS: 'H',
+  PCT: 'PCT',
+  PACOTE: 'PCT',
+  PACOTES: 'PCT',
+  CX: 'CX',
+  CAIXA: 'CX',
+  CAIXAS: 'CX',
+  MES: 'MES',
+  MESES: 'MES',
 };
+type PriceResearchBooleanFlag = 'srp' | 'meEpp' | 'sustainable';
+
+const REGION_BY_UF: Record<string, string> = {
+  AC: 'Norte',
+  AP: 'Norte',
+  AM: 'Norte',
+  PA: 'Norte',
+  RO: 'Norte',
+  RR: 'Norte',
+  TO: 'Norte',
+  AL: 'Nordeste',
+  BA: 'Nordeste',
+  CE: 'Nordeste',
+  MA: 'Nordeste',
+  PB: 'Nordeste',
+  PE: 'Nordeste',
+  PI: 'Nordeste',
+  RN: 'Nordeste',
+  SE: 'Nordeste',
+  DF: 'Centro-Oeste',
+  GO: 'Centro-Oeste',
+  MT: 'Centro-Oeste',
+  MS: 'Centro-Oeste',
+  ES: 'Sudeste',
+  MG: 'Sudeste',
+  RJ: 'Sudeste',
+  SP: 'Sudeste',
+  PR: 'Sul',
+  RS: 'Sul',
+  SC: 'Sul',
+};
+
+function rawValueByKeys(rawData: Record<string, unknown> | null | undefined, keys: string[]) {
+  if (!rawData || typeof rawData !== 'object') return undefined;
+  const normalizedKeys = new Set(keys.map((key) => normalizePriceResearchText(key).replace(/\s/g, '')));
+  const stack: unknown[] = [rawData];
+  while (stack.length > 0) {
+    const current = stack.shift();
+    if (!current || typeof current !== 'object') continue;
+    for (const [key, value] of Object.entries(current as Record<string, unknown>)) {
+      const normalizedKey = normalizePriceResearchText(key).replace(/\s/g, '');
+      if (normalizedKeys.has(normalizedKey)) return value;
+      if (value && typeof value === 'object') stack.push(value);
+    }
+  }
+  return undefined;
+}
+
+function stringFromRaw(rawData: Record<string, unknown> | null | undefined, keys: string[]) {
+  const value = rawValueByKeys(rawData, keys);
+  if (value === null || value === undefined) return '';
+  return String(value);
+}
+
+function dateFromRaw(rawData: Record<string, unknown> | null | undefined, keys: string[]) {
+  const value = stringFromRaw(rawData, keys).trim();
+  return /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : '';
+}
+
+function booleanFromRaw(rawData: Record<string, unknown> | null | undefined, keys: string[], positiveHints: string[], negativeHints: string[] = []) {
+  const value = rawValueByKeys(rawData, keys);
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1 ? true : value === 0 ? false : null;
+  const normalized = normalizePriceResearchText(value);
+  if (['s', 'sim', 'true', '1'].includes(normalized)) return true;
+  if (['n', 'nao', 'false', '0'].includes(normalized)) return false;
+  if (positiveHints.some((hint) => normalized.includes(hint))) return true;
+  if (negativeHints.some((hint) => normalized.includes(hint))) return false;
+  return null;
+}
+
+export function normalizePriceResearchText(value: unknown) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9\s/.-]/g, ' ')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function normalizePriceResearchDigits(value: unknown) {
+  return String(value ?? '').replace(/\D/g, '');
+}
+
+export function normalizePriceResearchUasg(value: unknown) {
+  return normalizePriceResearchDigits(value).slice(0, 6);
+}
+
+export function normalizePriceResearchUnit(value: unknown) {
+  const normalized = String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+  return MEASURE_ALIASES[normalized] ?? normalized;
+}
+
+export function getBrazilRegionFromUf(value: unknown) {
+  const uf = String(value ?? '').trim().toUpperCase();
+  return REGION_BY_UF[uf] ?? '';
+}
+
+export function parsePriceResearchPurchaseInfo(candidate: Pick<PriceResearchCandidate, 'purchaseId' | 'rawData'>) {
+  const purchaseId = String(candidate.purchaseId ?? '');
+  const digits = normalizePriceResearchDigits(purchaseId);
+  const rawNumber = stringFromRaw(candidate.rawData, ['numeroCompra', 'numero_compra', 'numeroPregao', 'numero_pregao', 'compra']);
+  const rawYear = stringFromRaw(candidate.rawData, ['anoCompra', 'ano_compra', 'ano']);
+  const rawModality = stringFromRaw(candidate.rawData, ['modalidadeCompra', 'modalidade', 'nomeModalidadeCompra', 'codigoModalidadeCompra']);
+  let uasg = normalizePriceResearchUasg(stringFromRaw(candidate.rawData, ['codigoUasg', 'uasg', 'codigo_uasg']));
+  let modalityCode = normalizePriceResearchDigits(rawModality);
+  let number = normalizePriceResearchDigits(rawNumber);
+  let year = normalizePriceResearchDigits(rawYear).slice(0, 4);
+
+  if (!uasg && digits.length >= 6) uasg = digits.slice(0, 6);
+  if (!modalityCode && digits.length >= 8) modalityCode = digits.slice(6, 8);
+  if (!number && digits.length >= 13) number = digits.slice(8, 13).replace(/^0+/, '') || digits.slice(8, 13);
+  if (!year && digits.length >= 17) year = digits.slice(13, 17);
+  if (!year && digits.length >= 15) year = digits.slice(11, 15);
+
+  const modalityLabel = rawModality || (() => {
+    const code = modalityCode.replace(/^0+/, '');
+    if (code === '5') return 'Pregão';
+    if (code === '6') return 'Dispensa';
+    if (code === '7') return 'Inexigibilidade';
+    return modalityCode;
+  })();
+
+  return {
+    uasg,
+    number,
+    year,
+    modalityCode,
+    modalityLabel,
+    label: [number, year].filter(Boolean).join('/'),
+  };
+}
+
+export function getPriceResearchCandidateBooleanFlag(candidate: PriceResearchCandidate, flag: PriceResearchBooleanFlag) {
+  if (flag === 'srp') {
+    return booleanFromRaw(
+      candidate.rawData,
+      ['compraSrp', 'srp', 'sistemaRegistroPrecos', 'registroPreco', 'registroPrecos', 'indicadorSrp'],
+      ['srp', 'registro de preco', 'registro de precos'],
+    );
+  }
+  if (flag === 'meEpp') {
+    return booleanFromRaw(
+      candidate.rawData,
+      ['porteFornecedor', 'tipoFornecedor', 'fornecedorPorte', 'indicadorMeEpp', 'microEmpresa', 'microempresa', 'epp'],
+      ['me/epp', 'microempresa', 'empresa de pequeno porte', 'pequeno porte', 'me epp'],
+      ['demais', 'nao'],
+    );
+  }
+  return booleanFromRaw(
+    candidate.rawData,
+    ['itemSustentavel', 'sustentavel', 'criterioSustentabilidade', 'possuiCriterioSustentabilidade'],
+    ['sustentavel', 'sustentabilidade'],
+  );
+}
+
+export function hasPriceResearchSearchFilters(filters?: PriceResearchSearchFilters | null) {
+  if (!filters) return false;
+  return Object.entries(filters).some(([, value]) => {
+    if (value === null || value === undefined || value === '') return false;
+    if (typeof value === 'number') return Number.isFinite(value);
+    return true;
+  });
+}
+
+function matchesDateRange(value: string | null | undefined, start?: string, end?: string) {
+  const normalized = value?.slice(0, 10) || '';
+  if (!normalized) return !start && !end;
+  if (start && normalized < start) return false;
+  if (end && normalized > end) return false;
+  return true;
+}
+
+function matchesBooleanFilter(value: boolean | null, filter?: PriceResearchBooleanFilter) {
+  if (!filter) return true;
+  if (value === null) return false;
+  return filter === 'yes' ? value === true : value === false;
+}
+
+export function candidateMatchesPriceResearchFilters(candidate: PriceResearchCandidate, filters?: PriceResearchSearchFilters | null) {
+  if (!hasPriceResearchSearchFilters(filters)) return true;
+  const active = filters ?? {};
+  const rawDataText = normalizePriceResearchText(JSON.stringify(candidate.rawData ?? {}));
+  const purchaseInfo = parsePriceResearchPurchaseInfo(candidate);
+  const dateValue = candidate.resultDate || candidate.purchaseDate;
+  const candidateText = normalizePriceResearchText([
+    candidate.description,
+    candidate.detailedDescription,
+    candidate.agencyName,
+    candidate.supplierName,
+    candidate.brand,
+    candidate.purchaseId,
+    candidate.purchaseItemId,
+    rawDataText,
+  ].join(' '));
+
+  if (active.description && !candidateText.includes(normalizePriceResearchText(active.description))) return false;
+  if (active.catalogCode) {
+    const rawCatalogCode = stringFromRaw(candidate.rawData, ['codigoItemCatalogo', 'codigoCatalogo', 'codigoItem', 'catmat', 'catser']);
+    if (!normalizePriceResearchDigits(rawCatalogCode).includes(normalizePriceResearchDigits(active.catalogCode))) return false;
+  }
+  if (!matchesDateRange(dateValue, active.startDate, active.endDate)) return false;
+  if (active.purchaseNumber) {
+    const wanted = normalizePriceResearchDigits(active.purchaseNumber);
+    const haystack = normalizePriceResearchDigits([purchaseInfo.number, purchaseInfo.year, candidate.purchaseId].join(' '));
+    if (!haystack.includes(wanted)) return false;
+  }
+  if (active.uasg && normalizePriceResearchUasg(candidate.agencyCode ?? purchaseInfo.uasg) !== normalizePriceResearchUasg(active.uasg)) return false;
+  if (active.agencyName && !normalizePriceResearchText(candidate.agencyName).includes(normalizePriceResearchText(active.agencyName))) return false;
+  if (active.supplierDocument && !normalizePriceResearchDigits(candidate.supplierDocument).includes(normalizePriceResearchDigits(active.supplierDocument))) return false;
+  if (Number.isFinite(active.quantityMin ?? NaN) && (candidate.quantity ?? 0) < Number(active.quantityMin)) return false;
+  if (Number.isFinite(active.quantityMax ?? NaN) && (candidate.quantity ?? 0) > Number(active.quantityMax)) return false;
+  if (active.unit && !normalizePriceResearchUnit(candidate.originalUnitLabel).includes(normalizePriceResearchUnit(active.unit))) return false;
+  if (active.state && String(candidate.state ?? '').toUpperCase() !== String(active.state).toUpperCase()) return false;
+  if (active.region && getBrazilRegionFromUf(candidate.state) !== active.region) return false;
+  if (active.modality) {
+    const modalityText = normalizePriceResearchText([purchaseInfo.modalityCode, purchaseInfo.modalityLabel].join(' '));
+    if (!modalityText.includes(normalizePriceResearchText(active.modality))) return false;
+  }
+  if (active.brand && !normalizePriceResearchText(candidate.brand).includes(normalizePriceResearchText(active.brand))) return false;
+  if (!matchesBooleanFilter(getPriceResearchCandidateBooleanFlag(candidate, 'srp'), active.srp)) return false;
+  if (!matchesBooleanFilter(getPriceResearchCandidateBooleanFlag(candidate, 'meEpp'), active.meEpp)) return false;
+  if (!matchesBooleanFilter(getPriceResearchCandidateBooleanFlag(candidate, 'sustainable'), active.sustainable)) return false;
+  if (!matchesDateRange(dateFromRaw(candidate.rawData, ['dataAdjudicacao', 'data_adjudicacao', 'adjudicacao']), active.adjudicationStartDate, active.adjudicationEndDate)) return false;
+  if (!matchesDateRange(dateFromRaw(candidate.rawData, ['dataHomologacao', 'data_homologacao', 'homologacao']), active.homologationStartDate, active.homologationEndDate)) return false;
+  if (active.rawDataText && !rawDataText.includes(normalizePriceResearchText(active.rawDataText))) return false;
+  return true;
+}
+
+export function filterPriceResearchCandidates(candidates: PriceResearchCandidate[], filters?: PriceResearchSearchFilters | null) {
+  return candidates.filter((candidate) => candidateMatchesPriceResearchFilters(candidate, filters));
+}
 
 export const METHOD_LABELS: Record<PriceResearchMethod, string> = {
   median: 'Mediana',
@@ -1515,8 +1790,8 @@ export function buildPriceResearchReportHtml(data: PriceResearchReportData, opti
       </section>
       <div class="auth">
         <div>
-          <h2 style="margin-top:0">Autenticacao do relatorio</h2>
-          <p>Este QR Code registra a impressao digital do snapshot revisado da pesquisa. A validacao deve comparar o hash abaixo com o hash gerado a partir dos dados salvos.</p>
+          <h2 style="margin-top:0">Autenticação do relatório</h2>
+          <p>Acesse este QR Code para verificar a autenticidade deste relatório</p>
           <p><strong>Hash:</strong> <span class="hash">${escapeHtml(authentication.snapshotHash)}</span></p>
           <p><strong>Gerado em:</strong> ${escapeHtml(new Date(authentication.generatedAt).toLocaleString('pt-BR'))}<br />
           <strong>Versao:</strong> ${escapeHtml(authentication.reportVersion)}<br />

@@ -81,6 +81,14 @@ type Props = {
 const STEPS = ['Modalidade', 'Fornecedores', 'Dados', 'Confirmar', 'Resultado'];
 const MODALITIES: QuotationModality[] = ['direct', 'express', 'batch', 'custom', 'manual'];
 
+const DEFAULT_EMAIL_INSTRUCTIONS = [
+  'Enviar proposta em papel timbrado da empresa, com CNPJ, preços unitários e totais;',
+  'Incluir validade mínima da proposta de 60 (sessenta) dias;',
+  'Informar marca e/ou modelo dos produtos, quando aplicável;',
+  'Encaminhar a proposta para o e-mail indicado no campo Reply-To;',
+  'Identificar o e-mail com o assunto da cotação.',
+].join('\n');
+
 const MODALITY_ICONS: Record<QuotationModality, React.ReactNode> = {
   direct:   <Send className="w-5 h-5" />,
   express:  <Zap className="w-5 h-5" />,
@@ -91,6 +99,17 @@ const MODALITY_ICONS: Record<QuotationModality, React.ReactNode> = {
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
+function getSavedEmailField(key: string, legacyDefault: string) {
+  const saved = localStorage.getItem(key);
+  const migrationKey = `${key}_legacy_default_cleared`;
+  if (saved === legacyDefault && !localStorage.getItem(migrationKey)) {
+    localStorage.removeItem(key);
+    localStorage.setItem(migrationKey, '1');
+    return '';
+  }
+  return saved || '';
 }
 
 // ---------------------------------------------------------------------------
@@ -134,11 +153,13 @@ export function SupplierEmailDialog({
   const [deadlineDate, setDeadlineDate] = useState('');
   const [deadlineBusinessDays, setDeadlineBusinessDays] = useState<number | ''>('');
   const [additionalMessage, setAdditionalMessage] = useState('');
+  const [instructions, setInstructions] = useState(() => localStorage.getItem('price_research_email_instructions') || DEFAULT_EMAIL_INSTRUCTIONS);
   const [replyTo, setReplyTo] = useState('');
   const [previewHtml, setPreviewHtml] = useState('');
 
-  const [agencyName, setAgencyName] = useState(() => localStorage.getItem('price_research_email_agency_name') || 'Instituto Federal do Rio Grande do Norte');
-  const [agencySub, setAgencySub] = useState(() => localStorage.getItem('price_research_email_agency_sub') || 'Campus Currais Novos');
+  const [agencyName, setAgencyName] = useState(() => getSavedEmailField('price_research_email_agency_name', 'Instituto Federal do Rio Grande do Norte'));
+  const [agencySub, setAgencySub] = useState(() => getSavedEmailField('price_research_email_agency_sub', 'Campus Currais Novos'));
+  const [agencySector, setAgencySector] = useState(() => getSavedEmailField('price_research_email_agency_sector', 'Setor de Licitações e Contratos'));
 
   useEffect(() => {
     localStorage.setItem('price_research_email_agency_name', agencyName);
@@ -147,6 +168,14 @@ export function SupplierEmailDialog({
   useEffect(() => {
     localStorage.setItem('price_research_email_agency_sub', agencySub);
   }, [agencySub]);
+
+  useEffect(() => {
+    localStorage.setItem('price_research_email_agency_sector', agencySector);
+  }, [agencySector]);
+
+  useEffect(() => {
+    localStorage.setItem('price_research_email_instructions', instructions);
+  }, [instructions]);
 
   // Send state
   const [isSending, setIsSending] = useState(false);
@@ -293,7 +322,7 @@ export function SupplierEmailDialog({
   const canGoNext = () => {
     if (step === 0) return true; // modality always selected
     if (step === 1) return selectedRecipients.length > 0;
-    if (step === 2) return true; // message is optional
+    if (step === 2) return agencyName.trim().length > 0;
     if (step === 3) return selectedRecipients.length > 0 && activeItems.length > 0;
     return false;
   };
@@ -324,6 +353,7 @@ export function SupplierEmailDialog({
   const handleSend = async () => {
     if (selectedRecipients.length === 0) { toast.error('Selecione ao menos um destinatário.'); return; }
     if (activeItems.length === 0) { toast.error('A pesquisa não possui itens.'); return; }
+    if (!agencyName.trim()) { toast.error('Informe o órgão/instituição antes de enviar.'); return; }
 
     setIsSending(true);
     try {
@@ -367,9 +397,11 @@ export function SupplierEmailDialog({
         deadlineDate: deadlineDate || undefined,
         deadlineBusinessDays: deadlineBusinessDays ? Number(deadlineBusinessDays) : undefined,
         additionalMessage: additionalMessage || undefined,
+        instructions: instructions || undefined,
         replyTo: replyTo || undefined,
-        agencyName: agencyName || undefined,
-        agencySub: agencySub || undefined,
+        agencyName: agencyName.trim(),
+        agencySub: agencySub.trim(),
+        agencySector: agencySector.trim(),
       });
       setSendResult(result);
       setStep(4);
@@ -690,6 +722,19 @@ export function SupplierEmailDialog({
             </div>
           </div>
 
+          <div className="space-y-1">
+            <Label htmlFor="agency-sector" className="text-xs font-medium">
+              Setor responsável
+            </Label>
+            <Input
+              id="agency-sector"
+              value={agencySector}
+              onChange={(e) => setAgencySector(e.target.value)}
+              placeholder="Ex: Setor de Licitações e Contratos"
+              className="h-9 text-sm"
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="deadline-date" className="text-xs font-medium">
@@ -738,6 +783,20 @@ export function SupplierEmailDialog({
           </div>
 
           <div className="space-y-1">
+            <Label htmlFor="instructions" className="text-xs font-medium">
+              Instruções para envio da proposta
+            </Label>
+            <Textarea
+              id="instructions"
+              placeholder="Uma instrução por linha"
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              rows={5}
+              className="text-sm resize-none"
+            />
+          </div>
+
+          <div className="space-y-1">
             <Label htmlFor="add-msg" className="text-xs font-medium">
               Observações adicionais (opcional)
             </Label>
@@ -766,6 +825,7 @@ export function SupplierEmailDialog({
             <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
               <p><strong className="text-foreground">Modalidade:</strong> {MODALITY_LABELS[modality]}</p>
               <p><strong className="text-foreground">Responsável:</strong> {responsibleName}</p>
+              <p><strong className="text-foreground">Setor:</strong> {agencySector || 'Setor de Licitações e Contratos'}</p>
               <p><strong className="text-foreground">Destinatários:</strong> {selectedRecipients.length} fornecedor(es)</p>
               <p>
                 <strong className="text-foreground">Prazo:</strong>{' '}
@@ -858,10 +918,17 @@ export function SupplierEmailDialog({
                 <div className="p-3 bg-slate-50 border rounded text-xs text-slate-600 space-y-1">
                   <p className="font-bold text-slate-800 uppercase tracking-wide text-[10px]">Instruções para envio:</p>
                   <ul className="list-disc pl-4 space-y-1">
-                    <li>Enviar proposta em papel timbrado da empresa, com CNPJ;</li>
-                    <li>Validade mínima da proposta de 60 dias;</li>
-                    <li>Encaminhar proposta para o e-mail: <strong className="text-primary">{replyTo || 'licitacoes@ifrn.edu.br'}</strong></li>
+                    {(instructions || DEFAULT_EMAIL_INSTRUCTIONS).split(/\r?\n/).filter(Boolean).map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
                   </ul>
+                </div>
+
+                <div className="pt-2 text-xs text-slate-500">
+                  <p className="font-semibold text-slate-700">{responsibleName}</p>
+                  <p>{agencySector || 'Setor de Licitações e Contratos'}</p>
+                  <p>{agencyName}{agencySub ? ` — ${agencySub}` : ''}</p>
+                  <p>Este e-mail foi gerado automaticamente pelo SIAGES - Sistema Integrado de Administração e Gestão Estratégica.</p>
                 </div>
               </div>
             </div>

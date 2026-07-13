@@ -78,8 +78,9 @@ const nestedNavigation: Record<string, NavigationLeaf[]> = {
     { name: 'Contrato de Serviço IFRN', href: '/editor-documentos/contrato-servico-ifrn', screenId: 'editor-documentos-contrato' },
   ],
   'pesquisa-precos': [
-    { name: 'Cotações', href: '/pesquisa-precos', screenId: 'pesquisa-precos-cotacoes' },
+    { name: 'Cotações', href: '/pesquisa-precos', screenId: 'pesquisa-precos' },
     { name: 'Cadastro de Fornecedores', href: '/cadastro-fornecedores', screenId: 'cadastro-fornecedores' },
+    { name: 'Capacitação EAD', href: '/pesquisa-precos/ead', screenId: 'pesquisa-precos-ead' },
   ],
 };
 
@@ -113,8 +114,12 @@ function isPathActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function isChildPathActive(pathname: string, href: string) {
+  return pathname === href;
+}
+
 function isItemActive(pathname: string, item: NavigationItem) {
-  return isPathActive(pathname, item.href) || Boolean(item.children?.some((child) => isPathActive(pathname, child.href)));
+  return isPathActive(pathname, item.href) || Boolean(item.children?.some((child) => isChildPathActive(pathname, child.href)));
 }
 
 export function Layout({ children }: LayoutProps) {
@@ -357,7 +362,7 @@ export function Layout({ children }: LayoutProps) {
                   {section.items.map((item) => {
                     const active = isItemActive(location.pathname, item);
                     const parentDirectlyActive = item.children?.length
-                      ? location.pathname === item.href && !item.children.some(child => isPathActive(location.pathname, child.href))
+                      ? location.pathname === item.href && !item.children.some(child => isChildPathActive(location.pathname, child.href))
                       : active;
                     const submenuExpanded = expandedSubmenus[item.screenId] ?? false;
                     const ItemIcon = item.icon;
@@ -402,7 +407,7 @@ export function Layout({ children }: LayoutProps) {
                             )}
                           >
                             {item.children.map((child) => {
-                              const childActive = isPathActive(location.pathname, child.href);
+                              const childActive = isChildPathActive(location.pathname, child.href);
 
                               return (
                                 <Link

@@ -83,9 +83,11 @@ export type SendQuotationPayload = {
   deadlineDate?: string;
   deadlineBusinessDays?: number;
   additionalMessage?: string;
+  instructions?: string;
   replyTo?: string;
   agencyName?: string;
   agencySub?: string;
+  agencySector?: string;
 };
 
 export type SendQuotationResult = {

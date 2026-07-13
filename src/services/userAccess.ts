@@ -186,9 +186,9 @@ export async function fetchUserAccess(user: User, isSuperAdmin: boolean): Promis
 
   if (permissionsError) throw permissionsError;
 
-  let screenIds = Array.from(
+  let screenIds = expandScreenAccessIds(Array.from(
     new Set(((permissions || []) as PermissionRow[]).map((row) => row.screen_id)),
-  );
+  ));
 
   if (isTerceirizado) {
     screenIds = screenIds.filter((id) => id !== 'requisicao-compra');
@@ -199,10 +199,10 @@ export async function fetchUserAccess(user: User, isSuperAdmin: boolean): Promis
   if (orgResult?.id) {
     const orgScreenIds = await fetchOrgEnabledScreenIds(orgResult.id);
     if (orgScreenIds !== null) {
-      const orgScreenSet = new Set(orgScreenIds);
+      const orgScreenSet = new Set(expandScreenAccessIds(orgScreenIds));
       screenIds = screenIds.filter((id) => orgScreenSet.has(id));
     }
   }
 
-  return { groups, screenIds: expandScreenAccessIds(screenIds), org: orgResult };
+  return { groups, screenIds, org: orgResult };
 }

@@ -95,6 +95,10 @@ vi.mock('@/pages/PriceResearchValidation', () => ({
   default: () => <div>price-research-validation-page</div>,
 }));
 
+vi.mock('@/pages/PriceResearchEad', () => ({
+  default: () => <div>price-research-ead-page</div>,
+}));
+
 vi.mock('@/pages/energia/EnergiaCampus', () => ({
   default: () => <div>energia-page</div>,
 }));
@@ -186,6 +190,14 @@ describe('App routes', () => {
     render(<App />);
 
     expect(await screen.findByText('economia-tempo-page')).toBeInTheDocument();
+  });
+
+  it('renderiza a rota de EAD da pesquisa de precos', async () => {
+    window.history.pushState({}, '', '/pesquisa-precos/ead');
+
+    render(<App />);
+
+    expect(await screen.findByText('price-research-ead-page')).toBeInTheDocument();
   });
 
   it('renderiza a rota de validacao da pesquisa de precos', async () => {

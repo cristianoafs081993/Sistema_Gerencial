@@ -533,6 +533,7 @@ Campos-chave:
 - `institution_logo`
 - `report_servers`
 - `research_date`
+- `search_filters`
 - `calculation_method`
 - `methodology_justification`
 - `status`
@@ -543,6 +544,7 @@ Observações operacionais:
 - os métodos aceitos são `median`, `mean` e `minimum`
 - `institution_logo` guarda data URL do logotipo para exportação local; `report_servers` guarda JSONB com nome, função, matrícula/SIAPE e e-mail dos servidores exibidos no relatório
 - a RLS restringe a pesquisa ao proprietário, com acesso global para superadministrador
+- `search_filters` guarda os filtros avancados usados na busca oficial e na curadoria local para restaurar pesquisas salvas
 - o status pode ser `draft`, `review` ou `completed`
 
 ### `price_research_items`
@@ -573,6 +575,35 @@ Consumido por:
 
 - `src/services/priceResearch.ts`
 - `src/pages/PesquisaPrecos.tsx`
+
+### `price_research_ead_videos`
+
+Finalidade:
+
+- catalogo global de aulas EAD do modulo Pesquisa de Precos, exibidas em `/pesquisa-precos/ead`
+
+Campos-chave:
+
+- `id`
+- `title`
+- `description`
+- `youtube_url`
+- `youtube_video_id`
+- `sort_order`
+- `is_active`
+- `created_by`
+- `created_by_email`
+
+Observacoes operacionais:
+
+- usuarios autenticados leem apenas aulas ativas; superadministradores leem todas e podem cadastrar, editar, ativar/desativar, ordenar e excluir
+- a tabela guarda somente metadados e o ID do video; o frontend monta o iframe com `youtube-nocookie.com`
+- nao ha uso de chave da API do YouTube
+
+Consumido por:
+
+- `src/services/priceResearchEad.ts`
+- `src/pages/PriceResearchEad.tsx`
 
 ### `suppliers`
 

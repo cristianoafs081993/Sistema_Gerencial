@@ -39,6 +39,10 @@ const SAMPLE_PAYLOAD: SendQuotationPayload = {
   processNumber: '23035.000001/2026-11',
   responsibleName: 'João da Silva',
   deadlineBusinessDays: 3,
+  instructions: 'Enviar proposta assinada.\nInformar validade da proposta.',
+  agencyName: 'SIAGES',
+  agencySub: 'Campus Currais Novos',
+  agencySector: 'Setor de Compras',
 };
 
 // ---------------------------------------------------------------------------

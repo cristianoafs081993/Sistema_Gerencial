@@ -30,9 +30,11 @@ type DispatchRequest = {
   deadlineDate?: string;        // YYYY-MM-DD
   deadlineBusinessDays?: number;
   additionalMessage?: string;
+  instructions?: string;
   replyTo?: string;
   agencyName?: string;
   agencySub?: string;
+  agencySector?: string;
 };
 
 type DispatchResult = {
@@ -97,6 +99,35 @@ function deadlineText(deadlineDate?: string, deadlineBusinessDays?: number, moda
   return '3 (três) dias úteis após o recebimento desta solicitação';
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function defaultInstructions(replyTo: string, objectDescription: string): string {
+  return [
+    'Enviar proposta em papel timbrado da empresa, com CNPJ, preços unitários e totais;',
+    'Incluir validade mínima da proposta de 60 (sessenta) dias;',
+    'Informar marca e/ou modelo dos produtos, quando aplicável;',
+    `Encaminhar a proposta para o e-mail: ${replyTo};`,
+    `Identificar o e-mail com o assunto: "Cotação — ${objectDescription.slice(0, 60)}".`,
+  ].join('\n');
+}
+
+function buildInstructionItems(params: { instructions?: string; replyTo: string; objectDescription: string }): string {
+  const source = params.instructions?.trim() || defaultInstructions(params.replyTo, params.objectDescription);
+  return source
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => `<li>${escapeHtml(line)}</li>`)
+    .join('');
+}
+
 // ---------------------------------------------------------------------------
 // HTML email builder
 // ---------------------------------------------------------------------------
@@ -110,9 +141,11 @@ function buildEmailHtml(params: {
   items: QuotationItem[];
   deadline: string;
   additionalMessage?: string;
+  instructions?: string;
   replyTo: string;
   agencyName?: string;
   agencySub?: string;
+  agencySector?: string;
 }): string {
   const {
     recipientName,
@@ -123,9 +156,11 @@ function buildEmailHtml(params: {
     items,
     deadline,
     additionalMessage,
+    instructions,
     replyTo,
     agencyName = 'INSTITUTO FEDERAL DO RIO GRANDE DO NORTE',
     agencySub = 'Campus Currais Novos',
+    agencySector = 'Setor de Licitações e Contratos',
   } = params;
 
   const itemRows = items
@@ -152,6 +187,7 @@ function buildEmailHtml(params: {
        </div>`
     : '';
 
+  const instructionItems = buildInstructionItems({ instructions, replyTo, objectDescription });
   const today = new Date().toLocaleDateString('pt-BR');
 
   // Change background color depending on urgency
@@ -222,11 +258,7 @@ function buildEmailHtml(params: {
       <div style="margin-top:28px;padding:20px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb">
         <p style="margin:0 0 10px;color:#1e3a5f;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">Instruções para envio da proposta</p>
         <ul style="margin:0;padding-left:18px;color:#4b5563;font-size:13px;line-height:1.9">
-          <li>Enviar proposta em papel timbrado da empresa, com CNPJ, preços unitários e totais;</li>
-          <li>Incluir validade mínima da proposta de <strong>60 (sessenta) dias</strong>;</li>
-          <li>Informar marca e/ou modelo dos produtos, quando aplicável;</li>
-          <li>Encaminhar a proposta para o e-mail: <a href="mailto:${replyTo}" style="color:#2563eb">${replyTo}</a></li>
-          <li>Identificar o e-mail com o assunto: <em>"Cotação — ${objectDescription.slice(0, 60)}"</em></li>
+          ${instructionItems}
         </ul>
       </div>
 
@@ -238,10 +270,10 @@ function buildEmailHtml(params: {
     <!-- Footer -->
     <div style="background:#f8fafc;border-top:1px solid #e5e7eb;padding:20px 32px">
       <p style="margin:0;color:#374151;font-size:13px;font-weight:600">${responsibleName}</p>
-      <p style="margin:4px 0 0;color:#6b7280;font-size:12px">Setor de Licitações e Contratos</p>
+      <p style="margin:4px 0 0;color:#6b7280;font-size:12px">${agencySector}</p>
       <p style="margin:4px 0 0;color:#6b7280;font-size:12px">${agencyName}${agencySub ? ` — ${agencySub}` : ''}</p>
       <p style="margin:4px 0 0;color:#6b7280;font-size:12px">
-        Este e-mail foi gerado automaticamente pelo Sistema Gerencial IFRN.
+        Este e-mail foi gerado automaticamente pelo SIAGES - Sistema Integrado de Administração e Gestão Estratégica.
         Não responda diretamente a este endereço.
       </p>
     </div>
@@ -336,9 +368,11 @@ Deno.serve(async (request) => {
       deadlineDate,
       deadlineBusinessDays,
       additionalMessage,
+      instructions,
       replyTo: bodyReplyTo,
       agencyName,
       agencySub,
+      agencySector,
     } = body;
 
     if (!researchId) return jsonResponse({ error: 'researchId é obrigatório.' }, 400);
@@ -349,7 +383,7 @@ Deno.serve(async (request) => {
 
     // Environment
     const resendApiKey = requireEnv('RESEND_API_KEY');
-    const emailFrom = Deno.env.get('EMAIL_FROM') ?? 'cotacao@ifrn.edu.br';
+    const emailFrom = requireEnv('EMAIL_FROM');
     const emailReplyTo = bodyReplyTo || Deno.env.get('EMAIL_REPLY_TO') || emailFrom;
 
     // Supabase service role client for DB writes
@@ -399,9 +433,11 @@ Deno.serve(async (request) => {
         items: recipientItems,
         deadline,
         additionalMessage: customMsg,
+        instructions,
         replyTo: emailReplyTo,
         agencyName,
         agencySub,
+        agencySector,
       });
 
       let status: 'sent' | 'failed' = 'sent';

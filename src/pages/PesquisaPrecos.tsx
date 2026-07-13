@@ -22,6 +22,7 @@ import {
   ChevronDown,
   Loader2,
   Mail,
+  Menu,
   MapPin,
   Pencil,
   Plus,
@@ -30,6 +31,7 @@ import {
   Save,
   Search,
   ShoppingBag,
+  X,
   Sparkles,
   Trash2,
   TrendingUp,
@@ -40,6 +42,7 @@ import { toast } from 'sonner';
 
 import { HeaderSubtitle } from '@/components/HeaderParts';
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
+import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { SectionPanel } from '@/components/design-system/SectionPanel';
 import { TableSkeletonRows } from '@/components/design-system/TableSkeletonRows';
 import { Badge } from '@/components/ui/badge';
@@ -66,12 +69,14 @@ import {
   exportPriceResearchCsvBundle,
   exportPriceResearchHtml,
   exportPriceResearchWorkbook,
+  filterPriceResearchCandidates,
   getEstimatedUnitPrice,
   getSelectedStatistics,
   analyzePriceResearchCompliance,
   METHOD_LABELS,
   parsePriceResearchFile,
   validatePriceResearchReport,
+  hasPriceResearchSearchFilters,
   type PriceResearchCandidate,
   type PriceResearchComplianceFinding,
   type PriceResearchItem,
@@ -79,6 +84,7 @@ import {
   type PriceResearchReportData,
   type PriceResearchReportServer,
   type PriceResearchAuthenticationOptions,
+  type PriceResearchSearchFilters,
 } from '@/lib/priceResearch';
 import { findCatalogSuggestions } from '@/lib/priceCatalogClient';
 import { priceResearchService } from '@/services/priceResearch';
@@ -139,6 +145,40 @@ const UNIT_OPTIONS = [
   { value: 'TUBO', label: 'TUBO (Tubo)' },
   { value: 'LOTE', label: 'LOTE (Lote)' },
 ];
+const EMPTY_SEARCH_FILTERS: PriceResearchSearchFilters = {
+  description: '',
+  catalogCode: '',
+  startDate: '',
+  endDate: '',
+  purchaseNumber: '',
+  uasg: '',
+  agencyName: '',
+  supplierDocument: '',
+  quantityMin: null,
+  quantityMax: null,
+  unit: '',
+  state: '',
+  region: '',
+  modality: '',
+  brand: '',
+  srp: '',
+  meEpp: '',
+  sustainable: '',
+  adjudicationStartDate: '',
+  adjudicationEndDate: '',
+  homologationStartDate: '',
+  homologationEndDate: '',
+  rawDataText: '',
+};
+
+const REGION_OPTIONS = ['Norte', 'Nordeste', 'Centro-Oeste', 'Sudeste', 'Sul'];
+const UF_OPTIONS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
+
+const BOOLEAN_FILTER_OPTIONS = [
+  { value: '', label: 'Todos' },
+  { value: 'yes', label: 'Sim' },
+  { value: 'no', label: 'Não' },
+] as const;
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -250,6 +290,9 @@ export default function PesquisaPrecos() {
   const [notes, setNotes] = useState('');
   const [sourceFile, setSourceFile] = useState('');
   const [items, setItems] = useState<PriceResearchItem[]>([]);
+  const [searchFilters, setSearchFilters] = useState<PriceResearchSearchFilters>(EMPTY_SEARCH_FILTERS);
+  const [showOfficialFilters, setShowOfficialFilters] = useState(false);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string>();
   const [itemPanelMode, setItemPanelMode] = useState<'config' | 'curation'>('config');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -319,6 +362,55 @@ export default function PesquisaPrecos() {
     candidate: PriceResearchCandidate;
     reason: string;
   } | null>(null);
+  const [filterSelectionDraft, setFilterSelectionDraft] = useState<{
+    reason: string;
+  } | null>(null);
+  const updateSearchFilter = <K extends keyof PriceResearchSearchFilters>(key: K, value: PriceResearchSearchFilters[K]) => {
+    setSearchFilters((current) => ({ ...current, [key]: value }));
+  };
+
+  const clearSearchFilters = () => {
+    setSearchFilters(EMPTY_SEARCH_FILTERS);
+    setShowAdvancedFilters(false);
+  };
+
+  const activeSearchFilterEntries = useMemo(() => {
+    const labels: Partial<Record<keyof PriceResearchSearchFilters, string>> = {
+      description: 'Descrição',
+      catalogCode: 'CATMAT/CATSER',
+      startDate: 'Data inicial',
+      endDate: 'Data final',
+      purchaseNumber: 'Pregão/compra',
+      uasg: 'UASG',
+      agencyName: 'Órgão',
+      supplierDocument: 'CNPJ/CPF',
+      quantityMin: 'Qtd. mín.',
+      quantityMax: 'Qtd. máx.',
+      unit: 'Unidade',
+      state: 'UF',
+      region: 'Região',
+      modality: 'Modalidade',
+      brand: 'Marca',
+      srp: 'SRP',
+      meEpp: 'ME/EPP',
+      sustainable: 'Sustentável',
+      adjudicationStartDate: 'Adjudicação inicial',
+      adjudicationEndDate: 'Adjudicação final',
+      homologationStartDate: 'Homologação inicial',
+      homologationEndDate: 'Homologação final',
+      rawDataText: 'Metadados',
+    };
+    return Object.entries(searchFilters)
+      .filter(([, value]) => value !== null && value !== undefined && value !== '')
+      .map(([key, value]) => {
+        const typedKey = key as keyof PriceResearchSearchFilters;
+        const label = labels[typedKey] ?? key;
+        const display = value === 'yes' ? 'Sim' : value === 'no' ? 'Não' : String(value);
+        return { key: typedKey, label, display };
+      });
+  }, [searchFilters]);
+
+  const hasActiveSearchFilters = hasPriceResearchSearchFilters(searchFilters);
 
   const [globalAdjustmentEnabled, setGlobalAdjustmentEnabled] = useState(false);
   const [globalAdjustmentIndex, setGlobalAdjustmentIndex] = useState<InflationIndexType | 'manual'>('IPCA');
@@ -390,7 +482,7 @@ export default function PesquisaPrecos() {
     setGlobalAdjustmentEnabled(enabled);
     setGlobalAdjustmentIndex(index);
     setGlobalAdjustmentManualRate(rateStr);
-    
+
     setItems((currentItems) =>
       applyGlobalAdjustmentToItems(currentItems, enabled, index, rateStr, rDate || monetaryAdjustmentReferenceDate)
     );
@@ -431,9 +523,13 @@ export default function PesquisaPrecos() {
     );
     setNotes('');
     setSourceFile('');
+    setSearchFilters(EMPTY_SEARCH_FILTERS);
+    setShowOfficialFilters(false);
+    setShowAdvancedFilters(false);
     setItems([]);
     setSelectedItemId(undefined);
     setCandidateExclusionDraft(null);
+    setFilterSelectionDraft(null);
     setViewMode('wizard');
   };
 
@@ -466,7 +562,7 @@ export default function PesquisaPrecos() {
 
   const resolveDirectPncpLinks = async (targetItems: PriceResearchItem[]): Promise<PriceResearchItem[]> => {
     const keysToLookup: Array<{ uasg: string; numFull: string; numShort: string; candidateId: string; localItemId: string; modalidadeId: number }> = [];
-    
+
     const getYearFromCandidate = (c: any, digits: string) => {
       const dateVal = c.resultDate || c.purchaseDate;
       if (dateVal && dateVal.length >= 4) {
@@ -568,7 +664,7 @@ export default function PesquisaPrecos() {
         const candidate = targetItems
           .find(item => item.localId === k.localItemId)
           ?.candidates.find(c => c.id === k.candidateId);
-        
+
         if (candidate) {
           const keyFull = `${k.uasg}_${k.numFull}`;
           const keyShort = `${k.uasg}_${k.numShort}`;
@@ -598,7 +694,7 @@ export default function PesquisaPrecos() {
 
       if (syncRequests.length > 0) {
         console.log(`[resolveDirectPncpLinks] Disparando ${syncRequests.length} resoluções rápidas em background (não bloqueante)...`);
-        
+
         const runBackgroundSync = async () => {
           const syncPromises = syncRequests.map(async (req) => {
             try {
@@ -729,6 +825,21 @@ export default function PesquisaPrecos() {
   const selectedItemBreadcrumbLabel = selectedItemId && selectedItem
     ? selectedItem.description
     : null;
+  const selectedOfficialCandidates = selectedItem ? selectedItem.candidates.filter(isOfficialCandidate) : [];
+  const filteredOfficialCandidates = useMemo(() => (
+    filterPriceResearchCandidates(selectedOfficialCandidates, searchFilters)
+  ), [selectedOfficialCandidates, searchFilters]);
+  const filteredOfficialCandidateIds = useMemo(() => (
+    new Set(filteredOfficialCandidates.map((candidate) => candidate.id))
+  ), [filteredOfficialCandidates]);
+  const officialCandidatesOutsideFilters = useMemo(() => (
+    hasActiveSearchFilters
+      ? selectedOfficialCandidates.filter((candidate) => !filteredOfficialCandidateIds.has(candidate.id))
+      : []
+  ), [filteredOfficialCandidateIds, hasActiveSearchFilters, selectedOfficialCandidates]);
+  const selectedOfficialCandidatesOutsideFilters = useMemo(() => (
+    officialCandidatesOutsideFilters.filter((candidate) => candidate.selected)
+  ), [officialCandidatesOutsideFilters]);
   const selectedStatistics = selectedItem ? getSelectedStatistics(selectedItem) : null;
   const selectedCoefficientOfVariation = selectedStatistics?.coefficientOfVariation ?? 0;
   const selectedHasHighDispersion = selectedCoefficientOfVariation > 25;
@@ -758,6 +869,7 @@ export default function PesquisaPrecos() {
     notes,
     sourceFile,
     items,
+    searchFilters,
   }), [
     items,
     institutionDetails,
@@ -772,6 +884,7 @@ export default function PesquisaPrecos() {
     reportServers,
     researchDate,
     responsibleName,
+    searchFilters,
     sourceFile,
   ]);
 
@@ -793,12 +906,12 @@ export default function PesquisaPrecos() {
     setItems((current) => current.map((item) => {
       if (item.localId !== localId) return item;
       const mergedItem = { ...item, ...patch };
-      
+
       if (patch.candidates && globalAdjustmentEnabled) {
         const adjustedCandidates = mergedItem.candidates.map((candidate) => {
           let factor = 1;
           let adjustedPrice = candidate.comparableUnitPrice;
-          
+
           if (globalAdjustmentIndex === 'manual') {
             const rate = parseFloat(globalAdjustmentManualRate) || 0;
             factor = 1 + (rate / 100);
@@ -810,7 +923,7 @@ export default function PesquisaPrecos() {
             factor = calculated !== null ? calculated : 1;
           }
           adjustedPrice = candidate.comparableUnitPrice * factor;
-          
+
           return {
             ...candidate,
             monetaryAdjustmentEnabled: true,
@@ -822,7 +935,7 @@ export default function PesquisaPrecos() {
         });
         mergedItem.candidates = adjustedCandidates;
       }
-      
+
       return mergedItem;
     }));
   };
@@ -947,13 +1060,13 @@ export default function PesquisaPrecos() {
         ...item,
         candidates: item.candidates.map((candidate) => {
           if (candidate.id !== candidateId) return candidate;
-          
+
           const mergedCandidate = { ...candidate, ...patch };
-          
+
           if (globalAdjustmentEnabled) {
             let factor = 1;
             let adjustedPrice = mergedCandidate.comparableUnitPrice;
-            
+
             if (globalAdjustmentIndex === 'manual') {
               const rate = parseFloat(globalAdjustmentManualRate) || 0;
               factor = 1 + (rate / 100);
@@ -965,7 +1078,7 @@ export default function PesquisaPrecos() {
               factor = calculated !== null ? calculated : 1;
             }
             adjustedPrice = mergedCandidate.comparableUnitPrice * factor;
-            
+
             mergedCandidate.monetaryAdjustmentEnabled = true;
             mergedCandidate.monetaryAdjustmentIndex = globalAdjustmentIndex;
             mergedCandidate.monetaryAdjustmentFactor = factor;
@@ -978,7 +1091,7 @@ export default function PesquisaPrecos() {
             mergedCandidate.monetaryAdjustmentManualRate = undefined;
             mergedCandidate.monetaryAdjustedPrice = undefined;
           }
-          
+
           return mergedCandidate;
         }),
       };
@@ -1005,6 +1118,31 @@ export default function PesquisaPrecos() {
       exclusionReason: reason,
     });
     setCandidateExclusionDraft(null);
+  };
+
+  const confirmApplyFiltersToSelection = () => {
+    if (!selectedItem || !filterSelectionDraft) return;
+    const reason = filterSelectionDraft.reason.trim();
+    if (reason.length < 10) {
+      toast.error('Informe uma justificativa objetiva para aplicar o filtro à seleção.');
+      return;
+    }
+    const excludedIds = new Set(selectedOfficialCandidatesOutsideFilters.map((candidate) => candidate.id));
+    if (excludedIds.size === 0) {
+      toast.info('Nenhuma referência selecionada ficou fora dos filtros atuais.');
+      setFilterSelectionDraft(null);
+      return;
+    }
+
+    updateItem(selectedItem.localId, {
+      candidates: selectedItem.candidates.map((candidate) => (
+        excludedIds.has(candidate.id)
+          ? { ...candidate, selected: false, exclusionReason: reason }
+          : candidate
+      )),
+    });
+    toast.success(`${excludedIds.size} referência(s) fora do filtro foram desmarcadas.`);
+    setFilterSelectionDraft(null);
   };
 
   const openMissingExclusionReason = (itemId: string) => {
@@ -1137,7 +1275,7 @@ export default function PesquisaPrecos() {
         if (!item) break;
 
         try {
-          const results = await priceResearchService.search([item]);
+          const results = await priceResearchService.search([item], searchFilters);
           const result = results[0];
 
           const searchResultItem = {
@@ -1175,8 +1313,8 @@ export default function PesquisaPrecos() {
           hasErrors = true;
           const errMsg = error instanceof Error ? error.message : 'Falha na pesquisa.';
           toast.error(errMsg);
-          setItems((current) => current.map((x) => 
-            x.localId === item.localId 
+          setItems((current) => current.map((x) =>
+            x.localId === item.localId
               ? {
                   ...x,
                   searchStatus: 'error',
@@ -1623,13 +1761,17 @@ export default function PesquisaPrecos() {
       setMethodologyJustification(record.methodologyJustification);
       setNotes(record.notes);
       setSourceFile(record.sourceFile);
+      const loadedHasSearchFilters = hasPriceResearchSearchFilters(record.searchFilters);
+      setSearchFilters({ ...EMPTY_SEARCH_FILTERS, ...(record.searchFilters ?? {}) });
+      setShowOfficialFilters(loadedHasSearchFilters);
+      setShowAdvancedFilters(loadedHasSearchFilters);
       const resolvedItems = await resolveDirectPncpLinks(record.items);
-      
+
       // Detect global monetary adjustment settings from loaded candidates
       let enabledVal = false;
       let indexVal: InflationIndexType | 'manual' = 'IPCA';
       let manualRateVal = '0';
-      
+
       for (const item of resolvedItems) {
         const adjustedCandidate = item.candidates.find(c => c.monetaryAdjustmentEnabled);
         if (adjustedCandidate) {
@@ -1642,15 +1784,15 @@ export default function PesquisaPrecos() {
       setGlobalAdjustmentEnabled(enabledVal);
       setGlobalAdjustmentIndex(indexVal);
       setGlobalAdjustmentManualRate(manualRateVal);
-      
-      const finalItems = enabledVal 
+
+      const finalItems = enabledVal
         ? applyGlobalAdjustmentToItems(resolvedItems, true, indexVal, manualRateVal, monetaryAdjustmentReferenceDate)
         : resolvedItems;
-        
+
       setItems(finalItems);
       setSelectedItemId(undefined);
       setCandidateExclusionDraft(null);
-      
+
       // Define a etapa adequada
       setActiveStep(2);
 
@@ -2002,7 +2144,7 @@ export default function PesquisaPrecos() {
                   </BreadcrumbList>
                 </Breadcrumb>
               </div>
-              
+
               <div className="text-right shrink-0 bg-surface-subtle/30 px-3 py-1.5 rounded-lg border border-border-default/40">
                 <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Etapa Atual</span>
                 <span className="text-sm font-black text-sebrae-blue">{activeStep} de 3</span>
@@ -2021,7 +2163,7 @@ export default function PesquisaPrecos() {
                   ].map((step) => {
                     const isCompleted = Math.min(...step.targetSteps) < activeStep && !step.targetSteps.includes(activeStep);
                     const isActive = step.targetSteps.includes(activeStep);
-                    
+
                     // Determina se pode clicar diretamente no botão
                     let isSelectable = false;
                     if (step.wizardNumber === 1) {
@@ -2798,7 +2940,7 @@ export default function PesquisaPrecos() {
                           <ChevronRight className="h-4 w-4" />
                         </Button>
                       </div>
-                      
+
                       <Button
                         type="button"
                         className="bg-sebrae-blue hover:bg-sebrae-navy text-white text-xs font-semibold h-9 px-4 rounded-lg shadow-sm"
@@ -2910,13 +3052,13 @@ export default function PesquisaPrecos() {
                       const selectedCandidates = item.candidates.filter(c => c.selected);
                       const selectedCount = selectedCandidates.length;
                       const isSufficient = selectedCount >= 3;
-                      
+
                       const estimatedPrice = getEstimatedUnitPrice(item, method);
                       const isItemLoading =
                         item.searchStatus === 'searching' ||
                         item.catalogMatchStatus === 'searching' ||
                         (isSearching && item.catalogCode && item.searchStatus !== 'success' && item.searchStatus !== 'error');
-                      
+
                       return (
                         <tr key={item.localId} className="hover:bg-surface-subtle/50 transition-colors">
                           <td className="py-3.5 px-4 text-center font-bold text-text-primary">{item.itemNumber}</td>
@@ -3253,36 +3395,149 @@ export default function PesquisaPrecos() {
                       {/* Conteúdo da Aba PNCP */}
                       {curadoriaTab === 'basket' && (
                         <div className="space-y-4">
+                          <div className="rounded-radius-lg border border-border-default/80 bg-surface-card/70 px-3 py-2 shadow-subtle">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                  type="button"
+                                  variant={showOfficialFilters ? 'secondary' : 'outline'}
+                                  size="sm"
+                                  className="h-8 gap-1.5 text-xs"
+                                  aria-expanded={showOfficialFilters}
+                                  aria-controls="official-filters-panel"
+                                  onClick={() => setShowOfficialFilters((current) => !current)}
+                                >
+                                  <Menu className="h-3.5 w-3.5" />
+                                  Filtros
+                                  {hasActiveSearchFilters && (
+                                    <Badge variant="secondary" className="ml-0.5 h-5 px-1.5 text-[10px]">
+                                      {activeSearchFilterEntries.length}
+                                    </Badge>
+                                  )}
+                                </Button>
+                                <span className="font-ui text-xs font-semibold text-text-muted">
+                                  Exibindo {filteredOfficialCandidates.length} de {selectedOfficialCandidates.length} referência(s)
+                                </span>
+                              </div>
+
+                              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                {activeSearchFilterEntries.slice(0, showOfficialFilters ? activeSearchFilterEntries.length : 4).map((entry) => (
+                                  <Badge key={entry.key} variant="outline" className="gap-1 bg-white/80 text-[10px]">
+                                    {entry.label}: {entry.display}
+                                    <button type="button" className="ml-1 rounded-full hover:text-destructive" aria-label={`Remover filtro ${entry.label}`} onClick={() => updateSearchFilter(entry.key, EMPTY_SEARCH_FILTERS[entry.key] as never)}><X className="h-3 w-3" /></button>
+                                  </Badge>
+                                ))}
+                                {!showOfficialFilters && activeSearchFilterEntries.length > 4 && (
+                                  <Badge variant="outline" className="bg-white/80 text-[10px]">
+                                    +{activeSearchFilterEntries.length - 4}
+                                  </Badge>
+                                )}
+                                {hasActiveSearchFilters && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 gap-1.5 border-amber-300 bg-amber-50 text-xs text-amber-800 hover:bg-amber-100"
+                                    onClick={() => setFilterSelectionDraft({ reason: '' })}
+                                    disabled={selectedOfficialCandidatesOutsideFilters.length === 0 || isSearching}
+                                  >
+                                    <Check className="h-3.5 w-3.5" />
+                                    Aplicar filtros à seleção
+                                  </Button>
+                                )}
+                                <Button type="button" variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={clearSearchFilters} disabled={!hasActiveSearchFilters || isSearching}>
+                                  <X className="h-3.5 w-3.5" />
+                                  Limpar
+                                </Button>
+                              </div>
+                            </div>
+                            {selectedOfficialCandidatesOutsideFilters.length > 0 && (
+                              <div className="mt-2 flex items-center gap-2 rounded-radius-md border border-amber-200 bg-amber-50 px-3 py-2 font-ui text-xs font-semibold text-amber-800">
+                                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                                {selectedOfficialCandidatesOutsideFilters.length} referência(s) selecionada(s) fora do filtro ainda entram no relatório. Use “Aplicar filtros à seleção” para desmarcá-las com justificativa.
+                              </div>
+                            )}
+                          </div>
+
+                          {showOfficialFilters && (
+                            <div id="official-filters-panel">
+                              <FilterPanel
+                                title="Filtros da cesta oficial"
+                                contentClassName="space-y-4"
+                                actions={(
+                                  <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setShowOfficialFilters(false)}>
+                                    <ChevronDown className="h-3.5 w-3.5 rotate-180" />
+                                    Recolher
+                                  </Button>
+                                )}
+                              >
+                                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                  <div className="space-y-1.5"><Label htmlFor="official-filter-description" className="text-xs">Descrição</Label><Input id="official-filter-description" value={searchFilters.description ?? ''} onChange={(event) => updateSearchFilter('description', event.target.value)} placeholder="Descrição, objeto ou fornecedor" className="h-9 text-xs" /></div>
+                                  <div className="space-y-1.5"><Label htmlFor="official-filter-code" className="text-xs">CATMAT/CATSER</Label><Input id="official-filter-code" value={searchFilters.catalogCode ?? ''} onChange={(event) => updateSearchFilter('catalogCode', event.target.value)} placeholder="Código do catálogo" className="h-9 text-xs font-mono" inputMode="numeric" /></div>
+                                  <div className="space-y-1.5"><Label htmlFor="official-filter-start" className="text-xs">Prazo inicial</Label><Input id="official-filter-start" type="date" value={searchFilters.startDate ?? ''} onChange={(event) => updateSearchFilter('startDate', event.target.value)} className="h-9 text-xs" /></div>
+                                  <div className="space-y-1.5"><Label htmlFor="official-filter-end" className="text-xs">Prazo final</Label><Input id="official-filter-end" type="date" value={searchFilters.endDate ?? ''} onChange={(event) => updateSearchFilter('endDate', event.target.value)} className="h-9 text-xs" /></div>
+                                  <div className="space-y-1.5"><Label htmlFor="official-filter-purchase" className="text-xs">Pregão/compra</Label><Input id="official-filter-purchase" value={searchFilters.purchaseNumber ?? ''} onChange={(event) => updateSearchFilter('purchaseNumber', event.target.value)} placeholder="Ex.: 12/2026" className="h-9 text-xs" /></div>
+                                  <div className="space-y-1.5"><Label htmlFor="official-filter-uasg" className="text-xs">Órgão (UASG)</Label><Input id="official-filter-uasg" value={searchFilters.uasg ?? ''} onChange={(event) => updateSearchFilter('uasg', event.target.value)} placeholder="158366" className="h-9 text-xs font-mono" inputMode="numeric" maxLength={6} /></div>
+                                  <div className="space-y-1.5"><Label htmlFor="official-filter-supplier" className="text-xs">CNPJ/CPF</Label><Input id="official-filter-supplier" value={searchFilters.supplierDocument ?? ''} onChange={(event) => updateSearchFilter('supplierDocument', event.target.value)} placeholder="Fornecedor" className="h-9 text-xs font-mono" inputMode="numeric" /></div>
+                                  <div className="space-y-1.5"><Label htmlFor="official-filter-brand" className="text-xs">Marca</Label><Input id="official-filter-brand" value={searchFilters.brand ?? ''} onChange={(event) => updateSearchFilter('brand', event.target.value)} placeholder="Marca informada" className="h-9 text-xs" /></div>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setShowAdvancedFilters((current) => !current)}><ChevronDown className={`h-3.5 w-3.5 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} />Avançados</Button>
+                                </div>
+
+                                {showAdvancedFilters && (
+                                  <div className="grid gap-3 border-t border-border-default/70 pt-4 md:grid-cols-2 xl:grid-cols-4">
+                                    <div className="space-y-1.5"><Label htmlFor="official-filter-agency" className="text-xs">Nome do órgão</Label><Input id="official-filter-agency" value={searchFilters.agencyName ?? ''} onChange={(event) => updateSearchFilter('agencyName', event.target.value)} placeholder="Nome da UASG/órgão" className="h-9 text-xs" /></div>
+                                    <div className="grid grid-cols-2 gap-2"><div className="space-y-1.5"><Label htmlFor="official-filter-qtd-min" className="text-xs">Qtd. mínima</Label><Input id="official-filter-qtd-min" type="number" min="0" value={searchFilters.quantityMin ?? ''} onChange={(event) => updateSearchFilter('quantityMin', event.target.value === '' ? null : Number(event.target.value))} className="h-9 text-xs" /></div><div className="space-y-1.5"><Label htmlFor="official-filter-qtd-max" className="text-xs">Qtd. máxima</Label><Input id="official-filter-qtd-max" type="number" min="0" value={searchFilters.quantityMax ?? ''} onChange={(event) => updateSearchFilter('quantityMax', event.target.value === '' ? null : Number(event.target.value))} className="h-9 text-xs" /></div></div>
+                                    <div className="space-y-1.5"><Label htmlFor="official-filter-unit" className="text-xs">Unidade</Label><Input id="official-filter-unit" value={searchFilters.unit ?? ''} onChange={(event) => updateSearchFilter('unit', event.target.value)} placeholder="UN, KG, H..." className="h-9 text-xs" /></div>
+                                    <div className="space-y-1.5"><Label className="text-xs">UF</Label><Select value={searchFilters.state || '__all'} onValueChange={(value) => updateSearchFilter('state', value === '__all' ? '' : value)}><SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="__all">Todas</SelectItem>{UF_OPTIONS.map((uf) => <SelectItem key={uf} value={uf}>{uf}</SelectItem>)}</SelectContent></Select></div>
+                                    <div className="space-y-1.5"><Label className="text-xs">Região</Label><Select value={searchFilters.region || '__all'} onValueChange={(value) => updateSearchFilter('region', value === '__all' ? '' : value)}><SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="__all">Todas</SelectItem>{REGION_OPTIONS.map((region) => <SelectItem key={region} value={region}>{region}</SelectItem>)}</SelectContent></Select></div>
+                                    <div className="space-y-1.5"><Label htmlFor="official-filter-modality" className="text-xs">Modalidade</Label><Input id="official-filter-modality" value={searchFilters.modality ?? ''} onChange={(event) => updateSearchFilter('modality', event.target.value)} placeholder="Pregão, Dispensa..." className="h-9 text-xs" /></div>
+                                    {([['srp', 'SRP'], ['meEpp', 'ME/EPP'], ['sustainable', 'Sustentável']] as const).map(([key, label]) => (
+                                      <div key={key} className="space-y-1.5"><Label className="text-xs">{label}</Label><Select value={searchFilters[key] || '__all'} onValueChange={(value) => updateSearchFilter(key, value === '__all' ? '' : value as PriceResearchSearchFilters[typeof key])}><SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger><SelectContent>{BOOLEAN_FILTER_OPTIONS.map((option) => (<SelectItem key={option.value || '__all'} value={option.value || '__all'}>{option.label}</SelectItem>))}</SelectContent></Select></div>
+                                    ))}
+                                    <div className="space-y-1.5"><Label htmlFor="official-filter-adj-start" className="text-xs">Adjudicação inicial</Label><Input id="official-filter-adj-start" type="date" value={searchFilters.adjudicationStartDate ?? ''} onChange={(event) => updateSearchFilter('adjudicationStartDate', event.target.value)} className="h-9 text-xs" /></div>
+                                    <div className="space-y-1.5"><Label htmlFor="official-filter-adj-end" className="text-xs">Adjudicação final</Label><Input id="official-filter-adj-end" type="date" value={searchFilters.adjudicationEndDate ?? ''} onChange={(event) => updateSearchFilter('adjudicationEndDate', event.target.value)} className="h-9 text-xs" /></div>
+                                    <div className="space-y-1.5"><Label htmlFor="official-filter-hom-start" className="text-xs">Homologação inicial</Label><Input id="official-filter-hom-start" type="date" value={searchFilters.homologationStartDate ?? ''} onChange={(event) => updateSearchFilter('homologationStartDate', event.target.value)} className="h-9 text-xs" /></div>
+                                    <div className="space-y-1.5"><Label htmlFor="official-filter-hom-end" className="text-xs">Homologação final</Label><Input id="official-filter-hom-end" type="date" value={searchFilters.homologationEndDate ?? ''} onChange={(event) => updateSearchFilter('homologationEndDate', event.target.value)} className="h-9 text-xs" /></div>
+                                    <div className="space-y-1.5 xl:col-span-2"><Label htmlFor="official-filter-raw" className="text-xs">Demais critérios</Label><Input id="official-filter-raw" value={searchFilters.rawDataText ?? ''} onChange={(event) => updateSearchFilter('rawDataText', event.target.value)} placeholder="Busca nos metadados oficiais preservados" className="h-9 text-xs" /></div>
+                                  </div>
+                                )}
+                              </FilterPanel>
+                            </div>
+                          )}
                           <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
                             <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="w-12">Usar</TableHead>
-                            <TableHead>Fonte / Aderência</TableHead>
-                            <TableHead>Órgão e Fornecedor</TableHead>
-                            <TableHead>Unidade</TableHead>
-                            <TableHead className="text-right">Preço Original</TableHead>
+                            <TableHead className="w-12 px-2 text-center text-[12px]">Usar</TableHead>
+                            <TableHead className="px-2 text-[12px]">Fonte / Aderência</TableHead>
+                            <TableHead className="px-2 text-[12px]">Órgão e Fornecedor</TableHead>
+                            <TableHead className="px-2 text-[12px]">Unidade</TableHead>
+                            <TableHead className="text-right px-2 text-[12px]">Preço Original</TableHead>
                             {globalAdjustmentEnabled && (
-                              <TableHead className="text-right w-44">Índice de atualização monetária</TableHead>
+                              <TableHead className="text-right w-44 px-2 text-[12px]">Índice de atualização monetária</TableHead>
                             )}
                             {!globalAdjustmentEnabled ? (
-                              <TableHead className="text-right">Preço Base</TableHead>
+                              <TableHead className="text-right px-2 text-[12px]">Preço Base</TableHead>
                             ) : (
-                              <TableHead className="text-right">Preço Ajustado</TableHead>
+                              <TableHead className="text-right px-2 text-[12px]">Preço Ajustado</TableHead>
                             )}
-                            <TableHead className="text-right">Variação (%)</TableHead>
-                            <TableHead className="text-center w-20">Excluir</TableHead>
+                            <TableHead className="text-right px-2 text-[12px]">Variação (%)</TableHead>
+                            <TableHead className="text-center w-20 px-2 text-[12px]">Excluir</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {(() => {
-                            const pncpCandidates = selectedItem.candidates.filter(isOfficialCandidate);
+                            const pncpCandidates = filteredOfficialCandidates;
                             if (isSearching) {
                               return (
                                 <TableSkeletonRows
                                   rows={5}
                                   columns={globalAdjustmentEnabled ? 9 : 8}
                                   widths={['w-5', 'w-48', 'w-36', 'w-20', 'w-20', 'w-20', 'w-16', 'w-8', 'w-8']}
+                                  cellClassName="px-2 py-2.5"
                                 />
                               );
                             }
@@ -3310,7 +3565,7 @@ export default function PesquisaPrecos() {
                             return pncpCandidates.length === 0 ? (
                               <TableRow>
                                 <TableCell colSpan={globalAdjustmentEnabled ? 9 : 8} className="text-center py-8 text-text-muted text-xs">
-                                  Nenhuma cotação do PNCP localizada para este item.
+                                  {selectedOfficialCandidates.length === 0 ? 'Nenhuma cotação do PNCP localizada para este item.' : 'Nenhuma cotação do PNCP atende aos filtros atuais.'}
                                 </TableCell>
                               </TableRow>
                             ) : (
@@ -3318,8 +3573,9 @@ export default function PesquisaPrecos() {
                               const isExcludedWithoutReason = !candidate.selected && !candidate.exclusionReason.trim();
                               return (
                                 <TableRow key={candidate.id} className={candidate.selected ? 'bg-primary/[0.01]' : 'opacity-85'}>
-                                  <TableCell>
-                                    <Checkbox
+                                  <TableCell className="px-2 py-2.5 align-middle">
+                                    <div className="flex justify-center">
+                                      <Checkbox
                                       aria-label={`Usar preço ${candidate.purchaseItemId}`}
                                       checked={candidate.selected}
                                       onCheckedChange={(checked) => {
@@ -3332,9 +3588,10 @@ export default function PesquisaPrecos() {
                                         }
                                         requestCandidateExclusion(selectedItem.localId, candidate);
                                       }}
-                                    />
+                                      />
+                                    </div>
                                   </TableCell>
-                                  <TableCell className="min-w-[220px]">
+                                  <TableCell className="min-w-[220px] px-2 py-2.5">
                                     <div className="flex gap-3 items-start">
                                       {candidate.thumbnailLink && (
                                         <img
@@ -3345,12 +3602,12 @@ export default function PesquisaPrecos() {
                                       )}
                                       <div className="space-y-1.5 flex-1">
                                         {shouldShowCandidateAiReason(candidate.aiReason) && (
-                                          <p className="font-ui text-xs text-text-primary leading-normal font-semibold">{candidate.aiReason}</p>
+                                          <p className="font-ui text-sm text-text-primary leading-normal font-semibold">{candidate.aiReason}</p>
                                         )}
-                                        <p className="line-clamp-3 font-ui text-xs text-text-secondary leading-relaxed font-bold" title={candidate.description}>{candidate.description}</p>
+                                        <p className="line-clamp-3 font-ui text-sm text-text-secondary leading-relaxed font-bold" title={candidate.description}>{candidate.description}</p>
                                         <div className="flex gap-2">
                                           {isMarketCandidate(candidate) && (
-                                            <a href={candidate.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-[10px] font-bold text-primary hover:underline">
+                                            <a href={candidate.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 text-[11px] font-bold text-primary hover:underline">
                                               Acessar no {candidate.sourceLabel} <ExternalLink className="h-2.5 w-2.5" />
                                             </a>
                                           )}
@@ -3380,10 +3637,10 @@ export default function PesquisaPrecos() {
                                                }
                                              }
                                              return (
-                                               <a 
-                                                 href={href} 
-                                                 target="_blank" 
-                                                 rel="noreferrer" 
+                                               <a
+                                                 href={href}
+                                                 target="_blank"
+                                                 rel="noreferrer"
                                                  onClick={() => {
                                                    console.log('[PNCP Link Diagnostics]', {
                                                      candidateId: candidate.id,
@@ -3392,7 +3649,7 @@ export default function PesquisaPrecos() {
                                                      renderedHref: href
                                                    });
                                                  }}
-                                                 className="inline-flex items-center gap-0.5 text-[10px] font-bold text-sebrae-blue hover:underline"
+                                                 className="inline-flex items-center gap-0.5 text-[11px] font-bold text-sebrae-blue hover:underline"
                                                >
                                                  PNCP <ExternalLink className="h-2.5 w-2.5" />
                                                </a>
@@ -3406,7 +3663,7 @@ export default function PesquisaPrecos() {
                                               value={candidate.exclusionReason}
                                               onChange={(event) => updateCandidate(selectedItem.localId, candidate.id, { exclusionReason: event.target.value })}
                                               placeholder="Justifique a exclusão..."
-                                              className={`h-7 text-xs pr-8 ${isExcludedWithoutReason ? 'border-amber-300 focus:border-amber-500 bg-amber-50/20' : ''}`}
+                                              className={`h-7 text-sm pr-8 ${isExcludedWithoutReason ? 'border-amber-300 focus:border-amber-500 bg-amber-50/20' : ''}`}
                                             />
                                             {isExcludedWithoutReason && (
                                               <AlertTriangle className="absolute right-2.5 h-3 w-3 text-amber-500" title="Justificativa obrigatória" />
@@ -3416,33 +3673,33 @@ export default function PesquisaPrecos() {
                                       </div>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="min-w-[180px]">
-                                    <p className="font-mono text-xs font-bold text-text-primary">{candidate.agencyCode || '-'}</p>
-                                    <p className="font-ui text-xs text-text-secondary truncate max-w-[160px]" title={candidate.agencyName || ''}>{candidate.agencyName || '-'}</p>
-                                    <p className="mt-1.5 font-ui text-xs font-bold text-text-primary truncate max-w-[160px]" title={candidate.supplierName || ''}>{candidate.supplierName || '-'}</p>
-                                    <p className="font-mono text-[10px] text-text-secondary leading-none mt-0.5">{candidate.supplierDocument || '-'}</p>
-                                    <p className="font-ui text-[10px] text-text-secondary mt-1 leading-none">{formatDate(candidate.resultDate || candidate.purchaseDate)}</p>
+                                  <TableCell className="min-w-[180px] px-2 py-2.5">
+                                    <p className="font-mono text-sm font-bold text-text-primary">{candidate.agencyCode || '-'}</p>
+                                    <p className="font-ui text-sm text-text-secondary truncate max-w-[160px]" title={candidate.agencyName || ''}>{candidate.agencyName || '-'}</p>
+                                    <p className="mt-1.5 font-ui text-sm font-bold text-text-primary truncate max-w-[160px]" title={candidate.supplierName || ''}>{candidate.supplierName || '-'}</p>
+                                    <p className="font-mono text-xs text-text-secondary leading-none mt-0.5">{candidate.supplierDocument || '-'}</p>
+                                    <p className="font-ui text-xs text-text-secondary mt-1 leading-none">{formatDate(candidate.resultDate || candidate.purchaseDate)}</p>
                                   </TableCell>
-                                  <TableCell className="font-mono text-xs">{candidate.originalUnitLabel}</TableCell>
-                                  <TableCell className="text-right font-mono text-xs">{formatCurrency(candidate.originalUnitPrice)}</TableCell>
+                                  <TableCell className="font-mono text-sm px-2 py-2.5">{candidate.originalUnitLabel}</TableCell>
+                                  <TableCell className="text-right font-mono text-sm px-2 py-2.5">{formatCurrency(candidate.originalUnitPrice)}</TableCell>
                                   {globalAdjustmentEnabled && (
-                                    <TableCell className="text-right font-mono text-[11px] text-text-secondary">
+                                    <TableCell className="text-right font-mono text-xs text-text-secondary px-2 py-2.5">
                                       {formatMonetaryAdjustmentIndex(candidate)}
                                     </TableCell>
                                   )}
                                   {!globalAdjustmentEnabled ? (
-                                    <TableCell className="text-right font-mono text-xs">{formatCurrency(candidate.comparableUnitPrice)}</TableCell>
+                                    <TableCell className="text-right font-mono text-sm px-2 py-2.5">{formatCurrency(candidate.comparableUnitPrice)}</TableCell>
                                   ) : (
-                                    <TableCell className="text-right font-mono text-xs font-bold">
+                                    <TableCell className="text-right font-mono text-sm font-bold px-2 py-2.5">
                                       {formatCurrency(candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice)}
                                     </TableCell>
                                   )}
-                                  <TableCell className="text-right font-mono text-xs font-bold">
+                                  <TableCell className="text-right font-mono text-sm font-bold px-2 py-2.5">
                                     {(() => {
                                       const itemEstimatedPrice = getEstimatedUnitPrice(selectedItem, method);
                                       const adjustedPrice = candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice;
                                       const dev = itemEstimatedPrice > 0 ? ((adjustedPrice - itemEstimatedPrice) / itemEstimatedPrice) * 100 : 0;
-                                      
+
                                       if (!candidate.selected) return <span className="text-text-muted">-</span>;
 
                                       if (dev > 0) {
@@ -3458,7 +3715,7 @@ export default function PesquisaPrecos() {
                                       return <span className="text-text-muted">0.0%</span>;
                                     })()}
                                   </TableCell>
-                                  <TableCell className="text-center">
+                                  <TableCell className="text-center px-2 py-2.5">
                                     <Button
                                       type="button"
                                       variant="ghost"
@@ -3681,14 +3938,14 @@ export default function PesquisaPrecos() {
                           })}
                         </div>
                       )}
-                      
+
                           {/* Cotações de Internet Adicionadas */}
                           <div className="space-y-4 pt-2">
                             <div className="border-b border-border-default/40 pb-4">
                               <h3 className="text-sm font-bold text-sebrae-navy">Cotações de Internet Adicionadas</h3>
                               <p className="text-xs text-text-muted">Veja abaixo as cotações de canais privados de internet que foram incluídas para este item.</p>
                             </div>
-                            
+
                             {selectedItem.candidates.filter(isMarketCandidate).length === 0 ? (
                               <div className="text-center py-8 text-text-muted text-xs border border-dashed border-border-default rounded-radius-xl bg-surface-subtle/5">
                                 Nenhuma cotação de internet adicionada para este item. Use o buscador acima para incluir preços.
@@ -3696,103 +3953,103 @@ export default function PesquisaPrecos() {
                             ) : (
                               <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
                                 <table className="w-full border-collapse text-left font-ui text-sm">
-                              <thead>
-                                <tr className="border-b border-border-default bg-surface-subtle text-text-muted font-bold">
-                                  <th className="py-3 px-4">Produto</th>
-                                  <th className="py-3 px-4 w-40">Provedor</th>
-                                  <th className="py-3 px-4 w-32 text-right">Preço Unitário</th>
-                                  <th className="py-3 px-4 w-32 text-right">Frete</th>
-                                  {!globalAdjustmentEnabled ? (
-                                    <th className="py-3 px-4 w-32 text-right">Preço Base</th>
-                                  ) : (
-                                    <th className="py-3 px-4 w-32 text-right">Preço Ajustado</th>
-                                  )}
-                                  <th className="py-3 px-4 w-32 text-right">Variação (%)</th>
-                                  <th className="py-3 px-4 text-center w-24">Excluir</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-border-default/60">
-                                {selectedItem.candidates
-                                  .filter(isMarketCandidate)
-                                  .map((candidate) => {
-                                    return (
-                                      <tr key={candidate.id} className="hover:bg-surface-subtle/50 transition-colors">
-                                        <td className="py-3.5 px-4 font-medium text-text-secondary">
-                                          <div className="flex gap-3 items-center">
-                                            {candidate.thumbnailLink && (
-                                              <img
-                                                src={candidate.thumbnailLink}
-                                                alt="Thumbnail"
-                                                className="h-10 w-10 object-contain rounded border border-border-default bg-white p-0.5 shrink-0"
-                                              />
-                                            )}
-                                            <div className="space-y-1">
-                                              <a
-                                                href={candidate.sourceUrl}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="font-bold text-text-primary hover:text-sebrae-blue hover:underline line-clamp-2 leading-tight flex items-center gap-1"
-                                              >
-                                                {candidate.description}
-                                                <ExternalLink className="h-3.5 w-3.5 text-text-muted shrink-0" />
-                                              </a>
-                                            </div>
-                                          </div>
-                                        </td>
-                                        <td className="py-3.5 px-4 capitalize font-semibold text-text-secondary">{candidate.sourceLabel}</td>
-                                        <td className="py-3.5 px-4 text-right font-mono text-xs">{formatCurrency(candidate.originalUnitPrice)}</td>
-                                        <td className="py-3.5 px-4 text-right font-mono text-xs">{candidate.freightCost ? formatCurrency(candidate.freightCost) : '-'}</td>
-                                        {!globalAdjustmentEnabled ? (
-                                          <td className="py-3.5 px-4 text-right font-mono text-xs text-text-secondary">{formatCurrency(candidate.comparableUnitPrice)}</td>
-                                        ) : (
-                                          <td className="py-3.5 px-4 text-right font-mono text-xs font-bold text-text-primary">
-                                            {formatCurrency(candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice)}
-                                          </td>
-                                        )}
-                                        <td className="py-3.5 px-4 text-right font-mono text-xs font-bold text-text-primary">
-                                          {(() => {
-                                            const itemEstimatedPrice = getEstimatedUnitPrice(selectedItem, method);
-                                            const adjustedPrice = candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice;
-                                            const dev = itemEstimatedPrice > 0 ? ((adjustedPrice - itemEstimatedPrice) / itemEstimatedPrice) * 100 : 0;
-                                            
-                                            if (!candidate.selected) return <span className="text-text-muted">-</span>;
+                               <thead>
+                                 <tr className="border-b border-border-default bg-surface-subtle text-text-muted font-bold">
+                                   <th className="py-2.5 px-2 text-[12px]">Produto</th>
+                                   <th className="py-2.5 px-2 w-40 text-[12px]">Provedor</th>
+                                   <th className="py-2.5 px-2 w-32 text-right text-[12px]">Preço Unitário</th>
+                                   <th className="py-2.5 px-2 w-32 text-right text-[12px]">Frete</th>
+                                   {!globalAdjustmentEnabled ? (
+                                     <th className="py-2.5 px-2 w-32 text-right text-[12px]">Preço Base</th>
+                                   ) : (
+                                     <th className="py-2.5 px-2 w-32 text-right text-[12px]">Preço Ajustado</th>
+                                   )}
+                                   <th className="py-2.5 px-2 w-32 text-right text-[12px]">Variação (%)</th>
+                                   <th className="py-2.5 px-2 text-center w-24 text-[12px]">Excluir</th>
+                                 </tr>
+                               </thead>
+                               <tbody className="divide-y divide-border-default/60">
+                                 {selectedItem.candidates
+                                   .filter(isMarketCandidate)
+                                   .map((candidate) => {
+                                     return (
+                                       <tr key={candidate.id} className="hover:bg-surface-subtle/50 transition-colors">
+                                         <td className="py-2.5 px-2 font-medium text-text-secondary text-sm">
+                                           <div className="flex gap-3 items-center">
+                                             {candidate.thumbnailLink && (
+                                               <img
+                                                 src={candidate.thumbnailLink}
+                                                 alt="Thumbnail"
+                                                 className="h-10 w-10 object-contain rounded border border-border-default bg-white p-0.5 shrink-0"
+                                               />
+                                             )}
+                                             <div className="space-y-1">
+                                               <a
+                                                 href={candidate.sourceUrl}
+                                                 target="_blank"
+                                                 rel="noreferrer"
+                                                 className="font-bold text-text-primary hover:text-sebrae-blue hover:underline line-clamp-2 leading-tight flex items-center gap-1 text-sm"
+                                               >
+                                                 {candidate.description}
+                                                 <ExternalLink className="h-3.5 w-3.5 text-text-muted shrink-0" />
+                                               </a>
+                                             </div>
+                                           </div>
+                                         </td>
+                                         <td className="py-2.5 px-2 capitalize font-semibold text-text-secondary text-sm">{candidate.sourceLabel}</td>
+                                         <td className="py-2.5 px-2 text-right font-mono text-sm">{formatCurrency(candidate.originalUnitPrice)}</td>
+                                         <td className="py-2.5 px-2 text-right font-mono text-sm">{candidate.freightCost ? formatCurrency(candidate.freightCost) : '-'}</td>
+                                         {!globalAdjustmentEnabled ? (
+                                           <td className="py-2.5 px-2 text-right font-mono text-sm text-text-secondary">{formatCurrency(candidate.comparableUnitPrice)}</td>
+                                         ) : (
+                                           <td className="py-2.5 px-2 text-right font-mono text-sm font-bold text-text-primary">
+                                             {formatCurrency(candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice)}
+                                           </td>
+                                         )}
+                                         <td className="py-2.5 px-2 text-right font-mono text-sm font-bold text-text-primary">
+                                           {(() => {
+                                             const itemEstimatedPrice = getEstimatedUnitPrice(selectedItem, method);
+                                             const adjustedPrice = candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice;
+                                             const dev = itemEstimatedPrice > 0 ? ((adjustedPrice - itemEstimatedPrice) / itemEstimatedPrice) * 100 : 0;
 
-                                            if (dev > 0) {
-                                              return (
-                                                <span className={dev > 25 ? 'text-destructive font-bold' : 'text-amber-600'}>
-                                                  +{dev.toFixed(1)}%
-                                                </span>
-                                              );
-                                            }
-                                            if (dev < 0) {
-                                              return <span className="text-emerald-600">{dev.toFixed(1)}%</span>;
-                                            }
-                                            return <span className="text-text-muted">0.0%</span>;
-                                          })()}
-                                        </td>
-                                        <td className="py-3.5 px-4 text-center">
-                                          <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            title="Excluir cotação de internet"
-                                            onClick={() => {
-                                              updateItem(selectedItem.localId, {
-                                                candidates: selectedItem.candidates.filter(c => c.id !== candidate.id),
-                                              });
-                                              toast.success('Cotação de internet removida.');
-                                            }}
-                                            className="h-8 w-8 text-destructive hover:text-white hover:bg-destructive rounded-full transition-all"
-                                          >
-                                            <Trash2 className="h-4 w-4" />
-                                          </Button>
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                              </tbody>
-                              </table>
-                            </div>
+                                             if (!candidate.selected) return <span className="text-text-muted">-</span>;
+
+                                             if (dev > 0) {
+                                               return (
+                                                 <span className={dev > 25 ? 'text-destructive font-bold' : 'text-amber-600'}>
+                                                   +{dev.toFixed(1)}%
+                                                 </span>
+                                               );
+                                             }
+                                             if (dev < 0) {
+                                               return <span className="text-emerald-600">{dev.toFixed(1)}%</span>;
+                                             }
+                                             return <span className="text-text-muted">0.0%</span>;
+                                           })()}
+                                         </td>
+                                         <td className="py-2.5 px-2 text-center">
+                                           <Button
+                                             type="button"
+                                             variant="ghost"
+                                             size="icon"
+                                             title="Excluir cotação de internet"
+                                             onClick={() => {
+                                               updateItem(selectedItem.localId, {
+                                                 candidates: selectedItem.candidates.filter(c => c.id !== candidate.id),
+                                               });
+                                               toast.success('Cotação de internet removida.');
+                                             }}
+                                             className="h-8 w-8 text-destructive hover:text-white hover:bg-destructive rounded-full transition-all"
+                                           >
+                                             <Trash2 className="h-4 w-4" />
+                                           </Button>
+                                         </td>
+                                       </tr>
+                                     );
+                                   })}
+                               </tbody>
+                               </table>
+                             </div>
                           )}
                         </div>
                       </div>
@@ -3903,7 +4160,7 @@ export default function PesquisaPrecos() {
                               <h3 className="text-sm font-bold text-sebrae-navy">Cotações Locais Cadastradas</h3>
                               <p className="text-xs text-text-muted">Veja abaixo as cotações de fornecedores locais que você inseriu manualmente para este item.</p>
                             </div>
-                            
+
                             {selectedItem.candidates.filter(isLocalCandidate).length === 0 ? (
                               <div className="text-center py-8 text-text-muted text-xs border border-dashed border-border-default rounded-radius-xl bg-surface-subtle/5">
                                 Nenhuma cotação de fornecedor local cadastrada para este item.
@@ -3949,7 +4206,7 @@ export default function PesquisaPrecos() {
                                             const itemEstimatedPrice = getEstimatedUnitPrice(selectedItem, method);
                                             const adjustedPrice = candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice;
                                             const dev = itemEstimatedPrice > 0 ? ((adjustedPrice - itemEstimatedPrice) / itemEstimatedPrice) * 100 : 0;
-                                            
+
                                             if (!candidate.selected) return <span className="text-text-muted">-</span>;
 
                                             if (dev > 0) {
@@ -4077,6 +4334,64 @@ export default function PesquisaPrecos() {
       </div>
       )}
 
+      <Dialog open={Boolean(filterSelectionDraft)} onOpenChange={(open) => { if (!open) setFilterSelectionDraft(null); }}>
+        <DialogContent className="sm:max-w-[560px] bg-surface-card border border-border-default shadow-lg p-6">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-sebrae-navy">Aplicar filtros à seleção</DialogTitle>
+            <DialogDescription className="text-xs text-text-muted">
+              As referências oficiais selecionadas que ficaram fora dos filtros serão desmarcadas e deixarão de compor o relatório.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="grid gap-2 rounded-radius-md border border-border-default bg-surface-subtle/45 p-3 font-ui text-xs text-text-secondary sm:grid-cols-3">
+              <div>
+                <span className="block text-[10px] font-bold uppercase tracking-wide text-text-muted">Referências oficiais</span>
+                <span className="text-sm font-black text-text-primary">{selectedOfficialCandidates.length}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold uppercase tracking-wide text-text-muted">Dentro do filtro</span>
+                <span className="text-sm font-black text-text-primary">{filteredOfficialCandidates.length}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold uppercase tracking-wide text-text-muted">Serão desmarcadas</span>
+                <span className="text-sm font-black text-amber-700">{selectedOfficialCandidatesOutsideFilters.length}</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="apply-filter-exclusion-reason">Justificativa obrigatória</Label>
+              <Textarea
+                id="apply-filter-exclusion-reason"
+                value={filterSelectionDraft?.reason ?? ''}
+                onChange={(event) => setFilterSelectionDraft((current) => (
+                  current ? { ...current, reason: event.target.value } : current
+                ))}
+                rows={4}
+                autoFocus
+                placeholder="Ex.: registros desconsiderados por não atenderem aos filtros de UASG, CNPJ, marca, período e demais critérios definidos para a amostra comparável."
+              />
+              <p className="font-ui text-[10px] text-text-muted">
+                A justificativa será aplicada a todas as referências oficiais selecionadas que ficaram fora do filtro. Mínimo operacional: 10 caracteres.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" className="text-xs" onClick={() => setFilterSelectionDraft(null)}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              className="bg-amber-600 text-white hover:bg-amber-700 text-xs"
+              onClick={confirmApplyFiltersToSelection}
+              disabled={selectedOfficialCandidatesOutsideFilters.length === 0}
+            >
+              Desmarcar fora do filtro
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {candidateExclusionDraft && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-lg rounded-radius-xl border border-border-default bg-surface-card shadow-xl animate-in zoom-in-95 duration-200">

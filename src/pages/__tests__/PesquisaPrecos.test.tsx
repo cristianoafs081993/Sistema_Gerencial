@@ -224,7 +224,7 @@ describe('PesquisaPrecos', () => {
     await waitFor(() => {
       expect(mockedService.search).toHaveBeenCalledWith([
         expect.objectContaining({ catalogCode: '606523', catalogType: 'material' }),
-      ]);
+      ], expect.any(Object));
     });
     fireEvent.click(await screen.findByRole('button', { name: /Ver Cotações/i }));
     expect(await screen.findByText('Fornecedor')).toBeInTheDocument();
@@ -245,6 +245,79 @@ describe('PesquisaPrecos', () => {
     fireEvent.click(screen.getByRole('link', { name: /Itens/i }));
     expect(await screen.findByRole('button', { name: /Ver Cotações/i })).toBeInTheDocument();
   }, 15000);
+  it('aplica filtros da cesta oficial à seleção com justificativa obrigatória', async () => {
+    const secondCandidate = {
+      ...candidate,
+      id: 'comprasgov:2',
+      purchaseItemId: '2',
+      supplierName: 'Outro fornecedor',
+      supplierDocument: '11111111000199',
+      agencyCode: '158155',
+      state: 'DF',
+    };
+    mockedService.search.mockResolvedValueOnce([{ localId: 'item-1', candidates: [candidate, secondCandidate] }]);
+    const { container } = renderPage();
+
+    fireEvent.change(container.querySelector('input[type="file"]') as HTMLInputElement, {
+      target: { files: [new File(['xlsx'], 'custos.xlsx')] },
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: /Ver Cotações/i }));
+    expect(await screen.findByText('Fornecedor')).toBeInTheDocument();
+    expect(screen.getByText('Outro fornecedor')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/CNPJ\/CPF/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Filtros/i }));
+
+    fireEvent.change(screen.getByLabelText(/CNPJ\/CPF/i), { target: { value: '00000000000100' } });
+
+    expect(await screen.findByText(/Exibindo 1 de 2 referência/i)).toBeInTheDocument();
+    expect(screen.getByText('Fornecedor')).toBeInTheDocument();
+    expect(screen.queryByText('Outro fornecedor')).not.toBeInTheDocument();
+
+    expect(screen.getByText(/1 referência\(s\) selecionada\(s\) fora do filtro/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Aplicar filtros/i }));
+    expect(await screen.findByRole('dialog')).toHaveTextContent(/Serão desmarcadas/i);
+    fireEvent.click(screen.getByRole('button', { name: /Desmarcar fora do filtro/i }));
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/justificativa/i));
+
+    const bulkReason = 'Fornecedor fora do filtro de CNPJ definido para a amostra comparável.';
+    fireEvent.change(screen.getByLabelText(/Justificativa obrigatória/i), { target: { value: bulkReason } });
+    fireEvent.click(screen.getByRole('button', { name: /Desmarcar fora do filtro/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(screen.queryByText(/selecionada\(s\) fora do filtro/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Limpar/i }));
+    expect(await screen.findByText(/Exibindo 2 de 2 referência/i)).toBeInTheDocument();
+    expect(screen.getByText('Outro fornecedor')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /Usar preço 2/i })).not.toBeChecked();
+    expect(screen.getByDisplayValue('Fornecedor fora do filtro de CNPJ definido para a amostra comparável.')).toBeInTheDocument();
+  });
+
+  it('envia filtros ativos ao tentar novamente a busca oficial', async () => {
+    mockedService.search
+      .mockRejectedValueOnce(new Error('Serviço oficial indisponível.'))
+      .mockResolvedValueOnce([{ localId: 'item-1', candidates: [candidate] }]);
+    const { container } = renderPage();
+
+    fireEvent.change(container.querySelector('input[type="file"]') as HTMLInputElement, {
+      target: { files: [new File(['xlsx'], 'custos.xlsx')] },
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: /Ver Cotações/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /Filtros/i }));
+    fireEvent.change(await screen.findByLabelText(/Órgão \(UASG\)/i), { target: { value: '158366' } });
+    fireEvent.click(await screen.findByRole('button', { name: /Tentar novamente/i }));
+
+    await waitFor(() => {
+      expect(mockedService.search).toHaveBeenLastCalledWith([
+        expect.objectContaining({ catalogCode: '606523' }),
+      ], expect.objectContaining({ uasg: '158366' }));
+    });
+  });
 
   it('mostra skeleton contextual enquanto busca cotações e não antecipa o estado vazio', async () => {
     const search = createDeferred<Array<{ localId: string; candidates: typeof candidate[] }>>();
@@ -441,10 +514,12 @@ describe('PesquisaPrecos', () => {
     await screen.findByText('Fornecedor');
 
     // Clica no checkbox para desconsiderar o preço
-    fireEvent.click(screen.getByRole('checkbox', { name: /Usar preço 1/i }));
-
+    const usePriceCheckbox = screen.getByRole('checkbox', { name: /Usar preço 1/i });
+    expect(usePriceCheckbox).toBeChecked();
+    fireEvent.click(usePriceCheckbox);
     // O modal deve aparecer exigindo justificativa
-    const textarea = await screen.findByPlaceholderText(/Ex\.: unidade de fornecimento/i);
+    expect(await screen.findByText(/Justificar desconsideração/i)).toBeInTheDocument();
+    const textarea = await screen.findByLabelText(/Justificativa obrigatória/i);
     fireEvent.change(textarea, { target: { value: 'Justificativa válida com mais de 10 caracteres' } });
     
     // Confirma a exclusão no modal

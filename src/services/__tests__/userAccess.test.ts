@@ -159,6 +159,32 @@ describe('fetchUserAccess', () => {
 
     expect(access.screenIds).toContain('pesquisa-precos');
     expect(access.screenIds).toContain('cadastro-fornecedores');
+    expect(access.screenIds).toContain('pesquisa-precos-ead');
+  });
+
+  it('mantem subpaginas implicitas quando o orgao libera somente o modulo pai', async () => {
+    supabaseMocks.memberships = [
+      {
+        group_id: 'group-compras',
+        user_groups: { id: 'group-compras', name: 'Compras', slug: 'compras' },
+      },
+    ];
+    supabaseMocks.permissions = [{ screen_id: 'pesquisa-precos-ead' }];
+    supabaseMocks.orgUser = {
+      role: 'member',
+      orgs: {
+        id: 'org-inconfidentes',
+        slug: 'prefeitura-inconfidentes',
+        name: 'Prefeitura de Inconfidentes',
+      },
+    };
+    supabaseMocks.orgPermissions = [{ screen_id: 'pesquisa-precos' }];
+
+    const { fetchUserAccess } = await import('@/services/userAccess');
+
+    const access = await fetchUserAccess(makeUser({ email: 'inconfidentes@inconfidentes.com.br' }), false);
+
+    expect(access.screenIds).toContain('pesquisa-precos-ead');
   });
 
   it('mantem requisicao de compra para terceirizado do refeitorio mesmo sem permissao de tela no grupo', async () => {

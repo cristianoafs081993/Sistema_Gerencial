@@ -10,6 +10,7 @@ import {
   FileSearch,
   FileStack,
   FileText,
+  GraduationCap,
   LayoutDashboard,
   MessageSquare,
   Receipt,
@@ -82,6 +83,7 @@ export const appScreens: AppScreen[] = [
   { id: 'requisicao-compra', groupId: 'contratos', name: 'Requisição de Compra', path: '/requisicao-compra', icon: ClipboardList, sortOrder: 20 },
   { id: 'cadastro-terceirizados', groupId: 'contratos', name: 'Cadastro de Terceirizados', path: '/cadastro-terceirizados', icon: UserCog, sortOrder: 25 },
   { id: 'pesquisa-precos', groupId: 'licitacoes', name: 'Pesquisa de Preços', path: '/pesquisa-precos', icon: SearchCheck, sortOrder: 5 },
+  { id: 'pesquisa-precos-ead', groupId: 'licitacoes', name: 'Capacitação EAD', path: '/pesquisa-precos/ead', icon: GraduationCap, sortOrder: 6, hiddenFromNavigation: true },
   { id: 'licitacoes-pregoes', groupId: 'licitacoes', name: 'Pregões por UASG', path: '/licitacoes-pregoes', icon: ScrollText, sortOrder: 10 },
   { id: 'atas-registro-precos', groupId: 'licitacoes', name: 'Atas e ARP', path: '/atas-registro-precos', icon: ClipboardList, sortOrder: 20 },
   { id: 'cadastro-fornecedores', groupId: 'licitacoes', name: 'Cadastro de Fornecedores', path: '/cadastro-fornecedores', icon: Users, sortOrder: 30, hiddenFromNavigation: true },
@@ -157,7 +159,7 @@ export const appScreens: AppScreen[] = [
 ];
 
 const impliedScreenAccess: Record<string, string[]> = {
-  'pesquisa-precos': ['cadastro-fornecedores'],
+  'pesquisa-precos': ['cadastro-fornecedores', 'pesquisa-precos-ead'],
 };
 
 export function expandScreenAccessIds(screenIds: string[]) {
