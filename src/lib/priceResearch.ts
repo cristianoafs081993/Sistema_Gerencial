@@ -1291,16 +1291,35 @@ export function buildPriceResearchReportHtml(data: PriceResearchReportData, opti
         }
       }
 
+      let agencyColHtml = '';
+      let sourceColHtml = '';
+
+      if (candidate.sourceType === 'compras_gov_precos') {
+        agencyColHtml = escapeHtml(
+          [candidate.agencyCode, candidate.agencyName].filter(Boolean).join(' - ') || '-'
+        );
+        sourceColHtml = `
+          ${escapeHtml(candidate.purchaseId)} / item ${escapeHtml(candidate.purchaseItemId)}<br />
+          <a href="${escapeHtml(candidate.sourceUrl)}" target="_blank" rel="noopener noreferrer">Fonte oficial</a>
+          ${candidate.pncpSearchUrl ? ` | <a href="${escapeHtml(candidate.pncpSearchUrl)}" target="_blank" rel="noopener noreferrer">PNCP</a>` : ''}
+        `;
+      } else if (candidate.sourceType === 'custom') {
+        agencyColHtml = `<strong>Fornecedor Local</strong>${candidate.supplierDocument ? `<br /><span style="font-size: 8px; color: #555;">CNPJ/CPF: ${escapeHtml(candidate.supplierDocument)}</span>` : ''}`;
+        sourceColHtml = `Cotação direta (Física/E-mail)`;
+      } else {
+        agencyColHtml = `<strong>Internet</strong><br /><span style="font-size: 9px; color: #555;">${escapeHtml(candidate.agencyName || candidate.sourceLabel)}</span>`;
+        sourceColHtml = `
+          Pesquisa de Mercado (Internet)<br />
+          ${candidate.sourceUrl ? `<a href="${escapeHtml(candidate.sourceUrl)}" target="_blank" rel="noopener noreferrer">Acessar link da oferta</a>` : ''}
+        `;
+      }
+
       return `
         <tr>
           <td>${index + 1}</td>
-          <td>${escapeHtml(candidate.agencyCode || '-')} - ${escapeHtml(candidate.agencyName || '-')}</td>
+          <td>${agencyColHtml}</td>
           <td>${escapeHtml(candidate.supplierName || '-')}</td>
-          <td>
-            ${escapeHtml(candidate.purchaseId)} / item ${escapeHtml(candidate.purchaseItemId)}<br />
-            <a href="${escapeHtml(candidate.sourceUrl)}">Fonte oficial</a>
-            ${candidate.pncpSearchUrl ? ` | <a href="${escapeHtml(candidate.pncpSearchUrl)}">PNCP</a>` : ''}
-          </td>
+          <td>${sourceColHtml}</td>
           <td>${formatDate(candidate.resultDate || candidate.purchaseDate)}</td>
           <td>${escapeHtml(candidate.originalUnitLabel)}</td>
           <td class="number">${formatCurrency(candidate.originalUnitPrice)}</td>
@@ -1313,13 +1332,23 @@ export function buildPriceResearchReportHtml(data: PriceResearchReportData, opti
       `;
     }).join('');
 
-    const excludedRows = excluded.map((candidate) => `
-      <tr>
-        <td>${escapeHtml(candidate.agencyCode || candidate.purchaseItemId)}</td>
-        <td class="number">${formatCurrency(candidate.comparableUnitPrice)}</td>
-        <td>${escapeHtml(candidate.exclusionReason || 'Sem justificativa registrada')}</td>
-      </tr>
-    `).join('');
+    const excludedRows = excluded.map((candidate) => {
+      let sourceName = '-';
+      if (candidate.sourceType === 'compras_gov_precos') {
+        sourceName = [candidate.agencyCode, 'Oficial'].filter(Boolean).join(' - ') || 'Oficial';
+      } else if (candidate.sourceType === 'custom') {
+        sourceName = 'Fornecedor Local';
+      } else {
+        sourceName = `Internet (${candidate.sourceLabel})`;
+      }
+      return `
+        <tr>
+          <td>${escapeHtml(sourceName)}</td>
+          <td class="number">${formatCurrency(candidate.comparableUnitPrice)}</td>
+          <td>${escapeHtml(candidate.exclusionReason || 'Sem justificativa registrada')}</td>
+        </tr>
+      `;
+    }).join('');
 
     return `
       <section>

@@ -1427,58 +1427,113 @@ export default function PesquisaPrecos() {
       return;
     }
 
-    const saved = await saveResearch('completed');
-    if (!saved) return;
-
-    // Pré-carrega todas as imagens de evidência como base64 para embutir no HTML
-    // (evita imagens em branco no PDF causadas por carregamento assíncrono de URLs externas)
-    const fetchImageAsDataUri = async (url: string): Promise<string> => {
-      try {
-        const res = await fetch(url);
-        if (!res.ok) return url;
-        const blob = await res.blob();
-        return await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = () => resolve(url);
-          reader.readAsDataURL(blob);
-        });
-      } catch {
-        return url; // fallback: usa URL original
-      }
-    };
-
-    // Clona os dados e substitui URLs por data URIs
-    const reportDataWithEmbeddedImages: typeof reportData = {
-      ...reportData,
-      items: await Promise.all(
-        reportData.items.map(async (item) => ({
-          ...item,
-          candidates: await Promise.all(
-            item.candidates.map(async (c) => {
-              if (c.evidenceImage && c.evidenceImage.startsWith('http')) {
-                return { ...c, evidenceImage: await fetchImageAsDataUri(c.evidenceImage) };
-              }
-              return c;
-            })
-          ),
-        }))
-      ),
-    };
-
+    // Abre a janela imediatamente para evitar o bloqueador de popups do navegador
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      toast.error('O navegador bloqueou a abertura do relatório.');
+      toast.error('O navegador bloqueou a abertura do relatório. Por favor, permita popups para este site.');
       return;
     }
-    printWindow.document.write(buildPriceResearchReportHtml(reportDataWithEmbeddedImages, {
-      ...reportAuthenticationOptions,
-      researchId: saved,
-      authenticationData: reportData,
-    }));
+
+    // Escreve uma mensagem de carregamento inicial na nova janela
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Gerando Relatório PDF...</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              height: 100vh;
+              margin: 0;
+              background-color: #f8fafc;
+              color: #1e293b;
+            }
+            .spinner {
+              border: 4px solid #e2e8f0;
+              border-top: 4px solid #3b82f6;
+              border-radius: 50%;
+              width: 40px;
+              height: 40px;
+              animation: spin 1s linear infinite;
+              margin-bottom: 16px;
+            }
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+            h3 { margin: 0 0 8px 0; font-weight: 600; font-size: 18px; }
+            p { margin: 0; color: #64748b; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <div class="spinner"></div>
+          <h3>Gerando Relatório</h3>
+          <p>Processando imagens de evidências e formatando o PDF, aguarde...</p>
+        </body>
+      </html>
+    `);
     printWindow.document.close();
-    printWindow.focus();
-    window.setTimeout(() => printWindow.print(), 500);
+
+    try {
+      const saved = await saveResearch('completed');
+      if (!saved) {
+        printWindow.close();
+        return;
+      }
+
+      // Pré-carrega todas as imagens de evidência como base64 para embutir no HTML
+      // (evita imagens em branco no PDF causadas por carregamento assíncrono de URLs externas)
+      const fetchImageAsDataUri = async (url: string): Promise<string> => {
+        try {
+          const res = await fetch(url);
+          if (!res.ok) return url;
+          const blob = await res.blob();
+          return await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => resolve(url);
+            reader.readAsDataURL(blob);
+          });
+        } catch {
+          return url; // fallback: usa URL original
+        }
+      };
+
+      // Clona os dados e substitui URLs por data URIs
+      const reportDataWithEmbeddedImages: typeof reportData = {
+        ...reportData,
+        items: await Promise.all(
+          reportData.items.map(async (item) => ({
+            ...item,
+            candidates: await Promise.all(
+              item.candidates.map(async (c) => {
+                if (c.evidenceImage && c.evidenceImage.startsWith('http')) {
+                  return { ...c, evidenceImage: await fetchImageAsDataUri(c.evidenceImage) };
+                }
+                return c;
+              })
+            ),
+          }))
+        ),
+      };
+
+      printWindow.document.open();
+      printWindow.document.write(buildPriceResearchReportHtml(reportDataWithEmbeddedImages, {
+        ...reportAuthenticationOptions,
+        researchId: saved,
+        authenticationData: reportData,
+      }));
+      printWindow.document.close();
+      printWindow.focus();
+      window.setTimeout(() => printWindow.print(), 500);
+    } catch (error) {
+      printWindow.close();
+      toast.error('Erro ao gerar o relatório em PDF.');
+      console.error(error);
+    }
   };
 
 
