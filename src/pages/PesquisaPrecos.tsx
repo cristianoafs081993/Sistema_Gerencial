@@ -1099,26 +1099,36 @@ export default function PesquisaPrecos() {
     }
   };
 
-  const searchPrices = async () => {
-    const invalid = items.filter((item) => !/^\d{4,9}$/.test(item.catalogCode));
-    if (invalid.length > 0) {
-      const missing = invalid.filter((item) => !item.catalogCode);
-      if (missing.length > 0) {
-        toast.info(`Confirme uma sugestão de CATMAT/CATSER para ${missing.length} item(ns).`);
-        void suggestMissingCatalogCodes(missing);
-      } else {
-        toast.error(`Informe um CATMAT/CATSER válido para ${invalid.length} item(ns).`);
+  const searchPrices = async (targetItems?: PriceResearchItem[]) => {
+    const candidateItems = targetItems ?? items;
+    const toSearch = candidateItems.filter((item) => /^\d{4,9}$/.test(item.catalogCode));
+
+    if (toSearch.length === 0) {
+      if (!targetItems) {
+        const invalid = items.filter((item) => !/^\d{4,9}$/.test(item.catalogCode));
+        if (invalid.length > 0) {
+          const missing = invalid.filter((item) => !item.catalogCode);
+          if (missing.length > 0) {
+            toast.info(`Confirme uma sugestão de CATMAT/CATSER para ${missing.length} item(ns).`);
+            void suggestMissingCatalogCodes(missing);
+          } else {
+            toast.error(`Informe um CATMAT/CATSER válido para ${invalid.length} item(ns).`);
+          }
+        }
       }
       return;
     }
 
     setIsSearching(true);
-    setItems((current) => current.map((item) => ({ ...item, searchStatus: 'searching', searchError: undefined })));
+    setItems((current) => current.map((item) => {
+      const match = toSearch.some((t) => t.localId === item.localId);
+      return match ? { ...item, searchStatus: 'searching', searchError: undefined } : item;
+    }));
 
     let totalFound = 0;
     let anySuccess = false;
     let hasErrors = false;
-    const itemsToSearch = [...items];
+    const itemsToSearch = [...toSearch];
     const concurrencyLimit = 3;
 
     const worker = async () => {
@@ -1180,16 +1190,15 @@ export default function PesquisaPrecos() {
 
     try {
       const workers = Array.from(
-        { length: Math.min(concurrencyLimit, items.length) },
+        { length: Math.min(concurrencyLimit, toSearch.length) },
         () => worker()
       );
       await Promise.all(workers);
 
       if (anySuccess) {
         toast.success(`${totalFound} referência(s) oficial(is) encontrada(s).`);
-        // Avança para a curadoria automaticamente ao buscar preços com sucesso (Passo 2)
         setActiveStep(2);
-      } else if (!hasErrors) {
+      } else if (!hasErrors && !targetItems) {
         toast.error('Nenhuma referência oficial encontrada.');
       }
     } catch (error) {
@@ -1378,22 +1387,23 @@ export default function PesquisaPrecos() {
     }
   };
 
-  const hasTriggeredSearch = useRef(false);
+  const searchedCodes = useRef<Record<string, string>>({});
 
   useEffect(() => {
-    const allHaveCodes = items.length > 0 && items.every(i => /^\d{4,9}$/.test(i.catalogCode));
-    const anyIdle = items.some(i => i.searchStatus === 'idle');
-    const anyError = items.some(i => i.searchStatus === 'error');
+    if (isSearching || items.length === 0) return;
 
-    if (allHaveCodes && (anyIdle || anyError) && !isSearching && !hasTriggeredSearch.current) {
-      hasTriggeredSearch.current = true;
-      // Dispara em background sem bloquear a UI
-      void searchPrices();
-    }
+    // Dispara a busca automaticamente para qualquer item em 'idle' que possua código CATMAT/CATSER válido
+    const toSearch = items.filter((item) => {
+      if (!/^\d{4,9}$/.test(item.catalogCode)) return false;
+      if (item.searchStatus !== 'idle') return false;
+      return searchedCodes.current[item.localId] !== item.catalogCode;
+    });
 
-    // Reset do gatilho se os códigos mudarem (novo item ou código alterado)
-    if (!allHaveCodes) {
-      hasTriggeredSearch.current = false;
+    if (toSearch.length > 0) {
+      toSearch.forEach((item) => {
+        searchedCodes.current[item.localId] = item.catalogCode;
+      });
+      void searchPrices(toSearch);
     }
   }, [items, isSearching]);
 

@@ -124,24 +124,45 @@ function textSimilarity(left: unknown, right: unknown) {
 }
 
 function normalizeMeasure(value: unknown) {
-  const normalized = String(value ?? '').trim().toUpperCase().replace(/[^A-Z]/g, '');
+  const normalized = String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
   const aliases: Record<string, string> = {
     G: 'G',
     GR: 'G',
     GRAMA: 'G',
+    GRAMAS: 'G',
     KG: 'KG',
+    QUILO: 'KG',
     QUILOGRAMA: 'KG',
+    QUILOGRAMAS: 'KG',
     ML: 'ML',
     MILILITRO: 'ML',
+    MILILITROS: 'ML',
     L: 'L',
     LT: 'L',
     LITRO: 'L',
+    LITROS: 'L',
     UN: 'UN',
     UND: 'UN',
+    UNID: 'UN',
     UNIDADE: 'UN',
+    UNIDADES: 'UN',
     H: 'H',
     HR: 'H',
     HORA: 'H',
+    HORAS: 'H',
+    PCT: 'PCT',
+    PACOTE: 'PCT',
+    PACOTES: 'PCT',
+    CX: 'CX',
+    CAIXA: 'CX',
+    CAIXAS: 'CX',
+    MES: 'MES',
+    MESES: 'MES',
   };
   return aliases[normalized] ?? normalized;
 }
@@ -162,19 +183,36 @@ function comparablePrice(item: SearchItem, row: PriceApiRow) {
   const sourceMeasure = normalizeMeasure(row.siglaUnidadeMedida || row.nomeUnidadeMedida || row.siglaUnidadeFornecimento);
   const targetCapacity = item.targetCapacity ?? 1;
   const targetMeasure = normalizeMeasure(item.targetMeasureUnit || item.unit);
+
+  // If the units are exactly the same, they are compatible and can be converted via capacity.
+  if (sourceMeasure && targetMeasure && sourceMeasure === targetMeasure) {
+    if (sourceCapacity <= 0 || targetCapacity <= 0) {
+      return { price: originalPrice, compatible: true };
+    }
+    return {
+      price: originalPrice * (targetCapacity / sourceCapacity),
+      compatible: true,
+    };
+  }
+
   const source = measureScale(sourceMeasure);
   const target = measureScale(targetMeasure);
 
-  if (!source || !target || source.dimension !== target.dimension || sourceCapacity <= 0 || targetCapacity <= 0) {
-    return { price: originalPrice, compatible: false };
+  // If they are convertible via physical scales
+  if (source && target && source.dimension === target.dimension) {
+    if (sourceCapacity <= 0 || targetCapacity <= 0) {
+      return { price: originalPrice, compatible: true };
+    }
+    const sourceBaseAmount = sourceCapacity * source.scale;
+    const targetBaseAmount = targetCapacity * target.scale;
+    return {
+      price: originalPrice * (targetBaseAmount / sourceBaseAmount),
+      compatible: true,
+    };
   }
 
-  const sourceBaseAmount = sourceCapacity * source.scale;
-  const targetBaseAmount = targetCapacity * target.scale;
-  return {
-    price: originalPrice * (targetBaseAmount / sourceBaseAmount),
-    compatible: true,
-  };
+  // Otherwise, we do not perform automatic conversion, but we STILL treat them as compatible.
+  return { price: originalPrice, compatible: true };
 }
 
 function buildPriceApiUrl(item: SearchItem, pageSize = 100) {
