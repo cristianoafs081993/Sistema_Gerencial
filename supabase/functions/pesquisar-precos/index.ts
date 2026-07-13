@@ -502,8 +502,7 @@ async function resolvePncpSearchUrls(client: any, candidates: RankedCandidate[])
       });
     }
 
-    // 2. Identify which ones need API resolution
-    const unresolved: typeof purchasesToResolve = [];
+    // 2. Resolve candidates from cache
     for (const p of purchasesToResolve) {
       const keyFull = `${p.uasg}_${p.num}/${p.year}`;
       const keyShort = `${p.uasg}_${p.numInt}/${p.year}`;
@@ -513,91 +512,9 @@ async function resolvePncpSearchUrls(client: any, candidates: RankedCandidate[])
         const match = ctrlNum.match(/^(\d{14})-\d+-(\d+)\/(\d{4})/);
         if (match) {
           p.candidate.pncpSearchUrl = `https://pncp.gov.br/app/editais/${match[1]}/${match[3]}/${parseInt(match[2], 10)}`;
-          continue;
         }
       }
-      unresolved.push(p);
     }
-
-    if (unresolved.length === 0) return;
-
-    // 3. Resolve unresolved in parallel via PNCP search API (up to 5 concurrent requests)
-    const limitConcurrency = async (tasks: (() => Promise<void>)[], limit: number) => {
-      const active: Promise<void>[] = [];
-      for (const task of tasks) {
-        const p = task();
-        active.push(p);
-        if (active.length >= limit) {
-          await Promise.race(active);
-          const index = active.findIndex((item) => item === p);
-          if (index !== -1) active.splice(index, 1);
-        }
-      }
-      await Promise.all(active);
-    };
-
-    const apiTasks = unresolved.map((p) => async () => {
-      try {
-        const query = `${p.uasg} ${p.numInt}/${p.year}`;
-        const searchUrl = `https://pncp.gov.br/api/search/?q=${encodeURIComponent(query)}&tipos_documento=edital&pagina=1&tam_pagina=10`;
-        
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 10000);
-        
-        const response = await fetch(searchUrl, {
-          signal: controller.signal,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-            'Referer': 'https://pncp.gov.br/app/editais',
-          }
-        });
-        clearTimeout(timer);
-        
-        if (!response.ok) return;
-        const searchData = await response.json();
-        const items = searchData?.items || [];
-        
-        let matchedItem = null;
-        for (const item of items) {
-          if (item.unidade_codigo === p.uasg && String(item.ano) === p.year) {
-            const titleMatch = item.title?.match(/n[ºo]\s*(\d+)/i);
-            if (titleMatch && parseInt(titleMatch[1], 10) === p.numInt) {
-              matchedItem = item;
-              break;
-            }
-          }
-        }
-
-        if (matchedItem && matchedItem.numero_controle_pncp && matchedItem.orgao_cnpj && matchedItem.numero_sequencial) {
-          const cnpj = matchedItem.orgao_cnpj;
-          const seq = Number(matchedItem.numero_sequencial);
-          p.candidate.pncpSearchUrl = `https://pncp.gov.br/app/editais/${cnpj}/${p.year}/${seq}`;
-
-          // Write to local database cache
-          const { error: insertErr } = await client.from('licitacoes_pncp').upsert({
-            numero_controle_pncp: matchedItem.numero_controle_pncp,
-            cnpj_orgao: cnpj,
-            ano_compra: Number(p.year),
-            sequencial_compra: Number(seq),
-            numero_compra: String(p.numInt),
-            uasg_codigo: p.uasg,
-            objeto_compra: matchedItem.description || '',
-            raw_data: matchedItem,
-            compras_gov_data: {}
-          }, { onConflict: 'numero_controle_pncp' });
-
-          if (insertErr) {
-            console.warn(`Failed to insert PNCP cache for UASG ${p.uasg} ${p.numInt}/${p.year}:`, insertErr);
-          }
-        }
-      } catch (err) {
-        console.warn(`Failed to resolve PNCP link for UASG ${p.uasg} ${p.numInt}/${p.year}:`, err);
-      }
-    });
-
-    await limitConcurrency(apiTasks, 5);
   } catch (err) {
     console.error('Error in resolvePncpSearchUrls:', err);
   }

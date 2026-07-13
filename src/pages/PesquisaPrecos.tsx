@@ -1114,31 +1114,86 @@ export default function PesquisaPrecos() {
 
     setIsSearching(true);
     setItems((current) => current.map((item) => ({ ...item, searchStatus: 'searching', searchError: undefined })));
+
+    let totalFound = 0;
+    let anySuccess = false;
+    let hasErrors = false;
+    const itemsToSearch = [...items];
+    const concurrencyLimit = 3;
+
+    const worker = async () => {
+      while (itemsToSearch.length > 0) {
+        const item = itemsToSearch.shift();
+        if (!item) break;
+
+        try {
+          const results = await priceResearchService.search([item]);
+          const result = results[0];
+
+          const searchResultItem = {
+            ...item,
+            candidates: result?.candidates ?? [],
+            searchStatus: result?.error ? 'error' : 'success',
+            searchError: result?.error,
+          };
+
+          const resolvedItems = await resolveDirectPncpLinks([searchResultItem]);
+          const finalItem = resolvedItems[0];
+
+          if (finalItem.searchStatus === 'success') {
+            anySuccess = true;
+            totalFound += finalItem.candidates.length;
+          }
+
+          setItems((current) => current.map((x) => {
+            if (x.localId === item.localId) {
+              if (globalAdjustmentEnabled) {
+                const adjusted = applyGlobalAdjustmentToItems(
+                  [finalItem],
+                  true,
+                  globalAdjustmentIndex,
+                  globalAdjustmentManualRate,
+                  monetaryAdjustmentReferenceDate
+                );
+                return adjusted[0];
+              }
+              return finalItem;
+            }
+            return x;
+          }));
+        } catch (error) {
+          hasErrors = true;
+          const errMsg = error instanceof Error ? error.message : 'Falha na pesquisa.';
+          toast.error(errMsg);
+          setItems((current) => current.map((x) => 
+            x.localId === item.localId 
+              ? {
+                  ...x,
+                  searchStatus: 'error',
+                  searchError: errMsg,
+                }
+              : x
+          ));
+        }
+      }
+    };
+
     try {
-      const results = await priceResearchService.search(items);
-      const resultMap = new Map(results.map((result) => [result.localId, result]));
-      const searchResultItems = items.map((item) => {
-        const result = resultMap.get(item.localId);
-        return {
-          ...item,
-          candidates: result?.candidates ?? [],
-          searchStatus: result?.error ? 'error' : 'success',
-          searchError: result?.error,
-        };
-      });
-      const resolvedItems = await resolveDirectPncpLinks(searchResultItems);
-      setItems(globalAdjustmentEnabled ? applyGlobalAdjustmentToItems(resolvedItems, true, globalAdjustmentIndex, globalAdjustmentManualRate, monetaryAdjustmentReferenceDate) : resolvedItems);
-      const found = results.reduce((total, result) => total + result.candidates.length, 0);
-      toast.success(`${found} referência(s) oficial(is) encontrada(s).`);
-      // Avança para a curadoria automaticamente ao buscar preços com sucesso (Passo 4)
-      setActiveStep(2);
+      const workers = Array.from(
+        { length: Math.min(concurrencyLimit, items.length) },
+        () => worker()
+      );
+      await Promise.all(workers);
+
+      if (anySuccess) {
+        toast.success(`${totalFound} referência(s) oficial(is) encontrada(s).`);
+        // Avança para a curadoria automaticamente ao buscar preços com sucesso (Passo 2)
+        setActiveStep(2);
+      } else if (!hasErrors) {
+        toast.error('Nenhuma referência oficial encontrada.');
+      }
     } catch (error) {
-      setItems((current) => current.map((item) => ({
-        ...item,
-        searchStatus: 'error',
-        searchError: error instanceof Error ? error.message : 'Falha na pesquisa.',
-      })));
-      toast.error(error instanceof Error ? error.message : 'Não foi possível pesquisar os preços.');
+      toast.error('Ocorreu um erro durante a pesquisa de preços.');
     } finally {
       setIsSearching(false);
     }
