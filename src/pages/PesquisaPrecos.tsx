@@ -296,7 +296,7 @@ export default function PesquisaPrecos() {
 
   const [curadoriaTab, setCuradoriaTab] = useState<'basket' | 'market' | 'local'>('basket');
   const [marketSearchTerm, setMarketSearchTerm] = useState('');
-  const [selectedMarketProviders, setSelectedMarketProviders] = useState<string[]>(['amazon', 'magalu', 'americanas']);
+  const [selectedMarketProviders, setSelectedMarketProviders] = useState<string[]>(['amazon']);
   const [marketResults, setMarketResults] = useState<MarketSearchResult[]>([]);
   const [isSearchingMarket, setIsSearchingMarket] = useState(false);
   const [capturingUrls, setCapturingUrls] = useState<Set<string>>(new Set());
@@ -3378,8 +3378,6 @@ export default function PesquisaPrecos() {
                           <div className="flex flex-wrap items-center gap-4">
                             {[
                               { id: 'amazon', label: 'Amazon' },
-                              { id: 'magalu', label: 'Magalu' },
-                              { id: 'americanas', label: 'Americanas' },
                             ].map((prov) => {
                               const isChecked = selectedMarketProviders.includes(prov.id);
                               return (
