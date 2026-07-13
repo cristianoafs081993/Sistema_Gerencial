@@ -9,31 +9,39 @@ export type CaptureResult = {
   imageUrl: string;
   freight: FreightResult;
 };
+const SCRAPER_URL = import.meta.env.VITE_MARKET_SEARCH_URL || 'https://scraper.siages.com.br';
+const SCRAPER_TOKEN = import.meta.env.VITE_MARKET_SEARCH_TOKEN || '';
 
 export const marketSearchService = {
   async search(query: string, providers: string[]): Promise<MarketSearchResult[]> {
-    const response = await fetch('http://localhost:8787/search', {
+    const response = await fetch(`${SCRAPER_URL}/search`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        ...(SCRAPER_TOKEN ? { 'Authorization': `Bearer ${SCRAPER_TOKEN}` } : {})
+      },
       body: JSON.stringify({ query, providers }),
     });
     if (!response.ok) {
-      throw new Error(`Erro ao conectar ao buscador de mercado (${response.status}). Certifique-se de que o serviço local está em execução.`);
+      throw new Error(`Erro ao conectar ao buscador de mercado (${response.status}). Certifique-se de que o serviço de pesquisa está online.`);
     }
     const data = await response.json();
     return (data.results || []) as MarketSearchResult[];
   },
 
   async capture(url: string, cep?: string): Promise<CaptureResult> {
-    // 1. Busca o screenshot (e frete se Amazon + CEP) do scraper local
-    const scraperResponse = await fetch('http://localhost:8787/capture', {
+    // 1. Busca o screenshot (e frete se Amazon + CEP) do scraper
+    const scraperResponse = await fetch(`${SCRAPER_URL}/capture`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        ...(SCRAPER_TOKEN ? { 'Authorization': `Bearer ${SCRAPER_TOKEN}` } : {})
+      },
       body: JSON.stringify({ url, cep: cep || '' }),
     });
 
     if (!scraperResponse.ok) {
-      throw new Error(`Erro ao conectar ao capturador de evidências (${scraperResponse.status}). Certifique-se de que o serviço local está em execução.`);
+      throw new Error(`Erro ao conectar ao capturador de evidências (${scraperResponse.status}). Certifique-se de que o serviço de pesquisa está online.`);
     }
 
     const data = await scraperResponse.json();

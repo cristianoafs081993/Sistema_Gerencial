@@ -264,6 +264,32 @@ describe('PesquisaPrecos', () => {
     await waitFor(() => expect(screen.queryByText('Buscando cotações oficiais...')).not.toBeInTheDocument());
   });
 
+  it('mostra skeleton nas colunas de cotações e preço na tabela de itens enquanto busca cotações', async () => {
+    const search = createDeferred<Array<{ localId: string; candidates: typeof candidate[] }>>();
+    mockedService.search.mockReturnValueOnce(search.promise);
+    const { container } = renderPage();
+
+    fireEvent.change(container.querySelector('input[type="file"]') as HTMLInputElement, {
+      target: { files: [new File(['xlsx'], 'custos.xlsx')] },
+    });
+
+    // Devemos ver o skeleton das colunas na tabela de itens
+    expect(await screen.findByTestId('item-quotes-skeleton')).toBeInTheDocument();
+    expect(screen.getByTestId('item-price-skeleton')).toBeInTheDocument();
+
+    await act(async () => {
+      search.resolve([{ localId: 'item-1', candidates: [candidate] }]);
+      await search.promise;
+    });
+
+    // Skeletons devem sumir e mostrar as cotações/preços reais
+    await waitFor(() => {
+      expect(screen.queryByTestId('item-quotes-skeleton')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('1 cotações')).toBeInTheDocument();
+    expect(screen.getByText('R$ 20,00')).toBeInTheDocument();
+  });
+
   it('mostra o estado vazio somente depois que a busca termina sem cotações', async () => {
     mockedService.search.mockResolvedValueOnce([{ localId: 'item-1', candidates: [] }]);
     const { container } = renderPage();

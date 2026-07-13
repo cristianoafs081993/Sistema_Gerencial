@@ -2383,6 +2383,10 @@ export default function PesquisaPrecos() {
                           const isSufficient = selectedCount >= 3;
                           const estimatedPrice = getEstimatedUnitPrice(item, method);
                           const currentIndex = items.findIndex((i) => i.localId === item.localId);
+                          const isItemLoading =
+                            item.searchStatus === 'searching' ||
+                            item.catalogMatchStatus === 'searching' ||
+                            (isSearching && item.catalogCode && item.searchStatus !== 'success' && item.searchStatus !== 'error');
 
                           return (
                             <tr key={item.localId} className="hover:bg-surface-subtle/50 transition-colors">
@@ -2394,12 +2398,23 @@ export default function PesquisaPrecos() {
                                 </span>
                               </td>
                               <td className="py-3.5 px-4 text-center">
-                                <span className={`font-mono font-bold ${isSufficient ? 'text-primary' : 'text-amber-800'}`}>
-                                  {selectedCount} cotações
-                                </span>
+                                {isItemLoading ? (
+                                  <div className="flex items-center justify-center gap-1.5" title="Buscando cotações...">
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary/70 shrink-0" />
+                                    <Skeleton className="h-4 w-16 bg-slate-200/80 dark:bg-slate-700/80" data-testid="item-quotes-skeleton" />
+                                  </div>
+                                ) : (
+                                  <span className={`font-mono font-bold ${isSufficient ? 'text-primary' : 'text-amber-800'}`}>
+                                    {selectedCount} cotações
+                                  </span>
+                                )}
                               </td>
                               <td className="py-3.5 px-4 text-right font-mono font-bold text-text-primary">
-                                {estimatedPrice > 0 ? (
+                                {isItemLoading ? (
+                                  <div className="flex items-center justify-end gap-1.5" title="Calculando preço estimado...">
+                                    <Skeleton className="h-4 w-20 bg-slate-200/80 dark:bg-slate-700/80" data-testid="item-price-skeleton" />
+                                  </div>
+                                ) : estimatedPrice > 0 ? (
                                   `R$ ${estimatedPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                                 ) : (
                                   <span className="text-text-muted font-normal italic">Pendente</span>
@@ -2775,6 +2790,10 @@ export default function PesquisaPrecos() {
                       const isSufficient = selectedCount >= 3;
                       
                       const estimatedPrice = getEstimatedUnitPrice(item, method);
+                      const isItemLoading =
+                        item.searchStatus === 'searching' ||
+                        item.catalogMatchStatus === 'searching' ||
+                        (isSearching && item.catalogCode && item.searchStatus !== 'success' && item.searchStatus !== 'error');
                       
                       return (
                         <tr key={item.localId} className="hover:bg-surface-subtle/50 transition-colors">
@@ -2786,19 +2805,34 @@ export default function PesquisaPrecos() {
                             </span>
                           </td>
                           <td className="py-3.5 px-4 text-center">
-                            <span className={`font-mono font-bold ${isSufficient ? 'text-primary' : 'text-amber-800'}`}>
-                              {selectedCount} cotações
-                            </span>
+                            {isItemLoading ? (
+                              <div className="flex items-center justify-center gap-1.5" title="Buscando cotações...">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary/70 shrink-0" />
+                                <Skeleton className="h-4 w-16 bg-slate-200/80 dark:bg-slate-700/80" data-testid="item-quotes-skeleton" />
+                              </div>
+                            ) : (
+                              <span className={`font-mono font-bold ${isSufficient ? 'text-primary' : 'text-amber-800'}`}>
+                                {selectedCount} cotações
+                              </span>
+                            )}
                           </td>
                           <td className="py-3.5 px-4 text-right font-mono font-bold text-text-primary">
-                            {estimatedPrice > 0 ? (
+                            {isItemLoading ? (
+                              <div className="flex items-center justify-end gap-1.5" title="Calculando preço estimado...">
+                                <Skeleton className="h-4 w-20 bg-slate-200/80 dark:bg-slate-700/80" data-testid="item-price-skeleton" />
+                              </div>
+                            ) : estimatedPrice > 0 ? (
                               `R$ ${estimatedPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                             ) : (
                               <span className="text-text-muted font-normal italic">Pendente</span>
                             )}
                           </td>
                           <td className="py-3.5 px-4 text-center">
-                            {isSufficient ? (
+                            {isItemLoading ? (
+                              <Badge className="border-blue-200 bg-blue-50 text-blue-800 text-[10px] hover:bg-blue-50 animate-pulse">
+                                Carregando...
+                              </Badge>
+                            ) : isSufficient ? (
                               <Badge className="border-primary/25 bg-primary/5 text-primary text-[10px] hover:bg-primary/5">Pronto</Badge>
                             ) : (
                               <Badge className="border-amber-300 bg-amber-50 text-amber-800 text-[10px] hover:bg-amber-50">Incompleto</Badge>
