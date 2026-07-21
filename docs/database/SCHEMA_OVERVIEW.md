@@ -25,6 +25,8 @@ public.current_user_org_id() → uuid
 ```
 Retorna o `org_id` do usuário autenticado. Usada em **todas** as policies de isolamento de dados — o frontend não precisa passar `org_id` nas queries; o banco filtra automaticamente.
 
+A migration `20260716103000` adiciona `public.default_org_id()` como default de `org_id` nas tabelas transacionais multi-org. Inserts feitos por usuarios autenticados usam o orgao do usuario; jobs com service role sem `auth.uid()`, como a ingestao automatica de CSV por e-mail, caem para o orgao legado `ifrn-cn`.
+
 ### Tabelas com isolamento por org_id (RLS automático)
 
 `atividades`, `empenhos`, `descentralizacoes`, `descentralizacoes_conta_saldos`,

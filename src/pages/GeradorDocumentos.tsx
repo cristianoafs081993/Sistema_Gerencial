@@ -25,7 +25,7 @@ interface Natureza {
   valor: number;
 }
 
-type DespachoFinalidade = 'contrato' | 'projeto' | 'bolsa-sem-projeto';
+type DespachoFinalidade = 'contrato' | 'projeto' | 'bolsa-sem-projeto' | 'auxilio-transporte' | 'pafe' | 'auxilio-moradia';
 
 const macroprocessoData: Record<string, string[]> = {
   "AD - Administração": ["8 - Orçamento", "9 - Contabilidade e Finanças", "10 - Compras e Licitações", "11 - Contratos", "12 - Material", "13 - Patrimônio", "5 - Contratos"],
@@ -116,6 +116,38 @@ export default function GeradorDocumentos() {
     const favorecidoUpper = favorecido.toUpperCase();
     const empenhoUpper = empenho.toUpperCase();
     
+    if (finalidade === 'auxilio-transporte' || finalidade === 'pafe' || finalidade === 'auxilio-moradia') {
+      const nomePrograma = finalidade === 'auxilio-transporte'
+        ? 'Programa de Auxílio Transporte'
+        : finalidade === 'pafe'
+        ? 'Programa de Apoio à Formação Estudantil (PAFE)'
+        : 'Programa de Auxílio Moradia';
+      const resolucao = finalidade === 'auxilio-transporte'
+        ? 'Resolução nº 35/2017 - CONSUP/IFRN'
+        : finalidade === 'pafe'
+        ? 'Resolução nº 34/2017 - CONSUP/IFRN'
+        : 'Resolução nº 36/2017 - CONSUP/IFRN';
+
+      return `
+        <div style="font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; text-align: justify; color: black;">
+          <div>À Coordenação de Finanças e Contratos do <i>Campus</i> Currais Novos</div>
+          <div style="font-weight: bold; margin-top: 30px;">Assunto: Autorização para Liquidação de Despesa</div>
+          <div style="text-indent: 2.5cm; margin-top: 30px; margin-bottom: 25px;">
+            Considerando a regularidade dos documentos apresentados, o acompanhamento do ${nomePrograma}, aprovado pela ${resolucao} e a solicitação presente no processo <b>${processo}</b>, <i>AUTORIZO</i> a liquidação da despesa no valor de <b>R$ ${valor}</b>
+          </div>
+          <div style="text-indent: 2.5cm; margin-bottom: 15px;">
+            <b>1. EMPENHO(S) A SER(EM) LIQUIDADO(S):</b> <span style="color: #d9534f; text-decoration: underline; font-weight: bold; text-transform: uppercase;">${empenhoUpper}</span>
+          </div>
+          <div style="text-indent: 2.5cm; margin-bottom: 25px;">
+            <b>2. Encaminhamento:</b> Após a liquidação, encaminhe-se à Direção Geral para análise e autorização do pagamento, respeitando o cronograma e a disponibilidade orçamentária.
+          </div>
+          <div style="text-indent: 2.5cm; margin-top: 25px;">
+            Eventuais inconsistências ou pendências devem ser reportadas de imediato para análise e providências.
+          </div>
+        </div>
+      `;
+    }
+
     let htmlTexto = "";
     let htmlItens = "";
 
@@ -290,6 +322,9 @@ export default function GeradorDocumentos() {
                       <SelectItem value="contrato">Contrato ou Aquisição Comum</SelectItem>
                       <SelectItem value="projeto">Projeto de Pesquisa / Extensão (Alunos)</SelectItem>
                       <SelectItem value="bolsa-sem-projeto">Bolsa sem projeto</SelectItem>
+                      <SelectItem value="auxilio-transporte">Auxílio Transporte</SelectItem>
+                      <SelectItem value="pafe">Programa de Apoio à Formação Estudantil - PAFE</SelectItem>
+                      <SelectItem value="auxilio-moradia">Auxílio Moradia</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -354,10 +389,12 @@ export default function GeradorDocumentos() {
                 </div>
               ) : null}
 
-              <div className="space-y-2">
-                <Label>{finalidade === 'contrato' ? 'Favorecido (Empresa)' : 'Favorecido (Bolsistas)'}</Label>
-                <Input value={favorecido} onChange={e => { setFavorecido(e.target.value); setStep(1); setHasGenerated(false); }} className="uppercase" />
-              </div>
+              {finalidade !== 'auxilio-transporte' && finalidade !== 'pafe' && finalidade !== 'auxilio-moradia' && (
+                <div className="space-y-2">
+                  <Label>{finalidade === 'contrato' ? 'Favorecido (Empresa)' : 'Favorecido (Bolsistas)'}</Label>
+                  <Input value={favorecido} onChange={e => { setFavorecido(e.target.value); setStep(1); setHasGenerated(false); }} className="uppercase" />
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -371,7 +408,7 @@ export default function GeradorDocumentos() {
               </div>
 
               <div className="space-y-2">
-                <Label>Número do Empenho</Label>
+                <Label>{(finalidade === 'projeto' || finalidade === 'auxilio-transporte' || finalidade === 'pafe' || finalidade === 'auxilio-moradia') ? 'Empenho(s)' : 'Número do Empenho'}</Label>
                 <Input value={empenho} onChange={e => { setEmpenho(e.target.value); setStep(1); setHasGenerated(false); }} placeholder="202XNE000XXX" className="uppercase" />
               </div>
             </>

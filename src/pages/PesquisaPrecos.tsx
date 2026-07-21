@@ -4168,84 +4168,84 @@ export default function PesquisaPrecos() {
                             ) : (
                               <div className="overflow-x-auto rounded-radius-xl border border-border-default bg-surface-card">
                                 <table className="w-full border-collapse text-left font-ui text-sm">
-                              <thead>
-                                <tr className="border-b border-border-default bg-surface-subtle text-text-muted font-bold">
-                                  <th className="py-3 px-4">Fornecedor</th>
-                                  <th className="py-3 px-4 w-40">CNPJ / CPF</th>
-                                  <th className="py-3 px-4 w-32 text-right">Preço Unitário</th>
-                                  <th className="py-3 px-4 w-32 text-right">Frete</th>
-                                  {!globalAdjustmentEnabled ? (
-                                    <th className="py-3 px-4 w-32 text-right">Preço Base</th>
-                                  ) : (
-                                    <th className="py-3 px-4 w-32 text-right">Preço Ajustado</th>
-                                  )}
-                                  <th className="py-3 px-4 w-32 text-right">Variação (%)</th>
-                                  <th className="py-3 px-4 w-32">Data</th>
-                                  <th className="py-3 px-4 text-center w-24">Excluir</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-border-default/60">
-                                {selectedItem.candidates
-                                  .filter(isLocalCandidate)
-                                  .map((candidate) => {
-                                    return (
-                                      <tr key={candidate.id} className="hover:bg-surface-subtle/50 transition-colors">
-                                        <td className="py-3.5 px-4 font-bold text-text-primary">{candidate.supplierName}</td>
-                                        <td className="py-3.5 px-4 font-mono text-xs text-text-secondary">{candidate.supplierDocument || '-'}</td>
-                                        <td className="py-3.5 px-4 text-right font-mono text-xs">{formatCurrency(candidate.originalUnitPrice)}</td>
-                                        <td className="py-3.5 px-4 text-right font-mono text-xs">{candidate.freightCost ? formatCurrency(candidate.freightCost) : '-'}</td>
-                                        {!globalAdjustmentEnabled ? (
-                                          <td className="py-3.5 px-4 text-right font-mono text-xs text-text-secondary">{formatCurrency(candidate.comparableUnitPrice)}</td>
-                                        ) : (
-                                          <td className="py-3.5 px-4 text-right font-mono text-xs font-bold text-text-primary">
-                                            {formatCurrency(candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice)}
-                                          </td>
-                                        )}
-                                        <td className="py-3.5 px-4 text-right font-mono text-xs font-bold text-text-primary">
-                                          {(() => {
-                                            const itemEstimatedPrice = getEstimatedUnitPrice(selectedItem, method);
-                                            const adjustedPrice = candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice;
-                                            const dev = itemEstimatedPrice > 0 ? ((adjustedPrice - itemEstimatedPrice) / itemEstimatedPrice) * 100 : 0;
-
-                                            if (!candidate.selected) return <span className="text-text-muted">-</span>;
-
-                                            if (dev > 0) {
-                                              return (
-                                                <span className={dev > 25 ? 'text-destructive font-bold' : 'text-amber-600'}>
-                                                  +{dev.toFixed(1)}%
-                                                </span>
-                                              );
-                                            }
-                                            if (dev < 0) {
-                                              return <span className="text-emerald-600">{dev.toFixed(1)}%</span>;
-                                            }
-                                            return <span className="text-text-muted">0.0%</span>;
-                                          })()}
-                                        </td>
-                                        <td className="py-3.5 px-4 font-mono text-xs">{formatDate(candidate.purchaseDate)}</td>
-                                        <td className="py-3.5 px-4 text-center">
-                                          <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            title="Excluir cotação local"
-                                            onClick={() => {
-                                              updateItem(selectedItem.localId, {
-                                                candidates: selectedItem.candidates.filter(c => c.id !== candidate.id),
-                                              });
-                                              toast.success('Cotação local removida.');
-                                            }}
-                                            className="h-8 w-8 text-destructive hover:text-white hover:bg-destructive rounded-full transition-all"
-                                          >
-                                            <Trash2 className="h-4 w-4" />
-                                          </Button>
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                              </tbody>
-                              </table>
-                            </div>
+                               <thead>
+                                 <tr className="border-b border-border-default bg-surface-subtle text-text-muted font-bold">
+                                   <th className="py-2.5 px-2 text-[12px]">Fornecedor</th>
+                                   <th className="py-2.5 px-2 w-40 text-[12px]">CNPJ / CPF</th>
+                                   <th className="py-2.5 px-2 w-32 text-right text-[12px]">Preço Unitário</th>
+                                   <th className="py-2.5 px-2 w-32 text-right text-[12px]">Frete</th>
+                                   {!globalAdjustmentEnabled ? (
+                                     <th className="py-2.5 px-2 w-32 text-right text-[12px]">Preço Base</th>
+                                   ) : (
+                                     <th className="py-2.5 px-2 w-32 text-right text-[12px]">Preço Ajustado</th>
+                                   )}
+                                   <th className="py-2.5 px-2 w-32 text-right text-[12px]">Variação (%)</th>
+                                   <th className="py-2.5 px-2 w-32 text-[12px]">Data</th>
+                                   <th className="py-2.5 px-2 text-center w-24 text-[12px]">Excluir</th>
+                                 </tr>
+                               </thead>
+                               <tbody className="divide-y divide-border-default/60">
+                                 {selectedItem.candidates
+                                   .filter(isLocalCandidate)
+                                   .map((candidate) => {
+                                     return (
+                                       <tr key={candidate.id} className="hover:bg-surface-subtle/50 transition-colors">
+                                         <td className="py-2.5 px-2 font-bold text-text-primary text-sm">{candidate.supplierName}</td>
+                                         <td className="py-2.5 px-2 font-mono text-xs text-text-secondary">{candidate.supplierDocument || '-'}</td>
+                                         <td className="py-2.5 px-2 text-right font-mono text-sm">{formatCurrency(candidate.originalUnitPrice)}</td>
+                                         <td className="py-2.5 px-2 text-right font-mono text-sm">{candidate.freightCost ? formatCurrency(candidate.freightCost) : '-'}</td>
+                                         {!globalAdjustmentEnabled ? (
+                                           <td className="py-2.5 px-2 text-right font-mono text-sm text-text-secondary">{formatCurrency(candidate.comparableUnitPrice)}</td>
+                                         ) : (
+                                           <td className="py-2.5 px-2 text-right font-mono text-sm font-bold text-text-primary">
+                                             {formatCurrency(candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice)}
+                                           </td>
+                                         )}
+                                         <td className="py-2.5 px-2 text-right font-mono text-sm font-bold text-text-primary">
+                                           {(() => {
+                                             const itemEstimatedPrice = getEstimatedUnitPrice(selectedItem, method);
+                                             const adjustedPrice = candidate.monetaryAdjustedPrice ?? candidate.comparableUnitPrice;
+                                             const dev = itemEstimatedPrice > 0 ? ((adjustedPrice - itemEstimatedPrice) / itemEstimatedPrice) * 100 : 0;
+ 
+                                             if (!candidate.selected) return <span className="text-text-muted">-</span>;
+ 
+                                             if (dev > 0) {
+                                               return (
+                                                 <span className={dev > 25 ? 'text-destructive font-bold' : 'text-amber-600'}>
+                                                   +{dev.toFixed(1)}%
+                                                 </span>
+                                               );
+                                             }
+                                             if (dev < 0) {
+                                               return <span className="text-emerald-600">{dev.toFixed(1)}%</span>;
+                                             }
+                                             return <span className="text-text-muted">0.0%</span>;
+                                           })()}
+                                         </td>
+                                         <td className="py-2.5 px-2 font-mono text-sm">{formatDate(candidate.purchaseDate)}</td>
+                                         <td className="py-2.5 px-2 text-center">
+                                           <Button
+                                             type="button"
+                                             variant="ghost"
+                                             size="icon"
+                                             title="Excluir cotação local"
+                                             onClick={() => {
+                                               updateItem(selectedItem.localId, {
+                                                 candidates: selectedItem.candidates.filter(c => c.id !== candidate.id),
+                                               });
+                                               toast.success('Cotação local removida.');
+                                             }}
+                                             className="h-8 w-8 text-destructive hover:text-white hover:bg-destructive rounded-full transition-all"
+                                           >
+                                             <Trash2 className="h-4 w-4" />
+                                           </Button>
+                                         </td>
+                                       </tr>
+                                     );
+                                   })}
+                               </tbody>
+                               </table>
+                             </div>
                           )}
                         </div>
                       </div>
