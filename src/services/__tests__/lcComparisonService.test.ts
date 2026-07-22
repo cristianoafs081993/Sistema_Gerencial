@@ -39,6 +39,13 @@ describe('compararBolsistasComLC', () => {
     expect(result).toHaveLength(0);
   });
 
+  it('nao gera pendencia quando conta com X bate apos normalizacao', () => {
+    const bolsistas = [makeBolsista({ cpf: '709.453.264-40', conta: '7456X' })];
+    const lcRows = [makeLC({ favorecidoDocumento: '70945326440', contaBancaria: '7456-X' })];
+
+    const result = compararBolsistasComLC(bolsistas, lcRows);
+    expect(result).toHaveLength(0);
+  });
   it('gera sem_cadastro_lc quando CPF nao existe na LC', () => {
     const bolsistas = [makeBolsista({ cpf: '126.729.284-95' })];
     const lcRows = [makeLC({ favorecidoDocumento: '99999999999' })];

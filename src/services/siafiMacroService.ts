@@ -2,6 +2,7 @@ import type { BolsistaPdfRecord } from '@/services/bolsistasPdfService';
 import type { LCRegistro } from '@/services/lcImportService';
 import type { ComparacaoBolsista } from '@/services/lcComparisonService';
 import { env } from '@/lib/env';
+import { normalizeLcAccount, padLeftLcAccount } from '@/utils/lcAccount';
 
 export interface SiafiMacroInputRow {
   cpf: string;
@@ -71,10 +72,6 @@ export function buildSiafiContaPayload(row: SiafiMacroInputRow, codigoFinalCampo
   return `${banco}${agencia}${'0'.repeat(10)}${contaPagadora}${'0'.repeat(4)}${codigoFinal}`;
 }
 
-function buildSiafiCampo3(row: SiafiMacroInputRow): string {
-  return padLeft(row.contaFavorecido, 8);
-}
-
 export function buildSiafiMacroRowsFromComparison(
   bolsistas: BolsistaPdfRecord[],
   lcRows: LCRegistro[],
@@ -102,17 +99,17 @@ export function buildSiafiMacroRowsFromComparison(
     if (!lcList.length) continue;
 
     const preferred =
-      lcList.find((x) => onlyDigits(x.contaBancaria) && onlyDigits(x.contaBancaria) === onlyDigits(b.conta)) ||
-      lcList.find((x) => onlyDigits(x.contaBancaria)) ||
+      lcList.find((x) => normalizeLcAccount(x.contaBancaria) && normalizeLcAccount(x.contaBancaria) === normalizeLcAccount(b.conta)) ||
+      lcList.find((x) => normalizeLcAccount(x.contaBancaria)) ||
       lcList[0];
 
-    const contaLcDigits = onlyDigits(preferred.contaBancaria);
-    const contaPdfDigits = onlyDigits(b.conta);
+    const contaLcNormalized = normalizeLcAccount(preferred.contaBancaria);
+    const contaPdfNormalized = normalizeLcAccount(b.conta);
 
-    if (!contaLcDigits) continue;
-    if (contaPdfDigits && contaPdfDigits !== contaLcDigits) continue;
+    if (!contaLcNormalized) continue;
+    if (contaPdfNormalized && contaPdfNormalized !== contaLcNormalized) continue;
 
-    const key = `${doc}|${contaLcDigits}`;
+    const key = `${doc}|${contaLcNormalized}`;
     if (seen.has(key)) continue;
     seen.add(key);
 
@@ -121,7 +118,7 @@ export function buildSiafiMacroRowsFromComparison(
       bancoCodigo: preferred.bancoCodigo || '001',
       agenciaCodigo: preferred.agenciaCodigo || '0001',
       contaPagadora: contaPagadoraPadrao,
-      contaFavorecido: contaLcDigits,
+      contaFavorecido: contaLcNormalized,
       valor: b.valor,
     });
   }
@@ -154,7 +151,7 @@ export function buildSiafiMacroRowsFromPendencias(
     if (!cpf) continue;
 
     const bolsista = bolsistaByDocAndFile.get(`${cpf}|${(p.arquivoPdf || '').toLowerCase()}`);
-    const contaFavorecido = onlyDigits(p.contaPdf || bolsista?.conta || p.contaLc || '');
+    const contaFavorecido = normalizeLcAccount(p.contaPdf || bolsista?.conta || p.contaLc || '');
     if (!contaFavorecido) continue;
 
     const bancoCodigo = onlyDigits(bolsista?.banco || '') || bancoPadrao;
@@ -198,7 +195,7 @@ export function buildSiafiListaCredoresMacro(
     const cpf = padLeft(row.cpf, 11);
     const banco = padLeft(row.bancoCodigo, 3);
     const agencia = padLeft(row.agenciaCodigo, 4);
-    const conta = padLeft(row.contaFavorecido, 20);
+    const conta = padLeftLcAccount(row.contaFavorecido, 20);
     
     const valorCents = row.valor !== undefined
       ? Math.round(row.valor * 100)

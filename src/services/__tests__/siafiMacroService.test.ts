@@ -72,6 +72,23 @@ describe('siafiMacroService', () => {
     expect(macro).toContain('<input value="10000000000[tab]00111970000000000000023642800000000000000000[tab]"');
   });
 
+  it('preserva X normalizado no campo de conta favorecida da macro', () => {
+    const macro = buildSiafiListaCredoresMacro(
+      [
+        {
+          cpf: '70945326440',
+          bancoCodigo: '001',
+          agenciaCodigo: '8285',
+          contaPagadora: '408034',
+          contaFavorecido: '7456-X',
+        },
+      ],
+      { scriptName: 'Conta com X' },
+    );
+
+    const expectedConta = `${'0'.repeat(15)}7456X`;
+    expect(macro).toContain(`0018285${expectedConta}${'0'.repeat(17)}`);
+  });
   it('gera linhas aptas apenas para bolsistas sem pendencia', () => {
     const bolsistas = [
       makeBolsista({ cpf: '126.729.284-95', conta: '236428' }),

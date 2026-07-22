@@ -30,6 +30,7 @@ import {
   type SiafiMacroInputRow,
 } from '@/services/siafiMacroService';
 import { env } from '@/lib/env';
+import { normalizeLcAccount, padLeftLcAccount } from '@/utils/lcAccount';
 
 const statusLabel: Record<PendenciaStatus, string> = {
   sem_cadastro_lc: 'Sem cadastro na LC',
@@ -167,7 +168,7 @@ export default function LCPage() {
       const byConta = new Map<string, LCRegistro>();
 
       for (const row of group) {
-        const contaKey = onlyDigits(row.contaBancaria) || `sem-conta:${row.obListaCredores}-${row.sequencial}`;
+        const contaKey = normalizeLcAccount(row.contaBancaria) || `sem-conta:${row.obListaCredores}-${row.sequencial}`;
         const existing = byConta.get(contaKey);
         byConta.set(contaKey, existing ? pickPreferredRow(existing, row) : row);
       }
@@ -295,17 +296,17 @@ export default function LCPage() {
           const lcAccounts = lcList.map((r) => ({
             bancoCodigo: onlyDigits(r.bancoCodigo) || '001',
             agenciaCodigo: onlyDigits(r.agenciaCodigo) || '0001',
-            contaBancaria: onlyDigits(r.contaBancaria) || '',
+            contaBancaria: normalizeLcAccount(r.contaBancaria) || '',
           })).filter(acc => acc.contaBancaria);
 
           const hasCpfInLc = lcList.length > 0;
-          const pdfContaDigits = onlyDigits(b.conta);
-          const matchedLcAcc = lcAccounts.find(acc => acc.contaBancaria === pdfContaDigits);
+          const pdfContaNormalized = normalizeLcAccount(b.conta);
+          const matchedLcAcc = lcAccounts.find(acc => acc.contaBancaria === pdfContaNormalized);
           
           let status: 'ok' | 'aluno_nao_encontrado' | 'conta_nao_encontrada' = 'ok';
           let selectedBanco = b.banco || '001';
           let selectedAgencia = b.agencia || '0001';
-          let selectedConta = pdfContaDigits;
+          let selectedConta = pdfContaNormalized;
 
           if (!hasCpfInLc) {
             status = 'aluno_nao_encontrado';
@@ -328,11 +329,11 @@ export default function LCPage() {
             nome: b.nome,
             bancoPdf: onlyDigits(b.banco) || '001',
             agenciaPdf: onlyDigits(b.agencia) || '0001',
-            contaPdf: pdfContaDigits,
+            contaPdf: pdfContaNormalized,
             valor: b.valor,
             selectedBanco: onlyDigits(selectedBanco) || '001',
             selectedAgencia: onlyDigits(selectedAgencia) || '0001',
-            selectedConta: onlyDigits(selectedConta),
+            selectedConta: normalizeLcAccount(selectedConta),
             contaPagadora,
             status,
             lcAccounts,
@@ -504,7 +505,7 @@ export default function LCPage() {
                         <div className="flex items-center gap-1">
                           <span>{row.contaPdf || '-'}</span>
                           {row.contaPdf && row.contaPdf !== '-' && (
-                            <CopyButton value={onlyDigits(row.contaPdf)} />
+                            <CopyButton value={normalizeLcAccount(row.contaPdf)} />
                           )}
                         </div>
                       </TableCell>
@@ -727,9 +728,9 @@ export default function LCPage() {
                                       </div>
                                     </TableCell>
                                     <TableCell className="px-4 py-2.5 text-xs font-mono flex items-center gap-1.5">
-                                      <span>{row.selectedConta.replace(/\D/g, '') || <span className="text-red-500 italic">Vazia</span>}</span>
-                                      {hasDivergence && row.selectedConta.replace(/\D/g, '') && (
-                                        <CopyButton value={row.selectedConta.replace(/\D/g, '')} disabled={!isExpanded} />
+                                      <span>{normalizeLcAccount(row.selectedConta) || <span className="text-red-500 italic">Vazia</span>}</span>
+                                      {hasDivergence && normalizeLcAccount(row.selectedConta) && (
+                                        <CopyButton value={normalizeLcAccount(row.selectedConta)} disabled={!isExpanded} />
                                       )}
                                       {row.status === 'conta_nao_encontrada' && (
                                         <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300">
@@ -908,7 +909,7 @@ export default function LCPage() {
                               const cpf     = padLeft(row.cpf, 11);           // 11 chars
                               const banco   = padLeft(row.selectedBanco, 4);   // 3 + 1 buffer
                               const agencia = padLeft(row.selectedAgencia, 5); // 4 + 1 buffer
-                              const conta   = padLeft(row.selectedConta, 21);  // 20 + 1 buffer
+                              const conta   = padLeftLcAccount(row.selectedConta, 21);  // 20 + 1 buffer
 
                               const valorCents = row.valor !== undefined
                                 ? Math.round(row.valor * 100)

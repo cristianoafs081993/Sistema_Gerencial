@@ -27,7 +27,7 @@ describe('GeradorDocumentos', () => {
     render(<GeradorDocumentos />);
 
     fireEvent.click(screen.getAllByRole('combobox')[0]);
-    fireEvent.click(screen.getByText('Autorização de Liquidação (Programa de Auxílio Transporte)'));
+    fireEvent.click(screen.getByText('Auxílio Transporte'));
 
     expect(screen.queryByText('Favorecido (Bolsistas)')).not.toBeInTheDocument();
     expect(screen.queryByText('Favorecido (Empresa)')).not.toBeInTheDocument();
@@ -39,7 +39,7 @@ describe('GeradorDocumentos', () => {
     render(<GeradorDocumentos />);
 
     fireEvent.click(screen.getAllByRole('combobox')[0]);
-    fireEvent.click(screen.getByText('Autorização de Liquidação (Programa de Apoio à Formação Estudantil - PAFE)'));
+    fireEvent.click(screen.getByText('Programa de Apoio à Formação Estudantil - PAFE'));
 
     expect(screen.queryByText('Favorecido (Bolsistas)')).not.toBeInTheDocument();
     expect(screen.queryByText('Favorecido (Empresa)')).not.toBeInTheDocument();
@@ -51,7 +51,7 @@ describe('GeradorDocumentos', () => {
     render(<GeradorDocumentos />);
 
     fireEvent.click(screen.getAllByRole('combobox')[0]);
-    fireEvent.click(screen.getByText('Autorização de Liquidação (Programa de Auxílio Moradia)'));
+    fireEvent.click(screen.getByText('Auxílio Moradia'));
 
     expect(screen.queryByText('Favorecido (Bolsistas)')).not.toBeInTheDocument();
     expect(screen.queryByText('Favorecido (Empresa)')).not.toBeInTheDocument();

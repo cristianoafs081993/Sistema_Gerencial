@@ -51,9 +51,58 @@ function extractFieldAfterLabel(segment: string, labelRegex: RegExp): string {
   return normalizeWhitespace(match[1]);
 }
 
+function normalizeForDetection(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+}
+
+function parseCurrencyValue(value: string): number {
+  return parseFloat(value.replace(/\./g, '').replace(',', '.'));
+}
+
+function cleanStudentName(value: string): string {
+  return normalizeWhitespace(value).replace(/\s*[\u00b9\u00b2\u00b3\uFFFD]+$/g, '').trim();
+}
+
+function extractPafeTableRows(text: string, sourceFile: string): BolsistaPdfRecord[] {
+  const headerProbe = normalizeForDetection(text);
+  const hasPafeHeader =
+    /VR\s*R\$/.test(headerProbe) &&
+    /\bCPF\b/.test(headerProbe) &&
+    /DADOS\s+BANC.RIOS/.test(headerProbe) &&
+    /\bBANCO\b/.test(headerProbe) &&
+    /AG.NCIA/.test(headerProbe) &&
+    /\bOP\./.test(headerProbe) &&
+    /\bCONTA\b/.test(headerProbe);
+
+  if (!hasPafeHeader) return [];
+
+  const rows: BolsistaPdfRecord[] = [];
+  const normalizedText = normalizeWhitespace(text);
+  const rowRegex = /(?:^|\s)(\d{1,3})\s+(.+?)\s+(\d{10,15})\s+(.+?)\s+(MAT\.|VESP\.|NOT\.)\s+R\$\s*([0-9.,]+)\s+(\d{3}\.\d{3}\.\d{3}-\d{2})\s+(\d{2,4})\s+([0-9A-Za-z.-]+)\s+(?:(\d{1,4})\s+)?([0-9A-Za-z.-]+)(?=\s+\d{1,3}\s+|\s+Total\b|\s+INSTITUTO\b|$)/gi;
+
+  for (const match of normalizedText.matchAll(rowRegex)) {
+    rows.push({
+      nome: cleanStudentName(match[2]),
+      cpf: match[7],
+      banco: match[8],
+      agencia: match[9],
+      conta: match[11],
+      sourceFile,
+      valor: parseCurrencyValue(match[6]),
+    });
+  }
+
+  return rows;
+}
+
 export function extractFromText(text: string, sourceFile: string): BolsistaPdfRecord[] {
   const cleanText = text.replace(/\s+/g, ' ');
   const found: BolsistaPdfRecord[] = [];
+  const pafeRows = extractPafeTableRows(text, sourceFile);
+  if (pafeRows.length) return pafeRows;
 
   // Layout 1: Old table — headers like "MATRÍCULA CPF BANCO" or "VALOR REFERÊNCIA"
   // Columns: Seq Nome Matrícula CPF Banco Agência [OP] Conta [Valor]
@@ -72,7 +121,7 @@ export function extractFromText(text: string, sourceFile: string): BolsistaPdfRe
       const nome = m[2].trim();
       const banco = m[5];
       const agencia = m[6];
-      const conta = m[7] ? `${m[7]}-${m[8]}` : m[8]; 
+      const conta = m[8];
       const valorStr = m[9].replace(/\./g, '').replace(',', '.');
       const valor = parseFloat(valorStr);
 

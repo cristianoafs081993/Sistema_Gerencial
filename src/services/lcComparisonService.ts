@@ -1,5 +1,6 @@
 import type { LCRegistro } from '@/services/lcImportService';
 import type { BolsistaPdfRecord } from '@/services/bolsistasPdfService';
+import { normalizeLcAccount } from '@/utils/lcAccount';
 
 export type PendenciaStatus = 'sem_cadastro_lc' | 'sem_conta_lc' | 'conta_divergente';
 
@@ -75,12 +76,12 @@ export function compararBolsistasComLC(
     }
 
     const matchingRow = lcList.find(
-      (x) => onlyDigits(x.contaBancaria) && onlyDigits(x.contaBancaria) === onlyDigits(b.conta),
+      (x) => normalizeLcAccount(x.contaBancaria) && normalizeLcAccount(x.contaBancaria) === normalizeLcAccount(b.conta),
     );
-    const contaLcDigitsList = lcList
-      .map((x) => onlyDigits(x.contaBancaria))
+    const contaLcNormalizedList = lcList
+      .map((x) => normalizeLcAccount(x.contaBancaria))
       .filter(Boolean);
-    const contaPdfDigits = onlyDigits(b.conta);
+    const contaPdfNormalized = normalizeLcAccount(b.conta);
     const contaLcResumo = buildContaLcResumo(lcList);
     const nomeLcResumo = buildNomeLcResumo(lcList);
 
@@ -88,7 +89,7 @@ export function compararBolsistasComLC(
       continue;
     }
 
-    if (!contaLcDigitsList.length) {
+    if (!contaLcNormalizedList.length) {
       pend.push({
         cpf: b.cpf,
         nome: b.nome,
@@ -101,7 +102,7 @@ export function compararBolsistasComLC(
       continue;
     }
 
-    if (contaPdfDigits) {
+    if (contaPdfNormalized) {
       pend.push({
         cpf: b.cpf,
         nome: b.nome,
