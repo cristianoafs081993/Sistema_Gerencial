@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { copySuapDocumentToClipboard } from '@/lib/suapClipboard';
 import { toast } from 'sonner';
 
 // --- Types ---
@@ -239,11 +240,9 @@ export default function GeradorDocumentos() {
 
   const handleCopy = async () => {
     const html = activeTab === 'despacho' ? generateDespachoHTML() : generateCDOHTML();
-    const blob = new Blob([html], { type: "text/html" });
     try {
-      const data = [new ClipboardItem({ "text/html": blob })];
-      await navigator.clipboard.write(data);
-      toast.success("Documento copiado com sucesso!");
+      const result = await copySuapDocumentToClipboard(html);
+      toast.success(result === 'html' ? "Documento copiado com sucesso!" : "Documento copiado em texto simples.");
       setStep(3);
     } catch (err) {
       toast.error("Erro ao copiar o documento");

@@ -111,6 +111,7 @@ import {
   type PreliminaryStudyQuestionSuggestion,
 } from '@/lib/preliminaryStudyQuestionnaire';
 import { suapExtensionGithubUrl } from '@/lib/suapExtension';
+import { copySuapDocumentToClipboard } from '@/lib/suapClipboard';
 import { cn, formatarDocumento } from '@/lib/utils';
 import { contractDraftsService } from '@/services/contractDrafts';
 import type { DocumentTemplateQuestion, DocumentTemplateRecord } from '@/services/documentTemplates';
@@ -3644,6 +3645,17 @@ export default function EditorDocumentos() {
   const handleCopy = async () => {
     const html = editorContent;
     const clipboardHtml = (isPreliminaryStudyDocument || isRiskMapDocument) ? highlightPendingFieldsInHtml(html) : html;
+
+    if (activeDocumentId === 'despacho-liquidacao') {
+      try {
+        const result = await copySuapDocumentToClipboard(clipboardHtml, { plainText: stripHtml(html) });
+        toast.success(result === 'html' ? 'Minuta copiada com sucesso.' : 'Minuta copiada em texto simples.');
+      } catch {
+        toast.error('Nao foi possivel copiar a minuta.');
+      }
+      return;
+    }
+
     try {
       const blob = new Blob([clipboardHtml], { type: 'text/html' });
       const clipboard = new ClipboardItem({
@@ -3663,6 +3675,22 @@ export default function EditorDocumentos() {
       dispatch.documentType === 'mapa-riscos-licitacao'
       ? highlightPendingFieldsInHtml(dispatch.html)
       : dispatch.html;
+
+    if (dispatch.documentType === 'despacho-liquidacao') {
+      try {
+        const result = await copySuapDocumentToClipboard(html, { plainText: stripHtml(dispatch.html) });
+        setCopiedDispatchIds((current) => (current.includes(dispatch.id) ? current : [...current, dispatch.id]));
+        toast.success(
+          result === 'html'
+            ? `Documento ${dispatch.processo || dispatch.title} copiado.`
+            : `Documento ${dispatch.processo || dispatch.title} copiado em texto simples.`,
+        );
+      } catch {
+        toast.error(`Nao foi possivel copiar ${dispatch.processo || dispatch.title}.`);
+      }
+      return;
+    }
+
     try {
       const blob = new Blob([html], { type: 'text/html' });
       const clipboard = new ClipboardItem({
