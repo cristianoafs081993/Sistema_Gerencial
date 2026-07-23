@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "SUAP Atividades Scraper",
-  "version": "1.1",
-  "description": "Extrai atividades do Planejamento Estratégico do SUAP para o Supabase",
+  "version": "1.2",
+  "description": "Extrai atividades do Planejamento Estrategico do SUAP para o Supabase",
   "permissions": [
     "activeTab",
     "scripting"
@@ -13,5 +13,16 @@
   ],
   "action": {
     "default_popup": "popup.html"
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://suap.ifrn.edu.br/documento_eletronico/*"
+      ],
+      "js": [
+        "clone-document.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
 }

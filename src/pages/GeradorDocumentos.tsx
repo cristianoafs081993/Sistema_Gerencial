@@ -18,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { copySuapDocumentToClipboard } from '@/lib/suapClipboard';
+import { buildSuapCloneUrl, SuapCloneAutomationMode } from '@/lib/suapCloneAutomation';
 import { toast } from 'sonner';
 
 // --- Types ---
@@ -250,8 +251,24 @@ export default function GeradorDocumentos() {
   };
 
   const handleClone = () => {
-    const id = activeTab === 'despacho' ? '1026154' : '1016427';
-    window.open(`https://suap.ifrn.edu.br/documento_eletronico/clonar_documento/${id}/`, '_blank');
+    const html = activeTab === 'despacho' ? generateDespachoHTML() : generateCDOHTML();
+    let mode: SuapCloneAutomationMode = 'review';
+
+    if (activeTab === 'despacho') {
+      mode = window.confirm(
+        'Deseja que a extensao clique em Salvar automaticamente no SUAP apos preencher o assunto? Clique em Cancelar para apenas preencher e revisar.'
+      ) ? 'save-after-confirmation' : 'review';
+    }
+
+    const cloneUrl = buildSuapCloneUrl({ documentType: activeTab, html, mode });
+    window.open(cloneUrl, '_blank');
+    if (activeTab === 'despacho') {
+      toast.info(
+        mode === 'save-after-confirmation'
+          ? 'Clone aberto no SUAP. A extensao preenchera o assunto e tentara salvar.'
+          : 'Clone aberto no SUAP. A extensao preenchera o assunto para revisao.'
+      );
+    }
     setStep(3);
   };
 
