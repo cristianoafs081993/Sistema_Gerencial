@@ -104,12 +104,12 @@ export function SuapSyncPanel({ onSyncComplete }: SuapSyncPanelProps) {
       const now = Date.now();
       const oneHourMs = 60 * 60 * 1000;
       
-      let lastSyncTime = lastSyncStr ? Number(lastSyncStr) : 0;
+      const lastSyncTime = lastSyncStr ? Number(lastSyncStr) : 0;
       const timeRemaining = oneHourMs - (now - lastSyncTime);
 
       if (timeRemaining <= 0) {
         addLog('Iniciando sincronização automática programada (de hora em hora)...');
-        await handleStartSync({ onlyAutoActive: true });
+        await handleStartSync({ onlyAutoActive: true, fullFlow: true });
       } else {
         const minutesLeft = Math.ceil(timeRemaining / 60000);
         setNextAutoSyncTime(`em ~${minutesLeft} min`);
@@ -314,19 +314,18 @@ export function SuapSyncPanel({ onSyncComplete }: SuapSyncPanelProps) {
     setSelectedBoxIds(next);
   };
 
-  // Sincronização Geral
-  const handleStartSync = async (options?: { onlyAutoActive?: boolean }) => {
+  // Sincronizacao Geral
+  const handleStartSync = async (options?: { onlyAutoActive?: boolean; fullFlow?: boolean }) => {
     if (!suapSessionId) {
-      toast.error('Sessão do SUAP não conectada.');
+      toast.error('Sessao do SUAP nao conectada.');
       return;
     }
 
     if (!session?.user?.id) {
-      toast.error('Usuário não logado no Sistema.');
+      toast.error('Usuario nao logado no Sistema.');
       return;
     }
 
-    // Filtrar caixas a serem sincronizadas
     const boxesToSync = caixas.filter(b => {
       if (options?.onlyAutoActive) {
         return b.sync_automatica;
@@ -341,23 +340,23 @@ export function SuapSyncPanel({ onSyncComplete }: SuapSyncPanelProps) {
       return;
     }
 
+    const fullFlow = options?.fullFlow ?? false;
+
     setSyncStatus('running');
     setIsCollapsed(false);
     setLogs([]);
-    addLog(`Iniciando sincronização nativa de ${boxesToSync.length} caixa(s)...`);
+    addLog(`Iniciando ${fullFlow ? 'fluxo completo' : 'sincronizacao de inventario'} de ${boxesToSync.length} caixa(s)...`);
 
     try {
       const allScrapedProcesses: ScrapedProcesso[] = [];
 
-      // 1. Scraping de todas as caixas
       for (const box of boxesToSync) {
         addLog(`[Caixa: ${box.nome}] Lendo processos de: ${box.url}`);
         try {
           const scraped = await suapScraperService.fetchAndScrapeCaixa(box.url, suapSessionId);
           addLog(`[Caixa: ${box.nome}] ${scraped.length} processo(s) encontrado(s).`);
-          allScrapedProcesses.push(...scraped);
-          
-          // Registrar última sync bem sucedida para esta caixa
+          allScrapedProcesses.push(...scraped.map((processo) => ({ ...processo, caixa: box.nome })));
+
           await suapScraperService.updateLastSyncTime(box.id, session.user.id);
         } catch (boxErr: any) {
           addLog(`[Caixa: ${box.nome}] FALHA: ${boxErr.message}`);
@@ -365,88 +364,82 @@ export function SuapSyncPanel({ onSyncComplete }: SuapSyncPanelProps) {
         }
       }
 
-      // 2. Desduplicação inteligente dos processos
       const uniqueProcessesMap = new Map<string, ScrapedProcesso>();
       for (const proc of allScrapedProcesses) {
         uniqueProcessesMap.set(proc.suapId, proc);
       }
       const uniqueProcesses = Array.from(uniqueProcessesMap.values());
-      addLog(`Consolidação completa: ${allScrapedProcesses.length} total, desduplicado para ${uniqueProcesses.length} únicos.`);
+      addLog(`Consolidacao completa: ${allScrapedProcesses.length} total, ${uniqueProcesses.length} unico(s).`);
 
       if (uniqueProcesses.length === 0) {
         throw new Error('Nenhum processo foi localizado em nenhuma das caixas selecionadas.');
       }
 
-      // 3. Sincronização básica no banco de dados
-      addLog('Atualizando inventário de processos no Supabase...');
+      addLog('Atualizando inventario de processos no Supabase...');
       const syncedProcesses = await suapScraperService.syncProcessListInSupabase(uniqueProcesses, session.user.id);
-      addLog(`Inventário atualizado. Persistidos ${syncedProcesses.length} processo(s).`);
+      const createdCount = syncedProcesses.filter((proc) => proc.created).length;
+      const existingCount = syncedProcesses.length - createdCount;
+      addLog(`Inventario atualizado: ${createdCount} novo(s), ${existingCount} ja existente(s) preservado(s).`);
 
       let completed = 0;
-      let skipped = 0;
+      const skipped = existingCount;
       let errors = 0;
 
-      // 4. Download do PDF e IA apenas para os novos
-      for (let i = 0; i < syncedProcesses.length; i++) {
-        const proc = syncedProcesses[i];
-        const displayId = proc.numProcesso || proc.suapId;
-
-        addLog(`--- Sincronizando ${i + 1}/${syncedProcesses.length}: ${displayId} ---`);
-
-        try {
-          if (proc.already_exists) {
-            addLog(`[${displayId}] Processo já extraído com sucesso no banco. Pulando download para poupar recursos.`);
-            skipped++;
-            continue;
-          }
-
-          // Obter número formatado se necessário
-          if (!proc.numProcesso) {
-            const num = await suapScraperService.enrichProcessNumber(proc, suapSessionId, addLog);
-            if (num) proc.numProcesso = num;
-          }
-
-          // Executar download nativo e IA
-          await suapScraperService.processAndSyncSingle(proc, suapSessionId, session.user.id, addLog);
-          completed++;
-        } catch (procErr: any) {
-          addLog(`[${displayId}] ERRO: ${procErr.message}`);
-          console.error(procErr);
-          
-          if (procErr.message?.includes('Sessão expirada') || procErr.message?.includes('não autenticada')) {
-            handleDisconnect();
-            throw procErr;
-          }
-          errors++;
+      if (fullFlow) {
+        const processesToProcess = syncedProcesses.filter((proc) => proc.created);
+        if (processesToProcess.length === 0) {
+          addLog('Nenhum processo novo para baixar PDF ou extrair por IA.');
         }
-      }
 
-      // 5. Finalizar
-      addLog('======================================');
-      addLog(`Sincronização concluída: ${completed} novos, ${skipped} pulados/otimizados, ${errors} erros.`);
-      setSyncStatus(errors === 0 ? 'success' : 'error');
-      
-      // Salvar timestamp da sync automática
-      localStorage.setItem('suap_last_auto_sync_time', String(Date.now()));
-      
-      if (errors === 0) {
-        toast.success('Sincronização concluída com sucesso!');
+        for (let i = 0; i < processesToProcess.length; i++) {
+          const proc = processesToProcess[i];
+          const displayId = proc.numProcesso || proc.suapId;
+          addLog(`--- Fluxo completo ${i + 1}/${processesToProcess.length}: ${displayId} ---`);
+
+          try {
+            await suapScraperService.processAndSyncSingle(proc, suapSessionId, session.user.id, addLog);
+            completed++;
+          } catch (procErr: any) {
+            addLog(`[${displayId}] ERRO: ${procErr.message}`);
+            console.error(procErr);
+
+            if (procErr.message?.includes('Sessao expirada') || procErr.message?.includes('nao autenticada')) {
+              handleDisconnect();
+              throw procErr;
+            }
+            errors++;
+          }
+        }
       } else {
-        toast.warning(`Sincronização concluída com ${errors} falhas parciais.`);
+        addLog('Modo inventario concluido. PDF e IA podem ser executados depois por processo selecionado.');
       }
 
-      // Recarregar caixas para atualizar last_sync_at
+      addLog('======================================');
+      addLog(
+        fullFlow
+          ? `Fluxo completo concluido: ${completed} novo(s) processado(s), ${skipped} existente(s) preservado(s), ${errors} erro(s).`
+          : `Sincronizacao de inventario concluida: ${createdCount} novo(s), ${existingCount} existente(s) preservado(s).`,
+      );
+      setSyncStatus(errors === 0 ? 'success' : 'error');
+
+      localStorage.setItem('suap_last_auto_sync_time', String(Date.now()));
+
+      if (errors === 0) {
+        toast.success(fullFlow ? 'Fluxo completo concluido com sucesso!' : 'Inventario sincronizado com sucesso!');
+      } else {
+        toast.warning(`Fluxo completo concluido com ${errors} falha(s) parcial(is).`);
+      }
+
       loadUserCaixas();
 
       if (onSyncComplete) {
         onSyncComplete();
       }
-
     } catch (err: any) {
       addLog(`FATAL: ${err.message}`);
       console.error(err);
       setSyncStatus('error');
-      toast.error(`Sincronização abortada: ${err.message}`);
+      toast.error(`Sincronizacao abortada: ${err.message}`);
     }
   };
 
@@ -780,14 +773,25 @@ export function SuapSyncPanel({ onSyncComplete }: SuapSyncPanelProps) {
 
           {/* Seção 3: Executar Sincronização Manual */}
           {suapSessionId && caixas.length > 0 && (
-            <div className="flex justify-end gap-3">
-              <Button 
-                onClick={() => handleStartSync()} 
+            <div className="flex flex-col justify-end gap-2 sm:flex-row">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleStartSync()}
                 disabled={syncStatus === 'running' || selectedBoxIds.size === 0}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 gap-1.5 text-xs shadow-sm px-6"
+                className="h-9 gap-1.5 border-emerald-200 bg-white px-5 text-xs font-bold text-emerald-700 shadow-sm hover:bg-emerald-50"
+              >
+                <FolderSync className="h-3.5 w-3.5" />
+                Sincronizar Inventario ({selectedBoxIds.size})
+              </Button>
+              <Button
+                type="button"
+                onClick={() => handleStartSync({ fullFlow: true })}
+                disabled={syncStatus === 'running' || selectedBoxIds.size === 0}
+                className="h-9 gap-1.5 bg-emerald-600 px-6 text-xs font-bold text-white shadow-sm hover:bg-emerald-700"
               >
                 <Play className="h-3.5 w-3.5 fill-current" />
-                Sincronizar Caixas Selecionadas ({selectedBoxIds.size})
+                Executar Fluxo Completo ({selectedBoxIds.size})
               </Button>
             </div>
           )}

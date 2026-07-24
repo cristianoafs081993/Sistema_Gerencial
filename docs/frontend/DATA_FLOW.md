@@ -140,6 +140,19 @@ Alguns services usam fallback para REST quando `supabase-js` falha ou retorna va
 
 ## Exemplos de fluxo
 
+### SUAP Processos
+
+`Suap.tsx` -> `SuapSyncPanel` / `suapScraperService` -> `suap-proxy` / `process-pdf` -> `processos` / `suap-pdfs`
+
+Observacoes:
+
+- o fluxo e modular: o usuario pode sincronizar somente o inventario, baixar PDFs selecionados, executar somente a extracao por IA ou rodar o fluxo completo para processos escolhidos
+- a sincronizacao automatica obedece as caixas marcadas pelo usuario e executa o fluxo completo apenas para processos novos; processos ja sincronizados sao preservados, inclusive quando concluidos
+- antes da IA o frontend persiste apenas `suap_id`, `url`, `caixa` e `num_processo` quando o numero aparece na listagem do SUAP; a tabela continua exibindo os processos durante fila/processamento da IA, mas beneficiario, contrato, valores, dados bancarios, empenhos e retencoes ficam no detalhe aberto pelo ícone de olho e so aparecem depois de extraidos pela IA
+- a tela /suap filtra visualmente apenas entre processos em andamento e concluidos; etapa operacional, PDF, atualizacao e metadados extraidos pela IA aparecem na propria linha do processo
+- a chamada padrao para `process-pdf` envia somente `{ suap_id }` e retorna assim que a extracao entra na fila; o resultado real chega depois pelo worker, que altera `processos.status`. Enquanto houver IA em fila ou processamento, a tela consulta os processos a cada cinco segundos; fora disso, a atualizacao volta ao intervalo normal
+- a UI nao anuncia conclusao quando a IA esta apenas enfileirada. Limites temporarios do Gemini ficam visiveis na linha do processo para evitar tentativas repetidas sem resultado
+
 ### Economia de tempo
 
 `App.tsx` -> `EconomiaTempo.tsx` -> `automationSavingsService` -> `automation_savings_scenarios` / `automation_savings_events`

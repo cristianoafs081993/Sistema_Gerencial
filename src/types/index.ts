@@ -346,6 +346,13 @@ export interface SuapWorkflowConclusao {
 }
 
 export interface SuapDadosCompletos {
+  extraction_job?: {
+    provider?: string;
+    used_async_worker?: boolean;
+    last_error_code?: string;
+    last_error_message?: string;
+    updated_at?: string;
+  };
   val_nf?: string;
   contrato_numero?: string;
   ns_numero?: string;

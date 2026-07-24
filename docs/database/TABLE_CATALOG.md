@@ -1280,7 +1280,7 @@ Campos-chave:
 Observações operacionais:
 
 - Isolamento por Tenant (RLS `tenant_isolation`): `(auth.uid() = tenant_id)`. O usuário só pode ver e editar processos criados por ele mesmo.
-- Quando o robô de sincronização faz a leitura, ele cria ou atualiza os registros de processos pendentes para posterior enriquecimento pela IA.
+- Quando o robo de sincronizacao faz a leitura, ele cria apenas registros novos no fluxo comum e preserva processos ja sincronizados, mesmo quando concluidos; atualizacoes de registros existentes dependem de acao explicita do usuario.
 
 ### Storage Bucket: `suap-pdfs`
 

@@ -388,10 +388,38 @@ Implementacao no repo:
 
 Dependencias externas:
 
-- `OPENAI_API_KEY`
-- opcionalmente `OPENAI_VISION_MODEL`
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional `GEMINI_LIQUIDACAO_MODEL`, com fallback para `gemini-2.5-flash-lite` e `gemini-2.5-flash`
 
-## 6. Edge Function `consultor`
+## 6. Edge Functions `process-pdf` e `process-pdf-worker`
+
+Uso:
+
+- extracao por IA dos PDFs de processos sincronizados do SUAP, gravando metadados e resumo operacional em `processos.dados_completos`
+
+Chamador:
+
+- [suapScraperService.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/suapScraperService.ts)
+
+Implementacao no repo:
+
+- [process-pdf/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/process-pdf/index.ts)
+- [process-pdf-worker/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/process-pdf-worker/index.ts)
+- [_shared/process_pdf_shared.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/_shared/process_pdf_shared.ts)
+
+Dependencias externas:
+
+- `GEMINI_API_KEY`
+- `OPENAI_API_KEY`, usado como segundo provedor
+- opcional `GEMINI_MODEL`, com default `gemini-2.5-flash-lite`
+- opcional `OPENAI_MODEL`, com default `gpt-5-mini` e entrada PDF direta em detalhe alto pela Responses API
+- opcional `OPENROUTER_API_KEY` como terceiro provedor; ele usa o contexto explicitamente informado ou uma resposta anterior nao estruturada para reparar o JSON
+
+Observacao:
+
+- `process-pdf` e assincrona e retorna `202`; o fluxo SUAP padrao envia apenas `suap_id` para a Edge Function. O worker usa Gemini sobre o PDF como primeira opcao; se Gemini falhar, envia o mesmo PDF ao OpenAI; por fim, tenta o OpenRouter com contexto explicito ou a saida anterior nao estruturada para recuperar JSON valido.
+
+## 7. Edge Function `consultor`
 
 Uso:
 
@@ -411,7 +439,7 @@ Status:
 - as conversas do frontend ficam em `localStorage` com chave derivada do usuario autenticado, evitando compartilhar historico entre contas no mesmo navegador
 - o backlog de ingestao dos normativos que alimentam a base semantica fica em [NORMATIVOS_CONSULTOR_INGESTION.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/integrations/NORMATIVOS_CONSULTOR_INGESTION.md)
 
-## 7. Edge Function `verificar-conformidade`
+## 8. Edge Function `verificar-conformidade`
 
 Uso:
 
@@ -762,28 +790,30 @@ Credenciais/segredos:
 - `SUPABASE_SERVICE_ROLE_KEY` na Edge Function para gravacao no banco
 - opcional `EMAIL_CSV_ALLOWED_SENDERS` para restringir remetentes
 
-## 11. Sincronização Nativa SUAP (Antiga Extensão SUAP Scraper)
+## 11. Sincronizacao Nativa SUAP
 
 Uso:
 
-- Sincronização direta e nativa da caixa de processos do SUAP para a tabela `processos`
-- Download automático de PDFs e envio para o bucket `suap-pdfs`
-- Extração determinística direta no frontend aliada à extração por IA no backend
+- Sincronizacao direta e nativa da caixa de processos do SUAP para a tabela `processos`
+- Download de PDFs e envio para o bucket `suap-pdfs`, como etapa independente ou dentro do fluxo completo
+- Extracao por IA no backend via Gemini; antes da IA o frontend nao busca beneficiario, contrato, valores, dados bancarios ou outros metadados alem de ID e numero do processo
 
-Fluxo Técnico:
+Fluxo Tecnico:
 
-- O frontend realiza as chamadas de scraping e download fazendo requests ao SUAP através da Edge Function `suap-proxy` (evitando bloqueios de CORS).
-- As credenciais de acesso do SUAP (access token OAuth) são mantidas de forma segura no `localStorage` após o login do usuário.
+- O frontend realiza as chamadas de scraping e download fazendo requests ao SUAP atraves da Edge Function `suap-proxy` (evitando bloqueios de CORS).
+- A sincronizacao de inventario, o download de PDF e a extracao por IA sao etapas modulares e podem ser repetidas separadamente para processos escolhidos pelo usuario.
+- Processos ja sincronizados sao preservados no fluxo comum, inclusive quando concluidos; atualizacao de registro existente depende de acao explicita.
+- As credenciais de acesso do SUAP sao mantidas no `localStorage` apos o login/cookie informado pelo usuario.
 
 Consumidores no app:
 
 - [Suap.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Suap.tsx)
 - [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx)
 
-Observação:
+Observacao:
 
-- Não é mais necessária a instalação de extensão Chrome. A sincronização ocorre diretamente através do componente `<SuapSyncPanel>` na tela de processos.
-- O usuário deve manter a aba ativa no navegador durante a sincronização em razão das requisições assíncronas do Celery.
+- Nao e mais necessaria a instalacao de extensao Chrome. A sincronizacao ocorre diretamente atraves do componente `<SuapSyncPanel>` na tela de processos.
+- O usuario deve manter a aba ativa no navegador durante o download de PDFs em razao das requisicoes assincronas do Celery.
 
 ## 12. Edge Function `record-automation-savings-event`
 

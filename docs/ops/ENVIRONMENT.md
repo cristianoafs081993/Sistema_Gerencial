@@ -87,8 +87,33 @@ Observacoes operacionais:
 
 Necessarias no ambiente do Supabase:
 
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional: `GEMINI_LIQUIDACAO_MODEL`, com fallback para `gemini-2.5-flash-lite` e `gemini-2.5-flash`
+
+### `process-pdf` e `process-pdf-worker`
+
+Necessarias no ambiente do Supabase:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `GEMINI_API_KEY`
+
+Opcional:
+
+- `GEMINI_MODEL`
+  - default no codigo: `gemini-2.5-flash-lite`
+- `PROCESS_PDF_WORKER_SECRET`
+  - default no codigo: `SUPABASE_SERVICE_ROLE_KEY`
 - `OPENAI_API_KEY`
-- opcional: `OPENAI_VISION_MODEL`
+  - segundo provedor de extracao, acionado quando Gemini falhar
+- opcional `OPENAI_MODEL`
+  - default no codigo: `gpt-5-mini`
+- `OPENROUTER_API_KEY` e `OPENROUTER_MODEL`
+  - terceiro provedor de reparo, acionado depois do OpenAI com contexto explicito ou resposta anterior nao estruturada
+
+Observacoes operacionais:
+
+- `process-pdf` retorna `202` quando a extracao foi enfileirada; o resultado real e gravado depois pelo `process-pdf-worker` em `processos`. A ordem de provedores e Gemini, OpenAI e OpenRouter. Gemini recebe o PDF como primeira tentativa; o fallback OpenAI usa detalhe alto para evitar uma resposta vazia em processos visualmente complexos. OpenRouter e reservado para converter o contexto disponivel ou uma resposta anterior nao estruturada em JSON valido.
+- a resposta da Edge Function confirma apenas o enfileiramento. O frontend deve considerar a IA finalizada somente quando `processos.status` chegar a `success`, `incomplete_extraction` ou `extraction_failed`; enquanto houver fila ou processamento, a tela acompanha a atualizacao em segundo plano.
 
 ### `validar-pesquisa-precos`
 

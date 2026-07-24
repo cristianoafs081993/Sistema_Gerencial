@@ -1,13 +1,12 @@
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo } from 'react';
 import {
   AlertTriangle,
   Building2,
   CheckCircle2,
-  Clock3,
   Copy,
   ExternalLink,
+  Eye,
   FileDown,
   Landmark,
   RefreshCw,
@@ -33,7 +32,7 @@ import { HeaderActions, HeaderSubtitle } from '@/components/HeaderParts';
 import { SuapConclusaoDialog } from '@/components/modals/SuapConclusaoDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -58,18 +57,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { useAuth } from '@/contexts/AuthContext';
 import { suapExtensionGithubUrl } from '@/lib/suapExtension';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
-import { SuapProcesso, SuapCaixa } from '@/types';
+import { SuapProcesso } from '@/types';
 import { suapProcessosService } from '@/services/suapProcessos';
+import { suapScraperService } from '@/services/suapScraperService';
 import { SuapSyncPanel } from '@/components/suap/SuapSyncPanel';
 
-type StatusFilter = 'all' | 'active' | 'concluded' | 'pending' | 'error';
+type StatusFilter = 'active' | 'concluded';
+type ProcessAction = 'download' | 'ai' | 'full';
 
-const isPendingStatus = (status: string) =>
-  status === 'pending_extraction' || status === 'pdf_uploaded';
 
 const isErrorStatus = (status: string) =>
   status.includes('error') || status.includes('fail');
@@ -153,8 +160,6 @@ const getVisibleProcesses = (
   return processos
     .filter((processo) => {
       const isConcluded = isProcessConcluded(processo);
-      const status = processo.status.toLowerCase();
-      const { hasExtractedInfo } = getProcessCompleteness(processo);
       const matchesSearch =
         normalizedSearch === '' ||
         processo.suapId.toLowerCase().includes(normalizedSearch) ||
@@ -162,22 +167,16 @@ const getVisibleProcesses = (
         (processo.beneficiario || '').toLowerCase().includes(normalizedSearch) ||
         (processo.assunto || '').toLowerCase().includes(normalizedSearch) ||
         (processo.cpfCnpj || '').toLowerCase().includes(normalizedSearch);
-
       const matchesStatus =
-        statusFilter === 'all' ||
         (statusFilter === 'active' && !isConcluded) ||
-        (statusFilter === 'concluded' && isConcluded) ||
-        (statusFilter === 'pending' && isPendingStatus(status)) ||
-        (statusFilter === 'error' && isErrorStatus(status));
+        (statusFilter === 'concluded' && isConcluded);
 
       const matchesCaixa =
         caixaFilter === 'all' ||
         (processo.caixa && processo.caixa.toLowerCase().includes(caixaFilter.toLowerCase())) ||
         (caixaFilter === 'none' && !processo.caixa);
 
-      const visibleInCurrentFilter = statusFilter === 'pending' ? true : hasExtractedInfo;
-
-      return matchesSearch && matchesStatus && matchesCaixa && visibleInCurrentFilter;
+      return matchesSearch && matchesStatus && matchesCaixa;
     })
     .sort((left, right) => {
       const leftCompleteness = getProcessCompleteness(left);
@@ -214,7 +213,7 @@ const copyText = async (text: string, successMessage: string) => {
 };
 
 const getStatusMeta = (processo: SuapProcesso) => {
-  if (isProcessConcluded(processo)) {
+  if (isProcessConcluded(processo) || processo.status.toLowerCase() === 'concluido') {
     return {
       label: 'Concluído',
       badgeClassName: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -224,27 +223,43 @@ const getStatusMeta = (processo: SuapProcesso) => {
 
   const normalized = processo.status.toLowerCase();
 
-  if (normalized === 'concluido') {
+  if (normalized === 'pending_extraction') {
     return {
-      label: 'Concluído',
-      badgeClassName: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      accentClassName: 'before:bg-emerald-500',
+      label: 'Inventário',
+      badgeClassName: 'bg-slate-50 text-slate-700 border-slate-200',
+      accentClassName: 'before:bg-slate-400',
     };
   }
 
-  if (normalized === 'success') {
+  if (normalized === 'pdf_uploaded') {
+    return {
+      label: 'PDF pronto',
+      badgeClassName: 'bg-blue-50 text-blue-700 border-blue-200',
+      accentClassName: 'before:bg-blue-500',
+    };
+  }
+
+  if (normalized === 'queued_extraction') {
+    return {
+      label: 'IA em fila',
+      badgeClassName: 'bg-amber-50 text-amber-700 border-amber-200',
+      accentClassName: 'before:bg-amber-500',
+    };
+  }
+
+  if (normalized === 'processing_extraction' || normalized === 'processing_chunks') {
+    return {
+      label: 'IA processando',
+      badgeClassName: 'bg-amber-50 text-amber-700 border-amber-200',
+      accentClassName: 'before:bg-amber-500',
+    };
+  }
+
+  if (normalized === 'success' || normalized === 'incomplete_extraction') {
     return {
       label: 'Extraído',
       badgeClassName: 'bg-sky-50 text-sky-700 border-sky-200',
       accentClassName: 'before:bg-sky-500',
-    };
-  }
-
-  if (isPendingStatus(normalized)) {
-    return {
-      label: 'Pendente',
-      badgeClassName: 'bg-amber-50 text-amber-700 border-amber-200',
-      accentClassName: 'before:bg-amber-500',
     };
   }
 
@@ -261,6 +276,17 @@ const getStatusMeta = (processo: SuapProcesso) => {
     badgeClassName: 'bg-slate-100 text-slate-700 border-slate-200',
     accentClassName: 'before:bg-slate-400',
   };
+};
+
+const getExtractionIssue = (processo: SuapProcesso) => {
+  const job = processo.dadosCompletos?.extraction_job;
+  if (!job?.last_error_code) return null;
+
+  if (job.last_error_code === 'provider_rate_limit') {
+    return 'Gemini indisponivel por limite de cota';
+  }
+
+  return job.last_error_message || 'A extracao por IA precisa ser refeita.';
 };
 
 const getAnaliseMeta = (status?: 'ok' | 'warning' | 'error') => {
@@ -394,15 +420,269 @@ function InfoPanel({
   );
 }
 
+function ProcessDetailsContent({ processo }: { processo: SuapProcesso }) {
+  const statusMeta = getStatusMeta(processo);
+  const workflow = getProcessWorkflow(processo);
+  const analiseLiquidacao = workflow?.analiseLiquidacao;
+  const analiseMeta = analiseLiquidacao ? getAnaliseMeta(analiseLiquidacao.statusGeral) : null;
+  const AnaliseIcon = analiseMeta?.icon;
+  const notasFiscais = processo.dadosCompletos?.notas_fiscais || [];
+  const notaPrincipal = notasFiscais[0];
+  const dadosBancarios = processo.dadosCompletos?.dados_bancarios;
+  const retencoes = processo.dadosCompletos?.retencoes_tributarias;
+  const retencoesVisiveis = [
+    ['ISS', retencoes?.iss],
+    ['INSS', retencoes?.inss],
+    ['IR', retencoes?.ir],
+    ['CSLL', retencoes?.csll],
+    ['COFINS', retencoes?.cofins],
+    ['PIS/PASEP', retencoes?.pis_pasep],
+  ].filter(([, value]) => isCopyableValue(value));
+
+  const contrato = processo.contrato || processo.dadosCompletos?.contrato_numero || '-';
+  const valorLiquido = processo.dadosCompletos?.val_nf || '-';
+  const nsNumero = getNsNumero(processo);
+  const listaEmpenhos = processo.dadosCompletos?.empenhos || [];
+  const hasBeneficiarioPanel = isCopyableValue(processo.beneficiario) || isCopyableValue(processo.cpfCnpj);
+  const hasValorNsPanel = isCopyableValue(valorLiquido) || isCopyableValue(nsNumero);
+  const hasAssuntoPanel = isCopyableValue(processo.assunto);
+  const hasContratoNfPanel =
+    isCopyableValue(contrato) ||
+    isCopyableValue(notaPrincipal?.numero) ||
+    isCopyableValue(notaPrincipal?.data_emissao);
+  const hasDadosBancariosPanel =
+    isCopyableValue(dadosBancarios?.banco) ||
+    isCopyableValue(dadosBancarios?.agencia) ||
+    isCopyableValue(dadosBancarios?.conta);
+  const hasRetencoesEmpenhosPanel =
+    Boolean(retencoes?.optante_simples_nacional) || retencoesVisiveis.length > 0 || listaEmpenhos.length > 0;
+  const hasExtractedDetails =
+    hasBeneficiarioPanel || hasValorNsPanel || hasAssuntoPanel || hasContratoNfPanel || hasDadosBancariosPanel || hasRetencoesEmpenhosPanel;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 rounded-xl border border-border-default/70 bg-surface-subtle/40 p-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1">
+          <p className="font-ui text-sm font-semibold text-text-primary">
+            {processo.numProcesso || processo.suapId}
+          </p>
+          <p className="font-mono text-xs text-text-secondary">SUAP ID: {processo.suapId}</p>
+          {processo.caixa ? (
+            <Badge variant="outline" className={cn('mt-1 border text-[11px] font-semibold', getCaixaBadgeColor(processo.caixa))}>
+              {processo.caixa}
+            </Badge>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className={statusMeta.badgeClassName}>{statusMeta.label}</Badge>
+          <span className="text-xs text-text-secondary">Atualizado: {formatUpdatedAt(processo.updatedAt)}</span>
+        </div>
+      </div>
+
+      {!hasExtractedDetails && !workflow?.concluido ? (
+        <div className="rounded-xl border border-dashed border-border-default/80 bg-white p-6 text-sm text-text-secondary">
+          Nenhum dado extraído pela IA foi salvo ainda para este processo.
+        </div>
+      ) : null}
+
+      {hasBeneficiarioPanel || hasValorNsPanel ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {hasBeneficiarioPanel ? (
+            <InfoPanel icon={<Building2 className="h-3.5 w-3.5" />} label="Beneficiário" tone="cyan">
+              <div className="flex items-start justify-between gap-3">
+                <p className="font-ui text-sm font-semibold leading-6 text-text-primary">
+                  {processo.beneficiario || processo.cpfCnpj}
+                </p>
+                <CopyAction value={processo.beneficiario} message="Beneficiário copiado." />
+              </div>
+              {isCopyableValue(processo.cpfCnpj) ? (
+                <div className="mt-3 flex items-center justify-between gap-2 border-t border-border-default/70 pt-3 font-ui text-xs text-text-secondary">
+                  <span className="font-mono">{processo.cpfCnpj}</span>
+                  <CopyAction value={processo.cpfCnpj} message="Documento copiado." />
+                </div>
+              ) : null}
+            </InfoPanel>
+          ) : null}
+
+          {hasValorNsPanel ? (
+            <InfoPanel icon={<Wallet className="h-3.5 w-3.5" />} label="Valor e NS" tone="blue">
+              {isCopyableValue(valorLiquido) ? (
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-ui text-lg font-black tracking-tight text-sky-700">{valorLiquido}</p>
+                  <CopyAction value={valorLiquido} message="Valor copiado." />
+                </div>
+              ) : null}
+              {isCopyableValue(nsNumero) ? (
+                <div className="mt-3 flex items-center justify-between gap-3 border-t border-sky-100 pt-3 font-ui text-sm text-text-primary">
+                  <span>NS final: <span className="font-mono font-semibold">{nsNumero}</span></span>
+                  <CopyAction value={nsNumero} message="NS copiada." />
+                </div>
+              ) : null}
+            </InfoPanel>
+          ) : null}
+        </div>
+      ) : null}
+
+      {hasAssuntoPanel ? (
+        <InfoPanel icon={<ReceiptText className="h-3.5 w-3.5" />} label="Assunto" tone="amber">
+          <div className="flex items-start justify-between gap-3">
+            <p className="font-ui text-sm leading-6 text-text-primary">{processo.assunto}</p>
+            <CopyAction value={processo.assunto} message="Assunto copiado." />
+          </div>
+        </InfoPanel>
+      ) : null}
+
+      {hasContratoNfPanel || hasDadosBancariosPanel ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {hasContratoNfPanel ? (
+            <InfoPanel icon={<Landmark className="h-3.5 w-3.5" />} label="Contrato e NF" tone="violet">
+              {isCopyableValue(contrato) ? (
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-ui text-xs uppercase tracking-[0.12em] text-text-muted">Contrato</p>
+                    <p className="mt-1 font-ui text-sm font-semibold text-text-primary">{contrato}</p>
+                  </div>
+                  <CopyAction value={contrato} message="Contrato copiado." />
+                </div>
+              ) : null}
+              {isCopyableValue(notaPrincipal?.numero) || isCopyableValue(notaPrincipal?.data_emissao) ? (
+                <div className="mt-3 flex items-center justify-between gap-3 border-t border-violet-100 pt-3">
+                  <div className="font-ui text-sm text-text-secondary">
+                    <p className="text-xs uppercase tracking-[0.12em] text-text-muted">Nota Fiscal</p>
+                    {isCopyableValue(notaPrincipal?.numero) ? <p className="mt-1 font-semibold text-violet-700">{notaPrincipal?.numero}</p> : null}
+                    {isCopyableValue(notaPrincipal?.data_emissao) ? <p className="mt-1 text-xs text-text-secondary">{notaPrincipal?.data_emissao}</p> : null}
+                  </div>
+                  <div className="flex gap-2">
+                    <CopyAction value={notaPrincipal?.numero} message="Número da nota fiscal copiado." />
+                    <CopyAction value={notaPrincipal?.data_emissao} message="Data de emissão copiada." />
+                  </div>
+                </div>
+              ) : null}
+            </InfoPanel>
+          ) : null}
+
+          {hasDadosBancariosPanel ? (
+            <InfoPanel icon={<Building2 className="h-3.5 w-3.5" />} label="Dados Bancários" tone="emerald">
+              {isCopyableValue(dadosBancarios?.banco) ? (
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-ui text-xs uppercase tracking-[0.12em] text-text-muted">Banco</p>
+                    <p className="mt-1 font-ui text-sm font-semibold text-text-primary">{dadosBancarios?.banco}</p>
+                  </div>
+                  <CopyAction value={dadosBancarios?.banco} message="Banco copiado." />
+                </div>
+              ) : null}
+              {isCopyableValue(dadosBancarios?.agencia) || isCopyableValue(dadosBancarios?.conta) ? (
+                <div className="mt-3 grid gap-2 border-t border-emerald-100 pt-3 sm:grid-cols-2">
+                  {isCopyableValue(dadosBancarios?.agencia) ? (
+                    <div className="flex items-center justify-between gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+                      <div>
+                        <p className="font-ui text-[11px] uppercase tracking-[0.12em] text-text-muted">Agência</p>
+                        <p className="mt-1 font-mono text-sm font-semibold text-text-primary">{dadosBancarios?.agencia}</p>
+                      </div>
+                      <CopyAction value={dadosBancarios?.agencia} message="Agência copiada." className="h-7 w-7" />
+                    </div>
+                  ) : null}
+                  {isCopyableValue(dadosBancarios?.conta) ? (
+                    <div className="flex items-center justify-between gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+                      <div>
+                        <p className="font-ui text-[11px] uppercase tracking-[0.12em] text-text-muted">Conta</p>
+                        <p className="mt-1 font-mono text-sm font-semibold text-text-primary">{dadosBancarios?.conta}</p>
+                      </div>
+                      <CopyAction value={dadosBancarios?.conta} message="Conta copiada." className="h-7 w-7" />
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </InfoPanel>
+          ) : null}
+        </div>
+      ) : null}
+
+      {hasRetencoesEmpenhosPanel ? (
+        <InfoPanel icon={<ShieldCheck className="h-3.5 w-3.5" />} label="Retenções e Empenhos" tone="slate">
+          {retencoes?.optante_simples_nacional ? (
+            <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
+              Optante pelo Simples Nacional
+            </Badge>
+          ) : null}
+          {retencoesVisiveis.length > 0 ? (
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {retencoesVisiveis.map(([label, value]) => (
+                <div key={label} className="flex items-center justify-between rounded-xl border border-dashed border-border-default/90 bg-surface-subtle/40 px-3 py-2 font-ui text-sm">
+                  <span className="text-text-secondary">{label}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-text-primary">{value}</span>
+                    <CopyAction value={value} message={`${label} copiado.`} className="h-7 w-7" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {listaEmpenhos.length ? (
+            <div className="mt-4 border-t border-border-default/70 pt-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-ui text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">Empenhos</p>
+                <CopyAction value={listaEmpenhos.join(', ')} message="Lista de empenhos copiada." />
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {listaEmpenhos.map((empenho) => (
+                  <div key={empenho} className="inline-flex items-center gap-2 rounded-xl border border-border-default bg-surface-subtle/40 px-3 py-1.5 text-xs shadow-sm">
+                    <span className="font-mono font-semibold text-text-primary">{empenho}</span>
+                    <CopyAction value={empenho} message="Empenho copiado." className="h-6 w-6 border-0 bg-transparent shadow-none" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </InfoPanel>
+      ) : null}
+
+      {workflow?.concluido ? (
+        <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/50 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Conclusão do processo
+              </div>
+              <p className="mt-2 text-sm font-semibold text-slate-900">
+                NS registrada: <span className="font-mono">{workflow.nsNumero || nsNumero}</span>
+              </p>
+              <p className="mt-1 text-xs text-slate-600">
+                {workflow.concluidoEm ? `Concluído em ${formatUpdatedAt(new Date(workflow.concluidoEm))}` : 'Processo concluído sem data registrada.'}
+                {workflow.concluidoPor ? ` por ${workflow.concluidoPor}` : ''}
+              </p>
+            </div>
+            {analiseMeta && AnaliseIcon ? (
+              <Badge variant="outline" className={analiseMeta.badgeClassName}>
+                <AnaliseIcon className="mr-1 h-3.5 w-3.5" />
+                {analiseMeta.label}
+              </Badge>
+            ) : null}
+          </div>
+          {analiseLiquidacao ? (
+            <div className="mt-4 border-t border-emerald-200/70 pt-4">
+              <p className="text-sm leading-6 text-slate-700">{analiseLiquidacao.resumo}</p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 export default function Suap() {
   const queryClient = useQueryClient();
   const { session } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [caixaFilter, setCaixaFilter] = useState<string>('all');
-  const [openingPdfId, setOpeningPdfId] = useState<string | null>(null);
+  const [processActionId, setProcessActionId] = useState<string | null>(null);
+  const [bulkAction, setBulkAction] = useState<ProcessAction | null>(null);
+  const [selectedProcessIds, setSelectedProcessIds] = useState<Set<string>>(new Set());
   const [reopeningProcessId, setReopeningProcessId] = useState<string | null>(null);
   const [selectedProcesso, setSelectedProcesso] = useState<SuapProcesso | null>(null);
+  const [detailsProcesso, setDetailsProcesso] = useState<SuapProcesso | null>(null);
   const [isConclusaoDialogOpen, setIsConclusaoDialogOpen] = useState(false);
 
   // local login states
@@ -418,6 +698,7 @@ export default function Suap() {
 
   useEffect(() => {
     setSelectedProcesso(null);
+    setDetailsProcesso(null);
     setIsConclusaoDialogOpen(false);
   }, [session?.user.id]);
 
@@ -432,7 +713,13 @@ export default function Suap() {
     queryKey: ['suap-processos'],
     queryFn: suapProcessosService.getAll,
     enabled: !!session,
-    refetchInterval: 30000,
+    refetchInterval: (query) => {
+      const items = (query.state.data || []) as SuapProcesso[];
+      const hasPendingAi = items.some((processo) =>
+        ['queued_extraction', 'processing_extraction', 'processing_chunks', 'consolidating_extraction'].includes(processo.status),
+      );
+      return hasPendingAi ? 5000 : 30000;
+    },
   });
 
   const {
@@ -507,12 +794,51 @@ export default function Suap() {
     () => ({
       active: getVisibleProcesses(processos, '', 'active', caixaFilter).length,
       concluded: getVisibleProcesses(processos, '', 'concluded', caixaFilter).length,
-      pending: getVisibleProcesses(processos, '', 'pending', caixaFilter).length,
-      error: getVisibleProcesses(processos, '', 'error', caixaFilter).length,
-      all: getVisibleProcesses(processos, '', 'all', caixaFilter).length,
     }),
     [processos, caixaFilter],
   );
+  const selectedProcesses = useMemo(
+    () => visibleProcesses.filter((processo) => selectedProcessIds.has(processo.id)),
+    [visibleProcesses, selectedProcessIds],
+  );
+  const allVisibleSelected = visibleProcesses.length > 0 && visibleProcesses.every((processo) => selectedProcessIds.has(processo.id));
+
+  const getSuapSessionId = () => {
+    const savedSession = localStorage.getItem('suap_session_id');
+    if (!savedSession || savedSession === 'undefined' || savedSession === 'null') {
+      toast.error('Conecte-se ao SUAP no importador antes de baixar PDFs.');
+      return null;
+    }
+    return savedSession;
+  };
+
+  const toScrapedProcess = (processo: SuapProcesso) => ({
+    suapId: processo.suapId,
+    numProcesso: processo.numProcesso,
+    url: processo.url,
+    caixa: processo.caixa,
+  });
+
+  const toggleProcessSelection = (processoId: string) => {
+    setSelectedProcessIds((current) => {
+      const next = new Set(current);
+      if (next.has(processoId)) {
+        next.delete(processoId);
+      } else {
+        next.add(processoId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectVisibleProcesses = () => {
+    setSelectedProcessIds((current) => {
+      if (allVisibleSelected) {
+        return new Set([...current].filter((id) => !visibleProcesses.some((processo) => processo.id === id)));
+      }
+      return new Set([...current, ...visibleProcesses.map((processo) => processo.id)]);
+    });
+  };
 
   const replaceCachedProcess = (processoAtualizado: SuapProcesso) => {
     queryClient.setQueryData<SuapProcesso[]>(['suap-processos'], (current = []) =>
@@ -552,29 +878,126 @@ export default function Suap() {
     }
   };
 
-  const handleOpenPdf = async (processo: SuapProcesso) => {
-    if (!processo.pdfUrl) {
-      toast.info('Este processo ainda não possui PDF sincronizado.');
-      return;
-    }
+  const handleDownloadPdfStage = async (processo: SuapProcesso, force = false) => {
+    if (!session?.user?.id) return;
+    const suapSessionId = getSuapSessionId();
+    if (!suapSessionId) return;
 
-    setOpeningPdfId(processo.id);
+    const actionId = `${processo.id}:download`;
+    setProcessActionId(actionId);
+    const loadingToast = toast.loading(force ? 'Atualizando PDF do processo...' : 'Baixando PDF do processo...');
+
     try {
-      const signedUrl = await suapProcessosService.getPdfSignedUrl(processo.pdfUrl);
-      if (!signedUrl) {
-        toast.error('Não foi possível gerar o link do PDF.');
-        return;
-      }
-
-      window.open(signedUrl, '_blank', 'noopener,noreferrer');
-    } catch (openError) {
-      console.error(openError);
-      toast.error('Falha ao abrir o PDF sincronizado.');
+      await suapScraperService.downloadPdfForProcess(
+        toScrapedProcess(processo),
+        suapSessionId,
+        session.user.id,
+        (message) => console.info(message),
+        { force },
+      );
+      toast.success('PDF sincronizado.', { id: loadingToast });
+      await refetch();
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : 'Falha ao baixar PDF.', { id: loadingToast });
     } finally {
-      setOpeningPdfId(null);
+      setProcessActionId(null);
     }
   };
 
+  const handleAiExtractionStage = async (processo: SuapProcesso, force = false) => {
+    if (!session?.user?.id) return;
+    if (!processo.pdfUrl) {
+      toast.info('Baixe o PDF antes de iniciar a extracao por IA.');
+      return;
+    }
+
+    const actionId = `${processo.id}:ai`;
+    setProcessActionId(actionId);
+    const loadingToast = toast.loading(force ? 'Refazendo extracao por IA...' : 'Executando extracao por IA...');
+
+    try {
+      const result = await suapScraperService.runAiExtractionForProcess(
+        { suapId: processo.suapId },
+        session.user.id,
+        (message) => console.info(message),
+        { force },
+      );
+      toast.success(
+        result.queued ? 'Extracao por IA enfileirada. A tabela sera atualizada automaticamente.' : 'Extracao por IA ja estava concluida.',
+        { id: loadingToast },
+      );
+      await refetch();
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : 'Falha na extracao por IA.', { id: loadingToast });
+    } finally {
+      setProcessActionId(null);
+    }
+  };
+
+  const runBulkAction = async (action: ProcessAction) => {
+    if (!session?.user?.id || selectedProcesses.length === 0) return;
+
+    const suapSessionId = action === 'ai' ? null : getSuapSessionId();
+    if (action !== 'ai' && !suapSessionId) return;
+
+    setBulkAction(action);
+    const labels = {
+      download: 'Baixando PDFs selecionados...',
+      ai: 'Extraindo por IA os processos selecionados...',
+      full: 'Executando fluxo completo nos processos selecionados...',
+    };
+    const loadingToast = toast.loading(labels[action]);
+
+    let completed = 0;
+    let skipped = 0;
+    let errors = 0;
+
+    for (const processo of selectedProcesses) {
+      try {
+        if (action === 'download') {
+          await suapScraperService.downloadPdfForProcess(
+            toScrapedProcess(processo),
+            suapSessionId!,
+            session.user.id,
+            (message) => console.info(message),
+          );
+        } else if (action === 'ai') {
+          if (!processo.pdfUrl) {
+            skipped++;
+            continue;
+          }
+          await suapScraperService.runAiExtractionForProcess(
+            { suapId: processo.suapId },
+            session.user.id,
+            (message) => console.info(message),
+          );
+        } else {
+          await suapScraperService.processAndSyncSingle(
+            toScrapedProcess(processo),
+            suapSessionId!,
+            session.user.id,
+            (message) => console.info(message),
+          );
+        }
+        completed++;
+      } catch (error) {
+        console.error(error);
+        errors++;
+      }
+    }
+
+    await refetch();
+    setSelectedProcessIds(new Set());
+    setBulkAction(null);
+
+    if (errors > 0) {
+      toast.warning(`${completed} concluido(s), ${skipped} pulado(s), ${errors} erro(s).`, { id: loadingToast });
+    } else {
+      toast.success(`${completed} concluido(s), ${skipped} pulado(s).`, { id: loadingToast });
+    }
+  };
   return (
     <div className="space-y-6 pb-10">
       <HeaderSubtitle>
@@ -726,6 +1149,24 @@ export default function Suap() {
         userEmail={session?.user?.email}
         onSuccess={handleConclusaoSuccess}
       />
+
+      <Dialog
+        open={Boolean(detailsProcesso)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDetailsProcesso(null);
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90vh] w-[95vw] overflow-y-auto bg-surface-card sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="font-ui text-lg text-text-primary">
+              Detalhes do processo SUAP
+            </DialogTitle>
+          </DialogHeader>
+          {detailsProcesso ? <ProcessDetailsContent processo={detailsProcesso} /> : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isCaixasDialogOpen} onOpenChange={setIsCaixasDialogOpen}>
         <DialogContent className="w-[95vw] sm:max-w-lg bg-surface-card border-border-default overflow-hidden">
@@ -879,13 +1320,10 @@ export default function Suap() {
                 onValueChange={(value) => setStatusFilter(value as StatusFilter)}
                 className="w-full lg:w-auto"
               >
-                <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-lg border border-border-default/60 bg-surface-card p-1 shadow-sm lg:inline-grid lg:w-auto lg:grid-cols-5">
+                <TabsList className="grid h-auto w-full grid-cols-2 gap-2 rounded-lg border border-border-default/60 bg-surface-card p-1 shadow-sm lg:inline-grid lg:w-auto lg:grid-cols-2">
                   {([
                     ['active', 'Em andamento'],
-                    ['concluded', 'Concluídos'],
-                    ['pending', 'Pendentes'],
-                    ['error', 'Erros'],
-                    ['all', 'Todos'],
+                    ['concluded', 'Concluidos'],
                   ] as Array<[StatusFilter, string]>).map(([value, label]) => (
                     <TabsTrigger
                       key={value}
@@ -903,6 +1341,66 @@ export default function Suap() {
             </div>
 
           </div>
+
+      {session && visibleProcesses.length > 0 ? (
+        <div className="flex flex-col gap-3 rounded-xl border border-border-default/70 bg-surface-card p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <label className="flex items-center gap-2 font-ui text-xs font-semibold text-text-secondary">
+            <input
+              type="checkbox"
+              checked={allVisibleSelected}
+              onChange={toggleSelectVisibleProcesses}
+              className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+            />
+            {selectedProcesses.length > 0
+              ? `${selectedProcesses.length} processo(s) selecionado(s)`
+              : 'Selecionar processos visíveis'}
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={selectedProcesses.length === 0 || bulkAction !== null}
+              onClick={() => void runBulkAction('download')}
+              className="h-9 gap-2 bg-white text-xs"
+            >
+              <FileDown className="h-4 w-4" />
+              {bulkAction === 'download' ? 'Baixando...' : 'Baixar PDF'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={selectedProcesses.length === 0 || bulkAction !== null}
+              onClick={() => void runBulkAction('ai')}
+              className="h-9 gap-2 bg-white text-xs"
+            >
+              <Sparkles className="h-4 w-4" />
+              {bulkAction === 'ai' ? 'Extraindo...' : 'Extrair IA'}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={selectedProcesses.length === 0 || bulkAction !== null}
+              onClick={() => void runBulkAction('full')}
+              className="h-9 gap-2 bg-emerald-600 text-xs font-semibold text-white hover:bg-emerald-700"
+            >
+              <RefreshCw className={cn('h-4 w-4', bulkAction === 'full' && 'animate-spin')} />
+              {bulkAction === 'full' ? 'Executando...' : 'Fluxo completo'}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={selectedProcesses.length === 0 || bulkAction !== null}
+              onClick={() => setSelectedProcessIds(new Set())}
+              className="h-9 text-xs text-slate-600"
+            >
+              Limpar seleção
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {isError ? (
         <Card className="border-rose-200 bg-rose-50/60">
@@ -923,391 +1421,232 @@ export default function Suap() {
         </Card>
       ) : null}
 
-      <div className="grid gap-5 xl:grid-cols-2 2xl:grid-cols-3">
-        {isLoading
-          ? Array.from({ length: 6 }).map((_, index) => (
-              <Card key={index} className="overflow-hidden">
-                <CardHeader className="space-y-3">
-                  <Skeleton className="h-5 w-40" />
-                  <Skeleton className="h-4 w-56" />
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Skeleton className="h-16 w-full" />
-                  <Skeleton className="h-16 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                </CardContent>
-              </Card>
-            ))
-          : visibleProcesses.map((processo) => {
-              const statusMeta = getStatusMeta(processo);
-              const workflow = getProcessWorkflow(processo);
-              const analiseLiquidacao = workflow?.analiseLiquidacao;
-              const analiseMeta = analiseLiquidacao ? getAnaliseMeta(analiseLiquidacao.statusGeral) : null;
-              const AnaliseIcon = analiseMeta?.icon;
-              const notasFiscais = processo.dadosCompletos?.notas_fiscais || [];
-              const notaPrincipal = notasFiscais[0];
-              const dadosBancarios = processo.dadosCompletos?.dados_bancarios;
-              const retencoes = processo.dadosCompletos?.retencoes_tributarias;
-              const retencoesVisiveis = [
-                ['ISS', retencoes?.iss],
-                ['INSS', retencoes?.inss],
-                ['IR', retencoes?.ir],
-                ['CSLL', retencoes?.csll],
-                ['COFINS', retencoes?.cofins],
-                ['PIS/PASEP', retencoes?.pis_pasep],
-              ].filter(([, value]) => isCopyableValue(value));
+      <Card className="overflow-hidden border-border-default/70 bg-surface-card shadow-soft">
+        <CardContent className="p-0">
+          <Table className="min-w-[1180px]">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12 px-4">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={toggleSelectVisibleProcesses}
+                    aria-label="Selecionar processos filtrados"
+                    className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                </TableHead>
+                <TableHead>Processo</TableHead>
+                <TableHead>Caixa</TableHead>
+                <TableHead>Informacoes</TableHead>
+                <TableHead>Andamento</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                Array.from({ length: 6 }).map((_, index) => (
+                  <TableRow key={index}>
+                    <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-44" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-12 w-72" /></TableCell>
+                    <TableCell><Skeleton className="h-12 w-36" /></TableCell>
+                    <TableCell><Skeleton className="ml-auto h-8 w-44" /></TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                visibleProcesses.map((processo) => {
+                  const statusMeta = getStatusMeta(processo);
+                  const extractionIssue = getExtractionIssue(processo);
+                  const isSelected = selectedProcessIds.has(processo.id);
+                  const isDownloading = processActionId === `${processo.id}:download`;
+                  const isExtractingAi = processActionId === `${processo.id}:ai`;
+                  const isConcluded = isProcessConcluded(processo);
+                  const processLabel = processo.numProcesso || processo.suapId || 'Processo sem SUAP ID';
+                  const valorLiquido = processo.dadosCompletos?.val_nf;
+                  const nsNumero = getNsNumero(processo);
+                  const contrato = processo.contrato || processo.dadosCompletos?.contrato_numero;
+                  const notaPrincipal = processo.dadosCompletos?.notas_fiscais?.[0];
+                  const dadosBancarios = processo.dadosCompletos?.dados_bancarios;
+                  const empenhos = processo.dadosCompletos?.empenhos || [];
+                  const retencoes = processo.dadosCompletos?.retencoes_tributarias;
+                  const hasRetencoes = Boolean(retencoes?.optante_simples_nacional) ||
+                    ['iss', 'inss', 'ir', 'csll', 'cofins', 'pis_pasep'].some((field) =>
+                      isCopyableValue(retencoes?.[field as keyof typeof retencoes] as string | undefined),
+                    );
+                  const rowDetails = [
+                    processo.beneficiario,
+                    processo.cpfCnpj,
+                    processo.assunto,
+                    isCopyableValue(valorLiquido) ? `Valor: ${valorLiquido}` : null,
+                    isCopyableValue(nsNumero) ? `NS: ${nsNumero}` : null,
+                    isCopyableValue(contrato) ? `Contrato: ${contrato}` : null,
+                    isCopyableValue(notaPrincipal?.numero) ? `NF: ${notaPrincipal?.numero}` : null,
+                    isCopyableValue(dadosBancarios?.banco) ? `Banco: ${dadosBancarios?.banco}` : null,
+                    empenhos.length > 0 ? `Empenhos: ${empenhos.join(', ')}` : null,
+                    hasRetencoes ? 'Retencoes registradas' : null,
+                  ].filter((item): item is string => Boolean(item));
 
-              const contrato = processo.contrato || processo.dadosCompletos?.contrato_numero || '-';
-              const valorLiquido = processo.dadosCompletos?.val_nf || '-';
-              const nsNumero = getNsNumero(processo);
-              const listaEmpenhos = processo.dadosCompletos?.empenhos || [];
-
-              return (
-                <Card
-                  key={processo.id}
-                  className={cn(
-                    'group relative overflow-hidden border-border-default/70 bg-surface-card shadow-soft transition-all duration-200 hover:-translate-y-[1px] hover:shadow-card before:absolute before:bottom-0 before:left-0 before:top-0 before:w-1',
-                    statusMeta.accentClassName,
-                  )}
-                >
-                  <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-primary/8 blur-3xl transition-opacity duration-200 group-hover:opacity-100" />
-                  <div className="pointer-events-none absolute -bottom-10 left-10 h-24 w-24 rounded-full bg-surface-subtle blur-3xl" />
-                  <CardHeader className="gap-4 pb-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-1">
-                        <div className="flex items-start gap-2">
-                          <CardTitle className="font-ui text-lg tracking-tight text-text-primary">
-                            {processo.suapId || processo.numProcesso || 'Processo sem SUAP ID'}
-                          </CardTitle>
-                          <CopyAction
-                            value={processo.suapId}
-                            message="SUAP ID copiado."
-                            className="mt-0.5 h-7 w-7 shrink-0 rounded-lg"
-                          />
-                        </div>
-                        {processo.caixa && (
-                          <div className="pt-1 flex">
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                'text-[11px] font-semibold px-2.5 py-0.5 rounded-full border shadow-xs transition-colors',
-                                getCaixaBadgeColor(processo.caixa)
-                              )}
-                            >
-                              {processo.caixa}
-                            </Badge>
+                  return (
+                    <TableRow key={processo.id} data-state={isSelected ? 'selected' : undefined}>
+                      <TableCell className="px-4">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleProcessSelection(processo.id)}
+                          aria-label={`Selecionar processo ${processLabel}`}
+                          className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-ui text-sm font-semibold text-text-primary">{processLabel}</span>
+                            <CopyAction
+                              value={processo.numProcesso || processo.suapId}
+                              message="Processo copiado."
+                              className="h-7 w-7 rounded-lg shadow-none"
+                            />
                           </div>
-                        )}
-                      </div>
-
-                      {isProcessConcluded(processo) ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-9 gap-2 border-border-default bg-surface-card text-text-primary"
-                          disabled={reopeningProcessId === processo.id}
-                          onClick={() => void handleReopenProcess(processo)}
-                        >
-                          <RefreshCw className={cn('h-4 w-4', reopeningProcessId === processo.id && 'animate-spin')} />
-                          {reopeningProcessId === processo.id ? 'Reabrindo...' : 'Reabrir'}
-                        </Button>
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-9 gap-2 border-border-default bg-surface-card text-text-primary"
-                          onClick={() => handleOpenConclusaoDialog(processo)}
-                        >
-                          <CheckCircle2 className="h-4 w-4" />
-                          Concluir
-                        </Button>
-                      )}
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-11 gap-2 border-border-default bg-surface-card text-text-primary"
-                        disabled={!processo.pdfUrl || openingPdfId === processo.id}
-                        onClick={() => void handleOpenPdf(processo)}
-                      >
-                        <FileDown className="h-4 w-4" />
-                        {openingPdfId === processo.id ? 'Abrindo...' : 'PDF'}
-                      </Button>
-
-                      <div className="flex h-11 items-center gap-2 rounded-xl border border-border-default bg-surface-subtle/40 px-3 font-ui text-xs text-text-secondary shadow-xs">
-                        <span className="font-semibold uppercase tracking-[0.12em] text-text-muted">Processo</span>
-                        <span className="font-mono font-semibold text-text-primary">{processo.numProcesso || '-'}</span>
-                        <div className="ml-auto flex items-center gap-1">
-                          <button
-                            type="button"
-                            title="Abrir processo no SUAP"
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-border-default/70 bg-surface-card text-text-secondary transition hover:border-border-default hover:text-text-primary"
-                            onClick={() => window.open(processo.url, '_blank', 'noopener,noreferrer')}
+                          {processo.numProcesso ? <p className="font-mono text-[11px] text-text-muted">SUAP ID: {processo.suapId}</p> : null}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {processo.caixa ? (
+                          <Badge
+                            variant="outline"
+                            className={cn('max-w-[220px] truncate border px-2.5 py-0.5 text-[11px] font-semibold', getCaixaBadgeColor(processo.caixa))}
+                            title={processo.caixa}
                           >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </button>
-                          <CopyAction
-                            value={processo.numProcesso}
-                            message="Número do processo copiado."
-                            className="h-7 w-7 border-border-default/70 bg-surface-card shadow-none"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-
-                  <CardContent className="space-y-4">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <InfoPanel icon={<Building2 className="h-3.5 w-3.5" />} label="Beneficiário" tone="cyan">
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="font-ui text-sm font-semibold leading-6 text-text-primary">
-                              {processo.beneficiario || 'Não extraído'}
-                          </p>
-                            <CopyAction value={processo.beneficiario} message="Beneficiário copiado." />
-                        </div>
-                        <div className="mt-3 flex items-center justify-between gap-2 border-t border-border-default/70 pt-3 font-ui text-xs text-text-secondary">
-                          <span className="font-mono">{processo.cpfCnpj || 'Sem documento'}</span>
-                          <CopyAction value={processo.cpfCnpj} message="Documento copiado." />
-                        </div>
-                      </InfoPanel>
-
-                      <InfoPanel icon={<Wallet className="h-3.5 w-3.5" />} label="Valor e NS" tone="blue">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="font-ui text-lg font-black tracking-tight text-sky-700">{valorLiquido}</p>
-                          </div>
-                          <CopyAction value={valorLiquido} message="Valor copiado." />
-                        </div>
-                        <div className="mt-3 flex items-center justify-between gap-3 border-t border-sky-100 pt-3 font-ui text-sm text-text-primary">
-                          <span>NS final: <span className="font-mono font-semibold">{nsNumero}</span></span>
-                          <CopyAction value={nsNumero} message="NS copiada." />
-                        </div>
-                      </InfoPanel>
-                    </div>
-
-                    <InfoPanel icon={<ReceiptText className="h-3.5 w-3.5" />} label="Assunto" tone="amber">
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="font-ui text-sm leading-6 text-text-primary">
-                          {processo.assunto || 'Sem assunto extraído'}
-                        </p>
-                        <CopyAction value={processo.assunto} message="Assunto copiado." />
-                      </div>
-                    </InfoPanel>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <InfoPanel icon={<Landmark className="h-3.5 w-3.5" />} label="Contrato e NF" tone="violet">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="font-ui text-xs uppercase tracking-[0.12em] text-text-muted">Contrato</p>
-                            <p className="mt-1 font-ui text-sm font-semibold text-text-primary">{contrato}</p>
-                          </div>
-                          <CopyAction value={contrato} message="Contrato copiado." />
-                        </div>
-                        <div className="mt-3 flex items-center justify-between gap-3 border-t border-violet-100 pt-3">
-                          <div className="font-ui text-sm text-text-secondary">
-                            <p className="text-xs uppercase tracking-[0.12em] text-text-muted">Nota Fiscal</p>
-                            <p className="mt-1 font-semibold text-violet-700">{notaPrincipal?.numero || '-'}</p>
-                            <p className="mt-1 text-xs text-text-secondary">{notaPrincipal?.data_emissao || 'Sem data de emissão'}</p>
-                          </div>
-                          <div className="flex gap-2">
-                            <CopyAction value={notaPrincipal?.numero} message="Número da nota fiscal copiado." />
-                            <CopyAction value={notaPrincipal?.data_emissao} message="Data de emissão copiada." />
-                          </div>
-                        </div>
-                      </InfoPanel>
-
-                      <InfoPanel icon={<Building2 className="h-3.5 w-3.5" />} label="Dados Bancários" tone="emerald">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="font-ui text-xs uppercase tracking-[0.12em] text-text-muted">Banco</p>
-                            <p className="mt-1 font-ui text-sm font-semibold text-text-primary">{dadosBancarios?.banco || 'Sem banco extraído'}</p>
-                          </div>
-                          <CopyAction value={dadosBancarios?.banco} message="Banco copiado." />
-                        </div>
-                        <div className="mt-3 grid gap-2 border-t border-emerald-100 pt-3 sm:grid-cols-2">
-                          <div className="flex items-center justify-between gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
-                            <div>
-                              <p className="font-ui text-[11px] uppercase tracking-[0.12em] text-text-muted">Agência</p>
-                              <p className="mt-1 font-mono text-sm font-semibold text-text-primary">{dadosBancarios?.agencia || '-'}</p>
-                            </div>
-                            <CopyAction value={dadosBancarios?.agencia} message="Agência copiada." className="h-7 w-7" />
-                          </div>
-
-                          <div className="flex items-center justify-between gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
-                            <div>
-                              <p className="font-ui text-[11px] uppercase tracking-[0.12em] text-text-muted">Conta</p>
-                              <p className="mt-1 font-mono text-sm font-semibold text-text-primary">{dadosBancarios?.conta || '-'}</p>
-                            </div>
-                            <CopyAction value={dadosBancarios?.conta} message="Conta copiada." className="h-7 w-7" />
-                          </div>
-                        </div>
-                      </InfoPanel>
-                    </div>
-
-                    <InfoPanel icon={<ShieldCheck className="h-3.5 w-3.5" />} label="Retenções e Empenhos" tone="slate">
-                      {retencoes?.optante_simples_nacional ? (
-                        <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
-                          Optante pelo Simples Nacional
-                        </Badge>
-                      ) : null}
-
-                      {retencoesVisiveis.length > 0 ? (
-                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                          {retencoesVisiveis.map(([label, value]) => (
-                            <div
-                              key={label}
-                              className="flex items-center justify-between rounded-xl border border-dashed border-border-default/90 bg-surface-subtle/40 px-3 py-2 font-ui text-sm"
-                            >
-                              <span className="text-text-secondary">{label}</span>
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-text-primary">{value}</span>
-                                <CopyAction value={value} message={`${label} copiado.`} className="h-7 w-7" />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-slate-500">Sem retenções detalhadas extraídas.</p>
-                      )}
-
-                      <div className="mt-4 border-t border-border-default/70 pt-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="font-ui text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
-                            Empenhos
-                          </p>
-                          <CopyAction value={listaEmpenhos.length ? listaEmpenhos.join(', ') : undefined} message="Lista de empenhos copiada." />
-                        </div>
-                        {listaEmpenhos.length ? (
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {listaEmpenhos.map((empenho) => (
-                              <div
-                                key={empenho}
-                                className="inline-flex items-center gap-2 rounded-xl border border-border-default bg-surface-subtle/40 px-3 py-1.5 text-xs shadow-sm"
+                            {processo.caixa}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-text-muted">Sem caixa</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="max-w-[460px]">
+                        {rowDetails.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {rowDetails.map((detail) => (
+                              <span
+                                key={detail}
+                                className="max-w-[220px] truncate rounded-md border border-border-default/70 bg-surface-subtle/60 px-2 py-1 text-[11px] font-medium text-text-secondary"
+                                title={detail}
                               >
-                                <span className="font-mono font-semibold text-text-primary">{empenho}</span>
-                                <CopyAction value={empenho} message="Empenho copiado." className="h-6 w-6 border-0 bg-transparent shadow-none" />
-                              </div>
+                                {detail}
+                              </span>
                             ))}
                           </div>
                         ) : (
-                          <p className="mt-2 text-sm text-slate-500">Nenhum empenho associado.</p>
+                          <span className="text-xs text-text-muted">Aguardando dados da IA</span>
                         )}
-                      </div>
-                    </InfoPanel>
-
-                    {workflow?.concluido ? (
-                      <div className="rounded-2xl border border-emerald-200/80 bg-[linear-gradient(180deg,rgba(236,253,245,0.92),rgba(255,255,255,0.98))] p-4 shadow-[0_10px_24px_rgba(16,185,129,0.08)]">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div>
-                            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              Conclusão do processo
-                            </div>
-                            <p className="mt-2 text-sm font-semibold text-slate-900">
-                              NS registrada: <span className="font-mono">{workflow.nsNumero || nsNumero}</span>
-                            </p>
-                            <p className="mt-1 text-xs text-slate-600">
-                              {workflow.concluidoEm
-                                ? `Concluído em ${formatUpdatedAt(new Date(workflow.concluidoEm))}`
-                                : 'Processo concluído sem data registrada.'}
-                              {workflow.concluidoPor ? ` por ${workflow.concluidoPor}` : ''}
-                            </p>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <Badge variant="outline" className={cn('whitespace-nowrap', statusMeta.badgeClassName)}>
+                              {statusMeta.label}
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                'whitespace-nowrap border text-[11px]',
+                                processo.pdfUrl
+                                  ? 'border-blue-200 bg-blue-50 text-blue-700'
+                                  : 'border-slate-200 bg-slate-50 text-slate-500',
+                              )}
+                            >
+                              {processo.pdfUrl ? 'PDF pronto' : 'Sem PDF'}
+                            </Badge>
                           </div>
-
-                          {analiseMeta && AnaliseIcon ? (
-                            <Badge variant="outline" className={analiseMeta.badgeClassName}>
-                              <AnaliseIcon className="mr-1 h-3.5 w-3.5" />
-                              {analiseMeta.label}
-                            </Badge>
+                          <p className="whitespace-nowrap text-xs text-text-secondary">
+                            Atualizado em {formatUpdatedAt(processo.updatedAt)}
+                          </p>
+                          {extractionIssue ? (
+                            <p className="max-w-[220px] text-xs text-rose-700" title={processo.dadosCompletos?.extraction_job?.last_error_message}>
+                              {extractionIssue}
+                            </p>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-1.5">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            title="Visualizar detalhes"
+                            className="h-8 w-8 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                            onClick={() => setDetailsProcesso(processo)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            title="Abrir processo no SUAP"
+                            className="h-8 w-8 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                            onClick={() => window.open(processo.url, '_blank', 'noopener,noreferrer')}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            title={processo.pdfUrl ? 'Atualizar PDF' : 'Baixar PDF'}
+                            className="h-8 w-8 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                            disabled={isDownloading || processActionId !== null}
+                            onClick={() => void handleDownloadPdfStage(processo, Boolean(processo.pdfUrl))}
+                          >
+                            <FileDown className={cn('h-4 w-4', isDownloading && 'animate-pulse')} />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            title={processo.status === 'success' ? 'Refazer extração por IA' : 'Extrair com IA'}
+                            className="h-8 w-8 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+                            disabled={!processo.pdfUrl || isExtractingAi || processActionId !== null}
+                            onClick={() => void handleAiExtractionStage(processo, processo.status === 'success')}
+                          >
+                            <Sparkles className={cn('h-4 w-4', isExtractingAi && 'animate-pulse')} />
+                          </Button>
+                          {isConcluded ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              title="Reabrir processo"
+                              className="h-8 w-8 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                              disabled={reopeningProcessId === processo.id}
+                              onClick={() => void handleReopenProcess(processo)}
+                            >
+                              <RefreshCw className={cn('h-4 w-4', reopeningProcessId === processo.id && 'animate-spin')} />
+                            </Button>
                           ) : (
-                            <Badge variant="outline" className="border-slate-200 bg-white/80 text-slate-600">
-                              Sem análise de liquidação
-                            </Badge>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              title="Concluir processo"
+                              className="h-8 w-8 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                              onClick={() => handleOpenConclusaoDialog(processo)}
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                            </Button>
                           )}
                         </div>
-
-                        {workflow.solicitarAnaliseLiquidacao ? (
-                          <div className="mt-4 space-y-3 border-t border-emerald-200/70 pt-4">
-                            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-                              <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                              <span>Análise da liquidação solicitada</span>
-                              {workflow.arquivosSiafi?.length ? (
-                                <>
-                                  <span className="h-1 w-1 rounded-full bg-slate-300" />
-                                  <span>{workflow.arquivosSiafi.length} print(s) enviados</span>
-                                </>
-                              ) : null}
-                            </div>
-
-                            {analiseLiquidacao ? (
-                              <>
-                                <p className="text-sm leading-6 text-slate-700">{analiseLiquidacao.resumo}</p>
-
-                                {analiseLiquidacao.itens.length > 0 ? (
-                                  <div className="grid gap-2">
-                                    {analiseLiquidacao.itens.slice(0, 4).map((item, index) => (
-                                      <div
-                                        key={`${item.campo}-${index}`}
-                                        className={cn(
-                                          'rounded-xl border px-3 py-2 text-sm',
-                                          item.status === 'ok'
-                                            ? 'border-emerald-200/70 bg-emerald-50/80'
-                                            : item.status === 'error'
-                                              ? 'border-rose-200/70 bg-rose-50/80'
-                                              : 'border-amber-200/70 bg-amber-50/80',
-                                        )}
-                                      >
-                                        <div className="flex flex-wrap items-center gap-2">
-                                          <span className="font-semibold text-slate-900">{item.campo}</span>
-                                          <Badge variant="outline" className="border-white/70 bg-white/70 text-slate-600">
-                                            {item.status === 'ok'
-                                              ? 'OK'
-                                              : item.status === 'error'
-                                                ? 'Erro'
-                                                : 'Alerta'}
-                                          </Badge>
-                                        </div>
-                                        <p className="mt-1 text-slate-700">{item.observacao}</p>
-                                        {item.esperado || item.encontrado ? (
-                                          <p className="mt-1 text-xs text-slate-500">
-                                            {item.esperado ? `Esperado: ${item.esperado}. ` : ''}
-                                            {item.encontrado ? `Encontrado: ${item.encontrado}.` : ''}
-                                          </p>
-                                        ) : null}
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : null}
-
-                                {analiseLiquidacao.recomendacao ? (
-                                  <p className="rounded-xl border border-slate-200 bg-white/70 px-3 py-2 text-sm text-slate-700">
-                                    <strong>Recomendação:</strong> {analiseLiquidacao.recomendacao}
-                                  </p>
-                                ) : null}
-                              </>
-                            ) : (
-                              <p className="text-sm text-slate-600">
-                                A análise foi solicitada, mas nenhum resultado foi salvo ainda.
-                              </p>
-                            )}
-                          </div>
-                        ) : (
-                          <p className="mt-4 border-t border-emerald-200/70 pt-4 text-sm text-slate-600">
-                            O processo foi concluído sem solicitar análise automática da liquidação.
-                          </p>
-                        )}
-                      </div>
-                    ) : null}
-                  </CardContent>
-                </Card>
-              );
-            })}
-      </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {!isLoading && !isError && visibleProcesses.length === 0 ? (
         <Card className="border-dashed">

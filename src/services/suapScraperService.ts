@@ -1,21 +1,32 @@
 import { supabase } from '@/lib/supabase';
-import { SuapDadosCompletos, SuapProcesso, SuapNotaFiscal } from '@/types';
 
 export interface ScrapedProcesso {
   suapId: string;
   numProcesso?: string;
   url: string;
+  caixa?: string;
 }
 
 export type SyncProgressCallback = (message: string) => void;
+export type SyncedProcesso = ScrapedProcesso & {
+  already_exists: boolean;
+  created?: boolean;
+  pdfUrl?: string | null;
+  status?: string;
+};
+
+export type InventorySyncOptions = {
+  forceUpdateProcessIds?: Set<string>;
+};
+
+export type StageResult = {
+  completed: number;
+  skipped: number;
+  errors: number;
+};
 
 const PROCESS_NUMBER_REGEX = /\b\d{5}\.\d{6}\.\d{4}-\d{2}\b/;
 const PROCESS_LINK_HREF_REGEX = /\/processo_eletronico\/processo\/\d+\/?/;
-const CPF_REGEX = /\b\d{3}\.?\d{3}\.?\d{3}-\d{2}\b/g;
-const CNPJ_REGEX = /\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-\d{2}\b/g;
-const EMPENHO_REGEX = /\b20\d{2}NE\d{6}\b/gi;
-const MONEY_REGEX = /R\$\s*([\d.]+,\d{2})/gi;
-const MAX_PREFILL_IFRAMES = 4;
 
 // Função auxiliar para chamar o proxy do SUAP
 async function fetchViaProxy(
@@ -47,532 +58,22 @@ async function fetchViaProxy(
   return data;
 }
 
-// Helpers de normalização e limpeza
-function normalize(value: string | null | undefined): string {
-  return String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[\u200B-\u200D\uFEFF]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-}
-
-function clean(value: string | null | undefined): string | null {
-  if (value === null || value === undefined) return null;
-  const cleaned = String(value)
-    .replace(/[\u200B-\u200D\uFEFF]/g, '')
-    .replace(/\u00A0/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/^[\s:.-]+/, '')
-    .replace(/[\s:.-]+$/, '');
-
-  if (!cleaned) return null;
-  const low = cleaned.toLowerCase();
-  return low === '-' || low === 'null' || low === 'none' || low === 'nao extraido' ? null : cleaned;
-}
-
-function hasValue(value: any): boolean {
-  if (value === null || value === undefined) return false;
-  if (typeof value === 'string') return Boolean(clean(value));
-  if (Array.isArray(value)) return value.some(hasValue);
-  if (typeof value === 'object') return Object.values(value).some(hasValue);
-  return true;
-}
-
-function lines(text: string | null | undefined): string[] {
-  return String(text || '').split(/\r?\n+/).map(clean).filter(Boolean) as string[];
-}
-
-function unique(values: Array<string | null | undefined> = []): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const value of values) {
-    const cleaned = clean(value);
-    if (!cleaned) continue;
-    const key = cleaned.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(cleaned);
-  }
-  return out;
-}
-
-function mergeBank(existing: any, incoming: any) {
-  const ext = existing && typeof existing === 'object' ? existing : {};
-  const inc = incoming && typeof incoming === 'object' ? incoming : {};
-  const merged = {
-    banco: hasValue(ext.banco) ? ext.banco : inc.banco,
-    agencia: hasValue(ext.agencia) ? ext.agencia : inc.agencia,
-    conta: hasValue(ext.conta) ? ext.conta : inc.conta,
-  };
-  return hasValue(merged) ? merged : null;
-}
-
-function cleanupPrefill(prefill: any): any {
-  if (!prefill || typeof prefill !== 'object') return null;
-  const dc: any = {};
-  const out: any = {};
-
-  if (hasValue(prefill.num_processo)) out.num_processo = clean(prefill.num_processo);
-  if (hasValue(prefill.beneficiario)) out.beneficiario = clean(prefill.beneficiario);
-  if (hasValue(prefill.cpf_cnpj)) out.cpf_cnpj = clean(prefill.cpf_cnpj);
-  if (hasValue(prefill.assunto)) out.assunto = clean(prefill.assunto);
-
-  const dadosCompletos = prefill.dados_completos || {};
-  if (hasValue(dadosCompletos.processo_numero)) dc.processo_numero = clean(dadosCompletos.processo_numero);
-  if (hasValue(dadosCompletos.beneficiario)) dc.beneficiario = clean(dadosCompletos.beneficiario);
-  if (hasValue(dadosCompletos.cpf_cnpj)) dc.cpf_cnpj = clean(dadosCompletos.cpf_cnpj);
-  if (hasValue(dadosCompletos.assunto)) dc.assunto = clean(dadosCompletos.assunto);
-  if (hasValue(dadosCompletos.contrato_numero)) dc.contrato_numero = clean(dadosCompletos.contrato_numero);
-  if (hasValue(dadosCompletos.val_nf)) dc.val_nf = clean(dadosCompletos.val_nf);
-
-  const notas = unique(dadosCompletos.notas_fiscais || []);
-  const empenhos = unique(dadosCompletos.empenhos || []);
-  const banco = mergeBank(null, dadosCompletos.dados_bancarios);
-
-  if (notas.length) dc.notas_fiscais = notas.map(num => ({ numero: num }));
-  if (empenhos.length) dc.empenhos = empenhos;
-  if (banco) dc.dados_bancarios = banco;
-  if (Object.keys(dc).length) out.dados_completos = dc;
-
-  return Object.keys(out).length ? out : null;
-}
-
-function mergePrefill(basePrefill: any, incomingPrefill: any): any {
-  const base = cleanupPrefill(basePrefill) || { dados_completos: {} };
-  const incoming = cleanupPrefill(incomingPrefill);
-  if (!incoming) return cleanupPrefill(base);
-
-  const baseDc = base.dados_completos || {};
-  const incDc = incoming.dados_completos || {};
-
-  const mergedNotas = unique([
-    ...(baseDc.notas_fiscais || []).map((n: any) => n.numero),
-    ...(incDc.notas_fiscais || []).map((n: any) => n.numero)
-  ]);
-
-  return cleanupPrefill({
-    num_processo: hasValue(base.num_processo) ? base.num_processo : incoming.num_processo,
-    beneficiario: hasValue(base.beneficiario) ? base.beneficiario : incoming.beneficiario,
-    cpf_cnpj: hasValue(base.cpf_cnpj) ? base.cpf_cnpj : incoming.cpf_cnpj,
-    assunto: hasValue(base.assunto) ? base.assunto : incoming.assunto,
-    dados_completos: {
-      processo_numero: hasValue(baseDc.processo_numero) ? baseDc.processo_numero : incDc.processo_numero,
-      beneficiario: hasValue(baseDc.beneficiario) ? baseDc.beneficiario : incDc.beneficiario,
-      cpf_cnpj: hasValue(baseDc.cpf_cnpj) ? baseDc.cpf_cnpj : incDc.cpf_cnpj,
-      assunto: hasValue(baseDc.assunto) ? baseDc.assunto : incDc.assunto,
-      contrato_numero: hasValue(baseDc.contrato_numero) ? baseDc.contrato_numero : incDc.contrato_numero,
-      val_nf: hasValue(baseDc.val_nf) ? baseDc.val_nf : incDc.val_nf,
-      notas_fiscais: mergedNotas,
-      empenhos: unique([...(baseDc.empenhos || []), ...(incDc.empenhos || [])]),
-      dados_bancarios: mergeBank(baseDc.dados_bancarios, incDc.dados_bancarios),
-    },
-  });
-}
-
-// Regex Helpers
 function extractProcessNumber(text: string): string | null {
   const match = String(text || '').match(PROCESS_NUMBER_REGEX);
   return match ? match[0] : null;
 }
 
-function extractLabeled(text: string, labels: string[], stops: string[]): string | null {
-  const textLines = lines(text);
-  const labelKeys = labels.map(l => normalize(l));
-  const stopKeys = stops.map(s => normalize(s));
-
-  for (let i = 0; i < textLines.length; i++) {
-    const line = textLines[i];
-    const key = normalize(line);
-    const hit = labelKeys.find((label) => key === label || key.startsWith(`${label}:`) || key.startsWith(`${label} -`));
-    if (!hit) continue;
-
-    const direct = clean(line.replace(/^[^:]+:\s*/, ''));
-    if (direct && normalize(direct) !== hit) return direct;
-
-    const collected: string[] = [];
-    for (let j = i + 1; j < textLines.length; j++) {
-      const next = textLines[j];
-      const nextKey = normalize(next);
-      if (stopKeys.some((label) => nextKey === label || nextKey.startsWith(`${label}:`))) break;
-      collected.push(next);
-      if (collected.length >= 3) break;
-    }
-    return clean(collected.join(' '));
-  }
-
-  return null;
-}
-
-// Extrai CPF ou CNPJ
-function extractCpfCnpj(text: string): string | null {
-  const matches: Array<{ value: string; index: number }> = [];
-  const cnpjMatches = String(text || '').matchAll(CNPJ_REGEX);
-  for (const match of cnpjMatches) {
-    if (match.index !== undefined) matches.push({ value: match[0], index: match.index });
-  }
-  const cpfMatches = String(text || '').matchAll(CPF_REGEX);
-  for (const match of cpfMatches) {
-    if (match.index !== undefined) matches.push({ value: match[0], index: match.index });
-  }
-  matches.sort((a, b) => a.index - b.index);
-  return matches.length ? clean(matches[0].value) : null;
-}
-
-function extractEmpenhos(text: string): string[] {
-  return unique(String(text || '').match(EMPENHO_REGEX) || []);
-}
-
-function extractContrato(text: string): string | null {
-  const patterns = [
-    /contrato(?:\s+administrativo)?\s*(?:n[ouº°.]*)?\s*[:#-]?\s*([0-9]{1,5}\/20\d{2})/i,
-    /contrato(?:\s+administrativo)?\s*(?:n[ouº°.]*)?\s*[:#-]?\s*([a-z0-9.-]{3,20}\/20\d{2})/i,
-    /referente\s+ao\s+contrato\s*([a-z0-9./-]{3,20})/i,
-  ];
-  for (const pattern of patterns) {
-    const match = String(text || '').match(pattern);
-    if (match) return clean(match[1]);
-  }
-  return null;
-}
-
-function extractNotas(text: string): string[] {
-  const values: string[] = [];
-  const patterns = [
-    /\b(?:danfe|nota fiscal(?: eletronica)?|nfs-e|nf(?:-e)?)\s*(?:n[ouº°.]*)?\s*[:#-]?\s*([a-z0-9./-]{3,30})/gi,
-    /\bpagamento\s+da\s+nf\s*([a-z0-9./-]{3,30})/gi,
-  ];
-  for (const pattern of patterns) {
-    const matches = String(text || '').matchAll(pattern);
-    for (const match of matches) {
-      if (/\d/.test(match[1])) values.push(match[1]);
-    }
-  }
-  return unique(values);
-}
-
-function extractMoney(text: string): string | null {
-  const preferred = ['valor liquido', 'valor da bolsa', 'valor da nota', 'liquidacao da despesa no valor', 'valor devido'];
-  const textLines = lines(text);
-
-  for (const line of textLines) {
-    const key = normalize(line);
-    if (!key.includes('r$')) continue;
-    if (!preferred.some((item) => key.includes(item))) continue;
-    const match = [...line.matchAll(MONEY_REGEX)][0];
-    if (match) return clean(match[1]);
-  }
-
-  const generic = unique(
-    textLines
-      .filter((line) => normalize(line).includes('valor') && normalize(line).includes('r$'))
-      .map((line) => [...line.matchAll(MONEY_REGEX)][0]?.[1])
-      .filter(Boolean)
-  );
-  return generic.length === 1 ? generic[0] : null;
-}
-
-function extractBankData(text: string): any {
-  const textLines = lines(text);
-  const bank: any = {};
-
-  for (let i = 0; i < textLines.length; i++) {
-    const line = textLines[i];
-    const key = normalize(line);
-
-    const bankMatch = line.match(/\bbanco[:\s-]+(.+)$/i);
-    if (bankMatch && !hasValue(bank.banco)) bank.banco = clean(bankMatch[1]);
-
-    const agenciaMatch = line.match(/\bag(?:e|ê)ncia[:\s-]+([0-9x.-]{2,20})/i);
-    if (agenciaMatch && !hasValue(bank.agencia)) bank.agencia = clean(agenciaMatch[1]);
-
-    const contaMatch = line.match(/\bconta(?:\s+corrente)?[:\s-]+([0-9x./-]{3,30})/i);
-    if (contaMatch && !hasValue(bank.conta)) bank.conta = clean(contaMatch[1]);
-
-    if (!hasValue(bank.banco) && key.includes('dados banc')) {
-      const prev = textLines[i - 1];
-      if (prev && prev.length <= 40 && /[a-z]/i.test(prev)) bank.banco = clean(prev);
-    }
-  }
-
-  return hasValue(bank) ? bank : null;
-}
-
-function extractPrefillFromText(text: string): any {
-  const assunto = extractLabeled(
-    text,
-    ['tipo assunto', 'assunto'],
-    ['interessados', 'interessado', 'situacao', 'situação', 'tramites', 'trâmites', 'nivel de acesso', 'nível de acesso', 'data setor de origem']
-  );
-  const beneficiario = extractLabeled(
-    text,
-    ['interessados', 'interessado'],
-    ['situacao', 'situação', 'tramites', 'trâmites', 'nivel de acesso', 'nível de acesso', 'tipo assunto', 'assunto']
-  );
-  return cleanupPrefill({
-    num_processo: extractProcessNumber(text),
-    beneficiario,
-    cpf_cnpj: extractCpfCnpj(text),
-    assunto,
-    dados_completos: {
-      processo_numero: extractProcessNumber(text),
-      beneficiario,
-      cpf_cnpj: extractCpfCnpj(text),
-      assunto,
-      contrato_numero: extractContrato(text),
-      notas_fiscais: extractNotas(text),
-      val_nf: extractMoney(text),
-      empenhos: extractEmpenhos(text),
-      dados_bancarios: extractBankData(text),
-    },
-  });
-}
-
-function extractPrefillFromTitle(title: string): any {
-  return cleanupPrefill({
-    dados_completos: {
-      contrato_numero: extractContrato(title),
-      notas_fiscais: extractNotas(title),
-      empenhos: extractEmpenhos(title),
-    },
-  });
-}
-
-function scoreCandidate(src: string, title: string, index: number): number {
-  const key = normalize(title);
-  let score = 0;
-  if (src.includes('/visualizar_capa_processo/')) score += 200;
-  if (src.includes('/conteudo_documento/')) score += 120;
-  if (src.includes('/tramite/conteudo/')) score += 90;
-  if (src.includes('/visualizar_documento_digitalizado/')) score -= 1000;
-  if (key.includes('pagamento')) score += 60;
-  if (key.includes('oficio')) score += 50;
-  if (key.includes('despacho')) score += 40;
-  if (key.includes('contrato')) score += 50;
-  if (key.includes('liquidacao')) score += 50;
-  if (key.includes('bolsa')) score += 40;
-  score -= index;
-  return score;
-}
-
-// Coleta dados determinísticos de iframes de documentos internos
-async function collectDeterministicProcessData(
-  proc: ScrapedProcesso,
-  detailHtml: string,
-  viewerHtml: string,
-  suapSessionId: string,
-  log: SyncProgressCallback
-): Promise<any> {
-  let prefill = cleanupPrefill({
-    num_processo: proc.numProcesso,
-    dados_completos: { processo_numero: proc.numProcesso },
-  });
-
-  prefill = mergePrefill(prefill, extractPrefillFromText(detailHtml));
-  prefill = mergePrefill(prefill, extractPrefillFromText(viewerHtml));
-
-  const parser = new DOMParser();
-  const viewerDoc = parser.parseFromString(viewerHtml, 'text/html');
-  const containers = Array.from(viewerDoc.querySelectorAll('#capa_processo, div.page-break, div.page-break-after'));
-  
-  for (const container of containers) {
-    const title = clean(container.querySelector('h3')?.textContent);
-    if (title) {
-      prefill = mergePrefill(prefill, extractPrefillFromTitle(title));
-    }
-  }
-
-  const candidates = containers
-    .map((container, index) => {
-      const iframe = container.querySelector('iframe[src]');
-      const src = iframe?.getAttribute('src');
-      if (!src || src.includes('/visualizar_documento_digitalizado/')) return null;
-      const title = clean(container.querySelector('h3')?.textContent) || container.id || `doc_${index}`;
-      return { 
-        title, 
-        src, 
-        score: scoreCandidate(src, title, index) 
-      };
-    })
-    .filter((c): c is { title: string; src: string; score: number } => !!c)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, MAX_PREFILL_IFRAMES);
-
-  if (candidates.length) {
-    log(`[${proc.suapId}] Pré-extração determinística: analisando ${candidates.length} documento(s) leve(s)...`);
-  }
-
-  const fetched = await Promise.all(
-    candidates.map(async (candidate) => {
-      try {
-        const response = await fetchViaProxy(candidate.src, suapSessionId);
-        return { title: candidate.title, html: response.text || '' };
-      } catch (error: any) {
-        log(`[${proc.suapId}] Pré-extração: falha em ${candidate.title}: ${error.message}`);
-        return null;
-      }
-    })
-  );
-
-  for (const block of fetched.filter(Boolean)) {
-    if (block) {
-      prefill = mergePrefill(prefill, extractPrefillFromTitle(block.title));
-      prefill = mergePrefill(prefill, extractPrefillFromText(block.html));
-    }
-  }
-
-  const cleaned = cleanupPrefill(prefill);
-  return cleaned;
-}
-
-// Salva dados no banco local do Supabase
-async function persistDeterministicPrefill(suapId: string, prefill: any, tenantId: string) {
-  if (!cleanupPrefill(prefill)) return null;
-
-  const { data: existing, error: fetchErr } = await supabase
-    .from('processos')
-    .select('id, dados_completos, beneficiario, cpf_cnpj, assunto, num_processo')
-    .eq('tenant_id', tenantId)
-    .eq('suap_id', suapId)
-    .maybeSingle();
-
-  if (fetchErr || !existing) {
-    throw new Error(`Processo ${suapId} não encontrado no banco.`);
-  }
-
-  // Lógica de patch semelhante ao background
-  const patch: any = {};
-  const existingDc = existing.dados_completos || {};
-  const nextDc = { ...existingDc };
-  let dcChanged = false;
-
-  const assignTopLevelIfMissing = (fieldName: string, incomingValue: any) => {
-    if (!hasValue(incomingValue)) return;
-    if (fieldName === 'num_processo') {
-      if (existing[fieldName as keyof typeof existing] !== incomingValue) {
-        patch[fieldName] = incomingValue;
-      }
-      return;
-    }
-    if (!hasValue(existing[fieldName as keyof typeof existing])) {
-      patch[fieldName] = incomingValue;
-    }
-  };
-
-  const assignDcIfMissing = (fieldName: string, incomingValue: any) => {
-    if (!hasValue(incomingValue)) return;
-    if (!hasValue(nextDc[fieldName])) {
-      nextDc[fieldName] = incomingValue;
-      dcChanged = true;
-    }
-  };
-
-  assignTopLevelIfMissing('num_processo', prefill.num_processo);
-  assignTopLevelIfMissing('beneficiario', prefill.beneficiario);
-  assignTopLevelIfMissing('cpf_cnpj', prefill.cpf_cnpj);
-  assignTopLevelIfMissing('assunto', prefill.assunto);
-
-  assignDcIfMissing('processo_numero', prefill.num_processo);
-  assignDcIfMissing('beneficiario', prefill.beneficiario);
-  assignDcIfMissing('cpf_cnpj', prefill.cpf_cnpj);
-  assignDcIfMissing('assunto', prefill.assunto);
-  assignDcIfMissing('contrato_numero', prefill.dados_completos?.contrato_numero);
-  assignDcIfMissing('val_nf', prefill.dados_completos?.val_nf);
-
-  const mergedNotas = unique([
-    ...(existingDc.notas_fiscais || []).map((n: any) => n.numero),
-    ...(prefill.dados_completos?.notas_fiscais || []).map((n: any) => n.numero || n)
-  ]).map(n => ({ numero: n }));
-
-  if (mergedNotas.length > 0 && JSON.stringify(mergedNotas) !== JSON.stringify(existingDc.notas_fiscais || [])) {
-    nextDc.notas_fiscais = mergedNotas;
-    dcChanged = true;
-  }
-
-  const mergedEmpenhos = unique([
-    ...(existingDc.empenhos || []),
-    ...(prefill.dados_completos?.empenhos || [])
-  ]);
-  if (mergedEmpenhos.length > 0 && JSON.stringify(mergedEmpenhos) !== JSON.stringify(existingDc.empenhos || [])) {
-    nextDc.empenhos = mergedEmpenhos;
-    dcChanged = true;
-  }
-
-  const mergedBankData = mergeBank(existingDc.dados_bancarios, prefill.dados_completos?.dados_bancarios);
-  if (mergedBankData && JSON.stringify(mergedBankData) !== JSON.stringify(existingDc.dados_bancarios || null)) {
-    nextDc.dados_bancarios = mergedBankData;
-    dcChanged = true;
-  }
-
-  if (dcChanged) {
-    patch.dados_completos = nextDc;
-  }
-
-  if (Object.keys(patch).length === 0) {
-    return {
-      updated: false,
-      validation: validateExtractedProcessRecord(existing),
-    };
-  }
-
-  patch.updated_at = new Date().toISOString();
-
-  const { data: updatedRows, error: updateErr } = await supabase
-    .from('processos')
-    .update(patch)
-    .eq('tenant_id', tenantId)
-    .eq('suap_id', suapId)
-    .select()
-    .single();
-
-  if (updateErr) {
-    throw updateErr;
-  }
-
-  return {
-    updated: true,
-    validation: validateExtractedProcessRecord(updatedRows),
-  };
-}
-
-function validateExtractedProcessRecord(record: any) {
-  const dc = record?.dados_completos || {};
-  const hasIdentity = [
-    record?.beneficiario,
-    record?.cpf_cnpj,
-    record?.assunto,
-    dc.beneficiario,
-    dc.cpf_cnpj,
-    dc.assunto,
-  ].some(hasValue);
-
-  const hasFinancialData = [
-    dc.val_nf,
-    dc.contrato_numero,
-    dc.notas_fiscais,
-    dc.empenhos,
-    dc.dados_bancarios,
-  ].some(hasValue);
-
-  const missing = [];
-  if (!hasValue(record?.num_processo) && !hasValue(dc.processo_numero)) missing.push('num_processo');
-  if (!hasIdentity) missing.push('identificacao_basica');
-  if (!hasFinancialData) missing.push('dados_financeiros');
-
-  return {
-    ok: missing.length === 0,
-    missing,
-  };
-}
+export type AiExtractionQueueResult = {
+  queued: boolean;
+  status: string;
+};
 
 // Orquestra a geração e download do PDF no SUAP via polling Celery
 async function downloadProcessPdf(
   proc: ScrapedProcesso,
   suapSessionId: string,
   log: SyncProgressCallback
-): Promise<{ pdfBase64: string; deterministicData: any }> {
+): Promise<{ pdfBase64: string }> {
   const id = proc.suapId;
 
   log(`[${id}] Passo 1: Buscando página de detalhes do processo...`);
@@ -599,11 +100,6 @@ async function downloadProcessPdf(
   const triggerPath = triggerMatch[1];
   log(`[${id}] Passo 2 OK: Trigger Celery localizado.`);
 
-  // Iniciar extração determinística de documentos internos em paralelo
-  const deterministicPromise = collectDeterministicProcessData(proc, detailHtml, viewerHtml, suapSessionId, log).catch((err) => {
-    log(`[${id}] Pré-extração de metadados falhou: ${err.message}`);
-    return null;
-  });
 
   log(`[${id}] Passo 3: Disparando geração do PDF no Celery...`);
   const triggerRes = await fetchViaProxy(triggerPath, suapSessionId);
@@ -663,7 +159,6 @@ async function downloadProcessPdf(
 
   return {
     pdfBase64: pdfRes.base64,
-    deterministicData: await deterministicPromise,
   };
 }
 
@@ -746,129 +241,99 @@ export const suapScraperService = {
   },
 
   // Sincroniza a lista de processos básicos no Supabase (pendentes)
-  async syncProcessListInSupabase(processes: ScrapedProcesso[], tenantId: string): Promise<any[]> {
-    // 1. Obter processos já existentes
+  async syncProcessListInSupabase(
+    processes: ScrapedProcesso[],
+    tenantId: string,
+    options: InventorySyncOptions = {},
+  ): Promise<SyncedProcesso[]> {
     const { data: existingList, error: selectErr } = await supabase
       .from('processos')
-      .select('suap_id, status, beneficiario, cpf_cnpj, assunto, dados_completos')
+      .select('suap_id, status, num_processo, pdf_url')
       .eq('tenant_id', tenantId);
 
     if (selectErr) throw selectErr;
 
-    const existingMap = new Map(existingList.map((p) => [p.suap_id, p]));
-    const currentIds = new Set(processes.map((p) => p.suapId));
-    const synced: any[] = [];
+    const existingMap = new Map((existingList || []).map((p) => [p.suap_id, p]));
+    const synced: SyncedProcesso[] = [];
 
-    // 2. Upsert os processos atuais
     for (const proc of processes) {
       const existing = existingMap.get(proc.suapId);
-      
+      const shouldForceUpdate = options.forceUpdateProcessIds?.has(proc.suapId) ?? false;
+
       if (existing) {
-        const patch: any = { updated_at: new Date().toISOString() };
-        if (proc.url) patch.url = proc.url;
-        if (proc.numProcesso) patch.num_processo = proc.numProcesso;
+        if (shouldForceUpdate) {
+          const patch: any = { updated_at: new Date().toISOString() };
+          if (proc.url) patch.url = proc.url;
+          if (proc.numProcesso) patch.num_processo = proc.numProcesso;
+          if (proc.caixa) patch.caixa = proc.caixa;
 
-        await supabase
-          .from('processos')
-          .update(patch)
-          .eq('tenant_id', tenantId)
-          .eq('suap_id', proc.suapId);
-
-        // Verifica se já foi concluído/extraído com sucesso para evitar IA redundante
-        const dc = existing.dados_completos || {};
-        const hasIdentity = [existing.beneficiario, existing.cpf_cnpj, existing.assunto, dc.beneficiario, dc.cpf_cnpj, dc.assunto].some(hasValue);
-        const hasFinancial = [dc.val_nf, dc.contrato_numero, dc.notas_fiscais, dc.empenhos, dc.dados_bancarios].some(hasValue);
-        const alreadyExists = existing.status === 'concluido' || (existing.status === 'success' && hasIdentity && hasFinancial);
+          if (Object.keys(patch).length > 1) {
+            await supabase
+              .from('processos')
+              .update(patch)
+              .eq('tenant_id', tenantId)
+              .eq('suap_id', proc.suapId);
+          }
+        }
 
         synced.push({
           ...proc,
-          already_exists: alreadyExists,
+          already_exists: true,
+          created: false,
+          status: existing.status,
+          numProcesso: proc.numProcesso || existing.num_processo || undefined,
+          pdfUrl: existing.pdf_url,
         });
-      } else {
-        const payload: any = {
-          tenant_id: tenantId,
-          suap_id: proc.suapId,
-          url: proc.url,
-          status: 'pending_extraction',
-          updated_at: new Date().toISOString(),
-        };
-        if (proc.numProcesso) payload.num_processo = proc.numProcesso;
-
-        await supabase.from('processos').insert(payload);
-        synced.push({
-          ...proc,
-          already_exists: false,
-        });
+        continue;
       }
-    }
 
-    // 3. Remover processos antigos que sumiram da caixa (stale)
-    const staleIds = existingList
-      .map((p) => p.suap_id)
-      .filter((id) => !currentIds.has(id));
+      const payload: any = {
+        tenant_id: tenantId,
+        suap_id: proc.suapId,
+        url: proc.url,
+        status: 'pending_extraction',
+        updated_at: new Date().toISOString(),
+      };
+      if (proc.numProcesso) payload.num_processo = proc.numProcesso;
+      if (proc.caixa) payload.caixa = proc.caixa;
 
-    if (staleIds.length > 0) {
-      await supabase
-        .from('processos')
-        .delete()
-        .eq('tenant_id', tenantId)
-        .in('suap_id', staleIds);
+      await supabase.from('processos').insert(payload);
+      synced.push({
+        ...proc,
+        already_exists: false,
+        created: true,
+        status: 'pending_extraction',
+        pdfUrl: null,
+      });
     }
 
     return synced;
   },
 
-  // Executa o enriquecimento de número do processo
-  async enrichProcessNumber(proc: ScrapedProcesso, suapSessionId: string, log: SyncProgressCallback): Promise<string | null> {
-    if (proc.numProcesso) return proc.numProcesso;
-    log(`[${proc.suapId}] Obtendo número do processo...`);
-    try {
-      const res = await fetchViaProxy(`/processo_eletronico/processo/${proc.suapId}/`, suapSessionId);
-      const doc = new DOMParser().parseFromString(res.text || '', 'text/html');
-      const candidates = [
-        doc.title, 
-        doc.querySelector('.title-container h2')?.textContent, 
-        doc.querySelector('#breadcrumbs')?.textContent, 
-        doc.body?.textContent
-      ];
-      for (const candidate of candidates) {
-        const num = extractProcessNumber(candidate || '');
-        if (num) {
-          log(`[${proc.suapId}] Número do processo identificado: ${num}`);
-          return num;
-        }
-      }
-    } catch (err: any) {
-      log(`[${proc.suapId}] Falha ao buscar número do processo: ${err.message}`);
-    }
-    return null;
-  },
-
-  // Orquestra a importação e IA de um processo individual
-  async processAndSyncSingle(
-    proc: any,
+  async downloadPdfForProcess(
+    proc: ScrapedProcesso | SyncedProcesso,
     suapSessionId: string,
     tenantId: string,
-    log: SyncProgressCallback
-  ): Promise<boolean> {
-    if (proc.already_exists) {
-      log(`[${proc.suapId}] Já extraído com sucesso no banco. Pulando.`);
-      return true;
+    log: SyncProgressCallback,
+    options: { force?: boolean } = {},
+  ): Promise<string | null> {
+    const { data: existing, error: fetchError } = await supabase
+      .from('processos')
+      .select('pdf_url')
+      .eq('tenant_id', tenantId)
+      .eq('suap_id', proc.suapId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    if (existing?.pdf_url && !options.force) {
+      log(`[${proc.suapId}] PDF ja sincronizado. Pulando download.`);
+      return existing.pdf_url;
     }
 
-    // 1. Download do PDF e pre-extração determinística
-    const { pdfBase64, deterministicData } = await downloadProcessPdf(proc, suapSessionId, log);
+    const { pdfBase64 } = await downloadProcessPdf(proc, suapSessionId, log);
 
-    // 2. Persistir a pré-extração determinística imediata
-    if (deterministicData) {
-      log(`[${proc.suapId}] Salvando metadados preliminares...`);
-      await persistDeterministicPrefill(proc.suapId, deterministicData, tenantId);
-    }
-
-    // 3. Upload do PDF para o Storage do Supabase
     log(`[${proc.suapId}] Fazendo upload do PDF para o bucket suap-pdfs...`);
-    
-    // Converter base64 do proxy em Blob
     const byteChars = atob(pdfBase64);
     const byteArray = new Uint8Array(byteChars.length);
     for (let i = 0; i < byteChars.length; i++) {
@@ -888,7 +353,6 @@ export const suapScraperService = {
       throw new Error(`Upload do PDF falhou: ${uploadErr.message}`);
     }
 
-    // Atualizar referência no registro
     await supabase
       .from('processos')
       .update({
@@ -899,41 +363,63 @@ export const suapScraperService = {
       .eq('tenant_id', tenantId)
       .eq('suap_id', proc.suapId);
 
-    // 4. Disparar a Edge Function de extração por IA
-    log(`[${proc.suapId}] Executando extração por Inteligência Artificial...`);
+    log(`[${proc.suapId}] PDF sincronizado com sucesso.`);
+    return storagePath;
+  },
+
+  async runAiExtractionForProcess(
+    proc: Pick<ScrapedProcesso, 'suapId'>,
+    tenantId: string,
+    log: SyncProgressCallback,
+    options: { force?: boolean } = {},
+  ): Promise<AiExtractionQueueResult> {
+    const { data: existing, error: fetchError } = await supabase
+      .from('processos')
+      .select('status, pdf_url')
+      .eq('tenant_id', tenantId)
+      .eq('suap_id', proc.suapId)
+      .single();
+
+    if (fetchError) throw fetchError;
+    if (!existing?.pdf_url) {
+      log(`[${proc.suapId}] PDF ausente. Baixe o PDF antes da extracao por IA.`);
+      return { queued: false, status: 'pdf_missing' };
+    }
+
+    if (existing.status === 'success' && !options.force) {
+      log(`[${proc.suapId}] Extracao IA ja concluida. Pulando.`);
+      return { queued: false, status: 'success' };
+    }
+
+    log(`[${proc.suapId}] Executando extracao por Inteligencia Artificial...`);
     const { data: aiRes, error: aiErr } = await supabase.functions.invoke('process-pdf', {
       body: { suap_id: proc.suapId },
     });
 
     if (aiErr) {
-      throw new Error(`Extração por IA falhou: ${aiErr.message}`);
+      throw new Error(`Extracao por IA falhou: ${aiErr.message}`);
     }
 
-    log(`[${proc.suapId}] Extração por IA finalizada.`);
-
-    // 5. Se a IA deixou lacunas, aplicar prefill determinístico como reparo
-    const { data: record } = await supabase
-      .from('processos')
-      .select('beneficiario, cpf_cnpj, assunto, dados_completos')
-      .eq('tenant_id', tenantId)
-      .eq('suap_id', proc.suapId)
-      .single();
-
-    const validation = validateExtractedProcessRecord(record);
-    if (!validation.ok) {
-      log(`[${proc.suapId}] Extração IA incompleta. Aplicando reparo determinístico...`);
-      if (deterministicData) {
-        const repairRes = await persistDeterministicPrefill(proc.suapId, deterministicData, tenantId);
-        if (repairRes?.validation?.ok) {
-          log(`[${proc.suapId}] Informações ausentes recuperadas com sucesso.`);
-        }
-      }
+    if (aiRes?.queued) {
+      log(`[${proc.suapId}] Extracao IA enfileirada. Acompanhe o status na tabela.`);
     }
 
-    log(`[${proc.suapId}] Sincronização concluída com sucesso!`);
-    return true;
+    return {
+      queued: Boolean(aiRes?.queued),
+      status: typeof aiRes?.status === 'string' ? aiRes.status : 'queued_extraction',
+    };
   },
 
+  async processAndSyncSingle(
+    proc: ScrapedProcesso | SyncedProcesso,
+    suapSessionId: string,
+    tenantId: string,
+    log: SyncProgressCallback,
+    options: { forcePdf?: boolean; forceAi?: boolean } = {},
+  ): Promise<AiExtractionQueueResult> {
+    await this.downloadPdfForProcess(proc, suapSessionId, tenantId, log, { force: options.forcePdf });
+    return this.runAiExtractionForProcess(proc, tenantId, log, { force: options.forceAi });
+  },
   // Descobre todas as caixas de processos disponíveis analisando o HTML principal da caixa do SUAP
   discoverCaixasProcessos(html: string): Array<{ nome: string; url: string }> {
     const parser = new DOMParser();

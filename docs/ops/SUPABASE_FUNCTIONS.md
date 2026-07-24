@@ -50,8 +50,35 @@ Saida:
 
 Dependencias:
 
-- `OPENAI_API_KEY`
-- opcional `OPENAI_VISION_MODEL`
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional `GEMINI_LIQUIDACAO_MODEL`, com fallback para `gemini-2.5-flash-lite` e `gemini-2.5-flash`
+
+### `process-pdf` e `process-pdf-worker`
+
+Local:
+
+- [process-pdf/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/process-pdf/index.ts)
+- [process-pdf-worker/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/process-pdf-worker/index.ts)
+- [_shared/process_pdf_shared.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/_shared/process_pdf_shared.ts)
+
+Chamador:
+
+- [suapScraperService.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/suapScraperService.ts)
+
+Uso:
+
+- `process-pdf` autentica o usuario, valida o processo e enfileira a extracao do PDF sincronizado no bucket `suap-pdfs`
+- `process-pdf-worker` processa a fila, atualiza `processos` e grava `dados_completos.extraction_job`; a ordem de provedores e Gemini com PDF, OpenAI com PDF e OpenRouter para reparo final do JSON
+- o fluxo SUAP padrao envia apenas `suap_id` para a Edge Function; antes da IA o frontend persiste somente `suap_id`, `url`, `caixa` e, quando encontrado na listagem, `num_processo`. A resposta `202` confirma somente o enfileiramento; o frontend acompanha `processos.status` ate o resultado final e exibe falhas tecnicas registradas em `dados_completos.extraction_job`
+
+Dependencias:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `GEMINI_API_KEY`
+- opcional `GEMINI_MODEL`, com default `gemini-2.5-flash-lite`
+- opcional `PROCESS_PDF_WORKER_SECRET`; quando ausente, usa `SUPABASE_SERVICE_ROLE_KEY`
+- `OPENAI_API_KEY` e opcional `OPENAI_MODEL`, com default `gpt-5-mini`, como segundo provedor
+- opcional `OPENROUTER_API_KEY` e `OPENROUTER_MODEL` como terceiro provedor de reparo de JSON
 
 ### `suap-token-exchange`
 
