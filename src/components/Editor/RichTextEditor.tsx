@@ -32,16 +32,20 @@ interface RichTextEditorProps {
   onChange: (content: string) => void;
   placeholder?: string;
   highlightPendingFields?: boolean;
+  highlightBracketPlaceholders?: boolean;
+  contentClassName?: string;
   /** Content rendered on the left side of the toolbar (e.g. back button, template name) */
   toolbarLeft?: ReactNode;
   /** Content rendered on the right side of the toolbar (e.g. save, verify buttons) */
   toolbarRight?: ReactNode;
 }
 
-function ToolbarBtn({ active, onClick, children }: { active?: boolean; onClick: () => void; children: React.ReactNode }) {
+function ToolbarBtn({ active, label, onClick, children }: { active?: boolean; label: string; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
       type="button"
+      aria-label={label}
+      title={label}
       onMouseDown={(e) => { e.preventDefault(); onClick(); }}
       className={cn(
         'h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground transition-colors',
@@ -56,12 +60,13 @@ function ToolbarBtn({ active, onClick, children }: { active?: boolean; onClick: 
 
 const Sep = () => <div className="w-px h-4 bg-border mx-0.5" />;
 
-const PendingFieldHighlight = Extension.create<{ enabled: boolean }>({
+const PendingFieldHighlight = Extension.create<{ enabled: boolean; includeBracketPlaceholders: boolean }>({
   name: 'pendingFieldHighlight',
 
   addOptions() {
     return {
       enabled: false,
+      includeBracketPlaceholders: false,
     };
   },
 
@@ -77,7 +82,7 @@ const PendingFieldHighlight = Extension.create<{ enabled: boolean }>({
             state.doc.descendants((node, position) => {
               if (!node.isText || !node.text) return;
 
-              findPendingFieldMarkers(node.text).forEach((marker) => {
+              findPendingFieldMarkers(node.text, this.options.includeBracketPlaceholders).forEach((marker) => {
                 decorations.push(
                   Decoration.inline(position + marker.start, position + marker.end, {
                     class: PENDING_FIELD_HIGHLIGHT_CLASS,
@@ -100,6 +105,8 @@ export default function RichTextEditor({
   onChange,
   placeholder,
   highlightPendingFields = false,
+  highlightBracketPlaceholders = false,
+  contentClassName,
   toolbarLeft,
   toolbarRight,
 }: RichTextEditorProps) {
@@ -107,11 +114,11 @@ export default function RichTextEditor({
   const editorShellRef = useRef<HTMLDivElement | null>(null);
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({ underline: false }),
       Underline,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Placeholder.configure({ placeholder: placeholder || 'Comece a digitar...' }),
-      PendingFieldHighlight.configure({ enabled: highlightPendingFields }),
+      PendingFieldHighlight.configure({ enabled: highlightPendingFields, includeBracketPlaceholders: highlightBracketPlaceholders }),
     ],
     content,
     onUpdate: ({ editor }) => {
@@ -122,15 +129,15 @@ export default function RichTextEditor({
       if (editor.isDestroyed) return;
       onChange(editor.getHTML());
     },
-  }, [highlightPendingFields]);
+  }, [highlightBracketPlaceholders, highlightPendingFields]);
 
   const applyPendingFieldDomHighlight = useCallback(() => {
     if (!highlightPendingFields) return;
     window.requestAnimationFrame(() => {
       if (!editor || editor.isDestroyed) return;
-      highlightPendingFieldsInElement(editorShellRef.current?.querySelector('.tiptap') || null);
+      highlightPendingFieldsInElement(editorShellRef.current?.querySelector('.tiptap') || null, highlightBracketPlaceholders);
     });
-  }, [editor, highlightPendingFields]);
+  }, [editor, highlightBracketPlaceholders, highlightPendingFields]);
 
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
@@ -152,7 +159,7 @@ export default function RichTextEditor({
       editor.off('update', applyPendingFieldDomHighlight);
       editor.off('selectionUpdate', applyPendingFieldDomHighlight);
     };
-  }, [applyPendingFieldDomHighlight, editor, highlightPendingFields]);
+  }, [applyPendingFieldDomHighlight, editor, highlightBracketPlaceholders, highlightPendingFields]);
 
   if (!editor) return null;
 
@@ -170,37 +177,37 @@ export default function RichTextEditor({
 
         {/* Formatting tools */}
         <div className="flex items-center gap-0.5">
-          <ToolbarBtn active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
+          <ToolbarBtn label="Negrito" active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
             <Bold className="w-3.5 h-3.5" />
           </ToolbarBtn>
-          <ToolbarBtn active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>
+          <ToolbarBtn label="Italico" active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>
             <Italic className="w-3.5 h-3.5" />
           </ToolbarBtn>
-          <ToolbarBtn active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()}>
+          <ToolbarBtn label="Sublinhado" active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()}>
             <UnderlineIcon className="w-3.5 h-3.5" />
           </ToolbarBtn>
           <Sep />
-          <ToolbarBtn active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}>
+          <ToolbarBtn label="Lista com marcadores" active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}>
             <List className="w-3.5 h-3.5" />
           </ToolbarBtn>
-          <ToolbarBtn active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
+          <ToolbarBtn label="Lista numerada" active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
             <ListOrdered className="w-3.5 h-3.5" />
           </ToolbarBtn>
           <Sep />
-          <ToolbarBtn active={editor.isActive({ textAlign: 'left' })} onClick={() => editor.chain().focus().setTextAlign('left').run()}>
+          <ToolbarBtn label="Alinhar a esquerda" active={editor.isActive({ textAlign: 'left' })} onClick={() => editor.chain().focus().setTextAlign('left').run()}>
             <AlignLeft className="w-3.5 h-3.5" />
           </ToolbarBtn>
-          <ToolbarBtn active={editor.isActive({ textAlign: 'center' })} onClick={() => editor.chain().focus().setTextAlign('center').run()}>
+          <ToolbarBtn label="Centralizar" active={editor.isActive({ textAlign: 'center' })} onClick={() => editor.chain().focus().setTextAlign('center').run()}>
             <AlignCenter className="w-3.5 h-3.5" />
           </ToolbarBtn>
-          <ToolbarBtn active={editor.isActive({ textAlign: 'right' })} onClick={() => editor.chain().focus().setTextAlign('right').run()}>
+          <ToolbarBtn label="Alinhar a direita" active={editor.isActive({ textAlign: 'right' })} onClick={() => editor.chain().focus().setTextAlign('right').run()}>
             <AlignRight className="w-3.5 h-3.5" />
           </ToolbarBtn>
           <Sep />
-          <ToolbarBtn onClick={() => editor.chain().focus().undo().run()}>
+          <ToolbarBtn label="Desfazer" onClick={() => editor.chain().focus().undo().run()}>
             <Undo className="w-3.5 h-3.5" />
           </ToolbarBtn>
-          <ToolbarBtn onClick={() => editor.chain().focus().redo().run()}>
+          <ToolbarBtn label="Refazer" onClick={() => editor.chain().focus().redo().run()}>
             <Redo className="w-3.5 h-3.5" />
           </ToolbarBtn>
         </div>
@@ -216,7 +223,7 @@ export default function RichTextEditor({
       {/* Editor Content */}
       <EditorContent
         editor={editor}
-        className="prose prose-sm dark:prose-invert max-w-none flex-1 px-6 py-5 focus:outline-none min-h-[380px] [&_.tiptap]:outline-none [&_.tiptap]:min-h-[380px]"
+        className={cn("prose prose-sm dark:prose-invert max-w-none flex-1 px-6 py-5 focus:outline-none min-h-[380px] [&_.tiptap]:outline-none [&_.tiptap]:min-h-[380px]", contentClassName)}
       />
     </div>
   );

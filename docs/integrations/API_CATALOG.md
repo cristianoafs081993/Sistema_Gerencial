@@ -797,6 +797,7 @@ Uso:
 - Sincronizacao direta e nativa da caixa de processos do SUAP para a tabela `processos`
 - Download de PDFs e envio para o bucket `suap-pdfs`, como etapa independente ou dentro do fluxo completo
 - Extracao por IA no backend via Gemini; antes da IA o frontend nao busca beneficiario, contrato, valores, dados bancarios ou outros metadados alem de ID e numero do processo
+- Geracao local de `Despacho de Liquidacao` na propria tela `/suap`, por processo ou em lote, reaproveitando os dados do processo e o resultado ja persistido da extracao por IA
 
 Fluxo Tecnico:
 
@@ -804,6 +805,7 @@ Fluxo Tecnico:
 - A sincronizacao de inventario, o download de PDF e a extracao por IA sao etapas modulares e podem ser repetidas separadamente para processos escolhidos pelo usuario.
 - Processos ja sincronizados sao preservados no fluxo comum, inclusive quando concluidos; atualizacao de registro existente depende de acao explicita.
 - As credenciais de acesso do SUAP sao mantidas no `localStorage` apos o login/cookie informado pelo usuario.
+- O despacho nao aciona uma nova Edge Function ou uma nova chamada de IA: o frontend monta o documento com `documentGeneration`, copia pelo `suapClipboard` e cria a URL de clonagem com `suapCloneAutomation`. A fila de documentos em andamento usa `sessionStorage` e cada clonagem e confirmada individualmente.
 
 Consumidores no app:
 

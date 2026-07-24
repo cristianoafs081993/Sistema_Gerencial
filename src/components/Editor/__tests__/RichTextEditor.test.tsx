@@ -34,4 +34,29 @@ describe('RichTextEditor', () => {
     expect(await screen.findByText(/CAMPO PENDENTE/i)).toBeInTheDocument();
     expect(document.querySelector(`.${PENDING_FIELD_HIGHLIGHT_CLASS}`)).not.toBeInTheDocument();
   });
+
+  it('destaca placeholders entre colchetes quando solicitado', async () => {
+    render(
+      <RichTextEditor
+        content="<p>Beneficiario: [favorecido]</p>"
+        onChange={vi.fn()}
+        highlightPendingFields
+        highlightBracketPlaceholders
+      />,
+    );
+
+    await waitFor(() => {
+      const marker = document.querySelector(`.${PENDING_FIELD_HIGHLIGHT_CLASS}`);
+      expect(marker).toHaveTextContent('[favorecido]');
+      expect(marker).toHaveStyle({ color: 'rgb(185, 28, 28)' });
+    });
+  });
+
+  it('exibe comandos de formatacao com rotulos acessiveis', () => {
+    render(<RichTextEditor content="<p>Texto</p>" onChange={vi.fn()} />);
+
+    expect(screen.getByRole('button', { name: 'Negrito' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Centralizar' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Desfazer' })).toBeInTheDocument();
+  });
 });

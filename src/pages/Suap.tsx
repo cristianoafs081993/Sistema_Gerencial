@@ -8,6 +8,7 @@ import {
   ExternalLink,
   Eye,
   FileDown,
+  FilePenLine,
   Landmark,
   RefreshCw,
   ReceiptText,
@@ -73,6 +74,14 @@ import { SuapProcesso } from '@/types';
 import { suapProcessosService } from '@/services/suapProcessos';
 import { suapScraperService } from '@/services/suapScraperService';
 import { SuapSyncPanel } from '@/components/suap/SuapSyncPanel';
+import { SuapDocumentGeneratorDialog } from '@/components/suap/SuapDocumentGeneratorDialog';
+import {
+  clearDispatchQueue,
+  createDispatchQueue,
+  loadDispatchQueue,
+  saveDispatchQueue,
+  type DispatchQueueState,
+} from '@/lib/suapDispatchGeneration';
 
 type StatusFilter = 'active' | 'concluded';
 type ProcessAction = 'download' | 'ai' | 'full';
@@ -684,6 +693,8 @@ export default function Suap() {
   const [selectedProcesso, setSelectedProcesso] = useState<SuapProcesso | null>(null);
   const [detailsProcesso, setDetailsProcesso] = useState<SuapProcesso | null>(null);
   const [isConclusaoDialogOpen, setIsConclusaoDialogOpen] = useState(false);
+  const [dispatchQueue, setDispatchQueue] = useState<DispatchQueueState | null>(() => loadDispatchQueue());
+  const [isDispatchDialogOpen, setIsDispatchDialogOpen] = useState(() => Boolean(loadDispatchQueue()));
 
   // local login states
   const [email, setEmail] = useState('');
@@ -802,6 +813,27 @@ export default function Suap() {
     [visibleProcesses, selectedProcessIds],
   );
   const allVisibleSelected = visibleProcesses.length > 0 && visibleProcesses.every((processo) => selectedProcessIds.has(processo.id));
+
+  useEffect(() => {
+    if (dispatchQueue) {
+      saveDispatchQueue(dispatchQueue);
+    } else {
+      clearDispatchQueue();
+    }
+  }, [dispatchQueue]);
+
+  const startDispatchGeneration = (selected: SuapProcesso[]) => {
+    if (selected.length === 0) return;
+    setDispatchQueue(createDispatchQueue(selected));
+    setIsDispatchDialogOpen(true);
+  };
+
+  const handleDispatchDialogOpenChange = (open: boolean) => {
+    setIsDispatchDialogOpen(open);
+    if (!open) {
+      setDispatchQueue(null);
+    }
+  };
 
   const getSuapSessionId = () => {
     const savedSession = localStorage.getItem('suap_session_id');
@@ -1150,6 +1182,14 @@ export default function Suap() {
         onSuccess={handleConclusaoSuccess}
       />
 
+      <SuapDocumentGeneratorDialog
+        open={isDispatchDialogOpen}
+        onOpenChange={handleDispatchDialogOpenChange}
+        processos={processos}
+        queue={dispatchQueue}
+        onQueueChange={setDispatchQueue}
+      />
+
       <Dialog
         open={Boolean(detailsProcesso)}
         onOpenChange={(open) => {
@@ -1356,6 +1396,27 @@ export default function Suap() {
               : 'Selecionar processos visíveis'}
           </label>
           <div className="flex flex-wrap items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={selectedProcesses.length === 0 || bulkAction !== null}
+                  className="h-9 gap-2 bg-white text-xs"
+                >
+                  <FilePenLine className="h-4 w-4" />
+                  Gerar documentos
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => startDispatchGeneration(selectedProcesses)}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Despacho de Liquidacao
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               type="button"
               variant="outline"
@@ -1571,6 +1632,26 @@ export default function Suap() {
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1.5">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                title="Gerar documento"
+                                aria-label={`Gerar documento para ${processLabel}`}
+                                className="h-8 w-8 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                              >
+                                <FilePenLine className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => startDispatchGeneration([processo])}>
+                                <FileText className="mr-2 h-4 w-4" />
+                                Despacho de Liquidacao
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                           <Button
                             type="button"
                             variant="ghost"

@@ -82,6 +82,25 @@ describe('SUAP process PDF AI extraction flow', () => {
     expect(pageSource).not.toContain('visibleInCurrentFilter');
   });
 
+  it('keeps despacho generation available from the SUAP table and bulk selection', () => {
+    const pageSource = readFileSync(
+      path.resolve(process.cwd(), 'src/pages/Suap.tsx'),
+      'utf8',
+    );
+    const dialogSource = readFileSync(
+      path.resolve(process.cwd(), 'src/components/suap/SuapDocumentGeneratorDialog.tsx'),
+      'utf8',
+    );
+
+    expect(pageSource).toContain('SuapDocumentGeneratorDialog');
+    expect(pageSource).toContain('startDispatchGeneration(selectedProcesses)');
+    expect(pageSource).toContain('startDispatchGeneration([processo])');
+    expect(pageSource).toContain('FilePenLine');
+    expect(dialogSource).toContain('Despacho de Liquidacao');
+    expect(dialogSource).toContain('buildSuapCloneUrl');
+    expect(dialogSource).toContain('copySuapDocumentToClipboard');
+  });
+
   it('uses a stable Gemini model default for process-pdf extraction', () => {
     const sharedSource = readFileSync(
       path.resolve(process.cwd(), 'supabase/functions/_shared/process_pdf_shared.ts'),

@@ -16,10 +16,11 @@ export type PendingFieldMarker = {
 };
 
 const pendingFieldMarkerPattern = /\[\s*campo\s+pendente\b[^\]]*\]|\bcampo\s+pendente\b/gi;
+const bracketPlaceholderPattern = /\[[^\]\r\n]+\]/g;
 
-export const findPendingFieldMarkers = (text: string): PendingFieldMarker[] => {
+export const findPendingFieldMarkers = (text: string, includeBracketPlaceholders = false): PendingFieldMarker[] => {
   const markers: PendingFieldMarker[] = [];
-  const pattern = new RegExp(pendingFieldMarkerPattern);
+  const pattern = includeBracketPlaceholders ? new RegExp(`${pendingFieldMarkerPattern.source}|${bracketPlaceholderPattern.source}`, 'gi') : new RegExp(pendingFieldMarkerPattern);
   let match: RegExpExecArray | null;
 
   while ((match = pattern.exec(text)) !== null) {
@@ -33,7 +34,7 @@ export const findPendingFieldMarkers = (text: string): PendingFieldMarker[] => {
   return markers;
 };
 
-export const hasPendingFieldMarker = (text: string) => findPendingFieldMarkers(text).length > 0;
+export const hasPendingFieldMarker = (text: string, includeBracketPlaceholders = false) => findPendingFieldMarkers(text, includeBracketPlaceholders).length > 0;
 
 const shouldSkipTextNode = (node: Text) => {
   const parent = node.parentElement;
@@ -44,9 +45,9 @@ const shouldSkipTextNode = (node: Text) => {
   return tagName === 'script' || tagName === 'style';
 };
 
-const highlightTextNode = (textNode: Text) => {
+const highlightTextNode = (textNode: Text, includeBracketPlaceholders: boolean) => {
   const value = textNode.nodeValue || '';
-  const markers = findPendingFieldMarkers(value);
+  const markers = findPendingFieldMarkers(value, includeBracketPlaceholders);
   if (markers.length === 0) return;
 
   const fragment = document.createDocumentFragment();
@@ -73,7 +74,7 @@ const highlightTextNode = (textNode: Text) => {
   textNode.replaceWith(fragment);
 };
 
-export const highlightPendingFieldsInElement = (element: Node | null) => {
+export const highlightPendingFieldsInElement = (element: Node | null, includeBracketPlaceholders = false) => {
   if (!element || typeof document === 'undefined') return;
 
   const textNodes: Text[] = [];
@@ -82,20 +83,20 @@ export const highlightPendingFieldsInElement = (element: Node | null) => {
 
   while (current) {
     const textNode = current as Text;
-    if (!shouldSkipTextNode(textNode) && hasPendingFieldMarker(textNode.nodeValue || '')) {
+    if (!shouldSkipTextNode(textNode) && hasPendingFieldMarker(textNode.nodeValue || '', includeBracketPlaceholders)) {
       textNodes.push(textNode);
     }
     current = walker.nextNode();
   }
 
-  textNodes.forEach(highlightTextNode);
+  textNodes.forEach((textNode) => highlightTextNode(textNode, includeBracketPlaceholders));
 };
 
-export const highlightPendingFieldsInHtml = (html: string) => {
+export const highlightPendingFieldsInHtml = (html: string, includeBracketPlaceholders = false) => {
   if (!html || typeof document === 'undefined') return html;
 
   const template = document.createElement('template');
   template.innerHTML = html;
-  highlightPendingFieldsInElement(template.content);
+  highlightPendingFieldsInElement(template.content, includeBracketPlaceholders);
   return template.innerHTML;
 };
