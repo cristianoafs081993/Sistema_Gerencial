@@ -18,6 +18,7 @@ import {
   buildManualDespachoHtml,
   createManualDespachoFields,
   isAiAssistedDispatch,
+  createStandaloneManualDespachoFields,
   type DispatchQueueState,
   type ManualDespachoFields,
 } from '@/lib/suapDispatchGeneration';
@@ -45,16 +46,13 @@ export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, que
   const resolvingProcessId = useRef<string | null>(null);
 
   const currentItem = queue?.items[queue.currentIndex] || null;
-  const processo = useMemo(
-    () => processos.find((item) => item.id === currentItem?.processId) || null,
-    [currentItem?.processId, processos],
-  );
+  const processo = useMemo(() => currentItem?.standalone ? null : processos.find((item) => item.id === currentItem?.processId) || null, [currentItem?.processId, currentItem?.standalone, processos]);
   const latestOpenRef = useRef(open);
   const currentProcessIdRef = useRef<string | null>(currentItem?.processId || null);
   latestOpenRef.current = open;
   currentProcessIdRef.current = currentItem?.processId || null;
   const isAssisted = Boolean(processo && isAiAssistedDispatch(processo));
-  const manualFields = currentItem?.manualFields || (processo ? createManualDespachoFields(processo) : null);
+  const manualFields = currentItem?.manualFields || (processo ? createManualDespachoFields(processo) : currentItem?.standalone ? createStandaloneManualDespachoFields() : null);
   const isLast = Boolean(queue && queue.currentIndex === queue.items.length - 1);
   const isFirst = !queue || queue.currentIndex === 0;
   const pendingCount = queue?.items.filter((item) => item.status === 'pending').length || 0;
@@ -87,8 +85,8 @@ export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, que
   }, [contratos, contratosEmpenhos, currentItem, empenhos, isAssisted, onQueueChange, open, processo, queue]);
 
   useEffect(() => {
-    if (!open || !queue || !currentItem || !processo || isAssisted || currentItem.manualFields) return;
-    onQueueChange(updateCurrentItem(queue, { manualFields: createManualDespachoFields(processo) }));
+    if (!open || !queue || !currentItem || (!processo && !currentItem.standalone) || isAssisted || currentItem.manualFields) return;
+    onQueueChange(updateCurrentItem(queue, { manualFields: processo ? createManualDespachoFields(processo) : createStandaloneManualDespachoFields() }));
   }, [currentItem, isAssisted, onQueueChange, open, processo, queue]);
 
   const move = (direction: -1 | 1) => {
@@ -164,7 +162,7 @@ export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, que
                 Despacho de Liquidacao
               </DialogTitle>
               <DialogDescription className="mt-1 text-xs">
-                {queue ? `${queue.currentIndex + 1} de ${queue.items.length} processo(s)` : 'Preparando fila'}
+                {queue ? `${queue.currentIndex + 1} de ${queue.items.length} documento(s)` : 'Preparando fila'}
               </DialogDescription>
             </div>
             {processo ? (
@@ -179,7 +177,7 @@ export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, que
         </DialogHeader>
 
         <div className="min-h-0 overflow-y-auto px-5 py-4">
-          {!queue || !currentItem ? null : !processo ? (
+          {!queue || !currentItem ? null : !processo && !currentItem.standalone ? (
             <div className="flex min-h-48 flex-col items-center justify-center gap-3 text-center">
               <TriangleAlert className="h-8 w-8 text-amber-600" />
               <p className="text-sm text-text-secondary">Este processo nao esta mais disponivel no espelho SUAP.</p>
@@ -268,7 +266,7 @@ function ManualDespachoForm({
     <div className="space-y-3">
       <p className="flex items-center gap-2 text-xs font-semibold text-text-primary"><Sparkles className="h-4 w-4 text-amber-600" /> Preenchimento manual</p>
       <div className="space-y-1"><Label>Finalidade</Label><Select value={fields.finalidade} onValueChange={(value) => onChange('finalidade', value as ManualDespachoFields['finalidade'])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="contrato">Contrato ou aquisicao</SelectItem><SelectItem value="projeto">Projeto</SelectItem><SelectItem value="bolsa-sem-projeto">Bolsa sem projeto</SelectItem><SelectItem value="auxilio-transporte">Auxilio transporte</SelectItem><SelectItem value="pafe">PAFE</SelectItem><SelectItem value="auxilio-moradia">Auxilio moradia</SelectItem></SelectContent></Select></div>
-      <div className="space-y-1"><Label>Processo</Label><Input value={fields.processo} onChange={(event) => onChange('processo', event.target.value)} /></div>
+      <div className="space-y-1"><Label>Processo (opcional)</Label><Input value={fields.processo} onChange={(event) => onChange('processo', event.target.value)} /></div>
       {!noFavorecido ? <div className="space-y-1"><Label>Favorecido</Label><Input value={fields.favorecido} onChange={(event) => onChange('favorecido', event.target.value)} /></div> : null}
       {fields.finalidade === 'contrato' ? <><div className="space-y-1"><Label>Tipo</Label><Select value={fields.tipo} onValueChange={(value) => onChange('tipo', value as ManualDespachoFields['tipo'])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="servico">Servico</SelectItem><SelectItem value="aquisicao">Aquisicao</SelectItem></SelectContent></Select></div><div className="space-y-1"><Label>Descricao</Label><Textarea value={fields.descricao} onChange={(event) => onChange('descricao', event.target.value)} /></div></> : null}
       {fields.finalidade === 'projeto' ? <><div className="space-y-1"><Label>Projeto</Label><Input value={fields.projeto} onChange={(event) => onChange('projeto', event.target.value)} /></div><div className="space-y-1"><Label>Edital</Label><Input value={fields.edital} onChange={(event) => onChange('edital', event.target.value)} /></div></> : null}

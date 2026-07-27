@@ -73,12 +73,12 @@ import { cn } from '@/lib/utils';
 import { SuapProcesso } from '@/types';
 import { suapProcessosService } from '@/services/suapProcessos';
 import { suapScraperService } from '@/services/suapScraperService';
-import { SuapSyncPanel } from '@/components/suap/SuapSyncPanel';
 import { SuapDocumentGeneratorDialog } from '@/components/suap/SuapDocumentGeneratorDialog';
 import {
   clearDispatchQueue,
   createDispatchQueue,
   loadDispatchQueue,
+  createStandaloneDispatchQueue,
   saveDispatchQueue,
   type DispatchQueueState,
 } from '@/lib/suapDispatchGeneration';
@@ -719,7 +719,6 @@ export default function Suap() {
     isError,
     error,
     refetch,
-    isFetching,
   } = useQuery({
     queryKey: ['suap-processos'],
     queryFn: suapProcessosService.getAll,
@@ -828,6 +827,11 @@ export default function Suap() {
     setIsDispatchDialogOpen(true);
   };
 
+
+  const startStandaloneDispatchGeneration = () => {
+    setDispatchQueue(createStandaloneDispatchQueue());
+    setIsDispatchDialogOpen(true);
+  };
   const handleDispatchDialogOpenChange = (open: boolean) => {
     setIsDispatchDialogOpen(open);
     if (!open) {
@@ -1109,7 +1113,6 @@ export default function Suap() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : null}
-
           <Button
             variant="outline"
             size="sm"
@@ -1119,55 +1122,9 @@ export default function Suap() {
             <ExternalLink className="h-4 w-4" />
             Baixar extensão
           </Button>
-          {session ? (
-            <>
-              <Button
-                variant="outline"
-                onClick={() => void refetch()}
-                disabled={isFetching}
-                className="gap-2 h-9 text-sm"
-              >
-                <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
-                {isFetching ? 'Atualizando...' : 'Atualizar'}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={async () => {
-                  const { error: signOutError } = await supabase.auth.signOut();
-                  if (signOutError) {
-                    toast.error('Erro ao sair.');
-                  } else {
-                    toast.success('Sessão encerrada.');
-                  }
-                }}
-                className="h-9 text-sm text-red-600 hover:text-red-700 hover:bg-red-50"
-              >
-                Sair
-              </Button>
-            </>
-          ) : null}
         </div>
       </HeaderActions>
 
-      <SuapSyncPanel onSyncComplete={() => void refetch()} />
-
-      {session ? (
-        <Card className="border-emerald-100 bg-emerald-50/20 overflow-hidden shadow-soft">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600 shrink-0">
-                <Sparkles className="h-5 w-5" />
-              </div>
-              <div>
-                <h4 className="font-ui text-sm font-semibold text-emerald-950">Sincronização de Processos do SUAP</h4>
-                <p className="text-xs text-emerald-800/90 mt-0.5 leading-5">
-                  Para importar ou atualizar processos de uma caixa específica, clique em <strong>"Sincronizar caixa..."</strong> no menu acima, faça login no SUAP se necessário, e utilize a extensão instalada no seu navegador.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
 
       <SuapConclusaoDialog
         open={isConclusaoDialogOpen}
@@ -1302,27 +1259,6 @@ export default function Suap() {
         </DialogContent>
       </Dialog>
 
-      {session ? (
-        <Card className="border-emerald-200/50 bg-emerald-50/30 shadow-sm max-w-full mb-6">
-          <CardContent className="flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
-                <CheckCircle2 className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="font-semibold text-emerald-900 text-sm">Conectado ao Espelho SUAP</p>
-                <p className="text-xs text-emerald-700 mt-0.5">
-                  Sincronização configurada para o usuário <strong>{session.user.email}</strong>
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 text-xs text-emerald-700 bg-white/60 px-3 py-2 rounded-lg border border-emerald-100">
-              <RefreshCw className="h-4 w-4 text-emerald-500" />
-              <span>A extensão sincroniza automaticamente as caixas ativas a cada hora.</span>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
 
       <div className="space-y-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -1382,7 +1318,7 @@ export default function Suap() {
 
           </div>
 
-      {session && visibleProcesses.length > 0 ? (
+      {session ? (
         <div className="flex flex-col gap-3 rounded-xl border border-border-default/70 bg-surface-card p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <label className="flex items-center gap-2 font-ui text-xs font-semibold text-text-secondary">
             <input
@@ -1402,7 +1338,7 @@ export default function Suap() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled={selectedProcesses.length === 0 || bulkAction !== null}
+                  disabled={bulkAction !== null}
                   className="h-9 gap-2 bg-white text-xs"
                 >
                   <FilePenLine className="h-4 w-4" />
@@ -1411,7 +1347,14 @@ export default function Suap() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={() => startDispatchGeneration(selectedProcesses)}>
+                <DropdownMenuItem onClick={startStandaloneDispatchGeneration}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Despacho de Liquidacao avulso
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={selectedProcesses.length === 0 || bulkAction !== null}
+                  onClick={() => startDispatchGeneration(selectedProcesses)}
+                >
                   <FileText className="mr-2 h-4 w-4" />
                   Despacho de Liquidacao
                 </DropdownMenuItem>

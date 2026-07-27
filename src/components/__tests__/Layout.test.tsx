@@ -21,6 +21,10 @@ vi.mock('@/contexts/AuthContext', () => ({
 vi.mock('@/components/auth/InviteUserDialog', () => ({
   InviteUserDialog: () => <button type="button">Convidar</button>,
 }));
+vi.mock('@/components/suap/SuapSyncPanel', () => ({
+  SuapSyncPanel: () => <div>Painel de integração SUAP</div>,
+}));
+
 
 vi.mock('@/components/ui/tooltip', () => ({
   TooltipProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -115,7 +119,23 @@ describe('Layout', () => {
     expect(screen.queryByText('IFRN Campus Currais Novos')).not.toBeInTheDocument();
   });
 
-  it('permite alterar a senha pelo menu do usuario', async () => {
+  it('abre a configuração da integração SUAP pelo menu do usuário', () => {
+    render(
+      <MemoryRouter>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Abrir configurações do usuário' }), { key: 'ArrowDown' });
+    fireEvent.click(screen.getByRole('menuitem', { name: /configurar integração com o suap/i }));
+
+    expect(screen.getByRole('dialog')).toHaveTextContent('Configurar integração com o SUAP');
+    expect(screen.getByText('Painel de integração SUAP')).toBeInTheDocument();
+  });
+
+  it('permite alterar a senha pelo menu do usuário', async () => {
     updatePasswordMock.mockResolvedValue(null);
 
     render(
@@ -126,7 +146,8 @@ describe('Layout', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByTitle('Alterar senha'));
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Abrir configurações do usuário' }), { key: 'ArrowDown' });
+    fireEvent.click(screen.getByRole('menuitem', { name: /alterar senha/i }));
     fireEvent.change(screen.getByLabelText('Nova senha'), {
       target: { value: 'nova-senha-123' },
     });

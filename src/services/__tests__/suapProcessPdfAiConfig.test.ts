@@ -41,6 +41,22 @@ describe('SUAP process PDF AI extraction flow', () => {
     expect(panelSource).not.toContain('enrichProcessNumber');
   });
 
+  it('keeps SUAP configuration manual and refreshes processes after synchronization', () => {
+    const serviceSource = readFileSync(
+      path.resolve(process.cwd(), 'src/services/suapScraperService.ts'),
+      'utf8',
+    );
+    const panelSource = readFileSync(
+      path.resolve(process.cwd(), 'src/components/suap/SuapSyncPanel.tsx'),
+      'utf8',
+    );
+
+    expect(panelSource).toContain("queryClient.invalidateQueries({ queryKey: ['suap-processos'] })");
+    expect(panelSource).toContain('Cadastre uma caixa manualmente para iniciar a sincronização.');
+    expect(panelSource).not.toContain('Auto-descobrir Caixas');
+    expect(panelSource).not.toContain('handleDiscoverBoxes');
+    expect(serviceSource).not.toContain('discoverCaixasProcessos');
+  });
   it('exposes independent PDF and AI stages on the SUAP page', () => {
     const pageSource = readFileSync(
       path.resolve(process.cwd(), 'src/pages/Suap.tsx'),

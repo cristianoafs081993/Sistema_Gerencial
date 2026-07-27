@@ -797,7 +797,7 @@ Uso:
 - Sincronizacao direta e nativa da caixa de processos do SUAP para a tabela `processos`
 - Download de PDFs e envio para o bucket `suap-pdfs`, como etapa independente ou dentro do fluxo completo
 - Extracao por IA no backend via Gemini; antes da IA o frontend nao busca beneficiario, contrato, valores, dados bancarios ou outros metadados alem de ID e numero do processo
-- Geracao local de `Despacho de Liquidacao` na propria tela `/suap`, por processo ou em lote, reaproveitando os dados do processo e o resultado ja persistido da extracao por IA
+- Geracao local de `Despacho de Liquidacao` na propria tela `/suap`, avulso ou por processo/em lote; o modo avulso usa preenchimento manual e aceita processo opcional, enquanto os demais reaproveitam os dados do processo e o resultado ja persistido da extracao por IA
 
 Fluxo Tecnico:
 
@@ -814,7 +814,7 @@ Consumidores no app:
 
 Observacao:
 
-- Nao e mais necessaria a instalacao de extensao Chrome. A sincronizacao ocorre diretamente atraves do componente `<SuapSyncPanel>` na tela de processos.
+- Nao e mais necessaria a instalacao de extensao Chrome. A sincronizacao ocorre diretamente atraves do componente `<SuapSyncPanel>`, aberto pelo menu do usuario em `Configurar integração com o SUAP`. As caixas sao cadastradas manualmente; nao ha auto-descoberta.
 - O usuario deve manter a aba ativa no navegador durante o download de PDFs em razao das requisicoes assincronas do Celery.
 
 ## 12. Edge Function `record-automation-savings-event`

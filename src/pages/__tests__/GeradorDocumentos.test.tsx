@@ -88,15 +88,34 @@ describe('GeradorDocumentos', () => {
     expect(vi.mocked(copySuapDocumentToClipboard).mock.calls[0][0]).toContain('Assunto:');
   });
 
-  it('clona despacho usando payload de assunto em modo revisao quando usuario nao confirma salvar', () => {
+  it('clona despacho sem preenchimento automatico e sem depender da extensao', () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const confirmSpy = vi.spyOn(window, 'confirm');
     render(<GeradorDocumentos />);
 
     fireEvent.click(screen.getByRole('button', { name: /GERAR DESPACHO/i }));
-    fireEvent.click(screen.getAllByRole('button', { name: /CLONAR NO SUAP/i })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /^CLONAR$/i })[0]);
 
-    expect(confirmSpy).toHaveBeenCalled();
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(buildSuapCloneUrl).not.toHaveBeenCalled();
+    expect(openSpy).toHaveBeenCalledWith(
+      'https://suap.ifrn.edu.br/documento_eletronico/clonar_documento/1026154/',
+      '_blank',
+    );
+
+    openSpy.mockRestore();
+    confirmSpy.mockRestore();
+  });
+
+  it('clona e preenche despacho direto em modo revisao sem etapa intermediaria', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const confirmSpy = vi.spyOn(window, 'confirm');
+    render(<GeradorDocumentos />);
+
+    fireEvent.click(screen.getByRole('button', { name: /GERAR DESPACHO/i }));
+    fireEvent.click(screen.getAllByRole('button', { name: /CLONAR E PREENCHER NO SUAP/i })[0]);
+
+    expect(confirmSpy).not.toHaveBeenCalled();
     expect(buildSuapCloneUrl).toHaveBeenCalledWith(expect.objectContaining({
       documentType: 'despacho',
       mode: 'review',
@@ -106,24 +125,6 @@ describe('GeradorDocumentos', () => {
       'https://suap.ifrn.edu.br/documento_eletronico/clonar_documento/1026154/#siagesClone=mock',
       '_blank',
     );
-
-    openSpy.mockRestore();
-    confirmSpy.mockRestore();
-  });
-
-  it('clona despacho em modo salvar somente apos confirmacao explicita', () => {
-    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    render(<GeradorDocumentos />);
-
-    fireEvent.click(screen.getByRole('button', { name: /GERAR DESPACHO/i }));
-    fireEvent.click(screen.getAllByRole('button', { name: /CLONAR NO SUAP/i })[0]);
-
-    expect(confirmSpy).toHaveBeenCalled();
-    expect(buildSuapCloneUrl).toHaveBeenCalledWith(expect.objectContaining({
-      documentType: 'despacho',
-      mode: 'save-after-confirmation',
-    }));
 
     openSpy.mockRestore();
     confirmSpy.mockRestore();

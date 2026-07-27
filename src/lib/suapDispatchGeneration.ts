@@ -16,7 +16,8 @@ export type ManualDespachoFields = {
 };
 
 export type DispatchQueueItem = {
-  processId: string;
+  processId?: string;
+  standalone?: boolean;
   status: DispatchQueueItemStatus;
   html?: string;
   manualFields?: ManualDespachoFields;
@@ -39,6 +40,14 @@ export function createDispatchQueue(processos: SuapProcesso[]): DispatchQueueSta
   };
 }
 
+
+export function createStandaloneDispatchQueue(): DispatchQueueState {
+  return {
+    version: 1,
+    currentIndex: 0,
+    items: [{ standalone: true, status: 'pending', manualFields: createStandaloneManualDespachoFields() }],
+  };
+}
 export function saveDispatchQueue(queue: DispatchQueueState) {
   sessionStorage.setItem(SUAP_DISPATCH_QUEUE_STORAGE_KEY, JSON.stringify(queue));
 }
@@ -53,7 +62,11 @@ export function loadDispatchQueue(): DispatchQueueState | null {
       parsed.version !== 1 ||
       !Number.isInteger(parsed.currentIndex) ||
       !Array.isArray(parsed.items) ||
-      parsed.items.some((item) => !item || typeof item.processId !== 'string' || typeof item.status !== 'string')
+      parsed.items.some((item) =>
+        !item ||
+        typeof item.status !== 'string' ||
+        (!item.standalone && typeof item.processId !== 'string'),
+      )
     ) {
       return null;
     }
@@ -85,10 +98,25 @@ export function createManualDespachoFields(processo: SuapProcesso): ManualDespac
     empenho: processo.dadosCompletos?.empenhos?.join(', ') || '',
     projeto: '',
     edital: '',
+
     tipo: 'servico',
   };
 }
 
+
+export function createStandaloneManualDespachoFields(): ManualDespachoFields {
+  return {
+    finalidade: 'contrato',
+    processo: '',
+    favorecido: '',
+    descricao: '',
+    valor: '',
+    empenho: '',
+    projeto: '',
+    edital: '',
+    tipo: 'servico',
+  };
+}
 const esc = (value: string) => value.replace(/[&<>"']/g, (character) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 }[character] || character));
@@ -96,7 +124,7 @@ const esc = (value: string) => value.replace(/[&<>"']/g, (character) => ({
 const required = (value: string, label: string) => value.trim() ? `<b>${esc(value)}</b>` : `<b>[${esc(label)}]</b>`;
 
 export function buildManualDespachoHtml(fields: ManualDespachoFields) {
-  const processo = required(fields.processo, 'numero do processo');
+  const processReference = fields.processo.trim() ? ` (Processo n. ${required(fields.processo, 'numero do processo')})` : '';
   const valor = required(fields.valor, 'valor da liquidacao');
   const empenho = required(fields.empenho.toUpperCase(), 'empenho');
   const favorecido = required(fields.favorecido.toUpperCase(), 'favorecido');
@@ -104,21 +132,22 @@ export function buildManualDespachoHtml(fields: ManualDespachoFields) {
 
   let body = '';
   if (fields.finalidade === 'projeto') {
-    body = `Considerando a regularidade da documentacao apresentada e a execucao das atividades pelo(s) bolsista(s) ${favorecido}, do projeto ${required(fields.projeto, 'nome do projeto')}, aprovado no Edital n. ${required(fields.edital, 'numero do edital')} (Processo n. ${processo}), <b>AUTORIZO</b> a liquidacao da despesa no valor de ${valor}, referente ao empenho ${empenho}.`;
+    body = `Considerando a regularidade da documentacao apresentada e a execucao das atividades pelo(s) bolsista(s) ${favorecido}, do projeto ${required(fields.projeto, 'nome do projeto')}, aprovado no Edital n. ${required(fields.edital, 'numero do edital')}${processReference}, <b>AUTORIZO</b> a liquidacao da despesa no valor de ${valor}, referente ao empenho ${empenho}.`;
   } else if (fields.finalidade === 'bolsa-sem-projeto') {
-    body = `Considerando a regularidade da documentacao apresentada e a execucao das atividades pelo(s) bolsista(s) ${favorecido} (Processo n. ${processo}), <b>AUTORIZO</b> a liquidacao da despesa no valor de ${valor}, referente ao empenho ${empenho}.`;
+    body = `Considerando a regularidade da documentacao apresentada e a execucao das atividades pelo(s) bolsista(s) ${favorecido}${processReference}, <b>AUTORIZO</b> a liquidacao da despesa no valor de ${valor}, referente ao empenho ${empenho}.`;
   } else if (fields.finalidade === 'auxilio-transporte' || fields.finalidade === 'pafe' || fields.finalidade === 'auxilio-moradia') {
     const programa = fields.finalidade === 'auxilio-transporte'
       ? 'Programa de Auxilio Transporte'
       : fields.finalidade === 'pafe'
         ? 'Programa de Apoio a Formacao Estudantil (PAFE)'
         : 'Programa de Auxilio Moradia';
-    body = `Considerando a regularidade dos documentos apresentados e o acompanhamento do ${programa} (Processo n. ${processo}), <b>AUTORIZO</b> a liquidacao da despesa no valor de ${valor}, referente ao empenho ${empenho}.`;
+    body = `Considerando a regularidade dos documentos apresentados e o acompanhamento do ${programa}${processReference}, <b>AUTORIZO</b> a liquidacao da despesa no valor de ${valor}, referente ao empenho ${empenho}.`;
   } else {
     const reference = required(fields.descricao, fields.tipo === 'aquisicao' ? 'objeto da aquisicao' : 'objeto do servico');
     const action = fields.tipo === 'aquisicao' ? 'do fornecimento de' : 'da prestacao de servicos de';
-    body = `Considerando a regularidade dos documentos apresentados e o ateste ${action} ${reference} (Processo n. ${processo}), <b>AUTORIZO</b> a liquidacao da despesa no valor de ${valor}, referente ao empenho ${empenho}, em favor de ${favorecido}.`;
+    body = `Considerando a regularidade dos documentos apresentados e o ateste ${action} ${reference}${processReference}, <b>AUTORIZO</b> a liquidacao da despesa no valor de ${valor}, referente ao empenho ${empenho}, em favor de ${favorecido}.`;
   }
 
-  return `<div style="font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; text-align: justify; color: black;"><div>A Coordenacao de Financas e Contratos do <i>Campus</i> Currais Novos</div><div style="font-weight: bold; margin-top: 30px;">Assunto: ${assunto}</div><div style="text-indent: 2.5cm; margin-top: 30px; margin-bottom: 25px;">${body}</div><div style="margin-top: 25px;">Na sequencia, encaminhe-se o processo a Direcao-Geral para analise e posterior autorizacao do pagamento.</div><div style="margin-top: 40px;">Atenciosamente,</div></div>`;
+  const nextStep = fields.processo.trim() ? 'Na sequencia, encaminhe-se o processo a Direcao-Geral para analise e posterior autorizacao do pagamento.' : 'Na sequencia, encaminhe-se o documento a Direcao-Geral para analise e posterior autorizacao do pagamento.';
+  return `<div style="font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; text-align: justify; color: black;"><div>A Coordenacao de Financas e Contratos do <i>Campus</i> Currais Novos</div><div style="font-weight: bold; margin-top: 30px;">Assunto: ${assunto}</div><div style="text-indent: 2.5cm; margin-top: 30px; margin-bottom: 25px;">${body}</div><div style="margin-top: 25px;">${nextStep}</div><div style="margin-top: 40px;">Atenciosamente,</div></div>`;
 }

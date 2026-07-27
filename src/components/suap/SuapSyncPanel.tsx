@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { 
   AlertTriangle, 
   CheckCircle2, 
@@ -22,12 +23,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { suapScraperService, ScrapedProcesso } from '@/services/suapScraperService';
-import { supabase } from '@/lib/supabase';
-
-interface SuapSyncPanelProps {
-  onSyncComplete?: () => void;
-}
-
 interface CaixasSUAP {
   id: string;
   nome: string;
@@ -36,8 +31,9 @@ interface CaixasSUAP {
   last_sync_at?: string;
 }
 
-export function SuapSyncPanel({ onSyncComplete }: SuapSyncPanelProps) {
+export function SuapSyncPanel() {
   const { session } = useAuth();
+  const queryClient = useQueryClient();
   
   // Credenciais e caixas cadastradas
   const [suapSessionId, setSuapSessionId] = useState<string | null>(null);
@@ -209,46 +205,6 @@ export function SuapSyncPanel({ onSyncComplete }: SuapSyncPanelProps) {
     setSuapSessionId(null);
     setCaixas([]);
     toast.success('Sessão do SUAP encerrada.');
-  };
-
-  // Auto-descoberta inicial de caixas a partir da página padrão do SUAP
-  const handleDiscoverBoxes = async () => {
-    if (!suapSessionId || !session?.user?.id) return;
-    const loadingToast = toast.loading('Buscando caixas de processos no SUAP...');
-    try {
-      const rawRes = await supabase.functions.invoke('suap-proxy', {
-        body: {
-          path: '/processo_eletronico/caixa_processos/',
-          method: 'GET',
-          suapSessionId
-        }
-      });
-
-      if (rawRes.data?.text) {
-        const detected = suapScraperService.discoverCaixasProcessos(rawRes.data.text);
-        let addedCount = 0;
-        
-        for (const item of detected) {
-          const exists = caixas.some(c => c.url.trim() === item.url.trim());
-          if (!exists) {
-            await suapScraperService.addCaixa(session.user.id, item.nome, item.url, true);
-            addedCount++;
-          }
-        }
-        
-        if (addedCount > 0) {
-          toast.success(`${addedCount} nova(s) caixa(s) adicionada(s) automaticamente!`, { id: loadingToast });
-          loadUserCaixas();
-        } else {
-          toast.info('Nenhuma nova caixa de processos localizada.', { id: loadingToast });
-        }
-      } else {
-        throw new Error(rawRes.error || 'Resposta sem conteúdo.');
-      }
-    } catch (err: any) {
-      console.error(err);
-      toast.error('Falha ao descobrir caixas: ' + err.message, { id: loadingToast });
-    }
   };
 
   const handleAddBox = async (e: React.FormEvent) => {
@@ -431,10 +387,7 @@ export function SuapSyncPanel({ onSyncComplete }: SuapSyncPanelProps) {
       }
 
       loadUserCaixas();
-
-      if (onSyncComplete) {
-        onSyncComplete();
-      }
+      await queryClient.invalidateQueries({ queryKey: ['suap-processos'] });
     } catch (err: any) {
       addLog(`FATAL: ${err.message}`);
       console.error(err);
@@ -607,15 +560,6 @@ export function SuapSyncPanel({ onSyncComplete }: SuapSyncPanelProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleDiscoverBoxes}
-                  disabled={syncStatus === 'running'}
-                  className="h-8 border-emerald-200 bg-white hover:bg-emerald-50 text-emerald-700 text-[11px] font-semibold shadow-xs"
-                >
-                  Auto-descobrir Caixas
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
                   onClick={handleDisconnect}
                   disabled={syncStatus === 'running'}
                   className="h-8 border-rose-200 bg-white hover:bg-rose-50 text-rose-700 text-[11px] gap-1 shrink-0 shadow-xs"
@@ -697,10 +641,7 @@ export function SuapSyncPanel({ onSyncComplete }: SuapSyncPanelProps) {
                 </div>
               ) : caixas.length === 0 ? (
                 <div className="text-center py-8 border border-dashed border-slate-200 rounded-lg text-xs text-slate-400">
-                  Nenhuma caixa de processos cadastrada. 
-                  <span onClick={handleDiscoverBoxes} className="text-emerald-600 font-bold hover:underline cursor-pointer block mt-1">
-                    [Clique aqui para auto-descobrir no SUAP]
-                  </span>
+                  Nenhuma caixa de processos cadastrada. Cadastre uma caixa manualmente para iniciar a sincronização.
                 </div>
               ) : (
                 <div className="overflow-x-auto">

@@ -420,41 +420,6 @@ export const suapScraperService = {
     await this.downloadPdfForProcess(proc, suapSessionId, tenantId, log, { force: options.forcePdf });
     return this.runAiExtractionForProcess(proc, tenantId, log, { force: options.forceAi });
   },
-  // Descobre todas as caixas de processos disponíveis analisando o HTML principal da caixa do SUAP
-  discoverCaixasProcessos(html: string): Array<{ nome: string; url: string }> {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    
-    // O menu lateral de filtros/caixas do SUAP costuma usar links apontando para caixa_processos
-    const links = Array.from(doc.querySelectorAll('a[href*="/processo_eletronico/caixa_processos/"]'));
-    const caixasMap = new Map<string, string>(); // url -> nome
-    
-    // Caixa padrão (Recebidos)
-    caixasMap.set('https://suap.ifrn.edu.br/processo_eletronico/caixa_processos/', 'Caixa de Entrada (Padrão)');
-
-    for (const link of links) {
-      const href = link.getAttribute('href') || '';
-      let fullUrl = href;
-      if (href.startsWith('/')) {
-        fullUrl = `https://suap.ifrn.edu.br${href}`;
-      } else if (!href.startsWith('http')) {
-        fullUrl = `https://suap.ifrn.edu.br/processo_eletronico/caixa_processos/${href}`;
-      }
-      
-      const nome = link.textContent?.trim().replace(/\s+/g, ' ') || '';
-      // Limpar nomes vazios ou links repetitivos de paginação/filtros
-      if (!nome || nome.includes('Anterior') || nome.includes('Próximo') || nome.match(/^\d+$/)) {
-        continue;
-      }
-      
-      // Ignorar parâmetros de paginação (?page=) que alteram a mesma caixa
-      if (fullUrl.includes('page=')) continue;
-      
-      caixasMap.set(fullUrl, nome);
-    }
-    
-    return Array.from(caixasMap.entries()).map(([url, nome]) => ({ nome, url }));
-  },
 
   // CRUD de caixas de processos no banco de dados do Supabase
   async fetchCaixas(tenantId: string): Promise<any[]> {

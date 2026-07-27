@@ -3,7 +3,7 @@ import { useState, type ReactNode } from 'react';
 
 import { SuapDocumentGeneratorDialog } from '@/components/suap/SuapDocumentGeneratorDialog';
 import { buildResolvedContextFromSuapProcess } from '@/lib/documentGeneration';
-import { createDispatchQueue, type DispatchQueueState } from '@/lib/suapDispatchGeneration';
+import { createDispatchQueue, createStandaloneDispatchQueue, type DispatchQueueState } from '@/lib/suapDispatchGeneration';
 import { buildSuapCloneUrl } from '@/lib/suapCloneAutomation';
 import { copySuapDocumentToClipboard } from '@/lib/suapClipboard';
 import type { SuapProcesso } from '@/types';
@@ -104,10 +104,10 @@ describe('SuapDocumentGeneratorDialog', () => {
 
     await screen.findByLabelText('Previa editavel do despacho');
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Proximo/i })); });
-    await screen.findByText('2 de 2 processo(s)');
+    await screen.findByText('2 de 2 documento(s)');
     await screen.findByLabelText('Previa editavel do despacho');
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Anterior/i })); });
-    await screen.findByText('1 de 2 processo(s)');
+    await screen.findByText('1 de 2 documento(s)');
   });
 
   it('copia e clona o HTML efetivamente editado em modo de revisao', async () => {
@@ -126,6 +126,26 @@ describe('SuapDocumentGeneratorDialog', () => {
     expect(buildSuapCloneUrl).toHaveBeenCalledWith({ documentType: 'despacho', html: '<p>Despacho revisado</p>', mode: 'review' });
     expect(openSpy).toHaveBeenCalledWith('https://suap.local/clone', '_blank', 'noopener,noreferrer');
 
+    openSpy.mockRestore();
+    confirmSpy.mockRestore();
+  });
+
+  it('gera, copia e clona despacho avulso sem processo vinculado', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderDialog([], createStandaloneDispatchQueue());
+
+    expect(screen.queryByText('Este processo nao esta mais disponivel no espelho SUAP.')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar despacho' }));
+    await screen.findByLabelText('Previa editavel do despacho');
+    expect(screen.getByLabelText('Previa editavel do despacho')).not.toHaveTextContent('Processo n.');
+    const editor = screen.getByLabelText('Conteudo editavel do despacho');
+    editor.innerHTML = '<p>Despacho avulso revisado</p>';
+    fireEvent.input(editor);
+    fireEvent.click(screen.getByRole('button', { name: 'Copiar' }));
+    await waitFor(() => expect(copySuapDocumentToClipboard).toHaveBeenCalledWith('<p>Despacho avulso revisado</p>'));
+    fireEvent.click(screen.getByRole('button', { name: /Clonar no SUAP/i }));
+    expect(buildSuapCloneUrl).toHaveBeenCalledWith({ documentType: 'despacho', html: '<p>Despacho avulso revisado</p>', mode: 'review' });
     openSpy.mockRestore();
     confirmSpy.mockRestore();
   });
@@ -149,7 +169,7 @@ describe('SuapDocumentGeneratorDialog', () => {
 
     expect(screen.getByText('Este processo nao esta mais disponivel no espelho SUAP.')).toBeInTheDocument();
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Pular/i })); });
-    await screen.findByText('2 de 2 processo(s)');
+    await screen.findByText('2 de 2 documento(s)');
   });
 
   it('stops an assisted-context error and retries only when requested', async () => {

@@ -6,6 +6,8 @@ import {
   createDispatchQueue,
   createManualDespachoFields,
   isAiAssistedDispatch,
+  createStandaloneDispatchQueue,
+  createStandaloneManualDespachoFields,
   loadDispatchQueue,
   saveDispatchQueue,
   SUAP_DISPATCH_QUEUE_STORAGE_KEY,
@@ -39,6 +41,15 @@ describe('suapDispatchGeneration', () => {
     expect(loadDispatchQueue()).toBeNull();
   });
 
+
+  it('persiste e restaura o despacho avulso na sessao', () => {
+    const queue = createStandaloneDispatchQueue();
+    saveDispatchQueue(queue);
+
+    expect(loadDispatchQueue()).toEqual(queue);
+    expect(queue.items[0]).toMatchObject({ standalone: true });
+    expect(queue.items[0]).not.toHaveProperty('processId');
+  });
   it('ignora estado de sessao invalido', () => {
     sessionStorage.setItem(SUAP_DISPATCH_QUEUE_STORAGE_KEY, '{invalido');
     expect(loadDispatchQueue()).toBeNull();
@@ -71,5 +82,19 @@ describe('suapDispatchGeneration', () => {
     expect(html).toContain('[favorecido]');
     expect(html).toContain('[valor da liquidacao]');
     expect(html).toContain('[empenho]');
+  });
+
+  it('omite a referencia ao processo no despacho avulso e a inclui quando informada', () => {
+    const fields = {
+      ...createStandaloneManualDespachoFields(),
+      favorecido: 'Fornecedor Teste',
+      descricao: 'Servico de apoio',
+      valor: '1.250,00',
+      empenho: '2026NE000123',
+    };
+
+    expect(buildManualDespachoHtml(fields)).not.toContain('Processo n.');
+    expect(buildManualDespachoHtml(fields)).not.toContain('encaminhe-se o processo');
+    expect(buildManualDespachoHtml({ ...fields, processo: '23035.000123.2026-11' })).toContain('Processo n. <b>23035.000123.2026-11</b>');
   });
 });

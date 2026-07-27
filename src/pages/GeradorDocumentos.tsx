@@ -18,7 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { copySuapDocumentToClipboard } from '@/lib/suapClipboard';
-import { buildSuapCloneUrl, SuapCloneAutomationMode } from '@/lib/suapCloneAutomation';
+import { buildSuapCloneUrl, getSuapCloneBaseUrl } from '@/lib/suapCloneAutomation';
 import { toast } from 'sonner';
 
 // --- Types ---
@@ -251,27 +251,20 @@ export default function GeradorDocumentos() {
   };
 
   const handleClone = () => {
-    const html = activeTab === 'despacho' ? generateDespachoHTML() : generateCDOHTML();
-    let mode: SuapCloneAutomationMode = 'review';
-
-    if (activeTab === 'despacho') {
-      mode = window.confirm(
-        'Deseja que a extensao clique em Salvar automaticamente no SUAP apos preencher o assunto? Clique em Cancelar para apenas preencher e revisar.'
-      ) ? 'save-after-confirmation' : 'review';
-    }
-
-    const cloneUrl = buildSuapCloneUrl({ documentType: activeTab, html, mode });
-    window.open(cloneUrl, '_blank');
-    if (activeTab === 'despacho') {
-      toast.info(
-        mode === 'save-after-confirmation'
-          ? 'Clone aberto no SUAP. A extensao preenchera o assunto e tentara salvar.'
-          : 'Clone aberto no SUAP. A extensao preenchera o assunto para revisao.'
-      );
-    }
+    window.open(getSuapCloneBaseUrl(activeTab), '_blank');
+    toast.info('Clone aberto no SUAP para preenchimento manual.');
     setStep(3);
   };
 
+  const handleCloneAndFillInSuap = () => {
+    const html = activeTab === 'despacho' ? generateDespachoHTML() : generateCDOHTML();
+    const cloneUrl = buildSuapCloneUrl({ documentType: activeTab, html, mode: 'review' });
+    window.open(cloneUrl, '_blank');
+    if (activeTab === 'despacho') {
+      toast.info('Clone aberto no SUAP. A extensao preenchera o assunto para revisao.');
+    }
+    setStep(3);
+  };
   const handleReset = () => {
     setStep(1);
     setHasGenerated(false);
@@ -601,14 +594,20 @@ export default function GeradorDocumentos() {
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="grid grid-cols-2 gap-4 pb-2"
+                  className="grid grid-cols-3 gap-4 pb-2"
                 >
-                  <Button 
+                  <Button
                     variant="outline"
-                    className="h-14 bg-sebrae-blue hover:bg-sebrae-navy text-white font-black transition-all border-none active:scale-[0.98]"
+                    className="h-14 font-black transition-all active:scale-[0.98]"
                     onClick={handleClone}
                   >
-                    <ExternalLink className="w-5 h-5 mr-2" /> CLONAR NO SUAP
+                    <ExternalLink className="w-5 h-5 mr-2" /> CLONAR
+                  </Button>
+                  <Button
+                    className="h-14 bg-sebrae-blue hover:bg-sebrae-navy text-white font-black transition-all border-none active:scale-[0.98]"
+                    onClick={handleCloneAndFillInSuap}
+                  >
+                    <ExternalLink className="w-5 h-5 mr-2" /> CLONAR E PREENCHER NO SUAP
                   </Button>
                   {activeTab === 'despacho' ? (
                     <Button 
@@ -715,11 +714,18 @@ export default function GeradorDocumentos() {
               </div>
 
               <div className="px-6 py-4 border-t flex gap-4 bg-muted/20 shrink-0">
-                <Button 
-                  className="bg-sebrae-blue hover:bg-sebrae-navy text-white font-bold h-12 shadow-sm px-6"
+                <Button
+                  variant="outline"
+                  className="font-bold h-12 shadow-sm px-6"
                   onClick={handleClone}
                 >
-                  <ExternalLink className="w-4 h-4 mr-2" /> CLONAR NO SUAP
+                  <ExternalLink className="w-4 h-4 mr-2" /> CLONAR
+                </Button>
+                <Button
+                  className="bg-sebrae-blue hover:bg-sebrae-navy text-white font-bold h-12 shadow-sm px-6"
+                  onClick={handleCloneAndFillInSuap}
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" /> CLONAR E PREENCHER NO SUAP
                 </Button>
                 
                 <div className="flex-1" />

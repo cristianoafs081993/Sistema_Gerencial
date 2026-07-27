@@ -3,9 +3,11 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   Banknote,
   Bell,
+  ChevronDown,
   ChevronRight,
   Clock3,
   FileStack,
+  FolderSync,
   FileText,
   KeyRound,
   Landmark,
@@ -29,6 +31,15 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { SuapSyncPanel } from '@/components/suap/SuapSyncPanel';
 import { LogoIcon } from './Logo';
 
 interface LayoutProps {
@@ -128,6 +139,7 @@ export function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [isSuapSettingsDialogOpen, setIsSuapSettingsDialogOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('');
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
@@ -527,38 +539,52 @@ export function Layout({ children }: LayoutProps) {
               <span className="absolute top-1 right-1 w-2 h-2 bg-sebrae-gold rounded-full border border-white" />
             </button>
 
-            {/* User Profile Info & Logout */}
+            {/* User settings */}
             {session && (
-              <div className="flex items-center gap-2 md:gap-2.5 pl-2 md:pl-3 border-l border-slate-200">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-sebrae-blue to-ifrn-green flex items-center justify-center text-white font-bold text-xs shadow shrink-0 select-none">
-                  {userEmail ? userEmail.substring(0, 1).toUpperCase() : 'U'}
-                </div>
-                <div className="flex flex-col text-right hidden sm:flex">
-                  <span className="text-xs font-semibold text-ink-legacy leading-none">
-                    {userEmail ? userEmail.split('@')[0] : 'Usuário'}
-                  </span>
-                  <span className="text-[10px] text-muted-gray">
-                    {userEmail || ''}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsPasswordDialogOpen(true)}
-                  className="p-1.5 text-slate-400 hover:text-sebrae-blue hover:bg-slate-100 rounded-lg transition-colors ml-1 hidden sm:block"
-                  title="Alterar senha"
-                >
-                  <KeyRound className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  disabled={isSigningOut}
-                  onClick={() => void handleSignOut()}
-                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors hidden sm:block"
-                  title="Sair do sistema"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 rounded-lg border-l border-slate-200 py-1 pl-2 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:gap-2.5 md:pl-3"
+                    aria-label="Abrir configurações do usuário"
+                  >
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-sebrae-blue to-ifrn-green text-xs font-bold text-white shadow select-none">
+                      {userEmail ? userEmail.substring(0, 1).toUpperCase() : 'U'}
+                    </div>
+                    <div className="hidden flex-col text-right sm:flex">
+                      <span className="text-xs font-semibold leading-none text-ink-legacy">
+                        {userEmail ? userEmail.split('@')[0] : 'Usuário'}
+                      </span>
+                      <span className="text-[10px] text-muted-gray">{userEmail || ''}</span>
+                    </div>
+                    <ChevronDown className="hidden h-3.5 w-3.5 text-muted-gray sm:block" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  <DropdownMenuLabel className="space-y-0.5">
+                    <p className="text-sm font-semibold">{userEmail ? userEmail.split('@')[0] : 'Usuário'}</p>
+                    <p className="truncate text-xs font-normal text-muted-foreground">{userEmail || ''}</p>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setIsSuapSettingsDialogOpen(true)} className="gap-2">
+                    <FolderSync className="h-4 w-4 text-emerald-600" />
+                    Configurar integração com o SUAP
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setIsPasswordDialogOpen(true)} className="gap-2">
+                    <KeyRound className="h-4 w-4" />
+                    Alterar senha
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    disabled={isSigningOut}
+                    onSelect={() => void handleSignOut()}
+                    className="gap-2 text-red-600 focus:text-red-600"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sair
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         </header>
@@ -568,6 +594,22 @@ export function Layout({ children }: LayoutProps) {
         </main>
       </div>
 
+      <Dialog open={isSuapSettingsDialogOpen} onOpenChange={setIsSuapSettingsDialogOpen}>
+        <DialogContent className="flex h-[min(90vh,900px)] w-[calc(100vw-2rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0">
+          <DialogHeader className="border-b border-border-default/60 px-6 py-5">
+            <DialogTitle className="flex items-center gap-2">
+              <FolderSync className="h-5 w-5 text-emerald-600" />
+              Configurar integração com o SUAP
+            </DialogTitle>
+            <DialogDescription>
+              Gerencie suas caixas de processos e execute sincronizações manuais ou automáticas.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 overflow-y-auto p-6">
+            {isSuapSettingsDialogOpen ? <SuapSyncPanel /> : null}
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={isPasswordDialogOpen}
         onOpenChange={(open) => {
