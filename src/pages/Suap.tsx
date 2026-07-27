@@ -16,14 +16,10 @@ import {
   ShieldCheck,
   Sparkles,
   Wallet,
-  Inbox,
   FileText,
-  Users,
-  Send,
   ChevronDown,
   Plus,
   Trash2,
-  Settings,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -42,8 +38,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import {
   Select,
@@ -701,7 +695,6 @@ export default function Suap() {
   const [password, setPassword] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
-  // registered caixas states
   const [isCaixasDialogOpen, setIsCaixasDialogOpen] = useState(false);
   const [newCaixaNome, setNewCaixaNome] = useState('');
   const [newCaixaUrl, setNewCaixaUrl] = useState('');
@@ -1042,77 +1035,6 @@ export default function Suap() {
 
       <HeaderActions>
         <div className="flex items-center gap-2">
-          {session ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 gap-2 border-border-default bg-white text-slate-700 shadow-shadow-sm hover:bg-[hsl(var(--secondary))]"
-                >
-                  <RefreshCw className="h-4 w-4 text-emerald-600" />
-                  <span>Sincronizar caixa...</span>
-                  <ChevronDown className="h-3 w-3 opacity-60" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                <DropdownMenuLabel className="text-xs text-muted-foreground font-ui">
-                  Abrir caixa no SUAP:
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {registeredCaixas.length === 0 ? (
-                  <div className="py-3 px-2 text-center text-xs text-muted-foreground font-ui">
-                    Nenhuma caixa cadastrada
-                  </div>
-                ) : (
-                  registeredCaixas.map((caixa) => {
-                    const normalized = caixa.nome.toLowerCase();
-                    let IconComponent = FileText;
-                    let colorClass = 'text-slate-500';
-                    if (normalized.includes('entrada') || normalized.includes('recebido')) {
-                      IconComponent = Inbox;
-                      colorClass = 'text-emerald-600';
-                    } else if (normalized.includes('meus') || normalized.includes('criado')) {
-                      IconComponent = FileText;
-                      colorClass = 'text-sky-600';
-                    } else if (normalized.includes('interessado')) {
-                      IconComponent = Users;
-                      colorClass = 'text-violet-600';
-                    } else if (normalized.includes('aguardando') || normalized.includes('envio') || normalized.includes('saida')) {
-                      IconComponent = Send;
-                      colorClass = 'text-amber-600';
-                    }
-                    return (
-                      <DropdownMenuItem
-                        key={caixa.id}
-                        onClick={() => {
-                          const separator = caixa.url.includes('?') ? '&' : '?';
-                          window.open(`${caixa.url}${separator}suap-auto-sync=true`, '_blank', 'noopener,noreferrer');
-                        }}
-                        className="flex items-center gap-2 cursor-pointer py-2 text-sm"
-                      >
-                        <IconComponent className={cn('h-4 w-4', colorClass)} />
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-text-primary text-xs">{caixa.nome}</span>
-                          <span className="text-[10px] text-muted-foreground truncate max-w-[200px]" title={caixa.url}>
-                            {caixa.url}
-                          </span>
-                        </div>
-                      </DropdownMenuItem>
-                    );
-                  })
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => setIsCaixasDialogOpen(true)}
-                  className="flex items-center gap-2 cursor-pointer py-2 text-sm font-semibold text-primary hover:bg-slate-50"
-                >
-                  <Settings className="h-4 w-4" />
-                  <span>Gerenciar caixas...</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
           <Button
             variant="outline"
             size="sm"
