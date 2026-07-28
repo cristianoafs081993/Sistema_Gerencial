@@ -138,15 +138,24 @@ export function deriveContratoApiStatus(
   }
 
   const fallbackEnd = contrato.vigencia_fim ?? null;
-  const active = Boolean(fallbackEnd && fallbackEnd >= todayIso);
+  const fallbackStart = contrato.vigencia_inicio ?? null;
+  const activeWithOpenEndedVigencia = Boolean(
+    !fallbackEnd &&
+    contrato.situacao &&
+    fallbackStart &&
+    fallbackStart <= todayIso,
+  );
+  const active = Boolean((fallbackEnd && fallbackEnd >= todayIso) || activeWithOpenEndedVigencia);
 
   return {
     situacao_derivada: active,
-    vigencia_inicio_derivada: contrato.vigencia_inicio ?? null,
+    vigencia_inicio_derivada: fallbackStart,
     vigencia_fim_derivada: fallbackEnd,
-    situacao_derivada_motivo: active
-      ? 'fallback_sem_historico_vigente'
-      : 'fallback_sem_historico_vencido_ou_sem_data',
+    situacao_derivada_motivo: activeWithOpenEndedVigencia
+      ? 'fallback_sem_historico_vigente_sem_data_final'
+      : active
+        ? 'fallback_sem_historico_vigente'
+        : 'fallback_sem_historico_vencido_ou_sem_data',
   };
 }
 

@@ -89,7 +89,7 @@ describe('userFavoritesService', () => {
 
     const result = await userFavoritesService.getAll('user-1');
 
-    expect(mocks.selectMock).toHaveBeenCalledWith('id,user_id,entity_type,empenho_id,contrato_id,created_at');
+    expect(mocks.selectMock).toHaveBeenCalledWith('id,user_id,entity_type,empenho_id,contrato_id,contrato_api_id,created_at');
     expect(mocks.eqFirstMock).toHaveBeenCalledWith('user_id', 'user-1');
     expect(result).toEqual([
       {
@@ -117,6 +117,7 @@ describe('userFavoritesService', () => {
       entity_type: 'empenho',
       empenho_id: 'empenho-1',
       contrato_id: null,
+      contrato_api_id: null,
     });
   });
 
@@ -140,6 +141,7 @@ describe('userFavoritesService', () => {
       entity_type: 'contrato',
       empenho_id: null,
       contrato_id: 'contrato-1',
+      contrato_api_id: null,
     });
   });
 
@@ -150,5 +152,15 @@ describe('userFavoritesService', () => {
     expect(mocks.eqFirstMock).toHaveBeenCalledWith('user_id', 'user-1');
     expect(mocks.eqSecondMock).toHaveBeenCalledWith('entity_type', 'contrato');
     expect(mocks.eqThirdMock).toHaveBeenCalledWith('contrato_id', 'contrato-1');
+  });
+  it('insere favorito de contrato sincronizado na coluna correta', async () => {
+    mocks.singleMock.mockResolvedValueOnce({
+      data: { id: 'fav-contrato-api', user_id: 'user-1', entity_type: 'contrato_api', empenho_id: null, contrato_id: null, contrato_api_id: 'contrato-api-1', created_at: '2026-04-30T10:00:00Z' },
+      error: null,
+    });
+
+    await userFavoritesService.addFavorite('contrato_api', 'contrato-api-1', 'user-1');
+
+    expect(mocks.insertMock).toHaveBeenCalledWith({ user_id: 'user-1', entity_type: 'contrato_api', empenho_id: null, contrato_id: null, contrato_api_id: 'contrato-api-1' });
   });
 });

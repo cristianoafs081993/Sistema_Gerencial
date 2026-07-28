@@ -550,4 +550,53 @@ describe('Contratos regressions', () => {
     expect(screen.getByText('Sem item vinculado')).toBeInTheDocument();
     expect(screen.getByText('48162')).toBeInTheDocument();
   });
+  it('permite favoritar contrato sincronizado sem registro local', async () => {
+    const toggleFavorite = vi.fn();
+    mockedContratosApiService.getContratosApi.mockResolvedValueOnce([
+      {
+        id: 'contrato-api-00188',
+        api_contrato_id: 188,
+        numero: '00188/2026',
+        fornecedor_nome: 'Fornecedor sincronizado',
+        unidade_codigo: '158366',
+        unidade_nome: 'IFRN/Campus Currais Novos',
+        unidade_origem_codigo: '158366',
+        unidade_origem_nome: 'IFRN/Campus Currais Novos',
+        objeto: 'Contrato sincronizado sem espelho local',
+        processo: '23035.000188/2026-00',
+        vigencia_inicio: '2026-01-01',
+        vigencia_fim: '2026-12-31',
+        vigencia_inicio_derivada: '2026-01-01',
+        vigencia_fim_derivada: '2026-12-31',
+        valor_global: 1000,
+        valor_acumulado: 0,
+        situacao: true,
+        situacao_derivada: true,
+        updated_at: '2026-07-28T00:00:00Z',
+      },
+    ]);
+    mockedContratosApiService.getEmpenhosApi.mockResolvedValueOnce([]);
+    mockedContratosApiService.getHistoricosApi.mockResolvedValueOnce([]);
+    mockedContratosApiService.getFaturasApi.mockResolvedValueOnce([]);
+    mockedUseUserFavorites.mockReturnValue({
+      favorites: [],
+      favoriteIdsByType: {
+        empenho: new Set(),
+        contrato: new Set(),
+        contrato_api: new Set(),
+      },
+      isLoading: false,
+      isPending: false,
+      isFavorite: () => false,
+      toggleFavorite,
+    });
+
+    renderContratos();
+
+    const button = await screen.findByRole('button', { name: 'Favoritar contrato 00188/2026' });
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+
+    expect(toggleFavorite).toHaveBeenCalledWith('contrato_api', 'contrato-api-00188');
+  });
 });

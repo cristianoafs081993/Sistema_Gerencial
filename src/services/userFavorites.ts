@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 
-export type FavoriteEntityType = 'empenho' | 'contrato';
+export type FavoriteEntityType = 'empenho' | 'contrato' | 'contrato_api';
 
 export interface UserFavorite {
   id: string;
@@ -21,20 +21,28 @@ type UserFavoriteRow = {
   entity_type: FavoriteEntityType;
   empenho_id: string | null;
   contrato_id: string | null;
+  contrato_api_id: string | null;
   created_at: string;
 };
 
-const USER_FAVORITES_SELECT = 'id,user_id,entity_type,empenho_id,contrato_id,created_at';
+const USER_FAVORITES_SELECT = 'id,user_id,entity_type,empenho_id,contrato_id,contrato_api_id,created_at';
 
 export const userFavoritesQueryKeys = {
   byUser: (userId?: string) => ['user_favorites', userId ?? 'anonymous'] as const,
 };
 
-const getEntityColumn = (entityType: FavoriteEntityType) =>
-  entityType === 'empenho' ? 'empenho_id' : 'contrato_id';
+const getEntityColumn = (entityType: FavoriteEntityType) => {
+  if (entityType === 'empenho') return 'empenho_id';
+  if (entityType === 'contrato_api') return 'contrato_api_id';
+  return 'contrato_id';
+};
 
 const mapFavoriteRow = (row: UserFavoriteRow): UserFavorite => {
-  const entityId = row.entity_type === 'empenho' ? row.empenho_id : row.contrato_id;
+  const entityId = row.entity_type === 'empenho'
+    ? row.empenho_id
+    : row.entity_type === 'contrato_api'
+      ? row.contrato_api_id
+      : row.contrato_id;
 
   if (!entityId) {
     throw new Error(`Favorito ${row.id} sem identificador de ${row.entity_type}.`);
@@ -68,6 +76,7 @@ export const userFavoritesService = {
       entity_type: entityType,
       empenho_id: entityType === 'empenho' ? entityId : null,
       contrato_id: entityType === 'contrato' ? entityId : null,
+      contrato_api_id: entityType === 'contrato_api' ? entityId : null,
     };
 
     const { data, error } = await supabase
@@ -111,6 +120,7 @@ export function useUserFavorites() {
     const byType: Record<FavoriteEntityType, Set<string>> = {
       empenho: new Set<string>(),
       contrato: new Set<string>(),
+      contrato_api: new Set<string>(),
     };
 
     for (const favorite of favorites) {

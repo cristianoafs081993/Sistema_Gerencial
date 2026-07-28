@@ -270,7 +270,7 @@ Observacao:
 
 - a lista principal usa contratos sincronizados da API; a tela oferece um controle de visualização (`viewFilter`) com três opções: "Todos" (filtrando apenas `situacao_derivada = true`), "Favoritos" (favoritos do usuário) e "Vencidos (120d)" (contratos cuja vigência expirou nos últimos 120 dias). Contratos com faturas abertas (qualquer situação diferente de "Pago" e "Siafi Apropriado") recebem destaque visual na linha da tabela (fundo âmbar suave e borda lateral esquerda âmbar), além de um badge com pulso de animação ("Invoice Aberta") contendo um tooltip detalhado das faturas pendentes.
 - o upload manual XLSX foi removido da tela; superadmin ve a ultima sincronizacao e pode acionar "Atualizar Comprasnet" para antecipar o cron diario
-- `situacao_derivada`, `vigencia_inicio_derivada`, `vigencia_fim_derivada` e `situacao_derivada_motivo` sao calculados na sincronizacao pela maior vigencia valida do historico; rescisao/cancelamento inativa o contrato; sem historico, usa `vigencia_fim` da listagem como fallback registrado
+- `situacao_derivada`, `vigencia_inicio_derivada`, `vigencia_fim_derivada` e `situacao_derivada_motivo` sao calculados na sincronizacao pela maior vigencia valida do historico; rescisao/cancelamento inativa o contrato. Sem termo com data final, um contrato que a API informa ativo e cuja vigencia ja iniciou permanece ativo com motivo `fallback_sem_historico_vigente_sem_data_final`; nos demais casos sem historico, usa `vigencia_fim` da listagem como fallback registrado
 - contratos da UG `158366` entram se ativos pela regra derivada; contratos da UG `158155` so entram se houver evidencia operacional estruturada do campus, como empenho ou fatura com UG/contratante `158366`, registrada em `campus_scope_reason`
 - o historico da API (`contratos_api_historico`) aparece no drawer com assinatura, aditivos, apostilamentos e rescisao
 - contratos com origem `158155` recebem sinalizacao de Reitoria; a execucao operacional deve ser lida pela UG do campus `158366`
@@ -339,7 +339,7 @@ Observacoes:
 
 - favoritos sao pessoais por usuario autenticado do Supabase
 - as telas exibem uma estrela por linha e um filtro `Todos/Favoritos`
-- favoritos de contratos se referem aos contratos locais em `contratos`; linhas vindas apenas de `contratos_api` aparecem sem acao de favorito ate existir contrato local correspondente
+- favoritos de contratos podem referenciar `contratos` locais ou `contratos_api` sincronizados; a tabela `user_favorites` registra a origem em `contrato_id` ou `contrato_api_id`, permitindo favoritar uma linha da API mesmo sem espelho local
 
 ### Editor de Documentos
 

@@ -344,8 +344,9 @@ export default function Contratos() {
         (contrato) => !contrato.apiContrato || contrato.apiContrato.situacao_derivada === true
       );
     } else if (viewFilter === 'favorites') {
-      baseContratos = visibleContratos.filter(
-        (contrato) => contrato.localId && favoriteIdsByType.contrato.has(contrato.localId)
+      baseContratos = visibleContratos.filter((contrato) =>
+        (contrato.localId && favoriteIdsByType.contrato.has(contrato.localId)) ||
+        (contrato.apiContrato && favoriteIdsByType.contrato_api?.has(contrato.apiContrato.id)),
       );
     } else if (viewFilter === 'expired120') {
       const today = new Date();
@@ -687,8 +688,12 @@ export default function Contratos() {
                 const totalALiquidar =
                   empenhosVinculados.reduce((sum, e) => sum + getSaldoEmpenhoLocal(e), 0) +
                   empenhosApiSomente.reduce((sum, e) => sum + getSaldoEmpenhoApiPreferLocal(e), 0);
-                const favoriteLocalId = c.localId;
-                const contratoFavorite = favoriteLocalId ? isFavorite('contrato', favoriteLocalId) : false;
+                const favoriteEntity = c.localId
+                  ? { type: 'contrato' as const, id: c.localId }
+                  : apiContrato
+                    ? { type: 'contrato_api' as const, id: apiContrato.id }
+                    : null;
+                const contratoFavorite = favoriteEntity ? isFavorite(favoriteEntity.type, favoriteEntity.id) : false;
 
                 const contractFaturas = apiFaturas.filter((f) => f.contrato_api_id === apiContrato?.id);
                 const openFaturas = contractFaturas.filter((f) => {
@@ -722,16 +727,16 @@ export default function Contratos() {
                                   ? 'text-amber-500 hover:text-amber-600'
                                   : 'text-muted-foreground hover:text-amber-500',
                               )}
-                              disabled={isFavoritePending || !favoriteLocalId}
+                              disabled={isFavoritePending || !favoriteEntity}
                               onClick={() => {
-                                if (favoriteLocalId) void toggleFavorite('contrato', favoriteLocalId);
+                                if (favoriteEntity) void toggleFavorite(favoriteEntity.type, favoriteEntity.id);
                               }}
                             >
                               <Star className={cn('h-4 w-4', contratoFavorite ? 'fill-current' : '')} />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            {favoriteLocalId ? (contratoFavorite ? 'Remover dos favoritos' : 'Favoritar contrato') : 'Favoritos disponiveis apenas para contratos locais'}
+                            {favoriteEntity ? (contratoFavorite ? 'Remover dos favoritos' : 'Favoritar contrato') : 'Favorito indisponivel para este contrato'}
                           </TooltipContent>
                         </Tooltip>
                         <span className="font-data text-sm font-medium text-text-primary">{c.numero}</span>

@@ -108,6 +108,20 @@ describe('contratosApiStatus', () => {
     });
   });
 
+  it('mantem ativo contrato sem data final quando o Comprasnet o informa como ativo', () => {
+    const status = deriveContratoApiStatus(
+      { vigencia_inicio: '2026-07-16', vigencia_fim: null, situacao: true },
+      [{ tipo: 'Contrato', vigencia_inicio: '2026-07-16', vigencia_fim: null, situacao_contrato: 'Ativo' }],
+      new Date('2026-07-28T12:00:00Z'),
+    );
+
+    expect(status).toMatchObject({
+      situacao_derivada: true,
+      vigencia_inicio_derivada: '2026-07-16',
+      vigencia_fim_derivada: null,
+      situacao_derivada_motivo: 'fallback_sem_historico_vigente_sem_data_final',
+    });
+  });
   it('inclui UG 158366 diretamente no escopo do campus', () => {
     expect(deriveContratoApiCampusScope({ unidade_codigo: '158366' }, [], [])).toEqual({
       inScope: true,
