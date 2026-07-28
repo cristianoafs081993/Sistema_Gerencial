@@ -38,6 +38,7 @@ const EnergiaCampus = lazy(() => import('./pages/energia/EnergiaCampus'));
 const Consultor = lazy(() => import('./pages/ConsultorSessions'));
 const Suap = lazy(() => import('./pages/Suap'));
 const SuapCallback = lazy(() => import('./pages/SuapCallback'));
+const SuapExtensionDispatch = lazy(() => import('./pages/SuapExtensionDispatch'));
 const EconomiaTempo = lazy(() => import('./pages/EconomiaTempo'));
 const ControleUsuarios = lazy(() => import('./pages/ControleUsuarios'));
 const ModelosDocumentos = lazy(() => import('./pages/ModelosDocumentos'));
@@ -58,6 +59,14 @@ const AppShell = () => (
         <Outlet />
       </Suspense>
     </Layout>
+  </DataProvider>
+);
+
+const SuapExtensionShell = () => (
+  <DataProvider>
+    <Suspense fallback={<RouteLoadingFallback mode="screen" />}>
+      <Outlet />
+    </Suspense>
   </DataProvider>
 );
 
@@ -83,6 +92,9 @@ const App = () => (
                 <Route path="/pesquisa-precos/validar" element={<PriceResearchValidation />} />
               </Route>
               <Route element={<ProtectedRoute />}>
+                <Route element={<SuapExtensionShell />}>
+                  <Route path="/suap-extensao/despacho" element={<SuapExtensionDispatch />} />
+                </Route>
                 <Route element={<AppShell />}>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/atividades/*" element={<Navigate replace to="/planejamento/campus" />} />

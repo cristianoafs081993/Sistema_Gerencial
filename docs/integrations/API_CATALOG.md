@@ -803,9 +803,10 @@ Fluxo Tecnico:
 
 - O frontend realiza as chamadas de scraping e download fazendo requests ao SUAP atraves da Edge Function `suap-proxy` (evitando bloqueios de CORS).
 - A sincronizacao de inventario, o download de PDF e a extracao por IA sao etapas modulares e podem ser repetidas separadamente para processos escolhidos pelo usuario.
-- Processos ja sincronizados sao preservados no fluxo comum, inclusive quando concluidos; atualizacao de registro existente depende de acao explicita.
+- Processos ja sincronizados e seus PDFs sao preservados. O inventario reconcilia os vinculos em `suap_processo_caixas` apenas das caixas selecionadas e lidas com sucesso; processos ausentes deixam de aparecer sem exclusao permanente.
 - As credenciais de acesso do SUAP sao mantidas no `localStorage` apos o login/cookie informado pelo usuario.
 - O despacho nao aciona uma nova Edge Function ou uma nova chamada de IA: o frontend monta o documento com `documentGeneration`, copia pelo `suapClipboard` e cria a URL de clonagem com `suapCloneAutomation`. A fila de documentos em andamento usa `sessionStorage` e cada clonagem e confirmada individualmente.
+- A extensao tambem atende `processo/{id}` e `visualizar_processo/{id}`: o content script abre `/suap-extensao/despacho` em iframe e envia `{ suapId, processNumber, processUrl }` por `postMessage`. A rota aceita apenas mensagens da janela pai com origem `https://suap.ifrn.edu.br`, consulta `processos` pelo `suap_id` sob RLS do usuario e usa despacho avulso quando nao houver espelho. A rota possui `Content-Security-Policy: frame-ancestors https://suap.ifrn.edu.br`.
 
 Consumidores no app:
 
@@ -814,7 +815,7 @@ Consumidores no app:
 
 Observacao:
 
-- Nao e mais necessaria a instalacao de extensao Chrome. A sincronizacao ocorre diretamente atraves do componente `<SuapSyncPanel>`, aberto pelo menu do usuario em `Configurar integração com o SUAP`. As caixas sao cadastradas manualmente; nao ha auto-descoberta.
+- A extensao Chrome nao e necessaria para sincronizar caixas: essa etapa ocorre diretamente pelo componente `<SuapSyncPanel>`, aberto pelo menu do usuario em `Configurar integração com o SUAP`. As caixas sao cadastradas manualmente; nao ha auto-descoberta. A extensao permanece necessaria para o clone automatico e para gerar o despacho sem sair da pagina do processo no SUAP.
 - O usuario deve manter a aba ativa no navegador durante o download de PDFs em razao das requisicoes assincronas do Celery.
 
 ## 12. Edge Function `record-automation-savings-event`

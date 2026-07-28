@@ -235,6 +235,13 @@ Mostrar a linhagem operacional dos dados de forma curta:
   - rota de reabertura: `/editor-documentos/:modelId?artifactId=<id>`
   - observacao: edicoes posteriores atualizam a versao aberta; uma nova geracao cria nova versao
 
+### Processos SUAP
+
+- entrada: HTML das caixas SUAP lido por `SuapSyncPanel` e `suapScraperService`
+- persistencia: `processos` guarda dados, extrações e PDF; `suap_processo_caixas` guarda a presença atual por caixa
+- reconciliação: somente caixas selecionadas e lidas com sucesso removem vínculos de processos ausentes; processos e PDFs não são apagados
+- consumo: `suapProcessosService.getAll` retorna somente processos com vínculo ativo, agregando as caixas para a UI de `/suap`
+
 ### Liquidacoes e fonte SOF
 
 - arquivo de liquidacoes

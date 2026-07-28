@@ -1280,7 +1280,25 @@ Campos-chave:
 Observações operacionais:
 
 - Isolamento por Tenant (RLS `tenant_isolation`): `(auth.uid() = tenant_id)`. O usuário só pode ver e editar processos criados por ele mesmo.
-- Quando o robo de sincronizacao faz a leitura, ele cria apenas registros novos no fluxo comum e preserva processos ja sincronizados, mesmo quando concluidos; atualizacoes de registros existentes dependem de acao explicita do usuario.
+- O inventário preserva dados e PDFs em `processos`, mas a visibilidade na UI depende de pelo menos um vínculo ativo em `suap_processo_caixas`.
+- Processos ausentes de uma caixa lida com sucesso perdem apenas esse vínculo; se retornarem a qualquer caixa cadastrada, reaparecem com o mesmo histórico.
+
+### `suap_processo_caixas`
+
+Finalidade:
+
+- Relação N:N entre processos e caixas SUAP ativas, usada para reconciliar o inventário e filtrar a interface.
+
+Campos-chave:
+
+- `processo_id` e `caixa_id` (chave primária composta, ambos com remoção em cascata)
+- `tenant_id` (isolamento por usuário)
+- `last_seen_at` (última confirmação do processo na caixa)
+
+Observações operacionais:
+
+- Apenas caixas selecionadas e lidas com sucesso são reconciliadas; falhas e caixas não selecionadas não alteram vínculos.
+- Uma caixa vazia é um inventário válido e remove seus vínculos anteriores.
 
 ### Storage Bucket: `suap-pdfs`
 

@@ -142,17 +142,19 @@ Alguns services usam fallback para REST quando `supabase-js` falha ou retorna va
 
 ### SUAP Processos
 
-`Layout` (menu do usuário) -> `SuapSyncPanel` / `suapScraperService` -> `suap-proxy` / `process-pdf` -> `processos` / `suap-pdfs`
+`Layout` (menu do usuário) -> `SuapSyncPanel` / `suapScraperService` -> `suap-proxy` / `process-pdf` -> `processos` / `suap_processo_caixas` / `suap-pdfs`
 
 Observacoes:
 
 - a configuracao da integracao fica no menu do usuario, em `Configurar integração com o SUAP`; nela o usuario cadastra manualmente as caixas e executa a sincronizacao
 - o fluxo e modular: o usuario pode sincronizar somente o inventario, baixar PDFs selecionados, executar somente a extracao por IA ou rodar o fluxo completo para processos escolhidos
-- a sincronizacao automatica obedece as caixas marcadas pelo usuario e executa o fluxo completo apenas para processos novos; processos ja sincronizados sao preservados, inclusive quando concluidos
+- a sincronizacao automatica obedece as caixas marcadas pelo usuario e executa o fluxo completo apenas para processos novos; cada inventario reconcilia somente as caixas lidas com sucesso, ocultando processos ausentes pela remocao do vinculo em `suap_processo_caixas` sem apagar dados, PDFs ou historico
 - antes da IA o frontend persiste apenas `suap_id`, `url`, `caixa` e `num_processo` quando o numero aparece na listagem do SUAP; a tabela continua exibindo os processos durante fila/processamento da IA, mas beneficiario, contrato, valores, dados bancarios, empenhos e retencoes ficam no detalhe aberto pelo ícone de olho e so aparecem depois de extraidos pela IA
 - a tela /suap filtra visualmente apenas entre processos em andamento e concluidos; etapa operacional, PDF, atualizacao e metadados extraidos pela IA aparecem na propria linha do processo
 - a tela permite gerar o `Despacho de Liquidacao` avulso pelo cabecalho, alem da geracao por processo ou em lote na tabela, sem sair de `/suap`; a fila da geracao fica em `sessionStorage` para sobreviver a atualizacoes acidentais da pagina
 - o despacho avulso abre o formulario manual vazio e aceita numero de processo opcional: a minuta so cita `Processo n.` quando esse campo for informado
+- nas paginas `processo/{id}` e `visualizar_processo/{id}` do SUAP, a extensao injeta `Gerar documento` e incorpora a rota protegida `/suap-extensao/despacho` sobre a pagina; o contexto chega por `postMessage` validado para `https://suap.ifrn.edu.br`, processos existentes sao carregados por `suap_id` mesmo fora de caixas ativas e processos ausentes iniciam o formulario avulso com o numero ja preenchido
+- a origem publica do SIAGES e configurada no popup da extensao; o iframe pode autenticar no proprio modal quando nao houver sessao, e `Clonar no SUAP` continua abrindo uma nova aba com a automacao existente de assunto e texto
 - processos com extracao `success` ou `incomplete_extraction` alimentam o despacho com o contexto extraido pela IA; na extracao parcial, os campos ausentes ficam marcados no texto para revisao. Processos sem IA concluida abrem somente os campos manuais pendentes, ja preenchidos com os dados basicos do processo
 - cada item da fila pode ser editado, copiado e clonado individualmente no SUAP. A clonagem da fila pode usar revisao ou salvamento apos confirmacao no proprio dialog e nao abre varias abas automaticamente em lote
 - a edicao usa o mesmo `RichTextEditor` de `/editor-documentos`: negrito, italico, sublinhado, listas, alinhamento, desfazer e refazer ficam disponiveis sem sair do SUAP. A minuta preserva a apresentacao serifada, o recuo e o alinhamento justificado; placeholders entre colchetes, como `[favorecido]`, continuam destacados em vermelho ate serem revisados

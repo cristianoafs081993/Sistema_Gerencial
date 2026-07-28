@@ -114,6 +114,11 @@ A migration `20260716103000` adiciona `public.default_org_id()` como default de 
 - `price_research_suppliers`
 - `price_research_email_dispatches`
 
+### Processos SUAP
+
+- `processos` preserva os dados extraídos e o histórico de cada processo.
+- `suap_caixas` contém as caixas cadastradas pelo usuário.
+- `suap_processo_caixas` mantém os vínculos ativos processo–caixa; a UI do SUAP exibe apenas processos com pelo menos um vínculo. Inventários de caixas lidas com sucesso removem somente os vínculos ausentes, sem apagar processos ou PDFs.
 ### Importacoes auxiliares
 
 - `financeiro_fonte_vinculacao`

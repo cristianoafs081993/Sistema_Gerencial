@@ -41,11 +41,11 @@ export function createDispatchQueue(processos: SuapProcesso[]): DispatchQueueSta
 }
 
 
-export function createStandaloneDispatchQueue(): DispatchQueueState {
+export function createStandaloneDispatchQueue(initialFields: Partial<ManualDespachoFields> = {}): DispatchQueueState {
   return {
     version: 1,
     currentIndex: 0,
-    items: [{ standalone: true, status: 'pending', manualFields: createStandaloneManualDespachoFields() }],
+    items: [{ standalone: true, status: 'pending', manualFields: { ...createStandaloneManualDespachoFields(), ...initialFields } }],
   };
 }
 export function saveDispatchQueue(queue: DispatchQueueState) {

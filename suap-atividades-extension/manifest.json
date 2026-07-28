@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
   "name": "SUAP Atividades Scraper",
-  "version": "1.2",
-  "description": "Extrai atividades do Planejamento Estrategico do SUAP para o Supabase",
+  "version": "1.3",
+  "description": "Extrai atividades e automatiza documentos do SUAP no SIAGES",
   "permissions": [
     "activeTab",
-    "scripting"
+    "scripting",
+    "storage"
   ],
   "host_permissions": [
     "https://suap.ifrn.edu.br/*",
@@ -21,6 +22,16 @@
       ],
       "js": [
         "clone-document.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://suap.ifrn.edu.br/processo_eletronico/processo/*",
+        "https://suap.ifrn.edu.br/processo_eletronico/visualizar_processo/*"
+      ],
+      "js": [
+        "process-document.js"
       ],
       "run_at": "document_idle"
     }

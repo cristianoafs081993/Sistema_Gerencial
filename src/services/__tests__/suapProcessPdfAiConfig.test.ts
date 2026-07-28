@@ -41,6 +41,39 @@ describe('SUAP process PDF AI extraction flow', () => {
     expect(panelSource).not.toContain('enrichProcessNumber');
   });
 
+  it('reconcilia vínculos apenas para caixas lidas com sucesso e preserva processos ocultos', () => {
+    const scraperSource = readFileSync(
+      path.resolve(process.cwd(), 'src/services/suapScraperService.ts'),
+      'utf8',
+    );
+    const panelSource = readFileSync(
+      path.resolve(process.cwd(), 'src/components/suap/SuapSyncPanel.tsx'),
+      'utf8',
+    );
+    const processosSource = readFileSync(
+      path.resolve(process.cwd(), 'src/services/suapProcessos.ts'),
+      'utf8',
+    );
+    const migrationSource = readFileSync(
+      path.resolve(process.cwd(), 'supabase/migrations/20260727110000_reconcile_suap_process_box_memberships.sql'),
+      'utf8',
+    );
+
+    expect(migrationSource).toContain('CREATE TABLE IF NOT EXISTS public.suap_processo_caixas');
+    expect(migrationSource).toContain('REFERENCES public.processos(id) ON DELETE CASCADE');
+    expect(migrationSource).toContain('REFERENCES public.suap_caixas(id) ON DELETE CASCADE');
+    expect(migrationSource).toContain('ON CONFLICT (processo_id, caixa_id)');
+    expect(scraperSource).toContain('async reconcileProcessBoxMemberships(');
+    expect(scraperSource).toContain(".delete()");
+    expect(scraperSource).toContain(".in('processo_id', staleProcessIds)");
+    expect(scraperSource).toContain('if (uniqueProcessIds.length === 0) return;');
+    expect(panelSource).toContain('const scrapedProcessesByBox = new Map<string, ScrapedProcesso[]>();');
+    expect(panelSource).toContain('if (scrapedProcessesByBox.size === 0)');
+    expect(panelSource).toContain('reconcileProcessBoxMemberships(caixaId, processIds, session.user.id)');
+    expect(panelSource).not.toContain("Nenhum processo foi localizado em nenhuma das caixas selecionadas.");
+    expect(processosSource).toContain(".from('suap_processo_caixas')");
+    expect(processosSource).toContain('.filter((processo) => caixasByProcessoId.has(processo.id))');
+  });
   it('keeps SUAP configuration manual and refreshes processes after synchronization', () => {
     const serviceSource = readFileSync(
       path.resolve(process.cwd(), 'src/services/suapScraperService.ts'),

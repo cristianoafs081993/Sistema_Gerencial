@@ -9,6 +9,7 @@ export interface ScrapedProcesso {
 
 export type SyncProgressCallback = (message: string) => void;
 export type SyncedProcesso = ScrapedProcesso & {
+  processId: string;
   already_exists: boolean;
   created?: boolean;
   pdfUrl?: string | null;
@@ -248,7 +249,7 @@ export const suapScraperService = {
   ): Promise<SyncedProcesso[]> {
     const { data: existingList, error: selectErr } = await supabase
       .from('processos')
-      .select('suap_id, status, num_processo, pdf_url')
+      .select('id, suap_id, status, num_processo, pdf_url')
       .eq('tenant_id', tenantId);
 
     if (selectErr) throw selectErr;
@@ -278,6 +279,7 @@ export const suapScraperService = {
 
         synced.push({
           ...proc,
+          processId: existing.id,
           already_exists: true,
           created: false,
           status: existing.status,
@@ -297,9 +299,17 @@ export const suapScraperService = {
       if (proc.numProcesso) payload.num_processo = proc.numProcesso;
       if (proc.caixa) payload.caixa = proc.caixa;
 
-      await supabase.from('processos').insert(payload);
+      const { data: inserted, error: insertError } = await supabase
+        .from('processos')
+        .insert(payload)
+        .select('id')
+        .single();
+
+      if (insertError) throw insertError;
+
       synced.push({
         ...proc,
+        processId: inserted.id,
         already_exists: false,
         created: true,
         status: 'pending_extraction',
@@ -310,6 +320,52 @@ export const suapScraperService = {
     return synced;
   },
 
+  async reconcileProcessBoxMemberships(
+    caixaId: string,
+    processIds: string[],
+    tenantId: string,
+  ): Promise<void> {
+    const uniqueProcessIds = [...new Set(processIds)];
+    const { data: currentMemberships, error: selectError } = await supabase
+      .from('suap_processo_caixas')
+      .select('processo_id')
+      .eq('tenant_id', tenantId)
+      .eq('caixa_id', caixaId);
+
+    if (selectError) throw selectError;
+
+    const observedProcessIds = new Set(uniqueProcessIds);
+    const staleProcessIds = (currentMemberships || [])
+      .map((membership) => membership.processo_id as string)
+      .filter((processId) => !observedProcessIds.has(processId));
+
+    if (staleProcessIds.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('suap_processo_caixas')
+        .delete()
+        .eq('tenant_id', tenantId)
+        .eq('caixa_id', caixaId)
+        .in('processo_id', staleProcessIds);
+
+      if (deleteError) throw deleteError;
+    }
+
+    if (uniqueProcessIds.length === 0) return;
+
+    const { error: upsertError } = await supabase
+      .from('suap_processo_caixas')
+      .upsert(
+        uniqueProcessIds.map((processoId) => ({
+          processo_id: processoId,
+          caixa_id: caixaId,
+          tenant_id: tenantId,
+          last_seen_at: new Date().toISOString(),
+        })),
+        { onConflict: 'processo_id,caixa_id' },
+      );
+
+    if (upsertError) throw upsertError;
+  },
   async downloadPdfForProcess(
     proc: ScrapedProcesso | SyncedProcesso,
     suapSessionId: string,

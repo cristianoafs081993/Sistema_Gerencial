@@ -2,11 +2,41 @@ const SUPABASE_URL = 'https://mnqhwyrzhgykjlyyqodd.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ucWh3eXJ6aGd5a2pseXlxb2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNzk4NjIsImV4cCI6MjA4NTg1NTg2Mn0.g9h5nF0l8yKG-yjQRI8i_mq084IzKTrH64F2FpreVIg';
 const SAVINGS_EVENT_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/record-automation-savings-event`;
 const SECRET_STORAGE_KEY = 'automation-event-secret';
+const SIAGES_APP_ORIGIN_STORAGE_KEY = 'siages-app-origin';
+const DEFAULT_SIAGES_APP_ORIGIN = 'https://sistema-gerencial-gamma.vercel.app';
 
 const statusEl = document.getElementById('status');
 const btnExtractEn = document.getElementById('btn-extract-en');
 const btnExtractAll = document.getElementById('btn-extract-all');
 const automationSecretInput = document.getElementById('automation-secret');
+const siagesAppOriginInput = document.getElementById('siages-app-origin');
+const saveSiagesAppOriginButton = document.getElementById('btn-save-siages-origin');
+
+async function getSiagesAppOrigin() {
+  const stored = await chrome.storage.local.get(SIAGES_APP_ORIGIN_STORAGE_KEY);
+  return stored[SIAGES_APP_ORIGIN_STORAGE_KEY] || DEFAULT_SIAGES_APP_ORIGIN;
+}
+
+function normalizeSiagesAppOrigin(value) {
+  const url = new URL(value.trim());
+  if (url.protocol !== 'https:') throw new Error('Informe uma URL HTTPS válida para o SIAGES.');
+  return url.origin;
+}
+
+void getSiagesAppOrigin().then((origin) => {
+  siagesAppOriginInput.value = origin;
+});
+
+saveSiagesAppOriginButton.addEventListener('click', async () => {
+  try {
+    const origin = normalizeSiagesAppOrigin(siagesAppOriginInput.value);
+    await chrome.storage.local.set({ [SIAGES_APP_ORIGIN_STORAGE_KEY]: origin });
+    siagesAppOriginInput.value = origin;
+    log('URL do SIAGES salva.', 'success');
+  } catch (error) {
+    log(error.message, 'error');
+  }
+});
 
 automationSecretInput.value = localStorage.getItem(SECRET_STORAGE_KEY) || '';
 automationSecretInput.addEventListener('change', () => {

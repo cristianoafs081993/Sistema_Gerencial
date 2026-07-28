@@ -4,7 +4,7 @@ import { Outlet } from 'react-router-dom';
 import App from '@/App';
 
 vi.mock('@/components/Layout', () => ({
-  Layout: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  Layout: ({ children }: { children: ReactNode }) => <div data-testid="app-layout">{children}</div>,
 }));
 
 vi.mock('@/components/auth/ProtectedRoute', () => ({
@@ -111,6 +111,10 @@ vi.mock('@/pages/Suap', () => ({
   default: () => <div>suap-page</div>,
 }));
 
+vi.mock('@/pages/SuapExtensionDispatch', () => ({
+  default: () => <div>suap-extension-dispatch-page</div>,
+}));
+
 vi.mock('@/pages/EconomiaTempo', () => ({
   default: () => <div>economia-tempo-page</div>,
 }));
@@ -206,6 +210,15 @@ describe('App routes', () => {
     render(<App />);
 
     expect(await screen.findByText('price-research-validation-page')).toBeInTheDocument();
+  });
+
+  it('renderiza a rota leve da extensao SUAP sem layout global', async () => {
+    window.history.pushState({}, '', '/suap-extensao/despacho');
+
+    render(<App />);
+
+    expect(await screen.findByText('suap-extension-dispatch-page')).toBeInTheDocument();
+    expect(screen.queryByTestId('app-layout')).not.toBeInTheDocument();
   });
 
   it('renderiza as rotas do painel de energia', async () => {

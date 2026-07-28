@@ -305,19 +305,26 @@ export function SuapSyncPanel() {
 
     try {
       const allScrapedProcesses: ScrapedProcesso[] = [];
+      const scrapedProcessesByBox = new Map<string, ScrapedProcesso[]>();
 
       for (const box of boxesToSync) {
         addLog(`[Caixa: ${box.nome}] Lendo processos de: ${box.url}`);
         try {
           const scraped = await suapScraperService.fetchAndScrapeCaixa(box.url, suapSessionId);
-          addLog(`[Caixa: ${box.nome}] ${scraped.length} processo(s) encontrado(s).`);
-          allScrapedProcesses.push(...scraped.map((processo) => ({ ...processo, caixa: box.nome })));
+          const scrapedInBox = scraped.map((processo) => ({ ...processo, caixa: box.nome }));
+          scrapedProcessesByBox.set(box.id, scrapedInBox);
+          addLog(`[Caixa: ${box.nome}] ${scrapedInBox.length} processo(s) encontrado(s).`);
+          allScrapedProcesses.push(...scrapedInBox);
 
           await suapScraperService.updateLastSyncTime(box.id, session.user.id);
         } catch (boxErr: any) {
           addLog(`[Caixa: ${box.nome}] FALHA: ${boxErr.message}`);
           console.error(boxErr);
         }
+      }
+
+      if (scrapedProcessesByBox.size === 0) {
+        throw new Error('Nenhuma caixa selecionada pôde ser lida; o inventário anterior foi preservado.');
       }
 
       const uniqueProcessesMap = new Map<string, ScrapedProcesso>();
@@ -327,16 +334,21 @@ export function SuapSyncPanel() {
       const uniqueProcesses = Array.from(uniqueProcessesMap.values());
       addLog(`Consolidacao completa: ${allScrapedProcesses.length} total, ${uniqueProcesses.length} unico(s).`);
 
-      if (uniqueProcesses.length === 0) {
-        throw new Error('Nenhum processo foi localizado em nenhuma das caixas selecionadas.');
+      const syncedProcesses = uniqueProcesses.length > 0
+        ? await suapScraperService.syncProcessListInSupabase(uniqueProcesses, session.user.id)
+        : [];
+      const syncedProcessBySuapId = new Map(syncedProcesses.map((processo) => [processo.suapId, processo]));
+
+      for (const [caixaId, scrapedInBox] of scrapedProcessesByBox) {
+        const processIds = scrapedInBox
+          .map((processo) => syncedProcessBySuapId.get(processo.suapId)?.processId)
+          .filter((processId): processId is string => Boolean(processId));
+        await suapScraperService.reconcileProcessBoxMemberships(caixaId, processIds, session.user.id);
       }
 
-      addLog('Atualizando inventario de processos no Supabase...');
-      const syncedProcesses = await suapScraperService.syncProcessListInSupabase(uniqueProcesses, session.user.id);
       const createdCount = syncedProcesses.filter((proc) => proc.created).length;
       const existingCount = syncedProcesses.length - createdCount;
-      addLog(`Inventario atualizado: ${createdCount} novo(s), ${existingCount} ja existente(s) preservado(s).`);
-
+      addLog(`Inventario reconciliado: ${createdCount} novo(s), ${existingCount} ja existente(s), ${scrapedProcessesByBox.size} caixa(s) atualizada(s).`);
       let completed = 0;
       const skipped = existingCount;
       let errors = 0;

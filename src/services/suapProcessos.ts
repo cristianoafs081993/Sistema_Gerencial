@@ -26,6 +26,10 @@ type SuapProcessoRow = {
   updated_at?: string | null;
 };
 
+type SuapProcessoCaixaRow = {
+  processo_id: string;
+  suap_caixas?: { nome?: string | null } | Array<{ nome?: string | null }> | null;
+};
 type SuapScreenshotPayload = {
   name: string;
   type: string;
@@ -44,7 +48,7 @@ type ConcluirProcessoParams = {
 const PROCESSOS_SELECT =
   'id,tenant_id,suap_id,url,status,num_processo,beneficiario,cpf_cnpj,assunto,contrato,pdf_url,dados_completos,caixa,created_at,updated_at';
 
-const mapProcessoRow = (item: SuapProcessoRow): SuapProcesso => ({
+const mapProcessoRow = (item: SuapProcessoRow, caixas: string[] = []): SuapProcesso => ({
   id: item.id,
   tenantId: item.tenant_id || undefined,
   suapId: item.suap_id,
@@ -57,11 +61,38 @@ const mapProcessoRow = (item: SuapProcessoRow): SuapProcesso => ({
   contrato: item.contrato || undefined,
   pdfUrl: item.pdf_url || undefined,
   dadosCompletos: item.dados_completos || undefined,
-  caixa: item.caixa || undefined,
+  caixa: caixas.join(' · ') || item.caixa || undefined,
   createdAt: item.created_at ? new Date(item.created_at) : undefined,
   updatedAt: item.updated_at ? new Date(item.updated_at) : undefined,
 });
 
+const getMembershipBoxNames = (membership: SuapProcessoCaixaRow): string[] => {
+  const caixas = Array.isArray(membership.suap_caixas)
+    ? membership.suap_caixas
+    : membership.suap_caixas
+      ? [membership.suap_caixas]
+      : [];
+
+  return caixas
+    .map((caixa) => caixa.nome?.trim())
+    .filter((nome): nome is string => Boolean(nome));
+};
+
+const mapActiveProcessos = (
+  processos: SuapProcessoRow[],
+  memberships: SuapProcessoCaixaRow[],
+): SuapProcesso[] => {
+  const caixasByProcessoId = new Map<string, string[]>();
+
+  memberships.forEach((membership) => {
+    const current = caixasByProcessoId.get(membership.processo_id) || [];
+    caixasByProcessoId.set(membership.processo_id, [...new Set([...current, ...getMembershipBoxNames(membership)])]);
+  });
+
+  return processos
+    .filter((processo) => caixasByProcessoId.has(processo.id))
+    .map((processo) => mapProcessoRow(processo, caixasByProcessoId.get(processo.id)));
+};
 const upsertWorkflow = async (processoId: string, dadosCompletos: SuapDadosCompletos): Promise<SuapProcesso> => {
   const { data, error } = await supabase
     .from('processos')
@@ -80,32 +111,54 @@ const upsertWorkflow = async (processoId: string, dadosCompletos: SuapDadosCompl
 export const suapProcessosService = {
   async getAll(): Promise<SuapProcesso[]> {
     const fetchFallback = async () => {
-      const fallbackData = await fetchSupabaseRestRows<SuapProcessoRow>('processos', PROCESSOS_SELECT, {
-        orderBy: 'updated_at',
-        ascending: false,
-      });
+      const [processos, memberships] = await Promise.all([
+        fetchSupabaseRestRows<SuapProcessoRow>('processos', PROCESSOS_SELECT, {
+          orderBy: 'updated_at',
+          ascending: false,
+        }),
+        fetchSupabaseRestRows<SuapProcessoCaixaRow>('suap_processo_caixas', 'processo_id,suap_caixas(nome)'),
+      ]);
 
-      return fallbackData.map(mapProcessoRow);
+      return mapActiveProcessos(processos, memberships);
     };
+
+    const [processosResult, membershipsResult] = await Promise.all([
+      supabase
+        .from('processos')
+        .select(PROCESSOS_SELECT)
+        .order('updated_at', { ascending: false }),
+      supabase
+        .from('suap_processo_caixas')
+        .select('processo_id,suap_caixas(nome)'),
+    ]);
+
+    if (processosResult.error || membershipsResult.error) {
+      console.warn(
+        'suapProcessosService.getAll: fallback para Supabase REST',
+        processosResult.error || membershipsResult.error,
+      );
+      return fetchFallback();
+    }
+
+    return mapActiveProcessos(
+      (processosResult.data as SuapProcessoRow[] | null) || [],
+      (membershipsResult.data as SuapProcessoCaixaRow[] | null) || [],
+    );
+  },
+  async getBySuapId(suapId: string): Promise<SuapProcesso | null> {
+    const normalizedSuapId = suapId.trim();
+    if (!normalizedSuapId) return null;
 
     const { data, error } = await supabase
       .from('processos')
       .select(PROCESSOS_SELECT)
-      .order('updated_at', { ascending: false });
+      .eq('suap_id', normalizedSuapId)
+      .maybeSingle();
 
-    if (error) {
-      console.warn('suapProcessosService.getAll: fallback para Supabase REST', error);
-      return fetchFallback();
-    }
+    if (error) throw error;
 
-    if (!data || data.length === 0) {
-      console.warn('suapProcessosService.getAll: resultado vazio via supabase-js, consultando REST');
-      return fetchFallback();
-    }
-
-    return ((data as SuapProcessoRow[] | null) || []).map(mapProcessoRow);
+    return data ? mapProcessoRow(data as SuapProcessoRow) : null;
   },
-
   async getPdfSignedUrl(path: string): Promise<string | null> {
     const { data, error } = await supabase.storage
       .from('suap-pdfs')
