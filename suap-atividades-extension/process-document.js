@@ -50,11 +50,16 @@
 
   function closeModal() {
     document.getElementById(MODAL_ID)?.remove();
-    document.removeEventListener('keydown', handleEscape);
   }
 
-  function handleEscape(event) {
-    if (event.key === 'Escape') closeModal();
+  function isSiagesFrameMessage(event, siagesOrigin, frame, type) {
+    return (
+      event.origin === siagesOrigin &&
+      event.source === frame.contentWindow &&
+      event.data?.source === 'siages' &&
+      event.data?.type === type &&
+      event.data?.version === 1
+    );
   }
 
   function openModal() {
@@ -69,7 +74,7 @@
       overlay.id = MODAL_ID;
       overlay.setAttribute('role', 'dialog');
       overlay.setAttribute('aria-modal', 'true');
-      overlay.setAttribute('aria-label', 'Gerar despacho de liquidação no SIAGES');
+      overlay.setAttribute('aria-label', 'Gerar despacho de liquidacao no SIAGES');
       Object.assign(overlay.style, {
         position: 'fixed', inset: '0', zIndex: '2147483647', background: 'rgba(15, 23, 42, 0.55)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
@@ -89,37 +94,44 @@
         position: 'absolute', zIndex: '1', top: '12px', right: '12px', border: '1px solid #cbd5e1', borderRadius: '6px',
         padding: '6px 10px', background: '#fff', color: '#334155', cursor: 'pointer', fontSize: '13px',
       });
-      closeButton.addEventListener('click', closeModal);
 
       const frame = document.createElement('iframe');
       frame.id = IFRAME_ID;
       frame.src = `${siagesOrigin}/suap-extensao/despacho`;
-      frame.title = 'Gerador de Despacho de Liquidação do SIAGES';
+      frame.title = 'Gerador de Despacho de Liquidacao do SIAGES';
       frame.allow = 'clipboard-read; clipboard-write';
       Object.assign(frame.style, { display: 'block', width: '100%', height: '100%', border: '0' });
-      frame.addEventListener('load', () => frame.contentWindow?.postMessage(context, siagesOrigin));
+
+      const postContext = () => frame.contentWindow?.postMessage(context, siagesOrigin);
+      const cleanupAndClose = () => {
+        window.removeEventListener('message', receiveFromSiages);
+        document.removeEventListener('keydown', closeOnEscape);
+        closeModal();
+      };
+      const closeOnEscape = (event) => {
+        if (event.key === 'Escape') cleanupAndClose();
+      };
+      const receiveFromSiages = (event) => {
+        if (isSiagesFrameMessage(event, siagesOrigin, frame, 'siages:suap-dispatch-ready')) {
+          postContext();
+          return;
+        }
+        if (isSiagesFrameMessage(event, siagesOrigin, frame, 'siages:suap-dispatch-close')) {
+          cleanupAndClose();
+        }
+      };
+
+      closeButton.addEventListener('click', cleanupAndClose);
+      frame.addEventListener('load', postContext);
+      window.addEventListener('message', receiveFromSiages);
 
       overlay.addEventListener('click', (event) => {
-        if (event.target === overlay) closeModal();
+        if (event.target === overlay) cleanupAndClose();
       });
       panel.append(closeButton, frame);
       overlay.appendChild(panel);
       document.body.appendChild(overlay);
-      document.addEventListener('keydown', handleEscape);
-
-      const closeFromSiages = (event) => {
-        if (
-          event.origin === siagesOrigin &&
-          event.source === frame.contentWindow &&
-          event.data?.source === 'siages' &&
-          event.data?.type === 'siages:suap-dispatch-close' &&
-          event.data?.version === 1
-        ) {
-          window.removeEventListener('message', closeFromSiages);
-          closeModal();
-        }
-      };
-      window.addEventListener('message', closeFromSiages);
+      document.addEventListener('keydown', closeOnEscape);
     });
   }
 
@@ -129,7 +141,7 @@
     button.id = BUTTON_ID;
     button.type = 'button';
     button.textContent = 'Gerar documento';
-    button.setAttribute('aria-label', 'Gerar despacho de liquidação com o SIAGES');
+    button.setAttribute('aria-label', 'Gerar despacho de liquidacao com o SIAGES');
     Object.assign(button.style, {
       position: 'fixed', right: '20px', bottom: '20px', zIndex: '2147483646', border: '0', borderRadius: '7px',
       padding: '10px 14px', background: '#047857', color: '#fff', boxShadow: '0 8px 20px rgba(4, 120, 87, 0.28)',

@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   getSuapExtensionProcessContext,
   SUAP_EXTENSION_DISPATCH_CLOSE_MESSAGE,
+  SUAP_EXTENSION_DISPATCH_READY_MESSAGE,
   SUAP_EXTENSION_ORIGIN,
   type SuapExtensionProcessContext,
 } from '@/lib/suapExtensionDispatch';
@@ -18,6 +19,14 @@ type DispatchState = {
   queue: DispatchQueueState;
 };
 
+function postMessageToSuapParent(message: unknown) {
+  try {
+    window.parent.postMessage(message, SUAP_EXTENSION_ORIGIN);
+  } catch {
+    // Em testes ou acesso direto, a janela pai pode nao ser o SUAP.
+  }
+}
+
 export default function SuapExtensionDispatch() {
   const { user } = useAuth();
   const userId = user?.id;
@@ -26,15 +35,37 @@ export default function SuapExtensionDispatch() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let readyAttempts = 0;
+    let readyInterval: ReturnType<typeof setInterval> | null = null;
+
+    const stopReadySignal = () => {
+      if (!readyInterval) return;
+      clearInterval(readyInterval);
+      readyInterval = null;
+    };
+
+    const announceReady = () => {
+      readyAttempts += 1;
+      postMessageToSuapParent(SUAP_EXTENSION_DISPATCH_READY_MESSAGE);
+      if (readyAttempts >= 20) stopReadySignal();
+    };
+
     const receiveContext = (event: MessageEvent) => {
       const nextContext = getSuapExtensionProcessContext(event, window.parent);
       if (!nextContext) return;
+      stopReadySignal();
       setError(null);
       setContext(nextContext);
     };
 
     window.addEventListener('message', receiveContext);
-    return () => window.removeEventListener('message', receiveContext);
+    announceReady();
+    readyInterval = setInterval(announceReady, 500);
+
+    return () => {
+      stopReadySignal();
+      window.removeEventListener('message', receiveContext);
+    };
   }, []);
 
   useEffect(() => {
@@ -55,7 +86,7 @@ export default function SuapExtensionDispatch() {
         });
       })
       .catch(() => {
-        if (active) setError('Não foi possível consultar este processo no espelho SUAP. Tente novamente.');
+        if (active) setError('Nao foi possivel consultar este processo no espelho SUAP. Tente novamente.');
       });
 
     return () => {
@@ -70,7 +101,7 @@ export default function SuapExtensionDispatch() {
     <SuapDocumentGeneratorDialog
       open
       onOpenChange={(open) => {
-        if (!open) window.parent.postMessage(SUAP_EXTENSION_DISPATCH_CLOSE_MESSAGE, SUAP_EXTENSION_ORIGIN);
+        if (!open) postMessageToSuapParent(SUAP_EXTENSION_DISPATCH_CLOSE_MESSAGE);
       }}
       processos={dispatch.processo ? [dispatch.processo] : []}
       queue={dispatch.queue}

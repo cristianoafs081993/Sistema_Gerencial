@@ -1,5 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 
+import { SUAP_EXTENSION_DISPATCH_READY_MESSAGE, SUAP_EXTENSION_ORIGIN } from '@/lib/suapExtensionDispatch';
 import SuapExtensionDispatch from '@/pages/SuapExtensionDispatch';
 import { suapProcessosService } from '@/services/suapProcessos';
 import type { SuapProcesso } from '@/types';
@@ -31,6 +32,15 @@ async function sendContext(data = processContext, origin = 'https://suap.ifrn.ed
 
 describe('SuapExtensionDispatch', () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it('avisa a extensao quando esta pronto para receber o contexto', () => {
+    const postMessage = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => undefined);
+
+    render(<SuapExtensionDispatch />);
+
+    expect(postMessage).toHaveBeenCalledWith(SUAP_EXTENSION_DISPATCH_READY_MESSAGE, SUAP_EXTENSION_ORIGIN);
+    postMessage.mockRestore();
+  });
 
   it('abre a fila do processo sincronizado a partir do contexto validado', async () => {
     vi.mocked(suapProcessosService.getBySuapId).mockResolvedValue({

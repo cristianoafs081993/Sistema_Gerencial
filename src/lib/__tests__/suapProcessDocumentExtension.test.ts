@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { waitFor } from '@testing-library/dom';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type ExtensionWindow = Window & typeof globalThis & {
   __SIAGES_SUAP_PROCESS_TEST__?: boolean;
@@ -9,6 +10,8 @@ type ExtensionWindow = Window & typeof globalThis & {
     getProcessNumber: () => string;
     buildContext: () => { payload: { suapId: string; processNumber: string; processUrl: string } } | null;
     installButton: () => void;
+    openModal: () => void;
+    closeModal: () => void;
   };
   chrome?: unknown;
 };
@@ -54,6 +57,28 @@ describe('process-document extension script', () => {
     expect(document.querySelectorAll('#siages-suap-generate-document')).toHaveLength(1);
   });
 
+  it('reenvia o contexto quando o iframe do SIAGES informa que esta pronto', async () => {
+    const script = loadProcessScript();
+
+    script.openModal();
+
+    await waitFor(() => expect(document.getElementById('siages-suap-dispatch-frame')).toBeTruthy());
+    const frame = document.getElementById('siages-suap-dispatch-frame') as HTMLIFrameElement;
+    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage').mockImplementation(() => undefined);
+
+    window.dispatchEvent(new MessageEvent('message', {
+      origin: 'https://sistema-gerencial-gamma.vercel.app',
+      source: frame.contentWindow,
+      data: { source: 'siages', type: 'siages:suap-dispatch-ready', version: 1 },
+    }));
+
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'siages-suap-extension',
+      type: 'siages:suap-process-context',
+      payload: expect.objectContaining({ suapId: '321', processNumber: '23035.000001.2026-11' }),
+    }), 'https://sistema-gerencial-gamma.vercel.app');
+    postMessage.mockRestore();
+  });
   it('reconhece a tela de visualizacao e ignora paginas sem processo', () => {
     window.history.replaceState(null, '', '/processo_eletronico/visualizar_processo/654/');
     let script = loadProcessScript();

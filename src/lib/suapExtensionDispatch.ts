@@ -13,6 +13,12 @@ export type SuapExtensionProcessContextMessage = {
   payload: SuapExtensionProcessContext;
 };
 
+export const SUAP_EXTENSION_DISPATCH_READY_MESSAGE = {
+  source: 'siages',
+  type: 'siages:suap-dispatch-ready',
+  version: 1,
+} as const;
+
 export const SUAP_EXTENSION_DISPATCH_CLOSE_MESSAGE = {
   source: 'siages',
   type: 'siages:suap-dispatch-close',
