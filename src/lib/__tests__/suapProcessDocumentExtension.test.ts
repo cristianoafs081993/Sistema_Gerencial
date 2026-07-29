@@ -31,6 +31,28 @@ function loadProcessScript() {
   return testWindow.__siagesSuapProcessDocument;
 }
 
+function financeSummary() {
+  return {
+    status: 'ready',
+    beneficiario: { nome: 'Fornecedor Alfa' },
+    contrato: { numero: '00040/2026' },
+    escopoContrato: true,
+    totais: { empenhado: 1000, liquidado: 300, saldo: 700 },
+    empenhos: [{
+      id: 'emp-1',
+      numero: '2026NE000001',
+      saldo: 700,
+      liquidado: 300,
+      liquidacoes: [
+        { id: 'liq-1', numero: 'NF 123', data: '2026-02-20', situacao: 'Liquidada', valor: 280 },
+        { id: 'liq-2', numero: 'NF 124', data: '2026-02-21', situacao: 'Pago', valor: 20 },
+        { id: 'liq-3', numero: 'NF 125', data: '2026-02-22', situacao: 'Liquidada', valor: 10 },
+        { id: 'liq-4', numero: 'NF 126', data: '2026-02-23', situacao: 'Liquidada', valor: 5 },
+      ],
+    }],
+  };
+}
+
 describe('process-document extension script', () => {
   beforeEach(() => {
     document.body.innerHTML = '<main>Processo 23035.000001.2026-11</main>';
@@ -88,7 +110,8 @@ describe('process-document extension script', () => {
     postMessage.mockRestore();
   });
 
-  it('injeta card financeiro e renderiza resumo recebido do SIAGES', async () => {
+  it('injeta card financeiro no fim da area de tramitacao e renderiza liquidacoes sem pagamento', async () => {
+    document.body.innerHTML = '<main><section id="tramites"><h3>Tramitação do processo</h3><p>Processo 23035.000001.2026-11</p></section></main>';
     const script = loadProcessScript();
 
     script.installFinancePanel();
@@ -116,22 +139,32 @@ describe('process-document extension script', () => {
         source: 'siages',
         type: 'siages:suap-process-finance-summary',
         version: 1,
-        payload: {
-          status: 'ready',
-          beneficiario: { nome: 'Fornecedor Alfa' },
-          contrato: { numero: '00040/2026' },
-          escopoContrato: true,
-          totais: { empenhado: 1000, liquidado: 300, pago: 100, saldo: 700 },
-          empenhos: [{ id: 'emp-1', numero: '2026NE000001', saldo: 700, liquidado: 300, pago: 100, liquidacoes: [] }],
-        },
+        payload: financeSummary(),
       },
     }));
 
     await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeNull());
-    expect(document.getElementById('siages-suap-finance-panel')?.textContent).toContain('Fornecedor Alfa');
-    expect(document.getElementById('siages-suap-finance-panel')?.textContent).toContain('00040/2026');
-    expect(document.getElementById('siages-suap-finance-panel')?.textContent).toContain('R$');
+    const panel = document.getElementById('siages-suap-finance-panel') as HTMLElement;
+    expect(document.getElementById('tramites')?.lastElementChild).toBe(panel);
+    expect(panel.dataset.siagesPlacement).toBe('flow');
+    expect(panel.style.position).toBe('static');
+    expect(panel.textContent).toContain('Fornecedor Alfa');
+    expect(panel.textContent).toContain('00040/2026');
+    expect(panel.textContent).toContain('Liquidado');
+    expect(panel.textContent).toContain('NF 123');
+    expect(panel.textContent).toContain('+1 liquidacoes');
+    expect(panel.textContent).not.toMatch(/pago|pagamento/i);
     postMessage.mockRestore();
+  });
+
+  it('usa o conteudo principal como fallback quando nao encontra area de tramitacao', () => {
+    const script = loadProcessScript();
+    script.renderFinanceSummary(financeSummary());
+
+    const panel = document.getElementById('siages-suap-finance-panel') as HTMLElement;
+    expect(document.querySelector('main')?.contains(panel)).toBe(true);
+    expect(panel.dataset.siagesPlacement).toBe('content');
+    expect(panel.style.position).toBe('static');
   });
 
   it('remove o card quando o processo nao tem beneficiario identificado', () => {

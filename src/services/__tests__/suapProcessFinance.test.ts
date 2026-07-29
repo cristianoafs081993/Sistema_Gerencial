@@ -134,7 +134,7 @@ function liquidacao(overrides: Partial<ContratoApiPublicLiquidacaoRow> = {}): Co
 }
 
 describe('buildSuapProcessFinanceSummary', () => {
-  it('resume empenhos locais do beneficiario quando o processo nao tem contrato', () => {
+  it('resume empenhos locais do beneficiario sem expor pagamento', () => {
     const summary = buildSuapProcessFinanceSummary({
       processo: processo(),
       empenhos: [empenho(), empenho({ id: 'empenho-2', numero: '2026NE000002', favorecidoDocumento: '99999999000199' })],
@@ -147,13 +147,32 @@ describe('buildSuapProcessFinanceSummary', () => {
     expect(summary.status).toBe('ready');
     expect(summary.escopoContrato).toBe(false);
     expect(summary.empenhos).toHaveLength(1);
-    expect(summary.totais).toMatchObject({ empenhado: 1000, liquidado: 300, pago: 120, saldo: 700 });
+    expect(summary.totais).toMatchObject({ empenhado: 1000, liquidado: 300, saldo: 700 });
+    expect(JSON.stringify(summary)).not.toMatch(/pago|pagamento/i);
   });
 
-  it('quando ha contrato, limita empenhos ao contrato e preserva liquidacoes em cache', () => {
+  it('usa saldo e liquidacoes como fallback quando campos oficiais vierem zerados', () => {
+    const summary = buildSuapProcessFinanceSummary({
+      processo: processo({ contrato: '40/2026' }),
+      empenhos: [],
+      contratos: [contrato()],
+      contratosEmpenhos: [],
+      contratosApi: [contratoApi()],
+      contratosApiEmpenhos: [empenhoApi({ valor_liquidado: 0, valor_pago: 0, valor_empenhado: 500, valor_a_liquidar: 200 })],
+      liquidacoesPorEmpenho: new Map([['2026NE000099', [liquidacao({ valor_liquido: 280 })]]]),
+    });
+
+    expect(summary.empenhos[0]).toMatchObject({ numero: '2026NE000099', liquidado: 300, saldo: 200 });
+    expect(summary.totais).toMatchObject({ empenhado: 500, liquidado: 300, saldo: 200 });
+  });
+
+  it('quando ha contrato, limita empenhos ao contrato e preserva liquidacoes detalhadas', () => {
     const cache = new Map([[
       '2026NE000099',
-      [liquidacao(), liquidacao({ contrato_numero: '41/2026', fatura_id: 901 })],
+      [
+        liquidacao({ situacao: 'Pago' }),
+        liquidacao({ contrato_numero: '41/2026', fatura_id: 901, numero_instrumento_cobranca: 'NF fora' }),
+      ],
     ]]);
 
     const summary = buildSuapProcessFinanceSummary({
@@ -173,8 +192,10 @@ describe('buildSuapProcessFinanceSummary', () => {
     expect(summary.escopoContrato).toBe(true);
     expect(summary.contrato?.numero).toBe('00040/2026');
     expect(summary.empenhos.map((item) => item.numero)).toEqual(['2026NE000001', '2026NE000099']);
-    expect(summary.empenhos.find((item) => item.numero === '2026NE000099')?.liquidacoes).toHaveLength(1);
-    expect(summary.totais.saldo).toBe(900);
+    expect(summary.empenhos.find((item) => item.numero === '2026NE000099')?.liquidacoes).toEqual([
+      expect.objectContaining({ numero: 'NF 123', situacao: 'Liquidada', valor: 280, data: '2026-02-20' }),
+    ]);
+    expect(JSON.stringify(summary)).not.toMatch(/pago|pagamento/i);
   });
 
   it('nao injeta dados quando o processo ainda nao tem beneficiario identificado', () => {

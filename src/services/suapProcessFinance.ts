@@ -29,7 +29,6 @@ export type SuapProcessFinanceSummary = {
   totais: {
     empenhado: number;
     liquidado: number;
-    pago: number;
     saldo: number;
   };
   empenhos: SuapProcessFinanceEmpenho[];
@@ -44,7 +43,6 @@ export type SuapProcessFinanceEmpenho = {
   dataEmissao?: string;
   empenhado: number;
   liquidado: number;
-  pago: number;
   saldo: number;
   liquidacoes: SuapProcessFinanceLiquidacao[];
 };
@@ -164,8 +162,6 @@ const getApiSaldo = (empenho: ContratoApiEmpenhoRow) => {
 const getLocalLiquidado = (empenho: Empenho) =>
   empenho.valorLiquidadoOficial ?? empenho.valorLiquidado ?? 0;
 
-const getLocalPago = (empenho: Empenho) =>
-  empenho.valorPagoOficial ?? empenho.valorPago ?? empenho.rapPago ?? 0;
 
 const getLocalSaldo = (empenho: Empenho) => {
   if (empenho.tipo === 'rap') {
@@ -236,6 +232,12 @@ const resolveApiContratos = (
   });
 };
 
+const normalizeLiquidacaoSituacao = (value: unknown) => {
+  const text = String(value ?? '').trim();
+  if (!text) return undefined;
+  return normalizeText(text).includes('pag') ? 'Liquidada' : text;
+};
+
 const getLiquidacoesForEmpenho = (
   liquidacoesPorEmpenho: Map<string, ContratoApiPublicLiquidacaoRow[]> | undefined,
   numero: string,
@@ -244,22 +246,32 @@ const getLiquidacoesForEmpenho = (
   const rows = liquidacoesPorEmpenho?.get(normalizeEmpenhoRef(numero)) ?? [];
   return rows
     .filter((row) => !contratoNumero || normalizeContratoNumero(row.contrato_numero) === contratoNumero)
-    .slice(0, 6)
     .map((row) => ({
       id: `${row.contrato_api_id}:${row.fatura_id}:${row.empenho_numero}:${row.numero_instrumento_cobranca ?? ''}`,
       numero: row.numero_instrumento_cobranca ?? undefined,
-      situacao: row.situacao ?? undefined,
+      situacao: normalizeLiquidacaoSituacao(row.situacao),
       valor: row.valor_liquido ?? row.valor_bruto ?? row.valor_empenho ?? undefined,
       data: row.data_liquidacao ?? row.data_emissao ?? row.data_pagamento ?? undefined,
     }));
 };
+
+const sumLiquidacoes = (liquidacoes: SuapProcessFinanceLiquidacao[]) =>
+  liquidacoes.reduce((sum, liquidacao) => sum + (liquidacao.valor ?? 0), 0);
+
+const resolveLiquidado = (values: { oficial?: number; liquidacoes: SuapProcessFinanceLiquidacao[]; empenhado: number; saldo: number }) =>
+  Math.max(
+    0,
+    values.oficial ?? 0,
+    sumLiquidacoes(values.liquidacoes),
+    values.empenhado > 0 ? values.empenhado - values.saldo : 0,
+  );
 
 const byEmpenhoSort = (left: SuapProcessFinanceEmpenho, right: SuapProcessFinanceEmpenho) =>
   right.saldo - left.saldo || right.empenhado - left.empenhado || left.numero.localeCompare(right.numero);
 
 export function buildSuapProcessFinanceSummary(input: BuildFinanceSummaryInput): SuapProcessFinanceSummary {
   const { processo } = input;
-  const emptyTotals = { empenhado: 0, liquidado: 0, pago: 0, saldo: 0 };
+  const emptyTotals = { empenhado: 0, liquidado: 0, saldo: 0 };
   if (!processo) return { status: 'missing-process', escopoContrato: false, totais: emptyTotals, empenhos: [] };
 
   const beneficiaryDocument = normalizeDigits(processo.cpfCnpj) || undefined;
@@ -296,22 +308,31 @@ export function buildSuapProcessFinanceSummary(input: BuildFinanceSummaryInput):
     return !Array.from(keys).some((key) => localEmpenhoKeys.has(key));
   });
 
-  const mappedLocal: SuapProcessFinanceEmpenho[] = localEmpenhos.map((empenho) => ({
-    id: empenho.id,
-    numero: empenho.numero,
-    origem: 'local',
-    descricao: empenho.descricao,
-    contratoNumero: contratoNumero || undefined,
-    dataEmissao: empenho.dataEmpenho instanceof Date ? empenho.dataEmpenho.toISOString().slice(0, 10) : undefined,
-    empenhado: empenho.valor || 0,
-    liquidado: getLocalLiquidado(empenho),
-    pago: getLocalPago(empenho),
-    saldo: getLocalSaldo(empenho),
-    liquidacoes: getLiquidacoesForEmpenho(input.liquidacoesPorEmpenho, empenho.numero, contratoNumero),
-  }));
+  const mappedLocal: SuapProcessFinanceEmpenho[] = localEmpenhos.map((empenho) => {
+    const empenhado = empenho.valor || 0;
+    const saldo = getLocalSaldo(empenho);
+    const liquidacoes = getLiquidacoesForEmpenho(input.liquidacoesPorEmpenho, empenho.numero, contratoNumero);
+    return {
+      id: empenho.id,
+      numero: empenho.numero,
+      origem: 'local',
+      descricao: empenho.descricao,
+      contratoNumero: contratoNumero || undefined,
+      dataEmissao: empenho.dataEmpenho instanceof Date ? empenho.dataEmpenho.toISOString().slice(0, 10) : undefined,
+      empenhado,
+      liquidado: resolveLiquidado({ oficial: getLocalLiquidado(empenho), liquidacoes, empenhado, saldo }),
+      saldo,
+      liquidacoes,
+    };
+  });
 
   const mappedApi: SuapProcessFinanceEmpenho[] = apiEmpenhos.map((empenho) => {
     const empenhado = getApiEmpenhoNumber(empenho, 'valor_empenhado', 'valorempenhado') ?? 0;
+    const saldo = getApiSaldo(empenho);
+    const liquidacoes = getLiquidacoesForEmpenho(input.liquidacoesPorEmpenho, empenho.numero, contratoNumero);
+    const liquidadoApi =
+      (getApiEmpenhoNumber(empenho, 'valor_liquidado', 'valorliquidado') ?? 0) +
+      (getApiEmpenhoNumber(empenho, 'valor_pago', 'valorpago') ?? 0);
     return {
       id: empenho.id,
       numero: empenho.numero,
@@ -320,10 +341,9 @@ export function buildSuapProcessFinanceSummary(input: BuildFinanceSummaryInput):
       contratoNumero: contratoNumeroByApiId.get(empenho.contrato_api_id) || undefined,
       dataEmissao: empenho.data_emissao ?? undefined,
       empenhado,
-      liquidado: getApiEmpenhoNumber(empenho, 'valor_liquidado', 'valorliquidado') ?? 0,
-      pago: getApiEmpenhoNumber(empenho, 'valor_pago', 'valorpago') ?? 0,
-      saldo: getApiSaldo(empenho),
-      liquidacoes: getLiquidacoesForEmpenho(input.liquidacoesPorEmpenho, empenho.numero, contratoNumero),
+      liquidado: resolveLiquidado({ oficial: liquidadoApi, liquidacoes, empenhado, saldo }),
+      saldo,
+      liquidacoes,
     };
   });
 
@@ -331,7 +351,6 @@ export function buildSuapProcessFinanceSummary(input: BuildFinanceSummaryInput):
   const totais = empenhos.reduce((acc, empenho) => ({
     empenhado: acc.empenhado + empenho.empenhado,
     liquidado: acc.liquidado + empenho.liquidado,
-    pago: acc.pago + empenho.pago,
     saldo: acc.saldo + empenho.saldo,
   }), emptyTotals);
 

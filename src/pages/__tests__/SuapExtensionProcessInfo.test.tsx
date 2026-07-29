@@ -51,7 +51,7 @@ describe('SuapExtensionProcessInfo', () => {
       status: 'ready' as const,
       escopoContrato: true,
       contrato: { numero: '00040/2026' },
-      totais: { empenhado: 1000, liquidado: 300, pago: 100, saldo: 700 },
+      totais: { empenhado: 1000, liquidado: 300, saldo: 700 },
       empenhos: [],
     };
     vi.mocked(suapProcessFinanceService.getSummaryBySuapId).mockResolvedValue(summary);

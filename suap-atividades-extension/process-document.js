@@ -82,34 +82,100 @@
     return element;
   }
 
-  function ensureFinancePanel() {
-    const existing = document.getElementById(FINANCE_PANEL_ID);
-    if (existing) return existing;
-
-    const panel = document.createElement('section');
-    panel.id = FINANCE_PANEL_ID;
-    panel.setAttribute('aria-live', 'polite');
-    Object.assign(panel.style, {
-      position: 'fixed',
-      right: '20px',
-      bottom: '74px',
-      zIndex: '2147483645',
-      width: 'min(440px, calc(100vw - 40px))',
-      maxHeight: 'min(640px, calc(100vh - 110px))',
-      overflow: 'auto',
-      border: '1px solid #bbf7d0',
-      borderRadius: '12px',
-      background: '#ffffff',
-      boxShadow: '0 18px 45px rgba(15, 23, 42, 0.22)',
-      color: '#0f172a',
-      fontFamily: 'Arial, sans-serif',
-      fontSize: '13px',
-    });
-
-    document.body.appendChild(panel);
-    return panel;
+  function getThemeColors() {
+    return isDarkTheme()
+      ? {
+        panelBg: '#1f2937', panelBorder: '#047857', panelText: '#e5e7eb', mutedText: '#cbd5e1', heading: '#a7f3d0',
+        chipBg: 'rgba(16,185,129,0.18)', chipText: '#a7f3d0', metricBg: 'rgba(15,23,42,0.42)', metricBorder: '#334155',
+        itemBg: 'rgba(15,23,42,0.32)', accent: '#34d399', shadow: '0 12px 32px rgba(0, 0, 0, 0.24)',
+      }
+      : {
+        panelBg: '#ffffff', panelBorder: '#bbf7d0', panelText: '#0f172a', mutedText: '#475569', heading: '#065f46',
+        chipBg: '#ecfdf5', chipText: '#047857', metricBg: '#f8fafc', metricBorder: '#e2e8f0',
+        itemBg: '#ffffff', accent: '#047857', shadow: '0 10px 28px rgba(15, 23, 42, 0.12)',
+      };
   }
 
+  function normalizeTextForMatch(value) {
+    return cleanText(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+  }
+
+  function isDarkTheme() {
+    const background = window.getComputedStyle(document.body).backgroundColor;
+    const match = background.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+    if (!match) return document.body.className.toLowerCase().includes('dark');
+    const [, red, green, blue] = match.map(Number);
+    return ((red * 299) + (green * 587) + (blue * 114)) / 1000 < 120;
+  }
+
+  function findUsefulContainer(element) {
+    const selectors = ['section', 'article', 'fieldset', '.box', '.card', '.module', '.panel', '.timeline', '.tabular', 'div'];
+    for (const selector of selectors) {
+      const candidate = element.closest(selector);
+      if (candidate && candidate !== document.body && candidate !== document.documentElement) return candidate;
+    }
+    return element.parentElement && element.parentElement !== document.body ? element.parentElement : null;
+  }
+
+  function findFinancePanelHost() {
+    const pattern = /\b(tramitacao|tramitacoes|tramite|tramites|historico de tramitacao)\b/i;
+    const labelSelectors = 'h1,h2,h3,h4,h5,h6,legend,summary,caption,strong,b,.title,.titulo,.card-title,.box-title';
+    const label = Array.from(document.querySelectorAll(labelSelectors)).find((element) => pattern.test(normalizeTextForMatch(element.textContent)));
+    if (label) {
+      const host = findUsefulContainer(label);
+      if (host) return { host, mode: 'flow' };
+    }
+
+    const contentCandidates = Array.from(document.querySelectorAll('section,article,fieldset,.box,.card,.module,.panel'));
+    const directHost = contentCandidates.find((element) => {
+      const text = normalizeTextForMatch(element.textContent).slice(0, 220);
+      return pattern.test(text);
+    });
+    if (directHost) return { host: directHost, mode: 'flow' };
+
+    const main = document.querySelector('main, #content, .content, #main, [role="main"]');
+    if (main && main !== document.body) return { host: main, mode: 'content' };
+
+    return { host: document.body, mode: 'fixed' };
+  }
+
+  function applyFinancePanelStyle(panel, placement) {
+    const colors = getThemeColors();
+    const integrated = placement.mode !== 'fixed';
+    Object.assign(panel.style, {
+      position: integrated ? 'static' : 'fixed',
+      right: integrated ? '' : '20px',
+      bottom: integrated ? '' : '74px',
+      zIndex: integrated ? '' : '2147483645',
+      width: integrated ? '100%' : 'min(440px, calc(100vw - 40px))',
+      maxHeight: integrated ? 'none' : 'min(640px, calc(100vh - 110px))',
+      overflow: integrated ? 'visible' : 'auto',
+      margin: integrated ? '16px 0 0' : '0',
+      border: `1px solid ${colors.panelBorder}`,
+      borderRadius: '12px',
+      background: colors.panelBg,
+      boxShadow: colors.shadow,
+      color: colors.panelText,
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '13px',
+      boxSizing: 'border-box',
+    });
+    panel.dataset.siagesPlacement = placement.mode;
+  }
+
+  function ensureFinancePanel() {
+    const placement = findFinancePanelHost();
+    const existing = document.getElementById(FINANCE_PANEL_ID);
+    const panel = existing || document.createElement('section');
+    panel.id = FINANCE_PANEL_ID;
+    panel.setAttribute('aria-live', 'polite');
+    applyFinancePanelStyle(panel, placement);
+    if (panel.parentElement !== placement.host) placement.host.appendChild(panel);
+    return panel;
+  }
   function removeFinancePanel() {
     document.getElementById(FINANCE_PANEL_ID)?.remove();
   }
@@ -141,13 +207,51 @@
   }
 
   function renderMetric(label, value) {
+    const colors = getThemeColors();
     const cell = document.createElement('div');
-    Object.assign(cell.style, { border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px', background: '#f8fafc' });
+    Object.assign(cell.style, { border: `1px solid ${colors.metricBorder}`, borderRadius: '8px', padding: '8px', background: colors.metricBg });
     cell.append(
-      createText('span', label, { display: 'block', color: '#64748b', fontSize: '11px', marginBottom: '3px' }),
-      createText('strong', formatCurrency(value), { display: 'block', color: '#0f172a', fontSize: '13px' }),
+      createText('span', label, { display: 'block', color: colors.mutedText, fontSize: '11px', marginBottom: '3px' }),
+      createText('strong', formatCurrency(value), { display: 'block', color: colors.panelText, fontSize: '13px' }),
     );
     return cell;
+  }
+  function formatDate(value) {
+    if (!value) return '';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value).slice(0, 10);
+    return parsed.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+  }
+
+  function formatLiquidacaoSituation(value) {
+    const text = cleanText(value || '');
+    if (!text) return '';
+    return /pag/i.test(normalizeTextForMatch(text)) ? 'Liquidada' : text;
+  }
+
+  function renderLiquidacoes(empenho, colors) {
+    const liquidacoes = empenho.liquidacoes || [];
+    if (!liquidacoes.length) return null;
+
+    const wrapper = document.createElement('div');
+    Object.assign(wrapper.style, { marginTop: '8px', display: 'grid', gap: '4px' });
+    wrapper.appendChild(createText('div', 'Liquidacoes', { color: colors.mutedText, fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em' }));
+
+    liquidacoes.slice(0, 3).forEach((liquidacao) => {
+      const parts = [
+        liquidacao.numero,
+        formatDate(liquidacao.data),
+        formatLiquidacaoSituation(liquidacao.situacao),
+        liquidacao.valor != null ? formatCurrency(liquidacao.valor) : '',
+      ].filter(Boolean);
+      wrapper.appendChild(createText('div', parts.join(' | '), { color: colors.mutedText, fontSize: '12px', lineHeight: '1.35' }));
+    });
+
+    if (liquidacoes.length > 3) {
+      wrapper.appendChild(createText('div', `+${liquidacoes.length - 3} liquidacoes`, { color: colors.mutedText, fontSize: '12px' }));
+    }
+
+    return wrapper;
   }
 
   function renderFinanceSummary(summary) {
@@ -163,30 +267,30 @@
       return;
     }
 
+    const colors = getThemeColors();
     const panel = ensureFinancePanel();
     panel.innerHTML = '';
 
     const header = document.createElement('div');
-    Object.assign(header.style, { padding: '14px 14px 10px', borderBottom: '1px solid #e2e8f0' });
+    Object.assign(header.style, { padding: '14px 14px 10px', borderBottom: `1px solid ${colors.metricBorder}` });
     header.append(
-      createText('strong', 'SIAGES - Empenhos do beneficiario', { display: 'block', color: '#065f46', fontSize: '14px' }),
+      createText('strong', 'SIAGES - Empenhos do beneficiario', { display: 'block', color: colors.heading, fontSize: '14px' }),
       createText('span', summary.beneficiario?.nome || summary.beneficiario?.documento || 'Beneficiario identificado', {
-        display: 'block', color: '#334155', marginTop: '4px', lineHeight: '1.35',
+        display: 'block', color: colors.panelText, marginTop: '4px', lineHeight: '1.35',
       }),
     );
     if (summary.contrato?.numero) {
       header.appendChild(createText('span', `Filtrado pelo contrato ${summary.contrato.numero}`, {
-        display: 'inline-block', marginTop: '7px', padding: '3px 7px', borderRadius: '999px', background: '#ecfdf5',
-        color: '#047857', fontSize: '11px', fontWeight: '700',
+        display: 'inline-block', marginTop: '7px', padding: '3px 7px', borderRadius: '999px', background: colors.chipBg,
+        color: colors.chipText, fontSize: '11px', fontWeight: '700',
       }));
     }
 
     const totals = document.createElement('div');
-    Object.assign(totals.style, { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '12px 14px' });
+    Object.assign(totals.style, { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px', padding: '12px 14px' });
     totals.append(
       renderMetric('Empenhado', summary.totais?.empenhado),
       renderMetric('Liquidado', summary.totais?.liquidado),
-      renderMetric('Pago', summary.totais?.pago),
       renderMetric('Saldo', summary.totais?.saldo),
     );
 
@@ -194,35 +298,30 @@
     Object.assign(list.style, { padding: '0 14px 14px', display: 'grid', gap: '8px' });
     (summary.empenhos || []).slice(0, 6).forEach((empenho) => {
       const item = document.createElement('article');
-      Object.assign(item.style, { border: '1px solid #e2e8f0', borderRadius: '9px', padding: '9px', background: '#fff' });
+      Object.assign(item.style, { border: `1px solid ${colors.metricBorder}`, borderRadius: '9px', padding: '9px', background: colors.itemBg });
       const title = document.createElement('div');
       Object.assign(title.style, { display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'baseline' });
       title.append(
-        createText('strong', empenho.numero || 'Empenho sem numero', { color: '#0f172a' }),
-        createText('span', `Saldo ${formatCurrency(empenho.saldo)}`, { color: '#047857', fontWeight: '700', whiteSpace: 'nowrap' }),
+        createText('strong', empenho.numero || 'Empenho sem numero', { color: colors.panelText }),
+        createText('span', `Saldo ${formatCurrency(empenho.saldo)}`, { color: colors.accent, fontWeight: '700', whiteSpace: 'nowrap' }),
       );
       item.appendChild(title);
-      item.appendChild(createText('div', `Liquidado ${formatCurrency(empenho.liquidado)} · Pago ${formatCurrency(empenho.pago)}`, {
-        marginTop: '4px', color: '#475569', fontSize: '12px',
+      item.appendChild(createText('div', `Liquidado ${formatCurrency(empenho.liquidado)}`, {
+        marginTop: '4px', color: colors.mutedText, fontSize: '12px',
       }));
-      if (empenho.liquidacoes?.length) {
-        const liquidacoes = createText('div', `${empenho.liquidacoes.length} liquidacao(oes) no cache`, {
-          marginTop: '5px', color: '#64748b', fontSize: '12px',
-        });
-        item.appendChild(liquidacoes);
-      }
+      const liquidacoes = renderLiquidacoes(empenho, colors);
+      if (liquidacoes) item.appendChild(liquidacoes);
       list.appendChild(item);
     });
 
     if ((summary.empenhos || []).length > 6) {
       list.appendChild(createText('div', `+${summary.empenhos.length - 6} empenho(s) adicional(is)`, {
-        color: '#64748b', fontSize: '12px', textAlign: 'center',
+        color: colors.mutedText, fontSize: '12px', textAlign: 'center',
       }));
     }
 
     panel.append(header, totals, list);
   }
-
   function openFinanceBridge() {
     const context = buildContext();
     if (!context || document.getElementById(FINANCE_FRAME_ID)) return;
