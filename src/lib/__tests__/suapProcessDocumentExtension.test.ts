@@ -159,6 +159,29 @@ describe('process-document extension script', () => {
     postMessage.mockRestore();
   });
 
+  it('prioriza a coluna direita da timeline de tramitacao quando ela existe', () => {
+    document.body.innerHTML = `
+      <main>
+        <section id="processo-principal"><h3>Tramitação</h3><p>Documentos e detalhes do processo</p></section>
+      </main>
+      <aside id="timeline-direita">
+        <div>24/07/2026 10:01:59 Recebido por COFINC/CN: Fransuelia Araujo</div>
+        <div>23/07/2026 09:55:21 Encaminhado por COINFRA/CN: Sheila Pessoa</div>
+        <h3>Registro de ações</h3>
+      </aside>
+    `;
+    const script = loadProcessScript();
+
+    script.renderFinanceSummary(financeSummary());
+
+    const panel = document.getElementById('siages-suap-finance-panel') as HTMLElement;
+    expect(document.getElementById('timeline-direita')?.lastElementChild).toBe(panel);
+    expect(document.getElementById('processo-principal')?.contains(panel)).toBe(false);
+    expect(panel.dataset.siagesPlacement).toBe('flow');
+    expect(panel.style.position).toBe('static');
+    expect(panel.style.overflow).toBe('hidden');
+    expect(panel.style.maxWidth).toBe('100%');
+  });
   it('usa o conteudo principal como fallback quando nao encontra area de tramitacao', () => {
     const script = loadProcessScript();
     script.renderFinanceSummary(financeSummary());

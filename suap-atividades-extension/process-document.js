@@ -112,7 +112,7 @@
   }
 
   function findUsefulContainer(element) {
-    const selectors = ['section', 'article', 'fieldset', '.box', '.card', '.module', '.panel', '.timeline', '.tabular', 'div'];
+    const selectors = ['aside', 'section', 'article', 'fieldset', '.box', '.card', '.module', '.panel', '.timeline', '.tabular', 'div'];
     for (const selector of selectors) {
       const candidate = element.closest(selector);
       if (candidate && candidate !== document.body && candidate !== document.documentElement) return candidate;
@@ -120,7 +120,51 @@
     return element.parentElement && element.parentElement !== document.body ? element.parentElement : null;
   }
 
+  function scoreTimelineHost(element) {
+    if (!element || element === document.body || element === document.documentElement) return -1;
+    if (element.id === FINANCE_PANEL_ID || element.id === FINANCE_FRAME_ID) return -1;
+    const text = normalizeTextForMatch(element.textContent).slice(0, 2400);
+    if (!text) return -1;
+
+    let score = 0;
+    if (/\brecebido por\b/i.test(text)) score += 90;
+    if (/\bencaminhado por\b/i.test(text)) score += 80;
+    if (/\bregistro de acoes\b/i.test(text)) score += 35;
+    if (/\bcriacao do processo\b/i.test(text)) score += 25;
+    if (score <= 0) return -1;
+
+    if (/\b(documentos|adicionar documento|upload de documento|minutas|comentarios|solicitacoes)\b/i.test(text)) score -= 45;
+
+    const rect = element.getBoundingClientRect?.();
+    if (rect && rect.width > 0) {
+      if (rect.left > window.innerWidth * 0.45) score += 40;
+      if (rect.width >= 160 && rect.width <= 520) score += 35;
+      if (rect.width > 680) score -= 80;
+    }
+
+    const parentText = normalizeTextForMatch(element.parentElement?.textContent).slice(0, 2400);
+    if (parentText === text && element.parentElement && element.parentElement !== document.body) score -= 10;
+    return score;
+  }
+
+  function findTimelinePanelHost() {
+    const candidates = Array.from(document.querySelectorAll('aside,section,article,fieldset,.box,.card,.module,.panel,.timeline,[class*="right"],[id*="right"],div'));
+    let best = null;
+    let bestScore = -1;
+    candidates.forEach((element) => {
+      const score = scoreTimelineHost(element);
+      if (score > bestScore) {
+        best = element;
+        bestScore = score;
+      }
+    });
+    return bestScore > 0 ? best : null;
+  }
+
   function findFinancePanelHost() {
+    const timelineHost = findTimelinePanelHost();
+    if (timelineHost) return { host: timelineHost, mode: 'flow' };
+
     const pattern = /\b(tramitacao|tramitacoes|tramite|tramites|historico de tramitacao)\b/i;
     const labelSelectors = 'h1,h2,h3,h4,h5,h6,legend,summary,caption,strong,b,.title,.titulo,.card-title,.box-title';
     const label = Array.from(document.querySelectorAll(labelSelectors)).find((element) => pattern.test(normalizeTextForMatch(element.textContent)));
@@ -151,8 +195,10 @@
       bottom: integrated ? '' : '74px',
       zIndex: integrated ? '' : '2147483645',
       width: integrated ? '100%' : 'min(440px, calc(100vw - 40px))',
+      maxWidth: integrated ? '100%' : '',
+      minWidth: '0',
       maxHeight: integrated ? 'none' : 'min(640px, calc(100vh - 110px))',
-      overflow: integrated ? 'visible' : 'auto',
+      overflow: integrated ? 'hidden' : 'auto',
       margin: integrated ? '16px 0 0' : '0',
       border: `1px solid ${colors.panelBorder}`,
       borderRadius: '12px',
@@ -162,6 +208,7 @@
       fontFamily: 'Arial, sans-serif',
       fontSize: '13px',
       boxSizing: 'border-box',
+      alignSelf: 'stretch',
     });
     panel.dataset.siagesPlacement = placement.mode;
   }
@@ -242,15 +289,14 @@
     liquidacoes.forEach((liquidacao) => {
       const row = document.createElement('div');
       Object.assign(row.style, {
-        display: 'grid', gridTemplateColumns: 'minmax(90px, 1.2fr) minmax(72px, 0.8fr) minmax(86px, 0.9fr) minmax(86px, 0.9fr)',
-        gap: '8px', alignItems: 'center', padding: '7px 8px', border: `1px solid ${colors.metricBorder}`,
+        display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)',
+        gap: '3px', alignItems: 'start', padding: '7px 8px', border: `1px solid ${colors.metricBorder}`,
         borderRadius: '7px', background: colors.metricBg, color: colors.panelText, fontSize: '12px', lineHeight: '1.25',
       });
       row.append(
         createText('span', liquidacao.numero || 'NF sem numero', { fontWeight: '700', overflowWrap: 'anywhere' }),
-        createText('span', formatDate(liquidacao.data) || '-', { color: colors.mutedText }),
-        createText('span', formatLiquidacaoSituation(liquidacao.situacao) || '-', { color: colors.mutedText }),
-        createText('strong', liquidacao.valor != null ? formatCurrency(liquidacao.valor) : '-', { textAlign: 'right', color: colors.panelText }),
+        createText('span', [formatDate(liquidacao.data), formatLiquidacaoSituation(liquidacao.situacao)].filter(Boolean).join(' - ') || '-', { color: colors.mutedText }),
+        createText('strong', liquidacao.valor != null ? formatCurrency(liquidacao.valor) : '-', { color: colors.panelText }),
       );
       wrapper.appendChild(row);
     });
@@ -291,7 +337,7 @@
     }
 
     const totals = document.createElement('div');
-    Object.assign(totals.style, { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px', padding: '12px 14px' });
+    Object.assign(totals.style, { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(120px, 100%), 1fr))', gap: '8px', padding: '12px 14px' });
     totals.append(
       renderMetric('Empenhado', summary.totais?.empenhado),
       renderMetric('Saldo', summary.totais?.saldo),
