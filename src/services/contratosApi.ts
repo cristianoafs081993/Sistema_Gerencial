@@ -95,6 +95,7 @@ export interface ContratoApiRow {
   api_contrato_id: number;
   numero: string;
   fornecedor_nome: string | null;
+  fornecedor_documento?: string | null;
   unidade_codigo: string | null;
   unidade_nome: string | null;
   unidade_origem_codigo: string | null;
@@ -625,7 +626,7 @@ export const contratosApiService = {
     const today = new Date().toISOString().slice(0, 10);
     let query = supabase
       .from('contratos_api')
-      .select('id, api_contrato_id, numero, fornecedor_nome, unidade_codigo, unidade_nome, unidade_origem_codigo, unidade_origem_nome, objeto, processo, vigencia_inicio, vigencia_fim, vigencia_inicio_derivada, vigencia_fim_derivada, valor_global, valor_acumulado, situacao, situacao_derivada, situacao_derivada_motivo, campus_scope_reason, updated_at, categoria, prorrogavel:raw_data->>prorrogavel')
+      .select('id, api_contrato_id, numero, fornecedor_nome, fornecedor_documento, unidade_codigo, unidade_nome, unidade_origem_codigo, unidade_origem_nome, objeto, processo, vigencia_inicio, vigencia_fim, vigencia_inicio_derivada, vigencia_fim_derivada, valor_global, valor_acumulado, situacao, situacao_derivada, situacao_derivada_motivo, campus_scope_reason, updated_at, categoria, prorrogavel:raw_data->>prorrogavel')
       .in('campus_scope_reason', ['ug_campus', 'reitoria_com_empenho_campus', 'reitoria_com_fatura_campus'])
       .order('numero', { ascending: true });
 

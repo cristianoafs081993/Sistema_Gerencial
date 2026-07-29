@@ -25,6 +25,14 @@ export const SUAP_EXTENSION_DISPATCH_CLOSE_MESSAGE = {
   version: 1,
 } as const;
 
+export const SUAP_EXTENSION_PROCESS_INFO_READY_MESSAGE = {
+  source: 'siages',
+  type: 'siages:suap-process-info-ready',
+  version: 1,
+} as const;
+
+export const SUAP_EXTENSION_PROCESS_FINANCE_SUMMARY_TYPE = 'siages:suap-process-finance-summary' as const;
+
 const SUPPORTED_PROCESS_PATH = /^\/processo_eletronico\/(?:processo|visualizar_processo)\/(\d+)\/?$/;
 
 export function isValidSuapExtensionProcessContext(value: unknown): value is SuapExtensionProcessContextMessage {

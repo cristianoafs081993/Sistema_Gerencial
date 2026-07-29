@@ -10,6 +10,9 @@ type ExtensionWindow = Window & typeof globalThis & {
     getProcessNumber: () => string;
     buildContext: () => { payload: { suapId: string; processNumber: string; processUrl: string } } | null;
     installButton: () => void;
+    installFinancePanel: () => void;
+    openFinanceBridge: () => void;
+    renderFinanceSummary: (summary: unknown) => void;
     openModal: () => void;
     closeModal: () => void;
   };
@@ -24,7 +27,7 @@ function loadProcessScript() {
   };
   const script = readFileSync(resolve(process.cwd(), 'suap-atividades-extension/process-document.js'), 'utf8');
   window.eval(script);
-  if (!testWindow.__siagesSuapProcessDocument) throw new Error('Content script não foi carregado.');
+  if (!testWindow.__siagesSuapProcessDocument) throw new Error('Content script nao foi carregado.');
   return testWindow.__siagesSuapProcessDocument;
 }
 
@@ -33,6 +36,8 @@ describe('process-document extension script', () => {
     document.body.innerHTML = '<main>Processo 23035.000001.2026-11</main>';
     window.history.replaceState(null, '', '/processo_eletronico/processo/321/');
     document.getElementById('siages-suap-generate-document')?.remove();
+    document.getElementById('siages-suap-finance-panel')?.remove();
+    document.getElementById('siages-suap-finance-frame')?.remove();
   });
 
   afterEach(() => {
@@ -40,6 +45,9 @@ describe('process-document extension script', () => {
     delete testWindow.__SIAGES_SUAP_PROCESS_TEST__;
     delete testWindow.__siagesSuapProcessDocument;
     delete testWindow.chrome;
+    document.getElementById('siages-suap-dispatch-modal')?.remove();
+    document.getElementById('siages-suap-finance-panel')?.remove();
+    document.getElementById('siages-suap-finance-frame')?.remove();
   });
 
   it('gera o contexto da pagina de processo e instala apenas um botao', () => {
@@ -79,6 +87,62 @@ describe('process-document extension script', () => {
     }), 'https://sistema-gerencial-gamma.vercel.app');
     postMessage.mockRestore();
   });
+
+  it('injeta card financeiro e renderiza resumo recebido do SIAGES', async () => {
+    const script = loadProcessScript();
+
+    script.installFinancePanel();
+
+    await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeTruthy());
+    const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
+    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage').mockImplementation(() => undefined);
+
+    window.dispatchEvent(new MessageEvent('message', {
+      origin: 'https://sistema-gerencial-gamma.vercel.app',
+      source: frame.contentWindow,
+      data: { source: 'siages', type: 'siages:suap-process-info-ready', version: 1 },
+    }));
+
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'siages-suap-extension',
+      type: 'siages:suap-process-context',
+      payload: expect.objectContaining({ suapId: '321' }),
+    }), 'https://sistema-gerencial-gamma.vercel.app');
+
+    window.dispatchEvent(new MessageEvent('message', {
+      origin: 'https://sistema-gerencial-gamma.vercel.app',
+      source: frame.contentWindow,
+      data: {
+        source: 'siages',
+        type: 'siages:suap-process-finance-summary',
+        version: 1,
+        payload: {
+          status: 'ready',
+          beneficiario: { nome: 'Fornecedor Alfa' },
+          contrato: { numero: '00040/2026' },
+          escopoContrato: true,
+          totais: { empenhado: 1000, liquidado: 300, pago: 100, saldo: 700 },
+          empenhos: [{ id: 'emp-1', numero: '2026NE000001', saldo: 700, liquidado: 300, pago: 100, liquidacoes: [] }],
+        },
+      },
+    }));
+
+    await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeNull());
+    expect(document.getElementById('siages-suap-finance-panel')?.textContent).toContain('Fornecedor Alfa');
+    expect(document.getElementById('siages-suap-finance-panel')?.textContent).toContain('00040/2026');
+    expect(document.getElementById('siages-suap-finance-panel')?.textContent).toContain('R$');
+    postMessage.mockRestore();
+  });
+
+  it('remove o card quando o processo nao tem beneficiario identificado', () => {
+    const script = loadProcessScript();
+    script.renderFinanceSummary({ status: 'ready', escopoContrato: false, totais: {}, empenhos: [] });
+    expect(document.getElementById('siages-suap-finance-panel')).toBeTruthy();
+
+    script.renderFinanceSummary({ status: 'missing-beneficiary', escopoContrato: false, totais: {}, empenhos: [] });
+    expect(document.getElementById('siages-suap-finance-panel')).toBeNull();
+  });
+
   it('reconhece a tela de visualizacao e ignora paginas sem processo', () => {
     window.history.replaceState(null, '', '/processo_eletronico/visualizar_processo/654/');
     let script = loadProcessScript();
@@ -89,6 +153,8 @@ describe('process-document extension script', () => {
     script = loadProcessScript();
     expect(script.getProcessId()).toBeNull();
     script.installButton();
+    script.installFinancePanel();
     expect(document.querySelector('#siages-suap-generate-document')).toBeNull();
+    expect(document.querySelector('#siages-suap-finance-panel')).toBeNull();
   });
 });

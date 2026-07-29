@@ -115,6 +115,10 @@ vi.mock('@/pages/SuapExtensionDispatch', () => ({
   default: () => <div>suap-extension-dispatch-page</div>,
 }));
 
+vi.mock('@/pages/SuapExtensionProcessInfo', () => ({
+  default: () => <div>suap-extension-process-info-page</div>,
+}));
+
 vi.mock('@/pages/EconomiaTempo', () => ({
   default: () => <div>economia-tempo-page</div>,
 }));
@@ -218,6 +222,15 @@ describe('App routes', () => {
     render(<App />);
 
     expect(await screen.findByText('suap-extension-dispatch-page')).toBeInTheDocument();
+    expect(screen.queryByTestId('app-layout')).not.toBeInTheDocument();
+  });
+
+  it('renderiza a rota leve de informacoes do processo SUAP sem layout global', async () => {
+    window.history.pushState({}, '', '/suap-extensao/processo-info');
+
+    render(<App />);
+
+    expect(await screen.findByText('suap-extension-process-info-page')).toBeInTheDocument();
     expect(screen.queryByTestId('app-layout')).not.toBeInTheDocument();
   });
 

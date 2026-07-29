@@ -1,32 +1,41 @@
 {
-    "framework": "vite",
-    "installCommand": "npm install --legacy-peer-deps",
-    "buildCommand": "npm run build",
-    "outputDirectory": "dist",
-    "cleanUrls": true,
-    "headers": [
+  "framework": "vite",
+  "installCommand": "npm install --legacy-peer-deps",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "cleanUrls": true,
+  "headers": [
+    {
+      "source": "/suap-extensao/despacho",
+      "headers": [
         {
-            "source": "/suap-extensao/despacho",
-            "headers": [
-                {
-                    "key": "Content-Security-Policy",
-                    "value": "frame-ancestors https://suap.ifrn.edu.br"
-                }
-            ]
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors https://suap.ifrn.edu.br"
         }
-    ],
-    "rewrites": [
+      ]
+    },
+    {
+      "source": "/suap-extensao/processo-info",
+      "headers": [
         {
-            "source": "/api-transparencia/:path*",
-            "destination": "https://api.portaldatransparencia.gov.br/:path*"
-        },
-        {
-            "source": "/api-contratos/:path*",
-            "destination": "https://contratos.comprasnet.gov.br/:path*"
-        },
-        {
-            "source": "/(.*)",
-            "destination": "/index.html"
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors https://suap.ifrn.edu.br"
         }
-    ]
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api-transparencia/:path*",
+      "destination": "https://api.portaldatransparencia.gov.br/:path*"
+    },
+    {
+      "source": "/api-contratos/:path*",
+      "destination": "https://contratos.comprasnet.gov.br/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }

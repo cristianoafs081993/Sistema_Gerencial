@@ -39,6 +39,7 @@ const Consultor = lazy(() => import('./pages/ConsultorSessions'));
 const Suap = lazy(() => import('./pages/Suap'));
 const SuapCallback = lazy(() => import('./pages/SuapCallback'));
 const SuapExtensionDispatch = lazy(() => import('./pages/SuapExtensionDispatch'));
+const SuapExtensionProcessInfo = lazy(() => import('./pages/SuapExtensionProcessInfo'));
 const EconomiaTempo = lazy(() => import('./pages/EconomiaTempo'));
 const ControleUsuarios = lazy(() => import('./pages/ControleUsuarios'));
 const ModelosDocumentos = lazy(() => import('./pages/ModelosDocumentos'));
@@ -94,6 +95,7 @@ const App = () => (
               <Route element={<ProtectedRoute />}>
                 <Route element={<SuapExtensionShell />}>
                   <Route path="/suap-extensao/despacho" element={<SuapExtensionDispatch />} />
+                  <Route path="/suap-extensao/processo-info" element={<SuapExtensionProcessInfo />} />
                 </Route>
                 <Route element={<AppShell />}>
                   <Route path="/" element={<Dashboard />} />
