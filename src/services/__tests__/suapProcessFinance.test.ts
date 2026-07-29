@@ -147,11 +147,11 @@ describe('buildSuapProcessFinanceSummary', () => {
     expect(summary.status).toBe('ready');
     expect(summary.escopoContrato).toBe(false);
     expect(summary.empenhos).toHaveLength(1);
-    expect(summary.totais).toMatchObject({ empenhado: 1000, liquidado: 300, saldo: 700 });
+    expect(summary.totais).toEqual({ empenhado: 1000, saldo: 750 });
     expect(JSON.stringify(summary)).not.toMatch(/pago|pagamento/i);
   });
 
-  it('usa saldo e liquidacoes como fallback quando campos oficiais vierem zerados', () => {
+  it('mantem empenhado e saldo da fonte de empenhos e preserva liquidacoes detalhadas', () => {
     const summary = buildSuapProcessFinanceSummary({
       processo: processo({ contrato: '40/2026' }),
       empenhos: [],
@@ -162,8 +162,11 @@ describe('buildSuapProcessFinanceSummary', () => {
       liquidacoesPorEmpenho: new Map([['2026NE000099', [liquidacao({ valor_liquido: 280 })]]]),
     });
 
-    expect(summary.empenhos[0]).toMatchObject({ numero: '2026NE000099', liquidado: 300, saldo: 200 });
-    expect(summary.totais).toMatchObject({ empenhado: 500, liquidado: 300, saldo: 200 });
+    expect(summary.empenhos[0]).toMatchObject({ numero: '2026NE000099', empenhado: 500, saldo: 200 });
+    expect(summary.empenhos[0].liquidacoes).toEqual([
+      expect.objectContaining({ numero: 'NF 123', valor: 280, data: '2026-02-20' }),
+    ]);
+    expect(summary.totais).toEqual({ empenhado: 500, saldo: 200 });
   });
 
   it('quando ha contrato, limita empenhos ao contrato e preserva liquidacoes detalhadas', () => {

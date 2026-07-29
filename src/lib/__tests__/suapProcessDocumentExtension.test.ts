@@ -37,15 +37,15 @@ function financeSummary() {
     beneficiario: { nome: 'Fornecedor Alfa' },
     contrato: { numero: '00040/2026' },
     escopoContrato: true,
-    totais: { empenhado: 1000, liquidado: 300, saldo: 700 },
+    totais: { empenhado: 1000, saldo: 700 },
     empenhos: [{
       id: 'emp-1',
       numero: '2026NE000001',
+      empenhado: 1000,
       saldo: 700,
-      liquidado: 300,
       liquidacoes: [
         { id: 'liq-1', numero: 'NF 123', data: '2026-02-20', situacao: 'Liquidada', valor: 280 },
-        { id: 'liq-2', numero: 'NF 124', data: '2026-02-21', situacao: 'Pago', valor: 20 },
+        { id: 'liq-2', numero: 'NF 124', data: '2026-02-21', situacao: 'Siafi Apropriado', valor: 20 },
         { id: 'liq-3', numero: 'NF 125', data: '2026-02-22', situacao: 'Liquidada', valor: 10 },
         { id: 'liq-4', numero: 'NF 126', data: '2026-02-23', situacao: 'Liquidada', valor: 5 },
       ],
@@ -150,9 +150,11 @@ describe('process-document extension script', () => {
     expect(panel.style.position).toBe('static');
     expect(panel.textContent).toContain('Fornecedor Alfa');
     expect(panel.textContent).toContain('00040/2026');
-    expect(panel.textContent).toContain('Liquidado');
+    expect(panel.textContent).toContain('Empenhado');
     expect(panel.textContent).toContain('NF 123');
-    expect(panel.textContent).toContain('+1 liquidacoes');
+    expect(panel.textContent).toContain('NF 126');
+    expect(panel.textContent).not.toContain('Liquidado');
+    expect(panel.textContent).not.toContain('+1 liquidacoes');
     expect(panel.textContent).not.toMatch(/pago|pagamento/i);
     postMessage.mockRestore();
   });

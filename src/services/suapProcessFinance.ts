@@ -4,6 +4,7 @@ import { contratosService } from '@/services/contratos';
 import { empenhosService } from '@/services/empenhos';
 import type { Contrato, ContratoEmpenho, Empenho, SuapProcesso } from '@/types';
 import { buildEmpenhoLookupKeys, normalizeContratoNumero } from '@/utils/contratosSync';
+import { getRapBaseVigente, getRapReferenceYear, getRapSaldoAtual } from '@/utils/rapMetrics';
 
 export type SuapProcessFinanceSummaryStatus =
   | 'ready'
@@ -28,7 +29,6 @@ export type SuapProcessFinanceSummary = {
   escopoContrato: boolean;
   totais: {
     empenhado: number;
-    liquidado: number;
     saldo: number;
   };
   empenhos: SuapProcessFinanceEmpenho[];
@@ -42,7 +42,6 @@ export type SuapProcessFinanceEmpenho = {
   contratoNumero?: string;
   dataEmissao?: string;
   empenhado: number;
-  liquidado: number;
   saldo: number;
   liquidacoes: SuapProcessFinanceLiquidacao[];
 };
@@ -159,17 +158,14 @@ const getApiSaldo = (empenho: ContratoApiEmpenhoRow) => {
   return getApiEmpenhoNumber(empenho, 'valor_a_liquidar', 'valoraliquidar') ?? 0;
 };
 
-const getLocalLiquidado = (empenho: Empenho) =>
-  empenho.valorLiquidadoOficial ?? empenho.valorLiquidado ?? 0;
+const getLocalEmpenhado = (empenho: Empenho, rapReferenceYear: number) => {
+  if (empenho.tipo === 'rap') return getRapBaseVigente(empenho, rapReferenceYear);
+  return empenho.valor || 0;
+};
 
-
-const getLocalSaldo = (empenho: Empenho) => {
-  if (empenho.tipo === 'rap') {
-    if (empenho.saldoRapOficial !== undefined) return Math.max(0, empenho.saldoRapOficial);
-    if (empenho.rapALiquidar !== undefined) return Math.max(0, empenho.rapALiquidar);
-  }
-
-  return Math.max(0, (empenho.valor || 0) - getLocalLiquidado(empenho));
+const getLocalSaldo = (empenho: Empenho, rapReferenceYear: number) => {
+  if (empenho.tipo === 'rap') return getRapSaldoAtual(empenho, rapReferenceYear);
+  return (empenho.valor || 0) - (empenho.valorLiquidado || 0);
 };
 
 const getProcessContratoNumero = (processo: SuapProcesso) =>
@@ -255,23 +251,13 @@ const getLiquidacoesForEmpenho = (
     }));
 };
 
-const sumLiquidacoes = (liquidacoes: SuapProcessFinanceLiquidacao[]) =>
-  liquidacoes.reduce((sum, liquidacao) => sum + (liquidacao.valor ?? 0), 0);
-
-const resolveLiquidado = (values: { oficial?: number; liquidacoes: SuapProcessFinanceLiquidacao[]; empenhado: number; saldo: number }) =>
-  Math.max(
-    0,
-    values.oficial ?? 0,
-    sumLiquidacoes(values.liquidacoes),
-    values.empenhado > 0 ? values.empenhado - values.saldo : 0,
-  );
 
 const byEmpenhoSort = (left: SuapProcessFinanceEmpenho, right: SuapProcessFinanceEmpenho) =>
   right.saldo - left.saldo || right.empenhado - left.empenhado || left.numero.localeCompare(right.numero);
 
 export function buildSuapProcessFinanceSummary(input: BuildFinanceSummaryInput): SuapProcessFinanceSummary {
   const { processo } = input;
-  const emptyTotals = { empenhado: 0, liquidado: 0, saldo: 0 };
+  const emptyTotals = { empenhado: 0, saldo: 0 };
   if (!processo) return { status: 'missing-process', escopoContrato: false, totais: emptyTotals, empenhos: [] };
 
   const beneficiaryDocument = normalizeDigits(processo.cpfCnpj) || undefined;
@@ -308,9 +294,11 @@ export function buildSuapProcessFinanceSummary(input: BuildFinanceSummaryInput):
     return !Array.from(keys).some((key) => localEmpenhoKeys.has(key));
   });
 
+  const rapReferenceYear = getRapReferenceYear(input.empenhos);
+
   const mappedLocal: SuapProcessFinanceEmpenho[] = localEmpenhos.map((empenho) => {
-    const empenhado = empenho.valor || 0;
-    const saldo = getLocalSaldo(empenho);
+    const empenhado = getLocalEmpenhado(empenho, rapReferenceYear);
+    const saldo = getLocalSaldo(empenho, rapReferenceYear);
     const liquidacoes = getLiquidacoesForEmpenho(input.liquidacoesPorEmpenho, empenho.numero, contratoNumero);
     return {
       id: empenho.id,
@@ -320,7 +308,6 @@ export function buildSuapProcessFinanceSummary(input: BuildFinanceSummaryInput):
       contratoNumero: contratoNumero || undefined,
       dataEmissao: empenho.dataEmpenho instanceof Date ? empenho.dataEmpenho.toISOString().slice(0, 10) : undefined,
       empenhado,
-      liquidado: resolveLiquidado({ oficial: getLocalLiquidado(empenho), liquidacoes, empenhado, saldo }),
       saldo,
       liquidacoes,
     };
@@ -330,9 +317,7 @@ export function buildSuapProcessFinanceSummary(input: BuildFinanceSummaryInput):
     const empenhado = getApiEmpenhoNumber(empenho, 'valor_empenhado', 'valorempenhado') ?? 0;
     const saldo = getApiSaldo(empenho);
     const liquidacoes = getLiquidacoesForEmpenho(input.liquidacoesPorEmpenho, empenho.numero, contratoNumero);
-    const liquidadoApi =
-      (getApiEmpenhoNumber(empenho, 'valor_liquidado', 'valorliquidado') ?? 0) +
-      (getApiEmpenhoNumber(empenho, 'valor_pago', 'valorpago') ?? 0);
+
     return {
       id: empenho.id,
       numero: empenho.numero,
@@ -341,7 +326,6 @@ export function buildSuapProcessFinanceSummary(input: BuildFinanceSummaryInput):
       contratoNumero: contratoNumeroByApiId.get(empenho.contrato_api_id) || undefined,
       dataEmissao: empenho.data_emissao ?? undefined,
       empenhado,
-      liquidado: resolveLiquidado({ oficial: liquidadoApi, liquidacoes, empenhado, saldo }),
       saldo,
       liquidacoes,
     };
@@ -350,7 +334,6 @@ export function buildSuapProcessFinanceSummary(input: BuildFinanceSummaryInput):
   const empenhos = [...mappedLocal, ...mappedApi].sort(byEmpenhoSort);
   const totais = empenhos.reduce((acc, empenho) => ({
     empenhado: acc.empenhado + empenho.empenhado,
-    liquidado: acc.liquidado + empenho.liquidado,
     saldo: acc.saldo + empenho.saldo,
   }), emptyTotals);
 

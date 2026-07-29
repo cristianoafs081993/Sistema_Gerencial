@@ -85,7 +85,7 @@ export default function SuapExtensionProcessInfo() {
         postSummary({
           status: 'empty',
           escopoContrato: false,
-          totais: { empenhado: 0, liquidado: 0, saldo: 0 },
+          totais: { empenhado: 0, saldo: 0 },
           empenhos: [],
         });
         setStatus('Nao foi possivel consultar os dados financeiros deste processo.');

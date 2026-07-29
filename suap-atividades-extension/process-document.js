@@ -234,22 +234,26 @@
     if (!liquidacoes.length) return null;
 
     const wrapper = document.createElement('div');
-    Object.assign(wrapper.style, { marginTop: '8px', display: 'grid', gap: '4px' });
-    wrapper.appendChild(createText('div', 'Liquidacoes', { color: colors.mutedText, fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em' }));
+    Object.assign(wrapper.style, { marginTop: '10px', display: 'grid', gap: '6px' });
+    wrapper.appendChild(createText('div', 'Liquidacoes em cache', {
+      color: colors.mutedText, fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em',
+    }));
 
-    liquidacoes.slice(0, 3).forEach((liquidacao) => {
-      const parts = [
-        liquidacao.numero,
-        formatDate(liquidacao.data),
-        formatLiquidacaoSituation(liquidacao.situacao),
-        liquidacao.valor != null ? formatCurrency(liquidacao.valor) : '',
-      ].filter(Boolean);
-      wrapper.appendChild(createText('div', parts.join(' | '), { color: colors.mutedText, fontSize: '12px', lineHeight: '1.35' }));
+    liquidacoes.forEach((liquidacao) => {
+      const row = document.createElement('div');
+      Object.assign(row.style, {
+        display: 'grid', gridTemplateColumns: 'minmax(90px, 1.2fr) minmax(72px, 0.8fr) minmax(86px, 0.9fr) minmax(86px, 0.9fr)',
+        gap: '8px', alignItems: 'center', padding: '7px 8px', border: `1px solid ${colors.metricBorder}`,
+        borderRadius: '7px', background: colors.metricBg, color: colors.panelText, fontSize: '12px', lineHeight: '1.25',
+      });
+      row.append(
+        createText('span', liquidacao.numero || 'NF sem numero', { fontWeight: '700', overflowWrap: 'anywhere' }),
+        createText('span', formatDate(liquidacao.data) || '-', { color: colors.mutedText }),
+        createText('span', formatLiquidacaoSituation(liquidacao.situacao) || '-', { color: colors.mutedText }),
+        createText('strong', liquidacao.valor != null ? formatCurrency(liquidacao.valor) : '-', { textAlign: 'right', color: colors.panelText }),
+      );
+      wrapper.appendChild(row);
     });
-
-    if (liquidacoes.length > 3) {
-      wrapper.appendChild(createText('div', `+${liquidacoes.length - 3} liquidacoes`, { color: colors.mutedText, fontSize: '12px' }));
-    }
 
     return wrapper;
   }
@@ -290,7 +294,6 @@
     Object.assign(totals.style, { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px', padding: '12px 14px' });
     totals.append(
       renderMetric('Empenhado', summary.totais?.empenhado),
-      renderMetric('Liquidado', summary.totais?.liquidado),
       renderMetric('Saldo', summary.totais?.saldo),
     );
 
@@ -306,9 +309,13 @@
         createText('span', `Saldo ${formatCurrency(empenho.saldo)}`, { color: colors.accent, fontWeight: '700', whiteSpace: 'nowrap' }),
       );
       item.appendChild(title);
-      item.appendChild(createText('div', `Liquidado ${formatCurrency(empenho.liquidado)}`, {
-        marginTop: '4px', color: colors.mutedText, fontSize: '12px',
-      }));
+      const values = document.createElement('div');
+      Object.assign(values.style, { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px', color: colors.mutedText, fontSize: '12px' });
+      values.append(
+        createText('span', `Empenhado ${formatCurrency(empenho.empenhado)}`),
+        createText('span', `Saldo ${formatCurrency(empenho.saldo)}`),
+      );
+      item.appendChild(values);
       const liquidacoes = renderLiquidacoes(empenho, colors);
       if (liquidacoes) item.appendChild(liquidacoes);
       list.appendChild(item);
