@@ -805,7 +805,7 @@ Fluxo Tecnico:
 - A sincronizacao de inventario, o download de PDF e a extracao por IA sao etapas modulares e podem ser repetidas separadamente para processos escolhidos pelo usuario.
 - Processos ja sincronizados e seus PDFs sao preservados. O inventario reconcilia os vinculos em `suap_processo_caixas` apenas das caixas selecionadas e lidas com sucesso; processos ausentes deixam de aparecer sem exclusao permanente.
 - As credenciais de acesso do SUAP sao mantidas no `localStorage` apos o login/cookie informado pelo usuario.
-- O despacho nao aciona uma nova Edge Function ou uma nova chamada de IA: o frontend monta o documento com `documentGeneration`, copia pelo `suapClipboard` e cria a URL de clonagem com `suapCloneAutomation`. A fila de documentos em andamento usa `sessionStorage` e cada clonagem e confirmada individualmente.
+- O despacho nao aciona uma nova Edge Function ou uma nova chamada de IA: o frontend monta o documento com `documentGeneration`, permite trocar localmente o modelo da minuta a partir dos dados ja resolvidos, copia pelo `suapClipboard` e cria a URL de clonagem com `suapCloneAutomation`. A fila de documentos em andamento usa `sessionStorage` e cada clonagem e confirmada individualmente.
 - A extensao tambem atende `processo/{id}` e `visualizar_processo/{id}`: o content script abre `/suap-extensao/despacho` em iframe, aguarda `siages:suap-dispatch-ready` e envia `{ suapId, processNumber, processUrl }` por `postMessage`. A rota aceita apenas mensagens da janela pai com origem `https://suap.ifrn.edu.br`, consulta `processos` pelo `suap_id` sob RLS do usuario e usa despacho avulso quando nao houver espelho. A rota possui `Content-Security-Policy: frame-ancestors https://suap.ifrn.edu.br`.
 
 Consumidores no app:

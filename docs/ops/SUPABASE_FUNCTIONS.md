@@ -68,7 +68,7 @@ Chamador:
 Uso:
 
 - `process-pdf` autentica o usuario, valida o processo e enfileira a extracao do PDF sincronizado no bucket `suap-pdfs`
-- `process-pdf-worker` processa a fila, atualiza `processos` e grava `dados_completos.extraction_job`; a ordem de provedores e Gemini com PDF, OpenAI com PDF e OpenRouter para reparo final do JSON
+- `process-pdf-worker` processa a fila, atualiza `processos` e grava `dados_completos.extraction_job`; a ordem de provedores e Gemini com PDF inteiro, Gemini por blocos, OpenAI com PDF e OpenRouter para reparo final do JSON. A OpenAI tambem repete a tentativa por blocos quando o PDF inteiro excede sua janela de contexto; a falha final registra explicitamente a tentativa primaria do Gemini e a do fallback.
 - o fluxo SUAP padrao envia apenas `suap_id` para a Edge Function; antes da IA o frontend persiste somente `suap_id`, `url`, `caixa` e, quando encontrado na listagem, `num_processo`. A resposta `202` confirma somente o enfileiramento; o frontend acompanha `processos.status` ate o resultado final e exibe falhas tecnicas registradas em `dados_completos.extraction_job`
 
 Dependencias:

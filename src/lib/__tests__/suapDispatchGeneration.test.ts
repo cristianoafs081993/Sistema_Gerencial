@@ -5,6 +5,8 @@ import {
   clearDispatchQueue,
   createDispatchQueue,
   createManualDespachoFields,
+  createManualDespachoFieldsFromResolvedContext,
+  inferManualDespachoFinalidade,
   isAiAssistedDispatch,
   createStandaloneDispatchQueue,
   createStandaloneManualDespachoFields,
@@ -71,6 +73,41 @@ describe('suapDispatchGeneration', () => {
     });
   });
 
+
+  it('deriva campos manuais do contexto resolvido para permitir troca de modelo', () => {
+    expect(inferManualDespachoFinalidade({
+      tipoPessoa: 'PF',
+      favorecido: 'Maria da Silva',
+      objeto: 'Bolsa estudantil',
+      projeto: undefined,
+    })).toBe('bolsa-sem-projeto');
+
+    const fields = createManualDespachoFieldsFromResolvedContext({
+      documentType: 'despacho-liquidacao',
+      candidateId: 'ctx-1',
+      title: 'Despacho',
+      subtitle: 'Teste',
+      processo: '23035.000123.2026-11',
+      favorecido: 'Maria da Silva',
+      documentoFavorecido: '12345678900',
+      tipoPessoa: 'PF',
+      empenho: '2026NE000123',
+      valor: 1250,
+      objeto: 'Bolsa estudantil',
+      fields: [],
+      missingRequiredFields: [],
+      warnings: [],
+      matchedFrom: ['Espelho SUAP'],
+    });
+
+    expect(fields).toMatchObject({
+      finalidade: 'bolsa-sem-projeto',
+      processo: '23035.000123.2026-11',
+      favorecido: 'Maria da Silva',
+      valor: '1.250,00',
+      empenho: '2026NE000123',
+    });
+  });
   it('gera marcadores no despacho manual para dados pendentes', () => {
     const html = buildManualDespachoHtml({
       ...createManualDespachoFields(processo),

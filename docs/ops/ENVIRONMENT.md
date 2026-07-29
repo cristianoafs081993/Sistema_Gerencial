@@ -112,7 +112,7 @@ Opcional:
 
 Observacoes operacionais:
 
-- `process-pdf` retorna `202` quando a extracao foi enfileirada; o resultado real e gravado depois pelo `process-pdf-worker` em `processos`. A ordem de provedores e Gemini, OpenAI e OpenRouter. Gemini recebe o PDF como primeira tentativa; o fallback OpenAI usa detalhe alto para evitar uma resposta vazia em processos visualmente complexos. OpenRouter e reservado para converter o contexto disponivel ou uma resposta anterior nao estruturada em JSON valido.
+- `process-pdf` retorna `202` quando a extracao foi enfileirada; o resultado real e gravado depois pelo `process-pdf-worker` em `processos`. A ordem de provedores e Gemini com PDF inteiro, Gemini por blocos, OpenAI e OpenRouter. Se a tentativa inicial Gemini falhar, o mesmo provedor e tentado por blocos de paginas antes de qualquer fallback externo. A OpenAI usa detalhe alto para evitar uma resposta vazia em processos visualmente complexos e, se o PDF completo exceder a janela de contexto, tambem tenta os blocos. OpenRouter e reservado para converter o contexto disponivel ou uma resposta anterior nao estruturada em JSON valido.
 - a resposta da Edge Function confirma apenas o enfileiramento. O frontend deve considerar a IA finalizada somente quando `processos.status` chegar a `success`, `incomplete_extraction` ou `extraction_failed`; enquanto houver fila ou processamento, a tela acompanha a atualizacao em segundo plano.
 
 ### `validar-pesquisa-precos`

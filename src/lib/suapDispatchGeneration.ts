@@ -1,3 +1,4 @@
+import type { ResolvedDocumentContext } from '@/lib/documentGeneration';
 import type { SuapProcesso } from '@/types';
 
 export type DispatchQueueItemStatus = 'pending' | 'copied' | 'cloned' | 'skipped' | 'error';
@@ -40,7 +41,6 @@ export function createDispatchQueue(processos: SuapProcesso[]): DispatchQueueSta
   };
 }
 
-
 export function createStandaloneDispatchQueue(initialFields: Partial<ManualDespachoFields> = {}): DispatchQueueState {
   return {
     version: 1,
@@ -48,6 +48,7 @@ export function createStandaloneDispatchQueue(initialFields: Partial<ManualDespa
     items: [{ standalone: true, status: 'pending', manualFields: { ...createStandaloneManualDespachoFields(), ...initialFields } }],
   };
 }
+
 export function saveDispatchQueue(queue: DispatchQueueState) {
   sessionStorage.setItem(SUAP_DISPATCH_QUEUE_STORAGE_KEY, JSON.stringify(queue));
 }
@@ -89,20 +90,28 @@ export function isAiAssistedDispatch(processo: SuapProcesso) {
 }
 
 export function createManualDespachoFields(processo: SuapProcesso): ManualDespachoFields {
+  const documentoFavorecido = processo.cpfCnpj || '';
+  const tipoPessoa = documentoFavorecido.replace(/\D/g, '').length === 11 ? 'PF' : 'PJ';
+  const finalidade = inferManualDespachoFinalidade({
+    tipoPessoa,
+    favorecido: processo.beneficiario,
+    objeto: processo.assunto,
+    projeto: undefined,
+  });
+  const tipo = /\baquisi|material|equipamento|produto|fornecimento|compra\b/.test(normalizeText(processo.assunto)) ? 'aquisicao' : 'servico';
+
   return {
-    finalidade: 'contrato',
+    finalidade,
     processo: processo.numProcesso || processo.suapId || '',
     favorecido: processo.beneficiario || '',
     descricao: processo.assunto || '',
     valor: processo.dadosCompletos?.val_nf || '',
     empenho: processo.dadosCompletos?.empenhos?.join(', ') || '',
-    projeto: '',
+    projeto: finalidade === 'projeto' ? processo.assunto || '' : '',
     edital: '',
-
-    tipo: 'servico',
+    tipo,
   };
 }
-
 
 export function createStandaloneManualDespachoFields(): ManualDespachoFields {
   return {
@@ -117,6 +126,47 @@ export function createStandaloneManualDespachoFields(): ManualDespachoFields {
     tipo: 'servico',
   };
 }
+
+const normalizeText = (value: string | undefined) => (value || '')
+  .toLowerCase()
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '');
+
+const formatManualValue = (value: number | string | undefined) => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+  }
+  return typeof value === 'string' ? value : '';
+};
+
+export function inferManualDespachoFinalidade(context: Pick<ResolvedDocumentContext, 'tipoPessoa' | 'objeto' | 'projeto' | 'favorecido'>): DespachoFinalidade {
+  const haystack = normalizeText(`${context.objeto || ''} ${context.projeto || ''}`);
+  const isFolhaPagamento = Boolean(context.favorecido && /folha de pagamento/i.test(context.favorecido));
+
+  if (/auxilio\s+transporte/.test(haystack)) return 'auxilio-transporte';
+  if (/\bpafe\b|apoio\s+a\s+formacao\s+estudantil/.test(haystack)) return 'pafe';
+  if (/auxilio\s+moradia/.test(haystack)) return 'auxilio-moradia';
+  if (context.projeto || /\bprojet[oa]s?\b/.test(haystack)) return 'projeto';
+  if (context.tipoPessoa === 'PF' || isFolhaPagamento || /\bbolsa\b|\bbolsista\b|\bauxilio\b/.test(haystack)) return 'bolsa-sem-projeto';
+  return 'contrato';
+}
+
+export function createManualDespachoFieldsFromResolvedContext(context: ResolvedDocumentContext): ManualDespachoFields {
+  const finalidade = inferManualDespachoFinalidade(context);
+  const normalizedObject = normalizeText(context.objeto);
+  return {
+    finalidade,
+    processo: context.processo || '',
+    favorecido: context.favorecido || '',
+    descricao: context.objeto || '',
+    valor: formatManualValue(context.valor),
+    empenho: context.empenho || '',
+    projeto: context.projeto || (finalidade === 'projeto' ? context.objeto || '' : ''),
+    edital: context.edital || '',
+    tipo: /\baquisi|material|equipamento|produto|fornecimento|compra\b/.test(normalizedObject) ? 'aquisicao' : 'servico',
+  };
+}
+
 const esc = (value: string) => value.replace(/[&<>"']/g, (character) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 }[character] || character));

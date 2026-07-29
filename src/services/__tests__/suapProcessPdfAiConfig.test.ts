@@ -173,6 +173,13 @@ describe('SUAP process PDF AI extraction flow', () => {
 
     expect(workerSource).toContain('callOpenAiWithPdfBytes');
     expect(workerSource).toContain('runOpenAiThenOpenRouter');
+    expect(workerSource).toContain('runOpenAiChunkedFallback');
+    expect(workerSource).toContain('runGeminiChunkedFallback');
+    expect(workerSource).toContain('if (await runGeminiChunkedFallback(job, processo, pdfBytes)) return;');
+    expect(workerSource).toContain('buildGeminiFallbackFailure');
+    expect(workerSource).toContain('Gemini (tentativa principal) falhou');
+    expect(workerSource).toContain('OpenAI/OpenRouter (fallback) falhou');
+    expect(workerSource).toContain('isOpenAiContextWindowError(openAiError)');
     expect(workerSource).toContain('const openRouterContext = cleanContextText || cleanString(openAiResult?.rawText);');
     expect(sharedSource).toContain('Deno.env.get("OPENAI_MODEL") ?? "gpt-5-mini"');
     expect(sharedSource).toContain('https://api.openai.com/v1/responses');

@@ -286,7 +286,9 @@ const getExtractionIssue = (processo: SuapProcesso) => {
   if (!job?.last_error_code) return null;
 
   if (job.last_error_code === 'provider_rate_limit') {
-    return 'Gemini indisponivel por limite de cota';
+    return job.last_error_message?.includes('OpenAI/OpenRouter (fallback) falhou')
+      ? 'Gemini indisponivel por limite de cota; o fallback tambem falhou'
+      : 'Gemini indisponivel por limite de cota';
   }
 
   return job.last_error_message || 'A extracao por IA precisa ser refeita.';

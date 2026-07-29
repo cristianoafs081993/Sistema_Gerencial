@@ -27,6 +27,7 @@ import {
   validatePayload,
   type ExtractionJobRow,
   type ExtractionPayload,
+  type ExtractionValidation,
   type ProcessRecord,
   type ProviderName,
 } from "../_shared/process_pdf_shared.ts";
@@ -119,6 +120,88 @@ async function persistSuccess(job: ExtractionJobRow, processo: ProcessRecord, pa
   await markJobCompleted(job.id, provider);
 }
 
+function toError(error: unknown) {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function buildGeminiFallbackFailure(geminiFailure: Error, fallbackFailure: unknown) {
+  const fallbackError = toError(fallbackFailure);
+  const message = [
+    `Gemini (tentativa principal) falhou: ${geminiFailure.message}`,
+    `OpenAI/OpenRouter (fallback) falhou: ${fallbackError.message}`,
+  ].join(" | ");
+
+  return Object.assign(new Error(message), {
+    code: detectErrorCode({ error: fallbackError }),
+  });
+}
+
+function isOpenAiContextWindowError(error: Error | null) {
+  const message = error?.message.toLowerCase() ?? "";
+  return message.includes("context window") || message.includes("context_length_exceeded");
+}
+
+async function runOpenAiChunkedFallback(
+  job: ExtractionJobRow,
+  processo: ProcessRecord,
+  pdfBytes: Uint8Array,
+  processoNumeroAtual: string | null,
+): Promise<boolean> {
+  const chunks = await splitPdfIntoChunks(pdfBytes);
+  if (chunks.length < 2) return false;
+
+  await initializeChunkRows(job.id, chunks);
+  const partialPayloads: ExtractionPayload[] = [];
+  let lastOpenAiError: Error | null = null;
+
+  for (const chunk of chunks) {
+    await extendLease(job.id);
+    await updateChunk(job.id, chunk.chunkIndex, {
+      page_start: chunk.pageStart,
+      page_end: chunk.pageEnd,
+      status: "processing",
+      attempt_count: 2,
+      provider: "openai",
+    });
+
+    try {
+      const result = await callOpenAiWithPdfBytes(chunk.bytes, processoNumeroAtual);
+      await updateChunk(job.id, chunk.chunkIndex, {
+        page_start: chunk.pageStart,
+        page_end: chunk.pageEnd,
+        status: result.validation.ok ? "completed" : "failed",
+        attempt_count: 2,
+        provider: "openai",
+        partial_result: { extracted: result.extracted, validation: result.validation },
+        last_error_code: result.validation.ok ? null : detectErrorCode({ validation: result.validation }),
+        last_error_message: result.validation.ok ? null : result.validation.details.join(", "),
+      });
+      if (result.validation.ok) partialPayloads.push(result.extracted);
+    } catch (error) {
+      lastOpenAiError = toError(error);
+      await updateChunk(job.id, chunk.chunkIndex, {
+        page_start: chunk.pageStart,
+        page_end: chunk.pageEnd,
+        status: "failed",
+        attempt_count: 2,
+        provider: "openai",
+        partial_result: null,
+        last_error_code: detectErrorCode({ error }),
+        last_error_message: lastOpenAiError.message,
+      });
+    }
+  }
+
+  if (partialPayloads.length > 0) {
+    const consolidated = consolidateExtractionPayloads(partialPayloads, processoNumeroAtual);
+    await persistSuccess(job, processo, consolidated, "openai");
+    return true;
+  }
+
+  if (lastOpenAiError) throw lastOpenAiError;
+  return false;
+}
+
 async function runOpenAiThenOpenRouter(
   job: ExtractionJobRow,
   processo: ProcessRecord,
@@ -137,7 +220,18 @@ async function runOpenAiThenOpenRouter(
       return true;
     }
   } catch (error) {
-    openAiError = error instanceof Error ? error : new Error(String(error));
+    openAiError = toError(error);
+  }
+
+  // Large PDFs are first tried whole to preserve cross-page context. If OpenAI
+  // rejects that request for context size, retry it in the same page chunks
+  // already used by the Gemini path instead of surfacing a deterministic 400.
+  if (isOpenAiContextWindowError(openAiError)) {
+    try {
+      if (await runOpenAiChunkedFallback(job, processo, pdfBytes, processoNumeroAtual)) return true;
+    } catch (error) {
+      openAiError = toError(error);
+    }
   }
 
   const cleanContextText = cleanString(contextText);
@@ -182,12 +276,24 @@ async function runLightPdfPath(job: ExtractionJobRow, processo: ProcessRecord, p
     geminiError = error instanceof Error ? error : new Error(String(error));
   }
 
-  if (await runOpenAiThenOpenRouter(job, processo, pdfBytes, processoNumeroAtual, contextText)) return;
+  const geminiFailure = geminiError ?? Object.assign(
+    new Error(`Gemini returned invalid output: ${geminiValidation?.details.join(", ") || "unknown validation error"}`),
+    { code: detectErrorCode({ validation: geminiValidation }) },
+  );
 
-  if (geminiError) throw geminiError;
-  throw Object.assign(new Error(`Gemini returned invalid output: ${geminiValidation?.details.join(", ") || "unknown validation error"}`), {
-    code: detectErrorCode({ validation: geminiValidation }),
-  });
+  try {
+    if (await runGeminiChunkedFallback(job, processo, pdfBytes)) return;
+  } catch {
+    // The Gemini full-PDF error remains the primary failure if chunking cannot run.
+  }
+
+  try {
+    if (await runOpenAiThenOpenRouter(job, processo, pdfBytes, processoNumeroAtual, contextText)) return;
+  } catch (fallbackError) {
+    throw buildGeminiFallbackFailure(geminiFailure, fallbackError);
+  }
+
+  throw geminiFailure;
 }
 async function processChunk(job: ExtractionJobRow, processoNumeroAtual: string | null, chunk: Awaited<ReturnType<typeof splitPdfIntoChunks>>[number]) {
   await updateChunk(job.id, chunk.chunkIndex, {
@@ -228,6 +334,34 @@ async function processChunk(job: ExtractionJobRow, processoNumeroAtual: string |
   }
 }
 
+async function runGeminiChunkedFallback(job: ExtractionJobRow, processo: ProcessRecord, pdfBytes: Uint8Array) {
+  const processoNumeroAtual = cleanString(processo.num_processo);
+  const chunks = await splitPdfIntoChunks(pdfBytes);
+  if (chunks.length < 2) return false;
+
+  await updateProcessStatus(job.tenant_id, job.suap_id, "processing_chunks");
+  await initializeChunkRows(job.id, chunks);
+  const partialPayloads: ExtractionPayload[] = [];
+
+  for (const chunk of chunks) {
+    await extendLease(job.id);
+    try {
+      const result = await processChunk(job, processoNumeroAtual, chunk);
+      if (result?.validation.ok) partialPayloads.push(result.extracted);
+    } catch {
+      return false;
+    }
+  }
+
+  if (partialPayloads.length === 0) return false;
+
+  const consolidated = consolidateExtractionPayloads(partialPayloads, processoNumeroAtual);
+  if (!validatePayload(consolidated, "gemini").ok) return false;
+
+  await persistSuccess(job, processo, consolidated, "gemini");
+  return true;
+}
+
 async function runHeavyPdfPath(job: ExtractionJobRow, processo: ProcessRecord, pdfBytes: Uint8Array, contextText: string | null) {
   const processoNumeroAtual = cleanString(processo.num_processo);
   await updateProcessStatus(job.tenant_id, job.suap_id, "processing_chunks");
@@ -244,7 +378,11 @@ async function runHeavyPdfPath(job: ExtractionJobRow, processo: ProcessRecord, p
       }
     }
   } catch (geminiError) {
-    if (await runOpenAiThenOpenRouter(job, processo, pdfBytes, processoNumeroAtual, contextText, partialPayloads)) return;
+    try {
+      if (await runOpenAiThenOpenRouter(job, processo, pdfBytes, processoNumeroAtual, contextText, partialPayloads)) return;
+    } catch (fallbackError) {
+      throw buildGeminiFallbackFailure(toError(geminiError), fallbackError);
+    }
     throw geminiError;
   }
 
@@ -264,7 +402,15 @@ async function runHeavyPdfPath(job: ExtractionJobRow, processo: ProcessRecord, p
     console.timeEnd("[process-pdf-worker] consolidating");
   }
 
-  if (await runOpenAiThenOpenRouter(job, processo, pdfBytes, processoNumeroAtual, contextText, partialPayloads)) return;
+  const geminiFailure = Object.assign(
+    new Error("Gemini extraction did not produce usable PDF chunks."),
+    { code: detectErrorCode({ validation: { ok: false, reason: "technical_failure", provider: "gemini", details: ["no usable chunks"] } }) },
+  );
+  try {
+    if (await runOpenAiThenOpenRouter(job, processo, pdfBytes, processoNumeroAtual, contextText, partialPayloads)) return;
+  } catch (fallbackError) {
+    throw buildGeminiFallbackFailure(geminiFailure, fallbackError);
+  }
 
   if (partialPayloads.length > 0) {
     const consolidated = consolidateExtractionPayloads(partialPayloads, processoNumeroAtual);
@@ -272,9 +418,7 @@ async function runHeavyPdfPath(job: ExtractionJobRow, processo: ProcessRecord, p
     return;
   }
 
-  throw Object.assign(new Error("Gemini extraction did not produce usable PDF chunks."), {
-    code: detectErrorCode({ validation: { ok: false, reason: "technical_failure", provider: "gemini", details: ["no usable chunks"] } }),
-  });
+  throw geminiFailure;
 }
 
 async function processJob(job: ExtractionJobRow) {

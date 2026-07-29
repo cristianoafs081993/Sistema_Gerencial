@@ -17,6 +17,7 @@ import { buildSuapCloneUrl, type SuapCloneAutomationMode } from '@/lib/suapClone
 import {
   buildManualDespachoHtml,
   createManualDespachoFields,
+  createManualDespachoFieldsFromResolvedContext,
   isAiAssistedDispatch,
   createStandaloneManualDespachoFields,
   type DispatchQueueState,
@@ -67,7 +68,10 @@ export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, que
     void buildResolvedContextFromSuapProcess(processo, { empenhos, contratos, contratosEmpenhos })
       .then((context) => {
         if (!latestOpenRef.current || currentProcessIdRef.current !== processo.id) return;
-        onQueueChange(updateCurrentItem(queue, { html: buildDespachoLiquidacaoHtml(context) }));
+        onQueueChange(updateCurrentItem(queue, {
+          html: buildDespachoLiquidacaoHtml(context),
+          manualFields: currentItem.manualFields || createManualDespachoFieldsFromResolvedContext(context),
+        }));
       })
       .catch((error) => {
         if (!latestOpenRef.current || currentProcessIdRef.current !== processo.id) return;
@@ -196,9 +200,21 @@ export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, que
                   </div>
                 ) : null}
                 {isAssisted ? (
-                  <div className="space-y-2 text-xs text-text-secondary">
-                    <p className="font-semibold text-text-primary">Minuta assistida</p>
-                    <p>A IA ja preencheu os dados encontrados. Marcadores no texto indicam campos pendentes.</p>
+                  <div className="space-y-4">
+                    <div className="space-y-2 text-xs text-text-secondary">
+                      <p className="font-semibold text-text-primary">Minuta assistida</p>
+                      <p>A IA ja preencheu os dados encontrados. Marcadores no texto indicam campos pendentes.</p>
+                    </div>
+                    {manualFields ? (
+                      <ManualDespachoForm
+                        fields={manualFields}
+                        onChange={changeManualField}
+                        onGenerate={generateManual}
+                        title="Modelo da minuta"
+                        description="Troque o modelo quando a IA classificar o caso errado e aplique para regerar o texto."
+                        submitLabel="Aplicar modelo"
+                      />
+                    ) : null}
                   </div>
                 ) : manualFields ? (
                   <ManualDespachoForm fields={manualFields} onChange={changeManualField} onGenerate={generateManual} />
@@ -256,15 +272,24 @@ function ManualDespachoForm({
   fields,
   onChange,
   onGenerate,
+  title = 'Preenchimento manual',
+  description,
+  submitLabel = 'Gerar despacho',
 }: {
   fields: ManualDespachoFields;
   onChange: <K extends keyof ManualDespachoFields>(key: K, value: ManualDespachoFields[K]) => void;
   onGenerate: () => void;
+  title?: string;
+  description?: string;
+  submitLabel?: string;
 }) {
   const noFavorecido = ['auxilio-transporte', 'pafe', 'auxilio-moradia'].includes(fields.finalidade);
   return (
     <div className="space-y-3">
-      <p className="flex items-center gap-2 text-xs font-semibold text-text-primary"><Sparkles className="h-4 w-4 text-amber-600" /> Preenchimento manual</p>
+      <div className="space-y-1">
+        <p className="flex items-center gap-2 text-xs font-semibold text-text-primary"><Sparkles className="h-4 w-4 text-amber-600" /> {title}</p>
+        {description ? <p className="text-xs leading-5 text-text-secondary">{description}</p> : null}
+      </div>
       <div className="space-y-1"><Label>Finalidade</Label><Select value={fields.finalidade} onValueChange={(value) => onChange('finalidade', value as ManualDespachoFields['finalidade'])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="contrato">Contrato ou aquisicao</SelectItem><SelectItem value="projeto">Projeto</SelectItem><SelectItem value="bolsa-sem-projeto">Bolsa sem projeto</SelectItem><SelectItem value="auxilio-transporte">Auxilio transporte</SelectItem><SelectItem value="pafe">PAFE</SelectItem><SelectItem value="auxilio-moradia">Auxilio moradia</SelectItem></SelectContent></Select></div>
       <div className="space-y-1"><Label>Processo (opcional)</Label><Input value={fields.processo} onChange={(event) => onChange('processo', event.target.value)} /></div>
       {!noFavorecido ? <div className="space-y-1"><Label>Favorecido</Label><Input value={fields.favorecido} onChange={(event) => onChange('favorecido', event.target.value)} /></div> : null}
@@ -272,7 +297,7 @@ function ManualDespachoForm({
       {fields.finalidade === 'projeto' ? <><div className="space-y-1"><Label>Projeto</Label><Input value={fields.projeto} onChange={(event) => onChange('projeto', event.target.value)} /></div><div className="space-y-1"><Label>Edital</Label><Input value={fields.edital} onChange={(event) => onChange('edital', event.target.value)} /></div></> : null}
       <div className="space-y-1"><Label>Valor (R$)</Label><Input value={fields.valor} onChange={(event) => onChange('valor', event.target.value)} /></div>
       <div className="space-y-1"><Label>Empenho(s)</Label><Input value={fields.empenho} onChange={(event) => onChange('empenho', event.target.value)} /></div>
-      <Button type="button" className="w-full" onClick={onGenerate}>Gerar despacho</Button>
+      <Button type="button" className="w-full" onClick={onGenerate}>{submitLabel}</Button>
     </div>
   );
 }
