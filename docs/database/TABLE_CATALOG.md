@@ -461,7 +461,7 @@ Campos-chave:
 
 Regras:
 - `save_requisicao_compra` salva cabeçalho e itens na mesma transacao.
-- Requisicoes em `review` ou `approved` exigem empenho com saldo suficiente; requisicoes em `review` do mesmo empenho entram como valor reservado.
+- Requisicoes em `review` ou `approved` exigem empenho com saldo suficiente; requisicoes em `review` do mesmo empenho entram como valor reservado. Para terceirizados, a RPC exige permissao explicita no `empenho_id`; permissao de contrato nao autoriza automaticamente as NEs vinculadas ao contrato.
 - `fn_empenho_saldo_disponivel` calcula saldo de exercicio com dados SIAFI locais e prioriza `saldo_rap_oficial` para RAP.
 
 ### `requisicao_compra_itens`

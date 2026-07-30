@@ -413,6 +413,23 @@ async function loadCachedLiquidacoesForEmpenhos(empenhoNumeros: string[]) {
   return rowsByEmpenho;
 }
 
+async function loadLiquidacoesForEmpenhos(empenhoNumeros: string[]) {
+  const cachedRowsByEmpenho = await loadCachedLiquidacoesForEmpenhos(empenhoNumeros);
+  const rowsByEmpenho = new Map(cachedRowsByEmpenho);
+  const numerosUnicos = Array.from(new Set(empenhoNumeros.map((numero) => String(numero ?? '').trim()).filter(Boolean)));
+
+  await Promise.all(numerosUnicos.map(async (numero) => {
+    try {
+      const rows = await contratosApiService.getLiquidacoesPublicasPorEmpenho(numero);
+      if (rows.length > 0) rowsByEmpenho.set(normalizeEmpenhoRef(numero), rows);
+    } catch (error) {
+      console.warn('suapProcessFinanceService: atualizacao de liquidacoes indisponivel', error);
+    }
+  }));
+
+  return rowsByEmpenho;
+}
+
 export const suapProcessFinanceService = {
   async getSummaryBySuapId(suapId: string): Promise<SuapProcessFinanceSummary> {
     const { suapProcessosService } = await import('@/services/suapProcessos');
@@ -445,7 +462,7 @@ export const suapProcessFinanceService = {
       contratosApi,
       contratosApiEmpenhos,
     });
-    const liquidacoesPorEmpenho = await loadCachedLiquidacoesForEmpenhos(preliminary.empenhos.map((empenho) => empenho.numero));
+    const liquidacoesPorEmpenho = await loadLiquidacoesForEmpenhos(preliminary.empenhos.map((empenho) => empenho.numero));
 
     return buildSuapProcessFinanceSummary({
       processo,

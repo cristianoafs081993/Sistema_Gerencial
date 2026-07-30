@@ -109,23 +109,11 @@ export default function RequisicaoCompraPage() {
     let baseEmpenhos = empenhos;
 
     if (isTerceirizado && !isSuperAdmin) {
-      // Explicitly allowed empenho IDs
       const userPerms = permissions.filter(
         (p) => permissionMatchesAuthUser(p, userIdentity) && p.empenhoId
       );
       const allowedEmpenhoIds = new Set(userPerms.map((p) => p.empenhoId));
-
-      // Empenhos linked to allowed contracts
-      const allowedContractIds = new Set(allowedContracts.map((c) => c.id));
-      const linkedEmpenhoIds = new Set(
-        contratosEmpenhos
-          .filter((ce) => allowedContractIds.has(ce.contrato_id))
-          .map((ce) => ce.empenho_id)
-      );
-
-      baseEmpenhos = empenhos.filter(
-        (e) => allowedEmpenhoIds.has(e.id) || linkedEmpenhoIds.has(e.id)
-      );
+      baseEmpenhos = empenhos.filter((e) => allowedEmpenhoIds.has(e.id));
     }
 
     // Filter by selected contract if active
@@ -143,12 +131,22 @@ export default function RequisicaoCompraPage() {
     empenhos,
     contratosEmpenhos,
     permissions,
-    allowedContracts,
     isTerceirizado,
     isSuperAdmin,
     userIdentity,
     selectedContratoId,
   ]);
+
+  useEffect(() => {
+    if (selectedEmpenhoId === 'none') return;
+    if (allowedEmpenhos.some((empenho) => empenho.id === selectedEmpenhoId)) return;
+
+    setSelectedEmpenhoId('none');
+    if (!editingRequisicaoId) {
+      setItems([]);
+      setShouldAutoFillEmpenhoItems(true);
+    }
+  }, [allowedEmpenhos, editingRequisicaoId, selectedEmpenhoId]);
 
   // Selected details
   const currentContrato = useMemo(() => {

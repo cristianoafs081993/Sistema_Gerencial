@@ -564,6 +564,7 @@ Uso:
 - atualiza o cache de subitens do Portal da Transparencia por empenho para o modal de detalhes do empenho
 - aceita empenhos especificos enviados pelo frontend
 - em modo `refreshDue`, reprocessa entradas vencidas do cache
+- em modo `refreshLinkedRequisicaoEmpenhos`, descobre empenhos vinculados diretamente a terceirizados e empenhos de requisicoes recentes em `draft`/`review`, pre-aquecendo o cache para `/requisicao-compra`
 - em modo `readCacheOnly` com `returnRows`, devolve as linhas ja materializadas no cache sem consultar novamente o Portal
 - consulta `/api-de-dados/despesas/itens-de-empenho` usando `codigoDocumento = 158366 + 26435 + numero do empenho`
 - salva dados em `portal_transparencia_empenho_itens_cache_status` e `portal_transparencia_empenho_itens_cache`
@@ -578,7 +579,7 @@ Observacao:
 
 - publicada com `verify_jwt = false`, pois pode ser chamada pelo cron e pelo frontend
 - responde preflight CORS com `POST, OPTIONS`
-- a migration agenda `refresh-portal-transparencia-itens-cache-hourly` com Supabase Cron/pg_net para executar a cada hora
+- a migration agenda `refresh-portal-transparencia-itens-cache-daily` com Supabase Cron/pg_net para executar diariamente as `07:10 UTC` (`04:10` em Brasilia), substituindo o job horario anterior
 - resultados encontrados recebem TTL de 12 horas
 - resultados `not_found` recebem TTL de 1 hora
 

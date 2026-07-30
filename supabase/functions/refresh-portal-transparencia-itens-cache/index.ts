@@ -36,6 +36,7 @@ type RefreshRequest = {
   empenhoNumero?: string;
   empenhos?: string[];
   refreshDue?: boolean;
+  refreshLinkedRequisicaoEmpenhos?: boolean;
   readCacheOnly?: boolean;
   returnRows?: boolean;
   limit?: number;
@@ -314,6 +315,56 @@ async function getDueEmpenhos(supabase: SupabaseClient, limit: number) {
   return (data ?? []).map((row: { empenho_numero: string }) => row.empenho_numero).filter(Boolean);
 }
 
+async function getLinkedRequisicaoEmpenhos(supabase: SupabaseClient, limit: number) {
+  const empenhoIds = new Set<string>();
+  const empenhoNumeros = new Set<string>();
+
+  const { data: permissionRows, error: permissionError } = await supabase
+    .from('terceirizado_permissions')
+    .select('empenho_id')
+    .not('empenho_id', 'is', null)
+    .limit(limit * 3);
+  if (permissionError) throw permissionError;
+
+  for (const row of permissionRows ?? []) {
+    const empenhoId = String((row as { empenho_id?: string | null }).empenho_id ?? '').trim();
+    if (empenhoId) empenhoIds.add(empenhoId);
+  }
+
+  const { data: requisicaoRows, error: requisicaoError } = await supabase
+    .from('requisicoes_compra')
+    .select('empenho_id, empenho_numero, updated_at')
+    .in('status', ['draft', 'review'])
+    .not('empenho_id', 'is', null)
+    .order('updated_at', { ascending: false })
+    .limit(limit);
+  if (requisicaoError) throw requisicaoError;
+
+  for (const row of requisicaoRows ?? []) {
+    const requisicao = row as { empenho_id?: string | null; empenho_numero?: string | null };
+    const empenhoId = String(requisicao.empenho_id ?? '').trim();
+    const empenhoNumero = normalizeEmpenhoNumero(requisicao.empenho_numero);
+    if (empenhoId) empenhoIds.add(empenhoId);
+    if (empenhoNumero) empenhoNumeros.add(empenhoNumero);
+  }
+
+  for (const idChunk of chunk(Array.from(empenhoIds), 100)) {
+    if (idChunk.length === 0) continue;
+    const { data: empenhoRows, error: empenhoError } = await supabase
+      .from('empenhos')
+      .select('id, numero')
+      .in('id', idChunk);
+    if (empenhoError) throw empenhoError;
+
+    for (const row of empenhoRows ?? []) {
+      const empenhoNumero = normalizeEmpenhoNumero((row as { numero?: string | null }).numero);
+      if (empenhoNumero) empenhoNumeros.add(empenhoNumero);
+    }
+  }
+
+  return Array.from(empenhoNumeros).slice(0, limit);
+}
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -342,6 +393,12 @@ Deno.serve(async (request) => {
 
     if (body.refreshDue) {
       for (const empenho of await getDueEmpenhos(supabase, limit)) {
+        requestedEmpenhos.add(empenho);
+      }
+    }
+
+    if (body.refreshLinkedRequisicaoEmpenhos) {
+      for (const empenho of await getLinkedRequisicaoEmpenhos(supabase, limit)) {
         requestedEmpenhos.add(empenho);
       }
     }
