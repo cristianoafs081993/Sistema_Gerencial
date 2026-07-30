@@ -4,19 +4,17 @@ import {
   Check,
   ClipboardList,
   Coins,
-  FileDown,
   FileText,
   Loader2,
   Plus,
   Printer,
   ShieldCheck,
   Trash2,
-  UserCheck,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { HeaderActions, HeaderSubtitle } from '@/components/HeaderParts';
+import { HeaderSubtitle } from '@/components/HeaderParts';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +22,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
@@ -32,7 +29,7 @@ import { getAuthUserMatricula, permissionMatchesAuthUser } from '@/lib/terceiriz
 import { formatCurrency, formatarDocumento } from '@/lib/utils';
 import { contratosApiService } from '@/services/contratosApi';
 import { requisicoesCompraService } from '@/services/requisicoesCompra';
-import type { RequisicaoCompra, RequisicaoCompraItem, RequisicaoCompraRecord, TerceirizadoPermission } from '@/types';
+import type { RequisicaoCompra, RequisicaoCompraItem, RequisicaoCompraRecord } from '@/types';
 import { buildContratoItemBalances } from '@/utils/contratoItemBalance';
 import { getEmpenhoAvailableBalance, hasSufficientEmpenhoBalance } from '@/utils/empenhoBalance';
 
@@ -70,8 +67,6 @@ export default function RequisicaoCompraPage() {
     );
   }, [userGroups, isSuperAdmin]);
 
-  // Tab State
-  const [activeTab, setActiveTab] = useState<'requisitions' | 'manage'>('requisitions');
 
   // Form & Edit State
   const [isEditing, setIsEditing] = useState(false);
@@ -83,28 +78,17 @@ export default function RequisicaoCompraPage() {
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<Omit<RequisicaoCompraItem, 'id' | 'requisicaoCompraId' | 'createdAt' | 'updatedAt'>[]>([]);
 
-  // Permissions Management State (Fiscais only)
-  const [selectedTerceirizadoId, setSelectedTerceirizadoId] = useState<string>('');
-  const [permissionType, setPermissionType] = useState<'contrato' | 'empenho'>('contrato');
-  const [permissionTargetId, setPermissionTargetId] = useState<string>('');
-  const [isLinking, setIsLinking] = useState(false);
-
   // Queries
   const { data: requisicoes = [], isLoading: isLoadingRequisicoes } = useQuery({
     queryKey: ['requisicoes-compra'],
     queryFn: () => requisicoesCompraService.listRecentRequisicoes(),
   });
 
-  const { data: permissions = [], isLoading: isLoadingPermissions } = useQuery({
+  const { data: permissions = [] } = useQuery({
     queryKey: ['terceirizado-permissions'],
     queryFn: () => requisicoesCompraService.listPermissions(),
   });
 
-  const { data: terceirizados = [], isLoading: isLoadingTerceirizados } = useQuery({
-    queryKey: ['terceirizados-list'],
-    queryFn: () => requisicoesCompraService.listTerceirizados(),
-    enabled: isFiscalOrManager,
-  });
 
   // Filter allowed Contracts and Empenhos for Terceirizado
   const allowedContracts = useMemo(() => {
@@ -353,56 +337,6 @@ export default function RequisicaoCompraPage() {
       toast.error('Falha ao excluir.', { id: loadingToast });
     }
   };
-
-  // Add Permission Link
-  const handleAddPermission = async () => {
-    const targetTerceirizado = terceirizados.find((t) => t.id === selectedTerceirizadoId);
-
-    if (!targetTerceirizado) {
-      toast.error('Selecione um prestador terceirizado.');
-      return;
-    }
-    if (!targetTerceirizado.matricula) {
-      toast.error('O prestador selecionado nao possui matricula cadastrada.');
-      return;
-    }
-    if (!permissionTargetId || permissionTargetId === 'none') {
-      toast.error('Selecione o contrato ou empenho para vincular.');
-      return;
-    }
-
-    setIsLinking(true);
-
-    try {
-      await requisicoesCompraService.addPermission(
-        targetTerceirizado.matricula,
-        permissionType,
-        permissionTargetId,
-        targetTerceirizado.userId,
-        targetTerceirizado.email
-      );
-      toast.success('Vínculo adicionado com sucesso!');
-      setPermissionTargetId('');
-      void queryClient.invalidateQueries({ queryKey: ['terceirizado-permissions'] });
-    } catch (err) {
-      toast.error('Falha ao criar vínculo. Talvez já exista.');
-    } finally {
-      setIsLinking(false);
-    }
-  };
-
-  // Remove Permission Link
-  const handleRemovePermission = async (permId: string) => {
-    if (!confirm('Deseja realmente remover este vínculo de acesso?')) return;
-    try {
-      await requisicoesCompraService.removePermission(permId);
-      toast.success('Vínculo removido.');
-      void queryClient.invalidateQueries({ queryKey: ['terceirizado-permissions'] });
-    } catch (err) {
-      toast.error('Falha ao remover vínculo.');
-    }
-  };
-
   // Print PDF Generator
   const handlePrintPDF = async (requisicao: RequisicaoCompra) => {
     const loadingToast = toast.loading('Preparando documento de impressão...');
@@ -554,38 +488,10 @@ export default function RequisicaoCompraPage() {
     }
   };
 
-  // Permission console target options
-  const targetOptions = useMemo(() => {
-    if (permissionType === 'contrato') {
-      return contratos.map((c) => ({ id: c.id, label: `${c.numero} - ${c.contratada}` }));
-    } else {
-      return empenhos.map((e) => ({
-        id: e.id,
-        label: `${e.numero} (${formatCurrency(e.valor)} - ${e.favorecidoNome || 'Sem favorecido'})`,
-      }));
-    }
-  }, [permissionType, contratos, empenhos]);
-
   return (
     <div className="space-y-6 pb-10">
       <HeaderSubtitle>Gestão de Requisições de Compra</HeaderSubtitle>
 
-      {isFiscalOrManager && (
-        <HeaderActions>
-          <div className="flex items-center gap-2">
-            <Button
-              variant={activeTab === 'requisitions' ? 'default' : 'outline'}
-              className={activeTab === 'requisitions' ? 'bg-primary hover:bg-primary/90' : ''}
-              onClick={() => setActiveTab('requisitions')}
-            >
-              Requisições de Compra
-            </Button>
-            <Button variant={activeTab === 'manage' ? 'default' : 'outline'} onClick={() => setActiveTab('manage')}>
-              Gerenciar Vínculos de Terceirizados
-            </Button>
-          </div>
-        </HeaderActions>
-      )}
 
       {/* VIEW: EDICÃO OU CRIAÇÃO DE REQUISICAO */}
       {isEditing && (
@@ -818,7 +724,7 @@ export default function RequisicaoCompraPage() {
       )}
 
       {/* VIEW: MAIN DASHBOARD */}
-      {!isEditing && activeTab === 'requisitions' && (
+      {!isEditing && (
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center">
             <div className="flex items-center gap-2">
@@ -949,144 +855,6 @@ export default function RequisicaoCompraPage() {
         </div>
       )}
 
-      {/* VIEW: FISCAL PERMISSIONS MANAGE */}
-      {!isEditing && activeTab === 'manage' && isFiscalOrManager && (
-        <div className="space-y-6">
-          <Card className="border-border-default shadow-soft">
-            <CardHeader className="bg-primary/[0.01] border-b">
-              <CardTitle>Vincular Contratos e Empenhos</CardTitle>
-              <CardDescription>Configure o escopo de visualização dos terceirizados. Eles só poderão adicionar itens nestas referências nas suas Requisições de Compra.</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6 space-y-6">
-              <div className="grid gap-4 md:grid-cols-4 items-end">
-                <div className="space-y-2">
-                  <Label>Selecione o Terceirizado</Label>
-                  <Select value={selectedTerceirizadoId} onValueChange={(val) => setSelectedTerceirizadoId(val)}>
-                    <SelectTrigger><SelectValue placeholder="Escolha um terceirizado..." /></SelectTrigger>
-                    <SelectContent>
-                      {isLoadingTerceirizados ? (
-                        <SelectItem value="loading" disabled>Carregando terceirizados...</SelectItem>
-                      ) : terceirizados.length === 0 ? (
-                        <SelectItem value="empty" disabled>Nenhum terceirizado cadastrado</SelectItem>
-                      ) : (
-                        terceirizados.map((t) => (
-                          <SelectItem key={t.id} value={t.id}>
-                            {t.name} - {t.matricula || 'sem matricula'}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Tipo de Vínculo</Label>
-                  <Select value={permissionType} onValueChange={(val) => {
-                    setPermissionType(val as 'contrato' | 'empenho');
-                    setPermissionTargetId('');
-                  }}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="contrato">Contrato</SelectItem>
-                      <SelectItem value="empenho">Empenho / NE</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2 md:col-span-2 flex gap-2">
-                  <div className="flex-1 space-y-2">
-                    <Label>Selecione a Entidade</Label>
-                    <Select value={permissionTargetId} onValueChange={(val) => setPermissionTargetId(val)}>
-                      <SelectTrigger><SelectValue placeholder={`Escolha o ${permissionType === 'contrato' ? 'contrato' : 'empenho'}...`} /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none" disabled>Selecione uma opção...</SelectItem>
-                        {targetOptions.map((opt) => (
-                          <SelectItem key={opt.id} value={opt.id}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button type="button" className="bg-primary hover:bg-primary/95 text-primary-foreground gap-1.5 self-end h-10" disabled={isLinking} onClick={handleAddPermission}>
-                    {isLinking ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" />}
-                    Vincular Acesso
-                  </Button>
-                </div>
-              </div>
-
-              {/* LIST ACTIVE VINCLES */}
-              <div className="space-y-3 pt-4 border-t">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-primary" />
-                  <span className="font-ui text-sm font-bold text-text-primary uppercase tracking-wider">Vínculos de Acesso Ativos ({permissions.length})</span>
-                </div>
-
-                <div className="border border-border-default rounded-radius-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-surface-subtle/50">
-                        <TableHead>Matricula do Prestador</TableHead>
-                        <TableHead>Tipo de Vínculo</TableHead>
-                        <TableHead>Identificação / Referência</TableHead>
-                        <TableHead>Detalhes da Entidade</TableHead>
-                        <TableHead style={{ width: '5%' }} className="text-center">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {isLoadingPermissions ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center py-6">
-                            <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto" />
-                          </TableCell>
-                        </TableRow>
-                      ) : permissions.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center text-text-muted py-6">
-                            Nenhum vínculo configurado. Associe contratos/empenhos acima.
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        permissions.map((perm) => {
-                          let label = '-';
-                          let extra = '-';
-                          if (perm.contratoId) {
-                            const c = contratos.find((x) => x.id === perm.contratoId);
-                            label = c ? c.numero : 'Contrato ID não localizado';
-                            extra = c ? c.contratada : '';
-                          } else if (perm.empenhoId) {
-                            const e = empenhos.find((x) => x.id === perm.empenhoId);
-                            label = e ? e.numero : 'Empenho ID não localizado';
-                            extra = e ? `${formatCurrency(e.valor)} - ${e.favorecidoNome || ''}` : '';
-                          }
-
-                          return (
-                            <TableRow key={perm.id}>
-                              <TableCell className="font-bold font-mono">{perm.userMatricula || perm.userEmail}</TableCell>
-                              <TableCell>
-                                <Badge variant="secondary" className={perm.contratoId ? 'bg-sebrae-blue/10 text-sebrae-blue border border-sebrae-blue/20' : 'bg-amber-50 text-amber-800'}>
-                                  {perm.contratoId ? 'Contrato' : 'Empenho'}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="font-mono">{label}</TableCell>
-                              <TableCell className="text-text-secondary text-xs">{extra}</TableCell>
-                              <TableCell className="text-center">
-                                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleRemovePermission(perm.id)}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }

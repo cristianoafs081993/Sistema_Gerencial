@@ -501,6 +501,7 @@ Consumido por:
 Finalidade:
 - Controlar o escopo de contratos e empenhos que cada terceirizado pode ver/utilizar nas suas requisições.
 - O vinculo principal usa `user_matricula`; `user_email` permanece como fallback legado.
+- A página `/cadastro-terceirizados`, dentro da edição do prestador, pode criar múltiplos vínculos de empenho em lote, mas cada empenho autorizado continua sendo persistido como uma linha individual nesta tabela.
 
 Campos-chave:
 - `id`
@@ -512,6 +513,7 @@ Campos-chave:
 
 Consumido por:
 - [requisicoesCompra.ts](file:///c:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/services/requisicoesCompra.ts)
+- [CadastroTerceirizados.tsx](file:///c:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/pages/CadastroTerceirizados.tsx)
 - [RequisicaoCompra.tsx](file:///c:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/pages/RequisicaoCompra.tsx)
 
 ## Importacoes auxiliares

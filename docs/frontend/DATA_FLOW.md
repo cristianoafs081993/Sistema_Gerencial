@@ -427,12 +427,13 @@ Observações:
 
 ### Requisições de Compra (Perfil Terceirizado e Fiscal de Contratos)
 
-`App.tsx` -> `RequisicaoCompra.tsx` -> `requisicoesCompra.ts` -> `requisicoes_compra` / `requisicao_compra_itens` / `terceirizado_permissions`
+`App.tsx` -> `RequisicaoCompra.tsx` / `CadastroTerceirizados.tsx` -> `requisicoesCompra.ts` -> `requisicoes_compra` / `requisicao_compra_itens` / `terceirizado_permissions`
 
 Observações:
 - O perfil `Terceirizado` acessa apenas a rota `/requisicao-compra` e gerencia suas próprias requisições de compra.
 - Um terceirizado só pode vincular contratos e empenhos que tenham sido previamente associados a ele na tabela `terceirizado_permissions` por um gestor/fiscal.
-- Perfis gestores (`fiscal-contratos`, `diretores`, `teste`) visualizam a aba "Gerenciamento de Terceirizados", onde podem cadastrar novos terceirizados pela matrícula SUAP, vincular essa matrícula aos contratos e empenhos autorizados e auditar todas as requisições de compra (com opções de aprovação/rejeição).
+- Em `/cadastro-terceirizados`, o ícone de edição do prestador abre uma página inteira de edição com os dados cadastrais e a seção `Vincular Contratos e Empenhos`; `Empenho / NE` é o tipo de vínculo padrão e usa seletor pesquisável com múltipla seleção, criando uma linha de `terceirizado_permissions` para cada empenho escolhido, sem alteração de schema.
+- Perfis gestores (`fiscal-contratos`, `diretores`, `teste`) cadastram e editam terceirizados em `/cadastro-terceirizados`; a rota `/requisicao-compra` permanece focada na criação, auditoria e aprovação/rejeição das requisições de compra.
 - O login SUAP grava `user_metadata.matricula` no Supabase Auth; permissões de terceirizados são resolvidas por essa matrícula, com fallback por e-mail apenas para registros legados.
 - Mesmo que o usuário possua associações antigas a outros grupos, um terceirizado de refeitório recebe somente a tela `/requisicao-compra`; o login SUAP também remove memberships incompatíveis.
 - Quando a autenticação termina na rota inicial `/` e o perfil não possui acesso ao Dashboard, `ProtectedRoute` redireciona para a primeira tela permitida; para o terceirizado de refeitório, o destino é `/requisicao-compra`.
