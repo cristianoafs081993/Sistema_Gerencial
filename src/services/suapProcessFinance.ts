@@ -239,7 +239,10 @@ const getLiquidacoesForEmpenho = (
   numero: string,
   contratoNumero: string,
 ) => {
-  const rows = liquidacoesPorEmpenho?.get(normalizeEmpenhoRef(numero)) ?? [];
+  const lookupKeys = new Set(buildEmpenhoRefKeys(numero));
+  const rows = Array.from(liquidacoesPorEmpenho ?? new Map<string, ContratoApiPublicLiquidacaoRow[]>())
+    .filter(([key]) => Array.from(buildEmpenhoRefKeys(key)).some((keyAlias) => lookupKeys.has(keyAlias)))
+    .flatMap(([, matchingRows]) => matchingRows);
   return rows
     .filter((row) => !contratoNumero || normalizeContratoNumero(row.contrato_numero) === contratoNumero)
     .map((row) => ({

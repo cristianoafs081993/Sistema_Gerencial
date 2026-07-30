@@ -31,6 +31,10 @@ type DbRequisicaoCompraItemRow = {
   quantity: number;
   unit: string;
   unit_price: number;
+  source_type: string | null;
+  source_item_key: string | null;
+  source_reference: string | null;
+  source_snapshot: Record<string, unknown> | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -91,6 +95,10 @@ function mapItemRow(row: DbRequisicaoCompraItemRow): RequisicaoCompraItem {
     quantity: Number(row.quantity),
     unit: row.unit,
     unitPrice: Number(row.unit_price),
+    sourceType: row.source_type as RequisicaoCompraItem['sourceType'] || undefined,
+    sourceItemKey: row.source_item_key || undefined,
+    sourceReference: row.source_reference || undefined,
+    sourceSnapshot: row.source_snapshot || undefined,
     sortOrder: row.sort_order,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
@@ -137,6 +145,33 @@ export const requisicoesCompraService = {
     };
   },
 
+  async getReviewItemReservations(
+    empenhoId: string,
+    excludeRequisicaoId?: string,
+  ): Promise<Record<string, number>> {
+    let query = supabase
+      .from('requisicoes_compra')
+      .select('id, requisicao_compra_itens(source_item_key, quantity, unit_price)')
+      .eq('empenho_id', empenhoId)
+      .eq('status', 'review');
+
+    if (excludeRequisicaoId) {
+      query = query.neq('id', excludeRequisicaoId);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return ((data || []) as Array<{
+      requisicao_compra_itens?: Array<{ source_item_key: string | null; quantity: number; unit_price: number }>;
+    }>).reduce<Record<string, number>>((acc, requisicao) => {
+      for (const item of requisicao.requisicao_compra_itens ?? []) {
+        if (!item.source_item_key) continue;
+        acc[item.source_item_key] = (acc[item.source_item_key] ?? 0) + Number(item.quantity || 0) * Number(item.unit_price || 0);
+      }
+      return acc;
+    }, {});
+  },
   async saveRequisicao(
     data: Omit<RequisicaoCompra, 'id' | 'createdBy' | 'createdByEmail' | 'createdAt' | 'updatedAt'>,
     items: Omit<RequisicaoCompraItem, 'id' | 'requisicaoCompraId' | 'createdAt' | 'updatedAt'>[],
@@ -159,6 +194,10 @@ export const requisicoesCompraService = {
       quantity: item.quantity,
       unit: item.unit || 'UN',
       unitPrice: item.unitPrice,
+      sourceType: item.sourceType || 'manual',
+      sourceItemKey: item.sourceItemKey || null,
+      sourceReference: item.sourceReference || null,
+      sourceSnapshot: item.sourceSnapshot || null,
     }));
 
     const { data: requisicaoId, error } = await supabase.rpc('save_requisicao_compra', {

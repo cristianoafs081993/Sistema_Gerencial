@@ -132,6 +132,32 @@ describe('CadastroTerceirizadosPage', () => {
     vi.clearAllMocks();
   });
 
+  it('abre cadastro em modal pelo botao no topo', async () => {
+    setup();
+
+    await screen.findByText('Teste');
+
+    expect(screen.getByRole('button', { name: /Cadastrar Terceirizado/i })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Novo Terceirizado/i })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Nome Completo')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Cadastrar Terceirizado/i }));
+
+    const dialog = await screen.findByRole('dialog', { name: /Novo Terceirizado/i });
+    expect(within(dialog).getByText(/Cadastre um novo prestador/i)).toBeInTheDocument();
+
+    fireEvent.change(within(dialog).getByLabelText('Nome Completo'), { target: { value: 'Novo Prestador' } });
+    fireEvent.change(within(dialog).getByLabelText(/Matrícula/i), { target: { value: '3129999' } });
+    fireEvent.change(within(dialog).getByRole('combobox'), { target: { value: 'refeitorio' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: /Cadastrar Terceirizado/i }));
+
+    await waitFor(() => expect(mockedService.saveTerceirizado).toHaveBeenCalledWith(expect.objectContaining({
+      id: undefined,
+      name: 'Novo Prestador',
+      matricula: '3129999',
+      tipo: 'refeitorio',
+    })));
+  });
   it('abre edicao em pagina inteira pelo lapis e salva dados cadastrais', async () => {
     setup();
 
@@ -139,6 +165,7 @@ describe('CadastroTerceirizadosPage', () => {
 
     expect(screen.getByText(/Dados do terceirizado/i)).toBeInTheDocument();
     expect(screen.getByText(/Vincular Contratos e Empenhos/i)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Cadastro de Terceirizados/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/Prestadores Cadastrados/i)).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Nome Completo'), { target: { value: 'Teste Atualizado' } });

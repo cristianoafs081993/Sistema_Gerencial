@@ -59,6 +59,7 @@ describe('process-document extension script', () => {
     window.history.replaceState(null, '', '/processo_eletronico/processo/321/');
     document.getElementById('siages-suap-generate-document')?.remove();
     document.getElementById('siages-suap-finance-panel')?.remove();
+    document.getElementById('siages-suap-finance-widget')?.remove();
     document.getElementById('siages-suap-finance-frame')?.remove();
   });
 
@@ -69,6 +70,7 @@ describe('process-document extension script', () => {
     delete testWindow.chrome;
     document.getElementById('siages-suap-dispatch-modal')?.remove();
     document.getElementById('siages-suap-finance-panel')?.remove();
+    document.getElementById('siages-suap-finance-widget')?.remove();
     document.getElementById('siages-suap-finance-frame')?.remove();
   });
 
@@ -114,6 +116,7 @@ describe('process-document extension script', () => {
     document.body.innerHTML = '<main><section id="tramites"><h3>Tramitação do processo</h3><p>Processo 23035.000001.2026-11</p></section></main>';
     const script = loadProcessScript();
 
+    script.installButton();
     script.installFinancePanel();
 
     await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeTruthy());
@@ -145,8 +148,13 @@ describe('process-document extension script', () => {
 
     await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeNull());
     const panel = document.getElementById('siages-suap-finance-panel') as HTMLElement;
-    expect(document.getElementById('tramites')?.lastElementChild).toBe(panel);
-    expect(panel.dataset.siagesPlacement).toBe('flow');
+    const widget = document.getElementById('siages-suap-finance-widget') as HTMLElement;
+    expect(widget).toContainElement(panel);
+    expect(widget).toContainElement(document.getElementById('siages-suap-generate-document'));
+    expect(widget.style.position).toBe('fixed');
+    expect(widget.style.right).toBe('20px');
+    expect(widget.lastElementChild?.id).toBe('siages-suap-generate-document');
+    expect(panel.dataset.siagesPlacement).toBe('widget');
     expect(panel.style.position).toBe('static');
     expect(panel.textContent).toContain('Fornecedor Alfa');
     expect(panel.textContent).toContain('00040/2026');
@@ -159,7 +167,7 @@ describe('process-document extension script', () => {
     postMessage.mockRestore();
   });
 
-  it('prioriza a coluna direita da timeline de tramitacao quando ela existe', () => {
+  it('mantem o painel a direita mesmo quando a timeline do SUAP estiver em outra coluna', () => {
     document.body.innerHTML = `
       <main>
         <section id="processo-principal"><h3>Tramitação</h3><p>Documentos e detalhes do processo</p></section>
@@ -175,20 +183,22 @@ describe('process-document extension script', () => {
     script.renderFinanceSummary(financeSummary());
 
     const panel = document.getElementById('siages-suap-finance-panel') as HTMLElement;
-    expect(document.getElementById('timeline-direita')?.lastElementChild).toBe(panel);
+    const widget = document.getElementById('siages-suap-finance-widget') as HTMLElement;
+    expect(widget).toContainElement(panel);
+    expect(document.getElementById('timeline-direita')?.contains(panel)).toBe(false);
     expect(document.getElementById('processo-principal')?.contains(panel)).toBe(false);
-    expect(panel.dataset.siagesPlacement).toBe('flow');
+    expect(panel.dataset.siagesPlacement).toBe('widget');
     expect(panel.style.position).toBe('static');
     expect(panel.style.overflow).toBe('hidden');
     expect(panel.style.maxWidth).toBe('100%');
   });
-  it('usa o conteudo principal como fallback quando nao encontra area de tramitacao', () => {
+  it('usa o painel a direita sem depender de uma area de tramitacao', () => {
     const script = loadProcessScript();
     script.renderFinanceSummary(financeSummary());
 
     const panel = document.getElementById('siages-suap-finance-panel') as HTMLElement;
-    expect(document.querySelector('main')?.contains(panel)).toBe(true);
-    expect(panel.dataset.siagesPlacement).toBe('content');
+    expect(document.getElementById('siages-suap-finance-widget')).toContainElement(panel);
+    expect(panel.dataset.siagesPlacement).toBe('widget');
     expect(panel.style.position).toBe('static');
   });
 

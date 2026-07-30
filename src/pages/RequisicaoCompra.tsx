@@ -7,6 +7,7 @@ import {
   FileText,
   Loader2,
   Plus,
+  Pencil,
   Printer,
   ShieldCheck,
   Trash2,
@@ -28,10 +29,15 @@ import { useData } from '@/contexts/DataContext';
 import { getAuthUserMatricula, permissionMatchesAuthUser } from '@/lib/terceirizadoIdentity';
 import { formatCurrency, formatarDocumento } from '@/lib/utils';
 import { contratosApiService } from '@/services/contratosApi';
+import { transparenciaService, type PortalTransparenciaItemEmpenho } from '@/services/transparencia';
 import { requisicoesCompraService } from '@/services/requisicoesCompra';
 import type { RequisicaoCompra, RequisicaoCompraItem, RequisicaoCompraRecord } from '@/types';
-import { buildContratoItemBalances } from '@/utils/contratoItemBalance';
 import { getEmpenhoAvailableBalance, hasSufficientEmpenhoBalance } from '@/utils/empenhoBalance';
+import {
+  buildEmpenhoItemBalances,
+  buildRequisicaoItemsFromEmpenho,
+  getRequisicaoItemAvailableBalance,
+} from '@/utils/requisicaoEmpenhoItems';
 
 // Helper to translate status labels
 const STATUS_META = {
@@ -41,8 +47,6 @@ const STATUS_META = {
   rejected: { label: 'Rejeitada', className: 'border-rose-300 bg-rose-50 text-rose-800' },
 };
 
-const normalizeContractNumber = (value: string | null | undefined) =>
-  String(value ?? '').replace(/\D/g, '').replace(/^0+/, '');
 
 export default function RequisicaoCompraPage() {
   const queryClient = useQueryClient();
@@ -77,6 +81,7 @@ export default function RequisicaoCompraPage() {
   const [selectedEmpenhoId, setSelectedEmpenhoId] = useState<string>('none');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<Omit<RequisicaoCompraItem, 'id' | 'requisicaoCompraId' | 'createdAt' | 'updatedAt'>[]>([]);
+  const [shouldAutoFillEmpenhoItems, setShouldAutoFillEmpenhoItems] = useState(false);
 
   // Queries
   const { data: requisicoes = [], isLoading: isLoadingRequisicoes } = useQuery({
@@ -159,22 +164,83 @@ export default function RequisicaoCompraPage() {
     [currentEmpenho],
   );
 
-  const { data: contratoItemBalances = [], isLoading: isLoadingContratoItems } = useQuery({
-    queryKey: ['requisicao-contrato-api-items', currentContrato?.numero],
-    enabled: Boolean(currentContrato?.numero),
-    queryFn: async () => {
-      const apiContracts = await contratosApiService.getContratosApi(false);
-      const normalizedNumber = normalizeContractNumber(currentContrato?.numero);
-      const apiContract = apiContracts.find(
-        (contract) => normalizeContractNumber(contract.numero) === normalizedNumber,
-      );
-      if (!apiContract) return [];
-      return buildContratoItemBalances(await contratosApiService.getContratoApiDetails(apiContract.id));
-    },
+  const {
+    data: portalEmpenhoItems = [],
+    isLoading: isLoadingPortalEmpenhoItems,
+    isError: isPortalEmpenhoItemsError,
+  } = useQuery({
+    queryKey: ['requisicao-portal-itens-empenho', currentEmpenho?.numero],
+    queryFn: () =>
+      currentEmpenho?.numero
+        ? transparenciaService.getItensEmpenhoPortal(currentEmpenho.numero, { includeHistorico: true })
+        : Promise.resolve([] as PortalTransparenciaItemEmpenho[]),
+    enabled: Boolean(currentEmpenho?.numero),
+    retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 
+  const { data: liquidacoesEmpenho = [], isLoading: isLoadingLiquidacoesEmpenho } = useQuery({
+    queryKey: ['requisicao-liquidacoes-api-empenho', currentEmpenho?.numero],
+    queryFn: () =>
+      currentEmpenho?.numero
+        ? contratosApiService.getLiquidacoesPublicasPorEmpenho(currentEmpenho.numero)
+        : Promise.resolve([]),
+    enabled: Boolean(currentEmpenho?.numero),
+    retry: false,
+    staleTime: 60 * 1000,
+  });
+
+  const { data: reservedReviewItems = {} } = useQuery({
+    queryKey: ['requisicao-review-item-reservations', currentEmpenho?.id, editingRequisicaoId],
+    queryFn: () =>
+      currentEmpenho?.id
+        ? requisicoesCompraService.getReviewItemReservations(currentEmpenho.id, editingRequisicaoId)
+        : Promise.resolve({}),
+    enabled: Boolean(currentEmpenho?.id),
+    retry: false,
+  });
+
+  const empenhoItemBalances = useMemo(
+    () => buildEmpenhoItemBalances(currentEmpenho?.numero || '', portalEmpenhoItems, liquidacoesEmpenho, reservedReviewItems),
+    [currentEmpenho?.numero, portalEmpenhoItems, liquidacoesEmpenho, reservedReviewItems],
+  );
+
+  useEffect(() => {
+    if (!isEditing || editingRequisicaoId || !shouldAutoFillEmpenhoItems || !currentEmpenho) return;
+    if (isLoadingPortalEmpenhoItems || isLoadingLiquidacoesEmpenho) return;
+
+    if (empenhoItemBalances.length > 0) {
+      setItems(buildRequisicaoItemsFromEmpenho(currentEmpenho.numero, empenhoItemBalances));
+      return;
+    }
+
+    if (!isPortalEmpenhoItemsError) {
+      setItems([
+        {
+          description: 'Aquisição de material/serviço conforme especificações',
+          quantity: 1,
+          unit: 'UN',
+          unitPrice: 0,
+          sourceType: 'manual',
+          sortOrder: 0,
+        },
+      ]);
+      setShouldAutoFillEmpenhoItems(false);
+      toast.warning('Nenhum subitem foi encontrado para este empenho. Você pode cadastrar os itens manualmente.');
+    }
+  }, [
+    currentEmpenho,
+    editingRequisicaoId,
+    empenhoItemBalances,
+    isEditing,
+    isLoadingLiquidacoesEmpenho,
+    isLoadingPortalEmpenhoItems,
+    isPortalEmpenhoItemsError,
+    shouldAutoFillEmpenhoItems,
+  ]);
   // Handlers for adding/removing items in form
   const handleAddItem = () => {
+    setShouldAutoFillEmpenhoItems(false);
     setItems((curr) => [
       ...curr,
       {
@@ -182,22 +248,39 @@ export default function RequisicaoCompraPage() {
         quantity: 1,
         unit: 'UN',
         unitPrice: 0,
+        sourceType: 'manual',
         sortOrder: curr.length,
       },
     ]);
   };
 
   const handleUpdateItem = (index: number, patch: Partial<typeof items[0]>) => {
+    setShouldAutoFillEmpenhoItems(false);
     setItems((curr) => curr.map((item, idx) => (idx === index ? { ...item, ...patch } : item)));
   };
 
   const handleRemoveItem = (index: number) => {
+    setShouldAutoFillEmpenhoItems(false);
     setItems((curr) => curr.filter((_, idx) => idx !== index).map((item, idx) => ({ ...item, sortOrder: idx })));
   };
 
   const requisicaoTotal = useMemo(() => {
     return items.reduce((acc, item) => acc + item.quantity * item.unitPrice, 0);
   }, [items]);
+
+  const itemBalanceViolations = useMemo(() => {
+    return items
+      .map((item, index) => {
+        const available = getRequisicaoItemAvailableBalance(item, empenhoItemBalances);
+        const requested = item.quantity * item.unitPrice;
+        return available !== null && requested > available
+          ? { index, description: item.description, requested, available }
+          : null;
+      })
+      .filter((item): item is { index: number; description: string; requested: number; available: number } => Boolean(item));
+  }, [empenhoItemBalances, items]);
+
+  const canSubmitForReview = Boolean(currentEmpenho) && requisicaoTotal <= (empenhoBalance || 0) && itemBalanceViolations.length === 0;
 
   // Start creating new Requisição
   const handleNewRequisicao = () => {
@@ -207,15 +290,8 @@ export default function RequisicaoCompraPage() {
     setSelectedContratoId('none');
     setSelectedEmpenhoId('none');
     setNotes('');
-    setItems([
-      {
-        description: 'Aquisição de material/serviço conforme especificações',
-        quantity: 1,
-        unit: 'UN',
-        unitPrice: 0,
-        sortOrder: 0,
-      },
-    ]);
+    setItems([]);
+    setShouldAutoFillEmpenhoItems(true);
     setIsEditing(true);
   };
 
@@ -233,6 +309,7 @@ export default function RequisicaoCompraPage() {
       setSelectedEmpenhoId(fullRequisicao.empenhoId || 'none');
       setNotes(fullRequisicao.notes || '');
       setItems(fullRequisicao.items);
+      setShouldAutoFillEmpenhoItems(false);
       setIsEditing(true);
       toast.dismiss(loadingToast);
     } catch (err) {
@@ -270,6 +347,11 @@ export default function RequisicaoCompraPage() {
       return;
     }
 
+    if (status === 'review' && itemBalanceViolations.length > 0) {
+      const firstViolation = itemBalanceViolations[0];
+      toast.error(`Saldo insuficiente no item ${firstViolation.index + 1}. Saldo do item: ${formatCurrency(firstViolation.available)}.`);
+      return;
+    }
     const payload = {
       title: `Requisição de Compra ${requisicaoNumber}`,
       number: requisicaoNumber,
@@ -559,49 +641,24 @@ export default function RequisicaoCompraPage() {
               </div>
             ) : null}
 
-            {currentContrato ? (
-              <div className="space-y-2">
+            {currentEmpenho ? (
+              <div className="space-y-2 rounded-radius-lg border border-border-default bg-surface-subtle/30 px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-bold text-text-primary">Saldo contratual por item</h3>
-                    <p className="text-xs text-text-muted">Contratado menos faturas pagas ou apropriadas no SIAFI com item vinculado.</p>
+                    <h3 className="text-sm font-bold text-text-primary">Itens do empenho</h3>
+                    <p className="text-xs text-text-muted">
+                      Os subitens vêm da NE. Quando há liquidações no histórico/API, o saldo do item é calculado abatendo essas execuções e as requisições em revisão.
+                    </p>
                   </div>
-                  {isLoadingContratoItems ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : null}
+                  {(isLoadingPortalEmpenhoItems || isLoadingLiquidacoesEmpenho) ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : null}
                 </div>
-                {!isLoadingContratoItems && contratoItemBalances.length > 0 ? (
-                  <div className="overflow-x-auto border-y border-border-default">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Item</TableHead>
-                          <TableHead className="text-right">Contratado</TableHead>
-                          <TableHead className="text-right">Executado</TableHead>
-                          <TableHead className="text-right">Saldo</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {contratoItemBalances.map((item) => (
-                          <TableRow key={item.id}>
-                            <TableCell>
-                              <p className="font-medium">Item {item.number}</p>
-                              <p className="max-w-xl text-xs text-text-muted">{item.description}</p>
-                            </TableCell>
-                            <TableCell className="text-right">{formatCurrency(item.contracted)}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(item.executed)}</TableCell>
-                            <TableCell className="text-right font-bold text-status-success">{formatCurrency(item.available)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                ) : !isLoadingContratoItems ? (
-                  <p className="border-y border-border-default py-3 text-sm text-text-muted">
-                    A API de Contratos não retornou itens vinculados para este contrato.
-                  </p>
+                {isPortalEmpenhoItemsError ? (
+                  <p className="text-sm text-status-warning">Não foi possível carregar os subitens do empenho agora. Cadastre os itens manualmente, se necessário.</p>
+                ) : !isLoadingPortalEmpenhoItems && portalEmpenhoItems.length === 0 ? (
+                  <p className="text-sm text-text-muted">Nenhum subitem foi encontrado para este empenho. O cadastro manual permanece disponível.</p>
                 ) : null}
               </div>
             ) : null}
-
             {/* INTERACTIVE ITEMS TABLE */}
             <div className="space-y-3">
               <div className="flex items-center justify-between border-b border-border-default/50 pb-2">
@@ -617,10 +674,11 @@ export default function RequisicaoCompraPage() {
                   <TableHeader>
                     <TableRow className="bg-surface-subtle/50">
                       <TableHead style={{ width: '4%' }} className="text-center">#</TableHead>
-                      <TableHead style={{ width: '50%' }}>Descrição do Item / Serviço</TableHead>
+                      <TableHead style={{ width: '38%' }}>Descrição do Item / Serviço</TableHead>
                       <TableHead style={{ width: '10%' }} className="text-center">Und</TableHead>
                       <TableHead style={{ width: '10%' }} className="text-right">Qtd</TableHead>
                       <TableHead style={{ width: '13%' }} className="text-right">Valor Unitário</TableHead>
+                      <TableHead style={{ width: '12%' }} className="text-right">Saldo do Item</TableHead>
                       <TableHead style={{ width: '10%' }} className="text-right">Subtotal</TableHead>
                       <TableHead style={{ width: '3%' }} className="text-center"></TableHead>
                     </TableRow>
@@ -628,63 +686,84 @@ export default function RequisicaoCompraPage() {
                   <TableBody>
                     {items.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center text-text-muted py-6">
+                        <TableCell colSpan={8} className="text-center text-text-muted py-6">
                           Nenhum item adicionado. Clique em "Adicionar Item" para começar.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      items.map((item, index) => (
-                        <TableRow key={index}>
-                          <TableCell className="text-center font-bold text-text-muted">{index + 1}</TableCell>
-                          <TableCell>
-                            <Input
-                              value={item.description}
-                              onChange={(e) => handleUpdateItem(index, { description: e.target.value })}
-                              placeholder="Ex: Material ou serviço específico"
-                              className="h-9"
-                            />
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Input
-                              value={item.unit}
-                              onChange={(e) => handleUpdateItem(index, { unit: e.target.value.toUpperCase() })}
-                              placeholder="UN"
-                              className="h-9 text-center"
-                            />
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Input
-                              type="number"
-                              min="0"
-                              step="any"
-                              value={item.quantity}
-                              onChange={(e) => handleUpdateItem(index, { quantity: Number(e.target.value) })}
-                              className="h-9 text-right"
-                            />
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Input
-                              type="number"
-                              min="0"
-                              step="any"
-                              value={item.unitPrice}
-                              onChange={(e) => handleUpdateItem(index, { unitPrice: Number(e.target.value) })}
-                              className="h-9 text-right"
-                            />
-                          </TableCell>
-                          <TableCell className="text-right font-mono font-bold text-text-primary leading-9">
-                            {formatCurrency(item.quantity * item.unitPrice)}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleRemoveItem(index)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
+                      items.map((item, index) => {
+                        const itemAvailableBalance = getRequisicaoItemAvailableBalance(item, empenhoItemBalances);
+                        const itemSubtotal = item.quantity * item.unitPrice;
+                        const isGeneratedItem = item.sourceType === 'portal_transparencia_empenho_item';
+                        const hasItemBalanceViolation = itemAvailableBalance !== null && itemSubtotal > itemAvailableBalance;
+
+                        return (
+                          <TableRow key={index} className={hasItemBalanceViolation ? 'bg-status-danger/5' : undefined}>
+                            <TableCell className="text-center font-bold text-text-muted">{index + 1}</TableCell>
+                            <TableCell>
+                              <div className="space-y-1">
+                                <Input
+                                  value={item.description}
+                                  onChange={(e) => handleUpdateItem(index, { description: e.target.value })}
+                                  placeholder="Ex: Material ou serviço específico"
+                                  className="h-9"
+                                  disabled={isGeneratedItem}
+                                />
+                                {item.sourceReference ? (
+                                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-text-muted">
+                                    <Badge variant="outline" className="text-[10px]">Subitem da NE</Badge>
+                                    <span>{item.sourceReference}</span>
+                                  </div>
+                                ) : null}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Input
+                                value={item.unit}
+                                onChange={(e) => handleUpdateItem(index, { unit: e.target.value.toUpperCase() })}
+                                placeholder="UN"
+                                className="h-9 text-center"
+                                disabled={isGeneratedItem}
+                              />
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Input
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={item.quantity}
+                                onChange={(e) => handleUpdateItem(index, { quantity: Number(e.target.value) })}
+                                className="h-9 text-right"
+                              />
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Input
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={item.unitPrice}
+                                onChange={(e) => handleUpdateItem(index, { unitPrice: Number(e.target.value) })}
+                                className="h-9 text-right"
+                                disabled={isGeneratedItem}
+                              />
+                            </TableCell>
+                            <TableCell className={`text-right font-mono text-xs font-bold leading-9 ${hasItemBalanceViolation ? 'text-status-danger' : 'text-status-success'}`}>
+                              {itemAvailableBalance !== null ? formatCurrency(itemAvailableBalance) : '-'}
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-bold text-text-primary leading-9">
+                              {formatCurrency(itemSubtotal)}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleRemoveItem(index)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
                     <TableRow className="bg-primary/[0.02] hover:bg-primary/[0.02] border-t border-border-default">
-                      <TableCell colSpan={5} className="text-right font-ui text-sm font-bold text-text-primary">
+                      <TableCell colSpan={6} className="text-right font-ui text-sm font-bold text-text-primary">
                         Total Geral da Requisição:
                       </TableCell>
                       <TableCell className="text-right font-mono text-base font-black text-primary" colSpan={2}>
@@ -712,7 +791,7 @@ export default function RequisicaoCompraPage() {
                 <Button
                   type="button"
                   className="bg-primary hover:bg-primary/95 text-primary-foreground"
-                  disabled={!currentEmpenho || requisicaoTotal > (empenhoBalance || 0)}
+                  disabled={!canSubmitForReview}
                   onClick={() => handleSaveRequisicao('review')}
                 >
                   Enviar para Fiscal
@@ -760,96 +839,159 @@ export default function RequisicaoCompraPage() {
               )}
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {requisicoes.map((requisicao) => {
-                const statusInfo = STATUS_META[requisicao.status] || { label: requisicao.status, className: '' };
-                const isCreator = requisicao.createdBy === user?.id;
+            <div className="overflow-hidden rounded-radius-lg border border-border-default bg-surface-card shadow-soft">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-surface-subtle/50">
+                    <TableHead>Situação</TableHead>
+                    <TableHead>Requisição</TableHead>
+                    <TableHead>Criado por</TableHead>
+                    <TableHead>Referências</TableHead>
+                    <TableHead>Atualização</TableHead>
+                    <TableHead>Observações</TableHead>
+                    <TableHead className="text-right pr-6">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {requisicoes.map((requisicao) => {
+                    const statusInfo = STATUS_META[requisicao.status] || { label: requisicao.status, className: '' };
+                    const isCreator = requisicao.createdBy === user?.id;
 
-                return (
-                  <Card key={requisicao.id} className="border-border-default bg-surface-card shadow-soft hover:shadow-card hover:-translate-y-[1px] transition-all duration-200 flex flex-col justify-between">
-                    <CardHeader className="pb-3 gap-2">
-                      <div className="flex justify-between items-start">
-                        <Badge variant="outline" className={`font-ui text-xs font-bold ${statusInfo.className}`}>
-                          {statusInfo.label}
-                        </Badge>
-                        <span className="font-ui text-[10px] text-text-muted">
+                    return (
+                      <TableRow key={requisicao.id} className="hover:bg-surface-hover/20">
+                        <TableCell className="align-top">
+                          <Badge variant="outline" className={`font-ui text-xs font-bold ${statusInfo.className}`}>
+                            {statusInfo.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="align-top">
+                          <div className="font-ui font-bold text-text-primary">{requisicao.number}</div>
+                          {requisicao.title && (
+                            <div className="mt-1 max-w-[18rem] truncate text-xs text-text-muted" title={requisicao.title}>
+                              {requisicao.title}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="align-top text-xs text-text-secondary">
+                          <span className="font-semibold text-text-primary">{requisicao.createdByEmail}</span>
+                        </TableCell>
+                        <TableCell className="align-top">
+                          <div className="space-y-1 text-xs text-text-secondary">
+                            {requisicao.contratoNumero && (
+                              <div className="flex gap-1.5 items-center">
+                                <ShieldCheck className="h-3.5 w-3.5 text-primary shrink-0" />
+                                <span>Contrato: <span className="font-bold text-text-primary">{requisicao.contratoNumero}</span></span>
+                              </div>
+                            )}
+                            {requisicao.empenhoNumero && (
+                              <div className="flex gap-1.5 items-center">
+                                <Coins className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                <span>Empenho: <span className="font-bold text-text-primary">{requisicao.empenhoNumero}</span></span>
+                              </div>
+                            )}
+                            {requisicao.processNumber && (
+                              <div className="flex gap-1.5 items-center">
+                                <FileText className="h-3.5 w-3.5 text-sebrae-blue shrink-0" />
+                                <span>Processo: <span className="font-bold text-text-primary">{requisicao.processNumber}</span></span>
+                              </div>
+                            )}
+                            {!requisicao.contratoNumero && !requisicao.empenhoNumero && !requisicao.processNumber && (
+                              <span className="text-text-muted">-</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="align-top text-xs text-text-muted">
                           {new Date(requisicao.updatedAt).toLocaleDateString('pt-BR')}
-                        </span>
-                      </div>
-                      <div>
-                        <CardTitle className="font-ui text-lg tracking-tight text-text-primary">{requisicao.number}</CardTitle>
-                        <CardDescription className="text-text-muted mt-1 leading-normal font-ui text-xs">
-                          Criado por: <span className="font-bold text-text-primary">{requisicao.createdByEmail}</span>
-                        </CardDescription>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4 pt-0">
-                      <div className="border-t border-border-default/50 pt-3 space-y-2 text-xs font-ui text-text-secondary leading-relaxed">
-                        {requisicao.contratoNumero && (
-                          <div className="flex gap-1.5 items-start">
-                            <ShieldCheck className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                            <span>Contrato: <span className="font-bold text-text-primary">{requisicao.contratoNumero}</span></span>
-                          </div>
-                        )}
-                        {requisicao.empenhoNumero && (
-                          <div className="flex gap-1.5 items-start">
-                            <Coins className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                            <span>Empenho: <span className="font-bold text-text-primary">{requisicao.empenhoNumero}</span></span>
-                          </div>
-                        )}
-                        {requisicao.processNumber && (
-                          <div className="flex gap-1.5 items-start">
-                            <FileText className="h-4 w-4 text-sebrae-blue shrink-0 mt-0.5" />
-                            <span>Processo: <span className="font-bold text-text-primary">{requisicao.processNumber}</span></span>
-                          </div>
-                        )}
-                      </div>
-
-                      {requisicao.notes && (
-                        <div className="bg-surface-subtle/50 p-2.5 rounded-radius-md text-xs text-text-secondary border border-border-default/50 line-clamp-2 leading-normal">
-                          {requisicao.notes}
-                        </div>
-                      )}
-
-                      {/* ACTIONS */}
-                      <div className="flex flex-wrap items-center justify-between border-t border-border-default/50 pt-3 gap-2">
-                        <div className="flex gap-1">
-                          <Button type="button" variant="outline" size="sm" title="Imprimir Requisição em PDF" onClick={() => void handlePrintPDF(requisicao)} className="h-9 px-2">
-                            <Printer className="h-4 w-4" />
-                          </Button>
-                          {isCreator && (requisicao.status === 'draft' || requisicao.status === 'rejected') && (
-                            <>
-                              <Button type="button" variant="outline" size="sm" onClick={() => handleEditRequisicao(requisicao)} className="h-9 px-3">
-                                Editar
-                              </Button>
-                              <Button type="button" variant="ghost" size="sm" onClick={() => handleDeleteRequisicao(requisicao.id)} className="h-9 px-2 text-destructive hover:bg-destructive/10">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </>
+                        </TableCell>
+                        <TableCell className="align-top text-xs text-text-secondary">
+                          {requisicao.notes ? (
+                            <span className="line-clamp-2 block max-w-[18rem]" title={requisicao.notes}>{requisicao.notes}</span>
+                          ) : (
+                            <span className="text-text-muted">-</span>
                           )}
-                          {!isCreator && isFiscalOrManager && (requisicao.status === 'review') && (
-                            <Button type="button" variant="outline" size="sm" onClick={() => handleEditRequisicao(requisicao)} className="h-9 px-3">
-                              Visualizar e Editar
+                        </TableCell>
+                        <TableCell className="align-top text-right pr-6">
+                          <div className="flex flex-wrap justify-end gap-1.5">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              title="Imprimir Requisição em PDF"
+                              aria-label={`Imprimir requisição ${requisicao.number}`}
+                              onClick={() => void handlePrintPDF(requisicao)}
+                              className="h-8 px-2"
+                            >
+                              <Printer className="h-4 w-4" />
                             </Button>
-                          )}
-                        </div>
-
-                        {/* Fiscal action badges */}
-                        {isFiscalOrManager && requisicao.status === 'review' && (
-                          <div className="flex gap-1">
-                            <Button type="button" size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white h-9 px-2" title="Aprovar Requisição" onClick={() => handleChangeStatus(requisicao.id, 'approved')}>
-                              <Check className="h-4 w-4" />
-                            </Button>
-                            <Button type="button" size="sm" className="bg-rose-600 hover:bg-rose-700 text-white h-9 px-2" title="Rejeitar Requisição" onClick={() => handleChangeStatus(requisicao.id, 'rejected')}>
-                              <X className="h-4 w-4" />
-                            </Button>
+                            {isCreator && (requisicao.status === 'draft' || requisicao.status === 'rejected') && (
+                              <>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  title="Editar Requisição"
+                                  aria-label={`Editar requisição ${requisicao.number}`}
+                                  onClick={() => handleEditRequisicao(requisicao)}
+                                  className="h-8 px-2"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  aria-label={`Excluir requisição ${requisicao.number}`}
+                                  onClick={() => handleDeleteRequisicao(requisicao.id)}
+                                  className="h-8 px-2 text-destructive hover:bg-destructive/10"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </>
+                            )}
+                            {!isCreator && isFiscalOrManager && requisicao.status === 'review' && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                title="Visualizar e Editar"
+                                aria-label={`Visualizar e editar requisição ${requisicao.number}`}
+                                onClick={() => handleEditRequisicao(requisicao)}
+                                className="h-8 px-2"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {isFiscalOrManager && requisicao.status === 'review' && (
+                              <>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-2"
+                                  title="Aprovar Requisição"
+                                  aria-label={`Aprovar requisição ${requisicao.number}`}
+                                  onClick={() => handleChangeStatus(requisicao.id, 'approved')}
+                                >
+                                  <Check className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="bg-rose-600 hover:bg-rose-700 text-white h-8 px-2"
+                                  title="Rejeitar Requisição"
+                                  aria-label={`Rejeitar requisição ${requisicao.number}`}
+                                  onClick={() => handleChangeStatus(requisicao.id, 'rejected')}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
           )}
         </div>

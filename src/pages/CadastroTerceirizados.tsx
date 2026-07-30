@@ -5,6 +5,7 @@ import { normalizeMatricula, permissionMatchesTerceirizado } from '@/lib/terceir
 import type { Terceirizado, TerceirizadoPermission } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -51,6 +52,7 @@ export default function CadastroTerceirizadosPage() {
   const [selectedPermissionEmpenhoIds, setSelectedPermissionEmpenhoIds] = useState<string[]>([]);
   const [isPermissionEmpenhoPickerOpen, setIsPermissionEmpenhoPickerOpen] = useState(false);
   const [isLinking, setIsLinking] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   // Load Data
   const loadData = async () => {
@@ -166,6 +168,25 @@ export default function CadastroTerceirizadosPage() {
 
   const handleEditViewOpenChange = (open: boolean) => {
     setIsPermissionsOpen(open);
+    if (!open) {
+      handleCancelEdit();
+    }
+  };
+
+  const handleOpenCreateDialog = () => {
+    setEditingTerceirizadoId(undefined);
+    setSelectedTerceirizado(null);
+    setName('');
+    setMatricula('');
+    setTipo('refeitorio');
+    setPermissionTargetId('');
+    setSelectedPermissionEmpenhoIds([]);
+    setIsPermissionEmpenhoPickerOpen(false);
+    setIsCreateDialogOpen(true);
+  };
+
+  const handleCreateDialogOpenChange = (open: boolean) => {
+    setIsCreateDialogOpen(open);
     if (!open) {
       handleCancelEdit();
     }
@@ -328,18 +349,27 @@ export default function CadastroTerceirizadosPage() {
 
   return (
     <div className="space-y-6 p-6">
-      {/* Top Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-text-primary font-ui flex items-center gap-2">
-            <Users className="h-6 w-6 text-primary" />
-            Cadastro de Terceirizados
-          </h1>
-          <p className="text-sm text-text-muted mt-1">
-            Gerencie prestadores terceirizados e configure seus vínculos de acesso a contratos e empenhos.
-          </p>
+      {!isPermissionsOpen && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-text-primary font-ui flex items-center gap-2">
+              <Users className="h-6 w-6 text-primary" />
+              Cadastro de Terceirizados
+            </h1>
+            <p className="text-sm text-text-muted mt-1">
+              Gerencie prestadores terceirizados e configure seus vínculos de acesso a contratos e empenhos.
+            </p>
+          </div>
+          <Button
+            type="button"
+            onClick={handleOpenCreateDialog}
+            className="bg-primary hover:bg-primary/95 text-primary-foreground gap-1.5 self-start sm:self-auto"
+          >
+            <UserPlus className="h-4 w-4" />
+            Cadastrar Terceirizado
+          </Button>
         </div>
-      </div>
+      )}
 
       {isPermissionsOpen && selectedTerceirizado ? (
         <div className="space-y-6">
@@ -619,176 +649,170 @@ export default function CadastroTerceirizadosPage() {
           </Card>
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-3">
-        {/* Form Card */}
-        <Card className="border-border-default shadow-soft md:col-span-1 h-fit">
-          <CardHeader>
-            <CardTitle className="font-ui text-base font-bold text-text-primary flex items-center gap-2">
-              <UserPlus className="h-5 w-5 text-primary" />
-              {editingTerceirizadoId ? 'Editar Terceirizado' : 'Novo Terceirizado'}
-            </CardTitle>
-            <CardDescription>
-              {editingTerceirizadoId 
-                ? 'Atualize os dados e o tipo do prestador.'
-                : 'Cadastre um novo prestador para configurar seu perfil.'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSaveTerceirizado} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="tc-name">Nome Completo</Label>
-                <Input
-                  id="tc-name"
-                  placeholder="Nome do terceirizado"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  disabled={isSaving}
-                  required
-                />
-              </div>
+        <div className="space-y-6">
+          <Dialog open={isCreateDialogOpen} onOpenChange={handleCreateDialogOpenChange}>
+            <DialogContent className="sm:max-w-[520px]">
+              <DialogHeader>
+                <DialogTitle className="font-ui text-base font-bold text-text-primary flex items-center gap-2">
+                  <UserPlus className="h-5 w-5 text-primary" />
+                  Novo Terceirizado
+                </DialogTitle>
+                <DialogDescription>
+                  Cadastre um novo prestador para configurar seu perfil.
+                </DialogDescription>
+              </DialogHeader>
 
-              <div className="space-y-2">
-                <Label htmlFor="tc-matricula">Matricula</Label>
-                <Input
-                  id="tc-matricula"
-                  inputMode="numeric"
-                  placeholder="Matricula SUAP"
-                  value={matricula}
-                  onChange={(e) => setMatricula(e.target.value)}
-                  disabled={isSaving}
-                  required
-                />
-                <p className="text-[10px] text-text-muted">
-                  A matricula deve corresponder ao login retornado pelo SUAP.
-                </p>
-              </div>
+              <form onSubmit={handleSaveTerceirizado} className="space-y-4 pt-2">
+                <div className="space-y-2">
+                  <Label htmlFor="create-tc-name">Nome Completo</Label>
+                  <Input
+                    id="create-tc-name"
+                    placeholder="Nome do terceirizado"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    disabled={isSaving}
+                    required
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="tc-type">Tipo de Prestação</Label>
-                <Select
-                  value={tipo}
-                  onValueChange={(val) => setTipo(val as 'limpeza_manutencao' | 'refeitorio')}
-                  disabled={isSaving}
-                >
-                  <SelectTrigger id="tc-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="refeitorio">Refeitório (Acesso liberado)</SelectItem>
-                    <SelectItem value="limpeza_manutencao">Limpeza e Manutenção (Sem acesso)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="create-tc-matricula">Matrícula</Label>
+                  <Input
+                    id="create-tc-matricula"
+                    inputMode="numeric"
+                    placeholder="Matrícula SUAP"
+                    value={matricula}
+                    onChange={(e) => setMatricula(e.target.value)}
+                    disabled={isSaving}
+                    required
+                  />
+                  <p className="text-[10px] text-text-muted">
+                    A matrícula deve corresponder ao login retornado pelo SUAP.
+                  </p>
+                </div>
 
-              <div className="flex gap-2 pt-2 justify-end">
-                {editingTerceirizadoId && (
-                  <Button type="button" variant="ghost" onClick={handleCancelEdit} disabled={isSaving}>
+                <div className="space-y-2">
+                  <Label htmlFor="create-tc-type">Tipo de Prestação</Label>
+                  <Select
+                    value={tipo}
+                    onValueChange={(val) => setTipo(val as 'limpeza_manutencao' | 'refeitorio')}
+                    disabled={isSaving}
+                  >
+                    <SelectTrigger id="create-tc-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="refeitorio">Refeitório (Acesso liberado)</SelectItem>
+                      <SelectItem value="limpeza_manutencao">Limpeza e Manutenção (Sem acesso)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button type="button" variant="ghost" onClick={() => handleCreateDialogOpenChange(false)} disabled={isSaving}>
                     Cancelar
                   </Button>
-                )}
-                <Button type="submit" disabled={isSaving} className="bg-primary hover:bg-primary/95 text-primary-foreground">
-                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
-                  {editingTerceirizadoId ? 'Salvar Alterações' : 'Cadastrar Terceirizado'}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+                  <Button type="submit" disabled={isSaving} className="bg-primary hover:bg-primary/95 text-primary-foreground">
+                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+                    Cadastrar Terceirizado
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
 
-        {/* List Card */}
-        <Card className="border-border-default shadow-soft md:col-span-2">
-          <CardHeader>
-            <CardTitle className="font-ui text-base font-bold text-text-primary">
-              Prestadores Cadastrados ({terceirizados.length})
-            </CardTitle>
-            <CardDescription>
-              Lista de todos os terceirizados. Fiscais e Diretores podem gerenciar e definir permissões de escopo.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            {isLoading ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-sm text-text-secondary">Carregando terceirizados...</p>
-              </div>
-            ) : terceirizados.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-3 bg-primary/[0.01] border-t border-dashed">
-                <Users className="h-10 w-10 text-primary opacity-30" />
-                <h3 className="font-ui text-sm font-bold text-text-primary">Nenhum terceirizado cadastrado</h3>
-                <p className="text-xs text-text-muted text-center max-w-xs">
-                  Cadastre o primeiro prestador terceirizado no formulário ao lado.
-                </p>
-              </div>
-            ) : (
-              <div className="border-t overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-surface-subtle/30">
-                      <TableHead>Nome</TableHead>
-                      <TableHead>Matricula</TableHead>
-                      <TableHead>Tipo / Acesso</TableHead>
-                      <TableHead>Vínculos Ativos</TableHead>
-                      <TableHead className="text-right pr-6">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {terceirizados.map((tc) => {
-                      const tcPermsCount = permissions.filter((p) => permissionMatchesTerceirizado(p, tc)).length;
+          <Card className="border-border-default shadow-soft">
+            <CardHeader>
+              <CardTitle className="font-ui text-base font-bold text-text-primary">
+                Prestadores Cadastrados ({terceirizados.length})
+              </CardTitle>
+              <CardDescription className="mt-1">
+                Lista de todos os terceirizados. Fiscais e Diretores podem gerenciar e definir permissões de escopo.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="text-sm text-text-secondary">Carregando terceirizados...</p>
+                </div>
+              ) : terceirizados.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-3 bg-primary/[0.01] border-t border-dashed">
+                  <Users className="h-10 w-10 text-primary opacity-30" />
+                  <h3 className="font-ui text-sm font-bold text-text-primary">Nenhum terceirizado cadastrado</h3>
+                  <p className="text-xs text-text-muted text-center max-w-xs">
+                    Clique em Cadastrar Terceirizado no topo para adicionar o primeiro prestador.
+                  </p>
+                </div>
+              ) : (
+                <div className="border-t overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-surface-subtle/30">
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Matrícula</TableHead>
+                        <TableHead>Tipo / Acesso</TableHead>
+                        <TableHead>Vínculos Ativos</TableHead>
+                        <TableHead className="text-right pr-6">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {terceirizados.map((tc) => {
+                        const tcPermsCount = permissions.filter((p) => permissionMatchesTerceirizado(p, tc)).length;
 
-                      return (
-                        <TableRow key={tc.id} className="hover:bg-surface-hover/20">
-                          <TableCell className="font-medium text-text-primary">{tc.name}</TableCell>
-                          <TableCell className="text-text-muted font-mono">{tc.matricula || '-'}</TableCell>
-                          <TableCell>
-                            {tc.tipo === 'refeitorio' ? (
-                              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 font-bold hover:bg-emerald-100">
-                                Refeitório
+                        return (
+                          <TableRow key={tc.id} className="hover:bg-surface-hover/20">
+                            <TableCell className="font-medium text-text-primary">{tc.name}</TableCell>
+                            <TableCell className="text-text-muted font-mono">{tc.matricula || '-'}</TableCell>
+                            <TableCell>
+                              {tc.tipo === 'refeitorio' ? (
+                                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 font-bold hover:bg-emerald-100">
+                                  Refeitório
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-100 flex items-center gap-1 w-fit">
+                                  <Lock className="h-3 w-3 shrink-0" />
+                                  Limpeza & Manut.
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="font-ui font-bold">
+                                {tcPermsCount} vínculo(s)
                               </Badge>
-                            ) : (
-                              <Badge variant="outline" className="bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-100 flex items-center gap-1 w-fit">
-                                <Lock className="h-3 w-3 shrink-0" />
-                                Limpeza & Manut.
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="font-ui font-bold">
-                              {tcPermsCount} vínculo(s)
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right pr-6 space-x-1.5">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              title="Editar terceirizado"
-                              onClick={() => handleStartEdit(tc)}
-                              className="h-8 w-8 p-0"
-                            >
-                              <Edit className="h-4 w-4 text-text-secondary" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              title="Excluir terceirizado"
-                              onClick={() => void handleDeleteTerceirizado(tc.id)}
-                              className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
+                            </TableCell>
+                            <TableCell className="text-right pr-6 space-x-1.5">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                title="Editar terceirizado"
+                                onClick={() => handleStartEdit(tc)}
+                                className="h-8 w-8 p-0"
+                              >
+                                <Edit className="h-4 w-4 text-text-secondary" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                title="Excluir terceirizado"
+                                onClick={() => void handleDeleteTerceirizado(tc.id)}
+                                className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   );

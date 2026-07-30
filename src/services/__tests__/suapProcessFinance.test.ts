@@ -169,6 +169,25 @@ describe('buildSuapProcessFinanceSummary', () => {
     expect(summary.totais).toEqual({ empenhado: 500, saldo: 200 });
   });
 
+  it('vincula liquidacoes cujo cache usa o numero longo do empenho da API', () => {
+    const summary = buildSuapProcessFinanceSummary({
+      processo: processo({ contrato: '40/2026' }),
+      empenhos: [],
+      contratos: [contrato()],
+      contratosEmpenhos: [],
+      contratosApi: [contratoApi()],
+      contratosApiEmpenhos: [empenhoApi({ numero: '2026NE000099' })],
+      liquidacoesPorEmpenho: new Map([[
+        '158366264352026NE000099',
+        [liquidacao({ empenho_numero: '158366264352026NE000099' })],
+      ]]),
+    });
+
+    expect(summary.empenhos[0].liquidacoes).toEqual([
+      expect.objectContaining({ numero: 'NF 123', valor: 280 }),
+    ]);
+  });
+
   it('quando ha contrato, limita empenhos ao contrato e preserva liquidacoes detalhadas', () => {
     const cache = new Map([[
       '2026NE000099',

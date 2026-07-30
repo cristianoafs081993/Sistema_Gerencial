@@ -467,7 +467,7 @@ Regras:
 ### `requisicao_compra_itens`
 
 Finalidade:
-- Armazenar os itens detalhados de cada Requisição de Compra.
+- Armazenar os itens detalhados de cada Requisicao de Compra.
 
 Campos-chave:
 - `id`
@@ -476,7 +476,14 @@ Campos-chave:
 - `quantity`
 - `unit`
 - `unit_price`
+- `source_type` (`manual`, `portal_transparencia_empenho_item` ou `contrato_api_item`)
+- `source_item_key`
+- `source_reference`
+- `source_snapshot`
 
+Regras:
+- Itens originados de empenho preservam a chave do subitem da NE para recalcular reservas por item em requisicoes em revisao.
+- Itens manuais permanecem validos para empenhos sem subitens disponiveis no cache/API.
 ### `terceirizados`
 
 Finalidade:

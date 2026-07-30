@@ -464,6 +464,10 @@ export interface RequisicaoCompraItem {
   quantity: number;
   unit: string;
   unitPrice: number;
+  sourceType?: 'manual' | 'portal_transparencia_empenho_item' | 'contrato_api_item';
+  sourceItemKey?: string;
+  sourceReference?: string;
+  sourceSnapshot?: Record<string, unknown>;
   sortOrder: number;
   createdAt: Date;
   updatedAt: Date;
@@ -489,4 +493,3 @@ export interface RequisicaoCompra {
 export interface RequisicaoCompraRecord extends RequisicaoCompra {
   items: RequisicaoCompraItem[];
 }
-

@@ -3,6 +3,7 @@
   const MODAL_ID = 'siages-suap-dispatch-modal';
   const IFRAME_ID = 'siages-suap-dispatch-frame';
   const FINANCE_PANEL_ID = 'siages-suap-finance-panel';
+  const FINANCE_WIDGET_ID = 'siages-suap-finance-widget';
   const FINANCE_FRAME_ID = 'siages-suap-finance-frame';
   const SIAGES_APP_ORIGIN_STORAGE_KEY = 'siages-app-origin';
   const DEFAULT_SIAGES_APP_ORIGIN = 'https://sistema-gerencial-gamma.vercel.app';
@@ -186,6 +187,22 @@
     return { host: document.body, mode: 'fixed' };
   }
 
+  function ensureFinanceWidget() {
+    const existing = document.getElementById(FINANCE_WIDGET_ID);
+    if (existing) return existing;
+
+    const widget = document.createElement('aside');
+    widget.id = FINANCE_WIDGET_ID;
+    widget.setAttribute('aria-label', 'Resumo financeiro do SIAGES e geracao de documento');
+    Object.assign(widget.style, {
+      position: 'fixed', right: '20px', bottom: '20px', zIndex: '2147483646',
+      width: 'min(360px, calc(100vw - 40px))', maxHeight: 'calc(100vh - 40px)',
+      display: 'flex', flexDirection: 'column', gap: '10px', boxSizing: 'border-box',
+    });
+    document.body.appendChild(widget);
+    return widget;
+  }
+
   function applyFinancePanelStyle(panel, placement) {
     const colors = getThemeColors();
     const integrated = placement.mode !== 'fixed';
@@ -214,13 +231,17 @@
   }
 
   function ensureFinancePanel() {
-    const placement = findFinancePanelHost();
+    const placement = { host: ensureFinanceWidget(), mode: 'widget' };
     const existing = document.getElementById(FINANCE_PANEL_ID);
     const panel = existing || document.createElement('section');
     panel.id = FINANCE_PANEL_ID;
     panel.setAttribute('aria-live', 'polite');
     applyFinancePanelStyle(panel, placement);
-    if (panel.parentElement !== placement.host) placement.host.appendChild(panel);
+    if (panel.parentElement !== placement.host) {
+      const button = document.getElementById(BUTTON_ID);
+      if (button?.parentElement === placement.host) placement.host.insertBefore(panel, button);
+      else placement.host.appendChild(panel);
+    }
     return panel;
   }
   function removeFinancePanel() {
@@ -495,17 +516,18 @@
   function installButton() {
     if (!getProcessId() || document.getElementById(BUTTON_ID)) return;
     const button = document.createElement('button');
+    const widget = ensureFinanceWidget();
     button.id = BUTTON_ID;
     button.type = 'button';
     button.textContent = 'Gerar documento';
     button.setAttribute('aria-label', 'Gerar despacho de liquidacao com o SIAGES');
     Object.assign(button.style, {
-      position: 'fixed', right: '20px', bottom: '20px', zIndex: '2147483646', border: '0', borderRadius: '7px',
+      width: '100%', border: '0', borderRadius: '7px',
       padding: '10px 14px', background: '#047857', color: '#fff', boxShadow: '0 8px 20px rgba(4, 120, 87, 0.28)',
       cursor: 'pointer', fontFamily: 'Arial, sans-serif', fontSize: '14px', fontWeight: '600',
     });
     button.addEventListener('click', openModal);
-    document.body.appendChild(button);
+    widget.appendChild(button);
   }
 
   function installFinancePanel() {
