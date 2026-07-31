@@ -464,6 +464,8 @@ export interface RequisicaoCompraItem {
   quantity: number;
   unit: string;
   unitPrice: number;
+  empenhoId?: string;
+  empenhoNumero?: string;
   sourceType?: 'manual' | 'portal_transparencia_empenho_item' | 'contrato_api_item';
   sourceItemKey?: string;
   sourceReference?: string;
@@ -471,6 +473,14 @@ export interface RequisicaoCompraItem {
   sortOrder: number;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface RequisicaoCompraEmpenho {
+  id?: string;
+  requisicaoCompraId?: string;
+  empenhoId: string;
+  empenhoNumero: string;
+  sortOrder: number;
 }
 
 export interface RequisicaoCompra {
@@ -482,6 +492,7 @@ export interface RequisicaoCompra {
   contratoNumero?: string;
   empenhoId?: string;
   empenhoNumero?: string;
+  empenhos?: RequisicaoCompraEmpenho[];
   notes?: string;
   status: 'draft' | 'review' | 'approved' | 'rejected';
   createdBy: string;

@@ -564,7 +564,7 @@ Uso:
 - atualiza o cache de subitens do Portal da Transparencia por empenho para o modal de detalhes do empenho
 - aceita empenhos especificos enviados pelo frontend
 - em modo `refreshDue`, reprocessa entradas vencidas do cache
-- em modo `refreshLinkedRequisicaoEmpenhos`, descobre empenhos vinculados diretamente a terceirizados e empenhos de requisicoes recentes em `draft`/`review`, pre-aquecendo o cache para `/requisicao-compra`
+- em modo `refreshLinkedRequisicaoEmpenhos`, descobre empenhos vinculados diretamente a terceirizados e empenhos de requisicoes recentes em `draft`/`review`; para requisicoes usa `requisicao_compra_empenhos` e mantem fallback pelos campos legados `requisicoes_compra.empenho_id/empenho_numero`, pre-aquecendo o cache para `/requisicao-compra`
 - em modo `readCacheOnly` com `returnRows`, devolve as linhas ja materializadas no cache sem consultar novamente o Portal
 - consulta `/api-de-dados/despesas/itens-de-empenho` usando `codigoDocumento = 158366 + 26435 + numero do empenho`
 - salva dados em `portal_transparencia_empenho_itens_cache_status` e `portal_transparencia_empenho_itens_cache`

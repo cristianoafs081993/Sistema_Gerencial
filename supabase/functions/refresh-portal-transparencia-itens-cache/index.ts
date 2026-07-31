@@ -331,6 +331,21 @@ async function getLinkedRequisicaoEmpenhos(supabase: SupabaseClient, limit: numb
     if (empenhoId) empenhoIds.add(empenhoId);
   }
 
+  const { data: requisicaoEmpenhoRows, error: requisicaoEmpenhoError } = await supabase
+    .from('requisicao_compra_empenhos')
+    .select('empenho_id, empenho_numero, requisicoes_compra!inner(status)')
+    .in('requisicoes_compra.status', ['draft', 'review'])
+    .limit(limit * 3);
+  if (requisicaoEmpenhoError) throw requisicaoEmpenhoError;
+
+  for (const row of requisicaoEmpenhoRows ?? []) {
+    const requisicaoEmpenho = row as { empenho_id?: string | null; empenho_numero?: string | null };
+    const empenhoId = String(requisicaoEmpenho.empenho_id ?? '').trim();
+    const empenhoNumero = normalizeEmpenhoNumero(requisicaoEmpenho.empenho_numero);
+    if (empenhoId) empenhoIds.add(empenhoId);
+    if (empenhoNumero) empenhoNumeros.add(empenhoNumero);
+  }
+
   const { data: requisicaoRows, error: requisicaoError } = await supabase
     .from('requisicoes_compra')
     .select('empenho_id, empenho_numero, updated_at')

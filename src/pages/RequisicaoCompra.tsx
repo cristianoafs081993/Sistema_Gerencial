@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Check,
   ClipboardList,
@@ -19,8 +19,10 @@ import { HeaderSubtitle } from '@/components/HeaderParts';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
@@ -32,7 +34,7 @@ import { contratosApiService } from '@/services/contratosApi';
 import { transparenciaService, type PortalTransparenciaItemEmpenho } from '@/services/transparencia';
 import { requisicoesCompraService } from '@/services/requisicoesCompra';
 import type { RequisicaoCompra, RequisicaoCompraItem, RequisicaoCompraRecord } from '@/types';
-import { getEmpenhoAvailableBalance, hasSufficientEmpenhoBalance } from '@/utils/empenhoBalance';
+import { getEmpenhoAvailableBalance } from '@/utils/empenhoBalance';
 import {
   buildEmpenhoItemBalances,
   buildRequisicaoItemsFromEmpenho,
@@ -78,10 +80,11 @@ export default function RequisicaoCompraPage() {
   const [requisicaoNumber, setRequisicaoNumber] = useState('');
   const [processNumber, setProcessNumber] = useState('');
   const [selectedContratoId, setSelectedContratoId] = useState<string>('none');
-  const [selectedEmpenhoId, setSelectedEmpenhoId] = useState<string>('none');
+  const [selectedEmpenhoIds, setSelectedEmpenhoIds] = useState<string[]>([]);
+  const [isEmpenhoPickerOpen, setIsEmpenhoPickerOpen] = useState(false);
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<Omit<RequisicaoCompraItem, 'id' | 'requisicaoCompraId' | 'createdAt' | 'updatedAt'>[]>([]);
-  const [shouldAutoFillEmpenhoItems, setShouldAutoFillEmpenhoItems] = useState(false);
+  const [pendingAutoFillEmpenhoIds, setPendingAutoFillEmpenhoIds] = useState<string[]>([]);
 
   // Queries
   const { data: requisicoes = [], isLoading: isLoadingRequisicoes } = useQuery({
@@ -138,107 +141,189 @@ export default function RequisicaoCompraPage() {
   ]);
 
   useEffect(() => {
-    if (selectedEmpenhoId === 'none') return;
-    if (allowedEmpenhos.some((empenho) => empenho.id === selectedEmpenhoId)) return;
+    const allowedIds = new Set(allowedEmpenhos.map((empenho) => empenho.id));
+    setSelectedEmpenhoIds((current) => {
+      const next = current.filter((id) => allowedIds.has(id));
+      if (next.length === current.length) return current;
 
-    setSelectedEmpenhoId('none');
-    if (!editingRequisicaoId) {
-      setItems([]);
-      setShouldAutoFillEmpenhoItems(true);
-    }
-  }, [allowedEmpenhos, editingRequisicaoId, selectedEmpenhoId]);
+      if (!editingRequisicaoId) {
+        setItems((currentItems) =>
+          currentItems
+            .filter((item) => item.empenhoId && next.includes(item.empenhoId))
+            .map((item, index) => ({ ...item, sortOrder: index })),
+        );
+      }
+      setPendingAutoFillEmpenhoIds((currentPending) => currentPending.filter((id) => next.includes(id)));
+      return next;
+    });
+  }, [allowedEmpenhos, editingRequisicaoId]);
 
   // Selected details
   const currentContrato = useMemo(() => {
     return contratos.find((c) => c.id === selectedContratoId);
   }, [contratos, selectedContratoId]);
 
-  const currentEmpenho = useMemo(() => {
-    return empenhos.find((e) => e.id === selectedEmpenhoId);
-  }, [empenhos, selectedEmpenhoId]);
-
-  const empenhoBalance = useMemo(
-    () => (currentEmpenho ? getEmpenhoAvailableBalance(currentEmpenho) : null),
-    [currentEmpenho],
+  const selectedEmpenhos = useMemo(
+    () => selectedEmpenhoIds
+      .map((id) => empenhos.find((empenho) => empenho.id === id))
+      .filter((empenho): empenho is NonNullable<typeof empenho> => Boolean(empenho)),
+    [empenhos, selectedEmpenhoIds],
   );
 
-  const {
-    data: portalEmpenhoItems = [],
-    isLoading: isLoadingPortalEmpenhoItems,
-    isError: isPortalEmpenhoItemsError,
-  } = useQuery({
-    queryKey: ['requisicao-portal-itens-empenho', currentEmpenho?.numero],
-    queryFn: () =>
-      currentEmpenho?.numero
-        ? transparenciaService.getItensEmpenhoPortal(currentEmpenho.numero, { includeHistorico: true })
-        : Promise.resolve([] as PortalTransparenciaItemEmpenho[]),
-    enabled: Boolean(currentEmpenho?.numero),
-    retry: false,
-    staleTime: 5 * 60 * 1000,
+  const primaryEmpenho = selectedEmpenhos[0];
+
+  const selectedEmpenhoOptions = useMemo(() => {
+    const selectedIds = new Set(selectedEmpenhoIds);
+    return allowedEmpenhos
+      .filter((empenho) => selectedIds.has(empenho.id))
+      .map((empenho) => ({
+        id: empenho.id,
+        label: `${empenho.numero} - saldo ${formatCurrency(getEmpenhoAvailableBalance(empenho))}`,
+      }));
+  }, [allowedEmpenhos, selectedEmpenhoIds]);
+
+  const portalEmpenhoItemQueries = useQueries({
+    queries: selectedEmpenhos.map((empenho) => ({
+      queryKey: ['requisicao-portal-itens-empenho', empenho.numero],
+      queryFn: () => transparenciaService.getItensEmpenhoPortal(empenho.numero, { includeHistorico: true }),
+      retry: false,
+      staleTime: 5 * 60 * 1000,
+    })),
   });
 
-  const { data: liquidacoesEmpenho = [], isLoading: isLoadingLiquidacoesEmpenho } = useQuery({
-    queryKey: ['requisicao-liquidacoes-api-empenho', currentEmpenho?.numero],
-    queryFn: () =>
-      currentEmpenho?.numero
-        ? contratosApiService.getLiquidacoesPublicasPorEmpenho(currentEmpenho.numero)
-        : Promise.resolve([]),
-    enabled: Boolean(currentEmpenho?.numero),
-    retry: false,
-    staleTime: 60 * 1000,
+  const liquidacoesEmpenhoQueries = useQueries({
+    queries: selectedEmpenhos.map((empenho) => ({
+      queryKey: ['requisicao-liquidacoes-api-empenho', empenho.numero],
+      queryFn: () => contratosApiService.getLiquidacoesPublicasPorEmpenho(empenho.numero),
+      retry: false,
+      staleTime: 60 * 1000,
+    })),
   });
 
-  const { data: reservedReviewItems = {} } = useQuery({
-    queryKey: ['requisicao-review-item-reservations', currentEmpenho?.id, editingRequisicaoId],
-    queryFn: () =>
-      currentEmpenho?.id
-        ? requisicoesCompraService.getReviewItemReservations(currentEmpenho.id, editingRequisicaoId)
-        : Promise.resolve({}),
-    enabled: Boolean(currentEmpenho?.id),
-    retry: false,
+  const reservedReviewItemQueries = useQueries({
+    queries: selectedEmpenhos.map((empenho) => ({
+      queryKey: ['requisicao-review-item-reservations', empenho.id, editingRequisicaoId],
+      queryFn: () => requisicoesCompraService.getReviewItemReservations(empenho.id, editingRequisicaoId),
+      retry: false,
+    })),
   });
 
-  const empenhoItemBalances = useMemo(
-    () => buildEmpenhoItemBalances(currentEmpenho?.numero || '', portalEmpenhoItems, liquidacoesEmpenho, reservedReviewItems),
-    [currentEmpenho?.numero, portalEmpenhoItems, liquidacoesEmpenho, reservedReviewItems],
-  );
+  const empenhoBalanceById = useMemo(() => {
+    return new Map(selectedEmpenhos.map((empenho) => [empenho.id, getEmpenhoAvailableBalance(empenho)]));
+  }, [selectedEmpenhos]);
+
+  const empenhoItemBalancesById = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof buildEmpenhoItemBalances>>();
+    selectedEmpenhos.forEach((empenho, index) => {
+      map.set(
+        empenho.id,
+        buildEmpenhoItemBalances(
+          empenho.numero,
+          (portalEmpenhoItemQueries[index]?.data ?? []) as PortalTransparenciaItemEmpenho[],
+          liquidacoesEmpenhoQueries[index]?.data ?? [],
+          reservedReviewItemQueries[index]?.data ?? {},
+        ),
+      );
+    });
+    return map;
+  }, [liquidacoesEmpenhoQueries, portalEmpenhoItemQueries, reservedReviewItemQueries, selectedEmpenhos]);
 
   useEffect(() => {
-    if (!isEditing || editingRequisicaoId || !shouldAutoFillEmpenhoItems || !currentEmpenho) return;
-    if (isLoadingPortalEmpenhoItems || isLoadingLiquidacoesEmpenho) return;
+    if (!isEditing || editingRequisicaoId || pendingAutoFillEmpenhoIds.length === 0) return;
 
-    if (empenhoItemBalances.length > 0) {
-      setItems(buildRequisicaoItemsFromEmpenho(currentEmpenho.numero, empenhoItemBalances));
-      return;
-    }
+    const nextPending: string[] = [];
+    const additions: typeof items = [];
 
-    if (!isPortalEmpenhoItemsError) {
-      setItems([
+    pendingAutoFillEmpenhoIds.forEach((empenhoId) => {
+      const empenhoIndex = selectedEmpenhos.findIndex((empenho) => empenho.id === empenhoId);
+      const empenho = selectedEmpenhos[empenhoIndex];
+      if (!empenho) return;
+
+      const isLoading = portalEmpenhoItemQueries[empenhoIndex]?.isLoading || liquidacoesEmpenhoQueries[empenhoIndex]?.isLoading;
+      if (isLoading) {
+        nextPending.push(empenhoId);
+        return;
+      }
+
+      if (items.some((item) => item.empenhoId === empenhoId) || additions.some((item) => item.empenhoId === empenhoId)) {
+        return;
+      }
+
+      const balances = empenhoItemBalancesById.get(empenhoId) ?? [];
+      if (balances.length > 0) {
+        additions.push(
+          ...buildRequisicaoItemsFromEmpenho(empenho.numero, balances).map((item) => ({
+            ...item,
+            empenhoId: empenho.id,
+            empenhoNumero: empenho.numero,
+          })),
+        );
+        return;
+      }
+
+      if (!portalEmpenhoItemQueries[empenhoIndex]?.isError) {
+        additions.push(
         {
           description: 'Aquisição de material/serviço conforme especificações',
           quantity: 1,
           unit: 'UN',
           unitPrice: 0,
+          empenhoId: empenho.id,
+          empenhoNumero: empenho.numero,
           sourceType: 'manual',
           sortOrder: 0,
         },
-      ]);
-      setShouldAutoFillEmpenhoItems(false);
+        );
       toast.warning('Nenhum subitem foi encontrado para este empenho. Você pode cadastrar os itens manualmente.');
+      }
+    });
+
+    if (additions.length > 0) {
+      setItems((current) => [...current, ...additions].map((item, index) => ({ ...item, sortOrder: index })));
     }
+    setPendingAutoFillEmpenhoIds(nextPending);
   }, [
-    currentEmpenho,
     editingRequisicaoId,
-    empenhoItemBalances,
+    empenhoItemBalancesById,
     isEditing,
-    isLoadingLiquidacoesEmpenho,
-    isLoadingPortalEmpenhoItems,
-    isPortalEmpenhoItemsError,
-    shouldAutoFillEmpenhoItems,
+    items,
+    liquidacoesEmpenhoQueries,
+    pendingAutoFillEmpenhoIds,
+    portalEmpenhoItemQueries,
+    selectedEmpenhos,
   ]);
+  const handleRemoveSelectedEmpenho = (empenhoId: string) => {
+    const hasItems = items.some((item) => item.empenhoId === empenhoId);
+    if (hasItems && !confirm('Remover este empenho tambem removera os itens vinculados a ele. Deseja continuar?')) {
+      return;
+    }
+
+    setSelectedEmpenhoIds((current) => current.filter((id) => id !== empenhoId));
+    setPendingAutoFillEmpenhoIds((current) => current.filter((id) => id !== empenhoId));
+    setItems((current) =>
+      current
+        .filter((item) => item.empenhoId !== empenhoId)
+        .map((item, index) => ({ ...item, sortOrder: index })),
+    );
+  };
+
+  const toggleEmpenhoSelection = (empenhoId: string) => {
+    if (selectedEmpenhoIds.includes(empenhoId)) {
+      handleRemoveSelectedEmpenho(empenhoId);
+      return;
+    }
+
+    setSelectedEmpenhoIds((current) => [...current, empenhoId]);
+    if (!editingRequisicaoId) {
+      setPendingAutoFillEmpenhoIds((current) => [...new Set([...current, empenhoId])]);
+    }
+  };
+
   // Handlers for adding/removing items in form
-  const handleAddItem = () => {
-    setShouldAutoFillEmpenhoItems(false);
+  const handleAddItem = (empenhoId?: string) => {
+    const empenho = selectedEmpenhos.find((item) => item.id === empenhoId) ?? primaryEmpenho;
+    if (!empenho) return;
+
     setItems((curr) => [
       ...curr,
       {
@@ -246,6 +331,8 @@ export default function RequisicaoCompraPage() {
         quantity: 1,
         unit: 'UN',
         unitPrice: 0,
+        empenhoId: empenho.id,
+        empenhoNumero: empenho.numero,
         sourceType: 'manual',
         sortOrder: curr.length,
       },
@@ -253,12 +340,10 @@ export default function RequisicaoCompraPage() {
   };
 
   const handleUpdateItem = (index: number, patch: Partial<typeof items[0]>) => {
-    setShouldAutoFillEmpenhoItems(false);
     setItems((curr) => curr.map((item, idx) => (idx === index ? { ...item, ...patch } : item)));
   };
 
   const handleRemoveItem = (index: number) => {
-    setShouldAutoFillEmpenhoItems(false);
     setItems((curr) => curr.filter((_, idx) => idx !== index).map((item, idx) => ({ ...item, sortOrder: idx })));
   };
 
@@ -269,16 +354,39 @@ export default function RequisicaoCompraPage() {
   const itemBalanceViolations = useMemo(() => {
     return items
       .map((item, index) => {
-        const available = getRequisicaoItemAvailableBalance(item, empenhoItemBalances);
+        const available = getRequisicaoItemAvailableBalance(item, item.empenhoId ? empenhoItemBalancesById.get(item.empenhoId) ?? [] : []);
         const requested = item.quantity * item.unitPrice;
         return available !== null && requested > available
           ? { index, description: item.description, requested, available }
           : null;
       })
       .filter((item): item is { index: number; description: string; requested: number; available: number } => Boolean(item));
-  }, [empenhoItemBalances, items]);
+  }, [empenhoItemBalancesById, items]);
 
-  const canSubmitForReview = Boolean(currentEmpenho) && requisicaoTotal <= (empenhoBalance || 0) && itemBalanceViolations.length === 0;
+  const requisicaoTotalByEmpenhoId = useMemo(() => {
+    const totals = new Map<string, number>();
+    items.forEach((item) => {
+      if (!item.empenhoId) return;
+      totals.set(item.empenhoId, (totals.get(item.empenhoId) ?? 0) + item.quantity * item.unitPrice);
+    });
+    return totals;
+  }, [items]);
+
+  const empenhoBalanceViolations = useMemo(() => {
+    return selectedEmpenhos
+      .map((empenho) => {
+        const requested = requisicaoTotalByEmpenhoId.get(empenho.id) ?? 0;
+        const available = empenhoBalanceById.get(empenho.id) ?? 0;
+        return requested > available ? { empenho, requested, available } : null;
+      })
+      .filter((item): item is { empenho: typeof selectedEmpenhos[number]; requested: number; available: number } => Boolean(item));
+  }, [empenhoBalanceById, requisicaoTotalByEmpenhoId, selectedEmpenhos]);
+
+  const canSubmitForReview =
+    selectedEmpenhos.length > 0 &&
+    items.every((item) => item.empenhoId && selectedEmpenhoIds.includes(item.empenhoId)) &&
+    empenhoBalanceViolations.length === 0 &&
+    itemBalanceViolations.length === 0;
 
   // Start creating new Requisição
   const handleNewRequisicao = () => {
@@ -286,10 +394,11 @@ export default function RequisicaoCompraPage() {
     setRequisicaoNumber(`REQ-${new Date().getFullYear()}-${String(requisicoes.length + 1).padStart(4, '0')}`);
     setProcessNumber('');
     setSelectedContratoId('none');
-    setSelectedEmpenhoId('none');
+    setSelectedEmpenhoIds([]);
+    setIsEmpenhoPickerOpen(false);
     setNotes('');
     setItems([]);
-    setShouldAutoFillEmpenhoItems(true);
+    setPendingAutoFillEmpenhoIds([]);
     setIsEditing(true);
   };
 
@@ -304,10 +413,21 @@ export default function RequisicaoCompraPage() {
       setRequisicaoNumber(fullRequisicao.number);
       setProcessNumber(fullRequisicao.processNumber || '');
       setSelectedContratoId(fullRequisicao.contratoId || 'none');
-      setSelectedEmpenhoId(fullRequisicao.empenhoId || 'none');
+      const requisicaoEmpenhoIds = (fullRequisicao.empenhos?.length
+        ? fullRequisicao.empenhos.map((empenho) => empenho.empenhoId)
+        : fullRequisicao.empenhoId
+          ? [fullRequisicao.empenhoId]
+          : []
+      ).filter(Boolean);
+      setSelectedEmpenhoIds(requisicaoEmpenhoIds);
       setNotes(fullRequisicao.notes || '');
-      setItems(fullRequisicao.items);
-      setShouldAutoFillEmpenhoItems(false);
+      setItems(fullRequisicao.items.map((item, index) => ({
+        ...item,
+        empenhoId: item.empenhoId || requisicaoEmpenhoIds[0],
+        empenhoNumero: item.empenhoNumero || fullRequisicao.empenhos?.find((empenho) => empenho.empenhoId === (item.empenhoId || requisicaoEmpenhoIds[0]))?.empenhoNumero || fullRequisicao.empenhoNumero,
+        sortOrder: index,
+      })));
+      setPendingAutoFillEmpenhoIds([]);
       setIsEditing(true);
       toast.dismiss(loadingToast);
     } catch (err) {
@@ -336,12 +456,18 @@ export default function RequisicaoCompraPage() {
       return;
     }
 
-    if (status === 'review' && !currentEmpenho) {
+    if (status === 'review' && selectedEmpenhos.length === 0) {
       toast.error('Selecione um empenho antes de enviar a requisição para o fiscal.');
       return;
     }
-    if (status === 'review' && currentEmpenho && !hasSufficientEmpenhoBalance(currentEmpenho, requisicaoTotal)) {
-      toast.error(`Saldo insuficiente no empenho. Saldo atual: ${formatCurrency(empenhoBalance || 0)}.`);
+    if (status === 'review' && items.some((item) => !item.empenhoId || !selectedEmpenhoIds.includes(item.empenhoId))) {
+      toast.error('Cada item deve estar vinculado a um empenho selecionado.');
+      return;
+    }
+
+    if (status === 'review' && empenhoBalanceViolations.length > 0) {
+      const firstViolation = empenhoBalanceViolations[0];
+      toast.error(`Saldo insuficiente no empenho ${firstViolation.empenho.numero}. Saldo atual: ${formatCurrency(firstViolation.available)}.`);
       return;
     }
 
@@ -350,14 +476,20 @@ export default function RequisicaoCompraPage() {
       toast.error(`Saldo insuficiente no item ${firstViolation.index + 1}. Saldo do item: ${formatCurrency(firstViolation.available)}.`);
       return;
     }
+    const selectedPayloadEmpenhos = selectedEmpenhos.map((empenho, index) => ({
+      empenhoId: empenho.id,
+      empenhoNumero: empenho.numero,
+      sortOrder: index,
+    }));
     const payload = {
       title: `Requisição de Compra ${requisicaoNumber}`,
       number: requisicaoNumber,
       processNumber: processNumber || undefined,
       contratoId: selectedContratoId !== 'none' ? selectedContratoId : undefined,
       contratoNumero: currentContrato?.numero,
-      empenhoId: selectedEmpenhoId !== 'none' ? selectedEmpenhoId : undefined,
-      empenhoNumero: currentEmpenho?.numero,
+      empenhoId: primaryEmpenho?.id,
+      empenhoNumero: primaryEmpenho?.numero,
+      empenhos: selectedPayloadEmpenhos,
       notes: notes || undefined,
       status,
     };
@@ -391,6 +523,7 @@ export default function RequisicaoCompraPage() {
           contratoNumero: fullRequisicao.contratoNumero,
           empenhoId: fullRequisicao.empenhoId,
           empenhoNumero: fullRequisicao.empenhoNumero,
+          empenhos: fullRequisicao.empenhos,
           notes: fullRequisicao.notes,
           status,
         },
@@ -432,13 +565,30 @@ export default function RequisicaoCompraPage() {
 
       // Find references
       const contratoInfo = contratos.find((c) => c.id === fullRequisicao.contratoId);
-      const empenhoInfo = empenhos.find((e) => e.id === fullRequisicao.empenhoId);
+      const requisicaoEmpenhos = fullRequisicao.empenhos?.length
+        ? fullRequisicao.empenhos
+        : fullRequisicao.empenhoId
+          ? [{ empenhoId: fullRequisicao.empenhoId, empenhoNumero: fullRequisicao.empenhoNumero || '', sortOrder: 0 }]
+          : [];
+      const empenhoInfoById = new Map(empenhos.map((empenho) => [empenho.id, empenho]));
+      const empenhosLabel = requisicaoEmpenhos.length > 0
+        ? requisicaoEmpenhos
+            .map((linkedEmpenho) => {
+              const empenhoInfo = empenhoInfoById.get(linkedEmpenho.empenhoId);
+              const numero = empenhoInfo?.numero || linkedEmpenho.empenhoNumero || '-';
+              return empenhoInfo?.favorecidoNome
+                ? `${numero} (Favorecido: ${empenhoInfo.favorecidoNome})`
+                : numero;
+            })
+            .join('<br />')
+        : '-';
 
       const itemsHtml = fullRequisicao.items
         .map(
           (item, idx) => `
         <tr>
           <td style="text-align: center;">${idx + 1}</td>
+          <td>${item.empenhoNumero || fullRequisicao.empenhoNumero || '-'}</td>
           <td>${item.description}</td>
           <td style="text-align: center;">${item.unit}</td>
           <td style="text-align: right;">${item.quantity.toLocaleString('pt-BR')}</td>
@@ -496,9 +646,7 @@ export default function RequisicaoCompraPage() {
             <strong>Contrato Vinculado:</strong> ${
               contratoInfo ? `${contratoInfo.numero} - ${contratoInfo.contratada}` : fullRequisicao.contratoNumero || '-'
             }<br />
-            <strong>Empenho / NE:</strong> ${
-              empenhoInfo ? `${empenhoInfo.numero} (Favorecido: ${empenhoInfo.favorecidoNome || '-'})` : fullRequisicao.empenhoNumero || '-'
-            }<br />
+            <strong>Empenhos / NEs:</strong> ${empenhosLabel}<br />
             <strong>Data de Cadastro:</strong> ${fullRequisicao.createdAt.toLocaleDateString('pt-BR')} às ${fullRequisicao.createdAt.toLocaleTimeString('pt-BR')}<br />
             <strong>Data da Última Atualização:</strong> ${fullRequisicao.updatedAt.toLocaleDateString('pt-BR')}<br />
             <strong>Data da Última Edição:</strong> ${fullRequisicao.updatedAt.toLocaleDateString('pt-BR')}
@@ -510,7 +658,8 @@ export default function RequisicaoCompraPage() {
           <thead>
             <tr>
               <th style="width: 5%; text-align: center;">Item</th>
-              <th style="width: 55%;">Descrição dos Itens / Serviços</th>
+              <th style="width: 16%;">Empenho / NE</th>
+              <th style="width: 39%;">Descrição dos Itens / Serviços</th>
               <th style="width: 10%; text-align: center;">Unid.</th>
               <th style="width: 10%; text-align: right;">Qtd.</th>
               <th style="width: 10%; text-align: right;">Preço Unitário</th>
@@ -520,7 +669,7 @@ export default function RequisicaoCompraPage() {
           <tbody>
             ${itemsHtml}
             <tr class="total-row">
-              <td colspan="5" style="text-align: right;">Valor Total da Requisição de Compra:</td>
+              <td colspan="6" style="text-align: right;">Valor Total da Requisição de Compra:</td>
               <td style="text-align: right; color: #1e6b2d;">${formatCurrency(totalValue)}</td>
             </tr>
           </tbody>
@@ -606,171 +755,255 @@ export default function RequisicaoCompraPage() {
               </div>
               <div className="space-y-2">
                 <Label>Empenho / Nota de Empenho</Label>
-                <Select value={selectedEmpenhoId} onValueChange={(val) => setSelectedEmpenhoId(val)}>
-                  <SelectTrigger aria-label="Empenho"><SelectValue placeholder="Selecione um empenho..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Nenhum empenho</SelectItem>
-                    {allowedEmpenhos.map((e) => (
-                      <SelectItem key={e.id} value={e.id}>
-                        {e.numero} - saldo {formatCurrency(getEmpenhoAvailableBalance(e))}
-                      </SelectItem>
+                <Popover open={isEmpenhoPickerOpen} onOpenChange={setIsEmpenhoPickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={isEmpenhoPickerOpen}
+                      aria-label={selectedEmpenhoIds.length > 0 ? `${selectedEmpenhoIds.length} empenho(s) selecionado(s)` : 'Buscar e selecionar empenhos'}
+                      className="min-h-10 w-full justify-between text-left font-normal"
+                    >
+                      <span className="truncate">
+                        {selectedEmpenhoIds.length > 0
+                          ? `${selectedEmpenhoIds.length} empenho(s) selecionado(s)`
+                          : 'Buscar e selecionar empenhos...'}
+                      </span>
+                      <Plus className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Filtrar por número, favorecido, descrição ou valor..." />
+                      <CommandList className="max-h-72">
+                        <CommandEmpty>Nenhum empenho encontrado.</CommandEmpty>
+                        <CommandGroup heading="Empenhos disponíveis">
+                          {allowedEmpenhos.map((empenho) => {
+                            const checked = selectedEmpenhoIds.includes(empenho.id);
+                            const label = `${empenho.numero} - saldo ${formatCurrency(getEmpenhoAvailableBalance(empenho))} - ${empenho.favorecidoNome || 'Sem favorecido'} - ${empenho.descricao || ''}`;
+                            return (
+                              <CommandItem
+                                key={empenho.id}
+                                value={label}
+                                onSelect={() => toggleEmpenhoSelection(empenho.id)}
+                                className="gap-2"
+                              >
+                                <Check className={checked ? 'h-4 w-4 opacity-100' : 'h-4 w-4 opacity-0'} />
+                                <span className="min-w-0 flex-1 truncate" title={label}>{label}</span>
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {selectedEmpenhoOptions.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5" aria-label="Empenhos selecionados">
+                    {selectedEmpenhoOptions.map((option) => (
+                      <Badge key={option.id} variant="secondary" className="max-w-full gap-1 pr-1">
+                        <span className="max-w-[22rem] truncate" title={option.label}>{option.label}</span>
+                        <button
+                          type="button"
+                          className="rounded-full p-0.5 hover:bg-surface-hover"
+                          aria-label={`Remover ${option.label}`}
+                          onClick={() => handleRemoveSelectedEmpenho(option.id)}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </div>
+                ) : null}
               </div>
             </div>
 
-            {currentEmpenho ? (
-              <div className={`flex flex-wrap items-center justify-between gap-3 border-l-4 px-4 py-3 ${
-                requisicaoTotal > (empenhoBalance || 0)
-                  ? 'border-status-danger bg-status-danger/5'
-                  : 'border-status-success bg-status-success/5'
-              }`}>
-                <div>
-                  <p className="text-xs font-semibold uppercase text-text-muted">Saldo disponível do empenho</p>
-                  <p className="mt-1 font-mono text-lg font-bold text-text-primary">{formatCurrency(empenhoBalance || 0)}</p>
-                </div>
-                <div className="text-right text-sm">
-                  <p className="text-text-muted">Após esta requisição</p>
-                  <p className="font-mono font-bold text-text-primary">
-                    {formatCurrency(Math.max(0, (empenhoBalance || 0) - requisicaoTotal))}
-                  </p>
-                </div>
-              </div>
-            ) : null}
-
-            {currentEmpenho ? (
-              <div className="space-y-2 rounded-radius-lg border border-border-default bg-surface-subtle/30 px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-text-primary">Itens do empenho</h3>
-                    <p className="text-xs text-text-muted">
-                      Os subitens vêm da NE. Quando há liquidações no histórico/API, o saldo do item é calculado abatendo essas execuções e as requisições em revisão.
-                    </p>
-                  </div>
-                  {(isLoadingPortalEmpenhoItems || isLoadingLiquidacoesEmpenho) ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : null}
-                </div>
-                {isPortalEmpenhoItemsError ? (
-                  <p className="text-sm text-status-warning">Não foi possível carregar os subitens do empenho agora. Cadastre os itens manualmente, se necessário.</p>
-                ) : !isLoadingPortalEmpenhoItems && portalEmpenhoItems.length === 0 ? (
-                  <p className="text-sm text-text-muted">Nenhum subitem foi encontrado para este empenho. O cadastro manual permanece disponível.</p>
-                ) : null}
-              </div>
-            ) : null}
-            {/* INTERACTIVE ITEMS TABLE */}
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-border-default/50 pb-2">
                 <h3 className="font-ui text-sm font-bold text-text-primary uppercase tracking-wider">Itens e Serviços Requisitados</h3>
-                <Button type="button" variant="outline" size="sm" className="gap-1.5 border-primary text-primary hover:bg-primary/5" onClick={handleAddItem}>
-                  <Plus className="h-4 w-4" />
-                  Adicionar Item
-                </Button>
+                <span className="font-mono text-sm font-bold text-primary">{formatCurrency(requisicaoTotal)}</span>
               </div>
 
-              <div className="border border-border-default rounded-radius-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-surface-subtle/50">
-                      <TableHead style={{ width: '4%' }} className="text-center">#</TableHead>
-                      <TableHead style={{ width: '38%' }}>Descrição do Item / Serviço</TableHead>
-                      <TableHead style={{ width: '10%' }} className="text-center">Und</TableHead>
-                      <TableHead style={{ width: '10%' }} className="text-right">Qtd</TableHead>
-                      <TableHead style={{ width: '13%' }} className="text-right">Valor Unitário</TableHead>
-                      <TableHead style={{ width: '12%' }} className="text-right">Saldo do Item</TableHead>
-                      <TableHead style={{ width: '10%' }} className="text-right">Subtotal</TableHead>
-                      <TableHead style={{ width: '3%' }} className="text-center"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {items.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center text-text-muted py-6">
-                          Nenhum item adicionado. Clique em "Adicionar Item" para começar.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      items.map((item, index) => {
-                        const itemAvailableBalance = getRequisicaoItemAvailableBalance(item, empenhoItemBalances);
-                        const itemSubtotal = item.quantity * item.unitPrice;
-                        const isGeneratedItem = item.sourceType === 'portal_transparencia_empenho_item';
-                        const hasItemBalanceViolation = itemAvailableBalance !== null && itemSubtotal > itemAvailableBalance;
+              {selectedEmpenhos.length === 0 ? (
+                <div className="rounded-radius-lg border border-dashed border-border-default bg-surface-subtle/30 px-4 py-6 text-center text-sm text-text-muted">
+                  Selecione ao menos um empenho para adicionar itens.
+                </div>
+              ) : (
+                selectedEmpenhos.map((empenho, empenhoIndex) => {
+                  const groupItems = items
+                    .map((item, index) => ({ item, index }))
+                    .filter(({ item }) => item.empenhoId === empenho.id);
+                  const groupTotal = requisicaoTotalByEmpenhoId.get(empenho.id) ?? 0;
+                  const availableBalance = empenhoBalanceById.get(empenho.id) ?? 0;
+                  const afterRequisicao = Math.max(0, availableBalance - groupTotal);
+                  const isLoadingPortalItems = portalEmpenhoItemQueries[empenhoIndex]?.isLoading ?? false;
+                  const isLoadingLiquidacoes = liquidacoesEmpenhoQueries[empenhoIndex]?.isLoading ?? false;
+                  const isPortalItemsError = portalEmpenhoItemQueries[empenhoIndex]?.isError ?? false;
+                  const portalItems = (portalEmpenhoItemQueries[empenhoIndex]?.data ?? []) as PortalTransparenciaItemEmpenho[];
+                  const empenhoItemBalances = empenhoItemBalancesById.get(empenho.id) ?? [];
+                  const hasBalanceViolation = groupTotal > availableBalance;
 
-                        return (
-                          <TableRow key={index} className={hasItemBalanceViolation ? 'bg-status-danger/5' : undefined}>
-                            <TableCell className="text-center font-bold text-text-muted">{index + 1}</TableCell>
-                            <TableCell>
-                              <div className="space-y-1">
-                                <Input
-                                  value={item.description}
-                                  onChange={(e) => handleUpdateItem(index, { description: e.target.value })}
-                                  placeholder="Ex: Material ou serviço específico"
-                                  className="h-9"
-                                  disabled={isGeneratedItem}
-                                />
-                                {item.sourceReference ? (
-                                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-text-muted">
-                                    <Badge variant="outline" className="text-[10px]">Subitem da NE</Badge>
-                                    <span>{item.sourceReference}</span>
-                                  </div>
-                                ) : null}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Input
-                                value={item.unit}
-                                onChange={(e) => handleUpdateItem(index, { unit: e.target.value.toUpperCase() })}
-                                placeholder="UN"
-                                className="h-9 text-center"
-                                disabled={isGeneratedItem}
-                              />
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Input
-                                type="number"
-                                min="0"
-                                step="any"
-                                value={item.quantity}
-                                onChange={(e) => handleUpdateItem(index, { quantity: Number(e.target.value) })}
-                                className="h-9 text-right"
-                              />
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Input
-                                type="number"
-                                min="0"
-                                step="any"
-                                value={item.unitPrice}
-                                onChange={(e) => handleUpdateItem(index, { unitPrice: Number(e.target.value) })}
-                                className="h-9 text-right"
-                                disabled={isGeneratedItem}
-                              />
-                            </TableCell>
-                            <TableCell className={`text-right font-mono text-xs font-bold leading-9 ${hasItemBalanceViolation ? 'text-status-danger' : 'text-status-success'}`}>
-                              {itemAvailableBalance !== null ? formatCurrency(itemAvailableBalance) : '-'}
-                            </TableCell>
-                            <TableCell className="text-right font-mono font-bold text-text-primary leading-9">
-                              {formatCurrency(itemSubtotal)}
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleRemoveItem(index)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                    <TableRow className="bg-primary/[0.02] hover:bg-primary/[0.02] border-t border-border-default">
-                      <TableCell colSpan={6} className="text-right font-ui text-sm font-bold text-text-primary">
-                        Total Geral da Requisição:
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-base font-black text-primary" colSpan={2}>
-                        {formatCurrency(requisicaoTotal)}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
+                  return (
+                    <div key={empenho.id} className="space-y-3 rounded-radius-lg border border-border-default bg-surface-base p-3">
+                      <div className={`flex flex-wrap items-center justify-between gap-3 border-l-4 px-4 py-3 ${
+                        hasBalanceViolation
+                          ? 'border-status-danger bg-status-danger/5'
+                          : 'border-status-success bg-status-success/5'
+                      }`}>
+                        <div>
+                          <p className="text-xs font-semibold uppercase text-text-muted">Empenho / NE</p>
+                          <p className="mt-1 font-mono text-sm font-bold text-text-primary">{empenho.numero}</p>
+                          {empenho.favorecidoNome ? (
+                            <p className="text-xs text-text-muted">{empenho.favorecidoNome}</p>
+                          ) : null}
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 text-right text-sm sm:grid-cols-3">
+                          <div>
+                            <p className="text-text-muted">Saldo disponível</p>
+                            <p className="font-mono font-bold text-text-primary">{formatCurrency(availableBalance)}</p>
+                          </div>
+                          <div>
+                            <p className="text-text-muted">Nesta NE</p>
+                            <p className="font-mono font-bold text-text-primary">{formatCurrency(groupTotal)}</p>
+                          </div>
+                          <div>
+                            <p className="text-text-muted">Após requisição</p>
+                            <p className="font-mono font-bold text-text-primary">{formatCurrency(afterRequisicao)}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 rounded-radius-lg border border-border-default bg-surface-subtle/30 px-4 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <h4 className="text-sm font-bold text-text-primary">Itens do empenho {empenho.numero}</h4>
+                            <p className="text-xs text-text-muted">
+                              Os subitens vêm da NE e os saldos consideram liquidações e requisições em revisão para este empenho.
+                            </p>
+                          </div>
+                          {(isLoadingPortalItems || isLoadingLiquidacoes) ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : null}
+                        </div>
+                        {isPortalItemsError ? (
+                          <p className="text-sm text-status-warning">Não foi possível carregar os subitens deste empenho agora. Cadastre os itens manualmente, se necessário.</p>
+                        ) : !isLoadingPortalItems && portalItems.length === 0 ? (
+                          <p className="text-sm text-text-muted">Nenhum subitem foi encontrado para este empenho. O cadastro manual permanece disponível.</p>
+                        ) : null}
+                      </div>
+
+                      <div className="flex justify-end">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 border-primary text-primary hover:bg-primary/5"
+                          onClick={() => handleAddItem(empenho.id)}
+                        >
+                          <Plus className="h-4 w-4" />
+                          Adicionar Item
+                        </Button>
+                      </div>
+
+                      <div className="overflow-hidden rounded-radius-lg border border-border-default">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-surface-subtle/50">
+                              <TableHead style={{ width: '4%' }} className="text-center">#</TableHead>
+                              <TableHead style={{ width: '38%' }}>Descrição do Item / Serviço</TableHead>
+                              <TableHead style={{ width: '10%' }} className="text-center">Und</TableHead>
+                              <TableHead style={{ width: '10%' }} className="text-right">Qtd</TableHead>
+                              <TableHead style={{ width: '13%' }} className="text-right">Valor Unitário</TableHead>
+                              <TableHead style={{ width: '12%' }} className="text-right">Saldo do Item</TableHead>
+                              <TableHead style={{ width: '10%' }} className="text-right">Subtotal</TableHead>
+                              <TableHead style={{ width: '3%' }} className="text-center"></TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {groupItems.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={8} className="py-6 text-center text-text-muted">
+                                  Nenhum item adicionado neste empenho.
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              groupItems.map(({ item, index }, groupIndex) => {
+                                const itemAvailableBalance = getRequisicaoItemAvailableBalance(item, empenhoItemBalances);
+                                const itemSubtotal = item.quantity * item.unitPrice;
+                                const isGeneratedItem = item.sourceType === 'portal_transparencia_empenho_item';
+                                const hasItemBalanceViolation = itemAvailableBalance !== null && itemSubtotal > itemAvailableBalance;
+
+                                return (
+                                  <TableRow key={`${empenho.id}-${index}`} className={hasItemBalanceViolation ? 'bg-status-danger/5' : undefined}>
+                                    <TableCell className="text-center font-bold text-text-muted">{groupIndex + 1}</TableCell>
+                                    <TableCell>
+                                      <div className="space-y-1">
+                                        <Input
+                                          value={item.description}
+                                          onChange={(e) => handleUpdateItem(index, { description: e.target.value })}
+                                          placeholder="Ex: Material ou serviço específico"
+                                          className="h-9"
+                                          disabled={isGeneratedItem}
+                                        />
+                                        {item.sourceReference ? (
+                                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-text-muted">
+                                            <Badge variant="outline" className="text-[10px]">Subitem da NE</Badge>
+                                            <span>{item.sourceReference}</span>
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                      <Input
+                                        value={item.unit}
+                                        onChange={(e) => handleUpdateItem(index, { unit: e.target.value.toUpperCase() })}
+                                        placeholder="UN"
+                                        className="h-9 text-center"
+                                        disabled={isGeneratedItem}
+                                      />
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        step="any"
+                                        value={item.quantity}
+                                        onChange={(e) => handleUpdateItem(index, { quantity: Number(e.target.value) })}
+                                        className="h-9 text-right"
+                                      />
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        step="any"
+                                        value={item.unitPrice}
+                                        onChange={(e) => handleUpdateItem(index, { unitPrice: Number(e.target.value) })}
+                                        className="h-9 text-right"
+                                        disabled={isGeneratedItem}
+                                      />
+                                    </TableCell>
+                                    <TableCell className={`text-right font-mono text-xs font-bold leading-9 ${hasItemBalanceViolation ? 'text-status-danger' : 'text-status-success'}`}>
+                                      {itemAvailableBalance !== null ? formatCurrency(itemAvailableBalance) : '-'}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono font-bold text-text-primary leading-9">
+                                      {formatCurrency(itemSubtotal)}
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => handleRemoveItem(index)}>
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
 
             <div className="space-y-2">
@@ -854,6 +1087,11 @@ export default function RequisicaoCompraPage() {
                   {requisicoes.map((requisicao) => {
                     const statusInfo = STATUS_META[requisicao.status] || { label: requisicao.status, className: '' };
                     const isCreator = requisicao.createdBy === user?.id;
+                    const requisicaoEmpenhoLabels = requisicao.empenhos?.length
+                      ? requisicao.empenhos.map((empenho) => empenho.empenhoNumero).filter(Boolean)
+                      : requisicao.empenhoNumero
+                        ? [requisicao.empenhoNumero]
+                        : [];
 
                     return (
                       <TableRow key={requisicao.id} className="hover:bg-surface-hover/20">
@@ -881,10 +1119,13 @@ export default function RequisicaoCompraPage() {
                                 <span>Contrato: <span className="font-bold text-text-primary">{requisicao.contratoNumero}</span></span>
                               </div>
                             )}
-                            {requisicao.empenhoNumero && (
+                            {requisicaoEmpenhoLabels.length > 0 && (
                               <div className="flex gap-1.5 items-center">
                                 <Coins className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                                <span>Empenho: <span className="font-bold text-text-primary">{requisicao.empenhoNumero}</span></span>
+                                <span>
+                                  Empenho{requisicaoEmpenhoLabels.length > 1 ? 's' : ''}:{' '}
+                                  <span className="font-bold text-text-primary">{requisicaoEmpenhoLabels.join(', ')}</span>
+                                </span>
                               </div>
                             )}
                             {requisicao.processNumber && (
@@ -893,7 +1134,7 @@ export default function RequisicaoCompraPage() {
                                 <span>Processo: <span className="font-bold text-text-primary">{requisicao.processNumber}</span></span>
                               </div>
                             )}
-                            {!requisicao.contratoNumero && !requisicao.empenhoNumero && !requisicao.processNumber && (
+                            {!requisicao.contratoNumero && requisicaoEmpenhoLabels.length === 0 && !requisicao.processNumber && (
                               <span className="text-text-muted">-</span>
                             )}
                           </div>

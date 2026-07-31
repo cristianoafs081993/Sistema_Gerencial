@@ -79,6 +79,19 @@ Mostrar a linhagem operacional dos dados de forma curta:
 - observacao: o upload manual XLSX deixou de ser o fluxo operacional da tela de contratos. A base local permanece para favoritos, CNPJ e saldos/vinculos locais quando casar por numero normalizado com `contratos_api`. Linhas vindas apenas da API aparecem sem favorito local. O contrato legado `00089/2016` da CAERN continua como excecao operacional fora da exibicao
   - pagina: [Contratos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Contratos.tsx)
 
+### Requisicoes de compra
+
+- cadastro por `/requisicao-compra`
+  - pagina: [RequisicaoCompra.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/RequisicaoCompra.tsx)
+  - service: [requisicoesCompra.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/requisicoesCompra.ts)
+  - RPC transacional: `save_requisicao_compra`
+  - tabelas:
+    - `requisicoes_compra`
+    - `requisicao_compra_empenhos`
+    - `requisicao_compra_itens`
+    - `terceirizado_permissions`
+  - observacao: a requisicao pode vincular multiplas NEs em `requisicao_compra_empenhos`; cada item carrega seu proprio `empenho_id`. Os campos legados `requisicoes_compra.empenho_id/empenho_numero` continuam preenchidos com a primeira NE para compatibilidade. Em `review`/`approved`, a RPC valida permissao de terceirizado e saldo separadamente por NE, abatendo reservas em revisao do mesmo empenho e subitem.
+
 ### Contratos API Comprasnet
 
 - API `https://contratos.comprasnet.gov.br/api`

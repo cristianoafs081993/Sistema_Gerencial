@@ -456,13 +456,30 @@ Campos-chave:
 - `number`
 - `status` ('draft', 'review', 'approved', 'rejected')
 - `contrato_id` (FK para contratos)
-- `empenho_id` (FK para empenhos)
+- `empenho_id` (FK para empenhos; compatibilidade com a primeira NE selecionada)
 - `created_by` (FK para auth.users)
 
 Regras:
-- `save_requisicao_compra` salva cabeçalho e itens na mesma transacao.
-- Requisicoes em `review` ou `approved` exigem empenho com saldo suficiente; requisicoes em `review` do mesmo empenho entram como valor reservado. Para terceirizados, a RPC exige permissao explicita no `empenho_id`; permissao de contrato nao autoriza automaticamente as NEs vinculadas ao contrato.
+- `save_requisicao_compra` salva cabecalho, empenhos vinculados e itens na mesma transacao.
+- Requisicoes em `review` ou `approved` exigem ao menos uma NE e exigem que cada item tenha `empenho_id`. O saldo e validado separadamente por NE; requisicoes em `review` da mesma NE entram como valor reservado. Para terceirizados, a RPC exige permissao explicita para cada `empenho_id`; permissao de contrato nao autoriza automaticamente as NEs vinculadas ao contrato.
 - `fn_empenho_saldo_disponivel` calcula saldo de exercicio com dados SIAFI locais e prioriza `saldo_rap_oficial` para RAP.
+
+### `requisicao_compra_empenhos`
+
+Finalidade:
+- Armazenar a relacao N:N entre uma Requisicao de Compra e as NEs selecionadas.
+
+Campos-chave:
+- `id`
+- `requisicao_compra_id` (FK para requisicoes_compra)
+- `empenho_id` (FK para empenhos)
+- `empenho_numero`
+- `sort_order`
+
+Regras:
+- O par `requisicao_compra_id` + `empenho_id` e unico.
+- `sort_order` preserva a ordem da selecao no frontend; a primeira NE tambem preenche `requisicoes_compra.empenho_id/empenho_numero` para compatibilidade com leituras legadas.
+- A RLS segue o mesmo escopo de leitura/escrita de `requisicoes_compra`: criador, gestor/fiscal/superadmin, ou terceirizado com permissao direta no empenho.
 
 ### `requisicao_compra_itens`
 
@@ -476,13 +493,16 @@ Campos-chave:
 - `quantity`
 - `unit`
 - `unit_price`
+- `empenho_id` (FK para empenhos)
+- `empenho_numero`
 - `source_type` (`manual`, `portal_transparencia_empenho_item` ou `contrato_api_item`)
 - `source_item_key`
 - `source_reference`
 - `source_snapshot`
 
 Regras:
-- Itens originados de empenho preservam a chave do subitem da NE para recalcular reservas por item em requisicoes em revisao.
+- Cada item pertence a uma NE quando a requisicao vai para `review` ou `approved`; registros antigos sem `empenho_id` usam o empenho legado do cabecalho como fallback nas validacoes.
+- Itens originados de empenho preservam a chave do subitem da NE para recalcular reservas por item e por NE em requisicoes em revisao.
 - Itens manuais permanecem validos para empenhos sem subitens disponiveis no cache/API.
 ### `terceirizados`
 

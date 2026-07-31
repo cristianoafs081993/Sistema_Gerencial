@@ -69,7 +69,7 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 - `SupplierEmailDialog`: modal de solicitacao de cotacao de `PesquisaPrecos`, com cabecalho, corpo e rodape no mesmo padrao dos modais operacionais; o rodape oferece a acao secundaria `Historico de e-mails`, que abre um modal dedicado com os disparos registrados da pesquisa.
 - `PriceResearchValidation`: tela operacional de validação do QR Code da pesquisa de preços, baseada em `HeaderSubtitle`, `SectionPanel`, badges de status e blocos compactos para comparar hash informado e hash recalculado.
 - `PriceResearchEad`: subpagina operacional de capacitacao do modulo Pesquisa de Precos, com `HeaderSubtitle`, `SectionPanel`, lista de aulas, player responsivo 16:9 em iframe `youtube-nocookie.com` e painel de gestao exibido apenas para superadministrador.
-- `RequisicaoCompra`: pagina operacional que apresenta "Gestão de Requisições de Compra" no header global por meio de `HeaderSubtitle`, sem repetir o titulo na area de conteudo.
+- `RequisicaoCompra`: pagina operacional que apresenta "Gestão de Requisições de Compra" no header global por meio de `HeaderSubtitle`, sem repetir o titulo na area de conteudo. O campo `Empenho / Nota de Empenho` usa `Popover + Command` pesquisavel com selecao multipla, contador no trigger e badges removiveis; os itens ficam agrupados por NE selecionada com saldo, carregamento e botao `Adicionar Item` em cada grupo.
 - `Layout`: sidebar global compacta com campo de busca visual, grupos expansivos, submenus expansivos, indicador ativo lateral e drawer mobile.
 
 ## Regra pratica

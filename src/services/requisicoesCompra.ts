@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import type {
   RequisicaoCompra,
+  RequisicaoCompraEmpenho,
   RequisicaoCompraItem,
   RequisicaoCompraRecord,
   TerceirizadoPermission,
@@ -16,6 +17,7 @@ type DbRequisicaoCompraRow = {
   contrato_numero: string | null;
   empenho_id: string | null;
   empenho_numero: string | null;
+  requisicao_compra_empenhos?: DbRequisicaoCompraEmpenhoRow[] | null;
   notes: string | null;
   status: RequisicaoCompra['status'];
   created_by: string;
@@ -31,6 +33,8 @@ type DbRequisicaoCompraItemRow = {
   quantity: number;
   unit: string;
   unit_price: number;
+  empenho_id: string | null;
+  empenho_numero: string | null;
   source_type: string | null;
   source_item_key: string | null;
   source_reference: string | null;
@@ -38,6 +42,14 @@ type DbRequisicaoCompraItemRow = {
   sort_order: number;
   created_at: string;
   updated_at: string;
+};
+
+type DbRequisicaoCompraEmpenhoRow = {
+  id: string;
+  requisicao_compra_id: string;
+  empenho_id: string;
+  empenho_numero: string | null;
+  sort_order: number;
 };
 
 type DbPermissionRow = {
@@ -60,6 +72,7 @@ const REQUISICAO_SELECT = [
   'contrato_numero',
   'empenho_id',
   'empenho_numero',
+  'requisicao_compra_empenhos(id,requisicao_compra_id,empenho_id,empenho_numero,sort_order)',
   'notes',
   'status',
   'created_by',
@@ -68,7 +81,28 @@ const REQUISICAO_SELECT = [
   'updated_at',
 ].join(',');
 
+function mapRequisicaoEmpenhoRow(row: DbRequisicaoCompraEmpenhoRow): RequisicaoCompraEmpenho {
+  return {
+    id: row.id,
+    requisicaoCompraId: row.requisicao_compra_id,
+    empenhoId: row.empenho_id,
+    empenhoNumero: row.empenho_numero || '',
+    sortOrder: row.sort_order,
+  };
+}
+
 function mapRequisicaoRow(row: DbRequisicaoCompraRow): RequisicaoCompra {
+  const linkedEmpenhos = (row.requisicao_compra_empenhos || []).map((item) => mapRequisicaoEmpenhoRow(item));
+  const empenhos = linkedEmpenhos.length > 0
+    ? linkedEmpenhos.sort((a, b) => a.sortOrder - b.sortOrder)
+    : row.empenho_id
+      ? [{
+          empenhoId: row.empenho_id,
+          empenhoNumero: row.empenho_numero || '',
+          sortOrder: 0,
+        }]
+      : [];
+
   return {
     id: row.id,
     title: row.title,
@@ -78,6 +112,7 @@ function mapRequisicaoRow(row: DbRequisicaoCompraRow): RequisicaoCompra {
     contratoNumero: row.contrato_numero || undefined,
     empenhoId: row.empenho_id || undefined,
     empenhoNumero: row.empenho_numero || undefined,
+    empenhos,
     notes: row.notes || undefined,
     status: row.status,
     createdBy: row.created_by,
@@ -95,6 +130,8 @@ function mapItemRow(row: DbRequisicaoCompraItemRow): RequisicaoCompraItem {
     quantity: Number(row.quantity),
     unit: row.unit,
     unitPrice: Number(row.unit_price),
+    empenhoId: row.empenho_id || undefined,
+    empenhoNumero: row.empenho_numero || undefined,
     sourceType: row.source_type as RequisicaoCompraItem['sourceType'] || undefined,
     sourceItemKey: row.source_item_key || undefined,
     sourceReference: row.source_reference || undefined,
@@ -151,8 +188,7 @@ export const requisicoesCompraService = {
   ): Promise<Record<string, number>> {
     let query = supabase
       .from('requisicoes_compra')
-      .select('id, requisicao_compra_itens(source_item_key, quantity, unit_price)')
-      .eq('empenho_id', empenhoId)
+      .select('id, empenho_id, requisicao_compra_itens(empenho_id, source_item_key, quantity, unit_price)')
       .eq('status', 'review');
 
     if (excludeRequisicaoId) {
@@ -163,9 +199,12 @@ export const requisicoesCompraService = {
     if (error) throw error;
 
     return ((data || []) as Array<{
-      requisicao_compra_itens?: Array<{ source_item_key: string | null; quantity: number; unit_price: number }>;
+      empenho_id?: string | null;
+      requisicao_compra_itens?: Array<{ empenho_id: string | null; source_item_key: string | null; quantity: number; unit_price: number }>;
     }>).reduce<Record<string, number>>((acc, requisicao) => {
       for (const item of requisicao.requisicao_compra_itens ?? []) {
+        const itemEmpenhoId = String(item.empenho_id ?? requisicao.empenho_id ?? '');
+        if (itemEmpenhoId !== empenhoId) continue;
         if (!item.source_item_key) continue;
         acc[item.source_item_key] = (acc[item.source_item_key] ?? 0) + Number(item.quantity || 0) * Number(item.unit_price || 0);
       }
@@ -185,6 +224,7 @@ export const requisicoesCompraService = {
       contratoNumero: data.contratoNumero || null,
       empenhoId: data.empenhoId || null,
       empenhoNumero: data.empenhoNumero || null,
+      empenhos: data.empenhos || [],
       notes: data.notes || null,
       status: options.status ?? data.status ?? 'draft',
     };
@@ -194,6 +234,8 @@ export const requisicoesCompraService = {
       quantity: item.quantity,
       unit: item.unit || 'UN',
       unitPrice: item.unitPrice,
+      empenhoId: item.empenhoId || null,
+      empenhoNumero: item.empenhoNumero || null,
       sourceType: item.sourceType || 'manual',
       sourceItemKey: item.sourceItemKey || null,
       sourceReference: item.sourceReference || null,

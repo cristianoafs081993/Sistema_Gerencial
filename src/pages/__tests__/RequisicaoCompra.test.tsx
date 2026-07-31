@@ -10,6 +10,16 @@ import { contratosApiService } from '@/services/contratosApi';
 import { requisicoesCompraService } from '@/services/requisicoesCompra';
 import { transparenciaService } from '@/services/transparencia';
 
+vi.mock('sonner', () => ({
+  toast: {
+    dismiss: vi.fn(),
+    error: vi.fn(),
+    loading: vi.fn(() => 'toast-id'),
+    success: vi.fn(),
+    warning: vi.fn(),
+  },
+}));
+
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: vi.fn(),
 }));
@@ -24,6 +34,7 @@ vi.mock('@/services/requisicoesCompra', () => ({
     listPermissions: vi.fn(),
     getReviewItemReservations: vi.fn(),
     getRequisicaoById: vi.fn(),
+    saveRequisicao: vi.fn(),
   },
 }));
 
@@ -88,6 +99,11 @@ describe('RequisicaoCompraPage', () => {
       configurable: true,
       value: vi.fn(),
     });
+    global.ResizeObserver = class ResizeObserver {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
     vi.clearAllMocks();
 
     mockedUseAuth.mockReturnValue({
@@ -108,6 +124,7 @@ describe('RequisicaoCompraPage', () => {
 
     mockedService.listRecentRequisicoes.mockResolvedValue([]);
     mockedService.listPermissions.mockResolvedValue([]);
+    mockedService.saveRequisicao.mockResolvedValue('req-1');
     mockedService.getReviewItemReservations.mockResolvedValue({});
     mockedContratosApiService.getLiquidacoesPublicasPorEmpenho.mockResolvedValue([]);
     mockedTransparenciaService.getItensEmpenhoPortal.mockResolvedValue([]);
@@ -135,6 +152,10 @@ describe('RequisicaoCompraPage', () => {
         createdByEmail: 'terceirizado@ifrn.edu.br',
         empenhoId: 'emp-83',
         empenhoNumero: '2025NE000083',
+        empenhos: [
+          { empenhoId: 'emp-83', empenhoNumero: '2025NE000083', sortOrder: 0 },
+          { empenhoId: 'emp-84', empenhoNumero: '2025NE000084', sortOrder: 1 },
+        ],
         contratoId: 'contrato-1',
         contratoNumero: '00329/2025',
         processNumber: '23035.000001/2026-01',
@@ -152,7 +173,8 @@ describe('RequisicaoCompraPage', () => {
     expect(within(table).getByRole('columnheader', { name: /Referências/i })).toBeInTheDocument();
     expect(within(table).getByText('REQ-2026-0001')).toBeInTheDocument();
     expect(within(table).getByText('Em Revisão')).toBeInTheDocument();
-    expect(within(table).getByText('2025NE000083')).toBeInTheDocument();
+    expect(within(table).getByText(/2025NE000083/)).toBeInTheDocument();
+    expect(within(table).getByText(/2025NE000084/)).toBeInTheDocument();
     expect(within(table).getByText('00329/2025')).toBeInTheDocument();
     expect(within(table).getByRole('button', { name: /Visualizar e editar requisição REQ-2026-0001/i })).toBeInTheDocument();
     expect(within(table).getByRole('button', { name: /Aprovar requisição REQ-2026-0001/i })).toBeInTheDocument();
@@ -246,7 +268,7 @@ describe('RequisicaoCompraPage', () => {
     renderPage();
 
     fireEvent.click(await screen.findByRole('button', { name: /Nova Requisi.*Compra/i }));
-    fireEvent.pointerDown(screen.getByRole('combobox', { name: /Empenho/i }), { button: 0, ctrlKey: false, pointerType: 'mouse' });
+    fireEvent.click(screen.getByRole('combobox', { name: /Buscar e selecionar empenhos/i }));
 
     expect(await screen.findByText(/2026NE000001/)).toBeInTheDocument();
     expect(screen.queryByText(/2026NE000002/)).not.toBeInTheDocument();
@@ -286,10 +308,55 @@ describe('RequisicaoCompraPage', () => {
     renderPage();
 
     fireEvent.click(await screen.findByRole('button', { name: /Nova Requisi.*Compra/i }));
-    fireEvent.pointerDown(screen.getByRole('combobox', { name: /Empenho/i }), { button: 0, ctrlKey: false, pointerType: 'mouse' });
+    fireEvent.click(screen.getByRole('combobox', { name: /Buscar e selecionar empenhos/i }));
 
     expect(await screen.findByText(/2026NE000011/)).toBeInTheDocument();
     expect(await screen.findByText(/2026NE000012/)).toBeInTheDocument();
+  });
+
+  it('exibe combobox pesquisavel com numero, favorecido e descricao dos empenhos', async () => {
+    mockedUseData.mockReturnValue({
+      empenhos: [
+        {
+          id: 'emp-1',
+          numero: '2026NE000011',
+          descricao: 'Material de expediente',
+          favorecidoNome: 'Fornecedor Norte',
+          valor: 1000,
+          tipo: 'exercicio',
+          status: 'pendente',
+          dataEmpenho: new Date('2026-07-01T12:00:00Z'),
+          createdAt: new Date('2026-07-01T12:00:00Z'),
+          updatedAt: new Date('2026-07-01T12:00:00Z'),
+        },
+        {
+          id: 'emp-2',
+          numero: '2026NE000012',
+          descricao: 'Servico de manutencao',
+          favorecidoNome: 'Fornecedor Sul',
+          valor: 2000,
+          tipo: 'exercicio',
+          status: 'pendente',
+          dataEmpenho: new Date('2026-07-01T12:00:00Z'),
+          createdAt: new Date('2026-07-01T12:00:00Z'),
+          updatedAt: new Date('2026-07-01T12:00:00Z'),
+        },
+      ],
+      contratos: [],
+      contratosEmpenhos: [],
+    } as never);
+
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: /Nova Requisi.*Compra/i }));
+    fireEvent.click(screen.getByRole('combobox', { name: /Buscar e selecionar empenhos/i }));
+
+    expect(await screen.findByPlaceholderText(/Filtrar por n.*favorecido/i)).toBeInTheDocument();
+    const firstEmpenhoOption = await screen.findByText(/2026NE000011/);
+    expect(firstEmpenhoOption).toBeVisible();
+    expect(screen.getByText(/Fornecedor Norte/)).toBeInTheDocument();
+    expect(screen.getByText(/Material de expediente/)).toBeInTheDocument();
+    expect(screen.getByText(/2026NE000012/)).toBeInTheDocument();
   });
 
   it('restaura item da NE sem exigir contrato na edicao', async () => {
@@ -363,7 +430,7 @@ describe('RequisicaoCompraPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Editar requisição REQ-2026-0001/i }));
 
     expect(await screen.findByDisplayValue('ARROZ BENEFICIADO TIPO 1')).toBeDisabled();
-    expect(screen.getByText('Itens do empenho')).toBeInTheDocument();
+    expect(screen.getByText(/Itens do empenho 2026NE000083/)).toBeInTheDocument();
     expect(screen.getByText('Subitem da NE')).toBeInTheDocument();
     expect(screen.getByText('30 - MATERIAL DE CONSUMO')).toBeInTheDocument();
   });
