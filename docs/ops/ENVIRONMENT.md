@@ -20,7 +20,7 @@ Sem elas:
 ## Variável recomendada para convites
 
 - `VITE_APP_ORIGIN`
-  - origem pública do frontend, por exemplo `https://sistema-gerencial-gamma.vercel.app`
+  - origem pública do frontend, por exemplo `https://www.siages.com.br`
   - usada para montar o `redirectTo` dos convites como `/auth?mode=invite&next=/`
 
 Sem ela:
@@ -279,7 +279,7 @@ Necessarias no ambiente do Supabase:
 
 Observacoes operacionais:
 
-- o projeto Supabase precisa aceitar o `redirectTo` usado pelo app, por exemplo `https://sistema-gerencial-gamma.vercel.app/auth?mode=invite&next=/`
+- o projeto Supabase precisa aceitar o `redirectTo` usado pelo app, por exemplo `https://www.siages.com.br/auth?mode=invite&next=/`
 - o frontend usa `VITE_APP_ORIGIN` quando configurada; se ela não existir, usa a origem atual apenas quando ela não for local
 - o frontend bloqueia o envio quando o `redirectTo` resultante apontar para `localhost` ou loopback
 - para o usuario concluir o convite, o cliente do frontend precisa manter `detectSessionInUrl` habilitado

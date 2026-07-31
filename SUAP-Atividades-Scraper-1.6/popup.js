@@ -5,7 +5,6 @@ const SECRET_STORAGE_KEY = 'automation-event-secret';
 const SIAGES_APP_ORIGIN_STORAGE_KEY = 'siages-app-origin';
 const DEFAULT_SIAGES_APP_ORIGIN = 'https://www.siages.com.br';
 const LEGACY_SIAGES_APP_ORIGIN = 'https://sistema-gerencial-gamma.vercel.app';
-const EXTENSION_SESSION_STORAGE_KEY = 'siages-extension-session';
 
 const statusEl = document.getElementById('status');
 const btnExtractEn = document.getElementById('btn-extract-en');
@@ -13,67 +12,6 @@ const btnExtractAll = document.getElementById('btn-extract-all');
 const automationSecretInput = document.getElementById('automation-secret');
 const siagesAppOriginInput = document.getElementById('siages-app-origin');
 const saveSiagesAppOriginButton = document.getElementById('btn-save-siages-origin');
-const extensionAuthEmailInput = document.getElementById('extension-auth-email');
-const extensionAuthPasswordInput = document.getElementById('extension-auth-password');
-const extensionAuthStatus = document.getElementById('extension-auth-status');
-const extensionSignInButton = document.getElementById('btn-extension-sign-in');
-const extensionSignOutButton = document.getElementById('btn-extension-sign-out');
-
-function setExtensionAuthStatus(message, isError = false) {
-  extensionAuthStatus.textContent = message;
-  extensionAuthStatus.style.color = isError ? '#b91c1c' : '#334155';
-}
-
-async function updateExtensionAuthStatus() {
-  const stored = await chrome.storage.local.get(EXTENSION_SESSION_STORAGE_KEY);
-  const session = stored[EXTENSION_SESSION_STORAGE_KEY];
-  if (session?.accessToken && Number(session.expiresAt || 0) > Date.now() / 1000) {
-    setExtensionAuthStatus('Sessão da extensão ativa. Os dados serão filtrados pelas permissões do seu usuário.');
-  } else {
-    setExtensionAuthStatus('Entre para permitir que a extensão consulte o banco de dados.');
-  }
-}
-
-async function signInExtension() {
-  const email = extensionAuthEmailInput.value.trim();
-  const password = extensionAuthPasswordInput.value;
-  if (!email || !password) {
-    setExtensionAuthStatus('Informe e-mail e senha do SIAGES.', true);
-    return;
-  }
-
-  try {
-    extensionSignInButton.disabled = true;
-    setExtensionAuthStatus('Autenticando a extensão...');
-    const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-      method: 'POST',
-      headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    if (!response.ok) throw new Error('Não foi possível autenticar. Verifique e-mail e senha.');
-    const payload = await response.json();
-    await chrome.storage.local.set({
-      [EXTENSION_SESSION_STORAGE_KEY]: {
-        accessToken: payload.access_token,
-        refreshToken: payload.refresh_token,
-        expiresAt: Math.floor(Date.now() / 1000) + Number(payload.expires_in || 3600),
-      },
-    });
-    extensionAuthPasswordInput.value = '';
-    setExtensionAuthStatus('Sessão ativa. Recarregue a página do plano para consultar os dados.');
-  } catch (error) {
-    setExtensionAuthStatus(error instanceof Error ? error.message : 'Não foi possível autenticar a extensão.', true);
-  } finally {
-    extensionSignInButton.disabled = false;
-  }
-}
-
-extensionSignInButton.addEventListener('click', () => { void signInExtension(); });
-extensionSignOutButton.addEventListener('click', async () => {
-  await chrome.storage.local.remove(EXTENSION_SESSION_STORAGE_KEY);
-  setExtensionAuthStatus('Sessão da extensão removida.');
-});
-void updateExtensionAuthStatus();
 
 async function getSiagesAppOrigin() {
   const stored = await chrome.storage.local.get(SIAGES_APP_ORIGIN_STORAGE_KEY);

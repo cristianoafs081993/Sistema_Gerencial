@@ -119,6 +119,10 @@ vi.mock('@/pages/SuapExtensionProcessInfo', () => ({
   default: () => <div>suap-extension-process-info-page</div>,
 }));
 
+vi.mock('@/pages/SuapExtensionPlanSummary', () => ({
+  default: () => <div>suap-extension-plan-summary-page</div>,
+}));
+
 vi.mock('@/pages/EconomiaTempo', () => ({
   default: () => <div>economia-tempo-page</div>,
 }));
@@ -231,6 +235,15 @@ describe('App routes', () => {
     render(<App />);
 
     expect(await screen.findByText('suap-extension-process-info-page')).toBeInTheDocument();
+    expect(screen.queryByTestId('app-layout')).not.toBeInTheDocument();
+  });
+
+  it('renderiza a rota leve do resumo do plano SUAP sem layout global', async () => {
+    window.history.pushState({}, '', '/suap-extensao/plano-resumo');
+
+    render(<App />);
+
+    expect(await screen.findByText('suap-extension-plan-summary-page')).toBeInTheDocument();
     expect(screen.queryByTestId('app-layout')).not.toBeInTheDocument();
   });
 

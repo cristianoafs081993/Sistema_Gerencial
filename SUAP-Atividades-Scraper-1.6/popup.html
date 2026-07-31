@@ -20,11 +20,6 @@
       padding-bottom: 8px;
       border-bottom: 1px solid #e2e8f0;
     }
-    h3 {
-      margin: 0 0 8px;
-      font-size: 13px;
-      color: #1e293b;
-    }
     label {
       display: block;
       margin-bottom: 10px;
@@ -67,21 +62,6 @@
     .secondary:hover {
       background-color: #334155;
     }
-    .auth-card {
-      margin: 0 0 14px;
-      padding: 12px;
-      border: 1px solid #bfdbfe;
-      border-radius: 8px;
-      background: #eff6ff;
-    }
-    .auth-card button:last-of-type {
-      margin-bottom: 0;
-    }
-    #extension-auth-status {
-      margin: 8px 0 0;
-      font-size: 12px;
-      color: #334155;
-    }
     #status {
       margin-top: 12px;
       font-size: 13px;
@@ -103,20 +83,6 @@
 </head>
 <body>
   <h2>SUAP Scraper</h2>
-  <section class="auth-card" aria-labelledby="extension-auth-title">
-    <h3 id="extension-auth-title">Acesso ao banco de dados</h3>
-    <label>
-      E-mail do SIAGES
-      <input id="extension-auth-email" type="email" autocomplete="username">
-    </label>
-    <label>
-      Senha do SIAGES
-      <input id="extension-auth-password" type="password" autocomplete="current-password">
-    </label>
-    <button id="btn-extension-sign-in" type="button">Entrar no banco</button>
-    <button id="btn-extension-sign-out" type="button" class="secondary">Sair do banco</button>
-    <p id="extension-auth-status" aria-live="polite">A extensão consulta o banco com as permissões do seu usuário.</p>
-  </section>
   <label>
     URL do SIAGES
     <input id="siages-app-origin" type="url" inputmode="url" placeholder="https://www.siages.com.br">
