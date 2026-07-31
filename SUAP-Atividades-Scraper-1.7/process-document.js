@@ -240,7 +240,7 @@
     Object.assign(widget.style, {
       position: 'fixed', right: '20px', bottom: '20px', zIndex: '2147483646',
       width: 'min(360px, calc(100vw - 40px))', maxHeight: 'calc(100vh - 40px)',
-      display: 'flex', flexDirection: 'column', gap: '10px', boxSizing: 'border-box',
+      display: 'flex', flexDirection: 'column', gap: '10px', minHeight: '0', overflow: 'hidden', boxSizing: 'border-box',
     });
     document.body.appendChild(widget);
     return widget;
@@ -258,7 +258,7 @@
       maxWidth: integrated ? '100%' : '',
       minWidth: '0',
       maxHeight: integrated ? 'none' : 'min(640px, calc(100vh - 110px))',
-      overflow: integrated ? 'hidden' : 'auto',
+      overflow: 'auto',
       margin: integrated ? '16px 0 0' : '0',
       border: `1px solid ${colors.panelBorder}`,
       borderRadius: '12px',
@@ -267,7 +267,7 @@
       color: colors.panelText,
       fontFamily: 'Arial, sans-serif',
       fontSize: '13px',
-      boxSizing: 'border-box',
+      flex: integrated ? '1 1 auto' : 'none', minHeight: '0', boxSizing: 'border-box',
       alignSelf: 'stretch',
     });
     panel.dataset.siagesPlacement = placement.mode;
@@ -570,7 +570,7 @@
     Object.assign(button.style, {
       width: '100%', border: '0', borderRadius: '7px',
       padding: '10px 14px', background: '#047857', color: '#fff', boxShadow: '0 8px 20px rgba(4, 120, 87, 0.28)',
-      cursor: 'pointer', fontFamily: 'Arial, sans-serif', fontSize: '14px', fontWeight: '600',
+      cursor: 'pointer', flex: '0 0 auto', fontFamily: 'Arial, sans-serif', fontSize: '14px', fontWeight: '600',
     });
     button.addEventListener('click', openModal);
     widget.appendChild(button);

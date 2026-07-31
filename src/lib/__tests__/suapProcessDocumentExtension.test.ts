@@ -192,7 +192,9 @@ describe('process-document extension script', () => {
     expect(document.getElementById('processo-principal')?.contains(panel)).toBe(false);
     expect(panel.dataset.siagesPlacement).toBe('widget');
     expect(panel.style.position).toBe('static');
-    expect(panel.style.overflow).toBe('hidden');
+    expect(panel.style.overflow).toBe('auto');
+    expect(panel.style.flex).toBe('1 1 auto');
+    expect(widget.style.overflow).toBe('hidden');
     expect(panel.style.maxWidth).toBe('100%');
   });
   it('usa o painel a direita sem depender de uma area de tramitacao', () => {
