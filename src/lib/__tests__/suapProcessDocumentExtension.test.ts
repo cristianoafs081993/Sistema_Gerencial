@@ -22,10 +22,13 @@ type ExtensionWindow = Window & typeof globalThis & {
 function loadProcessScript() {
   const testWindow = window as ExtensionWindow;
   testWindow.__SIAGES_SUAP_PROCESS_TEST__ = true;
+  const extensionSession = { accessToken: 'access-token', refreshToken: 'refresh-token', expiresAt: Date.now() / 1000 + 3600 };
   testWindow.chrome = {
-    storage: { local: { get: (_key: string, callback: (value: Record<string, string>) => void) => callback({}) } },
+    storage: { local: { get: (key: string, callback: (value: Record<string, unknown>) => void) => callback(
+      key === 'siages-extension-session' ? { 'siages-extension-session': extensionSession } : {},
+    ) } },
   };
-  const script = readFileSync(resolve(process.cwd(), 'suap-atividades-extension/process-document.js'), 'utf8');
+  const script = readFileSync(resolve(process.cwd(), 'SUAP-Atividades-Scraper-1.7/process-document.js'), 'utf8');
   window.eval(script);
   if (!testWindow.__siagesSuapProcessDocument) throw new Error('Content script nao foi carregado.');
   return testWindow.__siagesSuapProcessDocument;
@@ -99,7 +102,7 @@ describe('process-document extension script', () => {
     const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage').mockImplementation(() => undefined);
 
     window.dispatchEvent(new MessageEvent('message', {
-      origin: 'https://sistema-gerencial-gamma.vercel.app',
+      origin: 'https://www.siages.com.br',
       source: frame.contentWindow,
       data: { source: 'siages', type: 'siages:suap-dispatch-ready', version: 1 },
     }));
@@ -108,7 +111,7 @@ describe('process-document extension script', () => {
       source: 'siages-suap-extension',
       type: 'siages:suap-process-context',
       payload: expect.objectContaining({ suapId: '321', processNumber: '23035.000001.2026-11' }),
-    }), 'https://sistema-gerencial-gamma.vercel.app');
+    }), 'https://www.siages.com.br');
     postMessage.mockRestore();
   });
 
@@ -124,7 +127,7 @@ describe('process-document extension script', () => {
     const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage').mockImplementation(() => undefined);
 
     window.dispatchEvent(new MessageEvent('message', {
-      origin: 'https://sistema-gerencial-gamma.vercel.app',
+      origin: 'https://www.siages.com.br',
       source: frame.contentWindow,
       data: { source: 'siages', type: 'siages:suap-process-info-ready', version: 1 },
     }));
@@ -133,10 +136,10 @@ describe('process-document extension script', () => {
       source: 'siages-suap-extension',
       type: 'siages:suap-process-context',
       payload: expect.objectContaining({ suapId: '321' }),
-    }), 'https://sistema-gerencial-gamma.vercel.app');
+    }), 'https://www.siages.com.br');
 
     window.dispatchEvent(new MessageEvent('message', {
-      origin: 'https://sistema-gerencial-gamma.vercel.app',
+      origin: 'https://www.siages.com.br',
       source: frame.contentWindow,
       data: {
         source: 'siages',

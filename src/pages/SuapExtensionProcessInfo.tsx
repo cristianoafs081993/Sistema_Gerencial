@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
-import { useAuth } from '@/contexts/AuthContext';
 import {
   getSuapExtensionProcessContext,
   SUAP_EXTENSION_ORIGIN,
@@ -10,6 +9,7 @@ import {
   type SuapExtensionProcessContext,
 } from '@/lib/suapExtensionDispatch';
 import { suapProcessFinanceService, type SuapProcessFinanceSummary } from '@/services/suapProcessFinance';
+import { supabase } from '@/lib/supabase';
 
 function postMessageToSuapParent(message: unknown) {
   try {
@@ -29,8 +29,6 @@ function postSummary(summary: SuapProcessFinanceSummary) {
 }
 
 export default function SuapExtensionProcessInfo() {
-  const { user } = useAuth();
-  const userId = user?.id;
   const [context, setContext] = useState<SuapExtensionProcessContext | null>(null);
   const [status, setStatus] = useState('Aguardando o contexto do processo SUAP...');
 
@@ -69,12 +67,27 @@ export default function SuapExtensionProcessInfo() {
   }, []);
 
   useEffect(() => {
-    if (!context || !userId) return;
+    if (!context) return;
 
     let active = true;
     setStatus('Consultando empenhos do beneficiario no SIAGES...');
 
-    void suapProcessFinanceService.getSummaryBySuapId(context.suapId)
+    void (async () => {
+      const extensionSession = context.extensionSession;
+      if (!extensionSession) {
+        throw new Error('A extensao precisa ser autenticada no popup antes de consultar o resumo.');
+      }
+
+      const { data, error } = await supabase.auth.setSession({
+        access_token: extensionSession.accessToken,
+        refresh_token: extensionSession.refreshToken,
+      });
+      if (error || !data.session) {
+        throw error ?? new Error('Nao foi possivel iniciar a sessao da extensao.');
+      }
+
+      return suapProcessFinanceService.getSummaryBySuapId(context.suapId);
+    })()
       .then((summary) => {
         if (!active) return;
         postSummary(summary);
@@ -94,7 +107,7 @@ export default function SuapExtensionProcessInfo() {
     return () => {
       active = false;
     };
-  }, [context, userId]);
+  }, [context]);
 
   return <EmbeddedStatus message={status} />;
 }

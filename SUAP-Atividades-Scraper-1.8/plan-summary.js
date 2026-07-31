@@ -7,7 +7,9 @@
   const SIAGES_APP_ORIGIN_STORAGE_KEY = 'siages-app-origin';
   const DEFAULT_SIAGES_APP_ORIGIN = 'https://www.siages.com.br';
   const LEGACY_SIAGES_APP_ORIGIN = 'https://sistema-gerencial-gamma.vercel.app';
-  const SUAP_ORIGIN = 'https://suap.ifrn.edu.br';
+  const SUPABASE_URL = 'https://mnqhwyrzhgykjlyyqodd.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ucWh3eXJ6aGd5a2pseXlxb2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNzk4NjIsImV4cCI6MjA4NTg1NTg2Mn0.g9h5nF0l8yKG-yjQRI8i_mq084IzKTrH64F2FpreVIg';
+  const EXTENSION_SESSION_STORAGE_KEY = 'siages-extension-session';
   const PLAN_PATH = /^\/plan_estrategico\/plano_concluido\/8\/?$/;
   const BALANCE_LABEL = 'saldo disponivel para empenho da atividade r';
   const DIMENSION_CODES = new Set(['AD', 'AE', 'CI', 'EN', 'EX', 'GE', 'GO', 'GP', 'IE', 'IN', 'PI', 'TI']);
@@ -61,6 +63,93 @@
     if (!value) return '-';
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+  }
+
+  function getDimensionIdentity({ dimensao, planoInterno, descricao }) {
+    const directCode = getDimensionCode(dimensao);
+    const fromPlanInternal = cleanText(planoInterno).toUpperCase().match(/([A-Z]{2})[A-Z]?$/)?.[1];
+    const fromDescription = getDimensionCode(descricao);
+    const code = directCode || (fromPlanInternal && DIMENSION_CODES.has(fromPlanInternal) ? fromPlanInternal : null) || fromDescription;
+    const fallback = cleanText(dimensao) || 'Sem dimensão';
+    const labels = {
+      AD: 'AD - Administração', AE: 'AE - Atividades Estudantis', CI: 'CI - Comunicação Institucional',
+      EN: 'EN - Ensino', EX: 'EX - Extensão', GE: 'GE - Gestão Estratégica e Desenvolvimento Institucional',
+      GO: 'GO - Governança', GP: 'GP - Gestão de Pessoas', IE: 'IE - Infraestrutura',
+      IN: 'IN - Internacionalização', PI: 'PI - Pesquisa, Pós-Graduação e Inovação',
+      TI: 'TI - Tecnologia da Informação e Comunicação',
+    };
+    return {
+      key: code || normalizeText(fallback).toUpperCase(),
+      dimensao: code ? labels[code] : fallback,
+    };
+  }
+
+  function getOrCreateDimension(map, identity) {
+    const resolved = getDimensionIdentity(identity);
+    if (map.has(resolved.key)) return map.get(resolved.key);
+    const dimension = {
+      key: resolved.key,
+      dimensao: resolved.dimensao,
+      totalPlanejado: 0,
+      totalDescentralizado: 0,
+      aDescentralizar: 0,
+      totalEmpenhado: 0,
+      aEmpenhar: 0,
+      atividades: [],
+      descentralizacoes: [],
+      empenhos: [],
+    };
+    map.set(resolved.key, dimension);
+    return dimension;
+  }
+
+  function buildDirectPlanSummary(atividades, descentralizacoes, empenhos) {
+    const dimensions = new Map();
+    atividades.forEach((atividade) => {
+      const dimension = getOrCreateDimension(dimensions, {
+        dimensao: atividade.dimensao, planoInterno: atividade.plano_interno, descricao: atividade.descricao,
+      });
+      const valor = Number(atividade.valor_total) || 0;
+      dimension.totalPlanejado += valor;
+      dimension.atividades.push({
+        id: String(atividade.id), atividade: atividade.atividade || '', descricao: atividade.descricao || '',
+        componenteFuncional: atividade.componente_funcional || '', origemRecurso: atividade.origem_recurso || '',
+        planoInterno: atividade.plano_interno || '', valor,
+      });
+    });
+    descentralizacoes.forEach((descentralizacao) => {
+      const dimension = getOrCreateDimension(dimensions, {
+        dimensao: descentralizacao.dimensao, planoInterno: descentralizacao.plano_interno, descricao: descentralizacao.descricao,
+      });
+      const valor = Number(descentralizacao.valor) || 0;
+      dimension.totalDescentralizado += valor;
+      dimension.descentralizacoes.push({
+        id: String(descentralizacao.id), notaCredito: descentralizacao.nota_credito || undefined,
+        descricao: descentralizacao.descricao || undefined, origemRecurso: descentralizacao.origem_recurso || '',
+        naturezaDespesa: descentralizacao.natureza_despesa || undefined, planoInterno: descentralizacao.plano_interno || undefined,
+        dataEmissao: descentralizacao.data_emissao || undefined, valor,
+      });
+    });
+    empenhos.filter((empenho) => (empenho.tipo || 'exercicio') === 'exercicio' && empenho.status !== 'cancelado').forEach((empenho) => {
+      const dimension = getOrCreateDimension(dimensions, {
+        dimensao: empenho.dimensao, planoInterno: empenho.plano_interno, descricao: empenho.descricao,
+      });
+      const valor = Number(empenho.valor) || 0;
+      dimension.totalEmpenhado += valor;
+      dimension.empenhos.push({
+        id: String(empenho.id), numero: empenho.numero || '', descricao: empenho.descricao || '',
+        origemRecurso: empenho.origem_recurso || '', dataEmpenho: empenho.data_empenho || '', valor,
+      });
+    });
+    const dimensoes = Array.from(dimensions.values()).map((dimension) => ({
+      ...dimension,
+      aDescentralizar: dimension.totalPlanejado - dimension.totalDescentralizado,
+      aEmpenhar: dimension.totalDescentralizado - dimension.totalEmpenhado,
+      atividades: dimension.atividades.sort((left, right) => left.atividade.localeCompare(right.atividade, 'pt-BR')),
+      descentralizacoes: dimension.descentralizacoes.sort((left, right) => String(right.dataEmissao || '').localeCompare(String(left.dataEmissao || ''))),
+      empenhos: dimension.empenhos.sort((left, right) => right.dataEmpenho.localeCompare(left.dataEmpenho)),
+    })).sort((left, right) => left.dimensao.localeCompare(right.dimensao, 'pt-BR'));
+    return { planId: 8, dimensoes };
   }
 
   function getDimensionCode(value) {
@@ -140,26 +229,102 @@
     return blocks;
   }
 
-  function getStoredSiagesOrigin() {
+  function getStoredValue(key) {
     return new Promise((resolve) => {
-      const onStored = (stored) => {
-        const storedOrigin = stored?.[SIAGES_APP_ORIGIN_STORAGE_KEY];
-        const candidate = storedOrigin === LEGACY_SIAGES_APP_ORIGIN
-          ? DEFAULT_SIAGES_APP_ORIGIN
-          : (storedOrigin || DEFAULT_SIAGES_APP_ORIGIN);
-        try {
-          const url = new URL(candidate);
-          resolve(url.protocol === 'https:' ? url.origin : null);
-        } catch {
-          resolve(null);
-        }
-      };
       if (!window.chrome?.storage?.local?.get) {
-        onStored({});
+        resolve(undefined);
         return;
       }
-      chrome.storage.local.get(SIAGES_APP_ORIGIN_STORAGE_KEY, onStored);
+      chrome.storage.local.get(key, (stored) => resolve(stored?.[key]));
     });
+  }
+
+  function setStoredValue(key, value) {
+    return new Promise((resolve) => {
+      if (!window.chrome?.storage?.local?.set) {
+        resolve();
+        return;
+      }
+      chrome.storage.local.set({ [key]: value }, resolve);
+    });
+  }
+
+  function removeStoredValue(key) {
+    return new Promise((resolve) => {
+      if (!window.chrome?.storage?.local?.remove) {
+        resolve();
+        return;
+      }
+      chrome.storage.local.remove(key, resolve);
+    });
+  }
+
+  async function refreshExtensionSession(refreshToken) {
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    if (!response.ok) throw new Error('A sessão da extensão expirou. Abra o popup e entre novamente.');
+    const payload = await response.json();
+    const session = {
+      accessToken: payload.access_token,
+      refreshToken: payload.refresh_token,
+      expiresAt: Math.floor(Date.now() / 1000) + Number(payload.expires_in || 3600),
+    };
+    await setStoredValue(EXTENSION_SESSION_STORAGE_KEY, session);
+    return session;
+  }
+
+  async function getExtensionSession() {
+    const session = await getStoredValue(EXTENSION_SESSION_STORAGE_KEY);
+    if (!session?.accessToken || !session?.refreshToken) {
+      throw new Error('Autentique a extensão no popup para consultar os dados do banco.');
+    }
+    if (Number(session.expiresAt || 0) <= (Date.now() / 1000) + 60) {
+      try {
+        return await refreshExtensionSession(session.refreshToken);
+      } catch (error) {
+        await removeStoredValue(EXTENSION_SESSION_STORAGE_KEY);
+        throw error;
+      }
+    }
+    return session;
+  }
+
+  async function fetchTableRows(table, select, order, session) {
+    const rows = [];
+    const pageSize = 1000;
+    for (let offset = 0; ; offset += pageSize) {
+      const params = new URLSearchParams({ select, order });
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`, {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${session.accessToken}`,
+          Range: `${offset}-${offset + pageSize - 1}`,
+        },
+      });
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          await removeStoredValue(EXTENSION_SESSION_STORAGE_KEY);
+          throw new Error('A sessão da extensão não tem acesso a estes dados. Entre novamente no popup.');
+        }
+        throw new Error(`Falha ao consultar ${table} no banco (${response.status}).`);
+      }
+      const page = await response.json();
+      rows.push(...page);
+      if (page.length < pageSize) return rows;
+    }
+  }
+
+  async function fetchDirectPlanSummary() {
+    const session = await getExtensionSession();
+    const [atividades, descentralizacoes, empenhos] = await Promise.all([
+      fetchTableRows('atividades', 'id,dimensao,componente_funcional,atividade,descricao,valor_total,origem_recurso,plano_interno', 'created_at.desc', session),
+      fetchTableRows('descentralizacoes', 'id,dimensao,nota_credito,origem_recurso,natureza_despesa,plano_interno,data_emissao,descricao,valor', 'data_emissao.desc.nullslast', session),
+      fetchTableRows('empenhos', 'id,numero,descricao,valor,dimensao,origem_recurso,plano_interno,data_empenho,status,tipo', 'created_at.desc', session),
+    ]);
+    return buildDirectPlanSummary(atividades, descentralizacoes, empenhos);
   }
 
   function ensureStyles() {
@@ -329,7 +494,7 @@
     const titleGroup = createElement('div');
     titleGroup.append(
       createElement('h2', 'Resumo por dimensão'),
-      createElement('p', 'Valores consolidados do SIAGES para o plano de atividades 2026.'),
+      createElement('p', 'Dados consultados diretamente no banco para o plano de atividades 2026.'),
     );
     const switchLabel = createElement('label', undefined, 'siages-plan-switch');
     const checkbox = document.createElement('input');
@@ -391,7 +556,7 @@
     const header = createElement('div', undefined, 'siages-plan-header');
     header.append(
       createElement('div', 'Resumo por dimensão'),
-      createElement('span', 'Carregando dados do SIAGES...'),
+      createElement('span', 'Consultando dados do banco...'),
     );
     panel.appendChild(header);
   }
@@ -458,65 +623,9 @@
     state.cleanupRequest?.();
     document.getElementById(FRAME_ID)?.remove();
     renderLoading();
-    void getStoredSiagesOrigin().then((siagesOrigin) => {
-      if (!siagesOrigin) {
-        renderError('Configure uma origem HTTPS válida do SIAGES na extensão.');
-        return;
-      }
-
-      const frame = document.createElement('iframe');
-      frame.id = FRAME_ID;
-      frame.src = `${siagesOrigin}/suap-extensao/plano-resumo`;
-      frame.title = 'Resumo do plano no SIAGES';
-      Object.assign(frame.style, { position: 'absolute', width: '1px', height: '1px', border: '0', opacity: '0', pointerEvents: 'none' });
-      const context = {
-        source: 'siages-suap-extension',
-        type: 'siages:suap-plan-context',
-        version: 1,
-        payload: { planId: 8, planUrl: window.location.origin + window.location.pathname },
-      };
-      let frameLoaded = false;
-      let readyReceived = false;
-      const postContext = () => frame.contentWindow?.postMessage(context, siagesOrigin);
-      const timeout = window.setTimeout(() => {
-        cleanup();
-        if (!frameLoaded) {
-          renderError(`O iframe do SIAGES não carregou em ${siagesOrigin}. Verifique a URL configurada na extensão.`);
-        } else if (!readyReceived) {
-          renderError(`O SIAGES abriu, mas a sessão não foi reconhecida. Abra ${siagesOrigin} em outra guia, entre no sistema e tente novamente.`);
-        } else {
-          renderError(`O SIAGES recebeu a solicitação, mas não enviou o resumo. Tente novamente em alguns instantes.`);
-        }
-      }, 12000);
-      const cleanup = () => {
-        window.clearTimeout(timeout);
-        window.removeEventListener('message', receiveMessage);
-        frame.remove();
-        if (state.cleanupRequest === cleanup) state.cleanupRequest = null;
-      };
-      const receiveMessage = (event) => {
-        if (isValidPlanMessage(event, siagesOrigin, frame, 'siages:suap-plan-summary-ready')) {
-          readyReceived = true;
-          postContext();
-          return;
-        }
-        if (isValidPlanMessage(event, siagesOrigin, frame, 'siages:suap-plan-summary')) {
-          cleanup();
-          renderSummary(event.data.payload);
-        }
-        if (isValidPlanMessage(event, siagesOrigin, frame, 'siages:suap-plan-summary-error')) {
-          cleanup();
-          renderError(event.data.payload.message);
-        }
-      };
-      frame.addEventListener('load', () => {
-        frameLoaded = true;
-        postContext();
-      });
-      window.addEventListener('message', receiveMessage);
-      state.cleanupRequest = cleanup;
-      document.body.appendChild(frame);
-    });
+    void fetchDirectPlanSummary()
+      .then(renderSummary)
+      .catch((error) => renderError(error instanceof Error ? error.message : 'Não foi possível consultar o banco de dados.'));
   }
 
   function dispose() {
@@ -530,6 +639,8 @@
   window.__siagesSuapPlanSummary = {
     parseCurrency,
     isValidSummaryPayload,
+    buildDirectPlanSummary,
+    fetchDirectPlanSummary,
     collectActivityBlocks,
     applyBalanceFilter,
     renderSummary,

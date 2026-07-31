@@ -8,6 +8,9 @@
   const SIAGES_APP_ORIGIN_STORAGE_KEY = 'siages-app-origin';
   const DEFAULT_SIAGES_APP_ORIGIN = 'https://www.siages.com.br';
   const LEGACY_SIAGES_APP_ORIGIN = 'https://sistema-gerencial-gamma.vercel.app';
+  const SUPABASE_URL = 'https://mnqhwyrzhgykjlyyqodd.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ucWh3eXJ6aGd5a2pseXlxb2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNzk4NjIsImV4cCI6MjA4NTg1NTg2Mn0.g9h5nF0l8yKG-yjQRI8i_mq084IzKTrH64F2FpreVIg';
+  const EXTENSION_SESSION_STORAGE_KEY = 'siages-extension-session';
 
   function cleanText(value) {
     return value ? value.replace(/\s+/g, ' ').trim() : '';
@@ -47,7 +50,42 @@
     });
   }
 
-  function buildContext() {
+  function getStoredValue(key) {
+    return new Promise((resolve) => {
+      if (!window.chrome?.storage?.local?.get) {
+        resolve(undefined);
+        return;
+      }
+      chrome.storage.local.get(key, (stored) => resolve(stored?.[key]));
+    });
+  }
+
+  async function getExtensionSession() {
+    const storedSession = await getStoredValue(EXTENSION_SESSION_STORAGE_KEY);
+    if (!storedSession?.accessToken || !storedSession?.refreshToken) {
+      throw new Error('Autentique a extensao no popup para consultar o resumo financeiro.');
+    }
+    if (Number(storedSession.expiresAt || 0) > (Date.now() / 1000) + 60) return storedSession;
+
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: storedSession.refreshToken }),
+    });
+    if (!response.ok) throw new Error('A sessao da extensao expirou. Abra o popup e entre novamente.');
+    const payload = await response.json();
+    const session = {
+      accessToken: payload.access_token,
+      refreshToken: payload.refresh_token,
+      expiresAt: Math.floor(Date.now() / 1000) + Number(payload.expires_in || 3600),
+    };
+    if (window.chrome?.storage?.local?.set) {
+      await new Promise((resolve) => chrome.storage.local.set({ [EXTENSION_SESSION_STORAGE_KEY]: session }, resolve));
+    }
+    return session;
+  }
+  function buildContext(extensionSession) {
+
     const suapId = getProcessId();
     if (!suapId) return null;
     return {
@@ -58,6 +96,7 @@
         suapId,
         processNumber: getProcessNumber(),
         processUrl: window.location.origin + window.location.pathname,
+        ...(extensionSession ? { extensionSession } : {}),
       },
     };
   }
@@ -401,16 +440,17 @@
     panel.append(header, totals, list);
   }
   function openFinanceBridge() {
-    const context = buildContext();
-    if (!context || document.getElementById(FINANCE_FRAME_ID)) return;
+    if (!getProcessId() || document.getElementById(FINANCE_FRAME_ID)) return;
     renderFinanceLoading();
 
-    void getStoredSiagesOrigin().then((siagesOrigin) => {
+    void Promise.all([getStoredSiagesOrigin(), getExtensionSession()]).then(([siagesOrigin, session]) => {
       if (!siagesOrigin) {
         renderFinanceEmpty('Configure uma origem HTTPS valida do SIAGES na extensao.');
         return;
       }
       if (document.getElementById(FINANCE_FRAME_ID)) return;
+      const context = buildContext({ accessToken: session.accessToken, refreshToken: session.refreshToken });
+      if (!context) return;
 
       const frame = document.createElement('iframe');
       frame.id = FINANCE_FRAME_ID;
@@ -441,6 +481,8 @@
       frame.addEventListener('load', postContext);
       window.addEventListener('message', receiveFromSiages);
       document.body.appendChild(frame);
+    }).catch((error) => {
+      renderFinanceEmpty(error instanceof Error ? error.message : 'Nao foi possivel autenticar a extensao.');
     });
   }
 

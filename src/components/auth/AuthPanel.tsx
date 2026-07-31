@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { normalizeNextPath } from '@/lib/auth';
-import { env } from '@/lib/env';
+import { buildSuapAuthorizeUrl } from '@/lib/suapAuth';
 
 type AuthPanelProps = {
   title: string;
@@ -52,12 +52,7 @@ export function AuthPanel({ title, description }: AuthPanelProps) {
 
   const handleSuapLogin = () => {
     localStorage.setItem('suap_login_next', nextPath);
-    const clientId = env.suapClientId;
-    const redirectUri = window.location.origin + '/suap-callback';
-    const state = 'app';
-    const suapAuthUrl = `https://suap.ifrn.edu.br/o/authorize/?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(
-      redirectUri
-    )}&state=${encodeURIComponent(state)}`;
+    const suapAuthUrl = buildSuapAuthorizeUrl({ state: 'app' });
     window.location.href = suapAuthUrl;
   };
 

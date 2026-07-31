@@ -4,6 +4,7 @@ import { Loader2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { env } from '@/lib/env';
+import { getSuapRedirectUri } from '@/lib/suapAuth';
 import { supabase } from '@/lib/supabase';
 
 export default function SuapCallback() {
@@ -48,7 +49,7 @@ export default function SuapCallback() {
       const isAppLogin = state === 'app' || (state && state.startsWith('app'));
 
       try {
-        const redirectUri = window.location.origin + '/suap-callback';
+        const redirectUri = getSuapRedirectUri();
         
         const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/suap-token-exchange`, {
           method: 'POST',

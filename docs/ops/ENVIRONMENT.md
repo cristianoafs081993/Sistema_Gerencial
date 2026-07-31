@@ -17,11 +17,12 @@ Sem elas:
 - o fallback REST nao funciona
 - chamadas a Edge Functions montadas pelo frontend falham
 
-## Variável recomendada para convites
+## Variavel recomendada para convites e login SUAP
 
 - `VITE_APP_ORIGIN`
   - origem pública do frontend, por exemplo `https://www.siages.com.br`
   - usada para montar o `redirectTo` dos convites como `/auth?mode=invite&next=/`
+  - usada tambem para montar o callback OAuth SUAP como `/suap-callback`, evitando divergencia entre dominios de preview/producao
 
 Sem ela:
 
@@ -55,7 +56,8 @@ Sem isso:
   - em desenvolvimento local, deve apontar para um client SUAP separado cujo redirect seja `http://localhost:5173/suap-callback`
 - `VITE_APP_ORIGIN`
   - sem default
-  - recomendada para qualquer ambiente que possa enviar convites de usuário
+  - recomendada para qualquer ambiente que possa enviar convites de usuario ou login SUAP
+  - quando configurada, define a origem canonica do callback OAuth SUAP como `<VITE_APP_ORIGIN>/suap-callback`; essa origem deve bater exatamente com o redirect cadastrado no client SUAP
 - `PORTAL_TRANSPARENCIA_API_KEY` ou `VITE_PORTAL_TRANSPARENCIA_API_KEY`
   - chave `chave-api-dados` do Portal da Transparencia
   - usada pelo proxy local do Vite para injetar a credencial nas chamadas `/api-transparencia`; se ausente, o proxy usa o fallback operacional atual do codigo

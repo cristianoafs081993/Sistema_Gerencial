@@ -6,6 +6,11 @@ export type SuapExtensionProcessContext = {
   suapId: string;
   processNumber?: string;
   processUrl: string;
+  /** Sessao efemera enviada pelo armazenamento privado da extensao. */
+  extensionSession?: {
+    accessToken: string;
+    refreshToken: string;
+  };
 };
 
 export type SuapExtensionProcessContextMessage = {
@@ -87,7 +92,16 @@ export function isValidSuapExtensionProcessContext(value: unknown): value is Sua
     typeof payload.suapId !== 'string' ||
     !/^\d+$/.test(payload.suapId) ||
     typeof payload.processUrl !== 'string' ||
-    (payload.processNumber !== undefined && typeof payload.processNumber !== 'string')
+    (payload.processNumber !== undefined && typeof payload.processNumber !== 'string') ||
+    (payload.extensionSession !== undefined && (
+      typeof payload.extensionSession !== 'object' ||
+      typeof payload.extensionSession.accessToken !== 'string' ||
+      typeof payload.extensionSession.refreshToken !== 'string' ||
+      !payload.extensionSession.accessToken ||
+      !payload.extensionSession.refreshToken ||
+      payload.extensionSession.accessToken.length > 10000 ||
+      payload.extensionSession.refreshToken.length > 10000
+    ))
   ) {
     return false;
   }
@@ -106,8 +120,18 @@ export function getSuapExtensionProcessContext(event: MessageEvent, expectedSour
     return null;
   }
 
-  const { suapId, processUrl, processNumber } = event.data.payload;
-  return { suapId, processUrl, processNumber: processNumber?.trim() || undefined };
+  const { suapId, processUrl, processNumber, extensionSession } = event.data.payload;
+  return {
+    suapId,
+    processUrl,
+    processNumber: processNumber?.trim() || undefined,
+    ...(extensionSession ? {
+      extensionSession: {
+        accessToken: extensionSession.accessToken,
+        refreshToken: extensionSession.refreshToken,
+      },
+    } : {}),
+  };
 }
 
 export function isValidSuapExtensionPlanContext(value: unknown): value is SuapExtensionPlanContextMessage {

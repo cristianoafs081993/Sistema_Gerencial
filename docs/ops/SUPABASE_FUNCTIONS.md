@@ -110,6 +110,7 @@ Dependencias:
 Observacao:
 
 - a chave operacional do terceirizado e a matricula SUAP; e-mail e usado apenas como fallback legado.
+- o `redirectUri` recebido da UI deve ser o callback canonico `/suap-callback` montado a partir de `VITE_APP_ORIGIN` quando configurada; ele precisa ser identico ao usado no authorize e ao cadastrado no client OAuth do SUAP.
 - para login local, o frontend pode enviar um `VITE_SUAP_CLIENT_ID` proprio; quando ele corresponde a `SUAP_DEV_CLIENT_ID`, a function usa `SUAP_DEV_CLIENT_SECRET`, mantendo o client de producao inalterado.
 
 ### `suap-proxy`

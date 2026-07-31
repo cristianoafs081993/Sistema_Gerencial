@@ -72,6 +72,12 @@ const SuapExtensionShell = () => (
   </DataProvider>
 );
 
+const SuapExtensionFrameShell = () => (
+  <Suspense fallback={<RouteLoadingFallback mode="screen" />}>
+    <Outlet />
+  </Suspense>
+);
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -89,6 +95,9 @@ const App = () => (
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/feedback-ambiente/:codigo" element={<PublicFeedback />} />
               <Route path="/suap-callback" element={<SuapCallback />} />
+              <Route element={<SuapExtensionFrameShell />}>
+                <Route path="/suap-extensao/processo-info" element={<SuapExtensionProcessInfo />} />
+              </Route>
               <Route element={<AppShell />}>
                 <Route path="/suap" element={<Suap />} />
                 <Route path="/pesquisa-precos/validar" element={<PriceResearchValidation />} />
@@ -96,7 +105,6 @@ const App = () => (
               <Route element={<ProtectedRoute />}>
                 <Route element={<SuapExtensionShell />}>
                   <Route path="/suap-extensao/despacho" element={<SuapExtensionDispatch />} />
-                  <Route path="/suap-extensao/processo-info" element={<SuapExtensionProcessInfo />} />
                 </Route>
                 <Route path="/suap-extensao/plano-resumo" element={<SuapExtensionPlanSummary />} />
                 <Route element={<AppShell />}>
