@@ -59,6 +59,7 @@ describe('process-document 1.9', () => {
   beforeEach(() => {
     document.body.innerHTML = '<main><aside id="timeline"><div>Recebido por COFINC/CN</div><div>Encaminhado por DIAD/CN</div></aside><p>Processo 23035.000001.2026-11</p></main>';
     window.history.replaceState(null, '', '/processo_eletronico/processo/321/');
+    localValues['siages-extension-session'] = { accessToken: 'access', refreshToken: 'refresh', expiresAt: Date.now() / 1000 + 3600 };
     localValues['siages-toolkit-theme'] = 'dark';
     localValues['siages-toolkit-collapsed'] = false;
     syncValues['siages-snippets'] = { '/cn': 'Currais Novos' };
@@ -71,6 +72,7 @@ describe('process-document 1.9', () => {
     delete testWindow.chrome;
     document.body.innerHTML = '';
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('reconhece as duas rotas de processo e gera contexto sem tokens por padrao', () => {
@@ -172,5 +174,52 @@ describe('process-document 1.9', () => {
     const api = loadProcessScript();
     expect(api.normalizeSnippetKey(' CN ')).toBe('/cn');
     expect(api.normalizeSnippetKey('/Lei 14133')).toBe('/lei14133');
+  });
+
+  it('isola o formulario de login dos estilos globais do SUAP', async () => {
+    const toolkitStyle = document.createElement('style');
+    toolkitStyle.textContent = readFileSync(extensionFixturePath('process-toolkit.css'), 'utf8');
+    document.head.appendChild(toolkitStyle);
+    const hostileStyle = document.createElement('style');
+    hostileStyle.textContent = '#timeline form label { float:left; position:absolute; width:50%; opacity:.05 } #timeline form input { position:absolute; width:20%; opacity:.05 } #timeline form button { float:left; width:49% }';
+    document.head.appendChild(hostileStyle);
+    const api = loadProcessScript();
+    await api.installToolkit();
+    api.selectTab('settings');
+
+    const form = document.querySelector('.suape-auth-form') as HTMLFormElement;
+    const label = form.querySelector('label') as HTMLLabelElement;
+    const input = form.elements.namedItem('email') as HTMLInputElement;
+    const button = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+    expect(form).toBeTruthy();
+    expect(getComputedStyle(label).position).toBe('static');
+    expect(getComputedStyle(label).float).toBe('none');
+    expect(getComputedStyle(input).position).toBe('static');
+    expect(getComputedStyle(input).opacity).toBe('1');
+    expect(getComputedStyle(button).float).toBe('none');
+    hostileStyle.remove();
+    toolkitStyle.remove();
+  });
+
+  it('autentica pelo formulario e persiste a sessao da extensao', async () => {
+    delete localValues['siages-extension-session'];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ access_token: 'novo-access', refresh_token: 'novo-refresh', expires_in: 3600 }),
+    }));
+    const api = loadProcessScript();
+    await api.installToolkit();
+    api.selectTab('settings');
+
+    const form = document.querySelector('.suape-auth-form') as HTMLFormElement;
+    (form.elements.namedItem('email') as HTMLInputElement).value = 'usuario@ifrn.edu.br';
+    (form.elements.namedItem('password') as HTMLInputElement).value = 'senha-segura';
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await waitFor(() => expect(localValues['siages-extension-session']).toMatchObject({
+      accessToken: 'novo-access', refreshToken: 'novo-refresh',
+    }));
+    expect(form.querySelector('[data-auth-message]')).toHaveTextContent('Sessão ativa.');
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/auth/v1/token?grant_type=password'), expect.objectContaining({ method: 'POST' }));
   });
 });

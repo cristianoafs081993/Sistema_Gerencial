@@ -71,7 +71,7 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 - `PriceResearchEad`: subpagina operacional de capacitacao do modulo Pesquisa de Precos, com `HeaderSubtitle`, `SectionPanel`, lista de aulas, player responsivo 16:9 em iframe `youtube-nocookie.com` e painel de gestao exibido apenas para superadministrador.
 - `RequisicaoCompra`: pagina operacional que apresenta "Gestão de Requisições de Compra" no header global por meio de `HeaderSubtitle`, sem repetir o titulo na area de conteudo. O campo `Empenho / Nota de Empenho` usa `Popover + Command` pesquisavel com selecao multipla, contador no trigger e badges removiveis; os itens ficam agrupados por NE selecionada com saldo, carregamento e botao `Adicionar Item` em cada grupo.
 - `Layout`: sidebar global compacta com campo de busca visual, grupos expansivos, submenus expansivos, indicador ativo lateral e drawer mobile.
-- `SuapeProcessToolkit` (extensao 1.9): painel lateral prefixado por `suape-`, com abas Resumo, Financeiro, Atalhos, IA e Configuracoes. Usa superficie e tokens proprios para nao alterar o CSS do SUAP; Financeiro preserva o conteudo funcional anterior e IA abre o gerador existente.
+- `SuapeProcessToolkit` (extensao 1.9): painel lateral prefixado por `suape-`, com abas Resumo, Financeiro, Atalhos, IA e Configuracoes. Usa superficie e tokens proprios para nao alterar o CSS do SUAP; o formulario de autenticacao reforca localmente layout, visibilidade e dimensoes para resistir aos estilos globais legados do SUAP. Financeiro preserva o conteudo funcional anterior e IA abre o gerador existente.
 
 ## Regra pratica
 

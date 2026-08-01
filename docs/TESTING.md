@@ -98,7 +98,7 @@ Antes de publicar uma nova versao, execute as suites focadas, `src/__tests__/enc
 
 ### Validacao da versao 1.9 em 2026-07-31
 
-- 38 testes focados da extensao, bridge, pagina SIAGES, Plano de Atividades, popup, atalhos e clonagem: aprovados;
+- 40 testes focados da extensao, bridge, pagina SIAGES, Plano de Atividades, popup, atalhos e clonagem: aprovados; a regressao do login inclui CSS hostil equivalente ao legado do SUAP e persistencia da sessao autenticada;
 - teste de encoding: aprovado;
 - `npx tsc --noEmit`: aprovado;
 - `npm test`: aprovado;
