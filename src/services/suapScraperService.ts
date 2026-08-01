@@ -163,6 +163,39 @@ async function downloadProcessPdf(
   };
 }
 
+async function storeProcessPdf(
+  proc: Pick<ScrapedProcesso, 'suapId'>,
+  pdfBytes: ArrayBuffer | Uint8Array,
+  tenantId: string,
+  log: SyncProgressCallback,
+) {
+  const bytes = pdfBytes instanceof Uint8Array ? pdfBytes : new Uint8Array(pdfBytes);
+  if (bytes.length < 4 || String.fromCharCode(...bytes.slice(0, 4)) !== '%PDF') {
+    throw new Error('O arquivo recebido do SUAP nao e um PDF valido.');
+  }
+
+  log(`[${proc.suapId}] Fazendo upload do PDF para o bucket suap-pdfs...`);
+  const storagePath = `${tenantId}/${proc.suapId}.pdf`;
+  const { error: uploadErr } = await supabase.storage
+    .from('suap-pdfs')
+    .upload(storagePath, new Blob([bytes], { type: 'application/pdf' }), {
+      contentType: 'application/pdf',
+      upsert: true,
+    });
+
+  if (uploadErr) throw new Error(`Upload do PDF falhou: ${uploadErr.message}`);
+
+  const { error: updateError } = await supabase
+    .from('processos')
+    .update({ pdf_url: storagePath, status: 'pdf_uploaded', updated_at: new Date().toISOString() })
+    .eq('tenant_id', tenantId)
+    .eq('suap_id', proc.suapId);
+  if (updateError) throw updateError;
+
+  log(`[${proc.suapId}] PDF sincronizado com sucesso.`);
+  return storagePath;
+}
+
 // Portabilidade do scraping da página de listagem do SUAP
 export const suapScraperService = {
   async loginSuap(username: string, password: string): Promise<string> {
@@ -389,38 +422,21 @@ export const suapScraperService = {
 
     const { pdfBase64 } = await downloadProcessPdf(proc, suapSessionId, log);
 
-    log(`[${proc.suapId}] Fazendo upload do PDF para o bucket suap-pdfs...`);
     const byteChars = atob(pdfBase64);
     const byteArray = new Uint8Array(byteChars.length);
     for (let i = 0; i < byteChars.length; i++) {
       byteArray[i] = byteChars.charCodeAt(i);
     }
-    const blob = new Blob([byteArray], { type: 'application/pdf' });
-    const storagePath = `${tenantId}/${proc.suapId}.pdf`;
+    return storeProcessPdf(proc, byteArray, tenantId, log);
+  },
 
-    const { error: uploadErr } = await supabase.storage
-      .from('suap-pdfs')
-      .upload(storagePath, blob, {
-        contentType: 'application/pdf',
-        upsert: true,
-      });
-
-    if (uploadErr) {
-      throw new Error(`Upload do PDF falhou: ${uploadErr.message}`);
-    }
-
-    await supabase
-      .from('processos')
-      .update({
-        pdf_url: storagePath,
-        status: 'pdf_uploaded',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('tenant_id', tenantId)
-      .eq('suap_id', proc.suapId);
-
-    log(`[${proc.suapId}] PDF sincronizado com sucesso.`);
-    return storagePath;
+  async storePdfBytesForProcess(
+    proc: Pick<ScrapedProcesso, 'suapId'>,
+    pdfBytes: ArrayBuffer | Uint8Array,
+    tenantId: string,
+    log: SyncProgressCallback,
+  ) {
+    return storeProcessPdf(proc, pdfBytes, tenantId, log);
   },
 
   async runAiExtractionForProcess(

@@ -467,6 +467,12 @@ Observações:
 - fallback REST pode mascarar diferencas de schema e permissao
 - views e Edge Functions devem ser confirmadas no banco quando nao estiverem versionadas no repo
 
+## Extensao Suape 1.9
+
+`process-document.js` injeta o painel somente nas duas rotas de processo do SUAP. O iframe oculto `/suap-extension/process-info` recebe contexto e sessao por `postMessage`, valida origem e janela, consulta ou cadastra o processo, solicita o PDF ao content script quando necessario, armazena-o no bucket `suap-pdfs` e enfileira a extracao existente `process-pdf`. Snapshots e progresso retornam ao painel sem bloquear Financeiro, Atalhos ou IA.
+
+O script `plan-summary.js` permanece isolado na rota exata do Plano de Atividades concluido 8. `text-expander.js` e global e atua apenas no campo textual em edicao, sem ler nem modificar filtros, metricas ou drill-downs do plano.
+
 ### Almoxarifado
 
 App.tsx → Almoxarifado.tsx → inventoryService → tabelas operacionais e RPC post_stock_movement.

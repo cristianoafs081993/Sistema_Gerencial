@@ -8,6 +8,8 @@ import {
 import SuapExtensionProcessInfo from '@/pages/SuapExtensionProcessInfo';
 import { supabase } from '@/lib/supabase';
 import { suapProcessFinanceService } from '@/services/suapProcessFinance';
+import { suapProcessosService } from '@/services/suapProcessos';
+import { suapScraperService } from '@/services/suapScraperService';
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
@@ -24,6 +26,18 @@ vi.mock('@/services/suapProcessFinance', async () => {
     suapProcessFinanceService: { getSummaryBySuapId: vi.fn() },
   };
 });
+
+vi.mock('@/services/suapProcessos', () => ({
+  suapProcessosService: { getBySuapId: vi.fn() },
+}));
+
+vi.mock('@/services/suapScraperService', () => ({
+  suapScraperService: {
+    syncProcessListInSupabase: vi.fn(),
+    storePdfBytesForProcess: vi.fn(),
+    runAiExtractionForProcess: vi.fn(),
+  },
+}));
 
 const processContext = {
   source: 'siages-suap-extension',
@@ -47,7 +61,16 @@ async function sendContext(data = processContext, origin = SUAP_EXTENSION_ORIGIN
 }
 
 describe('SuapExtensionProcessInfo', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(suapProcessosService.getBySuapId).mockResolvedValue({
+      id: 'process-1',
+      suapId: '987',
+      url: processContext.payload.processUrl,
+      status: 'success',
+      numProcesso: processContext.payload.processNumber,
+    });
+  });
 
   it('avisa a extensao quando esta pronto para receber o contexto', () => {
     const postMessage = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => undefined);
@@ -92,5 +115,30 @@ describe('SuapExtensionProcessInfo', () => {
 
     await Promise.resolve();
     expect(suapProcessFinanceService.getSummaryBySuapId).not.toHaveBeenCalled();
+  });
+
+  it('cadastra um processo ausente antes de publicar os dados', async () => {
+    vi.mocked(suapProcessosService.getBySuapId)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue({
+        id: 'process-1',
+        suapId: '987',
+        url: processContext.payload.processUrl,
+        status: 'success',
+        numProcesso: processContext.payload.processNumber,
+      });
+    vi.mocked(suapProcessFinanceService.getSummaryBySuapId).mockResolvedValue({
+      status: 'not-found', escopoContrato: false, contrato: null, totais: null, empenhos: [],
+    });
+
+    render(<SuapExtensionProcessInfo />);
+    await sendContext();
+
+    await waitFor(() => expect(suapScraperService.syncProcessListInSupabase).toHaveBeenCalledWith([{
+      suapId: '987',
+      numProcesso: processContext.payload.processNumber,
+      url: processContext.payload.processUrl,
+    }], 'user-1'));
+    expect(suapProcessosService.getBySuapId).toHaveBeenCalledTimes(2);
   });
 });

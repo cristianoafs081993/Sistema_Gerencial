@@ -1,5 +1,4 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 import {
   buildSuapCloneUrl,
@@ -7,6 +6,7 @@ import {
   extractSuapSubjectFromHtml,
   parseSuapClonePayloadFromFragment,
 } from '@/lib/suapCloneAutomation';
+import { extensionFixturePath } from '@/test/extensionFixtures';
 
 interface ExtensionTestWindow extends Window {
   __SIAGES_SUAP_CLONE_TEST__?: boolean;
@@ -93,7 +93,7 @@ describe('suap-atividades-extension clone-document.js', () => {
   function loadContentScript() {
     const testWindow = window as ExtensionTestWindow;
     testWindow.__SIAGES_SUAP_CLONE_TEST__ = true;
-    const script = readFileSync(resolve(process.cwd(), 'suap-atividades-extension/clone-document.js'), 'utf8');
+    const script = readFileSync(extensionFixturePath('clone-document.js'), 'utf8');
     window.eval(script);
     if (!testWindow.__siagesSuapCloneAutomation) {
       throw new Error('Extension test hook was not registered');

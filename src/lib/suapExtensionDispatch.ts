@@ -1,4 +1,5 @@
 import type { SuapPlanSummary } from '@/services/suapPlanSummary';
+import type { SuapProcesso } from '@/types';
 
 export const SUAP_EXTENSION_ORIGIN = 'https://suap.ifrn.edu.br';
 
@@ -39,6 +40,67 @@ export const SUAP_EXTENSION_PROCESS_INFO_READY_MESSAGE = {
 } as const;
 
 export const SUAP_EXTENSION_PROCESS_FINANCE_SUMMARY_TYPE = 'siages:suap-process-finance-summary' as const;
+export const SUAP_EXTENSION_PROCESS_SNAPSHOT_TYPE = 'siages:suap-process-snapshot' as const;
+export const SUAP_EXTENSION_PROCESS_SYNC_STATUS_TYPE = 'siages:suap-process-sync-status' as const;
+export const SUAP_EXTENSION_PROCESS_PDF_REQUEST_TYPE = 'siages:suap-process-pdf-request' as const;
+export const SUAP_EXTENSION_PROCESS_PDF_RESULT_TYPE = 'siages:suap-process-pdf-result' as const;
+export const SUAP_EXTENSION_PROCESS_RETRY_TYPE = 'siages:suap-process-retry' as const;
+
+export type SuapExtensionProcessSnapshot = {
+  process: SuapProcesso | null;
+  fallback: {
+    suapId: string;
+    processNumber?: string;
+    processUrl: string;
+  };
+};
+
+export type SuapExtensionProcessSyncStatus = {
+  stage: 'checking' | 'registering' | 'requesting-pdf' | 'uploading-pdf' | 'queued' | 'processing' | 'ready' | 'error';
+  message: string;
+  retryable?: boolean;
+};
+
+export type SuapExtensionProcessPdfResultMessage = {
+  source: 'siages-suap-extension';
+  type: typeof SUAP_EXTENSION_PROCESS_PDF_RESULT_TYPE;
+  version: 1;
+  payload: {
+    suapId: string;
+    bytes?: ArrayBuffer;
+    error?: string;
+  };
+};
+
+export function isValidSuapExtensionProcessPdfResult(
+  event: MessageEvent,
+  expectedSource: WindowProxy | null,
+  expectedSuapId: string,
+): event is MessageEvent<SuapExtensionProcessPdfResultMessage> {
+  if (event.origin !== SUAP_EXTENSION_ORIGIN || event.source !== expectedSource) return false;
+  const message = event.data as Partial<SuapExtensionProcessPdfResultMessage> | null;
+  const payload = message?.payload;
+  return message?.source === 'siages-suap-extension' &&
+    message.type === SUAP_EXTENSION_PROCESS_PDF_RESULT_TYPE &&
+    message.version === 1 &&
+    Boolean(payload) &&
+    payload?.suapId === expectedSuapId &&
+    (payload.bytes instanceof ArrayBuffer || typeof payload.error === 'string');
+}
+
+export function isValidSuapExtensionProcessRetry(
+  event: MessageEvent,
+  expectedSource: WindowProxy | null,
+  expectedSuapId: string,
+) {
+  const message = event.data as { source?: string; type?: string; version?: number; payload?: { suapId?: string } } | null;
+  return event.origin === SUAP_EXTENSION_ORIGIN &&
+    event.source === expectedSource &&
+    message?.source === 'siages-suap-extension' &&
+    message.type === SUAP_EXTENSION_PROCESS_RETRY_TYPE &&
+    message.version === 1 &&
+    message.payload?.suapId === expectedSuapId;
+}
 
 export type SuapExtensionPlanContext = {
   planId: 8;

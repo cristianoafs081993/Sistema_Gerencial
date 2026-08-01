@@ -916,3 +916,12 @@ Observações operacionais:
 - quando houver segredo Gemini, a IA reordena no máximo 40 candidatos pela aderência técnica;
 - quando não houver segredo ou a chamada Gemini falhar, a ordenação heurística determinística continua funcionando;
 - a function exige sessão Supabase autenticada e limita a chamada a 25 itens.
+
+## Ponte da extensao Suape 1.9
+
+- Origem SIAGES fixa: `https://www.siages.com.br`.
+- Entrada: contexto autenticado do processo SUAP enviado ao iframe `/suap-extension/process-info`.
+- Saidas: snapshot do processo, resumo financeiro e progresso de sincronizacao.
+- PDF: o iframe solicita a geracao ao content script; a resposta aceita somente a origem, a janela e o `suapId` esperados e transporta um `ArrayBuffer`, nunca tokens.
+- Persistencia: `suapScraperService.storePdfBytesForProcess` grava o PDF no bucket existente `suap-pdfs`; a fila continua sendo a Edge Function existente `process-pdf`.
+- Nao foram adicionados endpoints, migrations ou Edge Functions.

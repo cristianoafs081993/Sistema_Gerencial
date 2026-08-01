@@ -6,6 +6,8 @@ import {
   isValidSuapExtensionPlanContext,
   isValidSuapExtensionPlanSummaryPayload,
   isValidSuapExtensionProcessContext,
+  isValidSuapExtensionProcessPdfResult,
+  isValidSuapExtensionProcessRetry,
   SUAP_EXTENSION_ORIGIN,
 } from '@/lib/suapExtensionDispatch';
 
@@ -99,5 +101,34 @@ describe('suapExtensionDispatch', () => {
       ...payload,
       dimensoes: [{ ...payload.dimensoes[0], totalPlanejado: '100' }],
     })).toBe(false);
+  });
+
+  it('aceita PDF e nova tentativa somente da janela, origem e processo esperados', () => {
+    const expectedSource = window.parent;
+    const pdfMessage = {
+      source: 'siages-suap-extension',
+      type: 'siages:suap-process-pdf-result',
+      version: 1,
+      payload: { suapId: '12345', bytes: new ArrayBuffer(8) },
+    };
+    const retryMessage = {
+      source: 'siages-suap-extension',
+      type: 'siages:suap-process-retry',
+      version: 1,
+      payload: { suapId: '12345' },
+    };
+
+    expect(isValidSuapExtensionProcessPdfResult(new MessageEvent('message', {
+      origin: SUAP_EXTENSION_ORIGIN, source: expectedSource, data: pdfMessage,
+    }), expectedSource, '12345')).toBe(true);
+    expect(isValidSuapExtensionProcessPdfResult(new MessageEvent('message', {
+      origin: 'https://invalido.exemplo', source: expectedSource, data: pdfMessage,
+    }), expectedSource, '12345')).toBe(false);
+    expect(isValidSuapExtensionProcessRetry(new MessageEvent('message', {
+      origin: SUAP_EXTENSION_ORIGIN, source: expectedSource, data: retryMessage,
+    }), expectedSource, '12345')).toBe(true);
+    expect(isValidSuapExtensionProcessRetry(new MessageEvent('message', {
+      origin: SUAP_EXTENSION_ORIGIN, source: expectedSource, data: retryMessage,
+    }), expectedSource, '999')).toBe(false);
   });
 });

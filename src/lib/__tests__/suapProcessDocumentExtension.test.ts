@@ -1,233 +1,176 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { waitFor } from '@testing-library/dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-type ExtensionWindow = Window & typeof globalThis & {
-  __SIAGES_SUAP_PROCESS_TEST__?: boolean;
-  __siagesSuapProcessDocument?: {
-    getProcessId: () => string | null;
-    getProcessNumber: () => string;
-    buildContext: () => { payload: { suapId: string; processNumber: string; processUrl: string } } | null;
-    installButton: () => void;
-    installFinancePanel: () => void;
-    openFinanceBridge: () => void;
-    renderFinanceSummary: (summary: unknown) => void;
-    openModal: () => void;
-    closeModal: () => void;
-  };
-  chrome?: unknown;
+import { extensionFixturePath } from '@/test/extensionFixtures';
+
+type ExtensionApi = {
+  getProcessId: () => string | null;
+  getProcessNumber: () => string;
+  buildContext: (session?: unknown) => { payload: { suapId: string; processNumber: string } } | null;
+  installToolkit: () => Promise<void>;
+  renderFinanceSummary: (summary: unknown) => void;
+  openModal: () => void;
+  closeModal: () => void;
+  selectTab: (tab: string) => void;
+  normalizeSnippetKey: (value: string) => string;
 };
 
-function loadProcessScript() {
-  const testWindow = window as ExtensionWindow;
-  testWindow.__SIAGES_SUAP_PROCESS_TEST__ = true;
-  const extensionSession = { accessToken: 'access-token', refreshToken: 'refresh-token', expiresAt: Date.now() / 1000 + 3600 };
-  testWindow.chrome = {
-    storage: { local: { get: (key: string, callback: (value: Record<string, unknown>) => void) => callback(
-      key === 'siages-extension-session' ? { 'siages-extension-session': extensionSession } : {},
-    ) } },
+const localValues: Record<string, unknown> = {
+  'siages-extension-session': { accessToken: 'access', refreshToken: 'refresh', expiresAt: Date.now() / 1000 + 3600 },
+};
+const syncValues: Record<string, unknown> = {};
+
+function storageArea(values: Record<string, unknown>) {
+  return {
+    get: vi.fn((key: string, callback: (result: Record<string, unknown>) => void) => callback({ [key]: values[key] })),
+    set: vi.fn((entries: Record<string, unknown>, callback?: () => void) => { Object.assign(values, entries); callback?.(); }),
+    remove: vi.fn((key: string, callback?: () => void) => { delete values[key]; callback?.(); }),
   };
-  const script = readFileSync(resolve(process.cwd(), 'SUAP-Atividades-Scraper-1.7/process-document.js'), 'utf8');
-  window.eval(script);
-  if (!testWindow.__siagesSuapProcessDocument) throw new Error('Content script nao foi carregado.');
+}
+
+function loadProcessScript() {
+  const testWindow = window as typeof window & {
+    __SIAGES_SUAP_PROCESS_TEST__?: boolean;
+    __siagesSuapProcessDocument?: ExtensionApi;
+    chrome?: unknown;
+  };
+  testWindow.__SIAGES_SUAP_PROCESS_TEST__ = true;
+  testWindow.chrome = {
+    storage: { local: storageArea(localValues), sync: storageArea(syncValues), onChanged: { addListener: vi.fn() } },
+  };
+  window.eval(readFileSync(extensionFixturePath('process-document.js'), 'utf8'));
+  if (!testWindow.__siagesSuapProcessDocument) throw new Error('Content script nao carregado.');
   return testWindow.__siagesSuapProcessDocument;
 }
 
 function financeSummary() {
   return {
-    status: 'ready',
-    beneficiario: { nome: 'Fornecedor Alfa' },
-    contrato: { numero: '00040/2026' },
-    escopoContrato: true,
+    status: 'ready', beneficiario: { nome: 'Fornecedor Alfa' }, contrato: { numero: '00040/2026' }, escopoContrato: true,
     totais: { empenhado: 1000, saldo: 700 },
-    empenhos: [{
-      id: 'emp-1',
-      numero: '2026NE000001',
-      empenhado: 1000,
-      saldo: 700,
-      liquidacoes: [
-        { id: 'liq-1', numero: 'NF 123', data: '2026-02-20', situacao: 'Liquidada', valor: 280 },
-        { id: 'liq-2', numero: 'NF 124', data: '2026-02-21', situacao: 'Siafi Apropriado', valor: 20 },
-        { id: 'liq-3', numero: 'NF 125', data: '2026-02-22', situacao: 'Liquidada', valor: 10 },
-        { id: 'liq-4', numero: 'NF 126', data: '2026-02-23', situacao: 'Liquidada', valor: 5 },
-      ],
-    }],
+    empenhos: [{ numero: '2026NE000001', empenhado: 1000, saldo: 700, liquidacoes: [
+      { numero: 'NF 123', data: '2026-02-20', situacao: 'Liquidada', valor: 280 },
+      { numero: 'NF 124', data: '2026-02-21', situacao: 'Siafi Apropriado', valor: 20 },
+    ] }],
   };
 }
 
-describe('process-document extension script', () => {
+describe('process-document 1.9', () => {
   beforeEach(() => {
-    document.body.innerHTML = '<main>Processo 23035.000001.2026-11</main>';
+    document.body.innerHTML = '<main><aside id="timeline"><div>Recebido por COFINC/CN</div><div>Encaminhado por DIAD/CN</div></aside><p>Processo 23035.000001.2026-11</p></main>';
     window.history.replaceState(null, '', '/processo_eletronico/processo/321/');
-    document.getElementById('siages-suap-generate-document')?.remove();
-    document.getElementById('siages-suap-finance-panel')?.remove();
-    document.getElementById('siages-suap-finance-widget')?.remove();
-    document.getElementById('siages-suap-finance-frame')?.remove();
+    localValues['siages-toolkit-theme'] = 'dark';
+    localValues['siages-toolkit-collapsed'] = false;
+    syncValues['siages-snippets'] = { '/cn': 'Currais Novos' };
   });
 
   afterEach(() => {
-    const testWindow = window as ExtensionWindow;
+    const testWindow = window as typeof window & Record<string, unknown>;
     delete testWindow.__SIAGES_SUAP_PROCESS_TEST__;
     delete testWindow.__siagesSuapProcessDocument;
     delete testWindow.chrome;
-    document.getElementById('siages-suap-dispatch-modal')?.remove();
-    document.getElementById('siages-suap-finance-panel')?.remove();
-    document.getElementById('siages-suap-finance-widget')?.remove();
-    document.getElementById('siages-suap-finance-frame')?.remove();
+    document.body.innerHTML = '';
+    vi.restoreAllMocks();
   });
 
-  it('gera o contexto da pagina de processo e instala apenas um botao', () => {
-    const script = loadProcessScript();
-    expect(script.getProcessId()).toBe('321');
-    expect(script.getProcessNumber()).toBe('23035.000001.2026-11');
-    expect(script.buildContext()).toMatchObject({
-      source: 'siages-suap-extension',
-      type: 'siages:suap-process-context',
-      payload: { suapId: '321', processNumber: '23035.000001.2026-11' },
-    });
+  it('reconhece as duas rotas de processo e gera contexto sem tokens por padrao', () => {
+    let api = loadProcessScript();
+    expect(api.getProcessId()).toBe('321');
+    expect(api.getProcessNumber()).toBe('23035.000001.2026-11');
+    expect(api.buildContext()).toMatchObject({ payload: { suapId: '321', processNumber: '23035.000001.2026-11' } });
 
-    script.installButton();
-    script.installButton();
-    expect(document.querySelectorAll('#siages-suap-generate-document')).toHaveLength(1);
+    delete (window as typeof window & Record<string, unknown>).__siagesSuapProcessDocument;
+    window.history.replaceState(null, '', '/processo_eletronico/visualizar_processo/654/');
+    api = loadProcessScript();
+    expect(api.getProcessId()).toBe('654');
   });
 
-  it('reenvia o contexto quando o iframe do SIAGES informa que esta pronto', async () => {
-    const script = loadProcessScript();
+  it('injeta uma unica vez no topo da lateral e cria as cinco abas', async () => {
+    const api = loadProcessScript();
+    await api.installToolkit();
+    await api.installToolkit();
 
-    script.openModal();
-
-    await waitFor(() => expect(document.getElementById('siages-suap-dispatch-frame')).toBeTruthy());
-    const frame = document.getElementById('siages-suap-dispatch-frame') as HTMLIFrameElement;
-    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage').mockImplementation(() => undefined);
-
-    window.dispatchEvent(new MessageEvent('message', {
-      origin: 'https://www.siages.com.br',
-      source: frame.contentWindow,
-      data: { source: 'siages', type: 'siages:suap-dispatch-ready', version: 1 },
-    }));
-
-    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
-      source: 'siages-suap-extension',
-      type: 'siages:suap-process-context',
-      payload: expect.objectContaining({ suapId: '321', processNumber: '23035.000001.2026-11' }),
-    }), 'https://www.siages.com.br');
-    postMessage.mockRestore();
+    const root = document.getElementById('siages-suap-toolkit');
+    expect(document.querySelectorAll('#siages-suap-toolkit')).toHaveLength(1);
+    expect(document.getElementById('timeline')?.firstElementChild).toBe(root);
+    expect(root?.querySelectorAll('[role="tab"]')).toHaveLength(5);
+    expect(root?.querySelector('[data-tab="summary"]')?.getAttribute('aria-selected')).toBe('true');
+    expect(root?.dataset.theme).toBe('dark');
   });
 
-  it('injeta card financeiro no fim da area de tramitacao e renderiza liquidacoes sem pagamento', async () => {
-    document.body.innerHTML = '<main><section id="tramites"><h3>Tramitação do processo</h3><p>Processo 23035.000001.2026-11</p></section></main>';
-    const script = loadProcessScript();
+  it('persiste recolhimento e troca de tema sem alterar o body do SUAP', async () => {
+    const api = loadProcessScript();
+    await api.installToolkit();
+    const root = document.getElementById('siages-suap-toolkit')!;
+    const originalBodyClass = document.body.className;
 
-    script.installButton();
-    script.installFinancePanel();
+    (root.querySelector('[data-action="collapse"]') as HTMLButtonElement).click();
+    (root.querySelector('[data-action="theme"]') as HTMLButtonElement).click();
 
+    await waitFor(() => expect(root.dataset.collapsed).toBe('true'));
+    expect(root.dataset.theme).toBe('light');
+    expect(localValues['siages-toolkit-collapsed']).toBe(true);
+    expect(localValues['siages-toolkit-theme']).toBe('light');
+    expect(document.body.className).toBe(originalBodyClass);
+  });
+
+  it('renderiza snapshot com copia individual e lista de empenhos', async () => {
+    const api = loadProcessScript();
+    await api.installToolkit();
     await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeTruthy());
     const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
-    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage').mockImplementation(() => undefined);
-
     window.dispatchEvent(new MessageEvent('message', {
-      origin: 'https://www.siages.com.br',
-      source: frame.contentWindow,
-      data: { source: 'siages', type: 'siages:suap-process-info-ready', version: 1 },
+      origin: 'https://www.siages.com.br', source: frame.contentWindow,
+      data: { source: 'siages', type: 'siages:suap-process-snapshot', version: 1, payload: {
+        fallback: { suapId: '321', processNumber: '23035.000001.2026-11' },
+        process: { suapId: '321', numProcesso: '23035.000001.2026-11', status: 'success', beneficiario: 'Fornecedor Alfa', cpfCnpj: '12345678000190', assunto: 'Servico', dadosCompletos: { val_nf: '1.250,00', empenhos: ['2026NE000001', '2026NE000002'], dados_bancarios: { banco: 'Banco do Brasil', agencia: '1234', conta: '5678-9' }, retencoes_tributarias: { iss: '25,00' } } },
+      } },
     }));
 
-    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
-      source: 'siages-suap-extension',
-      type: 'siages:suap-process-context',
-      payload: expect.objectContaining({ suapId: '321' }),
-    }), 'https://www.siages.com.br');
-
-    window.dispatchEvent(new MessageEvent('message', {
-      origin: 'https://www.siages.com.br',
-      source: frame.contentWindow,
-      data: {
-        source: 'siages',
-        type: 'siages:suap-process-finance-summary',
-        version: 1,
-        payload: financeSummary(),
-      },
-    }));
-
-    await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeNull());
-    const panel = document.getElementById('siages-suap-finance-panel') as HTMLElement;
-    const widget = document.getElementById('siages-suap-finance-widget') as HTMLElement;
-    expect(widget).toContainElement(panel);
-    expect(widget).toContainElement(document.getElementById('siages-suap-generate-document'));
-    expect(widget.style.position).toBe('fixed');
-    expect(widget.style.right).toBe('20px');
-    expect(widget.lastElementChild?.id).toBe('siages-suap-generate-document');
-    expect(panel.dataset.siagesPlacement).toBe('widget');
-    expect(panel.style.position).toBe('static');
-    expect(panel.textContent).toContain('Fornecedor Alfa');
-    expect(panel.textContent).toContain('00040/2026');
-    expect(panel.textContent).toContain('Empenhado');
-    expect(panel.textContent).toContain('NF 123');
-    expect(panel.textContent).toContain('NF 126');
-    expect(panel.textContent).not.toContain('Liquidado');
-    expect(panel.textContent).not.toContain('+1 liquidacoes');
-    expect(panel.textContent).not.toMatch(/pago|pagamento/i);
-    postMessage.mockRestore();
+    const summary = document.querySelector('[data-panel="summary"]');
+    expect(summary).toHaveTextContent('Fornecedor Alfa');
+    expect(summary).toHaveTextContent('Banco do Brasil');
+    expect(summary).toHaveTextContent('2026NE000002');
+    expect(summary?.querySelectorAll('.suape-copy').length).toBeGreaterThan(8);
   });
 
-  it('mantem o painel a direita mesmo quando a timeline do SUAP estiver em outra coluna', () => {
-    document.body.innerHTML = `
-      <main>
-        <section id="processo-principal"><h3>Tramitação</h3><p>Documentos e detalhes do processo</p></section>
-      </main>
-      <aside id="timeline-direita">
-        <div>24/07/2026 10:01:59 Recebido por COFINC/CN: Fransuelia Araujo</div>
-        <div>23/07/2026 09:55:21 Encaminhado por COINFRA/CN: Sheila Pessoa</div>
-        <h3>Registro de ações</h3>
-      </aside>
-    `;
-    const script = loadProcessScript();
+  it('preserva o resumo financeiro com empenhos e liquidacoes sem pagamento', async () => {
+    const api = loadProcessScript();
+    await api.installToolkit();
+    api.renderFinanceSummary(financeSummary());
+    api.selectTab('finance');
 
-    script.renderFinanceSummary(financeSummary());
-
-    const panel = document.getElementById('siages-suap-finance-panel') as HTMLElement;
-    const widget = document.getElementById('siages-suap-finance-widget') as HTMLElement;
-    expect(widget).toContainElement(panel);
-    expect(document.getElementById('timeline-direita')?.contains(panel)).toBe(false);
-    expect(document.getElementById('processo-principal')?.contains(panel)).toBe(false);
-    expect(panel.dataset.siagesPlacement).toBe('widget');
-    expect(panel.style.position).toBe('static');
-    expect(panel.style.overflow).toBe('auto');
-    expect(panel.style.flex).toBe('1 1 auto');
-    expect(widget.style.overflow).toBe('hidden');
-    expect(panel.style.maxWidth).toBe('100%');
-  });
-  it('usa o painel a direita sem depender de uma area de tramitacao', () => {
-    const script = loadProcessScript();
-    script.renderFinanceSummary(financeSummary());
-
-    const panel = document.getElementById('siages-suap-finance-panel') as HTMLElement;
-    expect(document.getElementById('siages-suap-finance-widget')).toContainElement(panel);
-    expect(panel.dataset.siagesPlacement).toBe('widget');
-    expect(panel.style.position).toBe('static');
+    const finance = document.getElementById('siages-suap-finance-panel');
+    expect(finance).toHaveTextContent('Fornecedor Alfa');
+    expect(finance).toHaveTextContent('00040/2026');
+    expect(finance).toHaveTextContent('Empenhado');
+    expect(finance).toHaveTextContent('NF 123');
+    expect(finance).toHaveTextContent('NF 124');
+    expect(finance?.textContent).not.toMatch(/pago|pagamento/i);
   });
 
-  it('remove o card quando o processo nao tem beneficiario identificado', () => {
-    const script = loadProcessScript();
-    script.renderFinanceSummary({ status: 'ready', escopoContrato: false, totais: {}, empenhos: [] });
-    expect(document.getElementById('siages-suap-finance-panel')).toBeTruthy();
-
-    script.renderFinanceSummary({ status: 'missing-beneficiary', escopoContrato: false, totais: {}, empenhos: [] });
-    expect(document.getElementById('siages-suap-finance-panel')).toBeNull();
+  it('mantem o gerador em modal e nao duplica a abertura', async () => {
+    const api = loadProcessScript();
+    await api.installToolkit();
+    api.openModal();
+    api.openModal();
+    expect(document.querySelectorAll('#siages-suap-dispatch-modal')).toHaveLength(1);
+    expect(document.getElementById('siages-suap-dispatch-frame')).toBeTruthy();
+    api.closeModal();
+    expect(document.getElementById('siages-suap-dispatch-modal')).toBeNull();
   });
 
-  it('reconhece a tela de visualizacao e ignora paginas sem processo', () => {
-    window.history.replaceState(null, '', '/processo_eletronico/visualizar_processo/654/');
-    let script = loadProcessScript();
-    expect(script.getProcessId()).toBe('654');
+  it('nao injeta o toolkit fora de uma rota de processo', async () => {
+    window.history.replaceState(null, '', '/plan_estrategico/plano_concluido/8/');
+    const api = loadProcessScript();
+    await api.installToolkit();
+    expect(api.getProcessId()).toBeNull();
+    expect(document.getElementById('siages-suap-toolkit')).toBeNull();
+  });
 
-    delete (window as ExtensionWindow).__siagesSuapProcessDocument;
-    window.history.replaceState(null, '', '/processo_eletronico/caixa/');
-    script = loadProcessScript();
-    expect(script.getProcessId()).toBeNull();
-    script.installButton();
-    script.installFinancePanel();
-    expect(document.querySelector('#siages-suap-generate-document')).toBeNull();
-    expect(document.querySelector('#siages-suap-finance-panel')).toBeNull();
+  it('normaliza chaves de atalhos', () => {
+    const api = loadProcessScript();
+    expect(api.normalizeSnippetKey(' CN ')).toBe('/cn');
+    expect(api.normalizeSnippetKey('/Lei 14133')).toBe('/lei14133');
   });
 });

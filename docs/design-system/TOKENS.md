@@ -56,3 +56,7 @@ Os tokens visuais do antigo `src/manus-stage1.css` foram completamente incorpora
 - `stat-card`: KPI numérico com realce luminoso no hover e gradiente opcional.
 - `table-pagination`: rodapé de tabela paginada com layout otimizado.
 - `Layout`: sidebar global com indicador lateral verde no link ativo, cabeçalhos de grupo em caixa alta e cabeçalho com efeito de vidro.
+
+## Tokens isolados da extensao Suape
+
+O arquivo `process-toolkit.css` define tokens semanticos sob `.suape-toolkit`: `--suape-bg`, `--suape-surface`, `--suape-surface-2`, `--suape-text`, `--suape-muted`, `--suape-border`, `--suape-primary`, `--suape-danger` e `--suape-shadow`. O atributo `data-theme="light"` troca somente esses valores; nenhuma variavel global ou regra do SUAP e sobrescrita.

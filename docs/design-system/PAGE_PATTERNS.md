@@ -91,3 +91,7 @@ Na etapa final, a prévia deve reutilizar o mesmo documento HTML da exportação
 - Reintroduzir folhas de estilo separadas para sobrescritas de tokens visuais concorrentes.
 - Criar cards, tabelas ou formulários customizados ad hoc sem reutilizar os componentes oficiais de `src/components/design-system`.
 - Quebrar a curva de transição suave (`spring`) ou a paleta de contraste acessível do Dark Mode.
+
+## Padrao 7: painel embarcado em sistema externo
+
+O painel da extensao usa namespace CSS exclusivo, ocupa primeiro a coluna lateral/timeline e cai para o conteudo principal quando ela nao existe. Dark e o modo inicial; light e recolhimento sao preferencias persistidas. A navegacao inicia em Resumo e preserva a disponibilidade independente das ferramentas durante sincronizacoes longas.

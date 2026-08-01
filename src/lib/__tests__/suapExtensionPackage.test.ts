@@ -1,0 +1,43 @@
+import fs from 'node:fs';
+
+import { describe, expect, it } from 'vitest';
+
+import { extensionFixturePath } from '@/test/extensionFixtures';
+
+describe('pacote da extensao Suape 1.9', () => {
+  it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
+    const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
+
+    expect(manifest.version).toBe('1.9');
+    expect(manifest.host_permissions).toContain('<all_urls>');
+    expect(manifest.permissions).toEqual(expect.arrayContaining(['activeTab', 'scripting', 'storage']));
+
+    const expander = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('text-expander.js'));
+    const process = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('process-document.js'));
+    const plan = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('plan-summary.js'));
+
+    expect(expander).toMatchObject({ matches: ['<all_urls>'], all_frames: true });
+    expect(process.matches).toEqual([
+      'https://suap.ifrn.edu.br/processo_eletronico/processo/*',
+      'https://suap.ifrn.edu.br/processo_eletronico/visualizar_processo/*',
+    ]);
+    expect(plan.matches).toEqual(['https://suap.ifrn.edu.br/plan_estrategico/plano_concluido/8/']);
+    expect(plan.js).toEqual(['plan-summary.js']);
+    expect(process.matches).not.toContain(plan.matches[0]);
+  });
+
+  it('preserva autenticacao e extracao no popup sem expor a origem configuravel', () => {
+    const popup = fs.readFileSync(extensionFixturePath('popup.html'), 'utf8');
+    const popupScript = fs.readFileSync(extensionFixturePath('popup.js'), 'utf8');
+
+    expect(popup).toContain('id="extension-auth-email"');
+    expect(popup).toContain('id="btn-extension-sign-in"');
+    expect(popup).toContain('id="btn-extension-sign-out"');
+    expect(popup).toContain('id="btn-extract-en"');
+    expect(popup).toContain('id="btn-extract-all"');
+    expect(popup).not.toContain('id="siages-app-origin"');
+    expect(popup).not.toContain('id="btn-save-siages-app-origin"');
+    expect(popupScript).not.toContain('siages-app-origin');
+    expect(popupScript).not.toContain('sistema-gerencial-gamma.vercel.app');
+  });
+});

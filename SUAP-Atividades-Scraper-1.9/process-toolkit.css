@@ -1,0 +1,92 @@
+#siages-suap-toolkit {
+  --suape-bg: #101722;
+  --suape-surface: #17212f;
+  --suape-surface-2: #1d2a3a;
+  --suape-border: #314156;
+  --suape-text: #eef4f8;
+  --suape-muted: #9aabbc;
+  --suape-primary: #34d399;
+  --suape-primary-strong: #059669;
+  --suape-primary-soft: rgba(52, 211, 153, 0.13);
+  --suape-danger: #fb7185;
+  all: initial;
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 280px;
+  margin: 0 0 16px;
+  color: var(--suape-text);
+  font: 13px/1.45 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  position: sticky;
+  top: 12px;
+  z-index: 50;
+}
+#siages-suap-toolkit[data-theme="light"] {
+  --suape-bg: #f7faf9;
+  --suape-surface: #ffffff;
+  --suape-surface-2: #f1f5f4;
+  --suape-border: #d9e3df;
+  --suape-text: #13231f;
+  --suape-muted: #60716c;
+  --suape-primary: #087f5b;
+  --suape-primary-strong: #047857;
+  --suape-primary-soft: #e8f7f0;
+  --suape-danger: #be123c;
+}
+#siages-suap-toolkit *, #siages-suap-toolkit *::before, #siages-suap-toolkit *::after { box-sizing: border-box; }
+#siages-suap-toolkit button, #siages-suap-toolkit input, #siages-suap-toolkit textarea { font: inherit; }
+.suape-shell { overflow: hidden; border: 1px solid var(--suape-border); border-radius: 14px; background: var(--suape-bg); box-shadow: 0 18px 44px rgba(2, 8, 23, .22); color: var(--suape-text); }
+.suape-header { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 10px 12px; border-bottom: 1px solid var(--suape-border); background: var(--suape-surface); }
+.suape-brand { display: flex; min-width: 0; flex: 1; align-items: center; gap: 9px; }
+.suape-logo { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 9px; background: var(--suape-primary-soft); color: var(--suape-primary); font-weight: 900; }
+.suape-brand strong { display: block; font-size: 14px; letter-spacing: -.02em; }
+.suape-brand small { display: block; color: var(--suape-muted); font-size: 10px; }
+.suape-icon-button { display: inline-grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--suape-border); border-radius: 8px; background: transparent; color: var(--suape-muted); cursor: pointer; }
+.suape-icon-button:hover, .suape-icon-button:focus-visible { border-color: var(--suape-primary); color: var(--suape-primary); outline: none; box-shadow: 0 0 0 3px var(--suape-primary-soft); }
+.suape-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-bottom: 1px solid var(--suape-border); background: var(--suape-surface); }
+.suape-tab { min-width: 0; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--suape-muted); cursor: pointer; padding: 10px 3px 8px; font-size: 10px; font-weight: 700; }
+.suape-tab:hover, .suape-tab:focus-visible { color: var(--suape-text); outline: none; background: var(--suape-primary-soft); }
+.suape-tab[aria-selected="true"] { border-bottom-color: var(--suape-primary); color: var(--suape-primary); }
+.suape-panel { display: none; max-height: min(680px, calc(100vh - 120px)); overflow: auto; padding: 12px; background: var(--suape-bg); scrollbar-width: thin; }
+.suape-panel[data-active="true"] { display: block; }
+.suape-section { margin-bottom: 10px; border: 1px solid var(--suape-border); border-radius: 10px; background: var(--suape-surface); overflow: hidden; }
+.suape-section-title { margin: 0; padding: 10px 11px 8px; color: var(--suape-muted); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.suape-data-row { display: grid; grid-template-columns: minmax(82px, .75fr) minmax(0, 1.5fr) 28px; align-items: start; gap: 8px; padding: 8px 10px; border-top: 1px solid var(--suape-border); }
+.suape-data-row > span:first-child { color: var(--suape-muted); font-size: 11px; }
+.suape-data-value { overflow-wrap: anywhere; color: var(--suape-text); font-weight: 650; }
+.suape-data-value.suape-mono { font-family: "IBM Plex Mono", Consolas, monospace; font-size: 11px; }
+.suape-copy { width: 26px; height: 26px; border: 0; border-radius: 7px; background: var(--suape-primary-soft); color: var(--suape-primary); cursor: pointer; }
+.suape-copy:hover, .suape-copy:focus-visible { outline: 2px solid var(--suape-primary); outline-offset: 1px; }
+.suape-status { margin-bottom: 10px; padding: 9px 10px; border: 1px solid var(--suape-border); border-radius: 9px; background: var(--suape-primary-soft); color: var(--suape-text); font-size: 11px; }
+.suape-status[data-stage="error"] { border-color: color-mix(in srgb, var(--suape-danger) 55%, transparent); color: var(--suape-danger); }
+.suape-status button { margin-top: 7px; }
+.suape-button { display: inline-flex; min-height: 36px; align-items: center; justify-content: center; border: 0; border-radius: 8px; padding: 8px 12px; background: var(--suape-primary-strong); color: #fff; cursor: pointer; font-weight: 750; }
+.suape-button:hover, .suape-button:focus-visible { filter: brightness(1.08); outline: none; box-shadow: 0 0 0 3px var(--suape-primary-soft); }
+.suape-button-secondary { border: 1px solid var(--suape-border); background: var(--suape-surface-2); color: var(--suape-text); }
+.suape-button-danger { border: 1px solid color-mix(in srgb, var(--suape-danger) 45%, transparent); background: transparent; color: var(--suape-danger); }
+.suape-full { width: 100%; }
+.suape-form { display: grid; gap: 9px; }
+.suape-form label { display: grid; gap: 4px; color: var(--suape-muted); font-size: 11px; font-weight: 700; }
+.suape-input { width: 100%; min-height: 35px; border: 1px solid var(--suape-border); border-radius: 8px; padding: 7px 9px; background: var(--suape-bg); color: var(--suape-text); outline: none; }
+textarea.suape-input { min-height: 72px; resize: vertical; }
+.suape-input:focus { border-color: var(--suape-primary); box-shadow: 0 0 0 3px var(--suape-primary-soft); }
+.suape-form-actions { display: flex; gap: 7px; }
+.suape-toolbar { display: flex; align-items: center; gap: 7px; margin-bottom: 9px; }
+.suape-toolbar .suape-input { flex: 1; }
+.suape-snippet-list { display: grid; gap: 7px; }
+.suape-snippet { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; border: 1px solid var(--suape-border); border-radius: 9px; padding: 8px; background: var(--suape-surface); }
+.suape-trigger { border-radius: 6px; padding: 3px 6px; background: var(--suape-primary-soft); color: var(--suape-primary); font: 700 11px/1.3 "IBM Plex Mono", Consolas, monospace; }
+.suape-expansion { overflow: hidden; color: var(--suape-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.suape-snippet-actions { display: flex; gap: 3px; }
+.suape-help { margin: 0 0 10px; color: var(--suape-muted); font-size: 11px; line-height: 1.5; }
+.suape-empty { padding: 18px 10px; color: var(--suape-muted); text-align: center; }
+#siages-suap-toolkit[data-collapsed="true"] .suape-tabs,
+#siages-suap-toolkit[data-collapsed="true"] .suape-panels,
+#siages-suap-toolkit[data-collapsed="true"] .suape-brand small { display: none; }
+#siages-suap-toolkit[data-collapsed="true"] { width: min(100%, 280px); }
+#siages-suap-toolkit[data-collapsed="true"] .suape-shell { border-radius: 11px; }
+@media (max-width: 720px) {
+  #siages-suap-toolkit { position: static; min-width: 0; }
+  .suape-panel { max-height: none; }
+  .suape-data-row { grid-template-columns: 84px minmax(0, 1fr) 28px; }
+}

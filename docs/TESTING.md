@@ -89,3 +89,22 @@ Almoxarifado:
 - integração deve cobrir idempotência, concorrência, saldo negativo, bloqueio e isolamento RLS;
 - o fluxo deve proteger entrada, saída, transferência e custo médio da origem;
 - a UI deve cobrir estado vazio, filtros, cadastro de item e lançamento de movimento.
+
+## Regressao da extensao Suape
+
+A pasta corrente e centralizada por `src/test/extensionFixtures.ts`. As suites `suapExtensionPackage`, `suapProcessDocumentExtension`, `suapTextExpander`, `suapExtensionDispatch`, `SuapExtensionProcessInfo`, `suapPlanContentScript` e `suapCloneAutomation` protegem manifesto e rotas, painel de processo, bridge segura, sincronizacao, Financeiro, atalhos, popup, Plano de Atividades e clonagem.
+
+Antes de publicar uma nova versao, execute as suites focadas, `src/__tests__/encoding.test.ts`, `npm test`, `npm run build` e `npm run check`; em seguida compare os arquivos do diretorio da extensao com o ZIP gerado.
+
+### Validacao da versao 1.9 em 2026-07-31
+
+- 38 testes focados da extensao, bridge, pagina SIAGES, Plano de Atividades, popup, atalhos e clonagem: aprovados;
+- teste de encoding: aprovado;
+- `npx tsc --noEmit`: aprovado;
+- `npm test`: aprovado;
+- `npm run build`: aprovado;
+- ESLint dos arquivos alterados: aprovado;
+- pasta 1.9 e ZIP: nove arquivos comparados por SHA-256, sem divergencias;
+- `supabase migration list`: historico local e remoto alinhado;
+- `supabase functions deploy process-pdf`: deploy de validacao concluido no projeto vinculado;
+- `npm run check`: bloqueado no lint global por cinco erros preexistentes fora do escopo, em `AuditLog.tsx`, `ControleOrgaos.tsx` e `supabase/functions/pesquisar-precos/index.ts`; as etapas de testes e build foram executadas separadamente e aprovadas.

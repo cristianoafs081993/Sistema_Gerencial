@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { extensionFixturePath } from '@/test/extensionFixtures';
 
 type PlanContentHelpers = {
   parseCurrency: (value: string) => number;
@@ -17,10 +17,7 @@ let planSummaryScript = '';
 
 beforeAll(() => {
   (window as typeof window & { __SIAGES_SUAP_PLAN_TEST__?: boolean }).__SIAGES_SUAP_PLAN_TEST__ = true;
-  planSummaryScript = readFileSync(
-    resolve(process.cwd(), 'suap-atividades-extension/plan-summary.js'),
-    'utf8',
-  );
+  planSummaryScript = readFileSync(extensionFixturePath('plan-summary.js'), 'utf8');
   window.eval(planSummaryScript);
   helpers = (window as typeof window & { __siagesSuapPlanSummary: PlanContentHelpers }).__siagesSuapPlanSummary;
 });
