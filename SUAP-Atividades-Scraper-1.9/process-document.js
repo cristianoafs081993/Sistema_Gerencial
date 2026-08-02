@@ -6,7 +6,7 @@
   const FINANCE_PANEL_ID = 'siages-suap-finance-panel';
   const SIAGES_ORIGIN = 'https://www.siages.com.br';
   const SUPABASE_URL = 'https://mnqhwyrzhgykjlyyqodd.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYXNlIiwicmVmIjoibW5xaHd5cnpoZ3lramx5eXFvZGQiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc3MDI3OTg2MSwiZXhwIjoyMDg1ODg1ODYxfQ.g9h5nF0l8yKG-yjQRI8i_mq084IzKTrH64F2FpreVIg';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ucWh3eXJ6aGd5a2pseXlxb2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNzk4NjIsImV4cCI6MjA4NTg1NTg2Mn0.g9h5nF0l8yKG-yjQRI8i_mq084IzKTrH64F2FpreVIg';
   const SESSION_KEY = 'siages-extension-session';
   const THEME_KEY = 'siages-toolkit-theme';
   const COLLAPSED_KEY = 'siages-toolkit-collapsed';
@@ -376,7 +376,12 @@
     button.disabled = true; message.dataset.state = 'loading'; message.textContent = 'Autenticando...';
     try {
       const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, { method: 'POST', headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
-      if (!response.ok) throw new Error('Não foi possível autenticar. Verifique e-mail e senha.'); const payload = await response.json();
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (response.status === 401) throw new Error('E-mail ou senha do SIAGES inválidos. Confirme o acesso no SIAGES ou redefina a senha.');
+        throw new Error(`Não foi possível autenticar no SIAGES (HTTP ${response.status}).`);
+      }
+      if (!payload.access_token || !payload.refresh_token) throw new Error('O SIAGES não devolveu uma sessão válida.');
       await storageSet('local', { [SESSION_KEY]: { accessToken: payload.access_token, refreshToken: payload.refresh_token, expiresAt: Math.floor(Date.now() / 1000) + Number(payload.expires_in || 3600) } });
       if (passwordInput) passwordInput.value = ''; message.dataset.state = 'success'; message.textContent = 'Sessão ativa.'; restartBridge();
     } catch (error) { message.dataset.state = 'error'; message.textContent = error instanceof Error ? error.message : 'Falha na autenticação.'; } finally { button.disabled = false; }

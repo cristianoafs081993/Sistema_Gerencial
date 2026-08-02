@@ -36,6 +36,10 @@ async function signInExtension() {
     setExtensionAuthStatus('Informe e-mail e senha do SIAGES.', true);
     return;
   }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    setExtensionAuthStatus('Use o e-mail cadastrado no SIAGES. A matrícula do SUAP não autentica neste campo.', true);
+    return;
+  }
 
   try {
     extensionSignInButton.disabled = true;
@@ -45,8 +49,12 @@ async function signInExtension() {
       headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
-    if (!response.ok) throw new Error('Não foi possível autenticar. Verifique e-mail e senha.');
-    const payload = await response.json();
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (response.status === 401) throw new Error('E-mail ou senha do SIAGES inválidos. Confirme o acesso no SIAGES ou redefina a senha.');
+      throw new Error(`Não foi possível autenticar no SIAGES (HTTP ${response.status}).`);
+    }
+    if (!payload.access_token || !payload.refresh_token) throw new Error('O SIAGES não devolveu uma sessão válida.');
     await chrome.storage.local.set({
       [EXTENSION_SESSION_STORAGE_KEY]: {
         accessToken: payload.access_token,

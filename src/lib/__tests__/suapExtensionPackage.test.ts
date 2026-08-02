@@ -30,6 +30,7 @@ describe('pacote da extensao Suape 1.9', () => {
     const popup = fs.readFileSync(extensionFixturePath('popup.html'), 'utf8');
     const popupScript = fs.readFileSync(extensionFixturePath('popup.js'), 'utf8');
     const processScript = fs.readFileSync(extensionFixturePath('process-document.js'), 'utf8');
+    const planScript = fs.readFileSync(extensionFixturePath('plan-summary.js'), 'utf8');
 
     expect(popup).toContain('id="extension-auth-email"');
     expect(popup).toContain('id="btn-extension-sign-in"');
@@ -44,5 +45,10 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(processScript).toContain("form.querySelector('input[name=\"password\"]')");
     expect(processScript).not.toContain('form.elements.email.value');
     expect(processScript).not.toContain('form.elements.password.value');
+    const processKey = processScript.match(/SUPABASE_ANON_KEY = '([^']+)'/)?.[1];
+    const planKey = planScript.match(/SUPABASE_ANON_KEY = '([^']+)'/)?.[1];
+    const popupKey = popupScript.match(/SUPABASE_KEY = '([^']+)'/)?.[1];
+    expect(processKey).toBe(planKey);
+    expect(popupKey).toBe(planKey);
   });
 });

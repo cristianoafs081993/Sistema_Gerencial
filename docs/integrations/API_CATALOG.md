@@ -924,4 +924,5 @@ Observações operacionais:
 - Saidas: snapshot do processo, resumo financeiro e progresso de sincronizacao.
 - PDF: o iframe solicita a geracao ao content script; a resposta aceita somente a origem, a janela e o `suapId` esperados e transporta um `ArrayBuffer`, nunca tokens.
 - Persistencia: `suapScraperService.storePdfBytesForProcess` grava o PDF no bucket existente `suap-pdfs`; a fila continua sendo a Edge Function existente `process-pdf`.
+- Autenticacao da extensao: o popup e o painel usam o grant `password` de `/auth/v1/token` com a mesma anon key vigente do projeto; o campo deve receber o e-mail cadastrado no Supabase Auth do SIAGES (nao a matricula do SUAP). Respostas `401` sao exibidas como credencial SIAGES recusada.
 - Nao foram adicionados endpoints, migrations ou Edge Functions.

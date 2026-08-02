@@ -225,6 +225,26 @@ describe('process-document 1.9', () => {
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/auth/v1/token?grant_type=password'), expect.objectContaining({ method: 'POST' }));
   });
 
+  it('traduz 401 do Supabase em erro de credencial e nao cria sessao', async () => {
+    delete localValues['siages-extension-session'];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: vi.fn().mockResolvedValue({ error: 'invalid_grant' }),
+    }));
+    const api = loadProcessScript();
+    await api.installToolkit();
+    api.selectTab('settings');
+
+    const form = document.querySelector('.suape-auth-form') as HTMLFormElement;
+    (form.querySelector('input[name="email"]') as HTMLInputElement).value = 'usuario@ifrn.edu.br';
+    (form.querySelector('input[name="password"]') as HTMLInputElement).value = 'senha-segura';
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await waitFor(() => expect(form.querySelector('[data-auth-message]')).toHaveTextContent('E-mail ou senha do SIAGES inválidos'));
+    expect(localValues['siages-extension-session']).toBeUndefined();
+  });
+
   it('explica que matricula do SUAP nao substitui o e-mail do SIAGES', async () => {
     delete localValues['siages-extension-session'];
     const fetchMock = vi.fn();
