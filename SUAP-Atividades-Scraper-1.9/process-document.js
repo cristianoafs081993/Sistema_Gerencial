@@ -137,7 +137,7 @@
     root.innerHTML = `
       <div class="suape-shell">
         <header class="suape-header">
-          <div class="suape-brand"><span class="suape-logo">S</span><div><strong>Suape</strong><small>Canivete suíço do IFRN · v1.9.1</small></div></div>
+          <div class="suape-brand"><span class="suape-logo">S</span><div><strong>Suape</strong><small>Canivete suíço do IFRN · v1.9.2</small></div></div>
           <button type="button" class="suape-icon-button" data-action="theme" aria-label="Alternar tema">◐</button>
           <button type="button" class="suape-icon-button" data-action="collapse" aria-label="Recolher painel">⌃</button>
         </header>
