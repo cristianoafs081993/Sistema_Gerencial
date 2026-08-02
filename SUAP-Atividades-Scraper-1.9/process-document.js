@@ -331,7 +331,7 @@
       const actions = createElement('div', 'suape-snippet-actions'); const edit = createElement('button', 'suape-icon-button', '✎'); edit.type = 'button'; edit.setAttribute('aria-label', `Editar ${key}`); edit.addEventListener('click', () => { state.editingKey = key; renderShortcuts(filter); });
       const remove = createElement('button', 'suape-icon-button', '×'); remove.type = 'button'; remove.setAttribute('aria-label', `Remover ${key}`); remove.addEventListener('click', () => void deleteShortcut(key, filter)); actions.append(edit, remove); item.appendChild(actions); list.appendChild(item);
     });
-    if (!list.children.length) list.appendChild(createElement('div', 'suape-empty', 'Nenhum atalho encontrado.')); container.appendChild(list);
+    if (!list.children.length) list.appendChild(createElement('div', 'suape-empty', 'Nenhum atalho encontrado.')); container.appendChild(list); isolateShortcutsLayout(container);
   }
   async function saveShortcut(event) {
     event.preventDefault(); const form = event.currentTarget; const message = form.querySelector('[data-form-message]');
@@ -351,6 +351,27 @@
     form.querySelectorAll('.suape-input').forEach((input) => force(input, { display: 'block', 'grid-area': 'auto', 'grid-column': 'auto', 'grid-row': 'auto', float: 'none', position: 'static', width: '100%', 'max-width': 'none', height: '38px', margin: '0', opacity: '1', visibility: 'visible' }));
     const actions = form.querySelector('.suape-auth-actions'); force(actions, { display: 'grid', 'grid-template-columns': 'repeat(2, minmax(0, 1fr))', gap: '8px' });
     actions.querySelectorAll('button').forEach((button) => force(button, { float: 'none', position: 'static', width: '100%', margin: '0' }));
+  }
+
+  function isolateShortcutsLayout(container) {
+    const force = (element, styles) => Object.entries(styles).forEach(([property, value]) => element?.style.setProperty(property, value, 'important'));
+    const form = container.querySelector('form.suape-form');
+    force(form, { display: 'grid', 'grid-template-columns': 'minmax(0, 1fr)', gap: '9px', clear: 'both', 'grid-area': 'auto', 'grid-column': 'auto', 'grid-row': 'auto', width: '100%' });
+    form?.querySelectorAll(':scope > label').forEach((label) => force(label, { display: 'grid', 'grid-template-columns': 'minmax(0, 1fr)', 'grid-area': 'auto', 'grid-column': 'auto', 'grid-row': 'auto', gap: '4px', float: 'none', position: 'static', width: 'auto', height: 'auto', margin: '0', padding: '0', 'text-align': 'left', 'writing-mode': 'horizontal-tb', 'text-orientation': 'mixed' }));
+    form?.querySelectorAll('.suape-input').forEach((input) => force(input, { display: 'block', 'grid-area': 'auto', 'grid-column': 'auto', 'grid-row': 'auto', float: 'none', position: 'static', width: '100%', 'max-width': 'none', 'min-width': '0', height: 'auto', margin: '0', 'writing-mode': 'horizontal-tb', 'text-orientation': 'mixed', 'white-space': 'normal' }));
+    const actions = form?.querySelector('.suape-form-actions');
+    force(actions, { display: 'flex', 'align-items': 'center', gap: '7px', 'grid-area': 'auto', 'grid-column': '1 / -1', 'grid-row': 'auto', width: '100%' });
+    actions?.querySelectorAll('button').forEach((button) => force(button, { float: 'none', position: 'static', width: 'auto', 'min-width': '0', margin: '0', 'writing-mode': 'horizontal-tb' }));
+    force(container.querySelector('.suape-toolbar'), { display: 'flex', 'align-items': 'center', gap: '7px', 'grid-area': 'auto', 'grid-column': 'auto', 'grid-row': 'auto', width: '100%' });
+    container.querySelectorAll('.suape-snippet').forEach((item) => {
+      force(item, { display: 'grid', 'grid-template-columns': 'max-content minmax(0, 1fr) max-content', 'align-items': 'center', gap: '8px', 'grid-area': 'auto', 'grid-column': 'auto', 'grid-row': 'auto', width: '100%', 'min-width': '0', overflow: 'hidden' });
+      item.children && Array.from(item.children).forEach((child) => force(child, { display: child.classList.contains('suape-snippet-actions') ? 'flex' : 'block', 'grid-area': 'auto', 'grid-column': 'auto', 'grid-row': 'auto', float: 'none', position: 'static', width: 'auto', 'min-width': '0', 'max-width': '100%', 'writing-mode': 'horizontal-tb', 'text-orientation': 'mixed' }));
+    });
+  }
+
+  function isolateTabTitles(root) {
+    const force = (element, styles) => Object.entries(styles).forEach(([property, value]) => element.style.setProperty(property, value, 'important'));
+    root.querySelectorAll('.suape-tab').forEach((tab) => force(tab, { display: 'flex', 'align-items': 'center', 'justify-content': 'center', 'grid-area': 'auto', 'grid-column': 'auto', 'grid-row': 'auto', float: 'none', position: 'static', width: 'auto', 'min-width': '0', 'writing-mode': 'horizontal-tb', 'text-orientation': 'mixed', 'white-space': 'nowrap', 'text-align': 'center' }));
   }
 
   function renderSettings() {
@@ -437,7 +458,7 @@
     const [theme, collapsed, storedSnippets] = await Promise.all([storageGet('local', THEME_KEY, 'dark'), storageGet('local', COLLAPSED_KEY, false), storageGet('sync', SNIPPETS_KEY, null)]);
     state.theme = theme === 'light' ? 'light' : 'dark'; state.collapsed = Boolean(collapsed); state.snippets = storedSnippets && Object.keys(storedSnippets).length ? storedSnippets : { ...DEFAULT_SNIPPETS };
     if (!storedSnippets) await storageSet('sync', { [SNIPPETS_KEY]: state.snippets });
-    const root = buildShell(); const host = findToolkitHost(); host.prepend(root); renderSummary({ process: null, fallback: { suapId: getProcessId(), processNumber: getProcessNumber(), processUrl: location.href } }); renderShortcuts(); renderAiPanel(); renderSettings(); selectTab('summary'); openProcessBridge();
+    const root = buildShell(); isolateTabTitles(root); const host = findToolkitHost(); host.prepend(root); renderSummary({ process: null, fallback: { suapId: getProcessId(), processNumber: getProcessNumber(), processUrl: location.href } }); renderShortcuts(); renderAiPanel(); renderSettings(); selectTab('summary'); openProcessBridge();
   }
   globalThis.chrome?.storage?.onChanged?.addListener((changes, area) => { if (area === 'sync' && changes[SNIPPETS_KEY]) { state.snippets = changes[SNIPPETS_KEY].newValue || { ...DEFAULT_SNIPPETS }; renderShortcuts(); } });
   window.__siagesSuapProcessDocument = { getProcessId, getProcessNumber, buildContext, installToolkit, installButton: installToolkit, installFinancePanel: openProcessBridge, openFinanceBridge: openProcessBridge, renderFinanceSummary, openModal, closeModal, downloadProcessPdfFromSuap, normalizeSnippetKey, selectTab, retrySync };

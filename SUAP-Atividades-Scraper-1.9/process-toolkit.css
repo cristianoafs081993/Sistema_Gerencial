@@ -44,7 +44,7 @@
 .suape-icon-button { display: inline-grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--suape-border); border-radius: 8px; background: transparent; color: var(--suape-muted); cursor: pointer; }
 .suape-icon-button:hover, .suape-icon-button:focus-visible { border-color: var(--suape-primary); color: var(--suape-primary); outline: none; box-shadow: 0 0 0 3px var(--suape-primary-soft); }
 .suape-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-bottom: 1px solid var(--suape-border); background: var(--suape-surface); }
-.suape-tab { min-width: 0; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--suape-muted); cursor: pointer; padding: 10px 3px 8px; font-size: 10px; font-weight: 700; }
+.suape-tab { display: flex !important; min-width: 0; min-height: 36px; align-items: center; justify-content: center; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--suape-muted); cursor: pointer; padding: 10px 2px 8px; font-size: 10px; font-weight: 700; line-height: 1.1; letter-spacing: -.01em; text-align: center; white-space: nowrap; writing-mode: horizontal-tb !important; text-orientation: mixed !important; overflow: hidden; text-overflow: ellipsis; }
 .suape-tab:hover, .suape-tab:focus-visible { color: var(--suape-text); outline: none; background: var(--suape-primary-soft); }
 .suape-tab[aria-selected="true"] { border-bottom-color: var(--suape-primary); color: var(--suape-primary); }
 .suape-panel { display: none; max-height: min(680px, calc(100vh - 120px)); overflow: auto; padding: 12px; background: var(--suape-bg); scrollbar-width: thin; }
@@ -70,14 +70,54 @@
 .suape-input { width: 100%; min-height: 35px; border: 1px solid var(--suape-border); border-radius: 8px; padding: 7px 9px; background: var(--suape-bg); color: var(--suape-text); outline: none; }
 textarea.suape-input { min-height: 72px; resize: vertical; }
 .suape-input:focus { border-color: var(--suape-primary); box-shadow: 0 0 0 3px var(--suape-primary-soft); }
-.suape-form-actions { display: flex; gap: 7px; }
+.suape-form > label,
+#siages-suap-toolkit .suape-form > label {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-area: auto !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
+  gap: 4px !important;
+  float: none !important;
+  position: static !important;
+  width: auto !important;
+  min-width: 0 !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: left !important;
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+}
+#siages-suap-toolkit .suape-form .suape-input {
+  display: block !important;
+  grid-area: auto !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
+  float: none !important;
+  position: static !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  height: auto !important;
+  min-height: 35px !important;
+  margin: 0 !important;
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  white-space: normal !important;
+}
+#siages-suap-toolkit .suape-form textarea.suape-input { min-height: 72px !important; resize: vertical !important; }
+.suape-form-actions { display: flex !important; align-items: center !important; gap: 7px !important; grid-area: auto !important; grid-column: 1 / -1 !important; grid-row: auto !important; width: 100% !important; }
+#siages-suap-toolkit .suape-form-actions > button { flex: 0 1 auto; float: none !important; position: static !important; width: auto !important; min-width: 0 !important; margin: 0 !important; white-space: normal !important; writing-mode: horizontal-tb !important; }
 .suape-toolbar { display: flex; align-items: center; gap: 7px; margin-bottom: 9px; }
+.suape-toolbar { grid-area: auto !important; grid-column: 1 / -1 !important; grid-row: auto !important; width: 100% !important; }
 .suape-toolbar .suape-input { flex: 1; }
 .suape-snippet-list { display: grid; gap: 7px; }
-.suape-snippet { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; border: 1px solid var(--suape-border); border-radius: 9px; padding: 8px; background: var(--suape-surface); }
-.suape-trigger { border-radius: 6px; padding: 3px 6px; background: var(--suape-primary-soft); color: var(--suape-primary); font: 700 11px/1.3 "IBM Plex Mono", Consolas, monospace; }
-.suape-expansion { overflow: hidden; color: var(--suape-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.suape-snippet-actions { display: flex; gap: 3px; }
+.suape-snippet { display: grid !important; grid-template-columns: max-content minmax(0, 1fr) max-content !important; align-items: center !important; gap: 8px !important; border: 1px solid var(--suape-border); border-radius: 9px; padding: 8px; background: var(--suape-surface); min-width: 0; overflow: hidden; }
+.suape-snippet > * { grid-area: auto !important; grid-column: auto !important; grid-row: auto !important; float: none !important; position: static !important; min-width: 0 !important; max-width: 100% !important; writing-mode: horizontal-tb !important; text-orientation: mixed !important; }
+.suape-trigger { display: inline-flex !important; align-items: center; border-radius: 6px; padding: 3px 6px; background: var(--suape-primary-soft); color: var(--suape-primary); font: 700 11px/1.3 "IBM Plex Mono", Consolas, monospace; white-space: nowrap; }
+.suape-expansion { display: block !important; overflow: hidden; color: var(--suape-muted); font-size: 11px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.suape-snippet-actions { display: flex !important; align-items: center; justify-content: flex-end; gap: 3px; grid-area: auto !important; width: auto !important; }
 .suape-help { margin: 0 0 10px; color: var(--suape-muted); font-size: 11px; line-height: 1.5; }
 .suape-auth-form { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; gap: 10px !important; clear: both !important; }
 #siages-suap-toolkit .suape-auth-form > label {

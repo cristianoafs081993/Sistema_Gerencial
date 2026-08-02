@@ -203,6 +203,37 @@ describe('process-document 1.9', () => {
     toolkitStyle.remove();
   });
 
+  it('mantem atalhos, campos e titulos das abas alinhados contra estilos globais', async () => {
+    const toolkitStyle = document.createElement('style');
+    toolkitStyle.textContent = readFileSync(extensionFixturePath('process-toolkit.css'), 'utf8');
+    document.head.appendChild(toolkitStyle);
+    const hostileStyle = document.createElement('style');
+    hostileStyle.textContent = '#timeline form.suape-form label { float:left; position:absolute; width:50%; grid-area:label; writing-mode:vertical-rl } #timeline form.suape-form input, #timeline form.suape-form textarea { position:absolute; width:20%; grid-area:input; writing-mode:vertical-rl } #timeline .suape-snippet > * { grid-area:input; writing-mode:vertical-rl } #timeline .suape-tab { display:block; writing-mode:vertical-rl }';
+    document.head.appendChild(hostileStyle);
+    const api = loadProcessScript();
+    await api.installToolkit();
+    api.selectTab('shortcuts');
+
+    const root = document.getElementById('siages-suap-toolkit')!;
+    const form = root.querySelector('[data-panel="shortcuts"] form') as HTMLFormElement;
+    const label = form.querySelector('label') as HTMLLabelElement;
+    const textarea = form.querySelector('textarea') as HTMLTextAreaElement;
+    const snippet = root.querySelector('.suape-snippet') as HTMLElement;
+    const expansion = root.querySelector('.suape-expansion') as HTMLElement;
+    const tab = root.querySelector('[data-tab="shortcuts"]') as HTMLButtonElement;
+
+    expect(getComputedStyle(label).position).toBe('static');
+    expect(getComputedStyle(label).gridArea).toBe('auto');
+    expect(getComputedStyle(textarea).position).toBe('static');
+    expect(getComputedStyle(textarea).gridArea).toBe('auto');
+    expect(getComputedStyle(snippet).display).toBe('grid');
+    expect(getComputedStyle(expansion).writingMode).toBe('horizontal-tb');
+    expect(getComputedStyle(tab).display).toBe('flex');
+    expect(getComputedStyle(tab).writingMode).toBe('horizontal-tb');
+    hostileStyle.remove();
+    toolkitStyle.remove();
+  });
+
   it('autentica pelo formulario e persiste a sessao da extensao', async () => {
     delete localValues['siages-extension-session'];
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({

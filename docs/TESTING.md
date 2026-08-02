@@ -100,7 +100,7 @@ Antes de publicar uma nova versao, execute as suites focadas, `src/__tests__/enc
 
 A correcao de compatibilidade do login foi publicada no pacote como `1.9.2`, permitindo confirmar no cabecalho da extensao que o Chrome descartou a versao anterior mantida em memoria. O fluxo tambem trata `401` do Supabase como credencial SIAGES recusada, sem confundir falha de rede com erro de botao.
 
-- 42 testes focados da extensao, bridge, pagina SIAGES, Plano de Atividades, popup, atalhos e clonagem: aprovados; a regressao do login inclui as areas nomeadas de grid do CSS real do SUAP, persistencia da sessao autenticada, consistencia da chave anonima entre os scripts e mensagem explicita para respostas `401` ou matricula usada no lugar do e-mail do SIAGES;
+- 43 testes focados da extensao, bridge, pagina SIAGES, Plano de Atividades, popup, atalhos e clonagem: aprovados; as regressões incluem a blindagem de layout dos formularios, cards de atalhos e titulos das abas contra CSS global do SUAP, alem da persistencia da sessao autenticada, consistencia da chave anonima entre os scripts e mensagem explicita para respostas `401` ou matricula usada no lugar do e-mail do SIAGES;
 - teste de encoding: aprovado;
 - `npx tsc --noEmit`: aprovado;
 - `npm test`: aprovado;
