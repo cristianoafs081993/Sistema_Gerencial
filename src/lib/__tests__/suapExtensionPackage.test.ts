@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9');
+    expect(manifest.version).toBe('1.9.1');
     expect(manifest.host_permissions).toContain('<all_urls>');
     expect(manifest.permissions).toEqual(expect.arrayContaining(['activeTab', 'scripting', 'storage']));
 
@@ -29,6 +29,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('preserva autenticacao e extracao no popup sem expor a origem configuravel', () => {
     const popup = fs.readFileSync(extensionFixturePath('popup.html'), 'utf8');
     const popupScript = fs.readFileSync(extensionFixturePath('popup.js'), 'utf8');
+    const processScript = fs.readFileSync(extensionFixturePath('process-document.js'), 'utf8');
 
     expect(popup).toContain('id="extension-auth-email"');
     expect(popup).toContain('id="btn-extension-sign-in"');
@@ -39,5 +40,9 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(popup).not.toContain('id="btn-save-siages-app-origin"');
     expect(popupScript).not.toContain('siages-app-origin');
     expect(popupScript).not.toContain('sistema-gerencial-gamma.vercel.app');
+    expect(processScript).toContain("form.querySelector('input[name=\"email\"]')");
+    expect(processScript).toContain("form.querySelector('input[name=\"password\"]')");
+    expect(processScript).not.toContain('form.elements.email.value');
+    expect(processScript).not.toContain('form.elements.password.value');
   });
 });

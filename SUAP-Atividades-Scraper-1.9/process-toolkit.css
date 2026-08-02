@@ -83,6 +83,9 @@ textarea.suape-input { min-height: 72px; resize: vertical; }
 #siages-suap-toolkit .suape-auth-form > label {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) !important;
+  grid-area: auto !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
   gap: 4px !important;
   float: none !important;
   position: static !important;
@@ -101,6 +104,9 @@ textarea.suape-input { min-height: 72px; resize: vertical; }
 #siages-suap-toolkit .suape-auth-form > label > span { display: block !important; color: var(--suape-muted) !important; opacity: 1 !important; }
 #siages-suap-toolkit .suape-auth-form .suape-input {
   display: block !important;
+  grid-area: auto !important;
+  grid-column: auto !important;
+  grid-row: auto !important;
   float: none !important;
   position: static !important;
   width: 100% !important;

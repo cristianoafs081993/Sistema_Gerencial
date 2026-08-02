@@ -98,7 +98,9 @@ Antes de publicar uma nova versao, execute as suites focadas, `src/__tests__/enc
 
 ### Validacao da versao 1.9 em 2026-07-31
 
-- 40 testes focados da extensao, bridge, pagina SIAGES, Plano de Atividades, popup, atalhos e clonagem: aprovados; a regressao do login inclui CSS hostil equivalente ao legado do SUAP e persistencia da sessao autenticada;
+A correcao de compatibilidade do login foi publicada no mesmo pacote como `1.9.1`, permitindo confirmar no cabecalho da extensao que o Chrome descartou a versao anterior mantida em memoria.
+
+- 41 testes focados da extensao, bridge, pagina SIAGES, Plano de Atividades, popup, atalhos e clonagem: aprovados; a regressao do login inclui as areas nomeadas de grid do CSS real do SUAP, persistencia da sessao autenticada e mensagem explicita quando uma matricula e usada no lugar do e-mail do SIAGES;
 - teste de encoding: aprovado;
 - `npx tsc --noEmit`: aprovado;
 - `npm test`: aprovado;

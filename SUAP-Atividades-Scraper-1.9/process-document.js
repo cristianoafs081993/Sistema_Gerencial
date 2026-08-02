@@ -137,7 +137,7 @@
     root.innerHTML = `
       <div class="suape-shell">
         <header class="suape-header">
-          <div class="suape-brand"><span class="suape-logo">S</span><div><strong>Suape</strong><small>Canivete suíço do IFRN · v1.9</small></div></div>
+          <div class="suape-brand"><span class="suape-logo">S</span><div><strong>Suape</strong><small>Canivete suíço do IFRN · v1.9.1</small></div></div>
           <button type="button" class="suape-icon-button" data-action="theme" aria-label="Alternar tema">◐</button>
           <button type="button" class="suape-icon-button" data-action="collapse" aria-label="Recolher painel">⌃</button>
         </header>
@@ -347,8 +347,8 @@
   function isolateAuthFormLayout(form) {
     const force = (element, styles) => Object.entries(styles).forEach(([property, value]) => element.style.setProperty(property, value, 'important'));
     force(form, { display: 'grid', 'grid-template-columns': 'minmax(0, 1fr)', gap: '10px', clear: 'both' });
-    form.querySelectorAll(':scope > label').forEach((label) => force(label, { display: 'grid', 'grid-template-columns': 'minmax(0, 1fr)', gap: '4px', float: 'none', position: 'static', width: 'auto', height: 'auto', margin: '0', padding: '0', opacity: '1', visibility: 'visible', 'text-align': 'left' }));
-    form.querySelectorAll('.suape-input').forEach((input) => force(input, { display: 'block', float: 'none', position: 'static', width: '100%', 'max-width': 'none', height: '38px', margin: '0', opacity: '1', visibility: 'visible' }));
+    form.querySelectorAll(':scope > label').forEach((label) => force(label, { display: 'grid', 'grid-template-columns': 'minmax(0, 1fr)', 'grid-area': 'auto', 'grid-column': 'auto', 'grid-row': 'auto', gap: '4px', float: 'none', position: 'static', width: 'auto', height: 'auto', margin: '0', padding: '0', opacity: '1', visibility: 'visible', 'text-align': 'left' }));
+    form.querySelectorAll('.suape-input').forEach((input) => force(input, { display: 'block', 'grid-area': 'auto', 'grid-column': 'auto', 'grid-row': 'auto', float: 'none', position: 'static', width: '100%', 'max-width': 'none', height: '38px', margin: '0', opacity: '1', visibility: 'visible' }));
     const actions = form.querySelector('.suape-auth-actions'); force(actions, { display: 'grid', 'grid-template-columns': 'repeat(2, minmax(0, 1fr))', gap: '8px' });
     actions.querySelectorAll('button').forEach((button) => force(button, { float: 'none', position: 'static', width: '100%', margin: '0' }));
   }
@@ -358,7 +358,7 @@
     const themeSection = createElement('section', 'suape-section'); themeSection.appendChild(createElement('h3', 'suape-section-title', 'Aparência'));
     const themeBody = createElement('div', 'suape-form'); themeBody.style.padding = '11px'; const themeButton = createElement('button', 'suape-button suape-button-secondary suape-full', state.theme === 'dark' ? 'Usar modo claro' : 'Usar modo escuro'); themeButton.type = 'button'; themeButton.addEventListener('click', async () => { await toggleTheme(); renderSettings(); }); themeBody.appendChild(themeButton); themeSection.appendChild(themeBody); container.appendChild(themeSection);
     const authSection = createElement('section', 'suape-section'); authSection.appendChild(createElement('h3', 'suape-section-title', 'Acesso ao SIAGES'));
-    const form = createElement('form', 'suape-form suape-auth-form'); form.style.padding = '11px'; form.innerHTML = '<label for="suape-auth-email"><span>E-mail</span><input id="suape-auth-email" class="suape-input" name="email" type="email" autocomplete="username" required></label><label for="suape-auth-password"><span>Senha</span><input id="suape-auth-password" class="suape-input" name="password" type="password" autocomplete="current-password" required></label><div class="suape-auth-actions"><button class="suape-button" type="submit">Entrar</button><button class="suape-button suape-button-secondary" type="button" data-signout>Sair</button></div><div class="suape-help suape-auth-message" data-auth-message aria-live="polite">A consulta respeita as permissões do seu usuário.</div>';
+    const form = createElement('form', 'suape-form suape-auth-form'); form.noValidate = true; form.style.padding = '11px'; form.innerHTML = '<label for="suape-auth-email"><span>E-mail cadastrado no SIAGES</span><input id="suape-auth-email" class="suape-input" name="email" type="text" inputmode="email" autocomplete="username" placeholder="nome@dominio.com" required></label><label for="suape-auth-password"><span>Senha do SIAGES</span><input id="suape-auth-password" class="suape-input" name="password" type="password" autocomplete="current-password" required></label><div class="suape-auth-actions"><button class="suape-button" type="submit">Entrar</button><button class="suape-button suape-button-secondary" type="button" data-signout>Sair</button></div><div class="suape-help suape-auth-message" data-auth-message aria-live="polite">Use seu e-mail e senha cadastrados no SIAGES, não a matrícula e senha do SUAP.</div>';
     isolateAuthFormLayout(form); form.addEventListener('submit', signIn); form.querySelector('[data-signout]').addEventListener('click', signOut); authSection.appendChild(form); container.appendChild(authSection); void updateAuthStatus(form);
   }
   async function updateAuthStatus(form) {
@@ -368,13 +368,17 @@
   }
   async function signIn(event) {
     event.preventDefault(); const form = event.currentTarget; const message = form.querySelector('[data-auth-message]'); const button = form.querySelector('button[type="submit"]');
-    const email = form.elements.email.value.trim(); const password = form.elements.password.value; if (!email || !password) { message.textContent = 'Informe e-mail e senha.'; return; }
+    const emailInput = form.querySelector('input[name="email"]'); const passwordInput = form.querySelector('input[name="password"]');
+    const email = emailInput?.value.trim() || ''; const password = passwordInput?.value || '';
+    message.dataset.state = 'error';
+    if (!email || !password) { message.textContent = 'Informe o e-mail e a senha cadastrados no SIAGES.'; return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { message.textContent = 'Use o e-mail cadastrado no SIAGES. A matrícula do SUAP não autentica neste campo.'; return; }
     button.disabled = true; message.dataset.state = 'loading'; message.textContent = 'Autenticando...';
     try {
       const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, { method: 'POST', headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
       if (!response.ok) throw new Error('Não foi possível autenticar. Verifique e-mail e senha.'); const payload = await response.json();
       await storageSet('local', { [SESSION_KEY]: { accessToken: payload.access_token, refreshToken: payload.refresh_token, expiresAt: Math.floor(Date.now() / 1000) + Number(payload.expires_in || 3600) } });
-      form.elements.password.value = ''; message.dataset.state = 'success'; message.textContent = 'Sessão ativa.'; restartBridge();
+      if (passwordInput) passwordInput.value = ''; message.dataset.state = 'success'; message.textContent = 'Sessão ativa.'; restartBridge();
     } catch (error) { message.dataset.state = 'error'; message.textContent = error instanceof Error ? error.message : 'Falha na autenticação.'; } finally { button.disabled = false; }
   }
   async function signOut(event) { const form = event.currentTarget.closest('form'); await storageRemove('local', SESSION_KEY); const message = form.querySelector('[data-auth-message]'); message.dataset.state = ''; message.textContent = 'Sessão encerrada.'; }

@@ -181,7 +181,7 @@ describe('process-document 1.9', () => {
     toolkitStyle.textContent = readFileSync(extensionFixturePath('process-toolkit.css'), 'utf8');
     document.head.appendChild(toolkitStyle);
     const hostileStyle = document.createElement('style');
-    hostileStyle.textContent = '#timeline form label { float:left; position:absolute; width:50%; opacity:.05 } #timeline form input { position:absolute; width:20%; opacity:.05 } #timeline form button { float:left; width:49% }';
+    hostileStyle.textContent = '#timeline form label { float:left; position:absolute; width:50%; opacity:.05; grid-area:label } #timeline form input { position:absolute; width:20%; opacity:.05; grid-area:input } #timeline form button { float:left; width:49% }';
     document.head.appendChild(hostileStyle);
     const api = loadProcessScript();
     await api.installToolkit();
@@ -194,8 +194,10 @@ describe('process-document 1.9', () => {
     expect(form).toBeTruthy();
     expect(getComputedStyle(label).position).toBe('static');
     expect(getComputedStyle(label).float).toBe('none');
+    expect(getComputedStyle(label).gridArea).toBe('auto');
     expect(getComputedStyle(input).position).toBe('static');
     expect(getComputedStyle(input).opacity).toBe('1');
+    expect(getComputedStyle(input).gridArea).toBe('auto');
     expect(getComputedStyle(button).float).toBe('none');
     hostileStyle.remove();
     toolkitStyle.remove();
@@ -221,5 +223,22 @@ describe('process-document 1.9', () => {
     }));
     expect(form.querySelector('[data-auth-message]')).toHaveTextContent('Sessão ativa.');
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/auth/v1/token?grant_type=password'), expect.objectContaining({ method: 'POST' }));
+  });
+
+  it('explica que matricula do SUAP nao substitui o e-mail do SIAGES', async () => {
+    delete localValues['siages-extension-session'];
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const api = loadProcessScript();
+    await api.installToolkit();
+    api.selectTab('settings');
+
+    const form = document.querySelector('.suape-auth-form') as HTMLFormElement;
+    (form.elements.namedItem('email') as HTMLInputElement).value = '1234567';
+    (form.elements.namedItem('password') as HTMLInputElement).value = 'senha';
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    expect(form.querySelector('[data-auth-message]')).toHaveTextContent('A matrícula do SUAP não autentica neste campo.');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
