@@ -8,9 +8,10 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.2');
+    expect(manifest.version).toBe('1.9.4');
     expect(manifest.host_permissions).toContain('<all_urls>');
-    expect(manifest.permissions).toEqual(expect.arrayContaining(['activeTab', 'scripting', 'storage']));
+    expect(manifest.permissions).toEqual(expect.arrayContaining(['activeTab', 'scripting', 'storage', 'alarms']));
+    expect(manifest.background).toEqual({ service_worker: 'background.js' });
 
     const expander = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('text-expander.js'));
     const process = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('process-document.js'));
@@ -31,6 +32,7 @@ describe('pacote da extensao Suape 1.9', () => {
     const popupScript = fs.readFileSync(extensionFixturePath('popup.js'), 'utf8');
     const processScript = fs.readFileSync(extensionFixturePath('process-document.js'), 'utf8');
     const planScript = fs.readFileSync(extensionFixturePath('plan-summary.js'), 'utf8');
+    const backgroundScript = fs.readFileSync(extensionFixturePath('background.js'), 'utf8');
 
     expect(popup).toContain('id="extension-auth-email"');
     expect(popup).toContain('id="btn-extension-sign-in"');
@@ -50,5 +52,8 @@ describe('pacote da extensao Suape 1.9', () => {
     const popupKey = popupScript.match(/SUPABASE_KEY = '([^']+)'/)?.[1];
     expect(processKey).toBe(planKey);
     expect(popupKey).toBe(planKey);
+    expect(backgroundScript).toContain("const EXTENSION_SESSION_STORAGE_KEY = 'siages-extension-session'");
+    expect(backgroundScript).toContain('refresh_token');
+    expect(backgroundScript).toContain('chrome.alarms.create');
   });
 });

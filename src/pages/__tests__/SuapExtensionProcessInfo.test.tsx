@@ -15,6 +15,7 @@ vi.mock('@/lib/supabase', () => ({
   supabase: {
     auth: {
       setSession: vi.fn().mockResolvedValue({ data: { session: { user: { id: 'user-1' } } }, error: null }),
+      stopAutoRefresh: vi.fn(),
     },
   },
 }));
@@ -99,6 +100,7 @@ describe('SuapExtensionProcessInfo', () => {
       access_token: 'access-token',
       refresh_token: 'refresh-token',
     }));
+    expect(supabase.auth.stopAutoRefresh).toHaveBeenCalledOnce();
     await waitFor(() => expect(suapProcessFinanceService.getSummaryBySuapId).toHaveBeenCalledWith('987'));
     expect(postMessage).toHaveBeenCalledWith({
       source: 'siages',

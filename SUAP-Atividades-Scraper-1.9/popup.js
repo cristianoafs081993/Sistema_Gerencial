@@ -19,16 +19,47 @@ function setExtensionAuthStatus(message, isError = false) {
   extensionAuthStatus.style.color = isError ? '#fca5a5' : '#b8c5d1';
 }
 
-async function updateExtensionAuthStatus() {
-  const stored = await chrome.storage.local.get(EXTENSION_SESSION_STORAGE_KEY);
-  const session = stored[EXTENSION_SESSION_STORAGE_KEY];
-  if (session?.accessToken && Number(session.expiresAt || 0) > Date.now() / 1000) {
-    setExtensionAuthStatus('Sessão da extensão ativa. Os dados serão filtrados pelas permissões do seu usuário.');
-  } else {
-    setExtensionAuthStatus('Entre para permitir que a extensão consulte o banco de dados.');
+async function refreshExtensionSession(session) {
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: session.refreshToken }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload.access_token || !payload.refresh_token) {
+    throw new Error('A sessao da extensao expirou ou foi revogada. Entre novamente.');
   }
+
+  const updatedSession = {
+    accessToken: payload.access_token,
+    refreshToken: payload.refresh_token,
+    expiresAt: Math.floor(Date.now() / 1000) + Number(payload.expires_in || 3600),
+  };
+  await chrome.storage.local.set({ [EXTENSION_SESSION_STORAGE_KEY]: updatedSession });
+  return updatedSession;
 }
 
+async function getStoredExtensionSession() {
+  const stored = await chrome.storage.local.get(EXTENSION_SESSION_STORAGE_KEY);
+  const session = stored[EXTENSION_SESSION_STORAGE_KEY];
+  if (!session?.accessToken || !session?.refreshToken) return null;
+  if (Number(session.expiresAt || 0) > (Date.now() / 1000) + (5 * 60)) return session;
+  return refreshExtensionSession(session);
+}
+
+async function updateExtensionAuthStatus() {
+  try {
+    const session = await getStoredExtensionSession();
+    if (session) {
+      setExtensionAuthStatus('Sessao da extensao ativa. Os dados respeitam as suas permissoes no SIAGES.');
+    } else {
+      setExtensionAuthStatus('Entre para permitir que a extensao consulte o banco de dados.');
+    }
+  } catch (error) {
+    await chrome.storage.local.remove(EXTENSION_SESSION_STORAGE_KEY);
+    setExtensionAuthStatus(error instanceof Error ? error.message : 'Nao foi possivel renovar a sessao da extensao.', true);
+  }
+}
 async function signInExtension() {
   const email = extensionAuthEmailInput.value.trim();
   const password = extensionAuthPasswordInput.value;

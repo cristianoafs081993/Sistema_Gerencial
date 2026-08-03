@@ -136,6 +136,27 @@ describe('process-document 1.9', () => {
     expect(summary?.querySelectorAll('.suape-copy').length).toBeGreaterThan(8);
   });
 
+  it('normaliza empenhos, remove duplicados e nunca renderiza objetos brutos', async () => {
+    const api = loadProcessScript();
+    await api.installToolkit();
+    await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeTruthy());
+    const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
+    window.dispatchEvent(new MessageEvent('message', {
+      origin: 'https://www.siages.com.br', source: frame.contentWindow,
+      data: { source: 'siages', type: 'siages:suap-process-snapshot', version: 1, payload: {
+        fallback: { suapId: '321', processNumber: '23035.000001.2026-11' },
+        process: { suapId: '321', numProcesso: '23035.000001.2026-11', status: 'success', dadosCompletos: { empenhos: [
+          { numero: '2026NE000060' }, '158366264352026NE000060', { empenho: '158366264352025NE000297' }, { invalido: true },
+        ] } },
+      } },
+    }));
+
+    const values = Array.from(document.querySelectorAll('[data-panel="summary"] .suape-mono'))
+      .map((element) => element.textContent)
+      .filter((value): value is string => Boolean(value?.match(/^20\d{2}NE\d{6}/)));
+    expect(values).toEqual(['2026NE000060', '2025NE000297', '2026NE000060, 2025NE000297']);
+    expect(document.querySelector('[data-panel="summary"]')).not.toHaveTextContent('[object Object]');
+  });
   it('preserva o resumo financeiro com empenhos e liquidacoes sem pagamento', async () => {
     const api = loadProcessScript();
     await api.installToolkit();

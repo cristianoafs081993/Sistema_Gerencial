@@ -160,6 +160,8 @@ export default function SuapExtensionProcessInfo() {
         refresh_token: extensionSession.refreshToken,
       });
       if (error || !data.session) throw error ?? new Error('Nao foi possivel iniciar a sessao da extensao.');
+      // O service worker da extensao e o unico responsavel por renovar este refresh token.
+      supabase.auth.stopAutoRefresh();
       const tenantId = data.session.user.id;
 
       let process = await publishProcess();

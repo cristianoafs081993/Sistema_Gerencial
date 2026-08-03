@@ -23,6 +23,30 @@
   };
 
   function cleanText(value) { return value ? String(value).replace(/\s+/g, ' ').trim() : ''; }
+  function normalizeEmpenhos(values) {
+    const numbers = []; const seen = new Set(); const visited = new WeakSet();
+    const add = (number) => {
+      const normalized = number.toUpperCase();
+      if (!seen.has(normalized)) { seen.add(normalized); numbers.push(normalized); }
+    };
+    const visit = (value, allowFallback = true) => {
+      if (value == null) return;
+      if (Array.isArray(value)) { value.forEach((item) => visit(item, allowFallback)); return; }
+      if (typeof value === 'object') {
+        if (visited.has(value)) return; visited.add(value);
+        const record = value;
+        [record.numero, record.numeroEmpenho, record.numero_empenho, record.empenho, record.notaEmpenho, record.nota_empenho, record.ne, record.numeroNE, record.numero_ne, record.texto, record.value].forEach((candidate) => visit(candidate, false));
+        return;
+      }
+      const raw = cleanText(value);
+      if (!raw || raw === '[object Object]') return;
+      const matches = Array.from(raw.matchAll(/(\d{4})\s*NE\s*(\d{6})/gi), (match) => `${match[1]}NE${match[2]}`);
+      if (matches.length) { matches.forEach(add); return; }
+      if (allowFallback) add(raw);
+    };
+    visit(values);
+    return numbers;
+  }
   function getProcessId() {
     const match = location.pathname.match(/^\/processo_eletronico\/(?:processo|visualizar_processo)\/(\d+)\/?$/);
     return match ? match[1] : null;
@@ -244,11 +268,12 @@
       appendCopyRow(section, 'Agência', bank.agencia, true);
       appendCopyRow(section, 'Conta', bank.conta, true);
     });
+    const empenhos = normalizeEmpenhos(full.empenhos);
     appendSection(container, 'Retenções e empenhos', (section) => {
       if (taxes.optante_simples_nacional) appendCopyRow(section, 'Regime', 'Optante pelo Simples Nacional');
       [['ISS', taxes.iss], ['INSS', taxes.inss], ['IR', taxes.ir], ['CSLL', taxes.csll], ['COFINS', taxes.cofins], ['PIS/PASEP', taxes.pis_pasep]].forEach(([label, value]) => appendCopyRow(section, label, value));
-      (full.empenhos || []).forEach((value, index) => appendCopyRow(section, `Empenho ${index + 1}`, value, true));
-      if ((full.empenhos || []).length > 1) appendCopyRow(section, 'Todos', full.empenhos.join(', '), true);
+      empenhos.forEach((value, index) => appendCopyRow(section, `Empenho ${index + 1}`, value, true));
+      if (empenhos.length > 1) appendCopyRow(section, 'Todos', empenhos.join(', '), true);
     });
     if (workflow.concluido) appendSection(container, 'Conclusão', (section) => {
       appendCopyRow(section, 'NS registrada', workflow.nsNumero || full.ns_numero, true);
