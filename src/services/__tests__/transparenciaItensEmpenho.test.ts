@@ -259,7 +259,7 @@ describe('transparenciaService.getItensEmpenhoPortal', () => {
     expect(supabaseFunctionsInvokeMock).toHaveBeenCalledWith(
       'refresh-portal-transparencia-itens-cache',
       expect.objectContaining({
-        body: expect.objectContaining({ empenhoNumero: '2026NE000009', returnRows: true }),
+        body: expect.objectContaining({ empenhoNumero: '2026NE000009', source: 'frontend-cache-stale' }),
       }),
     );
   });

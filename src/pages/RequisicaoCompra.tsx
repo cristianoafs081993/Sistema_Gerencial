@@ -838,7 +838,6 @@ export default function RequisicaoCompraPage() {
                   const availableBalance = empenhoBalanceById.get(empenho.id) ?? 0;
                   const afterRequisicao = Math.max(0, availableBalance - groupTotal);
                   const isLoadingPortalItems = portalEmpenhoItemQueries[empenhoIndex]?.isLoading ?? false;
-                  const isLoadingLiquidacoes = liquidacoesEmpenhoQueries[empenhoIndex]?.isLoading ?? false;
                   const isPortalItemsError = portalEmpenhoItemQueries[empenhoIndex]?.isError ?? false;
                   const portalItems = (portalEmpenhoItemQueries[empenhoIndex]?.data ?? []) as PortalTransparenciaItemEmpenho[];
                   const empenhoItemBalances = empenhoItemBalancesById.get(empenho.id) ?? [];
@@ -882,7 +881,7 @@ export default function RequisicaoCompraPage() {
                               Os subitens vêm da NE e os saldos consideram liquidações e requisições em revisão para este empenho.
                             </p>
                           </div>
-                          {(isLoadingPortalItems || isLoadingLiquidacoes) ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : null}
+                          {isLoadingPortalItems ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : null}
                         </div>
                         {isPortalItemsError ? (
                           <p className="text-sm text-status-warning">Não foi possível carregar os subitens deste empenho agora. Cadastre os itens manualmente, se necessário.</p>

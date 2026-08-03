@@ -308,6 +308,24 @@ const getItensCacheRowsViaFunction = async (
     };
 };
 
+const triggerItensCacheRefresh = (numeroEmpenho: string, source: string) => {
+    void supabase.functions
+        .invoke('refresh-portal-transparencia-itens-cache', {
+            body: {
+                empenhoNumero: numeroEmpenho,
+                source,
+            },
+        })
+        .then(({ error }) => {
+            if (error) {
+                console.warn('Portal da Transparencia: falha ao acionar refresh do cache de subitens', error);
+            }
+        })
+        .catch((error) => {
+            console.warn('Portal da Transparencia: falha ao acionar refresh do cache de subitens', error);
+        });
+};
+
 type DocumentoImportState = {
     doc: {
         id: string;
@@ -349,16 +367,7 @@ export const transparenciaService = {
             if (cached.available) {
                 if (cached.isFresh) return cached.rows ?? [];
 
-                const refreshed = await getItensCacheRowsViaFunction(numeroEmpenho, {
-                    source: cached.hasStatus ? 'frontend-cache-stale' : 'frontend-cache-miss',
-                });
-                if (refreshed?.status === 'found' || refreshed?.status === 'not_found') {
-                    return refreshed.rows;
-                }
-                if (refreshed?.rows.length) return refreshed.rows;
-
-                // An error refresh keeps previously materialized rows in the
-                // database. Keep that last known balance visible in the UI.
+                triggerItensCacheRefresh(numeroEmpenho, cached.hasStatus ? 'frontend-cache-stale' : 'frontend-cache-miss');
                 return cached.rows ?? [];
             }
         } catch (error) {
