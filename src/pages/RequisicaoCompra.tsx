@@ -239,7 +239,7 @@ export default function RequisicaoCompraPage() {
       const empenho = selectedEmpenhos[empenhoIndex];
       if (!empenho) return;
 
-      const isLoading = portalEmpenhoItemQueries[empenhoIndex]?.isLoading || liquidacoesEmpenhoQueries[empenhoIndex]?.isLoading;
+      const isLoading = portalEmpenhoItemQueries[empenhoIndex]?.isLoading;
       if (isLoading) {
         nextPending.push(empenhoId);
         return;
