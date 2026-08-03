@@ -38,5 +38,6 @@
 - O parser do `Relatorio (3)` ignora `Valor Liquidado` e `Valor Pago`; esses campos nao devem alimentar o modulo local de contratos.
 - A escrita no banco pode cair para `insert/update` se o `upsert onConflict(numero)` nao estiver disponivel no ambiente.
 - Alguns imports operam com JSON e CSV no mesmo fluxo porque usam `JsonImportDialog`.
+- Na aba Restos a Pagar, o filtro `Pendente` usa saldo RAP operacional estritamente maior que zero; empenhos com saldo zerado por pagamento ou cancelamento ficam fora dele.
 
 

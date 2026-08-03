@@ -43,7 +43,7 @@ export const matchesEmpenhoStatusFilter = (
 
     if (filterStatus === 'pago') return isCompletamentePago;
     if (filterStatus === 'liquidado') return liquidadoNoAno > 0 && !isCompletamentePago;
-    if (filterStatus === 'pendente') return !isCompletamentePago;
+    if (filterStatus === 'pendente') return saldoAtual > 0;
   }
 
   return empenho.status === filterStatus;

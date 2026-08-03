@@ -97,6 +97,15 @@ describe('empenhosFilters', () => {
       status: 'pago',
     });
 
+    const rapCancelado = createEmpenho({
+      id: 'rap-cancelado',
+      tipo: 'rap',
+      rapInscrito: 100,
+      rapALiquidar: 0,
+      saldoRapOficial: 0,
+      rapPago: 0,
+      status: 'pendente',
+    });
     expect(matchesEmpenhoStatusFilter(rapPendente, 'pendente')).toBe(true);
     expect(matchesEmpenhoStatusFilter(rapPendente, 'pago')).toBe(false);
 
@@ -109,6 +118,7 @@ describe('empenhosFilters', () => {
 
     expect(matchesEmpenhoStatusFilter(rapPago, 'pago')).toBe(true);
     expect(matchesEmpenhoStatusFilter(rapPago, 'pendente')).toBe(false);
+    expect(matchesEmpenhoStatusFilter(rapCancelado, 'pendente')).toBe(false);
   });
 
   it('combina busca textual, busca por documento e periodo', () => {
