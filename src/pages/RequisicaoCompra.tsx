@@ -185,7 +185,7 @@ export default function RequisicaoCompraPage() {
   const portalEmpenhoItemQueries = useQueries({
     queries: selectedEmpenhos.map((empenho) => ({
       queryKey: ['requisicao-portal-itens-empenho', empenho.numero],
-      queryFn: () => transparenciaService.getItensEmpenhoPortal(empenho.numero, { includeHistorico: true }),
+      queryFn: () => transparenciaService.getItensEmpenhoPortal(empenho.numero),
       retry: false,
       staleTime: 5 * 60 * 1000,
     })),

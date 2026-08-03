@@ -146,6 +146,124 @@ describe('transparenciaService.getItensEmpenhoPortal', () => {
     ]);
   });
 
+  it('uses cached rows after an error refresh', async () => {
+    const { transparenciaService } = await import('@/services/transparencia');
+
+    supabaseFromMock.mockImplementation((table: string) => {
+      if (table === 'portal_transparencia_empenho_itens_cache_status') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({
+                data: {
+                  status: 'error',
+                  rows_count: 0,
+                  expires_at: new Date(Date.now() + 60_000).toISOString(),
+                },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+
+      return {
+        select: () => ({
+          eq: () => ({
+            order: async () => ({
+              data: [
+                {
+                  codigo_item_empenho: '158366264352026NE000009',
+                  sequencial: 1,
+                  descricao: 'Cached item after Portal error',
+                  codigo_subelemento: '30',
+                  descricao_subelemento: 'MATERIAL DE CONSUMO',
+                  valor_atual: 14286.35,
+                  historico: [],
+                },
+              ],
+              error: null,
+            }),
+          }),
+        }),
+      };
+    });
+
+    const result = await transparenciaService.getItensEmpenhoPortal('2026NE000009');
+
+    expect(result).toMatchObject([
+      {
+        codigoItemEmpenho: '158366264352026NE000009',
+        valorAtual: 14286.35,
+      },
+    ]);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(supabaseFunctionsInvokeMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps stale cached rows when the refresh fails', async () => {
+    const { transparenciaService } = await import('@/services/transparencia');
+
+    supabaseFromMock.mockImplementation((table: string) => {
+      if (table === 'portal_transparencia_empenho_itens_cache_status') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({
+                data: {
+                  status: 'found',
+                  rows_count: 1,
+                  expires_at: new Date(Date.now() - 60_000).toISOString(),
+                },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+
+      return {
+        select: () => ({
+          eq: () => ({
+            order: async () => ({
+              data: [
+                {
+                  codigo_item_empenho: '158366264352026NE000009',
+                  sequencial: 1,
+                  descricao: 'Cached item after failed refresh',
+                  codigo_subelemento: '30',
+                  descricao_subelemento: 'MATERIAL DE CONSUMO',
+                  valor_atual: 14286.35,
+                  historico: [],
+                },
+              ],
+              error: null,
+            }),
+          }),
+        }),
+      };
+    });
+    supabaseFunctionsInvokeMock.mockResolvedValue({
+      data: { results: [{ status: 'error', rows: [] }] },
+      error: null,
+    });
+
+    const result = await transparenciaService.getItensEmpenhoPortal('2026NE000009');
+
+    expect(result).toMatchObject([
+      {
+        codigoItemEmpenho: '158366264352026NE000009',
+        valorAtual: 14286.35,
+      },
+    ]);
+    expect(supabaseFunctionsInvokeMock).toHaveBeenCalledWith(
+      'refresh-portal-transparencia-itens-cache',
+      expect.objectContaining({
+        body: expect.objectContaining({ empenhoNumero: '2026NE000009', returnRows: true }),
+      }),
+    );
+  });
+
   it('prepara valor atual e historico quando solicitado', async () => {
     const { transparenciaService } = await import('@/services/transparencia');
 
@@ -209,6 +327,56 @@ describe('transparenciaService.getItensEmpenhoPortal', () => {
         },
       ],
     });
+  });
+
+  it('keeps the base item when an item history request fails', async () => {
+    const { transparenciaService } = await import('@/services/transparencia');
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/historico')) {
+        return {
+          ok: false,
+          status: 504,
+          json: async () => ({}),
+        } as Response;
+      }
+      if (url.includes('pagina=1')) {
+        return {
+          ok: true,
+          json: async () => [
+            {
+              codigoItemEmpenho: '158366264352026NE000013',
+              descricao: 'Base item survives history failure',
+              codigoSubelemento: '01',
+              descricaoSubelemento: 'BOLSAS DE ESTUDO NO PAIS',
+              valorAtual: '36.700,00',
+              sequencial: 1,
+            },
+          ],
+        } as Response;
+      }
+
+      return {
+        ok: true,
+        json: async () => [],
+      } as Response;
+    });
+
+    const result = await transparenciaService.getItensEmpenhoPortal('2026NE000013', {
+      includeHistorico: true,
+    });
+
+    expect(result).toMatchObject([
+      {
+        descricao: 'Base item survives history failure',
+        valorAtual: 36700,
+        historico: [],
+      },
+    ]);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
   it('preserva itens ja recebidos quando uma pagina complementar falha', async () => {

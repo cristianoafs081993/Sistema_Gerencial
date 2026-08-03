@@ -65,6 +65,8 @@ vi.mock('@/services/transparencia', () => ({
   transparenciaService: {
     getItensEmpenhoPortal: vi.fn(),
   },
+  normalizeEmpenhoNumero: (numero?: string | null) =>
+    String(numero ?? '').toUpperCase().replace(/[^0-9A-Z]/g, ''),
 }));
 
 const mockedUseAuth = vi.mocked(useAuth);
@@ -359,6 +361,7 @@ describe('RequisicaoCompraPage', () => {
     expect(screen.getByText(/2026NE000012/)).toBeInTheDocument();
   });
 
+
   it('restaura item da NE sem exigir contrato na edicao', async () => {
     mockedUseData.mockReturnValue({
       empenhos: [
@@ -425,6 +428,18 @@ describe('RequisicaoCompraPage', () => {
       ],
     } as never);
 
+    mockedTransparenciaService.getItensEmpenhoPortal.mockResolvedValue([
+      {
+        codigoItemEmpenho: '158366264352026NE000083',
+        sequencial: 1,
+        descricao: 'ARROZ BENEFICIADO TIPO 1',
+        codigoSubelemento: '30',
+        descricaoSubelemento: 'MATERIAL DE CONSUMO',
+        valorAtual: 200,
+        historico: [],
+      },
+    ]);
+
     renderPage();
 
     fireEvent.click(await screen.findByRole('button', { name: /Editar requisição REQ-2026-0001/i }));
@@ -433,5 +448,7 @@ describe('RequisicaoCompraPage', () => {
     expect(screen.getByText(/Itens do empenho 2026NE000083/)).toBeInTheDocument();
     expect(screen.getByText('Subitem da NE')).toBeInTheDocument();
     expect(screen.getByText('30 - MATERIAL DE CONSUMO')).toBeInTheDocument();
+    expect(await screen.findByText(/R\$\s*200,00/)).toBeInTheDocument();
+    expect(mockedTransparenciaService.getItensEmpenhoPortal).toHaveBeenCalledWith('2026NE000083');
   });
 });

@@ -132,7 +132,7 @@ Credenciais:
 Observacao:
 
 - existe chave de API embutida no service. Isso deve ser tratado como contrato operacional sensivel e idealmente sair do codigo.
-- o modal de empenho e `/requisicao-compra` consultam subitens via cache Supabase em `portal_transparencia_empenho_itens_cache*`; quando o cache nao existe ou venceu, o frontend chama a Edge Function `refresh-portal-transparencia-itens-cache`, que consulta `/despesas/itens-de-empenho` pelo servidor usando `codigoDocumento = UG + gestao + numero do empenho` e salva as linhas no cache. Em Requisicao de Compra, `valorAtual` e o historico do item alimentam os itens da requisicao e o saldo por item; o contrato e apenas enriquecimento opcional. A mesma function possui modo de pre-aquecimento diario para empenhos vinculados diretamente a terceirizados e requisicoes recentes em rascunho/revisao.
+- o modal de empenho e `/requisicao-compra` consultam subitens via cache Supabase em `portal_transparencia_empenho_itens_cache*`; quando o cache nao existe ou venceu, o frontend chama a Edge Function `refresh-portal-transparencia-itens-cache`, que consulta `/despesas/itens-de-empenho` pelo servidor usando `codigoDocumento = UG + gestao + numero do empenho` e salva as linhas no cache. Em Requisicao de Compra, `valorAtual` do cache, liquidacoes e reservas alimentam o saldo por item; o historico individual do Portal e complementar e nao bloqueia essa exibicao. Se uma atualizacao falhar, o service preserva as linhas ja materializadas para nao ocultar o saldo; o contrato e apenas enriquecimento opcional. A mesma function possui modo de pre-aquecimento diario para empenhos vinculados diretamente a terceirizados e requisicoes recentes em rascunho/revisao.
 
 ## 4. API de Contratos
 

@@ -194,15 +194,20 @@ const getItensEmpenhoPortalDireto = async (
         mappedItens.map(async (item) => {
             if (!item.sequencial) return item;
 
-            const historicoRows = await fetchPortalTransparenciaPaginated<Record<string, unknown>>(
-                (page) =>
-                    `${API_HISTORICO}?codigoDocumento=${encodeURIComponent(codigoDocumento)}&sequencial=${item.sequencial}&pagina=${page}`,
-            );
+            try {
+                const historicoRows = await fetchPortalTransparenciaPaginated<Record<string, unknown>>(
+                    (page) =>
+                        `${API_HISTORICO}?codigoDocumento=${encodeURIComponent(codigoDocumento)}&sequencial=${item.sequencial}&pagina=${page}`,
+                );
 
-            return {
-                ...item,
-                historico: historicoRows.map(mapPortalItemEmpenhoHistorico),
-            };
+                return {
+                    ...item,
+                    historico: historicoRows.map(mapPortalItemEmpenhoHistorico),
+                };
+            } catch (error) {
+                console.warn('Portal da Transparencia: falha no historico do subitem, preservando o item base.', error);
+                return item;
+            }
         }),
     );
 };
@@ -242,15 +247,6 @@ const getCachedItensEmpenhoPortal = async (numeroEmpenho: string): Promise<{
         };
     }
 
-    if (typedStatus.status === 'error' && isFresh) {
-        return {
-            available: true,
-            hasStatus: true,
-            isFresh,
-            rowsCount: Number(typedStatus.rows_count ?? 0),
-            rows: [],
-        };
-    }
 
     const { data: rows, error: rowsError } = await supabase
         .from('portal_transparencia_empenho_itens_cache')
@@ -264,19 +260,26 @@ const getCachedItensEmpenhoPortal = async (numeroEmpenho: string): Promise<{
     }
 
     const mappedRows = ((rows ?? []) as PortalItensCacheRow[]).map(mapPortalCacheRowToItem);
+    const expectsCachedRows = typedStatus.status === 'found' && Number(typedStatus.rows_count ?? 0) > 0;
+    const hasInconsistentRows = expectsCachedRows && mappedRows.length === 0;
     return {
         available: true,
         hasStatus: true,
-        isFresh,
+        isFresh: isFresh && !hasInconsistentRows,
         rowsCount: mappedRows.length > 0 ? mappedRows.length : Number(typedStatus.rows_count ?? 0),
         rows: mappedRows,
     };
 };
 
+type ItensCacheFunctionResult = {
+    status?: 'found' | 'not_found' | 'error' | 'missing';
+    rows: PortalTransparenciaItemEmpenho[];
+};
+
 const getItensCacheRowsViaFunction = async (
     numeroEmpenho: string,
     options: { readCacheOnly?: boolean; source: string },
-): Promise<PortalTransparenciaItemEmpenho[] | null> => {
+): Promise<ItensCacheFunctionResult | null> => {
     const { data, error } = await supabase.functions.invoke('refresh-portal-transparencia-itens-cache', {
         body: {
             empenhoNumero: numeroEmpenho,
@@ -291,8 +294,18 @@ const getItensCacheRowsViaFunction = async (
         return null;
     }
 
-    const firstResult = (data as { results?: Array<{ rows?: PortalItensCacheRow[] }> } | null)?.results?.[0];
-    return (firstResult?.rows ?? []).map(mapPortalCacheRowToItem);
+    const firstResult = (data as {
+        results?: Array<{
+            status?: ItensCacheFunctionResult['status'];
+            rows?: PortalItensCacheRow[];
+        }>;
+    } | null)?.results?.[0];
+    if (!firstResult) return null;
+
+    return {
+        status: firstResult.status,
+        rows: (firstResult.rows ?? []).map(mapPortalCacheRowToItem),
+    };
 };
 
 type DocumentoImportState = {
@@ -336,10 +349,16 @@ export const transparenciaService = {
             if (cached.available) {
                 if (cached.isFresh) return cached.rows ?? [];
 
-                const refreshedRows = await getItensCacheRowsViaFunction(numeroEmpenho, {
+                const refreshed = await getItensCacheRowsViaFunction(numeroEmpenho, {
                     source: cached.hasStatus ? 'frontend-cache-stale' : 'frontend-cache-miss',
                 });
-                if (refreshedRows) return refreshedRows;
+                if (refreshed?.status === 'found' || refreshed?.status === 'not_found') {
+                    return refreshed.rows;
+                }
+                if (refreshed?.rows.length) return refreshed.rows;
+
+                // An error refresh keeps previously materialized rows in the
+                // database. Keep that last known balance visible in the UI.
                 return cached.rows ?? [];
             }
         } catch (error) {
