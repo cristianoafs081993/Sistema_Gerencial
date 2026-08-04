@@ -86,6 +86,105 @@ describe('transparenciaService.getItensEmpenhoPortal', () => {
     ]);
   });
 
+  it('atualiza o cache ausente e retorna os itens pela Edge Function no primeiro acesso', async () => {
+    const { transparenciaService } = await import('@/services/transparencia');
+
+    supabaseFromMock.mockReturnValue({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({ data: null, error: null }),
+        }),
+      }),
+    });
+    supabaseFunctionsInvokeMock.mockResolvedValue({
+      data: {
+        results: [{
+          status: 'found',
+          rows: [{
+            codigo_item_empenho: '158366264352026NE000014',
+            sequencial: 1,
+            descricao: 'Item retornado pela atualizacao do cache',
+            codigo_subelemento: '30',
+            descricao_subelemento: 'MATERIAL DE CONSUMO',
+            valor_atual: 1200,
+            historico: [],
+          }],
+        }],
+      },
+      error: null,
+    });
+
+    const result = await transparenciaService.getItensEmpenhoPortal('2026NE000014');
+
+    expect(result).toMatchObject([{
+      codigoItemEmpenho: '158366264352026NE000014',
+      descricao: 'Item retornado pela atualizacao do cache',
+      valorAtual: 1200,
+    }]);
+    expect(supabaseFunctionsInvokeMock).toHaveBeenCalledWith(
+      'refresh-portal-transparencia-itens-cache',
+      expect.objectContaining({
+        body: expect.objectContaining({ empenhoNumero: '2026NE000014', source: 'frontend-cache-miss', returnRows: true }),
+      }),
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('repara cache fresco marcado como encontrado, mas sem linhas', async () => {
+    const { transparenciaService } = await import('@/services/transparencia');
+
+    supabaseFromMock.mockImplementation((table: string) => {
+      if (table === 'portal_transparencia_empenho_itens_cache_status') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({
+                data: {
+                  status: 'found',
+                  rows_count: 2,
+                  expires_at: new Date(Date.now() + 60_000).toISOString(),
+                },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+
+      return {
+        select: () => ({
+          eq: () => ({
+            order: async () => ({ data: [], error: null }),
+          }),
+        }),
+      };
+    });
+    supabaseFunctionsInvokeMock.mockResolvedValue({
+      data: {
+        results: [{
+          status: 'found',
+          rows: [{
+            codigo_item_empenho: '158366264352026NE000015',
+            sequencial: 1,
+            descricao: 'Item recuperado do cache',
+            codigo_subelemento: '30',
+            descricao_subelemento: 'MATERIAL DE CONSUMO',
+            valor_atual: 250,
+            historico: [],
+          }],
+        }],
+      },
+      error: null,
+    });
+
+    const result = await transparenciaService.getItensEmpenhoPortal('2026NE000015');
+
+    expect(result).toMatchObject([{ codigoItemEmpenho: '158366264352026NE000015' }]);
+    expect(supabaseFunctionsInvokeMock).toHaveBeenCalledWith(
+      'refresh-portal-transparencia-itens-cache',
+      expect.objectContaining({ body: expect.objectContaining({ source: 'frontend-cache-repair', returnRows: true }) }),
+    );
+  });
   it('le subitens do cache Supabase quando o cache esta fresco', async () => {
     const { transparenciaService } = await import('@/services/transparencia');
 
@@ -198,7 +297,10 @@ describe('transparenciaService.getItensEmpenhoPortal', () => {
       },
     ]);
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(supabaseFunctionsInvokeMock).not.toHaveBeenCalled();
+    expect(supabaseFunctionsInvokeMock).toHaveBeenCalledWith(
+      'refresh-portal-transparencia-itens-cache',
+      expect.objectContaining({ body: expect.objectContaining({ empenhoNumero: '2026NE000009', source: 'frontend-cache-stale' }) }),
+    );
   });
 
   it('keeps stale cached rows when the refresh fails', async () => {

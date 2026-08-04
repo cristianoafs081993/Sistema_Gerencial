@@ -57,6 +57,9 @@ describe('requisicoesCompraService', () => {
       p_id: null,
       p_requisicao: expect.objectContaining({
         empenhoId: 'emp-1',
+        processNumber: null,
+        contratoId: null,
+        contratoNumero: null,
         empenhoNumero: '2026NE000011',
         empenhos: [
           { empenhoId: 'emp-1', empenhoNumero: '2026NE000011', sortOrder: 0 },

@@ -97,6 +97,62 @@ describe('contratosApiService.getLiquidacoesPublicasPorEmpenho', () => {
     vi.restoreAllMocks();
   });
 
+  it('mostra linhas do cache vencido e atualiza em background', async () => {
+    const contratosApiService = await loadService();
+
+    mockSupabaseCache(
+      {
+        empenho_lookup_key: '2026NE000011',
+        empenho_numero: '2026NE000011',
+        status: 'found',
+        rows_count: 1,
+        fetched_at: '2026-04-24T10:00:00.000Z',
+        expires_at: new Date(Date.now() - 60_000).toISOString(),
+        error_message: null,
+      },
+      [
+        {
+          id: 'cache-stale-1',
+          empenho_lookup_key: '2026NE000011',
+          empenho_numero: '2026NE000011',
+          empenho_numero_api: '2026NE000011',
+          unidade_contrato: '158366',
+          contrato_api_id: 15511,
+          contrato_numero: '00011/2026',
+          contrato_objeto: 'Contrato cache vencido',
+          fatura_id: 1551101,
+          numero_instrumento_cobranca: 'NF-11',
+          situacao: 'Siafi Apropriado',
+          valor_bruto: 1250,
+          valor_liquido: 1250,
+          data_emissao: '2026-04-10',
+          data_vencimento: null,
+          data_pagamento: null,
+          data_liquidacao: null,
+          processo: null,
+          valor_empenho: 1250,
+          subelemento: '16',
+          fetched_at: '2026-04-24T10:00:00.000Z',
+        },
+      ],
+    );
+
+    const result = await contratosApiService.getLiquidacoesPublicasPorEmpenho('2026NE000011');
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        contrato_numero: '00011/2026',
+        numero_instrumento_cobranca: 'NF-11',
+      }),
+    ]);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(functionsInvokeMock).toHaveBeenCalledWith('refresh-comprasnet-liquidacoes-cache', {
+      body: {
+        empenhoNumero: '2026NE000011',
+        source: 'frontend-cache-stale',
+      },
+    });
+  });
   it('retorna liquidacoes do cache fresco sem varrer a API publica', async () => {
     const contratosApiService = await loadService();
 

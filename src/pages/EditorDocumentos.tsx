@@ -67,6 +67,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { type ContractPdfAnalysis, type ContractTemplateCandidate } from '@/lib/contractProcessPdf';
+import { formatNotasFiscaisField, getNotasFiscais } from '@/lib/suapNotaFiscal';
 import { applyDocxTemplatePlan, type DocxTemplateExportPlan } from '@/lib/docxDocumentTemplate';
 import {
   buildDespachoLiquidacaoHtml,
@@ -1630,6 +1631,10 @@ export default function EditorDocumentos() {
   const selectedProcess = useMemo(
     () => exampleProcesses.find((processo) => processo.id === selectedProcessId)?.processoCompleto || null,
     [exampleProcesses, selectedProcessId],
+  );
+  const selectedProcessNotasFiscais = useMemo(
+    () => getNotasFiscais(selectedProcess?.dadosCompletos),
+    [selectedProcess],
   );
   const {
     data: selectedProcessArtifacts = [],
@@ -4809,7 +4814,7 @@ export default function EditorDocumentos() {
                   contentClassName="space-y-3"
                 >
                     <div className="space-y-2.5">
-                      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
                         <SidebarField
                           label="Contrato"
                           value={selectedProcess.contrato || selectedProcess.dadosCompletos?.contrato_numero || '-'}
@@ -4818,22 +4823,28 @@ export default function EditorDocumentos() {
                         />
                         <SidebarField
                           label="Nota fiscal"
-                          value={selectedProcess.dadosCompletos?.notas_fiscais?.[0]?.numero || '-'}
-                          copyValue={selectedProcess.dadosCompletos?.notas_fiscais?.[0]?.numero}
-                          copyMessage="Numero da nota fiscal copiado."
+                          value={formatNotasFiscaisField(selectedProcessNotasFiscais, 'numero')}
+                          copyValue={formatNotasFiscaisField(selectedProcessNotasFiscais, 'numero', '')}
+                          copyMessage="Numeros das notas fiscais copiados."
                           mono
                         />
                         <SidebarField
                           label="Emissao"
-                          value={selectedProcess.dadosCompletos?.notas_fiscais?.[0]?.data_emissao || 'Sem data de emissao'}
-                          copyValue={selectedProcess.dadosCompletos?.notas_fiscais?.[0]?.data_emissao}
-                          copyMessage="Data de emissao copiada."
+                          value={formatNotasFiscaisField(selectedProcessNotasFiscais, 'data_emissao', 'Sem data de emissao')}
+                          copyValue={formatNotasFiscaisField(selectedProcessNotasFiscais, 'data_emissao', '')}
+                          copyMessage="Datas de emissao copiadas."
                         />
                         <SidebarField
-                          label="Valor"
+                          label="Valores NF"
+                          value={formatNotasFiscaisField(selectedProcessNotasFiscais, 'valor')}
+                          copyValue={formatNotasFiscaisField(selectedProcessNotasFiscais, 'valor', '')}
+                          copyMessage="Valores das notas fiscais copiados."
+                        />
+                        <SidebarField
+                          label="Valor total"
                           value={selectedProcess.dadosCompletos?.val_nf || '-'}
                           copyValue={selectedProcess.dadosCompletos?.val_nf}
-                          copyMessage="Valor copiado."
+                          copyMessage="Valor total copiado."
                         />
                       </div>
                     </div>

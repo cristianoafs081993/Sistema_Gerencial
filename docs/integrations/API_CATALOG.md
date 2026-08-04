@@ -132,7 +132,7 @@ Credenciais:
 Observacao:
 
 - existe chave de API embutida no service. Isso deve ser tratado como contrato operacional sensivel e idealmente sair do codigo.
-- o modal de empenho e `/requisicao-compra` consultam subitens via cache Supabase em `portal_transparencia_empenho_itens_cache*`; quando o cache nao existe ou venceu, o frontend chama a Edge Function `refresh-portal-transparencia-itens-cache`, que consulta `/despesas/itens-de-empenho` pelo servidor usando `codigoDocumento = UG + gestao + numero do empenho` e salva as linhas no cache. Em Requisicao de Compra, `valorAtual` do cache, liquidacoes e reservas alimentam o saldo por item; o historico individual do Portal e complementar e nao bloqueia essa exibicao. Se uma atualizacao falhar, o service preserva as linhas ja materializadas para nao ocultar o saldo; o contrato e apenas enriquecimento opcional. A mesma function possui modo de pre-aquecimento diario para empenhos vinculados diretamente a terceirizados e requisicoes recentes em rascunho/revisao.
+- o modal de empenho e `/requisicao-compra` consultam subitens via cache Supabase em `portal_transparencia_empenho_itens_cache*`; quando o cache nao existe, esta vazio ou esta com erro, o frontend solicita a atualizacao server-side com `returnRows: true` e cai para `/despesas/itens-de-empenho` diretamente se a Edge Function nao responder. Quando o cache vencido possui linhas, elas permanecem visiveis enquanto a atualizacao roda em background. Em Requisicao de Compra, `valorAtual` do item e liquidacoes oficiais alimentam o saldo por item; o contrato e apenas enriquecimento opcional. A mesma function possui pre-aquecimento diario separado para todas as NEs com saldo positivo, em dois estagios: RAP e empenhos do exercicio.
 
 ## 4. API de Contratos
 
@@ -183,6 +183,7 @@ Descoberta publica em tempo real no modal de empenho:
 - a vinculacao final usa `dados_empenho[]` dentro da fatura para decidir quais liquidações apareceram no modal; faturas com `contratante = 158155` continuam validas quando o empenho correspondente no endpoint `/empenhos` pertence a UG `158366`, e faturas de outros campi sao escondidas quando a API permite identificar essa divergencia
 - `data_liquidacao` pode aparecer em payloads reais de `faturas`, mas nao esta garantida pelo schema OpenAPI; a UI deve tratá-la como opcional
 - o cache usa TTL de 12 horas para resultados encontrados e 1 hora para `not_found`; o cron horario reprocessa entradas vencidas
+- quando ha linhas vencidas, o frontend as entrega imediatamente e dispara a renovacao em background; a tela nao bloqueia o saldo por item esperando a consulta publica
 
 Endpoints v1 avaliados nesta rodada:
 

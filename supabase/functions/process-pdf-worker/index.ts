@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
   MAX_JOB_ATTEMPTS,
   WORKER_LEASE_SECONDS,
+  INVOICE_VERIFICATION_PROMPT,
   assertInternalWorkerRequest,
   buildUpdatePayload,
   callGeminiWithPdfBytes,
@@ -19,6 +20,7 @@ import {
   inspectPdf,
   isRetryableErrorCode,
   jsonResponse,
+  mergeNotas,
   splitPdfIntoChunks,
   supabase,
   updateChunk,
@@ -97,10 +99,45 @@ async function markJobFailed(job: ExtractionJobRow, processo: ProcessRecord, cod
   if (error) throw new Error(error.message);
 }
 
-async function persistSuccess(job: ExtractionJobRow, processo: ProcessRecord, payload: ExtractionPayload, provider: ProviderName) {
-  const validation = validatePayload(payload, provider);
+async function ensureInvoiceCompleteness(
+  payload: ExtractionPayload,
+  pdfBytes: Uint8Array,
+  processoNumeroAtual: string | null,
+): Promise<ExtractionPayload> {
+  if (payload.notas_fiscais.length > 1) return payload;
+
+  try {
+    const verification = await callGeminiWithPdfBytes(
+      pdfBytes,
+      processoNumeroAtual,
+      "invoice-verification",
+      null,
+      INVOICE_VERIFICATION_PROMPT,
+    );
+    if (verification.validation.ok && verification.extracted.notas_fiscais.length > 0) {
+      return {
+        ...payload,
+        notas_fiscais: mergeNotas(payload.notas_fiscais, verification.extracted.notas_fiscais),
+      };
+    }
+  } catch (error) {
+    console.warn("[process-pdf-worker] Invoice verification skipped:", error instanceof Error ? error.message : String(error));
+  }
+
+  return payload;
+}
+
+async function persistSuccess(
+  job: ExtractionJobRow,
+  processo: ProcessRecord,
+  payload: ExtractionPayload,
+  provider: ProviderName,
+  pdfBytes: Uint8Array,
+) {
+  const completePayload = await ensureInvoiceCompleteness(payload, pdfBytes, cleanString(processo.num_processo));
+  const validation = validatePayload(completePayload, provider);
   const processStatus = validation.ok ? "success" : "incomplete_extraction";
-  const updatePayload = buildUpdatePayload(processo, payload, processStatus);
+  const updatePayload = buildUpdatePayload(processo, completePayload, processStatus);
   updatePayload.dados_completos = {
     ...updatePayload.dados_completos,
     extraction_job: {
@@ -194,7 +231,7 @@ async function runOpenAiChunkedFallback(
 
   if (partialPayloads.length > 0) {
     const consolidated = consolidateExtractionPayloads(partialPayloads, processoNumeroAtual);
-    await persistSuccess(job, processo, consolidated, "openai");
+    await persistSuccess(job, processo, consolidated, "openai", pdfBytes);
     return true;
   }
 
@@ -216,7 +253,7 @@ async function runOpenAiThenOpenRouter(
   try {
     openAiResult = await callOpenAiWithPdfBytes(pdfBytes, processoNumeroAtual);
     if (openAiResult.validation.ok) {
-      await persistSuccess(job, processo, openAiResult.extracted, "openai");
+      await persistSuccess(job, processo, openAiResult.extracted, "openai", pdfBytes);
       return true;
     }
   } catch (error) {
@@ -240,7 +277,7 @@ async function runOpenAiThenOpenRouter(
     try {
       const openrouter = await callOpenRouterWithContext(openRouterContext, processoNumeroAtual, partialPayloads);
       if (openrouter.validation.ok) {
-        await persistSuccess(job, processo, openrouter.extracted, "openrouter");
+        await persistSuccess(job, processo, openrouter.extracted, "openrouter", pdfBytes);
         return true;
       }
     } catch {
@@ -269,7 +306,7 @@ async function runLightPdfPath(job: ExtractionJobRow, processo: ProcessRecord, p
     geminiValidation = gemini.validation;
     geminiPayload = gemini.extracted;
     if (gemini.validation.ok) {
-      await persistSuccess(job, processo, gemini.extracted, "gemini");
+      await persistSuccess(job, processo, gemini.extracted, "gemini", pdfBytes);
       return;
     }
   } catch (error) {
@@ -358,7 +395,7 @@ async function runGeminiChunkedFallback(job: ExtractionJobRow, processo: Process
   const consolidated = consolidateExtractionPayloads(partialPayloads, processoNumeroAtual);
   if (!validatePayload(consolidated, "gemini").ok) return false;
 
-  await persistSuccess(job, processo, consolidated, "gemini");
+  await persistSuccess(job, processo, consolidated, "gemini", pdfBytes);
   return true;
 }
 
@@ -394,7 +431,7 @@ async function runHeavyPdfPath(job: ExtractionJobRow, processo: ProcessRecord, p
       const consolidated = consolidateExtractionPayloads(partialPayloads, processoNumeroAtual);
       const consolidatedValidation = validatePayload(consolidated, "gemini");
       if (consolidatedValidation.ok) {
-        await persistSuccess(job, processo, consolidated, "gemini");
+        await persistSuccess(job, processo, consolidated, "gemini", pdfBytes);
         return;
       }
     }
@@ -414,7 +451,7 @@ async function runHeavyPdfPath(job: ExtractionJobRow, processo: ProcessRecord, p
 
   if (partialPayloads.length > 0) {
     const consolidated = consolidateExtractionPayloads(partialPayloads, processoNumeroAtual);
-    await persistSuccess(job, processo, consolidated, "gemini");
+    await persistSuccess(job, processo, consolidated, "gemini", pdfBytes);
     return;
   }
 

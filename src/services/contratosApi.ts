@@ -79,6 +79,7 @@ type LiquidacoesCacheLookup =
   | {
       available: true;
       hasStatus: boolean;
+      status: LiquidacoesCacheStatus['status'] | 'missing';
       isFresh: boolean;
       rowsCount: number;
       rows: ContratoApiPublicLiquidacaoRow[];
@@ -146,6 +147,8 @@ export interface ContratoApiFaturaRow {
   contrato_api_id: string;
   api_fatura_id: number;
   numero_instrumento_cobranca: string | null;
+  mes_referencia?: string | null;
+  ano_referencia?: string | null;
   situacao: string | null;
   valor_bruto: number | null;
   valor_liquido: number | null;
@@ -459,7 +462,7 @@ function mapCacheRowToLiquidacao(row: LiquidacoesCacheRow): ContratoApiPublicLiq
 
 async function getCachedLiquidacoesPublicasPorEmpenho(numeroEmpenho: string): Promise<LiquidacoesCacheLookup> {
   const lookupKey = buildCanonicalEmpenhoLookupKey(numeroEmpenho);
-  if (!lookupKey) return { available: true, hasStatus: false, isFresh: false, rowsCount: 0, rows: [] };
+  if (!lookupKey) return { available: true, hasStatus: false, status: 'not_found', isFresh: false, rowsCount: 0, rows: [] };
 
   const { data: status, error: statusError } = await supabase
     .from('contratos_api_empenho_liquidacoes_cache_status')
@@ -472,7 +475,7 @@ async function getCachedLiquidacoesPublicasPorEmpenho(numeroEmpenho: string): Pr
     throw statusError;
   }
 
-  if (!status) return { available: true, hasStatus: false, isFresh: false, rowsCount: 0, rows: [] };
+  if (!status) return { available: true, hasStatus: false, status: 'missing', isFresh: false, rowsCount: 0, rows: [] };
 
   const typedStatus = status as LiquidacoesCacheStatus;
   const isFresh = new Date(typedStatus.expires_at).getTime() > Date.now();
@@ -480,16 +483,7 @@ async function getCachedLiquidacoesPublicasPorEmpenho(numeroEmpenho: string): Pr
     return {
       available: true,
       hasStatus: true,
-      isFresh,
-      rowsCount: Number(typedStatus.rows_count ?? 0),
-      rows: [] as ContratoApiPublicLiquidacaoRow[],
-    };
-  }
-
-  if (typedStatus.status === 'error' && isFresh) {
-    return {
-      available: true,
-      hasStatus: true,
+      status: typedStatus.status,
       isFresh,
       rowsCount: Number(typedStatus.rows_count ?? 0),
       rows: [] as ContratoApiPublicLiquidacaoRow[],
@@ -514,6 +508,7 @@ async function getCachedLiquidacoesPublicasPorEmpenho(numeroEmpenho: string): Pr
   return {
     available: true,
     hasStatus: true,
+    status: typedStatus.status,
     isFresh,
     rowsCount,
     rows: visibleRows.map(mapCacheRowToLiquidacao),
@@ -542,15 +537,16 @@ async function getLiquidacoesCacheRowsViaFunction(
   return (firstResult?.rows ?? []).filter(isLiquidacaoCacheRowVisible).map(mapCacheRowToLiquidacao);
 }
 
-function triggerLiquidacoesCacheRefresh(numeroEmpenho: string) {
+function triggerLiquidacoesCacheRefresh(numeroEmpenho: string, source = 'frontend-cache-miss') {
   void supabase.functions
     .invoke('refresh-comprasnet-liquidacoes-cache', {
       body: {
         empenhoNumero: numeroEmpenho,
-        source: 'frontend-cache-miss',
+        source,
       },
     })
-    .then(({ error }) => {
+    .then((result) => {
+      const error = result?.error;
       if (error) {
         console.warn('Contratos API: falha ao acionar refresh do cache de liquidacoes', error);
       }
@@ -683,7 +679,7 @@ export const contratosApiService = {
   async getFaturasApi(contratoApiIds?: string[], period?: ContratoApiFaturasPeriod): Promise<ContratoApiFaturaRow[]> {
     let query = supabase
       .from('contratos_api_faturas')
-      .select('id, contrato_api_id, api_fatura_id, numero_instrumento_cobranca, situacao, valor_bruto, valor_liquido, data_emissao, data_pagamento, raw_data');
+      .select('id, contrato_api_id, api_fatura_id, numero_instrumento_cobranca, mes_referencia, ano_referencia, situacao, valor_bruto, valor_liquido, data_emissao, data_pagamento, raw_data');
 
     if (contratoApiIds && contratoApiIds.length > 0 && contratoApiIds.length <= 100) {
       query = query.in('contrato_api_id', contratoApiIds);
@@ -725,7 +721,7 @@ export const contratosApiService = {
         .order('numero_item_compra', { ascending: true }),
       supabase
         .from('contratos_api_faturas')
-        .select('id, contrato_api_id, api_fatura_id, numero_instrumento_cobranca, situacao, valor_bruto, valor_liquido, data_emissao, data_pagamento, raw_data')
+        .select('id, contrato_api_id, api_fatura_id, numero_instrumento_cobranca, mes_referencia, ano_referencia, situacao, valor_bruto, valor_liquido, data_emissao, data_pagamento, raw_data')
         .eq('contrato_api_id', contratoApiId)
         .order('data_emissao', { ascending: false }),
       supabase
@@ -789,14 +785,20 @@ export const contratosApiService = {
         });
         if (privilegedRows) return privilegedRows;
       }
-      if (cached.isFresh) return cached.rows;
+      if (cached.isFresh && cached.status !== 'error') return cached.rows;
+
+      // Linhas antigas sao preferiveis a bloquear a tela aguardando a API publica.
+      // A atualizacao continua em background e sera refletida na proxima consulta.
+      if (cached.rows.length > 0) {
+        triggerLiquidacoesCacheRefresh(numeroEmpenho, 'frontend-cache-stale');
+        return cached.rows;
+      }
 
       const refreshedRows = await getLiquidacoesCacheRowsViaFunction(numeroEmpenho, {
         source: cached.hasStatus ? 'frontend-cache-stale' : 'frontend-cache-miss',
       });
       if (refreshedRows) return refreshedRows;
 
-      if (cached.rows.length > 0) return cached.rows;
       triggerLiquidacoesCacheRefresh(numeroEmpenho);
       return [];
     }

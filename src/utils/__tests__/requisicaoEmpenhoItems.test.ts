@@ -6,6 +6,7 @@ import {
   buildEmpenhoItemBalances,
   buildEmpenhoItemSourceKey,
   buildRequisicaoItemsFromEmpenho,
+  getRequisicaoItemAvailableBalance,
 } from '@/utils/requisicaoEmpenhoItems';
 
 const buildPortalItem = (patch: Partial<PortalTransparenciaItemEmpenho>): PortalTransparenciaItemEmpenho => ({
@@ -40,7 +41,7 @@ const buildLiquidacao = (patch: Partial<ContratoApiPublicLiquidacaoRow>): Contra
 });
 
 describe('requisicaoEmpenhoItems', () => {
-  it('calcula saldo do item abatendo liquidacoes por subelemento e reservas em revisao', () => {
+  it('calcula saldo do item abatendo apenas liquidacoes oficiais por subelemento', () => {
     const item = buildPortalItem({ valorAtual: 1000 });
     const sourceKey = buildEmpenhoItemSourceKey('2026NE000083', item);
 
@@ -48,15 +49,13 @@ describe('requisicaoEmpenhoItems', () => {
       '2026NE000083',
       [item],
       [buildLiquidacao({ valor_bruto: 250 })],
-      { [sourceKey]: 100 },
     );
 
     expect(balance).toMatchObject({
       sourceItemKey: sourceKey,
       valorAtual: 1000,
       liquidadoCalculado: 250,
-      reservado: 100,
-      saldoItem: 650,
+      saldoItem: 750,
     });
   });
 
@@ -73,7 +72,7 @@ describe('requisicaoEmpenhoItems', () => {
         },
       ],
     });
-    const balances = buildEmpenhoItemBalances('2026NE000083', [item], [], {});
+    const balances = buildEmpenhoItemBalances('2026NE000083', [item], []);
 
     const [requisicaoItem] = buildRequisicaoItemsFromEmpenho('2026NE000083', balances);
 
@@ -98,10 +97,26 @@ describe('requisicaoEmpenhoItems', () => {
       '2026NE000083',
       [buildPortalItem({ codigoSubelemento: '52', valorAtual: 800 })],
       [buildLiquidacao({ subelemento: '30', valor_bruto: 250 })],
-      {},
     );
 
     expect(balance.saldoItem).toBe(800);
     expect(balance.liquidadoCalculado).toBe(0);
+  });
+
+  it('ignora reservas legadas do snapshot ao calcular o saldo do item', () => {
+    expect(
+      getRequisicaoItemAvailableBalance(
+        {
+          sourceItemKey: 'item-1',
+          sourceSnapshot: {
+            valorAtual: 1000,
+            liquidadoCalculado: 250,
+            reservado: 500,
+            saldoItem: 250,
+          },
+        },
+        [],
+      ),
+    ).toBe(750);
   });
 });

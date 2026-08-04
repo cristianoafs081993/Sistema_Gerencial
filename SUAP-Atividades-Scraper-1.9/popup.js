@@ -19,6 +19,19 @@ function setExtensionAuthStatus(message, isError = false) {
   extensionAuthStatus.style.color = isError ? '#fca5a5' : '#b8c5d1';
 }
 
+function isExtensionContextInvalidated(error) {
+  return String(error?.message || error || '').toLowerCase().includes('extension context invalidated');
+}
+
+function formatExtensionAuthError(error) {
+  if (isExtensionContextInvalidated(error)) return 'A extens\u00e3o foi atualizada. Reabra o popup e recarregue a p\u00e1gina do SUAP.';
+  return error instanceof Error ? error.message : 'Nao foi possivel autenticar a extensao.';
+}
+
+function getInvalidCredentialsMessage() {
+  return 'E-mail ou senha do SIAGES inv\u00e1lidos. Confirme o acesso no SIAGES ou redefina a senha.';
+}
+
 async function refreshExtensionSession(session) {
   const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
     method: 'POST',
@@ -82,7 +95,8 @@ async function signInExtension() {
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-      if (response.status === 401) throw new Error('E-mail ou senha do SIAGES inválidos. Confirme o acesso no SIAGES ou redefina a senha.');
+      const code = String(payload?.error || payload?.code || '').toLowerCase();
+      if (response.status === 400 || response.status === 401 || code === 'invalid_grant' || code === 'invalid_credentials') throw new Error(getInvalidCredentialsMessage());
       throw new Error(`Não foi possível autenticar no SIAGES (HTTP ${response.status}).`);
     }
     if (!payload.access_token || !payload.refresh_token) throw new Error('O SIAGES não devolveu uma sessão válida.');
@@ -96,7 +110,7 @@ async function signInExtension() {
     extensionAuthPasswordInput.value = '';
     setExtensionAuthStatus('Sessão ativa. Recarregue a página atual do SUAP para consultar os dados.');
   } catch (error) {
-    setExtensionAuthStatus(error instanceof Error ? error.message : 'Não foi possível autenticar a extensão.', true);
+    setExtensionAuthStatus(formatExtensionAuthError(error), true);
   } finally {
     extensionSignInButton.disabled = false;
   }

@@ -125,15 +125,49 @@ describe('process-document 1.9', () => {
       origin: 'https://www.siages.com.br', source: frame.contentWindow,
       data: { source: 'siages', type: 'siages:suap-process-snapshot', version: 1, payload: {
         fallback: { suapId: '321', processNumber: '23035.000001.2026-11' },
-        process: { suapId: '321', numProcesso: '23035.000001.2026-11', status: 'success', beneficiario: 'Fornecedor Alfa', cpfCnpj: '12345678000190', assunto: 'Servico', dadosCompletos: { val_nf: '1.250,00', empenhos: ['2026NE000001', '2026NE000002'], dados_bancarios: { banco: 'Banco do Brasil', agencia: '1234', conta: '5678-9' }, retencoes_tributarias: { iss: '25,00' } } },
+        process: { suapId: '321', numProcesso: '23035.000001.2026-11', status: 'success', beneficiario: 'Fornecedor Alfa', cpfCnpj: '12345678000190', assunto: 'Servico', dadosCompletos: { val_nf: '1.250,00', notas_fiscais: [{ numero: 'DANFE 2350', data_emissao: '2026-01-10', valor: '100,00' }, { numero: 'DANFE 2347', data_emissao: '2026-01-11', valor: '80,00' }], empenhos: ['2026NE000001', '2026NE000002'], dados_bancarios: { banco: 'Banco do Brasil', agencia: '1234', conta: '5678-9' }, retencoes_tributarias: { optante_simples_nacional: true, iss: '25,00', ir: '37,35', csll: '15,56', cofins: '37,65', pis_pasep: '8,16' } } },
       } },
     }));
 
     const summary = document.querySelector('[data-panel="summary"]');
     expect(summary).toHaveTextContent('Fornecedor Alfa');
+    expect(summary).toHaveTextContent('DANFE 2350');
+    expect(summary).toHaveTextContent('DANFE 2347');
+    expect(summary).not.toHaveTextContent('Status');
+    expect(summary).not.toHaveTextContent('Atualizado');
     expect(summary).toHaveTextContent('Banco do Brasil');
+    expect(summary).toHaveTextContent('Empenhos');
+    expect(summary).not.toHaveTextContent('Retenções e empenhos');
+    expect(summary).not.toHaveTextContent('Regime');
+    expect(summary).not.toHaveTextContent('ISS');
+    expect(summary).not.toHaveTextContent('INSS');
+    expect(summary).not.toHaveTextContent('IR');
+    expect(summary).not.toHaveTextContent('CSLL');
+    expect(summary).not.toHaveTextContent('COFINS');
+    expect(summary).not.toHaveTextContent('PIS/PASEP');
+    expect(summary).not.toHaveTextContent('25,00');
     expect(summary).toHaveTextContent('2026NE000002');
     expect(summary?.querySelectorAll('.suape-copy').length).toBeGreaterThan(8);
+  });
+  it('mantem as retenções quando o processo tem uma única nota', async () => {
+    const api = loadProcessScript();
+    await api.installToolkit();
+    await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeTruthy());
+    const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
+    window.dispatchEvent(new MessageEvent('message', {
+      origin: 'https://www.siages.com.br', source: frame.contentWindow,
+      data: { source: 'siages', type: 'siages:suap-process-snapshot', version: 1, payload: {
+        fallback: { suapId: '321', processNumber: '23035.000001.2026-11' },
+        process: { suapId: '321', numProcesso: '23035.000001.2026-11', status: 'success', dadosCompletos: { notas_fiscais: [{ numero: 'DANFE 2350', data_emissao: '2026-01-10', valor: '100,00' }], empenhos: ['2026NE000001'], retencoes_tributarias: { optante_simples_nacional: true, iss: '25,00' } } },
+      } },
+    }));
+
+    const summary = document.querySelector('[data-panel="summary"]');
+    expect(summary).toHaveTextContent('Retenções e empenhos');
+    expect(summary).toHaveTextContent('Regime');
+    expect(summary).toHaveTextContent('ISS');
+    expect(summary).toHaveTextContent('25,00');
+    expect(summary).toHaveTextContent('2026NE000001');
   });
 
   it('normaliza empenhos, remove duplicados e nunca renderiza objetos brutos', async () => {
@@ -146,7 +180,7 @@ describe('process-document 1.9', () => {
       data: { source: 'siages', type: 'siages:suap-process-snapshot', version: 1, payload: {
         fallback: { suapId: '321', processNumber: '23035.000001.2026-11' },
         process: { suapId: '321', numProcesso: '23035.000001.2026-11', status: 'success', dadosCompletos: { empenhos: [
-          { numero: '2026NE000060' }, '158366264352026NE000060', { empenho: '158366264352025NE000297' }, { invalido: true },
+          { numero: '2026NE000060' }, '158366264352026NE000060', { empenho: '158366264352025NE000297' }, '47NE2024', { invalido: true },
         ] } },
       } },
     }));
@@ -156,6 +190,7 @@ describe('process-document 1.9', () => {
       .filter((value): value is string => Boolean(value?.match(/^20\d{2}NE\d{6}/)));
     expect(values).toEqual(['2026NE000060', '2025NE000297', '2026NE000060, 2025NE000297']);
     expect(document.querySelector('[data-panel="summary"]')).not.toHaveTextContent('[object Object]');
+    expect(document.querySelector('[data-panel="summary"]')).not.toHaveTextContent('47NE2024');
   });
   it('preserva o resumo financeiro com empenhos e liquidacoes sem pagamento', async () => {
     const api = loadProcessScript();
@@ -167,6 +202,13 @@ describe('process-document 1.9', () => {
     expect(finance).toHaveTextContent('Fornecedor Alfa');
     expect(finance).toHaveTextContent('00040/2026');
     expect(finance).toHaveTextContent('Empenhado');
+    expect(finance).not.toHaveTextContent(/SIAGES - Empenhos do benefici?rio/i);
+    expect(finance?.querySelector('.suape-liquidations')?.style.display).toBe('none');
+    const commitmentToggle = finance?.querySelector('button[aria-expanded="false"]') as HTMLButtonElement;
+    expect(commitmentToggle).toHaveTextContent('2026NE000001');
+    commitmentToggle.click();
+    expect(commitmentToggle.getAttribute('aria-expanded')).toBe('true');
+    expect(finance?.querySelector('.suape-liquidations')?.style.display).toBe('grid');
     expect(finance).toHaveTextContent('NF 123');
     expect(finance).toHaveTextContent('NF 124');
     expect(finance?.textContent).not.toMatch(/pago|pagamento/i);
@@ -297,6 +339,46 @@ describe('process-document 1.9', () => {
     expect(localValues['siages-extension-session']).toBeUndefined();
   });
 
+  it('traduz 400 invalid_grant do Supabase em erro de credencial', async () => {
+    delete localValues['siages-extension-session'];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: vi.fn().mockResolvedValue({ error: 'invalid_grant', error_description: 'Invalid login credentials' }),
+    }));
+    const api = loadProcessScript();
+    await api.installToolkit();
+    api.selectTab('settings');
+
+    const form = document.querySelector('.suape-auth-form') as HTMLFormElement;
+    (form.querySelector('input[name="email"]') as HTMLInputElement).value = 'usuario@ifrn.edu.br';
+    (form.querySelector('input[name="password"]') as HTMLInputElement).value = 'senha-segura';
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await waitFor(() => expect(form.querySelector('[data-auth-message]')).toHaveTextContent('E-mail ou senha do SIAGES inválidos'));
+    expect(localValues['siages-extension-session']).toBeUndefined();
+  });
+
+  it('orienta recarregar a pagina quando o contexto da extensao foi invalidado', async () => {
+    delete localValues['siages-extension-session'];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ access_token: 'novo-access', refresh_token: 'novo-refresh', expires_in: 3600 }),
+    }));
+    const api = loadProcessScript();
+    await api.installToolkit();
+    api.selectTab('settings');
+
+    const chromeApi = (window as typeof window & { chrome?: any }).chrome;
+    chromeApi.storage.local.set = vi.fn(() => { throw new Error('Extension context invalidated.'); });
+    const form = document.querySelector('.suape-auth-form') as HTMLFormElement;
+    (form.elements.namedItem('email') as HTMLInputElement).value = 'usuario@ifrn.edu.br';
+    (form.elements.namedItem('password') as HTMLInputElement).value = 'senha-segura';
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await waitFor(() => expect(form.querySelector('[data-auth-message]')).toHaveTextContent('A extensão foi atualizada. Recarregue a página do SUAP e tente novamente.'));
+    expect(localValues['siages-extension-session']).toBeUndefined();
+  });
   it('explica que matricula do SUAP nao substitui o e-mail do SIAGES', async () => {
     delete localValues['siages-extension-session'];
     const fetchMock = vi.fn();

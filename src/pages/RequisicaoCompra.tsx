@@ -19,11 +19,10 @@ import { HeaderSubtitle } from '@/components/HeaderParts';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
@@ -40,6 +39,7 @@ import {
   buildRequisicaoItemsFromEmpenho,
   getRequisicaoItemAvailableBalance,
 } from '@/utils/requisicaoEmpenhoItems';
+import { filterAndRankRequisicaoEmpenhos } from '@/utils/requisicaoEmpenhoSelector';
 
 // Helper to translate status labels
 const STATUS_META = {
@@ -53,7 +53,7 @@ const STATUS_META = {
 export default function RequisicaoCompraPage() {
   const queryClient = useQueryClient();
   const { user, userGroups, isSuperAdmin } = useAuth();
-  const { empenhos = [], contratos = [], contratosEmpenhos = [] } = useData();
+  const { empenhos = [], contratos = [] } = useData();
   const userMatricula = getAuthUserMatricula(user);
   const userIdentity = useMemo(
     () => ({
@@ -78,13 +78,13 @@ export default function RequisicaoCompraPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editingRequisicaoId, setEditingRequisicaoId] = useState<string | undefined>();
   const [requisicaoNumber, setRequisicaoNumber] = useState('');
-  const [processNumber, setProcessNumber] = useState('');
-  const [selectedContratoId, setSelectedContratoId] = useState<string>('none');
   const [selectedEmpenhoIds, setSelectedEmpenhoIds] = useState<string[]>([]);
   const [isEmpenhoPickerOpen, setIsEmpenhoPickerOpen] = useState(false);
   const [notes, setNotes] = useState('');
+  const [empenhoSearch, setEmpenhoSearch] = useState('');
   const [items, setItems] = useState<Omit<RequisicaoCompraItem, 'id' | 'requisicaoCompraId' | 'createdAt' | 'updatedAt'>[]>([]);
   const [pendingAutoFillEmpenhoIds, setPendingAutoFillEmpenhoIds] = useState<string[]>([]);
+  const [emptyQuantityInputKeys, setEmptyQuantityInputKeys] = useState<Set<string>>(new Set());
 
   // Queries
   const { data: requisicoes = [], isLoading: isLoadingRequisicoes } = useQuery({
@@ -98,15 +98,6 @@ export default function RequisicaoCompraPage() {
   });
 
 
-  // Filter allowed Contracts and Empenhos for Terceirizado
-  const allowedContracts = useMemo(() => {
-    if (!isTerceirizado || isSuperAdmin) return contratos;
-    const userPerms = permissions.filter(
-      (p) => permissionMatchesAuthUser(p, userIdentity) && p.contratoId
-    );
-    const allowedIds = userPerms.map((p) => p.contratoId);
-    return contratos.filter((c) => allowedIds.includes(c.id));
-  }, [contratos, permissions, isTerceirizado, isSuperAdmin, userIdentity]);
 
   const allowedEmpenhos = useMemo(() => {
     let baseEmpenhos = empenhos;
@@ -119,25 +110,14 @@ export default function RequisicaoCompraPage() {
       baseEmpenhos = empenhos.filter((e) => allowedEmpenhoIds.has(e.id));
     }
 
-    // Filter by selected contract if active
-    if (selectedContratoId && selectedContratoId !== 'none') {
-      const linkedToSelectedIds = new Set(
-        contratosEmpenhos
-          .filter((ce) => ce.contrato_id === selectedContratoId)
-          .map((ce) => ce.empenho_id)
-      );
-      return baseEmpenhos.filter((e) => linkedToSelectedIds.has(e.id));
-    }
 
     return baseEmpenhos;
   }, [
     empenhos,
-    contratosEmpenhos,
     permissions,
     isTerceirizado,
     isSuperAdmin,
     userIdentity,
-    selectedContratoId,
   ]);
 
   useEffect(() => {
@@ -158,10 +138,6 @@ export default function RequisicaoCompraPage() {
     });
   }, [allowedEmpenhos, editingRequisicaoId]);
 
-  // Selected details
-  const currentContrato = useMemo(() => {
-    return contratos.find((c) => c.id === selectedContratoId);
-  }, [contratos, selectedContratoId]);
 
   const selectedEmpenhos = useMemo(
     () => selectedEmpenhoIds
@@ -174,13 +150,21 @@ export default function RequisicaoCompraPage() {
 
   const selectedEmpenhoOptions = useMemo(() => {
     const selectedIds = new Set(selectedEmpenhoIds);
-    return allowedEmpenhos
+    return selectedEmpenhos
       .filter((empenho) => selectedIds.has(empenho.id))
       .map((empenho) => ({
         id: empenho.id,
         label: `${empenho.numero} - saldo ${formatCurrency(getEmpenhoAvailableBalance(empenho))}`,
       }));
-  }, [allowedEmpenhos, selectedEmpenhoIds]);
+  }, [selectedEmpenhos, selectedEmpenhoIds]);
+
+
+  const filteredEmpenhos = useMemo(
+    () => filterAndRankRequisicaoEmpenhos(allowedEmpenhos, {
+      busca: empenhoSearch,
+    }),
+    [allowedEmpenhos, empenhoSearch],
+  );
 
   const portalEmpenhoItemQueries = useQueries({
     queries: selectedEmpenhos.map((empenho) => ({
@@ -199,14 +183,25 @@ export default function RequisicaoCompraPage() {
       staleTime: 60 * 1000,
     })),
   });
+  const empenhoItemBalanceReadyById = useMemo(() => {
+    return new Map(
+      selectedEmpenhos.map((empenho, index) => [
+        empenho.id,
+        Boolean(liquidacoesEmpenhoQueries[index]?.isSuccess),
+      ]),
+    );
+  }, [liquidacoesEmpenhoQueries, selectedEmpenhos]);
 
-  const reservedReviewItemQueries = useQueries({
-    queries: selectedEmpenhos.map((empenho) => ({
-      queryKey: ['requisicao-review-item-reservations', empenho.id, editingRequisicaoId],
-      queryFn: () => requisicoesCompraService.getReviewItemReservations(empenho.id, editingRequisicaoId),
-      retry: false,
-    })),
-  });
+  const empenhoItemBalanceErrorById = useMemo(() => {
+    return new Map(
+      selectedEmpenhos.map((empenho, index) => [
+        empenho.id,
+        Boolean(liquidacoesEmpenhoQueries[index]?.isError),
+      ]),
+    );
+  }, [liquidacoesEmpenhoQueries, selectedEmpenhos]);
+
+
 
   const empenhoBalanceById = useMemo(() => {
     return new Map(selectedEmpenhos.map((empenho) => [empenho.id, getEmpenhoAvailableBalance(empenho)]));
@@ -221,12 +216,11 @@ export default function RequisicaoCompraPage() {
           empenho.numero,
           (portalEmpenhoItemQueries[index]?.data ?? []) as PortalTransparenciaItemEmpenho[],
           liquidacoesEmpenhoQueries[index]?.data ?? [],
-          reservedReviewItemQueries[index]?.data ?? {},
         ),
       );
     });
     return map;
-  }, [liquidacoesEmpenhoQueries, portalEmpenhoItemQueries, reservedReviewItemQueries, selectedEmpenhos]);
+  }, [liquidacoesEmpenhoQueries, portalEmpenhoItemQueries, selectedEmpenhos]);
 
   useEffect(() => {
     if (!isEditing || editingRequisicaoId || pendingAutoFillEmpenhoIds.length === 0) return;
@@ -265,7 +259,7 @@ export default function RequisicaoCompraPage() {
         additions.push(
         {
           description: 'Aquisição de material/serviço conforme especificações',
-          quantity: 1,
+          quantity: 0,
           unit: 'UN',
           unitPrice: 0,
           empenhoId: empenho.id,
@@ -319,25 +313,6 @@ export default function RequisicaoCompraPage() {
     }
   };
 
-  // Handlers for adding/removing items in form
-  const handleAddItem = (empenhoId?: string) => {
-    const empenho = selectedEmpenhos.find((item) => item.id === empenhoId) ?? primaryEmpenho;
-    if (!empenho) return;
-
-    setItems((curr) => [
-      ...curr,
-      {
-        description: '',
-        quantity: 1,
-        unit: 'UN',
-        unitPrice: 0,
-        empenhoId: empenho.id,
-        empenhoNumero: empenho.numero,
-        sourceType: 'manual',
-        sortOrder: curr.length,
-      },
-    ]);
-  };
 
   const handleUpdateItem = (index: number, patch: Partial<typeof items[0]>) => {
     setItems((curr) => curr.map((item, idx) => (idx === index ? { ...item, ...patch } : item)));
@@ -354,14 +329,15 @@ export default function RequisicaoCompraPage() {
   const itemBalanceViolations = useMemo(() => {
     return items
       .map((item, index) => {
-        const available = getRequisicaoItemAvailableBalance(item, item.empenhoId ? empenhoItemBalancesById.get(item.empenhoId) ?? [] : []);
+        const isBalanceReady = item.empenhoId ? empenhoItemBalanceReadyById.get(item.empenhoId) === true : false;
+        const available = isBalanceReady ? getRequisicaoItemAvailableBalance(item, item.empenhoId ? empenhoItemBalancesById.get(item.empenhoId) ?? [] : []) : null;
         const requested = item.quantity * item.unitPrice;
         return available !== null && requested > available
           ? { index, description: item.description, requested, available }
           : null;
       })
       .filter((item): item is { index: number; description: string; requested: number; available: number } => Boolean(item));
-  }, [empenhoItemBalancesById, items]);
+  }, [empenhoItemBalanceReadyById, empenhoItemBalancesById, items]);
 
   const requisicaoTotalByEmpenhoId = useMemo(() => {
     const totals = new Map<string, number>();
@@ -382,22 +358,16 @@ export default function RequisicaoCompraPage() {
       .filter((item): item is { empenho: typeof selectedEmpenhos[number]; requested: number; available: number } => Boolean(item));
   }, [empenhoBalanceById, requisicaoTotalByEmpenhoId, selectedEmpenhos]);
 
-  const canSubmitForReview =
-    selectedEmpenhos.length > 0 &&
-    items.every((item) => item.empenhoId && selectedEmpenhoIds.includes(item.empenhoId)) &&
-    empenhoBalanceViolations.length === 0 &&
-    itemBalanceViolations.length === 0;
-
   // Start creating new Requisição
   const handleNewRequisicao = () => {
     setEditingRequisicaoId(undefined);
     setRequisicaoNumber(`REQ-${new Date().getFullYear()}-${String(requisicoes.length + 1).padStart(4, '0')}`);
-    setProcessNumber('');
-    setSelectedContratoId('none');
     setSelectedEmpenhoIds([]);
     setIsEmpenhoPickerOpen(false);
+    setEmpenhoSearch('');
     setNotes('');
     setItems([]);
+    setEmptyQuantityInputKeys(new Set());
     setPendingAutoFillEmpenhoIds([]);
     setIsEditing(true);
   };
@@ -411,9 +381,8 @@ export default function RequisicaoCompraPage() {
 
       setEditingRequisicaoId(fullRequisicao.id);
       setRequisicaoNumber(fullRequisicao.number);
-      setProcessNumber(fullRequisicao.processNumber || '');
-      setSelectedContratoId(fullRequisicao.contratoId || 'none');
-      const requisicaoEmpenhoIds = (fullRequisicao.empenhos?.length
+      setEmpenhoSearch('');
+        const requisicaoEmpenhoIds = (fullRequisicao.empenhos?.length
         ? fullRequisicao.empenhos.map((empenho) => empenho.empenhoId)
         : fullRequisicao.empenhoId
           ? [fullRequisicao.empenhoId]
@@ -421,6 +390,7 @@ export default function RequisicaoCompraPage() {
       ).filter(Boolean);
       setSelectedEmpenhoIds(requisicaoEmpenhoIds);
       setNotes(fullRequisicao.notes || '');
+      setEmptyQuantityInputKeys(new Set());
       setItems(fullRequisicao.items.map((item, index) => ({
         ...item,
         empenhoId: item.empenhoId || requisicaoEmpenhoIds[0],
@@ -439,42 +409,43 @@ export default function RequisicaoCompraPage() {
   const handleCancelForm = () => {
     setIsEditing(false);
     setEditingRequisicaoId(undefined);
+    setEmptyQuantityInputKeys(new Set());
   };
 
   // Save Requisição
-  const handleSaveRequisicao = async (status: RequisicaoCompra['status'] = 'draft') => {
+  const handleSaveRequisicao = async (status: RequisicaoCompra['status'] = 'draft'): Promise<string | null> => {
     if (!requisicaoNumber.trim()) {
       toast.error('Informe o número da Requisição de Compra.');
-      return;
+      return null;
     }
     if (items.length === 0) {
       toast.error('Adicione pelo menos um item à Requisição de Compra.');
-      return;
+      return null;
     }
-    if (items.some((i) => !i.description.trim() || i.quantity <= 0 || i.unitPrice < 0)) {
-      toast.error('Revise os itens. Todos devem conter descrição, quantidade positiva e preço válido.');
-      return;
+    if (items.some((i) => !i.description.trim() || i.quantity < 0 || i.unitPrice < 0)) {
+      toast.error('Revise os itens. Todos devem conter descrição, quantidade não negativa e preço válido.');
+      return null;
     }
 
     if (status === 'review' && selectedEmpenhos.length === 0) {
       toast.error('Selecione um empenho antes de enviar a requisição para o fiscal.');
-      return;
+      return null;
     }
     if (status === 'review' && items.some((item) => !item.empenhoId || !selectedEmpenhoIds.includes(item.empenhoId))) {
       toast.error('Cada item deve estar vinculado a um empenho selecionado.');
-      return;
+      return null;
     }
 
     if (status === 'review' && empenhoBalanceViolations.length > 0) {
       const firstViolation = empenhoBalanceViolations[0];
       toast.error(`Saldo insuficiente no empenho ${firstViolation.empenho.numero}. Saldo atual: ${formatCurrency(firstViolation.available)}.`);
-      return;
+      return null;
     }
 
     if (status === 'review' && itemBalanceViolations.length > 0) {
       const firstViolation = itemBalanceViolations[0];
       toast.error(`Saldo insuficiente no item ${firstViolation.index + 1}. Saldo do item: ${formatCurrency(firstViolation.available)}.`);
-      return;
+      return null;
     }
     const selectedPayloadEmpenhos = selectedEmpenhos.map((empenho, index) => ({
       empenhoId: empenho.id,
@@ -484,9 +455,6 @@ export default function RequisicaoCompraPage() {
     const payload = {
       title: `Requisição de Compra ${requisicaoNumber}`,
       number: requisicaoNumber,
-      processNumber: processNumber || undefined,
-      contratoId: selectedContratoId !== 'none' ? selectedContratoId : undefined,
-      contratoNumero: currentContrato?.numero,
       empenhoId: primaryEmpenho?.id,
       empenhoNumero: primaryEmpenho?.numero,
       empenhos: selectedPayloadEmpenhos,
@@ -496,13 +464,19 @@ export default function RequisicaoCompraPage() {
 
     const loadingToast = toast.loading('Salvando requisição de compra...');
     try {
-      await requisicoesCompraService.saveRequisicao(payload, items, { id: editingRequisicaoId, status });
+      const savedId = await requisicoesCompraService.saveRequisicao(payload, items, { id: editingRequisicaoId, status });
       toast.success(status === 'review' ? 'Requisição enviada para revisão.' : 'Requisição salva com sucesso.', { id: loadingToast });
       setIsEditing(false);
       void queryClient.invalidateQueries({ queryKey: ['requisicoes-compra'] });
+      return savedId;
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erro ao salvar Requisição de Compra.';
+      const message = err instanceof Error
+        ? err.message
+        : typeof err === 'object' && err && 'message' in err
+          ? String((err as { message?: unknown }).message || 'Erro ao salvar Requisição de Compra.')
+          : 'Erro ao salvar Requisição de Compra.';
       toast.error(message, { id: loadingToast });
+      return null;
     }
   };
 
@@ -583,7 +557,9 @@ export default function RequisicaoCompraPage() {
             .join('<br />')
         : '-';
 
-      const itemsHtml = fullRequisicao.items
+      const printableItems = fullRequisicao.items.filter((item) => item.quantity > 0);
+
+      const itemsHtml = printableItems
         .map(
           (item, idx) => `
         <tr>
@@ -599,7 +575,7 @@ export default function RequisicaoCompraPage() {
         )
         .join('');
 
-      const totalValue = fullRequisicao.items.reduce((acc, item) => acc + item.quantity * item.unitPrice, 0);
+      const totalValue = printableItems.reduce((acc, item) => acc + item.quantity * item.unitPrice, 0);
 
       const reportHtml = `
       <!DOCTYPE html>
@@ -632,7 +608,7 @@ export default function RequisicaoCompraPage() {
         <div class="header">
           <h1>INSTITUTO FEDERAL DE EDUCAÇÃO, CIÊNCIA E TECNOLOGIA DO RIO GRANDE DO NORTE</h1>
           <h2>REQUISIÇÃO DE COMPRA</h2>
-          <div class="sub">Sistema de Gestão Orçamentária e Contratos - GovAnalytics</div>
+          <div class="sub">SIAGES - Sistema Integrado de Administração e Gestão Estratégica</div>
         </div>
 
         <div class="meta-grid">
@@ -717,6 +693,19 @@ export default function RequisicaoCompraPage() {
     }
   };
 
+  const handlePrintAndSave = async () => {
+    const savedId = await handleSaveRequisicao('draft');
+    if (!savedId) return;
+
+    const savedRequisicao = await requisicoesCompraService.getRequisicaoById(savedId);
+    if (!savedRequisicao) {
+      toast.error('Requisição salva, mas não foi possível carregá-la para impressão.');
+      return;
+    }
+
+    await handlePrintPDF(savedRequisicao);
+  };
+
   return (
     <div className="space-y-6 pb-10">
       <HeaderSubtitle>Gestão de Requisições de Compra</HeaderSubtitle>
@@ -727,32 +716,10 @@ export default function RequisicaoCompraPage() {
         <Card className="border-primary/20 shadow-lg animate-in fade-in zoom-in-95 duration-200">
           <CardHeader className="bg-primary/[0.02] border-b border-border-default/50">
             <CardTitle>{editingRequisicaoId ? 'Editar Requisição de Compra' : 'Nova Requisição de Compra'}</CardTitle>
-            <CardDescription>Preencha os dados e associe as referências de contrato e empenho.</CardDescription>
+            <CardDescription>Preencha os dados e associe os empenhos que fundamentam a requisição.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 pt-6">
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="space-y-2">
-                <Label htmlFor="requisicao-number">Número da Requisição</Label>
-                <Input id="requisicao-number" value={requisicaoNumber} onChange={(e) => setRequisicaoNumber(e.target.value)} placeholder="REQ-2026-0001" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="requisicao-process">Número do Processo (Opcional)</Label>
-                <Input id="requisicao-process" value={processNumber} onChange={(e) => setProcessNumber(e.target.value)} placeholder="23035.XXXXXX/2026-XX" />
-              </div>
-              <div className="space-y-2">
-                <Label>Contrato Permitido</Label>
-                <Select value={selectedContratoId} onValueChange={(val) => setSelectedContratoId(val)}>
-                  <SelectTrigger aria-label="Contrato"><SelectValue placeholder="Selecione um contrato..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Nenhum contrato</SelectItem>
-                    {allowedContracts.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.numero} - {c.contratada}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
               <div className="space-y-2">
                 <Label>Empenho / Nota de Empenho</Label>
                 <Popover open={isEmpenhoPickerOpen} onOpenChange={setIsEmpenhoPickerOpen}>
@@ -773,28 +740,35 @@ export default function RequisicaoCompraPage() {
                       <Plus className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Filtrar por número, favorecido, descrição ou valor..." />
+                  <PopoverContent className="w-[min(48rem,calc(100vw-2rem))] p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput
+                        value={empenhoSearch}
+                        onValueChange={setEmpenhoSearch}
+                        placeholder="Buscar por número, favorecido, descrição ou valor..."
+                      />
                       <CommandList className="max-h-72">
-                        <CommandEmpty>Nenhum empenho encontrado.</CommandEmpty>
-                        <CommandGroup heading="Empenhos disponíveis">
-                          {allowedEmpenhos.map((empenho) => {
-                            const checked = selectedEmpenhoIds.includes(empenho.id);
-                            const label = `${empenho.numero} - saldo ${formatCurrency(getEmpenhoAvailableBalance(empenho))} - ${empenho.favorecidoNome || 'Sem favorecido'} - ${empenho.descricao || ''}`;
-                            return (
-                              <CommandItem
-                                key={empenho.id}
-                                value={label}
-                                onSelect={() => toggleEmpenhoSelection(empenho.id)}
-                                className="gap-2"
-                              >
-                                <Check className={checked ? 'h-4 w-4 opacity-100' : 'h-4 w-4 opacity-0'} />
-                                <span className="min-w-0 flex-1 truncate" title={label}>{label}</span>
-                              </CommandItem>
-                            );
-                          })}
-                        </CommandGroup>
+                        {filteredEmpenhos.length === 0 ? (
+                          <p className="py-6 text-center text-sm">Nenhum empenho encontrado.</p>
+                        ) : (
+                          <CommandGroup heading="Empenhos disponíveis">
+                            {filteredEmpenhos.map((empenho) => {
+                              const checked = selectedEmpenhoIds.includes(empenho.id);
+                              const label = `${empenho.numero} - saldo ${formatCurrency(getEmpenhoAvailableBalance(empenho))} - ${empenho.favorecidoNome || 'Sem favorecido'} - ${empenho.descricao || ''}`;
+                              return (
+                                <CommandItem
+                                  key={empenho.id}
+                                  value={label}
+                                  onSelect={() => toggleEmpenhoSelection(empenho.id)}
+                                  className="gap-2"
+                                >
+                                  <Check className={checked ? 'h-4 w-4 opacity-100' : 'h-4 w-4 opacity-0'} />
+                                  <span className="min-w-0 flex-1 truncate" title={label}>{label}</span>
+                                </CommandItem>
+                              );
+                            })}
+                          </CommandGroup>
+                        )}
                       </CommandList>
                     </Command>
                   </PopoverContent>
@@ -820,38 +794,31 @@ export default function RequisicaoCompraPage() {
             </div>
 
             <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-border-default/50 pb-2">
-                <h3 className="font-ui text-sm font-bold text-text-primary uppercase tracking-wider">Itens e Serviços Requisitados</h3>
-                <span className="font-mono text-sm font-bold text-primary">{formatCurrency(requisicaoTotal)}</span>
-              </div>
-
-              {selectedEmpenhos.length === 0 ? (
+                {selectedEmpenhos.length === 0 ? (
                 <div className="rounded-radius-lg border border-dashed border-border-default bg-surface-subtle/30 px-4 py-6 text-center text-sm text-text-muted">
                   Selecione ao menos um empenho para adicionar itens.
                 </div>
               ) : (
-                selectedEmpenhos.map((empenho, empenhoIndex) => {
+                selectedEmpenhos.map((empenho) => {
                   const groupItems = items
                     .map((item, index) => ({ item, index }))
                     .filter(({ item }) => item.empenhoId === empenho.id);
                   const groupTotal = requisicaoTotalByEmpenhoId.get(empenho.id) ?? 0;
                   const availableBalance = empenhoBalanceById.get(empenho.id) ?? 0;
                   const afterRequisicao = Math.max(0, availableBalance - groupTotal);
-                  const isLoadingPortalItems = portalEmpenhoItemQueries[empenhoIndex]?.isLoading ?? false;
-                  const isPortalItemsError = portalEmpenhoItemQueries[empenhoIndex]?.isError ?? false;
-                  const portalItems = (portalEmpenhoItemQueries[empenhoIndex]?.data ?? []) as PortalTransparenciaItemEmpenho[];
                   const empenhoItemBalances = empenhoItemBalancesById.get(empenho.id) ?? [];
                   const hasBalanceViolation = groupTotal > availableBalance;
+                  const isItemBalanceReady = empenhoItemBalanceReadyById.get(empenho.id) === true;
+                  const isItemBalanceError = empenhoItemBalanceErrorById.get(empenho.id) === true;
 
                   return (
                     <div key={empenho.id} className="space-y-3 rounded-radius-lg border border-border-default bg-surface-base p-3">
                       <div className={`flex flex-wrap items-center justify-between gap-3 border-l-4 px-4 py-3 ${
                         hasBalanceViolation
-                          ? 'border-status-danger bg-status-danger/5'
+                          ? 'border-status-error bg-status-error/5'
                           : 'border-status-success bg-status-success/5'
                       }`}>
                         <div>
-                          <p className="text-xs font-semibold uppercase text-text-muted">Empenho / NE</p>
                           <p className="mt-1 font-mono text-sm font-bold text-text-primary">{empenho.numero}</p>
                           {empenho.favorecidoNome ? (
                             <p className="text-xs text-text-muted">{empenho.favorecidoNome}</p>
@@ -863,44 +830,14 @@ export default function RequisicaoCompraPage() {
                             <p className="font-mono font-bold text-text-primary">{formatCurrency(availableBalance)}</p>
                           </div>
                           <div>
-                            <p className="text-text-muted">Nesta NE</p>
-                            <p className="font-mono font-bold text-text-primary">{formatCurrency(groupTotal)}</p>
+                            <p className={hasBalanceViolation ? 'text-status-error' : 'text-text-muted'}>Requisição</p>
+                            <p className={`font-mono font-bold ${hasBalanceViolation ? 'text-status-error' : 'text-text-primary'}`}>{formatCurrency(groupTotal)}</p>
                           </div>
                           <div>
                             <p className="text-text-muted">Após requisição</p>
                             <p className="font-mono font-bold text-text-primary">{formatCurrency(afterRequisicao)}</p>
                           </div>
                         </div>
-                      </div>
-
-                      <div className="space-y-2 rounded-radius-lg border border-border-default bg-surface-subtle/30 px-4 py-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <h4 className="text-sm font-bold text-text-primary">Itens do empenho {empenho.numero}</h4>
-                            <p className="text-xs text-text-muted">
-                              Os subitens vêm da NE e os saldos consideram liquidações e requisições em revisão para este empenho.
-                            </p>
-                          </div>
-                          {isLoadingPortalItems ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : null}
-                        </div>
-                        {isPortalItemsError ? (
-                          <p className="text-sm text-status-warning">Não foi possível carregar os subitens deste empenho agora. Cadastre os itens manualmente, se necessário.</p>
-                        ) : !isLoadingPortalItems && portalItems.length === 0 ? (
-                          <p className="text-sm text-text-muted">Nenhum subitem foi encontrado para este empenho. O cadastro manual permanece disponível.</p>
-                        ) : null}
-                      </div>
-
-                      <div className="flex justify-end">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="gap-1.5 border-primary text-primary hover:bg-primary/5"
-                          onClick={() => handleAddItem(empenho.id)}
-                        >
-                          <Plus className="h-4 w-4" />
-                          Adicionar Item
-                        </Button>
                       </div>
 
                       <div className="overflow-hidden rounded-radius-lg border border-border-default">
@@ -926,30 +863,19 @@ export default function RequisicaoCompraPage() {
                               </TableRow>
                             ) : (
                               groupItems.map(({ item, index }, groupIndex) => {
-                                const itemAvailableBalance = getRequisicaoItemAvailableBalance(item, empenhoItemBalances);
+                                const itemAvailableBalance = isItemBalanceReady
+                                  ? getRequisicaoItemAvailableBalance(item, empenhoItemBalances)
+                                  : null;
                                 const itemSubtotal = item.quantity * item.unitPrice;
                                 const isGeneratedItem = item.sourceType === 'portal_transparencia_empenho_item';
                                 const hasItemBalanceViolation = itemAvailableBalance !== null && itemSubtotal > itemAvailableBalance;
+                                const quantityInputKey = item.sourceItemKey || `${item.empenhoId ?? empenho.id}-${index}`;
 
                                 return (
-                                  <TableRow key={`${empenho.id}-${index}`} className={hasItemBalanceViolation ? 'bg-status-danger/5' : undefined}>
+                                  <TableRow key={`${empenho.id}-${index}`} className={hasItemBalanceViolation ? 'bg-status-error/5' : undefined}>
                                     <TableCell className="text-center font-bold text-text-muted">{groupIndex + 1}</TableCell>
                                     <TableCell>
-                                      <div className="space-y-1">
-                                        <Input
-                                          value={item.description}
-                                          onChange={(e) => handleUpdateItem(index, { description: e.target.value })}
-                                          placeholder="Ex: Material ou serviço específico"
-                                          className="h-9"
-                                          disabled={isGeneratedItem}
-                                        />
-                                        {item.sourceReference ? (
-                                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-text-muted">
-                                            <Badge variant="outline" className="text-[10px]">Subitem da NE</Badge>
-                                            <span>{item.sourceReference}</span>
-                                          </div>
-                                        ) : null}
-                                      </div>
+                                      <div className="min-w-0 whitespace-normal break-words text-sm leading-5 text-text-primary">{item.description}</div>
                                     </TableCell>
                                     <TableCell className="text-center">
                                       <Input
@@ -965,8 +891,21 @@ export default function RequisicaoCompraPage() {
                                         type="number"
                                         min="0"
                                         step="any"
-                                        value={item.quantity}
-                                        onChange={(e) => handleUpdateItem(index, { quantity: Number(e.target.value) })}
+                                        value={emptyQuantityInputKeys.has(quantityInputKey) ? '' : item.quantity}
+                                        onFocus={() => {
+                                          if (item.quantity !== 0) return;
+                                          setEmptyQuantityInputKeys((current) => new Set(current).add(quantityInputKey));
+                                        }}
+                                        onChange={(e) => {
+                                          const rawValue = e.target.value;
+                                          setEmptyQuantityInputKeys((current) => {
+                                            const next = new Set(current);
+                                            if (rawValue === '') next.add(quantityInputKey);
+                                            else next.delete(quantityInputKey);
+                                            return next;
+                                          });
+                                          handleUpdateItem(index, { quantity: rawValue === '' ? 0 : Number(rawValue) });
+                                        }}
                                         className="h-9 text-right"
                                       />
                                     </TableCell>
@@ -981,8 +920,10 @@ export default function RequisicaoCompraPage() {
                                         disabled={isGeneratedItem}
                                       />
                                     </TableCell>
-                                    <TableCell className={`text-right font-mono text-xs font-bold leading-9 ${hasItemBalanceViolation ? 'text-status-danger' : 'text-status-success'}`}>
-                                      {itemAvailableBalance !== null ? formatCurrency(itemAvailableBalance) : '-'}
+                                    <TableCell className={`text-right font-mono text-xs font-bold leading-9 ${hasItemBalanceViolation ? 'text-status-error' : 'text-status-success'}`}>
+                                      {itemAvailableBalance !== null
+                                        ? formatCurrency(itemAvailableBalance)
+                                        : isGeneratedItem ? <span title={isItemBalanceError ? 'Não foi possível consultar as liquidações deste empenho' : 'O saldo detalhado será carregado após as liquidações'}>{isItemBalanceError ? 'Indisponível' : 'Carregando...'}</span> : '-'}
                                     </TableCell>
                                     <TableCell className="text-right font-mono font-bold text-text-primary leading-9">
                                       {formatCurrency(itemSubtotal)}
@@ -1003,6 +944,11 @@ export default function RequisicaoCompraPage() {
                   );
                 })
               )}
+
+              <div className="flex items-center justify-between border-t border-border-default/50 pt-4">
+                <span className="font-ui text-sm font-bold uppercase tracking-wider text-text-primary">Total da requisição</span>
+                <span className="font-mono text-base font-bold text-primary">{formatCurrency(requisicaoTotal)}</span>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -1021,10 +967,10 @@ export default function RequisicaoCompraPage() {
                 <Button
                   type="button"
                   className="bg-primary hover:bg-primary/95 text-primary-foreground"
-                  disabled={!canSubmitForReview}
-                  onClick={() => handleSaveRequisicao('review')}
+                  onClick={() => void handlePrintAndSave()}
                 >
-                  Enviar para Fiscal
+                  <Printer className="mr-2 h-4 w-4" />
+                  Imprimir
                 </Button>
               </div>
             </div>

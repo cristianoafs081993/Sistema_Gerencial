@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.4');
+    expect(manifest.version).toBe('1.9.8');
     expect(manifest.host_permissions).toContain('<all_urls>');
     expect(manifest.permissions).toEqual(expect.arrayContaining(['activeTab', 'scripting', 'storage', 'alarms']));
     expect(manifest.background).toEqual({ service_worker: 'background.js' });
@@ -47,6 +47,9 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(processScript).toContain("form.querySelector('input[name=\"password\"]')");
     expect(processScript).not.toContain('form.elements.email.value');
     expect(processScript).not.toContain('form.elements.password.value');
+    expect(processScript).toContain('response.status === 400');
+    expect(popupScript).toContain('response.status === 400');
+    expect(processScript).toContain('extension context invalidated');
     const processKey = processScript.match(/SUPABASE_ANON_KEY = '([^']+)'/)?.[1];
     const planKey = planScript.match(/SUPABASE_ANON_KEY = '([^']+)'/)?.[1];
     const popupKey = popupScript.match(/SUPABASE_KEY = '([^']+)'/)?.[1];

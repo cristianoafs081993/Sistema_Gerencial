@@ -182,35 +182,6 @@ export const requisicoesCompraService = {
     };
   },
 
-  async getReviewItemReservations(
-    empenhoId: string,
-    excludeRequisicaoId?: string,
-  ): Promise<Record<string, number>> {
-    let query = supabase
-      .from('requisicoes_compra')
-      .select('id, empenho_id, requisicao_compra_itens(empenho_id, source_item_key, quantity, unit_price)')
-      .eq('status', 'review');
-
-    if (excludeRequisicaoId) {
-      query = query.neq('id', excludeRequisicaoId);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    return ((data || []) as Array<{
-      empenho_id?: string | null;
-      requisicao_compra_itens?: Array<{ empenho_id: string | null; source_item_key: string | null; quantity: number; unit_price: number }>;
-    }>).reduce<Record<string, number>>((acc, requisicao) => {
-      for (const item of requisicao.requisicao_compra_itens ?? []) {
-        const itemEmpenhoId = String(item.empenho_id ?? requisicao.empenho_id ?? '');
-        if (itemEmpenhoId !== empenhoId) continue;
-        if (!item.source_item_key) continue;
-        acc[item.source_item_key] = (acc[item.source_item_key] ?? 0) + Number(item.quantity || 0) * Number(item.unit_price || 0);
-      }
-      return acc;
-    }, {});
-  },
   async saveRequisicao(
     data: Omit<RequisicaoCompra, 'id' | 'createdBy' | 'createdByEmail' | 'createdAt' | 'updatedAt'>,
     items: Omit<RequisicaoCompraItem, 'id' | 'requisicaoCompraId' | 'createdAt' | 'updatedAt'>[],

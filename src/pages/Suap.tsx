@@ -62,6 +62,7 @@ import {
 } from '@/components/ui/table';
 import { useAuth } from '@/contexts/AuthContext';
 import { suapExtensionGithubUrl } from '@/lib/suapExtension';
+import { getNotasFiscais, hasNotaFiscalNumero } from '@/lib/suapNotaFiscal';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import { SuapProcesso } from '@/types';
@@ -99,7 +100,7 @@ const getNsNumero = (processo: SuapProcesso) =>
   getProcessWorkflow(processo)?.nsNumero || processo.dadosCompletos?.ns_numero || '-';
 
 const getProcessCompleteness = (processo: SuapProcesso) => {
-  const notaPrincipal = processo.dadosCompletos?.notas_fiscais?.[0];
+  const notasFiscais = getNotasFiscais(processo.dadosCompletos);
   const dadosBancarios = processo.dadosCompletos?.dados_bancarios;
   const retencoes = processo.dadosCompletos?.retencoes_tributarias;
   const listaEmpenhos = processo.dadosCompletos?.empenhos || [];
@@ -111,7 +112,7 @@ const getProcessCompleteness = (processo: SuapProcesso) => {
     isCopyableValue(processo.contrato || processo.dadosCompletos?.contrato_numero),
     isCopyableValue(processo.dadosCompletos?.val_nf),
     isCopyableValue(getNsNumero(processo)),
-    isCopyableValue(notaPrincipal?.numero),
+    hasNotaFiscalNumero(notasFiscais),
     isCopyableValue(dadosBancarios?.banco) &&
       isCopyableValue(dadosBancarios?.agencia) &&
       isCopyableValue(dadosBancarios?.conta),
@@ -431,8 +432,7 @@ function ProcessDetailsContent({ processo }: { processo: SuapProcesso }) {
   const analiseLiquidacao = workflow?.analiseLiquidacao;
   const analiseMeta = analiseLiquidacao ? getAnaliseMeta(analiseLiquidacao.statusGeral) : null;
   const AnaliseIcon = analiseMeta?.icon;
-  const notasFiscais = processo.dadosCompletos?.notas_fiscais || [];
-  const notaPrincipal = notasFiscais[0];
+  const notasFiscais = getNotasFiscais(processo.dadosCompletos);
   const dadosBancarios = processo.dadosCompletos?.dados_bancarios;
   const retencoes = processo.dadosCompletos?.retencoes_tributarias;
   const retencoesVisiveis = [
@@ -453,8 +453,7 @@ function ProcessDetailsContent({ processo }: { processo: SuapProcesso }) {
   const hasAssuntoPanel = isCopyableValue(processo.assunto);
   const hasContratoNfPanel =
     isCopyableValue(contrato) ||
-    isCopyableValue(notaPrincipal?.numero) ||
-    isCopyableValue(notaPrincipal?.data_emissao);
+    notasFiscais.some((nota) => isCopyableValue(nota.numero) || isCopyableValue(nota.data_emissao) || isCopyableValue(nota.valor));
   const hasDadosBancariosPanel =
     isCopyableValue(dadosBancarios?.banco) ||
     isCopyableValue(dadosBancarios?.agencia) ||
@@ -550,17 +549,25 @@ function ProcessDetailsContent({ processo }: { processo: SuapProcesso }) {
                   <CopyAction value={contrato} message="Contrato copiado." />
                 </div>
               ) : null}
-              {isCopyableValue(notaPrincipal?.numero) || isCopyableValue(notaPrincipal?.data_emissao) ? (
-                <div className="mt-3 flex items-center justify-between gap-3 border-t border-violet-100 pt-3">
-                  <div className="font-ui text-sm text-text-secondary">
-                    <p className="text-xs uppercase tracking-[0.12em] text-text-muted">Nota Fiscal</p>
-                    {isCopyableValue(notaPrincipal?.numero) ? <p className="mt-1 font-semibold text-violet-700">{notaPrincipal?.numero}</p> : null}
-                    {isCopyableValue(notaPrincipal?.data_emissao) ? <p className="mt-1 text-xs text-text-secondary">{notaPrincipal?.data_emissao}</p> : null}
-                  </div>
-                  <div className="flex gap-2">
-                    <CopyAction value={notaPrincipal?.numero} message="Número da nota fiscal copiado." />
-                    <CopyAction value={notaPrincipal?.data_emissao} message="Data de emissão copiada." />
-                  </div>
+              {notasFiscais.length > 0 ? (
+                <div className="mt-3 space-y-2 border-t border-violet-100 pt-3">
+                  <p className="text-xs uppercase tracking-[0.12em] text-text-muted">Notas Fiscais</p>
+                  {notasFiscais.map((nota, index) => (
+                    <div key={`${nota.numero || 'nota'}-${index}`} className="flex items-start justify-between gap-3 rounded-lg border border-violet-100 bg-violet-50/50 px-3 py-2">
+                      <div className="font-ui text-sm text-text-secondary">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-text-muted">
+                          {notasFiscais.length > 1 ? `Nota Fiscal ${index + 1}` : 'Nota Fiscal'}
+                        </p>
+                        {isCopyableValue(nota.numero) ? <p className="mt-1 font-semibold text-violet-700">{nota.numero}</p> : null}
+                        {isCopyableValue(nota.data_emissao) ? <p className="mt-1 text-xs text-text-secondary">{nota.data_emissao}</p> : null}
+                        {isCopyableValue(nota.valor) ? <p className="mt-1 text-xs text-text-secondary">Valor: {nota.valor}</p> : null}
+                      </div>
+                      <div className="flex gap-2">
+                        <CopyAction value={nota.numero} message="Número da nota fiscal copiado." />
+                        <CopyAction value={nota.data_emissao} message="Data de emissão copiada." />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : null}
             </InfoPanel>
@@ -1394,7 +1401,7 @@ export default function Suap() {
                   const valorLiquido = processo.dadosCompletos?.val_nf;
                   const nsNumero = getNsNumero(processo);
                   const contrato = processo.contrato || processo.dadosCompletos?.contrato_numero;
-                  const notaPrincipal = processo.dadosCompletos?.notas_fiscais?.[0];
+                  const notasFiscais = getNotasFiscais(processo.dadosCompletos);
                   const dadosBancarios = processo.dadosCompletos?.dados_bancarios;
                   const empenhos = processo.dadosCompletos?.empenhos || [];
                   const retencoes = processo.dadosCompletos?.retencoes_tributarias;
@@ -1409,7 +1416,9 @@ export default function Suap() {
                     isCopyableValue(valorLiquido) ? `Valor: ${valorLiquido}` : null,
                     isCopyableValue(nsNumero) ? `NS: ${nsNumero}` : null,
                     isCopyableValue(contrato) ? `Contrato: ${contrato}` : null,
-                    isCopyableValue(notaPrincipal?.numero) ? `NF: ${notaPrincipal?.numero}` : null,
+                    notasFiscais.some((nota) => isCopyableValue(nota.numero))
+                      ? `NF: ${notasFiscais.map((nota) => nota.numero).filter((numero): numero is string => Boolean(numero)).join(", ")}`
+                      : null,
                     isCopyableValue(dadosBancarios?.banco) ? `Banco: ${dadosBancarios?.banco}` : null,
                     empenhos.length > 0 ? `Empenhos: ${empenhos.join(', ')}` : null,
                     hasRetencoes ? 'Retencoes registradas' : null,

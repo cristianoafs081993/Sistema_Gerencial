@@ -298,6 +298,7 @@ export interface DocumentoDespesa {
 export interface SuapNotaFiscal {
   numero?: string;
   data_emissao?: string;
+  valor?: string;
 }
 
 export interface SuapDadosBancarios {

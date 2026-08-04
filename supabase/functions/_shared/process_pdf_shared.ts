@@ -1,5 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { PDFDocument } from "npm:pdf-lib@1.17.1";
+import { mergeInvoiceLists, normalizeInvoiceList, type InvoiceRecord } from "./invoice_utils.ts";
 
 export const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 export const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
@@ -75,9 +76,18 @@ export const EXTRACTION_PROMPT = `Analise o PDF deste processo do SUAP e extraia
   "empenhos": []
 }
 Regras adicionais:
+- percorra todas as paginas do PDF e todos os documentos de cobranca anexados ao processo;
+- em "notas_fiscais", retorne uma entrada para cada nota fiscal ou DANFE distinta encontrada, sem limitar a resposta a primeira nota e sem substituir varias notas por um unico numero;
+- preserve o numero, a data de emissao e o valor de cada nota individualmente; retorne [] somente quando nenhuma nota fiscal estiver presente;
 - assunto nunca pode ser rotulo de interface como "Assunto", "Nivel de prioridade", "Nivel de acesso", "Solicitar" ou "Acoes".
 - cpf_cnpj so pode ser retornado se estiver em formato valido de CPF/CNPJ ou um placeholder claro como "Varios (Folha de Pagamento)".
 Retorne APENAS o JSON, sem markdown, sem comentarios e sem HTML.`;
+
+export const INVOICE_VERIFICATION_PROMPT = `Analise novamente todas as paginas e documentos deste PDF do processo do SUAP, com foco exclusivo na identificacao de notas fiscais e DANFE.
+Retorne o mesmo JSON estruturado do extrator principal, mas confira especialmente "notas_fiscais": inclua uma entrada distinta para cada nota fiscal/DANFE encontrada, mantendo numero, data_emissao e valor de cada uma. Nunca retorne somente a primeira nota quando houver outras no PDF. Retorne [] apenas se nenhuma nota estiver presente.
+Retorne APENAS o JSON, sem markdown, sem comentarios e sem HTML.
+
+${EXTRACTION_PROMPT}`;
 
 export type ProviderName = "gemini" | "openai" | "openrouter";
 export type JobStatus = "queued" | "processing" | "retryable" | "completed" | "failed";
@@ -105,11 +115,7 @@ export type DadosBancarios = {
   conta: string | null;
 };
 
-export type NotaFiscal = {
-  numero: string | null;
-  data_emissao: string | null;
-  valor: string | null;
-};
+export type NotaFiscal = InvoiceRecord;
 
 export type RetencoesTributarias = {
   optante_simples_nacional: boolean | null;
@@ -432,7 +438,13 @@ export function pdfBytesToBase64(pdfBytes: Uint8Array): string {
   return btoa(binary);
 }
 
-export async function callGeminiWithPdfBytes(pdfBytes: Uint8Array, processoNumeroAtual: string | null, label = "full", contextText: string | null = null) {
+export async function callGeminiWithPdfBytes(
+  pdfBytes: Uint8Array,
+  processoNumeroAtual: string | null,
+  label = "full",
+  contextText: string | null = null,
+  prompt = EXTRACTION_PROMPT,
+) {
   if (!GEMINI_API_KEY) throw new Error("Missing environment variable: GEMINI_API_KEY");
   const base64Pdf = pdfBytesToBase64(pdfBytes);
   const contextSection = cleanString(contextText)
@@ -450,7 +462,7 @@ export async function callGeminiWithPdfBytes(pdfBytes: Uint8Array, processoNumer
           contents: [{
             parts: [
               { inline_data: { mime_type: "application/pdf", data: base64Pdf } },
-              { text: `${EXTRACTION_PROMPT}${contextSection}` },
+              { text: `${prompt}${contextSection}` },
             ],
           }],
           generationConfig: {
@@ -709,16 +721,8 @@ function pickTextField(fieldName: string, incoming: unknown, existing: unknown):
   return null;
 }
 
-function mergeNotas(existingNotas: NotaFiscal[], incomingNotas: NotaFiscal[]): NotaFiscal[] {
-  const seen = new Set<string>();
-  const out: NotaFiscal[] = [];
-  for (const nota of [...existingNotas, ...incomingNotas]) {
-    const key = [nota.numero ?? "", nota.data_emissao ?? "", nota.valor ?? ""].join("|").toLowerCase();
-    if (!key.replace(/\|/g, "").trim() || seen.has(key)) continue;
-    seen.add(key);
-    out.push(nota);
-  }
-  return out;
+export function mergeNotas(existingNotas: NotaFiscal[], incomingNotas: NotaFiscal[]): NotaFiscal[] {
+  return mergeInvoiceLists(existingNotas, incomingNotas);
 }
 
 function mergeRetencoes(existing: RetencoesTributarias | null, incoming: RetencoesTributarias | null): RetencoesTributarias | null {
@@ -773,6 +777,7 @@ export function buildUpdatePayload(processo: ProcessRecord, extracted: Extractio
   const valNf = pickTextField("val_nf", extracted.val_nf, existingDados.val_nf);
   const contratoNumero = pickTextField("contrato_numero", extracted.contrato_numero, processo.contrato ?? existingDados.contrato_numero);
   const assunto = pickTextField("assunto", extracted.assunto, processo.assunto ?? existingDados.assunto);
+  const existingNotas = normalizeInvoiceList(existingDados.notas_fiscais);
 
   return {
     status,
@@ -786,7 +791,7 @@ export function buildUpdatePayload(processo: ProcessRecord, extracted: Extractio
       contrato_numero: contratoNumero,
       assunto,
       dados_bancarios: extracted.dados_bancarios ?? existingDados.dados_bancarios ?? null,
-      notas_fiscais: extracted.notas_fiscais.length ? extracted.notas_fiscais : existingDados.notas_fiscais ?? [],
+      notas_fiscais: mergeNotas(existingNotas, extracted.notas_fiscais),
       retencoes_tributarias: extracted.retencoes_tributarias ?? existingDados.retencoes_tributarias ?? null,
       empenhos: extracted.empenhos.length ? extracted.empenhos : existingDados.empenhos ?? [],
     },

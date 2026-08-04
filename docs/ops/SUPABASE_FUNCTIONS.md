@@ -68,7 +68,7 @@ Chamador:
 Uso:
 
 - `process-pdf` autentica o usuario, valida o processo e enfileira a extracao do PDF sincronizado no bucket `suap-pdfs`
-- `process-pdf-worker` processa a fila, atualiza `processos` e grava `dados_completos.extraction_job`; a ordem de provedores e Gemini com PDF inteiro, Gemini por blocos, OpenAI com PDF e OpenRouter para reparo final do JSON. A OpenAI tambem repete a tentativa por blocos quando o PDF inteiro excede sua janela de contexto; a falha final registra explicitamente a tentativa primaria do Gemini e a do fallback.
+- `process-pdf-worker` processa a fila, atualiza `processos` e grava `dados_completos.extraction_job`; a ordem de provedores e Gemini com PDF inteiro, Gemini por blocos, OpenAI com PDF e OpenRouter para reparo final do JSON. A OpenAI tambem repete a tentativa por blocos quando o PDF inteiro excede sua janela de contexto; a falha final registra explicitamente a tentativa primaria do Gemini e a do fallback. O prompt exige todas as notas fiscais/DANFE encontradas e, quando a resposta valida traz no maximo uma nota, o worker executa uma verificacao complementar no PDF completo e mescla o resultado sem duplicatas. A persistencia tambem preserva notas ja armazenadas durante reprocessamentos incompletos.
 - o fluxo SUAP padrao envia apenas `suap_id` para a Edge Function; antes da IA o frontend persiste somente `suap_id`, `url`, `caixa` e, quando encontrado na listagem, `num_processo`. A resposta `202` confirma somente o enfileiramento; o frontend acompanha `processos.status` ate o resultado final e exibe falhas tecnicas registradas em `dados_completos.extraction_job`
 
 Dependencias:
@@ -566,7 +566,9 @@ Uso:
 - aceita empenhos especificos enviados pelo frontend
 - em modo `refreshDue`, reprocessa entradas vencidas do cache
 - em modo `refreshLinkedRequisicaoEmpenhos`, descobre empenhos vinculados diretamente a terceirizados e empenhos de requisicoes recentes em `draft`/`review`; para requisicoes usa `requisicao_compra_empenhos` e mantem fallback pelos campos legados `requisicoes_compra.empenho_id/empenho_numero`, pre-aquecendo o cache para `/requisicao-compra`
+- em modo `refreshPositiveEmpenhos`, percorre em paginas todas as NEs com saldo positivo em `empenhos`; `empenhoTipo = rap` processa RAP e `empenhoTipo = exercicio` processa empenhos do exercicio, usando a mesma regra de saldo da RPC `fn_empenho_saldo_disponivel`
 - em modo `readCacheOnly` com `returnRows`, devolve as linhas ja materializadas no cache sem consultar novamente o Portal
+- com `returnRows`, a atualizacao pode devolver as linhas recem-materializadas para o primeiro acesso do frontend; se a function estiver indisponivel, o frontend usa consulta direta como fallback
 - consulta `/api-de-dados/despesas/itens-de-empenho` usando `codigoDocumento = 158366 + 26435 + numero do empenho`
 - salva dados em `portal_transparencia_empenho_itens_cache_status` e `portal_transparencia_empenho_itens_cache`
 
@@ -580,7 +582,7 @@ Observacao:
 
 - publicada com `verify_jwt = false`, pois pode ser chamada pelo cron e pelo frontend
 - responde preflight CORS com `POST, OPTIONS`
-- a migration agenda `refresh-portal-transparencia-itens-cache-daily` com Supabase Cron/pg_net para executar diariamente as `07:10 UTC` (`04:10` em Brasilia), substituindo o job horario anterior
+- a migration agenda dois jobs com Supabase Cron/pg_net: `refresh-portal-transparencia-itens-cache-rap-daily` as `07:10 UTC` e `refresh-portal-transparencia-itens-cache-exercicio-daily` as `07:30 UTC` (`04:10` e `04:30` em Brasilia)
 - resultados encontrados recebem TTL de 12 horas
 - resultados `not_found` recebem TTL de 1 hora
 

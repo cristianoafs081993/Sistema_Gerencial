@@ -1,4 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
+import {
+  getPortalEmpenhoAvailableBalance,
+  matchesPortalEmpenhoCacheStage,
+  type PortalEmpenhoBalanceRow,
+  type PortalEmpenhoCacheStage,
+} from '../_shared/portal_itens_cache.ts';
 
 const PORTAL_API_BASE = 'https://api.portaldatransparencia.gov.br/api-de-dados/despesas';
 const DEFAULT_PORTAL_TRANSPARENCIA_API_KEY = '931d4d57337bef94e775337c318342e9';
@@ -36,6 +42,8 @@ type RefreshRequest = {
   empenhoNumero?: string;
   empenhos?: string[];
   refreshDue?: boolean;
+  refreshPositiveEmpenhos?: boolean;
+  empenhoTipo?: PortalEmpenhoCacheStage;
   refreshLinkedRequisicaoEmpenhos?: boolean;
   readCacheOnly?: boolean;
   returnRows?: boolean;
@@ -57,6 +65,12 @@ type PortalItemCacheRow = {
   raw_data: Record<string, unknown>;
   fetched_at: string;
 };
+type EmpenhoBalanceCacheRow = PortalEmpenhoBalanceRow & {
+  id: string;
+  numero: string;
+  status?: string | null;
+};
+
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -314,6 +328,43 @@ async function getDueEmpenhos(supabase: SupabaseClient, limit: number) {
   if (error) throw error;
   return (data ?? []).map((row: { empenho_numero: string }) => row.empenho_numero).filter(Boolean);
 }
+async function getPositiveEmpenhos(
+  supabase: SupabaseClient,
+  stage: PortalEmpenhoCacheStage,
+  pageSize: number,
+) {
+  const numbers = new Set<string>();
+  const select = 'id,numero,tipo,status,valor,valor_liquidado_a_pagar,valor_pago_oficial,saldo_rap_oficial,rap_a_liquidar,rap_inscrito,rap_pago';
+  let offset = 0;
+
+  while (true) {
+    let query = supabase
+      .from('empenhos')
+      .select(select)
+      .order('id', { ascending: true })
+      .range(offset, offset + pageSize - 1);
+    query = stage === 'rap'
+      ? query.eq('tipo', 'rap')
+      : query.or('tipo.eq.exercicio,tipo.is.null');
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const page = (data ?? []) as EmpenhoBalanceCacheRow[];
+    for (const row of page) {
+      if (String(row.status ?? '').trim().toLowerCase() === 'cancelado') continue;
+      if (getPortalEmpenhoAvailableBalance(row) <= 0) continue;
+      const numero = normalizeEmpenhoNumero(row.numero);
+      if (numero && matchesPortalEmpenhoCacheStage(row, stage)) numbers.add(numero);
+    }
+
+    if (page.length < pageSize) break;
+    offset += page.length;
+  }
+
+  return Array.from(numbers);
+}
+
 
 async function getLinkedRequisicaoEmpenhos(supabase: SupabaseClient, limit: number) {
   const empenhoIds = new Set<string>();
@@ -418,12 +469,26 @@ Deno.serve(async (request) => {
       }
     }
 
+    if (body.refreshPositiveEmpenhos) {
+      const stages: PortalEmpenhoCacheStage[] = body.empenhoTipo
+        ? [body.empenhoTipo]
+        : ['rap', 'exercicio'];
+      for (const stage of stages) {
+        for (const empenho of await getPositiveEmpenhos(supabase, stage, limit)) {
+          requestedEmpenhos.add(empenho);
+        }
+      }
+    }
+
     if (requestedEmpenhos.size === 0) {
       return jsonResponse({ status: 'noop', results: [] });
     }
 
     const results = [];
-    for (const empenho of Array.from(requestedEmpenhos).slice(0, limit)) {
+    const empenhosToProcess = body.refreshPositiveEmpenhos
+      ? Array.from(requestedEmpenhos)
+      : Array.from(requestedEmpenhos).slice(0, limit);
+    for (const empenho of empenhosToProcess) {
       if (body.readCacheOnly) {
         results.push(await readCacheRows(supabase, empenho, Boolean(body.returnRows)));
       } else {

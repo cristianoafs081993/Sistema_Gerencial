@@ -33,6 +33,7 @@ import {
   type ContratoApiRow,
 } from '@/services/contratosApi';
 import { isContratoApiDisplayFatura } from '@/utils/contratosApiStatus';
+import { calculateRobustInvoiceBaseline, getFaturaActivityDate, getProjectionHistoryPeriod, resolveFaturaCompetencia } from '@/utils/contractProjection';
 import type { Atividade, Empenho, Contrato, ContratoEmpenho } from '@/types';
 import {
   buildEmpenhoLookupKeys,
@@ -84,6 +85,15 @@ export type ContractProjectionBulletItem = {
   projetado: number;
   saldoEmpenhos: number;
   mesesConsiderados: number;
+  mesesHistorico?: number;
+  mesesRestantes?: number;
+  notasTotais?: number;
+  notasUtilizadas?: number;
+  notasDesconsideradas?: number;
+  mediaNota?: number;
+  ultimaEmissao?: string | null;
+  ultimaCompetencia?: string | null;
+  mesAtualTemNota?: boolean;
   percentualLiquidado: number;
   percentualProjetado: number;
   liquidacoes: ContractProjectionLiquidacaoTrace[];
@@ -594,6 +604,8 @@ export const buildContractProjectionBullets = (
     endDate: Date;
     today?: Date;
     projectionTargetMonths?: number;
+    projectionHistoryStart?: Date;
+    projectionHistoryEnd?: Date;
     allowedRenewalContractIds?: string[];
   },
   localData?: {
@@ -604,36 +616,71 @@ export const buildContractProjectionBullets = (
 ): ContractProjectionBulletItem[] => {
   const selectedIds = new Set(selectedContratoIds);
   const contratosById = new Map(contratos.map((contrato) => [contrato.id, contrato]));
-  const elapsedMonths = countProjectionMonths(options.startDate, options.endDate, options.today);
+  const today = options.today ?? new Date();
+  const historyPeriod = getProjectionHistoryPeriod(today);
+  const historyStart = options.projectionHistoryStart ?? parseISO(historyPeriod.startDate);
+  const historyEnd = options.projectionHistoryEnd ?? parseISO(historyPeriod.endDate);
+  const historyMonths = countMonthsBetween(monthStart(historyStart), monthStart(historyEnd));
+  const targetMonths = Math.max(1, options.projectionTargetMonths ?? countMonthsBetween(options.startDate, options.endDate));
+  const targetEnd = addMonths(options.startDate, targetMonths - 1);
   const liquidadoByContrato = new Map<string, number>();
+  const historicalValuesByContrato = new Map<string, number[]>();
+  const latestEmissionByContrato = new Map<string, Date>();
+  const latestCompetenceByContrato = new Map<string, Date>();
+  const currentMonthEvidenceByContrato = new Map<string, boolean>();
   const empenhadoByContrato = new Map<string, number>();
   const liquidacoesByContrato = new Map<string, ContractProjectionLiquidacaoTrace[]>();
   const empenhosByContrato = new Map<string, ContractProjectionEmpenhoTrace[]>();
+  const referenceMonth = monthStart(today < options.startDate ? options.startDate : today);
+  const targetMonth = monthStart(targetEnd);
+  const contractReferenceIsInTarget = referenceMonth.getTime() >= monthStart(options.startDate).getTime() && referenceMonth.getTime() <= targetMonth.getTime();
 
   faturas.forEach((fatura) => {
     if (!selectedIds.has(fatura.contrato_api_id) || !isContratoApiDisplayFatura(fatura)) return;
 
-    const date = toValidDate(fatura.data_emissao);
+    const emissionDate = toValidDate(fatura.data_emissao);
+    const activityDate = getFaturaActivityDate(fatura);
     const value = getContractExpenseValue(fatura);
-    if (
-      !date ||
-      value <= 0 ||
-      !isDateInsideOptionalRange(date, options.startDate, options.endDate)
-    ) {
-      return;
+    if (value <= 0) return;
+
+    if (emissionDate && isDateInsideOptionalRange(emissionDate, options.startDate, options.endDate)) {
+      liquidadoByContrato.set(fatura.contrato_api_id, (liquidadoByContrato.get(fatura.contrato_api_id) || 0) + value);
+      const currentLiquidacoes = liquidacoesByContrato.get(fatura.contrato_api_id) || [];
+      currentLiquidacoes.push({
+        id: fatura.id,
+        numeroInstrumento: fatura.numero_instrumento_cobranca || 'Sem instrumento',
+        situacao: fatura.situacao || 'Sem situacao',
+        dataEmissao: fatura.data_emissao,
+        dataPagamento: fatura.data_pagamento,
+        valor: value,
+      });
+      liquidacoesByContrato.set(fatura.contrato_api_id, currentLiquidacoes);
     }
 
-    liquidadoByContrato.set(fatura.contrato_api_id, (liquidadoByContrato.get(fatura.contrato_api_id) || 0) + value);
-    const currentLiquidacoes = liquidacoesByContrato.get(fatura.contrato_api_id) || [];
-    currentLiquidacoes.push({
-      id: fatura.id,
-      numeroInstrumento: fatura.numero_instrumento_cobranca || 'Sem instrumento',
-      situacao: fatura.situacao || 'Sem situacao',
-      dataEmissao: fatura.data_emissao,
-      dataPagamento: fatura.data_pagamento,
-      valor: value,
-    });
-    liquidacoesByContrato.set(fatura.contrato_api_id, currentLiquidacoes);
+    if (activityDate && isDateInsideOptionalRange(activityDate, historyStart, historyEnd)) {
+      const historicalValues = historicalValuesByContrato.get(fatura.contrato_api_id) || [];
+      historicalValues.push(value);
+      historicalValuesByContrato.set(fatura.contrato_api_id, historicalValues);
+    }
+
+    if (emissionDate && emissionDate.getTime() <= targetEnd.getTime()) {
+      const currentLatestEmission = latestEmissionByContrato.get(fatura.contrato_api_id);
+      if (!currentLatestEmission || emissionDate.getTime() > currentLatestEmission.getTime()) {
+        latestEmissionByContrato.set(fatura.contrato_api_id, emissionDate);
+      }
+    }
+
+    const competence = resolveFaturaCompetencia(fatura);
+    if (competence && competence.getTime() <= targetEnd.getTime()) {
+      const currentLatestCompetence = latestCompetenceByContrato.get(fatura.contrato_api_id);
+      if (!currentLatestCompetence || competence.getTime() > currentLatestCompetence.getTime()) {
+        latestCompetenceByContrato.set(fatura.contrato_api_id, competence);
+      }
+    }
+
+    if (contractReferenceIsInTarget && activityDate && monthKey(activityDate) === monthKey(referenceMonth)) {
+      currentMonthEvidenceByContrato.set(fatura.contrato_api_id, true);
+    }
   });
 
   empenhos.forEach((empenho) => {
@@ -687,14 +734,19 @@ export const buildContractProjectionBullets = (
         exceedsValiditySugestion = true;
       }
 
-      const targetMonths = options.projectionTargetMonths ?? 12;
       const isRenewalAllowed = options.allowedRenewalContractIds?.includes(contratoId) ?? false;
-      
-      const contractTargetMonths = (vigenciaFim && !isRenewalAllowed)
-        ? Math.max(elapsedMonths, Math.min(targetMonths, countMonthsBetween(options.startDate, vigenciaFim)))
-        : targetMonths;
+      const baseline = calculateRobustInvoiceBaseline(historicalValuesByContrato.get(contratoId) || []);
+      const mesAtualTemNota = currentMonthEvidenceByContrato.get(contratoId) === true;
+      const contractTargetEnd = vigenciaFim && !isRenewalAllowed && vigenciaFim.getTime() < targetEnd.getTime()
+        ? vigenciaFim
+        : targetEnd;
+      const contractTargetMonth = monthStart(contractTargetEnd);
+      const firstRemainingMonth = mesAtualTemNota ? addMonths(referenceMonth, 1) : referenceMonth;
+      const mesesRestantes = contractReferenceIsInTarget && firstRemainingMonth.getTime() <= contractTargetMonth.getTime()
+        ? countMonthsBetween(firstRemainingMonth, contractTargetMonth)
+        : 0;
 
-      const rawProjetado = elapsedMonths > 0 ? (liquidado / elapsedMonths) * contractTargetMonths : liquidado;
+      const rawProjetado = liquidado + baseline.mediaNota * mesesRestantes;
       const isCapped = valorTotal > 0 && rawProjetado > valorTotal;
       let projetado = rawProjetado;
       if (valorTotal > 0 && !isRenewalAllowed) {
@@ -827,11 +879,12 @@ export const buildContractProjectionBullets = (
         saldoEmpenhos = empenhosTrace.length > 0 ? saldoApi : Math.max(0, empenhado - liquidado);
       }
 
-      const gastoMensalMedio = elapsedMonths > 0 ? liquidado / elapsedMonths : 0;
+      const gastoMensalMedio = baseline.mediaNota;
       let coberturaMes: string | null = null;
-      if (gastoMensalMedio > 0) {
-        const totalMeses = (liquidado + saldoEmpenhos) / gastoMensalMedio;
-        let targetDate = addMonths(options.startDate, Math.max(0, totalMeses - 0.001));
+      if (gastoMensalMedio > 0 && saldoEmpenhos > 0) {
+        const coverageStart = contractReferenceIsInTarget ? firstRemainingMonth : monthStart(options.startDate);
+        const totalMeses = saldoEmpenhos / gastoMensalMedio;
+        let targetDate = addMonths(coverageStart, Math.max(0, Math.ceil(totalMeses) - 1));
         if (vigenciaFim && !isRenewalAllowed && targetDate > vigenciaFim) {
           targetDate = vigenciaFim;
         }
@@ -852,7 +905,16 @@ export const buildContractProjectionBullets = (
         liquidado,
         projetado,
         saldoEmpenhos,
-        mesesConsiderados: elapsedMonths,
+        mesesConsiderados: historyMonths,
+        mesesHistorico: historyMonths,
+        mesesRestantes,
+        notasTotais: baseline.notasTotais,
+        notasUtilizadas: baseline.notasUtilizadas,
+        notasDesconsideradas: baseline.notasDesconsideradas,
+        mediaNota: baseline.mediaNota,
+        ultimaEmissao: latestEmissionByContrato.has(contratoId) ? format(latestEmissionByContrato.get(contratoId)!, 'yyyy-MM-dd') : null,
+        ultimaCompetencia: latestCompetenceByContrato.has(contratoId) ? format(latestCompetenceByContrato.get(contratoId)!, 'MM/yyyy') : null,
+        mesAtualTemNota,
         percentualLiquidado: saldoEmpenhos > 0 ? (liquidado / saldoEmpenhos) * 100 : 0,
         percentualProjetado: saldoEmpenhos > 0 ? (projetado / saldoEmpenhos) * 100 : 0,
         liquidacoes,
@@ -1151,7 +1213,7 @@ export default function Dashboard() {
     setProjectionTargetMonths((prev) => (prev === target ? prev : target));
   }, [contractExpensePeriod]);
 
-  const { data: contratosApiFaturas = EMPTY_ARRAY, isLoading: isContractExpenseLoading = false } = useQuery({
+  const { data: contratosApiFaturas = EMPTY_ARRAY, isLoading: isContractExpenseCurrentLoading = false } = useQuery({
     queryKey: ['dashboard-contratos-api-faturas', contratosApiAtivosIds, contractExpensePeriod.startDate, contractExpensePeriod.endDate],
     queryFn: async () => {
       try {
@@ -1167,6 +1229,31 @@ export default function Dashboard() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const projectionHistoryPeriod = useMemo(() => getProjectionHistoryPeriod(new Date()), []);
+
+  const { data: contratosApiFaturasHistorico = EMPTY_ARRAY, isLoading: isContractExpenseHistoryLoading = false } = useQuery({
+    queryKey: ['dashboard-contratos-api-faturas-historico', contratosApiAtivosIds, projectionHistoryPeriod.startDate, projectionHistoryPeriod.endDate],
+    queryFn: async () => {
+      try {
+        return await contratosApiService.getFaturasApi(contratosApiAtivosIds, {
+          dataEmissaoInicio: projectionHistoryPeriod.startDate,
+          dataEmissaoFim: projectionHistoryPeriod.endDate,
+        });
+      } catch {
+        return EMPTY_ARRAY;
+      }
+    },
+    enabled: isContractExecutionTabActive && contratosApiAtivosIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const contratosApiFaturasProjecao = useMemo(() => {
+    const byId = new Map<string, ContratoApiFaturaRow>();
+    [...contratosApiFaturas, ...contratosApiFaturasHistorico].forEach((fatura) => byId.set(fatura.id, fatura));
+    return Array.from(byId.values());
+  }, [contratosApiFaturas, contratosApiFaturasHistorico]);
+
+  const isContractExpenseLoading = isContractExpenseCurrentLoading || isContractExpenseHistoryLoading;
   const contractExpenseAggregation = useMemo(
     () =>
       buildContractExpenseAggregation(contratosApiAtivos, contratosApiFaturas, {
@@ -1245,13 +1332,15 @@ export default function Dashboard() {
     () =>
       buildContractProjectionBullets(
         contratosApiAtivos,
-        contratosApiFaturas,
+        contratosApiFaturasProjecao,
         contratosApiEmpenhos,
         selectedContractExpenseIds,
         {
           startDate: parseISO(contractExpensePeriod.startDate),
           endDate: parseISO(contractExpensePeriod.endDate),
           projectionTargetMonths,
+          projectionHistoryStart: parseISO(projectionHistoryPeriod.startDate),
+          projectionHistoryEnd: parseISO(projectionHistoryPeriod.endDate),
           allowedRenewalContractIds: contractsWithRenewalAllowed,
         },
         {
@@ -1262,7 +1351,7 @@ export default function Dashboard() {
       ),
     [
       contratosApiAtivos,
-      contratosApiFaturas,
+      contratosApiFaturasProjecao,
       contratosApiEmpenhos,
       selectedContractExpenseIds,
       contractExpensePeriod,
@@ -1270,6 +1359,7 @@ export default function Dashboard() {
       contratos,
       contratosEmpenhos,
       projectionTargetMonths,
+      projectionHistoryPeriod,
       contractsWithRenewalAllowed,
     ],
   );
@@ -1278,13 +1368,15 @@ export default function Dashboard() {
     () =>
       buildContractProjectionBullets(
         contratosApiAtivos,
-        contratosApiFaturas,
+        contratosApiFaturasProjecao,
         contratosApiEmpenhos,
         contratosApiAtivosIds,
         {
           startDate: parseISO(contractExpensePeriod.startDate),
           endDate: parseISO(contractExpensePeriod.endDate),
           projectionTargetMonths,
+          projectionHistoryStart: parseISO(projectionHistoryPeriod.startDate),
+          projectionHistoryEnd: parseISO(projectionHistoryPeriod.endDate),
           allowedRenewalContractIds: contractsWithRenewalAllowed,
         },
         {
@@ -1295,7 +1387,7 @@ export default function Dashboard() {
       ),
     [
       contratosApiAtivos,
-      contratosApiFaturas,
+      contratosApiFaturasProjecao,
       contratosApiEmpenhos,
       contratosApiAtivosIds,
       contractExpensePeriod,
@@ -1303,6 +1395,7 @@ export default function Dashboard() {
       contratos,
       contratosEmpenhos,
       projectionTargetMonths,
+      projectionHistoryPeriod,
       contractsWithRenewalAllowed,
     ],
   );

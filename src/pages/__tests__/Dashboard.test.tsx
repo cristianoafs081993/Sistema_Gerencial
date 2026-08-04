@@ -533,13 +533,13 @@ describe('Dashboard', () => {
       id: 'c1',
       empenhado: 1000,
       liquidado: 1050,
-      projetado: 4200,
+      projetado: 1800,
       saldoEmpenhos: 830,
-      mesesConsiderados: 3,
+      mesesConsiderados: 12,
       percentualLiquidado: expect.closeTo(126.51, 1),
-      percentualProjetado: expect.closeTo(506.02, 1),
-      coberturaMes: 'Junho/26',
-      necessidadeEmpenho: 2320,
+      percentualProjetado: expect.closeTo(216.87, 1),
+      coberturaMes: 'Fevereiro/27',
+      necessidadeEmpenho: 0,
     });
     expect(bullets[0].liquidacoes).toEqual([
       expect.objectContaining({
@@ -578,7 +578,7 @@ describe('Dashboard', () => {
       liquidado: 0,
       projetado: 0,
       saldoEmpenhos: 500,
-      mesesConsiderados: 3,
+      mesesConsiderados: 12,
     });
     expect(bullets[1].liquidacoes).toHaveLength(0);
     expect(bullets[1].empenhos[0]).toMatchObject({
@@ -620,9 +620,65 @@ describe('Dashboard', () => {
     );
 
     expect(bullets).toHaveLength(1);
-    expect(bullets[0].projetado).toBeCloseTo(500, 1);
+    expect(bullets[0].projetado).toBeCloseTo(1400, 1);
   });
 
+  it('desconsidera nota atipica na media sem remover o valor real liquidado', () => {
+    const faturas = [
+      { id: 'h1', contrato_api_id: 'c1', situacao: 'Pago', valor_liquido: 100, valor_bruto: 100, data_emissao: '2025-08-10', raw_data: { contratante: '158366' } },
+      { id: 'h2', contrato_api_id: 'c1', situacao: 'Pago', valor_liquido: 110, valor_bruto: 110, data_emissao: '2025-09-10', raw_data: { contratante: '158366' } },
+      { id: 'h3', contrato_api_id: 'c1', situacao: 'Pago', valor_liquido: 105, valor_bruto: 105, data_emissao: '2025-10-10', raw_data: { contratante: '158366' } },
+      { id: 'h4', contrato_api_id: 'c1', situacao: 'Pago', valor_liquido: 1000, valor_bruto: 1000, data_emissao: '2025-11-10', raw_data: { contratante: '158366' } },
+      { id: 'current', contrato_api_id: 'c1', situacao: 'Pago', valor_liquido: 80, valor_bruto: 80, data_emissao: '2026-08-02', raw_data: { contratante: '158366' } },
+    ];
+
+    const [withCurrentNote] = buildContractProjectionBullets(
+      [{ id: 'c1', numero: '001/2026', fornecedor_nome: 'Fornecedor A', objeto: 'Servico A', valor_global: 10000 }] as never,
+      faturas as never,
+      [{ id: 'e1', contrato_api_id: 'c1', numero: '2026NE000001', valor_empenhado: 5000, valor_a_liquidar: 5000 }] as never,
+      ['c1'],
+      {
+        startDate: new Date('2025-08-01T00:00:00Z'),
+        endDate: new Date('2026-12-31T00:00:00Z'),
+        today: new Date('2026-08-04T00:00:00Z'),
+        projectionTargetMonths: 17,
+      },
+    );
+
+    expect(withCurrentNote.liquidado).toBe(1395);
+    expect(withCurrentNote.mediaNota).toBeCloseTo(105, 5);
+    expect(withCurrentNote.notasTotais).toBe(4);
+    expect(withCurrentNote.notasUtilizadas).toBe(3);
+    expect(withCurrentNote.notasDesconsideradas).toBe(1);
+    expect(withCurrentNote.mesAtualTemNota).toBe(true);
+    expect(withCurrentNote.mesesRestantes).toBe(4);
+    expect(withCurrentNote.projetado).toBe(1815);
+  });
+
+  it('reserva o mes atual quando ainda nao existe nota emitida', () => {
+    const [bullet] = buildContractProjectionBullets(
+      [{ id: 'c1', numero: '001/2026', fornecedor_nome: 'Fornecedor A', objeto: 'Servico A', valor_global: 10000 }] as never,
+      [
+        { id: 'h1', contrato_api_id: 'c1', situacao: 'Pago', valor_liquido: 100, valor_bruto: 100, data_emissao: '2025-08-10', raw_data: { contratante: '158366' } },
+        { id: 'h2', contrato_api_id: 'c1', situacao: 'Pago', valor_liquido: 110, valor_bruto: 110, data_emissao: '2025-09-10', raw_data: { contratante: '158366' } },
+        { id: 'h3', contrato_api_id: 'c1', situacao: 'Pago', valor_liquido: 105, valor_bruto: 105, data_emissao: '2025-10-10', raw_data: { contratante: '158366' } },
+        { id: 'h4', contrato_api_id: 'c1', situacao: 'Pago', valor_liquido: 1000, valor_bruto: 1000, data_emissao: '2025-11-10', raw_data: { contratante: '158366' } },
+      ] as never,
+      [{ id: 'e1', contrato_api_id: 'c1', numero: '2026NE000001', valor_empenhado: 5000, valor_a_liquidar: 5000 }] as never,
+      ['c1'],
+      {
+        startDate: new Date('2025-08-01T00:00:00Z'),
+        endDate: new Date('2026-12-31T00:00:00Z'),
+        today: new Date('2026-08-04T00:00:00Z'),
+        projectionTargetMonths: 17,
+      },
+    );
+
+    expect(bullet.mesAtualTemNota).toBe(false);
+    expect(bullet.mesesRestantes).toBe(5);
+    expect(bullet.liquidado).toBe(1315);
+    expect(bullet.projetado).toBe(1840);
+  });
   it('inicia sem nenhum contrato selecionado por padrao', async () => {
     const currentYear = new Date().getFullYear();
     contratosApiAtivosQueryData = [1, 2, 3, 4, 5, 6].map((index) => ({

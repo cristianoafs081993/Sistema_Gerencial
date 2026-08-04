@@ -32,7 +32,6 @@ vi.mock('@/services/requisicoesCompra', () => ({
   requisicoesCompraService: {
     listRecentRequisicoes: vi.fn(),
     listPermissions: vi.fn(),
-    getReviewItemReservations: vi.fn(),
     getRequisicaoById: vi.fn(),
     saveRequisicao: vi.fn(),
   },
@@ -127,10 +126,6 @@ describe('RequisicaoCompraPage', () => {
     mockedService.listRecentRequisicoes.mockResolvedValue([]);
     mockedService.listPermissions.mockResolvedValue([]);
     mockedService.saveRequisicao.mockResolvedValue('req-1');
-    mockedService.getReviewItemReservations.mockResolvedValue({});
-    mockedContratosApiService.getLiquidacoesPublicasPorEmpenho.mockResolvedValue([]);
-    mockedTransparenciaService.getItensEmpenhoPortal.mockResolvedValue([]);
-    mockedService.getReviewItemReservations.mockResolvedValue({});
     mockedContratosApiService.getLiquidacoesPublicasPorEmpenho.mockResolvedValue([]);
     mockedTransparenciaService.getItensEmpenhoPortal.mockResolvedValue([]);
   });
@@ -316,7 +311,7 @@ describe('RequisicaoCompraPage', () => {
     expect(await screen.findByText(/2026NE000012/)).toBeInTheDocument();
   });
 
-  it('exibe combobox pesquisavel com numero, favorecido e descricao dos empenhos', async () => {
+  it('usa filtro separado de favorecido e remove processo e contrato do formulario', async () => {
     mockedUseData.mockReturnValue({
       empenhos: [
         {
@@ -351,13 +346,19 @@ describe('RequisicaoCompraPage', () => {
     renderPage();
 
     fireEvent.click(await screen.findByRole('button', { name: /Nova Requisi.*Compra/i }));
+
+    expect(screen.queryByLabelText(/Filtrar por favorecido/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Número do Processo/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Contrato Permitido')).not.toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('combobox', { name: /Buscar e selecionar empenhos/i }));
 
-    expect(await screen.findByPlaceholderText(/Filtrar por n.*favorecido/i)).toBeInTheDocument();
-    const firstEmpenhoOption = await screen.findByText(/2026NE000011/);
-    expect(firstEmpenhoOption).toBeVisible();
-    expect(screen.getByText(/Fornecedor Norte/)).toBeInTheDocument();
-    expect(screen.getByText(/Material de expediente/)).toBeInTheDocument();
+    const empenhoSearchInput = await screen.findByPlaceholderText(/Buscar por .*favorecido/i);
+    expect(empenhoSearchInput).toBeInTheDocument();
+    fireEvent.change(empenhoSearchInput, { target: { value: 'fornecedor sul' } });
+    expect(screen.queryByText(/2026NE000011/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Fornecedor Sul/)).toBeInTheDocument();
+    expect(screen.getByText(/Servico de manutencao/)).toBeInTheDocument();
     expect(screen.getByText(/2026NE000012/)).toBeInTheDocument();
   });
 
@@ -445,7 +446,6 @@ describe('RequisicaoCompraPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Editar requisição REQ-2026-0001/i }));
 
     expect(await screen.findByDisplayValue('ARROZ BENEFICIADO TIPO 1')).toBeDisabled();
-    expect(screen.getByText(/Itens do empenho 2026NE000083/)).toBeInTheDocument();
     expect(screen.getByText('Subitem da NE')).toBeInTheDocument();
     expect(screen.getByText('30 - MATERIAL DE CONSUMO')).toBeInTheDocument();
     expect(await screen.findByText(/R\$\s*200,00/)).toBeInTheDocument();

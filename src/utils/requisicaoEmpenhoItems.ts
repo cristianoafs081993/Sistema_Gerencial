@@ -10,7 +10,6 @@ export type EmpenhoItemBalance = {
   item: PortalTransparenciaItemEmpenho;
   valorAtual: number;
   liquidadoCalculado: number;
-  reservado: number;
   saldoItem: number;
   liquidacoes: ContratoApiPublicLiquidacaoRow[];
 };
@@ -30,10 +29,7 @@ const getItemUnitPrice = (item: PortalTransparenciaItemEmpenho) => {
   return Number(historyUnitPrice || item.valorAtual || 0);
 };
 
-const getItemQuantity = (item: PortalTransparenciaItemEmpenho) => {
-  const historyQuantity = item.historico.find((row) => Number(row.quantidade) > 0)?.quantidade;
-  return Number(historyQuantity || 1);
-};
+const getItemQuantity = (_item: PortalTransparenciaItemEmpenho) => 0;
 
 export const buildEmpenhoItemSourceKey = (numeroEmpenho: string, item: PortalTransparenciaItemEmpenho) =>
   [
@@ -46,7 +42,6 @@ export function buildEmpenhoItemBalances(
   numeroEmpenho: string,
   itens: PortalTransparenciaItemEmpenho[],
   liquidacoes: ContratoApiPublicLiquidacaoRow[] = [],
-  reservasPorItem: Record<string, number> = {},
 ): EmpenhoItemBalance[] {
   const itemsBySubelemento = itens.reduce((map, item) => {
     const key = normalizeText(item.codigoSubelemento || item.descricaoSubelemento);
@@ -94,15 +89,13 @@ export function buildEmpenhoItemBalances(
     const sourceItemKey = buildEmpenhoItemSourceKey(numeroEmpenho, item);
     const valorAtual = Number(item.valorAtual || 0);
     const liquidadoCalculado = allocatedValues.get(sourceItemKey) ?? 0;
-    const reservado = Number(reservasPorItem[sourceItemKey] ?? 0) || 0;
 
     return {
       sourceItemKey,
       item,
       valorAtual,
       liquidadoCalculado,
-      reservado,
-      saldoItem: Math.max(0, valorAtual - liquidadoCalculado - reservado),
+      saldoItem: Math.max(0, valorAtual - liquidadoCalculado),
       liquidacoes: allocatedLiquidacoes.get(sourceItemKey) ?? [],
     };
   });
@@ -112,8 +105,8 @@ export function buildRequisicaoItemsFromEmpenho(
   numeroEmpenho: string,
   balances: EmpenhoItemBalance[],
 ): RequisicaoFormItem[] {
-  return balances.map(({ item, sourceItemKey, valorAtual, liquidadoCalculado, reservado, saldoItem, liquidacoes }, index) => ({
-    description: item.descricao || item.descricaoSubelemento || `Subitem ${item.sequencial || index + 1}`,
+  return balances.map(({ item, sourceItemKey, valorAtual, liquidadoCalculado, saldoItem, liquidacoes }, index) => ({
+    description: (item.descricao || item.descricaoSubelemento || `Subitem ${item.sequencial || index + 1}`).replace(/^item\s+compra\s*:\s*/i, '').trim(),
     quantity: getItemQuantity(item),
     unit: 'UN',
     unitPrice: getItemUnitPrice(item),
@@ -129,7 +122,6 @@ export function buildRequisicaoItemsFromEmpenho(
       descricaoSubelemento: item.descricaoSubelemento,
       valorAtual,
       liquidadoCalculado,
-      reservado,
       saldoItem,
       liquidacoes: liquidacoes.map((liquidacao) => ({
         contratoNumero: liquidacao.contrato_numero,
@@ -151,6 +143,11 @@ export function getRequisicaoItemAvailableBalance(
   if (!item.sourceItemKey) return null;
   const freshBalance = balances.find((balance) => balance.sourceItemKey === item.sourceItemKey);
   if (freshBalance) return freshBalance.saldoItem;
+  const valorAtual = item.sourceSnapshot?.valorAtual;
+  const liquidadoCalculado = item.sourceSnapshot?.liquidadoCalculado;
+  if (typeof valorAtual === 'number' && typeof liquidadoCalculado === 'number') {
+    return Math.max(0, valorAtual - liquidadoCalculado);
+  }
   const snapshotValue = item.sourceSnapshot?.saldoItem;
   return typeof snapshotValue === 'number' ? snapshotValue : null;
 }

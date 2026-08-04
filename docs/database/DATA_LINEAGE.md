@@ -90,7 +90,7 @@ Mostrar a linhagem operacional dos dados de forma curta:
     - `requisicao_compra_empenhos`
     - `requisicao_compra_itens`
     - `terceirizado_permissions`
-  - observacao: a requisicao pode vincular multiplas NEs em `requisicao_compra_empenhos`; cada item carrega seu proprio `empenho_id`. Os campos legados `requisicoes_compra.empenho_id/empenho_numero` continuam preenchidos com a primeira NE para compatibilidade. Em `review`/`approved`, a RPC valida permissao de terceirizado e saldo separadamente por NE, abatendo reservas em revisao do mesmo empenho e subitem.
+  - observacao: a requisicao pode vincular multiplas NEs em `requisicao_compra_empenhos`; cada item carrega seu proprio `empenho_id`. Os campos legados `requisicoes_compra.empenho_id/empenho_numero` continuam preenchidos com a primeira NE para compatibilidade. Em `review`/`approved`, a RPC valida permissao de terceirizado e saldo oficial separadamente por NE, sem abater outras requisicoes abertas.
 
 ### Contratos API Comprasnet
 

@@ -127,6 +127,7 @@ const buildPrompt = (processo: Record<string, unknown>) => [
   'Voce e um auditor de liquidacao de despesa publica.',
   'Compare os prints do SIAFI com os dados do processo abaixo e identifique erros, inconsistencias, ausencia de campos e sinais de preenchimento indevido.',
   'Se alguma informacao nao estiver visivel nos prints, trate como alerta e nao invente valores.',
+  'Quando o processo tiver mais de uma nota fiscal em notasFiscais, considere todas elas na comparacao e nunca use somente notaFiscal.',
   'Responda somente em JSON valido, sem markdown, com o formato:',
   '{"statusGeral":"ok|warning|error","resumo":"...","recomendacao":"...","itens":[{"campo":"...","status":"ok|warning|error","esperado":"...","encontrado":"...","observacao":"..."}]}',
   `Dados do processo: ${JSON.stringify(processo, null, 2)}`,

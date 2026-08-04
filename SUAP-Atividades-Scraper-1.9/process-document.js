@@ -29,20 +29,19 @@
       const normalized = number.toUpperCase();
       if (!seen.has(normalized)) { seen.add(normalized); numbers.push(normalized); }
     };
-    const visit = (value, allowFallback = true) => {
+    const visit = (value) => {
       if (value == null) return;
-      if (Array.isArray(value)) { value.forEach((item) => visit(item, allowFallback)); return; }
+      if (Array.isArray(value)) { value.forEach((item) => visit(item)); return; }
       if (typeof value === 'object') {
         if (visited.has(value)) return; visited.add(value);
         const record = value;
-        [record.numero, record.numeroEmpenho, record.numero_empenho, record.empenho, record.notaEmpenho, record.nota_empenho, record.ne, record.numeroNE, record.numero_ne, record.texto, record.value].forEach((candidate) => visit(candidate, false));
+        [record.numero, record.numeroEmpenho, record.numero_empenho, record.empenho, record.notaEmpenho, record.nota_empenho, record.ne, record.numeroNE, record.numero_ne, record.texto, record.value].forEach((candidate) => visit(candidate));
         return;
       }
       const raw = cleanText(value);
       if (!raw || raw === '[object Object]') return;
       const matches = Array.from(raw.matchAll(/(\d{4})\s*NE\s*(\d{6})/gi), (match) => `${match[1]}NE${match[2]}`);
-      if (matches.length) { matches.forEach(add); return; }
-      if (allowFallback) add(raw);
+      matches.forEach(add);
     };
     visit(values);
     return numbers;
@@ -75,6 +74,16 @@
       if (!storage?.remove) return resolve();
       storage.remove(key, resolve);
     });
+  }
+  function isExtensionContextInvalidated(error) {
+    return String(error?.message || error || '').toLowerCase().includes('extension context invalidated');
+  }
+  function formatAuthError(error) {
+    if (isExtensionContextInvalidated(error)) return 'A extens\u00e3o foi atualizada. Recarregue a p\u00e1gina do SUAP e tente novamente.';
+    return error instanceof Error ? error.message : 'Falha na autenticacao.';
+  }
+  function getInvalidCredentialsMessage() {
+    return 'E-mail ou senha do SIAGES inv\u00e1lidos. Confirme o acesso no SIAGES ou redefina a senha.';
   }
   async function getExtensionSession() {
     const storedSession = await storageGet('local', SESSION_KEY, null);
@@ -245,12 +254,21 @@
       appendCopyRow(section, 'Processo', process?.numProcesso || fallback.processNumber, true);
       appendCopyRow(section, 'SUAP ID', process?.suapId || fallback.suapId, true);
       appendCopyRow(section, 'Caixa', process?.caixa);
-      appendCopyRow(section, 'Status', process?.status);
-      appendCopyRow(section, 'Atualizado', process?.updatedAt ? formatDate(process.updatedAt) : '');
     });
     if (!process) return;
     const full = process.dadosCompletos || {}; const bank = full.dados_bancarios || {}; const taxes = full.retencoes_tributarias || {};
-    const invoice = (full.notas_fiscais || [])[0] || {}; const workflow = full.workflow || {};
+    const invoices = Array.isArray(full.notas_fiscais)
+      ? full.notas_fiscais
+        .filter((invoice) => invoice && typeof invoice === 'object')
+        .map((invoice) => ({
+          numero: cleanText(invoice.numero),
+          data_emissao: cleanText(invoice.data_emissao),
+          valor: cleanText(invoice.valor),
+        }))
+        .filter((invoice) => invoice.numero || invoice.data_emissao || invoice.valor)
+      : [];
+    const hasMultipleInvoices = invoices.length > 1;
+    const workflow = full.workflow || {};
     appendSection(container, 'Beneficiário', (section) => {
       appendCopyRow(section, 'Nome', process.beneficiario);
       appendCopyRow(section, 'CPF/CNPJ', process.cpfCnpj, true);
@@ -260,8 +278,12 @@
       appendCopyRow(section, 'Valor', full.val_nf);
       appendCopyRow(section, 'NS', workflow.nsNumero || full.ns_numero, true);
       appendCopyRow(section, 'Contrato', process.contrato || full.contrato_numero, true);
-      appendCopyRow(section, 'Nota fiscal', invoice.numero, true);
-      appendCopyRow(section, 'Emissão', invoice.data_emissao);
+      invoices.forEach((invoice, index) => {
+        const suffix = invoices.length > 1 ? ` ${index + 1}` : '';
+        appendCopyRow(section, `Nota fiscal${suffix}`, invoice.numero, true);
+        appendCopyRow(section, `Emissão${suffix}`, invoice.data_emissao);
+        appendCopyRow(section, `Valor NF${suffix}`, invoice.valor);
+      });
     });
     appendSection(container, 'Dados bancários', (section) => {
       appendCopyRow(section, 'Banco', bank.banco);
@@ -269,9 +291,11 @@
       appendCopyRow(section, 'Conta', bank.conta, true);
     });
     const empenhos = normalizeEmpenhos(full.empenhos);
-    appendSection(container, 'Retenções e empenhos', (section) => {
-      if (taxes.optante_simples_nacional) appendCopyRow(section, 'Regime', 'Optante pelo Simples Nacional');
-      [['ISS', taxes.iss], ['INSS', taxes.inss], ['IR', taxes.ir], ['CSLL', taxes.csll], ['COFINS', taxes.cofins], ['PIS/PASEP', taxes.pis_pasep]].forEach(([label, value]) => appendCopyRow(section, label, value));
+    appendSection(container, hasMultipleInvoices ? 'Empenhos' : 'Retenções e empenhos', (section) => {
+      if (!hasMultipleInvoices) {
+        if (taxes.optante_simples_nacional) appendCopyRow(section, 'Regime', 'Optante pelo Simples Nacional');
+        [['ISS', taxes.iss], ['INSS', taxes.inss], ['IR', taxes.ir], ['CSLL', taxes.csll], ['COFINS', taxes.cofins], ['PIS/PASEP', taxes.pis_pasep]].forEach(([label, value]) => appendCopyRow(section, label, value));
+      }
       empenhos.forEach((value, index) => appendCopyRow(section, `Empenho ${index + 1}`, value, true));
       if (empenhos.length > 1) appendCopyRow(section, 'Todos', empenhos.join(', '), true);
     });
@@ -314,22 +338,28 @@
     const colors = getThemeColors(); const finance = ensureFinancePanel(); finance.innerHTML = '';
     const wrapper = createElement('section', 'suape-section'); Object.assign(wrapper.style, { background: colors.panelBg, color: colors.panelText, borderColor: colors.panelBorder });
     const header = document.createElement('div'); Object.assign(header.style, { padding: '12px', borderBottom: `1px solid ${colors.metricBorder}` });
-    const title = createElement('strong', '', 'SIAGES - Empenhos do beneficiário'); Object.assign(title.style, { display: 'block', color: colors.heading, fontSize: '14px' });
-    const beneficiary = createElement('span', '', summary.beneficiario?.nome || summary.beneficiario?.documento || 'Beneficiário identificado'); Object.assign(beneficiary.style, { display: 'block', marginTop: '4px', color: colors.panelText }); header.append(title, beneficiary);
+    const beneficiary = createElement('span', '', summary.beneficiario?.nome || summary.beneficiario?.documento || 'Beneficiário identificado'); Object.assign(beneficiary.style, { display: 'block', marginTop: '4px', color: colors.panelText }); header.append(beneficiary);
     if (summary.contrato?.numero) { const chip = createElement('span', '', `Filtrado pelo contrato ${summary.contrato.numero}`); Object.assign(chip.style, { display: 'inline-block', marginTop: '7px', padding: '3px 7px', borderRadius: '999px', background: colors.chipBg, color: colors.chipText, fontSize: '11px', fontWeight: '700' }); header.appendChild(chip); }
     const totals = document.createElement('div'); Object.assign(totals.style, { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: '8px', padding: '10px 12px' }); totals.append(renderMetric('Empenhado', summary.totais?.empenhado, colors), renderMetric('Saldo', summary.totais?.saldo, colors));
     const list = document.createElement('div'); Object.assign(list.style, { padding: '0 12px 12px', display: 'grid', gap: '8px' });
     (summary.empenhos || []).slice(0, 6).forEach((commitment) => {
       const item = document.createElement('article'); Object.assign(item.style, { border: `1px solid ${colors.metricBorder}`, borderRadius: '9px', padding: '9px', background: colors.itemBg });
-      const heading = document.createElement('div'); Object.assign(heading.style, { display: 'flex', justifyContent: 'space-between', gap: '8px' });
-      const number = createElement('strong', '', commitment.numero || 'Empenho sem número'); const balance = createElement('span', '', `Saldo ${formatCurrency(commitment.saldo)}`); Object.assign(balance.style, { color: colors.accent, fontWeight: '700' }); heading.append(number, balance); item.appendChild(heading);
-      const values = createElement('div', '', `Empenhado ${formatCurrency(commitment.empenhado)} · Saldo ${formatCurrency(commitment.saldo)}`); Object.assign(values.style, { marginTop: '5px', color: colors.mutedText, fontSize: '11px' }); item.appendChild(values);
+      const number = createElement('strong', '', commitment.numero || 'Empenho sem \u00famero');
+      const balance = createElement('span', '', `Saldo ${formatCurrency(commitment.saldo)}`); Object.assign(balance.style, { color: colors.accent, fontWeight: '700' });
+      const toggle = document.createElement('button'); toggle.type = 'button'; toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-label', `Exibir liquida\u00e7\u00f5es de ${commitment.numero || 'empenho'}`);
+      Object.assign(toggle.style, { display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '8px', border: '0', padding: '0', background: 'transparent', color: 'inherit', cursor: 'pointer', textAlign: 'left' }); toggle.append(number, balance); item.appendChild(toggle);
+      const values = createElement('div', '', `Empenhado ${formatCurrency(commitment.empenhado)} \u00b7 Saldo ${formatCurrency(commitment.saldo)}`); Object.assign(values.style, { marginTop: '5px', color: colors.mutedText, fontSize: '11px' }); item.appendChild(values);
       if ((commitment.liquidacoes || []).length) {
-        const liquidations = document.createElement('div'); Object.assign(liquidations.style, { marginTop: '9px', display: 'grid', gap: '5px' }); liquidations.appendChild(createElement('strong', '', 'Liquidações em cache'));
+        const liquidations = document.createElement('div'); liquidations.className = 'suape-liquidations'; Object.assign(liquidations.style, { marginTop: '9px', display: 'none', gap: '5px' }); liquidations.setAttribute('aria-hidden', 'true'); liquidations.appendChild(createElement('strong', '', 'Liquida\u00e7\u00f5es em cache'));
         commitment.liquidacoes.forEach((liquidation) => {
           const row = document.createElement('div'); Object.assign(row.style, { border: `1px solid ${colors.metricBorder}`, borderRadius: '7px', padding: '7px', background: colors.metricBg, fontSize: '11px' });
-          row.append(createElement('strong', '', liquidation.numero || 'NF sem número'), createElement('div', '', [formatDate(liquidation.data), liquidation.situacao].filter(Boolean).join(' - ')), createElement('div', '', liquidation.valor != null ? formatCurrency(liquidation.valor) : '-')); liquidations.appendChild(row);
-        }); item.appendChild(liquidations);
+          row.append(createElement('strong', '', liquidation.numero || 'NF sem \u00famero'), createElement('div', '', [formatDate(liquidation.data), liquidation.situacao].filter(Boolean).join(' - ')), createElement('div', '', liquidation.valor != null ? formatCurrency(liquidation.valor) : '-')); liquidations.appendChild(row);
+        });
+        item.appendChild(liquidations);
+        toggle.addEventListener('click', () => {
+          const expanded = toggle.getAttribute('aria-expanded') === 'true';
+          toggle.setAttribute('aria-expanded', String(!expanded)); liquidations.setAttribute('aria-hidden', String(expanded)); liquidations.style.display = expanded ? 'none' : 'grid';
+        });
       }
       list.appendChild(item);
     });
@@ -424,13 +454,14 @@
       const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, { method: 'POST', headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        if (response.status === 401) throw new Error('E-mail ou senha do SIAGES inválidos. Confirme o acesso no SIAGES ou redefina a senha.');
+        const code = String(payload?.error || payload?.code || '').toLowerCase();
+        if (response.status === 400 || response.status === 401 || code === 'invalid_grant' || code === 'invalid_credentials') throw new Error(getInvalidCredentialsMessage());
         throw new Error(`Não foi possível autenticar no SIAGES (HTTP ${response.status}).`);
       }
       if (!payload.access_token || !payload.refresh_token) throw new Error('O SIAGES não devolveu uma sessão válida.');
       await storageSet('local', { [SESSION_KEY]: { accessToken: payload.access_token, refreshToken: payload.refresh_token, expiresAt: Math.floor(Date.now() / 1000) + Number(payload.expires_in || 3600) } });
       if (passwordInput) passwordInput.value = ''; message.dataset.state = 'success'; message.textContent = 'Sessão ativa.'; restartBridge();
-    } catch (error) { message.dataset.state = 'error'; message.textContent = error instanceof Error ? error.message : 'Falha na autenticação.'; } finally { button.disabled = false; }
+    } catch (error) { message.dataset.state = 'error'; message.textContent = formatAuthError(error); } finally { button.disabled = false; }
   }
   async function signOut(event) { const form = event.currentTarget.closest('form'); await storageRemove('local', SESSION_KEY); const message = form.querySelector('[data-auth-message]'); message.dataset.state = ''; message.textContent = 'Sessão encerrada.'; }
 

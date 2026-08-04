@@ -228,6 +228,7 @@ export const suapProcessosService = {
           assunto: params.processo.assunto,
           contrato: params.processo.contrato || params.processo.dadosCompletos?.contrato_numero,
           notaFiscal: params.processo.dadosCompletos?.notas_fiscais?.[0],
+          notasFiscais: params.processo.dadosCompletos?.notas_fiscais || [],
           valorLiquido: params.processo.dadosCompletos?.val_nf,
           nsNumero: params.nsNumero,
           dadosBancarios: params.processo.dadosCompletos?.dados_bancarios,

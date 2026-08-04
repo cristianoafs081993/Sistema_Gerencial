@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Check, Info, TrendingUp, FileText } from 'lucide-react';
+import { Check, Info, TrendingUp } from 'lucide-react';
 import {
   CartesianGrid,
   ComposedChart,
@@ -153,9 +153,9 @@ function ContractProjectionTraceHover({ item, targetMonths = 12 }: { item: Contr
         <div className="border-b border-border-default/60 bg-surface-subtle/60 px-4 py-3">
           <p className="line-clamp-1 font-ui text-sm font-semibold text-text-primary">{item.label}</p>
           <p className="mt-1 font-ui text-xs text-text-muted">
-            Projecao = liquidado / {item.mesesConsiderados || 1} mes(es) observado(s) x {targetMonths}
+            Projecao = liquidado atual + media por nota ({formatCurrency(item.mediaNota || 0)}) x {item.mesesRestantes || 0} mes(es) restante(s), ate o horizonte de {targetMonths} mes(es)
             {item.isCapped && !item.isRenewalAllowed && " (Limitada ao teto do contrato)"}
-            {item.isRenewalAllowed && " (Simulação de Renovação)"}.
+            {item.isRenewalAllowed && " (Simulacao de Renovacao)"}.
           </p>
         </div>
 
@@ -173,6 +173,16 @@ function ContractProjectionTraceHover({ item, targetMonths = 12 }: { item: Contr
           ))}
         </div>
 
+        <div className="border-b border-border-default/60 px-4 py-3">
+          <div className="grid gap-2 text-[11px] text-text-muted sm:grid-cols-2">
+            <span>Notas historicas: {item.notasUtilizadas || 0} usadas de {item.notasTotais || 0}</span>
+            <span>Desconsideradas: {item.notasDesconsideradas || 0}</span>
+            <span>Meses historicos: {item.mesesHistorico || item.mesesConsiderados || 0}</span>
+            <span>Mes atual: {item.mesAtualTemNota ? 'nota encontrada; mes encerrado' : 'sem nota; mes reservado'}</span>
+            <span>Ultima emissao: {item.ultimaEmissao ? formatTraceDate(item.ultimaEmissao) : 'nao informada'}</span>
+            <span>Ultima competencia: {item.ultimaCompetencia || 'nao informada'}</span>
+          </div>
+        </div>
         <div className="max-h-[420px] overflow-y-auto px-4 py-3">
           <div className="space-y-4">
             <section>
@@ -308,7 +318,7 @@ export function DashboardContractExecutionTab({
     return selectedOpt ? selectedOpt.label.replace(' (Padrão)', '') : '';
   }, [projectionOptions, projectionTargetMonths]);
 
-  const [heatmapFilter, setHeatmapFilter] = useState<'all' | 'continuos_exclusiva' | 'continuos_geral' | 'obras' | 'outros'>('all');
+  const [heatmapFilter, setHeatmapFilter] = useState<'all' | 'continuos_exclusiva' | 'continuos_geral' | 'obras' | 'outros'>('continuos_exclusiva');
 
   const isMaoDeObraExclusiva = (objeto: string | null, categoria: string | null) => {
     if (categoria === 'Mão de Obra') return true;
@@ -367,24 +377,6 @@ const totalB = b.liquidado + b.saldoEmpenhos;
 
   return (
     <div className="space-y-6">
-      {/* Banner de Introdução da Aba */}
-      <div className="bg-white border border-[#E6ECF4] rounded-[18px] p-5 shadow-soft flex flex-col md:flex-row md:items-start justify-between gap-4">
-        <div className="space-y-1.5 max-w-4xl">
-          <h4 className="text-sm font-bold text-sebrae-navy flex items-center gap-2">
-            <FileText className="w-5 h-5 text-sebrae-blue" />
-            <span>Painel de Monitoramento de Cobertura Orçamentária</span>
-          </h4>
-          <p className="text-xs text-muted-gray leading-relaxed">
-            Este painel interativo exibe o percentual de cobertura dos empenhos vigentes (Liquidado + Saldo) frente à provável necessidade anual projetada para todos os contratos ativos. Os blocos de calor no heatmap atualizam-se dinamicamente ao simular renovações ou ajustar a projeção temporal.
-          </p>
-        </div>
-
-        <span className="text-[10px] bg-emerald-50 text-emerald-800 font-bold font-sans px-2.5 py-1 rounded-lg flex items-center gap-1.5 w-fit border border-emerald-200/50 shadow-xs h-fit shrink-0">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-          Apurador em Tempo Real
-        </span>
-      </div>
-
       {/* Heatmap de Cobertura de Empenhos (Seletor de Contratos) */}
       <Card className="border border-border-default/80 bg-white p-5 rounded-[18px] shadow-soft">
         <CardContent className="p-0">

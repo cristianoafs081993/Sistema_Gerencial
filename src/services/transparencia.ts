@@ -215,6 +215,7 @@ const getItensEmpenhoPortalDireto = async (
 const getCachedItensEmpenhoPortal = async (numeroEmpenho: string): Promise<{
     available: boolean;
     hasStatus?: boolean;
+    status?: PortalItensCacheStatus['status'] | 'missing';
     isFresh?: boolean;
     rowsCount?: number;
     rows?: PortalTransparenciaItemEmpenho[];
@@ -233,7 +234,7 @@ const getCachedItensEmpenhoPortal = async (numeroEmpenho: string): Promise<{
         throw statusError;
     }
 
-    if (!status) return { available: true, hasStatus: false, isFresh: false, rowsCount: 0, rows: [] };
+    if (!status) return { available: true, hasStatus: false, status: 'missing', isFresh: false, rowsCount: 0, rows: [] };
 
     const typedStatus = status as PortalItensCacheStatus;
     const isFresh = new Date(typedStatus.expires_at).getTime() > Date.now();
@@ -241,6 +242,7 @@ const getCachedItensEmpenhoPortal = async (numeroEmpenho: string): Promise<{
         return {
             available: true,
             hasStatus: true,
+            status: typedStatus.status,
             isFresh,
             rowsCount: Number(typedStatus.rows_count ?? 0),
             rows: [],
@@ -265,6 +267,7 @@ const getCachedItensEmpenhoPortal = async (numeroEmpenho: string): Promise<{
     return {
         available: true,
         hasStatus: true,
+        status: typedStatus.status,
         isFresh: isFresh && !hasInconsistentRows,
         rowsCount: mappedRows.length > 0 ? mappedRows.length : Number(typedStatus.rows_count ?? 0),
         rows: mappedRows,
@@ -309,14 +312,16 @@ const getItensCacheRowsViaFunction = async (
 };
 
 const triggerItensCacheRefresh = (numeroEmpenho: string, source: string) => {
-    void supabase.functions
-        .invoke('refresh-portal-transparencia-itens-cache', {
+    void Promise.resolve(
+        supabase.functions.invoke('refresh-portal-transparencia-itens-cache', {
             body: {
                 empenhoNumero: numeroEmpenho,
                 source,
             },
-        })
-        .then(({ error }) => {
+        }),
+    )
+        .then((result) => {
+            const error = result?.error;
             if (error) {
                 console.warn('Portal da Transparencia: falha ao acionar refresh do cache de subitens', error);
             }
@@ -365,10 +370,20 @@ export const transparenciaService = {
         try {
             const cached = await getCachedItensEmpenhoPortal(numeroEmpenho);
             if (cached.available) {
-                if (cached.isFresh) return cached.rows ?? [];
+                const cachedRows = cached.rows ?? [];
+                if (cached.isFresh && cached.status === 'not_found') return [];
+                if (cached.isFresh && cached.status !== 'error' && cachedRows.length > 0) return cachedRows;
 
-                triggerItensCacheRefresh(numeroEmpenho, cached.hasStatus ? 'frontend-cache-stale' : 'frontend-cache-miss');
-                return cached.rows ?? [];
+                if (cachedRows.length > 0) {
+                    triggerItensCacheRefresh(numeroEmpenho, 'frontend-cache-stale');
+                    return cachedRows;
+                }
+
+                const refreshed = await getItensCacheRowsViaFunction(numeroEmpenho, {
+                    source: cached.hasStatus ? 'frontend-cache-repair' : 'frontend-cache-miss',
+                });
+                if (refreshed?.status === 'found' && refreshed.rows.length > 0) return refreshed.rows;
+                if (refreshed?.status === 'not_found') return [];
             }
         } catch (error) {
             console.warn('Portal da Transparencia: falha ao consultar cache de subitens, tentando consulta direta.', error);

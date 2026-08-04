@@ -96,7 +96,7 @@ A migration `20260716103000` adiciona `public.default_org_id()` como default de 
 - `contratos_api_sync_runs`
 - `requisicoes_compra`
 - `requisicao_compra_empenhos` (relacao N:N entre requisicao e NEs selecionadas)
-- `requisicao_compra_itens` (inclui origem opcional do item da NE e `empenho_id` para reservas por subitem e por NE)
+- `requisicao_compra_itens` (inclui origem opcional do item da NE e `empenho_id` para validacao do saldo por subitem e por NE)
 - `terceirizados`
 - `terceirizado_permissions`
 

@@ -461,7 +461,7 @@ Campos-chave:
 
 Regras:
 - `save_requisicao_compra` salva cabecalho, empenhos vinculados e itens na mesma transacao.
-- Requisicoes em `review` ou `approved` exigem ao menos uma NE e exigem que cada item tenha `empenho_id`. O saldo e validado separadamente por NE; requisicoes em `review` da mesma NE entram como valor reservado. Para terceirizados, a RPC exige permissao explicita para cada `empenho_id`; permissao de contrato nao autoriza automaticamente as NEs vinculadas ao contrato.
+- Requisicoes em `review` ou `approved` exigem ao menos uma NE e exigem que cada item tenha `empenho_id`. O saldo oficial e validado separadamente por NE para a propria requisicao; requisicoes abertas da mesma NE nao entram como reserva. Para terceirizados, a RPC exige permissao explicita para cada `empenho_id`; permissao de contrato nao autoriza automaticamente as NEs vinculadas ao contrato.
 - `fn_empenho_saldo_disponivel` calcula saldo de exercicio com dados SIAFI locais e prioriza `saldo_rap_oficial` para RAP.
 
 ### `requisicao_compra_empenhos`
@@ -1356,3 +1356,5 @@ A migration 20260706110000 cria cadastros compartilhados e o razão imutável de
 - post_stock_movement: RPC idempotente que valida entidade, depósito, bloqueio e saldo; saídas usam custo médio da origem.
 
 Consumido por src/services/inventory.ts e src/pages/Almoxarifado.tsx.
+
+- `quantity` aceita zero para rascunhos e impressao; valores negativos continuam invalidos na RPC `save_requisicao_compra`.
