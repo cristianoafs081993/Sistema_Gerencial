@@ -8,7 +8,18 @@ import {
 } from '@/lib/suapCloneAutomation';
 import { extensionFixturePath } from '@/test/extensionFixtures';
 
+type TestTinyEditor = {
+  initialized: boolean;
+  isHidden: () => boolean;
+  setContent: (content: string) => void;
+  fire: (event: string) => void;
+  save: () => void;
+  getBody: () => { isContentEditable: boolean };
+  getContent: () => string;
+};
+
 interface ExtensionTestWindow extends Window {
+  tinymce?: { activeEditor: TestTinyEditor | null; editors: TestTinyEditor[] };
   __SIAGES_SUAP_CLONE_TEST__?: boolean;
   __siagesSuapCloneAutomation?: {
     parsePayloadFromHash: (hash: string) => unknown;
@@ -108,6 +119,8 @@ describe('suap-atividades-extension clone-document.js', () => {
     const testWindow = window as ExtensionTestWindow;
     delete testWindow.__siagesSuapCloneAutomation;
     delete testWindow.__SIAGES_SUAP_CLONE_TEST__;
+    delete testWindow.tinymce;
+    window.history.replaceState(null, document.title, '/');
   });
 
   it('preenche #id_assunto, dispara input/change e guarda texto para a proxima tela', () => {
@@ -153,6 +166,25 @@ describe('suap-atividades-extension clone-document.js', () => {
     expect(clickSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('espera o botao Salvar quando a tela de clone ainda esta carregando', async () => {
+    vi.useFakeTimers();
+    const automation = loadContentScript();
+    document.body.innerHTML = '<input id="id_assunto">';
+    const clickSpy = vi.fn();
+    const runResult = automation.runCloneAutomation({ ...automationPayload, mode: 'save-after-confirmation' });
+
+    expect(runResult).toBe(true);
+    window.setTimeout(() => {
+      const saveButton = document.createElement('button');
+      saveButton.textContent = 'Salvar';
+      saveButton.addEventListener('click', clickSpy);
+      document.body.appendChild(saveButton);
+    }, 400);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('apos visualizar documento, abre o menu Editar e clica em Texto', async () => {
     const automation = loadContentScript();
     automation.storePendingAutomation(automationPayload, 'awaiting-document-view');
@@ -171,6 +203,33 @@ describe('suap-atividades-extension clone-document.js', () => {
     expect(events).toEqual(['editar', 'texto']);
   });
 
+  it('espera o botao Editar quando a pagina de visualizacao ainda esta carregando', async () => {
+    vi.useFakeTimers();
+    const automation = loadContentScript();
+    automation.storePendingAutomation(automationPayload, 'awaiting-document-view');
+    const events: string[] = [];
+    document.body.innerHTML = '<div id="menu"></div>';
+    const openPromise = automation.openTextEditorFromView();
+
+    window.setTimeout(() => {
+      const editButton = document.createElement('button');
+      editButton.textContent = 'Editar';
+      editButton.addEventListener('click', () => {
+        events.push('editar');
+        document.querySelector('#menu')!.innerHTML = '<a href="/documento_eletronico/editar_texto/1113677/">Texto</a>';
+        document.querySelector('a')?.addEventListener('click', (event) => {
+          event.preventDefault();
+          events.push('texto');
+        });
+      });
+      document.body.appendChild(editButton);
+    }, 400);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(openPromise).resolves.toBe(true);
+    expect(events).toEqual(['editar', 'texto']);
+  });
+
   it('preenche o textarea do editor de texto e limpa a automacao pendente', async () => {
     const automation = loadContentScript();
     automation.storePendingAutomation(automationPayload, 'opening-text-editor');
@@ -181,6 +240,36 @@ describe('suap-atividades-extension clone-document.js', () => {
     expect(document.querySelector<HTMLTextAreaElement>('#id_corpo')?.value).toContain('Conteudo gerado');
     expect(automation.loadPendingAutomation()).toBeNull();
     expect(document.getElementById('siages-suap-clone-notice')?.textContent).toContain('texto preenchido');
+  });
+
+  it('espera o TinyMCE inicializar e nao confirma a colagem pelo textarea oculto', async () => {
+    vi.useFakeTimers();
+    const automation = loadContentScript();
+    automation.storePendingAutomation(automationPayload, 'opening-text-editor');
+    document.body.innerHTML = '<textarea id="id_corpo" style="display:none"></textarea>';
+    let editorContent = '';
+    const editor: TestTinyEditor = {
+      initialized: true,
+      isHidden: () => false,
+      setContent: (content) => { editorContent = content; },
+      fire: vi.fn(),
+      save: vi.fn(),
+      getBody: () => ({ isContentEditable: true }),
+      getContent: () => editorContent,
+    };
+    const testWindow = window as ExtensionTestWindow;
+    testWindow.tinymce = { activeEditor: null, editors: [] };
+    const fillPromise = automation.fillTextEditorWhenReady();
+
+    window.setTimeout(() => {
+      testWindow.tinymce = { activeEditor: editor, editors: [editor] };
+    }, 250);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(fillPromise).resolves.toBe(true);
+    expect(editorContent).toContain('Conteudo gerado');
+    expect(document.querySelector<HTMLTextAreaElement>('#id_corpo')?.value).toBe('');
+    expect(automation.loadPendingAutomation()).toBeNull();
   });
 
   it('ignora payload invalido ou ausente', () => {

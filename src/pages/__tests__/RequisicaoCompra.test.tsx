@@ -54,6 +54,7 @@ vi.mock('@/components/ui/select', () => ({
 }));
 
 vi.mock('@/services/contratosApi', () => ({
+  LIQUIDACOES_CACHE_UPDATED_EVENT: 'siages:liquidacoes-cache-updated',
   contratosApiService: {
     getContratosApi: vi.fn(),
     getContratoApiDetails: vi.fn(),
@@ -445,9 +446,9 @@ describe('RequisicaoCompraPage', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /Editar requisição REQ-2026-0001/i }));
 
-    expect(await screen.findByDisplayValue('ARROZ BENEFICIADO TIPO 1')).toBeDisabled();
-    expect(screen.getByText('Subitem da NE')).toBeInTheDocument();
-    expect(screen.getByText('30 - MATERIAL DE CONSUMO')).toBeInTheDocument();
+    expect(await screen.findByText('ARROZ BENEFICIADO TIPO 1')).toBeInTheDocument();
+    expect(screen.queryByText('Subitem da NE')).not.toBeInTheDocument();
+    expect(screen.queryByText('30 - MATERIAL DE CONSUMO')).not.toBeInTheDocument();
     expect(await screen.findByText(/R\$\s*200,00/)).toBeInTheDocument();
     expect(mockedTransparenciaService.getItensEmpenhoPortal).toHaveBeenCalledWith('2026NE000083');
   });

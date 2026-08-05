@@ -130,6 +130,72 @@ describe('transparenciaService.getItensEmpenhoPortal', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('revalida cache fresco marcado como sem subitens antes de exibir estado vazio', async () => {
+    const { transparenciaService } = await import('@/services/transparencia');
+
+    supabaseFromMock.mockImplementation((table: string) => {
+      if (table === 'portal_transparencia_empenho_itens_cache_status') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({
+                data: {
+                  status: 'not_found',
+                  rows_count: 0,
+                  expires_at: new Date(Date.now() + 60_000).toISOString(),
+                },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+
+      return {
+        select: () => ({
+          eq: () => ({
+            order: async () => ({ data: [], error: null }),
+          }),
+        }),
+      };
+    });
+    supabaseFunctionsInvokeMock.mockResolvedValue({
+      data: {
+        results: [{
+          status: 'found',
+          rows: [{
+            codigo_item_empenho: '158366264352026NE000076',
+            sequencial: 1,
+            descricao: 'Item recuperado após falso not_found',
+            codigo_subelemento: '30',
+            descricao_subelemento: 'MATERIAL DE CONSUMO',
+            valor_atual: 23480.3,
+            historico: [],
+          }],
+        }],
+      },
+      error: null,
+    });
+
+    const result = await transparenciaService.getItensEmpenhoPortal('2026NE000076');
+
+    expect(result).toMatchObject([{
+      codigoItemEmpenho: '158366264352026NE000076',
+      descricao: 'Item recuperado após falso not_found',
+      valorAtual: 23480.3,
+    }]);
+    expect(supabaseFunctionsInvokeMock).toHaveBeenCalledWith(
+      'refresh-portal-transparencia-itens-cache',
+      expect.objectContaining({
+        body: expect.objectContaining({
+          empenhoNumero: '2026NE000076',
+          source: 'frontend-cache-recheck',
+          returnRows: true,
+        }),
+      }),
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it('repara cache fresco marcado como encontrado, mas sem linhas', async () => {
     const { transparenciaService } = await import('@/services/transparencia');
 

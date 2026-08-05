@@ -711,3 +711,5 @@ Para a automacao do Gmail:
 
 - suap-token-exchange sincroniza o terceirizado por user_id, matricula exata ou matricula normalizada legada antes de atribuir o grupo terceirizado; a aplicacao direciona esse grupo para /requisicao-compra.
 - refresh-comprasnet-liquidacoes-cache pode ser acionada em background pela requisicao de compra; a UI recebe o saldo base do subitem sem aguardar a funcao e invalida a consulta quando a atualizacao termina.
+
+- A leitura inicial do cache de itens revalida status not_found pela function e confirma o vazio via consulta direta quando necessario.

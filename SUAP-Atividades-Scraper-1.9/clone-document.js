@@ -54,7 +54,7 @@
   function looksLikeTextEditPage() {
     const path = window.location.pathname.toLowerCase();
     if (path.includes('texto') || path.includes('editar_documento')) return true;
-    return Boolean(findTinyEditor() || findTextAreaEditor(document));
+    return Boolean(findTinyEditor() || findTextAreaEditor(document) || document.querySelector('textarea#id_corpo, textarea#id_texto'));
   }
 
   function stripAutomationHash() {
@@ -177,7 +177,12 @@
     const startedAt = Date.now();
     return new Promise((resolve) => {
       const tick = () => {
-        const result = check();
+        let result = null;
+        try {
+          result = check();
+        } catch (error) {
+          result = null;
+        }
         if (result) {
           resolve(result);
           return;
@@ -205,14 +210,25 @@
     storePendingAutomation(payload, 'awaiting-document-view');
 
     if (payload.mode === 'save-after-confirmation') {
-      const saveButton = findSaveButton(document);
-      if (!saveButton) {
-        showNotice('SIAGES: assunto preenchido, mas o botao Salvar nao foi encontrado.', 'error');
-        return true;
-      }
+      const scheduleSave = (saveButton) => {
+        if (!saveButton) {
+          showNotice('SIAGES: assunto preenchido, mas o botao Salvar nao foi encontrado.', 'error');
+          return;
+        }
 
-      showNotice('SIAGES: assunto preenchido. Salvando documento...', 'success');
-      window.setTimeout(() => saveButton.click(), 250);
+        showNotice('SIAGES: assunto preenchido. Salvando documento...', 'success');
+        window.setTimeout(() => {
+          const currentSaveButton = document.contains(saveButton) ? saveButton : findSaveButton(document);
+          currentSaveButton?.click();
+        }, 250);
+      };
+
+      const saveButton = findSaveButton(document);
+      if (saveButton) {
+        scheduleSave(saveButton);
+      } else {
+        void waitFor(() => findSaveButton(document), 10000).then(scheduleSave);
+      }
       return true;
     }
 
@@ -224,7 +240,7 @@
     const pending = loadPendingAutomation();
     if (!pending?.payload?.contentHtml) return false;
 
-    const editButton = findClickableByText(document, 'editar');
+    const editButton = await waitFor(() => findClickableByText(document, 'editar'), 10000);
     if (!editButton) {
       showNotice('SIAGES: documento salvo, mas o botao Editar nao foi encontrado.', 'error');
       return false;
@@ -233,7 +249,7 @@
     updatePendingStage('opening-text-editor');
     editButton.click();
 
-    const textOption = await waitFor(() => findClickableByText(document, 'texto'), 2500);
+    const textOption = await waitFor(() => findClickableByText(document, 'texto'), 10000);
     if (!textOption) {
       showNotice('SIAGES: menu Editar aberto, mas a opcao Texto nao foi encontrada.', 'error');
       return false;
@@ -244,20 +260,59 @@
     return true;
   }
 
+  function isTinyEditorReady(editor) {
+    if (!editor || typeof editor.setContent !== 'function' || typeof editor.save !== 'function') return false;
+    if (editor.initialized === false) return false;
+    if (typeof editor.getBody === 'function') {
+      const body = editor.getBody();
+      if (!body || body.isContentEditable === false) return false;
+    }
+    return true;
+  }
+
   function findTinyEditor() {
     if (window.tinymce) {
-      const editors = Array.from(window.tinymce.editors || []).filter((editor) => !editor.isHidden());
-      if (window.tinymce.activeEditor && !window.tinymce.activeEditor.isHidden()) return window.tinymce.activeEditor;
-      if (editors[0]) return editors[0];
+      const isVisible = (editor) => {
+        if (!editor) return false;
+        if (typeof editor.isHidden === 'function') return !editor.isHidden();
+        return editor.isHidden !== true;
+      };
+      const activeEditor = window.tinymce.activeEditor;
+      if (isVisible(activeEditor) && isTinyEditorReady(activeEditor)) return activeEditor;
+
+      const editor = Array.from(window.tinymce.editors || [])
+        .filter(isVisible)
+        .find(isTinyEditorReady);
+      if (editor) return editor;
     }
     return null;
   }
 
+  function isVisibleFormControl(field) {
+    if (field.hidden || field.getAttribute('aria-hidden') === 'true') return false;
+    const style = window.getComputedStyle(field);
+    return style.display !== 'none' && style.visibility !== 'hidden';
+  }
+
   function findTextAreaEditor(root) {
     const doc = root || document;
-    return doc.querySelector(
+    const candidates = Array.from(doc.querySelectorAll(
       'textarea#id_corpo, textarea#id_texto, textarea[name="corpo"], textarea[name="texto"], textarea[name="conteudo"], textarea[id*="corpo"], textarea[id*="texto"], textarea'
-    );
+    ));
+    return candidates.find(isVisibleFormControl) || null;
+  }
+
+  function cleanContentText(value) {
+    if (!value) return '';
+    const container = document.createElement('div');
+    container.innerHTML = value;
+    return cleanText(container.textContent || value);
+  }
+
+  function containsExpectedContent(actual, payload) {
+    const expected = cleanContentText(payload?.plainText || payload?.contentHtml || '');
+    const received = cleanContentText(actual || '');
+    return Boolean(expected && received.includes(expected));
   }
 
   function fillTinyIframe(contentHtml) {
@@ -267,7 +322,7 @@
     body.innerHTML = contentHtml;
     body.dispatchEvent(new Event('input', { bubbles: true }));
     body.dispatchEvent(new Event('change', { bubbles: true }));
-    return true;
+    return containsExpectedContent(body.innerHTML, { contentHtml });
   }
 
   function fillTextEditor(payload) {
@@ -279,7 +334,10 @@
       tinyEditor.setContent(contentHtml);
       tinyEditor.fire('change');
       tinyEditor.save();
-      return true;
+      return containsExpectedContent(
+        typeof tinyEditor.getContent === 'function' ? tinyEditor.getContent() : '',
+        payload,
+      );
     }
 
     const textarea = findTextAreaEditor(document);
@@ -289,7 +347,7 @@
       textarea.dispatchEvent(new Event('input', { bubbles: true }));
       textarea.dispatchEvent(new Event('change', { bubbles: true }));
       textarea.blur();
-      return true;
+      return containsExpectedContent(textarea.value, payload);
     }
 
     return fillTinyIframe(contentHtml);

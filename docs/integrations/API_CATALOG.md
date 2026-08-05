@@ -929,3 +929,5 @@ Observações operacionais:
 - Nao foram adicionados endpoints, migrations ou Edge Functions.
 
 - O callback suap-token-exchange tambem procura a matricula normalizada em registros legados de terceirizados; perfis do grupo terceirizado sao direcionados a /requisicao-compra. Na consulta de requisicao, a ausencia de cache de liquidacoes dispara atualizacao assincrona e nao bloqueia a exibicao do saldo base do subitem.
+
+- O consumo do cache de itens de empenho revalida registros not_found e faz fallback direto ao Portal da Transparencia para evitar que uma falha transitoria oculte subitens reais.

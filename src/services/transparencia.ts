@@ -371,7 +371,8 @@ export const transparenciaService = {
             const cached = await getCachedItensEmpenhoPortal(numeroEmpenho);
             if (cached.available) {
                 const cachedRows = cached.rows ?? [];
-                if (cached.isFresh && cached.status === 'not_found') return [];
+                // not_found pode ter sido gravado durante uma falha transitória do Portal.
+                // Revalide no primeiro acesso antes de declarar que a NE não possui subitens.
                 if (cached.isFresh && cached.status !== 'error' && cachedRows.length > 0) return cachedRows;
 
                 if (cachedRows.length > 0) {
@@ -380,10 +381,15 @@ export const transparenciaService = {
                 }
 
                 const refreshed = await getItensCacheRowsViaFunction(numeroEmpenho, {
-                    source: cached.hasStatus ? 'frontend-cache-repair' : 'frontend-cache-miss',
+                    source: cached.hasStatus
+                        ? cached.status === 'not_found' ? 'frontend-cache-recheck' : 'frontend-cache-repair'
+                        : 'frontend-cache-miss',
                 });
                 if (refreshed?.status === 'found' && refreshed.rows.length > 0) return refreshed.rows;
-                if (refreshed?.status === 'not_found') return [];
+                if (refreshed?.status === 'not_found') {
+                    // A consulta direta confirma o vazio e cobre respostas transitórias da Edge Function.
+                    return getItensEmpenhoPortalDireto(numeroEmpenho, options);
+                }
             }
         } catch (error) {
             console.warn('Portal da Transparencia: falha ao consultar cache de subitens, tentando consulta direta.', error);
