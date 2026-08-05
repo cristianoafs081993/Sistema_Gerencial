@@ -494,3 +494,5 @@ A página carrega contexto e workspace em consultas separadas; os dados independ
 - A RLS de `terceirizados` e `terceirizado_permissions` tambem reconhece o grupo `assistencia`, que possui acesso explicito ao cadastro e a gestao de vinculos em `/cadastro-terceirizados`.
 
 - Para o login via SUAP, a identificacao do perfil prioriza user_id, matricula normalizada e entao e-mail legado; quando o grupo terceirizado estiver presente, a rota inicial e sempre /requisicao-compra. O saldo base do subitem aparece imediatamente e o saldo refinado por liquidacoes atualiza a consulta quando o cache termina.
+
+- A exclusao de requisicoes valida o numero de linhas afetadas; quando a RLS impede a operacao, a interface exibe o motivo em vez de confirmar uma exclusao inexistente.

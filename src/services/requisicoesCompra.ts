@@ -224,8 +224,16 @@ export const requisicoesCompraService = {
   },
 
   async deleteRequisicao(id: string): Promise<void> {
-    const { error } = await supabase.from('requisicoes_compra').delete().eq('id', id);
+    const { data, error } = await supabase
+      .from('requisicoes_compra')
+      .delete()
+      .eq('id', id)
+      .select('id');
+
     if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error('A requisição não foi excluída. Ela pode não estar mais disponível ou não ter permissão para exclusão.');
+    }
   },
 
   async listTerceirizados(): Promise<Terceirizado[]> {

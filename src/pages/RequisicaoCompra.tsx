@@ -531,7 +531,8 @@ export default function RequisicaoCompraPage() {
       toast.success('Excluído com sucesso.', { id: loadingToast });
       void queryClient.invalidateQueries({ queryKey: ['requisicoes-compra'] });
     } catch (err) {
-      toast.error('Falha ao excluir.', { id: loadingToast });
+      const message = err instanceof Error ? err.message : 'Falha ao excluir.';
+      toast.error(message, { id: loadingToast });
     }
   };
   // Print PDF Generator
