@@ -708,3 +708,6 @@ Para a automacao do Gmail:
 1. confirmar que a function `ingest-email-csv` foi publicada
 2. confirmar que o Apps Script aponta para a URL correta da function
 3. validar se `verify_jwt` e a estrategia de chamada externa estao alinhados com o ambiente real
+
+- suap-token-exchange sincroniza o terceirizado por user_id, matricula exata ou matricula normalizada legada antes de atribuir o grupo terceirizado; a aplicacao direciona esse grupo para /requisicao-compra.
+- refresh-comprasnet-liquidacoes-cache pode ser acionada em background pela requisicao de compra; a UI recebe o saldo base do subitem sem aguardar a funcao e invalida a consulta quando a atualizacao termina.

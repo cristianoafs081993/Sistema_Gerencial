@@ -29,7 +29,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { getAuthUserMatricula, permissionMatchesAuthUser } from '@/lib/terceirizadoIdentity';
 import { formatCurrency, formatarDocumento } from '@/lib/utils';
-import { contratosApiService } from '@/services/contratosApi';
+import { contratosApiService, LIQUIDACOES_CACHE_UPDATED_EVENT } from '@/services/contratosApi';
 import { transparenciaService, type PortalTransparenciaItemEmpenho } from '@/services/transparencia';
 import { requisicoesCompraService } from '@/services/requisicoesCompra';
 import type { RequisicaoCompra, RequisicaoCompraItem, RequisicaoCompraRecord } from '@/types';
@@ -183,6 +183,16 @@ export default function RequisicaoCompraPage() {
       staleTime: 60 * 1000,
     })),
   });
+
+  useEffect(() => {
+    const handleLiquidacoesCacheUpdated = () => {
+      void queryClient.invalidateQueries({ queryKey: ['requisicao-liquidacoes-api-empenho'] });
+    };
+
+    window.addEventListener(LIQUIDACOES_CACHE_UPDATED_EVENT, handleLiquidacoesCacheUpdated);
+    return () => window.removeEventListener(LIQUIDACOES_CACHE_UPDATED_EVENT, handleLiquidacoesCacheUpdated);
+  }, [queryClient]);
+
   const empenhoItemBalanceReadyById = useMemo(() => {
     return new Map(
       selectedEmpenhos.map((empenho, index) => [
@@ -863,11 +873,12 @@ export default function RequisicaoCompraPage() {
                               </TableRow>
                             ) : (
                               groupItems.map(({ item, index }, groupIndex) => {
-                                const itemAvailableBalance = isItemBalanceReady
+                                const isGeneratedItem = item.sourceType === 'portal_transparencia_empenho_item';
+                                const itemAvailableBalance = isGeneratedItem
                                   ? getRequisicaoItemAvailableBalance(item, empenhoItemBalances)
                                   : null;
+                                const isProvisionalItemBalance = isGeneratedItem && !isItemBalanceReady;
                                 const itemSubtotal = item.quantity * item.unitPrice;
-                                const isGeneratedItem = item.sourceType === 'portal_transparencia_empenho_item';
                                 const hasItemBalanceViolation = itemAvailableBalance !== null && itemSubtotal > itemAvailableBalance;
                                 const quantityInputKey = item.sourceItemKey || `${item.empenhoId ?? empenho.id}-${index}`;
 
@@ -922,7 +933,9 @@ export default function RequisicaoCompraPage() {
                                     </TableCell>
                                     <TableCell className={`text-right font-mono text-xs font-bold leading-9 ${hasItemBalanceViolation ? 'text-status-error' : 'text-status-success'}`}>
                                       {itemAvailableBalance !== null
-                                        ? formatCurrency(itemAvailableBalance)
+                                        ? <span title={isProvisionalItemBalance ? 'Saldo base do subitem; as liquidações oficiais serão aplicadas quando o cache terminar.' : undefined}>
+                                            {formatCurrency(itemAvailableBalance)}
+                                          </span>
                                         : isGeneratedItem ? <span title={isItemBalanceError ? 'Não foi possível consultar as liquidações deste empenho' : 'O saldo detalhado será carregado após as liquidações'}>{isItemBalanceError ? 'Indisponível' : 'Carregando...'}</span> : '-'}
                                     </TableCell>
                                     <TableCell className="text-right font-mono font-bold text-text-primary leading-9">

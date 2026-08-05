@@ -491,3 +491,6 @@ A página carrega contexto e workspace em consultas separadas; os dados independ
 - Ao clicar em `Imprimir`, a requisicao e salva como rascunho pela RPC antes da abertura da janela de impressao; `Salvar Rascunho` permanece separado e quantidades zero nao bloqueiam nenhuma das duas acoes.
 
 - O relatorio impresso lista apenas itens com quantidade maior que zero (inclusive valores decimais como 0,1) e identifica o sistema como `SIAGES - Sistema Integrado de Administração e Gestão Estratégica`.
+- A RLS de `terceirizados` e `terceirizado_permissions` tambem reconhece o grupo `assistencia`, que possui acesso explicito ao cadastro e a gestao de vinculos em `/cadastro-terceirizados`.
+
+- Para o login via SUAP, a identificacao do perfil prioriza user_id, matricula normalizada e entao e-mail legado; quando o grupo terceirizado estiver presente, a rota inicial e sempre /requisicao-compra. O saldo base do subitem aparece imediatamente e o saldo refinado por liquidacoes atualiza a consulta quando o cache termina.

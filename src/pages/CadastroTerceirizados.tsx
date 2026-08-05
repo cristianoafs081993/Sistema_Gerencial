@@ -92,6 +92,16 @@ export default function CadastroTerceirizadosPage() {
       return;
     }
 
+    const duplicateTerceirizado = terceirizados.find(
+      (terceirizado) =>
+        terceirizado.id !== editingTerceirizadoId &&
+        normalizeMatricula(terceirizado.matricula) === normalizedMatricula,
+    );
+    if (duplicateTerceirizado) {
+      toast.error(`A matricula ${normalizedMatricula} ja esta cadastrada para ${duplicateTerceirizado.name}.`);
+      return;
+    }
+
     setIsSaving(true);
     try {
       await requisicoesCompraService.saveTerceirizado({
@@ -135,7 +145,18 @@ export default function CadastroTerceirizadosPage() {
       }
     } catch (err) {
       console.error(err);
-      toast.error('Erro ao salvar terceirizado. Verifique se a matricula ja esta cadastrada.');
+      const serverMessage =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'object' && err && 'message' in err
+            ? String((err as { message?: unknown }).message || '')
+            : '';
+      const normalizedError = serverMessage.toLowerCase();
+      if (normalizedError.includes('duplicate') || normalizedError.includes('unique')) {
+        toast.error(`A matricula ${normalizedMatricula} ja esta cadastrada.`);
+      } else {
+        toast.error(serverMessage || 'Erro ao salvar terceirizado.');
+      }
     } finally {
       setIsSaving(false);
     }

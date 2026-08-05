@@ -927,3 +927,5 @@ Observações operacionais:
 - Persistencia: `suapScraperService.storePdfBytesForProcess` grava o PDF no bucket existente `suap-pdfs`; a fila continua sendo a Edge Function existente `process-pdf`.
 - Autenticacao da extensao: o popup e o painel usam o grant `password` de `/auth/v1/token` com a mesma anon key vigente do projeto; o campo deve receber o e-mail cadastrado no Supabase Auth do SIAGES (nao a matricula do SUAP). Respostas `401` sao exibidas como credencial SIAGES recusada.
 - Nao foram adicionados endpoints, migrations ou Edge Functions.
+
+- O callback suap-token-exchange tambem procura a matricula normalizada em registros legados de terceirizados; perfis do grupo terceirizado sao direcionados a /requisicao-compra. Na consulta de requisicao, a ausencia de cache de liquidacoes dispara atualizacao assincrona e nao bloqueia a exibicao do saldo base do subitem.

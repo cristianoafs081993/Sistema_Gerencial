@@ -2,7 +2,7 @@ import type { User } from '@supabase/supabase-js';
 
 import { appScreens, expandScreenAccessIds } from '@/lib/appScreens';
 import { supabase } from '@/lib/supabase';
-import { getAuthUserMatricula } from '@/lib/terceirizadoIdentity';
+import { getAuthUserMatricula, normalizeMatricula } from '@/lib/terceirizadoIdentity';
 
 export type UserAccessGroup = {
   id: string;
@@ -55,17 +55,39 @@ type TerceirizadoAccessRow = {
 };
 
 async function fetchTerceirizadoAccess(user: User): Promise<TerceirizadoAccessRow | null> {
+  const { data: linkedRows, error: linkedError } = await supabase
+    .from('terceirizados')
+    .select('tipo')
+    .eq('user_id', user.id)
+    .limit(1);
+
+  if (linkedError) throw linkedError;
+  if (linkedRows?.[0]) return linkedRows[0] as TerceirizadoAccessRow;
+
   const matricula = getAuthUserMatricula(user);
 
   if (matricula) {
     const { data, error } = await supabase
       .from('terceirizados')
-      .select('tipo')
+      .select('tipo,matricula')
       .eq('matricula', matricula)
-      .maybeSingle();
+      .limit(1);
 
     if (error) throw error;
-    if (data) return data as TerceirizadoAccessRow;
+    if (data?.[0]) return data[0] as TerceirizadoAccessRow;
+
+    // Registros antigos podem manter pontuação/formatação na matrícula.
+    // A policy já restringe a leitura ao próprio usuário; normalizamos o resultado localmente.
+    const { data: candidates, error: candidatesError } = await supabase
+      .from('terceirizados')
+      .select('tipo,matricula')
+      .limit(100);
+
+    if (candidatesError) throw candidatesError;
+    const normalizedMatch = (candidates || []).find(
+      (candidate) => normalizeMatricula(candidate.matricula) === matricula,
+    );
+    if (normalizedMatch) return normalizedMatch as TerceirizadoAccessRow;
   }
 
   if (!user.email) return null;
@@ -156,16 +178,17 @@ export async function fetchUserAccess(user: User, isSuperAdmin: boolean): Promis
     return [{ id: group.id, name: group.name, slug: group.slug }];
   });
 
-  // Lógica de terceirizado (refeitório)
+  // Usuários terceirizados sempre entram no fluxo de requisições de compra.
+  // A identificação pode vir do grupo sincronizado pelo SUAP ou do cadastro
+  // associado por user_id/matrícula/e-mail.
   const terceirizadoAccess = await fetchTerceirizadoAccess(user);
-  const isRefeitorioTerceirizado = terceirizadoAccess?.tipo === 'refeitorio';
-  const isTerceirizado = groups.some((g) => g.slug === 'terceirizado');
+  const isTerceirizado = groups.some((g) => g.slug === 'terceirizado') || Boolean(terceirizadoAccess);
 
-  if (isRefeitorioTerceirizado && !isTerceirizado) {
-    groups.push({ id: 'terceirizado', name: 'Terceirizado', slug: 'terceirizado' });
-  }
+  if (isTerceirizado) {
+    if (!groups.some((group) => group.slug === 'terceirizado')) {
+      groups.push({ id: 'terceirizado', name: 'Terceirizado', slug: 'terceirizado' });
+    }
 
-  if (isRefeitorioTerceirizado) {
     return {
       groups: groups.filter((group) => group.slug === 'terceirizado'),
       screenIds: expandScreenAccessIds(['requisicao-compra']),
@@ -190,9 +213,6 @@ export async function fetchUserAccess(user: User, isSuperAdmin: boolean): Promis
     new Set(((permissions || []) as PermissionRow[]).map((row) => row.screen_id)),
   ));
 
-  if (isTerceirizado) {
-    screenIds = screenIds.filter((id) => id !== 'requisicao-compra');
-  }
 
   // Intersecção com módulos habilitados pelo órgão
   // Se o órgão tiver restrições, aplica o filtro sobre o que o grupo já permite

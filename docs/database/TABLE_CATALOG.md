@@ -1358,3 +1358,4 @@ A migration 20260706110000 cria cadastros compartilhados e o razão imutável de
 Consumido por src/services/inventory.ts e src/pages/Almoxarifado.tsx.
 
 - `quantity` aceita zero para rascunhos e impressao; valores negativos continuam invalidos na RPC `save_requisicao_compra`.
+- A RLS de `terceirizados` e `terceirizado_permissions` tambem reconhece o grupo `assistencia`, que possui acesso explicito ao cadastro e a gestao de vinculos em `/cadastro-terceirizados`.

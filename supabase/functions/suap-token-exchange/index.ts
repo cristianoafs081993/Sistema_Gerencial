@@ -206,15 +206,35 @@ Deno.serve(async (req) => {
 
           let isTerceirizado = false;
           if (normalizedMatricula) {
-            const { data: terceirizadoMatch, error: terceirizadoError } = await supabaseAdmin
+            let terceirizadoMatch: { id: string; matricula: string | null } | null = null;
+            const { data: exactMatches, error: terceirizadoError } = await supabaseAdmin
               .from('terceirizados')
-              .select('id')
+              .select('id,matricula')
               .eq('matricula', normalizedMatricula)
-              .maybeSingle();
+              .limit(1);
 
             if (terceirizadoError) {
               console.error('Erro ao verificar terceirizado por matricula:', terceirizadoError);
-            } else if (terceirizadoMatch) {
+            } else {
+              terceirizadoMatch = exactMatches?.[0] || null;
+
+              if (!terceirizadoMatch) {
+                const { data: candidates, error: candidatesError } = await supabaseAdmin
+                  .from('terceirizados')
+                  .select('id,matricula')
+                  .not('matricula', 'is', null)
+                  .limit(1000);
+                if (candidatesError) {
+                  console.error('Erro ao procurar terceirizado por matricula normalizada:', candidatesError);
+                } else {
+                  terceirizadoMatch = (candidates || []).find((candidate) =>
+                    String(candidate.matricula || '').trim().replace(/[^0-9A-Za-z]/g, '').toLowerCase() === normalizedMatricula,
+                  ) || null;
+                }
+              }
+            }
+
+            if (terceirizadoMatch) {
               isTerceirizado = true;
               await supabaseAdmin.from('terceirizados').update({ user_id: userId }).eq('id', terceirizadoMatch.id);
               await supabaseAdmin

@@ -6,14 +6,18 @@ import { appScreens } from '@/lib/appScreens';
 import { buildAuthRoute } from '@/lib/auth';
 import { APP_BRAND } from '@/lib/brand';
 
-function getFirstAllowedPath(screenAccessIds: string[]) {
+function getFirstAllowedPath(screenAccessIds: string[], userGroups: Array<{ slug: string }>) {
+  if (userGroups.some((group) => group.slug === 'terceirizado')) {
+    return '/requisicao-compra';
+  }
+
   const allowedIds = new Set(screenAccessIds);
   return appScreens.find((screen) => allowedIds.has(screen.id))?.path;
 }
 
 export function ProtectedRoute() {
   const location = useLocation();
-  const { isAuthenticated, isLoading, isAccessLoading, accessError, canAccessPath, screenAccessIds } = useAuth();
+  const { isAuthenticated, isLoading, isAccessLoading, accessError, canAccessPath, screenAccessIds, userGroups } = useAuth();
 
   if (isLoading || (isAuthenticated && isAccessLoading)) {
     return (
@@ -63,7 +67,10 @@ export function ProtectedRoute() {
   }
 
   if (!canAccessPath(location.pathname)) {
-    const firstAllowedPath = location.pathname === '/' ? getFirstAllowedPath(screenAccessIds) : undefined;
+    const isTerceirizado = userGroups.some((group) => group.slug === 'terceirizado');
+    const firstAllowedPath = isTerceirizado || location.pathname === '/'
+      ? getFirstAllowedPath(screenAccessIds, userGroups)
+      : undefined;
     if (firstAllowedPath && firstAllowedPath !== location.pathname) {
       return <Navigate to={firstAllowedPath} replace />;
     }

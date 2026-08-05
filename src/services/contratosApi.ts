@@ -24,6 +24,7 @@ const MIGRATION_REQUIRED_MESSAGE =
 const PUBLIC_CONTRATOS_CACHE_TTL_MS = 5 * 60 * 1000;
 const PUBLIC_EMPENHOS_CACHE_TTL_MS = 5 * 60 * 1000;
 const PUBLIC_LIQUIDACOES_CACHE_TTL_MS = 2 * 60 * 1000;
+export const LIQUIDACOES_CACHE_UPDATED_EVENT = 'siages:liquidacoes-cache-updated';
 const LIQUIDACOES_CACHE_STATUS_SELECT = 'empenho_lookup_key, empenho_numero, status, rows_count, fetched_at, expires_at, error_message';
 const LIQUIDACOES_CACHE_ROWS_SELECT = 'id, empenho_lookup_key, empenho_numero, empenho_numero_api, unidade_contrato, contrato_api_id, contrato_numero, contrato_objeto, fatura_id, numero_instrumento_cobranca, situacao, valor_bruto, valor_liquido, data_emissao, data_vencimento, data_pagamento, data_liquidacao, processo, valor_empenho, subelemento, raw_data, fetched_at';
 
@@ -549,6 +550,13 @@ function triggerLiquidacoesCacheRefresh(numeroEmpenho: string, source = 'fronten
       const error = result?.error;
       if (error) {
         console.warn('Contratos API: falha ao acionar refresh do cache de liquidacoes', error);
+        return;
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(LIQUIDACOES_CACHE_UPDATED_EVENT, {
+          detail: { numeroEmpenho },
+        }));
       }
     })
     .catch((error) => {
@@ -794,12 +802,12 @@ export const contratosApiService = {
         return cached.rows;
       }
 
-      const refreshedRows = await getLiquidacoesCacheRowsViaFunction(numeroEmpenho, {
-        source: cached.hasStatus ? 'frontend-cache-stale' : 'frontend-cache-miss',
-      });
-      if (refreshedRows) return refreshedRows;
-
-      triggerLiquidacoesCacheRefresh(numeroEmpenho);
+      // O carregamento inicial nunca deve esperar a API publica. O cache é
+      // atualizado em background e a tela é invalidada quando terminar.
+      triggerLiquidacoesCacheRefresh(
+        numeroEmpenho,
+        cached.hasStatus ? 'frontend-cache-stale' : 'frontend-cache-miss',
+      );
       return [];
     }
 
