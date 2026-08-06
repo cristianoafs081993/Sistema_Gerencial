@@ -69,7 +69,7 @@ Uso:
 
 - `process-pdf` autentica o usuário, valida o processo e, por padrão, enfileira a estratégia `full` com o PDF canônico de `processos.pdf_url` no bucket `suap-pdfs`.
 - No piloto manual de `/suap`, `input_strategy: "eligible_documents"` aceita somente IDs do inventário do próprio tenant que estejam classificados como `included`, baixados e com `storage_path`; a função recusa itens ausentes, não elegíveis ou uma segunda estratégia enquanto outra estiver em processamento.
-- `process-pdf-worker` une temporariamente os PDFs elegíveis na ordem do inventário e preserva a mesma inspeção de peso, divisão em blocos, ordem Gemini/OpenAI/OpenRouter e consolidação de notas fiscais. A execução grava em `process_extraction_runs` os documentos, bytes, páginas, tempos recebidos, provedor, fallback, resultado ou falha; `dados_completos.extraction_job` recebe `run_id` e estratégia.
+- `process-pdf-worker` une temporariamente os PDFs elegíveis na ordem do inventário e preserva a mesma inspeção de peso, divisão em blocos, ordem Gemini/OpenAI/OpenRouter e consolidação de notas fiscais. Uma peça disponível já pode ser processada; se o resultado ficar incompleto ou sem nota fiscal utilizável e o PDF completo canônico já estiver disponível, o worker enfileira uma segunda execução `full` de complementação. A execução grava em `process_extraction_runs` os documentos, bytes, páginas, tempos recebidos, provedor, fallback, resultado ou falha; `dados_completos.extraction_job` recebe `run_id` e estratégia.
 - O fluxo padrão, a sincronização automática e a extensão continuam enviando apenas `suap_id` e usando o PDF completo. A resposta `202` confirma somente o enfileiramento; o frontend acompanha `processos.status` até o resultado final.
 
 Dependencias:
@@ -138,7 +138,7 @@ Dependencias:
 Observação:
 
 - Possui política de segurança interna que valida a sessão do usuário no Supabase
-- Restringe o proxy à origem fixa `https://suap.ifrn.edu.br`, aos caminhos de processo e Celery já usados e, para anexos individuais, exclusivamente a `/documento_eletronico/visualizar_documento(_digitalizado)/<id>/?original=sim`; URLs externas, parâmetros adicionais e caminhos arbitrários são recusados.
+- Restringe o proxy à origem fixa `https://suap.ifrn.edu.br`, aos caminhos de processo e Celery já usados e, para anexos individuais, exclusivamente a `/documento_eletronico/visualizar_documento(_digitalizado)/<id>/?original=sim`; URLs externas, parâmetros adicionais e caminhos arbitrários são recusados. Essa rota individual é retornada em base64 mesmo quando o SUAP a anuncia como `attachment` ou `application/octet-stream`, evitando que um PDF válido seja interpretado como texto.
 
 ### `gerar-contrato-licitacao`
 

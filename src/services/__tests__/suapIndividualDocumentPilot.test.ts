@@ -29,6 +29,11 @@ describe('piloto SUAP por PDFs individuais', () => {
     expect(service).toContain("inputStrategy: 'eligible_documents'");
     expect(page).toContain('Extrair com PDFs individuais');
     expect(page).toContain('handleIndividualDocumentPilot');
+    expect(service).toContain('hasUnavailableDocuments');
+    expect(service).toContain('PDF prioritario disponivel');
+    expect(service).toContain('individualDocumentDownloadPriority');
+    expect(service).toContain('queueLateFullPdfSupplementIfNeeded');
+    expect(service).toContain('expectedRunId');
   });
 
   it('valida as peças no backend e as une antes de aplicar os fallbacks existentes', () => {
@@ -44,5 +49,7 @@ describe('piloto SUAP por PDFs individuais', () => {
     expect(worker).toContain('runHeavyPdfPath');
     expect(worker).toContain('runLightPdfPath');
     expect(worker).toContain('updateExtractionRun');
+    expect(worker).toContain('queueFullPdfSupplement');
+    expect(worker).toContain("inputStrategy: 'full'");
   });
 });

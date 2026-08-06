@@ -66,6 +66,23 @@ export function toSuapDocumentOriginalPath(href: string): { suapDocumentId: stri
   }
 }
 
+function getDocumentClassificationContext(link: HTMLAnchorElement): string {
+  const linkText = String(link.textContent || '').replace(/\s+/g, ' ').trim();
+  let current = link.parentElement;
+
+  while (current && current !== link.ownerDocument.body) {
+    const className = current.getAttribute('class') || '';
+    const isDocumentContainer = ['LI', 'TR', 'ARTICLE'].includes(current.tagName)
+      || /(?:^|[-_\s])(box|card|media|documento|document)(?:[-_\s]|$)/i.test(className);
+    const text = String(current.textContent || '').replace(/\s+/g, ' ').trim();
+    const hasExclusionHint = /\bimr\b|certidao|documentacao complementar|conta vinculada|relatorio de recebimento provis|folhas? de pagamento/.test(normalizeSuapDocumentText(text));
+    if ((isDocumentContainer || hasExclusionHint) && text) return text;
+    current = current.parentElement;
+  }
+
+  return linkText;
+}
+
 export function parseSuapProcessDocumentManifest(html: string): SuapProcessDocumentCandidate[] {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const candidates: SuapProcessDocumentCandidate[] = [];
@@ -80,7 +97,8 @@ export function parseSuapProcessDocumentManifest(html: string): SuapProcessDocum
     if (!title) continue;
     const strongType = String(link.querySelector('strong')?.textContent || '').replace(/\s+/g, ' ').trim();
     const documentType = strongType.replace(/:\s*$/, '') || title.split(':', 1)[0]?.trim() || null;
-    const classification = classifySuapProcessDocument(title, documentType);
+    const classificationContext = getDocumentClassificationContext(link);
+    const classification = classifySuapProcessDocument(`${title} ${classificationContext}`, documentType);
 
     candidates.push({
       suapDocumentId: source.suapDocumentId,

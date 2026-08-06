@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
-import { isAllowedSuapProxyPath } from '../_shared/suap_proxy_paths.ts';
+import { isAllowedSuapProxyPath, isSuapOriginalDocumentPath } from '../_shared/suap_proxy_paths.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -242,7 +242,7 @@ Deno.serve(async (req) => {
     const contentType = suapResponse.headers.get('Content-Type') || '';
     
     // Se for PDF ou outro arquivo binário, retornar em base64
-    if (contentType.includes('application/pdf') || cleanPath.includes('/djtools/process_progress/1/')) {
+    if (contentType.includes('application/pdf') || cleanPath.includes('/djtools/process_progress/1/') || isSuapOriginalDocumentPath(cleanPath)) {
       const arrayBuffer = await suapResponse.arrayBuffer();
       // Utiliza a função chunked nativa e segura para base64
       const base64 = uint8ArrayToBase64(new Uint8Array(arrayBuffer));

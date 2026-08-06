@@ -95,7 +95,7 @@ Almoxarifado:
 Cobertura mínima obrigatória do piloto manual:
 
 - parser do HTML e classificação em português com variações de acento; documentos desconhecidos devem permanecer incluídos;
-- limite de quatro downloads concorrentes e falha de qualquer documento elegível, que deve forçar fallback completo sem extração parcial silenciosa;
+- limite de quatro downloads concorrentes, falha de download registrada por título/erro e prioridade da primeira extração com os PDFs úteis já disponíveis; o PDF completo só pode ser enfileirado depois como complementação de resultado incompleto ou sem nota fiscal utilizável;
 - bloqueio de URLs externas, caminhos de documento sem `?original=sim` e parâmetros arbitrários no `suap-proxy`;
 - migration com inventário e histórico isolados por `tenant_id` e RLS; endpoint deve validar os IDs contra o processo/tenant antes de enfileirar;
 - regressão do PDF completo, extensão SUAP, Editor de Documentos, PDFs pesados por blocos e múltiplas notas fiscais.

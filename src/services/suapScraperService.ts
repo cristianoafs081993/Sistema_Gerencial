@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import {
+  normalizeSuapDocumentText,
   parseSuapProcessDocumentManifest,
   runWithConcurrency,
 } from '@/lib/suapProcessDocuments';
@@ -117,6 +118,7 @@ export type IndividualDocumentPilotResult = AiExtractionQueueResult & {
   includedDocuments: number;
   excludedDocuments: number;
   usedFullPdfFallback: boolean;
+  hasUnavailableDocuments: boolean;
 };
 
 const INDIVIDUAL_DOCUMENT_DOWNLOAD_CONCURRENCY = 4;
@@ -133,6 +135,7 @@ function extractProcessNumber(text: string): string | null {
 export type AiExtractionQueueResult = {
   queued: boolean;
   status: string;
+  runId?: string;
 };
 
 // Orquestra a geração e download do PDF no SUAP via polling Celery
@@ -227,6 +230,53 @@ async function downloadProcessPdf(
   return {
     pdfBase64: pdfRes.base64,
   };
+}
+
+function hasUsableStoredInvoice(value: unknown) {
+  if (!Array.isArray(value)) return false;
+  return value.some((invoice) => {
+    if (!invoice || typeof invoice !== 'object') return false;
+    const record = invoice as Record<string, unknown>;
+    return ['numero', 'data_emissao', 'valor'].some((field) => Boolean(String(record[field] || '').trim()));
+  });
+}
+
+async function queueLateFullPdfSupplementIfNeeded(
+  proc: Pick<ScrapedProcesso, 'suapId'>,
+  tenantId: string,
+  log: SyncProgressCallback,
+  expectedRunId: string,
+) {
+  const { data: processRecord, error } = await supabase
+    .from('processos')
+    .select('status, dados_completos')
+    .eq('tenant_id', tenantId)
+    .eq('suap_id', proc.suapId)
+    .maybeSingle();
+  if (error || !processRecord) return;
+
+  const dados = processRecord.dados_completos && typeof processRecord.dados_completos === 'object'
+    ? processRecord.dados_completos as Record<string, unknown>
+    : {};
+  const extractionJob = dados.extraction_job && typeof dados.extraction_job === 'object'
+    ? dados.extraction_job as Record<string, unknown>
+    : {};
+  const firstExtractionWasIndividual = extractionJob.input_strategy === 'eligible_documents'
+    && extractionJob.run_id === expectedRunId;
+  const requiresSupplement = processRecord.status === 'incomplete_extraction' || !hasUsableStoredInvoice(dados.notas_fiscais);
+  if (!firstExtractionWasIndividual || !requiresSupplement) return;
+
+  const { data, error: queueError } = await supabase.functions.invoke('process-pdf', {
+    body: {
+      suap_id: proc.suapId,
+      stage_metrics: { strategy_fallback: 'full_supplement', late_pdf_ready: true },
+    },
+  });
+  if (queueError || data?.error) {
+    log(`[${proc.suapId}] Piloto: PDF completo pronto, mas a complementacao nao foi enfileirada (${queueError?.message || data?.error}).`);
+    return;
+  }
+  if (data?.queued) log(`[${proc.suapId}] Piloto: PDF completo enfileirado para complementar a primeira extracao.`);
 }
 
 async function storeProcessPdf(
@@ -329,11 +379,22 @@ async function syncIndividualDocumentInventory(
   if (inventoryError) throw inventoryError;
 
   const documents = ((rows || []) as SuapProcessDocumentRow[]).map(mapProcessDocumentRow);
+  const included = documents.filter((document) => document.classification === 'included');
+  const excluded = documents.filter((document) => document.classification === 'excluded');
+  log(`[${proc.suapId}] Piloto: ${included.length} documento(s) util(eis): ${included.map((document) => document.title).join('; ') || 'nenhum'}.`);
+  log(`[${proc.suapId}] Piloto: ${excluded.length} documento(s) ignorado(s): ${excluded.map((document) => document.title).join('; ') || 'nenhum'}.`);
   return {
     processId: processRecord.id,
-    included: documents.filter((document) => document.classification === 'included'),
-    excluded: documents.filter((document) => document.classification === 'excluded'),
+    included,
+    excluded,
   };
+}
+
+function individualDocumentDownloadPriority(document: SuapProcessDocument) {
+  const normalized = normalizeSuapDocumentText(`${document.documentType || ''} ${document.title}`);
+  if (normalized.includes('nota fiscal') || /\bnf ?e?\b/.test(normalized)) return 0;
+  if (normalized.includes('medicao')) return 1;
+  return 2;
 }
 
 async function downloadEligibleIndividualDocuments(
@@ -342,8 +403,11 @@ async function downloadEligibleIndividualDocuments(
   tenantId: string,
   documents: SuapProcessDocument[],
   log: SyncProgressCallback,
+  onDocumentDownloaded?: (document: SuapProcessDocument) => Promise<void>,
 ) {
-  const pending = documents.filter((document) => document.downloadStatus !== 'downloaded' || !document.storagePath);
+  const pending = documents
+    .filter((document) => document.downloadStatus !== 'downloaded' || !document.storagePath)
+    .sort((left, right) => individualDocumentDownloadPriority(left) - individualDocumentDownloadPriority(right) || left.order - right.order);
   if (pending.length === 0) return { downloaded: documents, failed: [] as Array<{ document: SuapProcessDocument; error: unknown }> };
 
   log(`[${proc.suapId}] Piloto: baixando ${pending.length} PDF(s) úteis (até ${INDIVIDUAL_DOCUMENT_DOWNLOAD_CONCURRENCY} em paralelo)...`);
@@ -384,11 +448,15 @@ async function downloadEligibleIndividualDocuments(
           .eq('id', document.id)
           .eq('tenant_id', tenantId);
         if (completedError) throw completedError;
-        return { ...document, downloadStatus: 'downloaded' as const, storagePath, byteSize: bytes.length };
+        const downloadedDocument = { ...document, downloadStatus: 'downloaded' as const, storagePath, byteSize: bytes.length };
+        await onDocumentDownloaded?.(downloadedDocument);
+        return downloadedDocument;
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        log(`[${proc.suapId}] Piloto: falha ao baixar "${document.title}": ${errorMessage}`);
         await supabase
           .from('suap_processo_documentos')
-          .update({ download_status: 'failed', download_error: error instanceof Error ? error.message : String(error) })
+          .update({ download_status: 'failed', download_error: errorMessage })
           .eq('id', document.id)
           .eq('tenant_id', tenantId);
         throw error;
@@ -707,6 +775,7 @@ export const suapScraperService = {
     return {
       queued: Boolean(aiRes?.queued),
       status: typeof aiRes?.status === 'string' ? aiRes.status : 'queued_extraction',
+      runId: typeof aiRes?.run_id === 'string' ? aiRes.run_id : undefined,
     };
   },
 
@@ -737,16 +806,41 @@ export const suapScraperService = {
         force: true,
         stageMetrics: { strategy_fallback: 'full', total_ms: Date.now() - startedAt },
       });
-      return { ...queued, includedDocuments: 0, excludedDocuments: 0, usedFullPdfFallback: true };
+      return { ...queued, includedDocuments: 0, excludedDocuments: 0, usedFullPdfFallback: true, hasUnavailableDocuments: false };
     }
 
     const downloadStartedAt = Date.now();
+    let initialQueueStarted = false;
+    let initialQueue: AiExtractionQueueResult | null = null;
+    let initialQueueError: Error | null = null;
     const downloads = await downloadEligibleIndividualDocuments(
       proc,
       suapSessionId,
       tenantId,
       inventory.included,
       log,
+      async (document) => {
+        if (initialQueueStarted) return;
+        initialQueueStarted = true;
+        try {
+          log(`[${proc.suapId}] Piloto: PDF prioritario disponivel (${document.title}); iniciando a IA sem aguardar as demais pecas.`);
+          initialQueue = await this.runAiExtractionForProcess(proc, tenantId, log, {
+            force: true,
+            inputStrategy: 'eligible_documents',
+            inputDocumentIds: [document.id],
+            stageMetrics: {
+              strategy_priority: 'first_available_document',
+              priority_document_id: document.id,
+              priority_document_title: document.title,
+              inventory_ms: Date.now() - startedAt,
+              total_ms_until_queue: Date.now() - startedAt,
+            },
+          });
+        } catch (error) {
+          initialQueueError = error instanceof Error ? error : new Error(String(error));
+          log(`[${proc.suapId}] Piloto: nao foi possivel enfileirar a primeira IA (${initialQueueError.message}); tentando as demais pecas.`);
+        }
+      },
     );
     const stageMetrics = {
       inventory_ms: downloadStartedAt - startedAt,
@@ -754,9 +848,29 @@ export const suapScraperService = {
       selected_documents: inventory.included.length,
       ignored_documents: inventory.excluded.length,
       selected_document_bytes: downloads.downloaded.reduce((total, document) => total + (document.byteSize || 0), 0),
+      unavailable_documents: downloads.failed.length,
     };
 
-    if (inventory.included.length === 0 || downloads.failed.length > 0 || downloads.downloaded.length !== inventory.included.length) {
+    if (initialQueue?.queued) {
+      if (initialQueue.runId) {
+        void fullPdfPromise.then((storagePath) => {
+          if (storagePath) return queueLateFullPdfSupplementIfNeeded(proc, tenantId, log, initialQueue!.runId!);
+        });
+      }
+      return {
+        ...initialQueue,
+        includedDocuments: inventory.included.length,
+        excludedDocuments: inventory.excluded.length,
+        usedFullPdfFallback: false,
+        hasUnavailableDocuments: downloads.failed.length > 0,
+      };
+    }
+
+    if (initialQueueError) {
+      log(`[${proc.suapId}] Piloto: primeira fila indisponivel; usando os ${downloads.downloaded.length} PDF(s) ja baixados.`);
+    }
+
+    if (inventory.included.length === 0 || downloads.downloaded.length === 0) {
       const failedTitles = downloads.failed.map(({ document }) => document.title).join(', ');
       log(`[${proc.suapId}] Piloto: peça relevante indisponível${failedTitles ? ` (${failedTitles})` : ''}; aguardando PDF completo.`);
       await fullPdfPromise;
@@ -770,7 +884,15 @@ export const suapScraperService = {
         includedDocuments: inventory.included.length,
         excludedDocuments: inventory.excluded.length,
         usedFullPdfFallback: true,
+        hasUnavailableDocuments: downloads.failed.length > 0,
       };
+    }
+
+    if (downloads.failed.length > 0) {
+      const failedDocuments = downloads.failed
+        .map(({ document, error }) => `${document.title}: ${error instanceof Error ? error.message : String(error)}`)
+        .join(' | ');
+      log(`[${proc.suapId}] Piloto: ${downloads.downloaded.length} PDF(s) util(eis) disponivel(is); iniciando a IA agora. Pecas pendentes: ${failedDocuments}. O PDF completo ficara pronto apenas para complementar uma extracao incompleta.`);
     }
 
     const queued = await this.runAiExtractionForProcess(proc, tenantId, log, {
@@ -779,11 +901,17 @@ export const suapScraperService = {
       inputDocumentIds: downloads.downloaded.map((document) => document.id),
       stageMetrics: { ...stageMetrics, total_ms_until_queue: Date.now() - startedAt },
     });
+    if (queued.queued && queued.runId) {
+      void fullPdfPromise.then((storagePath) => {
+        if (storagePath) return queueLateFullPdfSupplementIfNeeded(proc, tenantId, log, queued.runId!);
+      });
+    }
     return {
       ...queued,
       includedDocuments: inventory.included.length,
       excludedDocuments: inventory.excluded.length,
       usedFullPdfFallback: false,
+      hasUnavailableDocuments: downloads.failed.length > 0,
     };
   },
 

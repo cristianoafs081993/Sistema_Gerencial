@@ -992,8 +992,10 @@ export default function Suap() {
       const summary = `${result.includedDocuments} documento(s) útil(eis), ${result.excludedDocuments} ignorado(s)`;
       toast.success(
         result.usedFullPdfFallback
-          ? `Peça relevante indisponível; extração enfileirada com PDF completo (${summary}).`
-          : `Extração do piloto enfileirada com PDFs individuais (${summary}).`,
+          ? `Nenhum PDF útil ficou disponível; extração enfileirada com PDF completo (${summary}).`
+          : result.hasUnavailableDocuments
+            ? `Extração iniciada com os PDFs úteis disponíveis; o completo fica reservado para complementar dados ausentes (${summary}).`
+            : `Extração do piloto enfileirada com PDFs individuais (${summary}).`,
         { id: loadingToast },
       );
       await refetch();

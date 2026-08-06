@@ -15,6 +15,7 @@ import {
   corsHeaders,
   detectErrorCode,
   downloadPdfBytes,
+  enqueueJob,
   fetchJob,
   fetchProcessRecord,
   initializeChunkRows,
@@ -24,6 +25,7 @@ import {
   mergeNotas,
   splitPdfIntoChunks,
   supabase,
+  triggerWorker,
   updateChunk,
   updateExtractionRun,
   updateJob,
@@ -142,6 +144,36 @@ async function ensureInvoiceCompleteness(
   return payload;
 }
 
+function hasUsableInvoice(payload: ExtractionPayload) {
+  return payload.notas_fiscais.some((nota) => Boolean(
+    cleanString(nota.numero) || cleanString(nota.data_emissao) || cleanString(nota.valor),
+  ));
+}
+
+function needsFullPdfSupplement(job: ExtractionJobRow, payload: ExtractionPayload, validation: ExtractionValidation) {
+  return job.input_strategy === 'eligible_documents' && (!validation.ok || !hasUsableInvoice(payload));
+}
+
+async function queueFullPdfSupplement(job: ExtractionJobRow) {
+  const latestProcess = await fetchProcessRecord(job.tenant_id, job.suap_id);
+  if (!cleanString(latestProcess.pdf_url)) return { status: 'waiting_for_pdf' as const };
+
+  const followUpJob = await enqueueJob(job.tenant_id, job.suap_id, job.context_text, {
+    inputStrategy: 'full',
+    stageMetrics: {
+      strategy_fallback: 'full_supplement',
+      prior_run_id: job.current_run_id || '',
+    },
+  });
+  await updateProcessStatus(job.tenant_id, job.suap_id, 'queued_extraction');
+  EdgeRuntime.waitUntil(
+    triggerWorker(followUpJob.id).catch((error) => {
+      console.error(`[process-pdf-worker] Failed to trigger full PDF supplement for ${job.suap_id}:`, error);
+    }),
+  );
+  return { status: 'queued' as const, runId: followUpJob.current_run_id };
+}
+
 async function persistSuccess(
   job: ExtractionJobRow,
   processo: ProcessRecord,
@@ -171,7 +203,19 @@ async function persistSuccess(
     .eq("suap_id", job.suap_id);
   if (error) throw new Error(error.message);
 
+  const shouldSupplement = needsFullPdfSupplement(job, completePayload, validation);
   await markJobCompleted(job.id, provider);
+
+  let supplement: { status: 'not_needed' | 'queued' | 'waiting_for_pdf'; runId?: string } = { status: 'not_needed' };
+  if (shouldSupplement) {
+    try {
+      supplement = await queueFullPdfSupplement(job);
+    } catch (error) {
+      console.error(`[process-pdf-worker] Failed to queue full PDF supplement for ${job.suap_id}:`, error);
+      supplement = { status: 'waiting_for_pdf' };
+    }
+  }
+
   await updateExtractionRun(job.current_run_id, {
     status: "completed",
     provider,
@@ -180,6 +224,7 @@ async function persistSuccess(
       status: processStatus,
       validation: validation.ok ? "ok" : validation.reason,
       extracted: completePayload,
+      full_pdf_supplement: supplement,
     },
     finished_at: new Date().toISOString(),
   });

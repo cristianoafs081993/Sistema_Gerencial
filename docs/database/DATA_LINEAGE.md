@@ -259,7 +259,7 @@ Mostrar a linhagem operacional dos dados de forma curta:
 
 - entrada adicional: HTML da página de processo -> `parseSuapProcessDocumentManifest` -> `suap_processo_documentos`;
 - seleção: títulos classificados como `included` -> até quatro downloads via `suap-proxy` -> `suap-pdfs/{tenant}/{suap}/documents/*`;
-- fallback: falha de qualquer peça elegível -> PDF completo canônico gerado em paralelo -> estratégia `full`;
+- prioridade: quando ao menos uma peça elegível fica disponível, ela entra imediatamente na estratégia `eligible_documents`; a geração do PDF completo segue em paralelo e só vira uma segunda extração `full` se a primeira ficar incompleta ou não trouxer nota fiscal utilizável;
 - extração: `process-pdf` valida inventário e tenant -> `process_extraction_jobs`/`process_extraction_runs` -> worker une PDFs temporariamente -> `processos.dados_completos`;
 - comparação A/B: usar `process_extraction_runs` para mediana até `success`/`incomplete_extraction`, bytes, páginas, provedor/fallback e completude de campos nos 10 processos representativos.
 
