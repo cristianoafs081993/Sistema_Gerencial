@@ -1,4 +1,9 @@
 import { supabase } from '@/lib/supabase';
+import {
+  parseSuapProcessDocumentManifest,
+  runWithConcurrency,
+} from '@/lib/suapProcessDocuments';
+import type { SuapProcessDocument } from '@/types';
 
 export interface ScrapedProcesso {
   suapId: string;
@@ -57,6 +62,67 @@ async function fetchViaProxy(
   }
 
   return data;
+}
+
+function base64ToUint8Array(base64: string) {
+  const byteChars = atob(base64);
+  const byteArray = new Uint8Array(byteChars.length);
+  for (let index = 0; index < byteChars.length; index += 1) {
+    byteArray[index] = byteChars.charCodeAt(index);
+  }
+  return byteArray;
+}
+
+function mapProcessDocumentRow(row: SuapProcessDocumentRow): SuapProcessDocument {
+  return {
+    id: row.id,
+    processoId: row.processo_id,
+    tenantId: row.tenant_id || undefined,
+    suapDocumentId: row.suap_documento_id,
+    order: row.ordem,
+    title: row.titulo,
+    documentType: row.tipo || undefined,
+    originalUrl: row.url_original,
+    classification: row.classificacao,
+    classificationReason: row.motivo_classificacao || undefined,
+    downloadStatus: row.download_status,
+    storagePath: row.storage_path || undefined,
+    byteSize: row.byte_size ?? undefined,
+    pageCount: row.page_count ?? undefined,
+    downloadError: row.download_error || undefined,
+    downloadedAt: row.downloaded_at ? new Date(row.downloaded_at) : undefined,
+  };
+}
+
+type SuapProcessDocumentRow = {
+  id: string;
+  processo_id: string;
+  tenant_id: string | null;
+  suap_documento_id: string;
+  ordem: number;
+  titulo: string;
+  tipo: string | null;
+  url_original: string;
+  classificacao: 'included' | 'excluded';
+  motivo_classificacao: string | null;
+  download_status: 'pending' | 'downloading' | 'downloaded' | 'failed';
+  storage_path: string | null;
+  byte_size: number | null;
+  page_count: number | null;
+  download_error: string | null;
+  downloaded_at: string | null;
+};
+
+export type IndividualDocumentPilotResult = AiExtractionQueueResult & {
+  includedDocuments: number;
+  excludedDocuments: number;
+  usedFullPdfFallback: boolean;
+};
+
+const INDIVIDUAL_DOCUMENT_DOWNLOAD_CONCURRENCY = 4;
+
+function buildProcessDocumentStoragePath(tenantId: string, suapId: string, suapDocumentId: string) {
+  return `${tenantId}/${suapId}/documents/${suapDocumentId}.pdf`;
 }
 
 function extractProcessNumber(text: string): string | null {
@@ -185,18 +251,160 @@ async function storeProcessPdf(
 
   if (uploadErr) throw new Error(`Upload do PDF falhou: ${uploadErr.message}`);
 
-  const { error: updateError } = await supabase
+  const now = new Date().toISOString();
+  const { data: statusUpdated, error: updateError } = await supabase
     .from('processos')
-    .update({ pdf_url: storagePath, status: 'pdf_uploaded', updated_at: new Date().toISOString() })
+    .update({ pdf_url: storagePath, status: 'pdf_uploaded', updated_at: now })
     .eq('tenant_id', tenantId)
-    .eq('suap_id', proc.suapId);
+    .eq('suap_id', proc.suapId)
+    .in('status', ['pending_extraction', 'pdf_uploaded'])
+    .select('id')
+    .maybeSingle();
   if (updateError) throw updateError;
+
+  // O PDF completo continua canônico, mas uma geração em segundo plano não pode
+  // regredir o status de uma extração que já foi enfileirada ou concluída.
+  if (!statusUpdated) {
+    const { error: canonicalUrlError } = await supabase
+      .from('processos')
+      .update({ pdf_url: storagePath, updated_at: now })
+      .eq('tenant_id', tenantId)
+      .eq('suap_id', proc.suapId);
+    if (canonicalUrlError) throw canonicalUrlError;
+  }
 
   log(`[${proc.suapId}] PDF sincronizado com sucesso.`);
   return storagePath;
 }
 
 // Portabilidade do scraping da página de listagem do SUAP
+type IndividualDocumentInventory = {
+  processId: string;
+  included: SuapProcessDocument[];
+  excluded: SuapProcessDocument[];
+};
+
+async function syncIndividualDocumentInventory(
+  proc: Pick<ScrapedProcesso, 'suapId'>,
+  suapSessionId: string,
+  tenantId: string,
+  log: SyncProgressCallback,
+): Promise<IndividualDocumentInventory> {
+  const { data: processRecord, error: processError } = await supabase
+    .from('processos')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('suap_id', proc.suapId)
+    .single();
+  if (processError || !processRecord) throw processError || new Error('Processo não encontrado.');
+
+  log(`[${proc.suapId}] Piloto: inventariando os documentos individuais...`);
+  const detail = await fetchViaProxy(`/processo_eletronico/processo/${proc.suapId}/`, suapSessionId);
+  const candidates = parseSuapProcessDocumentManifest(detail.text || '');
+  if (candidates.length === 0) throw new Error('Nenhum documento individual foi localizado na página do processo.');
+
+  const inventoryRows = candidates.map((document) => ({
+    tenant_id: tenantId,
+    processo_id: processRecord.id,
+    suap_documento_id: document.suapDocumentId,
+    ordem: document.order,
+    titulo: document.title,
+    tipo: document.documentType,
+    url_original: document.originalUrl,
+    classificacao: document.classification,
+    motivo_classificacao: document.classificationReason,
+  }));
+  const { error: upsertError } = await supabase
+    .from('suap_processo_documentos')
+    .upsert(inventoryRows, { onConflict: 'tenant_id,processo_id,suap_documento_id' });
+  if (upsertError) throw upsertError;
+
+  const { data: rows, error: inventoryError } = await supabase
+    .from('suap_processo_documentos')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('processo_id', processRecord.id)
+    .in('suap_documento_id', candidates.map((candidate) => candidate.suapDocumentId))
+    .order('ordem', { ascending: true });
+  if (inventoryError) throw inventoryError;
+
+  const documents = ((rows || []) as SuapProcessDocumentRow[]).map(mapProcessDocumentRow);
+  return {
+    processId: processRecord.id,
+    included: documents.filter((document) => document.classification === 'included'),
+    excluded: documents.filter((document) => document.classification === 'excluded'),
+  };
+}
+
+async function downloadEligibleIndividualDocuments(
+  proc: Pick<ScrapedProcesso, 'suapId'>,
+  suapSessionId: string,
+  tenantId: string,
+  documents: SuapProcessDocument[],
+  log: SyncProgressCallback,
+) {
+  const pending = documents.filter((document) => document.downloadStatus !== 'downloaded' || !document.storagePath);
+  if (pending.length === 0) return { downloaded: documents, failed: [] as Array<{ document: SuapProcessDocument; error: unknown }> };
+
+  log(`[${proc.suapId}] Piloto: baixando ${pending.length} PDF(s) úteis (até ${INDIVIDUAL_DOCUMENT_DOWNLOAD_CONCURRENCY} em paralelo)...`);
+  const results = await runWithConcurrency(
+    pending.map((document) => async () => {
+      const { error: startingError } = await supabase
+        .from('suap_processo_documentos')
+        .update({ download_status: 'downloading', download_error: null })
+        .eq('id', document.id)
+        .eq('tenant_id', tenantId);
+      if (startingError) throw startingError;
+
+      try {
+        const response = await fetchViaProxy(new URL(document.originalUrl).pathname + '?original=sim', suapSessionId);
+        if (!response?.base64) throw new Error('O SUAP não retornou o PDF original.');
+        const bytes = base64ToUint8Array(response.base64);
+        if (bytes.length < 4 || String.fromCharCode(...bytes.slice(0, 4)) !== '%PDF') {
+          throw new Error('O documento retornado pelo SUAP não é um PDF válido.');
+        }
+        const storagePath = buildProcessDocumentStoragePath(tenantId, proc.suapId, document.suapDocumentId);
+        const { error: uploadError } = await supabase.storage
+          .from('suap-pdfs')
+          .upload(storagePath, new Blob([bytes], { type: 'application/pdf' }), {
+            contentType: 'application/pdf',
+            upsert: true,
+          });
+        if (uploadError) throw uploadError;
+
+        const { error: completedError } = await supabase
+          .from('suap_processo_documentos')
+          .update({
+            download_status: 'downloaded',
+            storage_path: storagePath,
+            byte_size: bytes.length,
+            download_error: null,
+            downloaded_at: new Date().toISOString(),
+          })
+          .eq('id', document.id)
+          .eq('tenant_id', tenantId);
+        if (completedError) throw completedError;
+        return { ...document, downloadStatus: 'downloaded' as const, storagePath, byteSize: bytes.length };
+      } catch (error) {
+        await supabase
+          .from('suap_processo_documentos')
+          .update({ download_status: 'failed', download_error: error instanceof Error ? error.message : String(error) })
+          .eq('id', document.id)
+          .eq('tenant_id', tenantId);
+        throw error;
+      }
+    }),
+    INDIVIDUAL_DOCUMENT_DOWNLOAD_CONCURRENCY,
+  );
+
+  const failed = results.rejected.map((entry) => ({ document: pending[entry.index], error: entry.reason }));
+  const downloaded = [
+    ...documents.filter((document) => !pending.some((pendingDocument) => pendingDocument.id === document.id)),
+    ...results.fulfilled,
+  ];
+  return { downloaded, failed };
+}
+
 export const suapScraperService = {
   async loginSuap(username: string, password: string): Promise<string> {
     const { data, error } = await supabase.functions.invoke('suap-proxy', {
@@ -443,7 +651,12 @@ export const suapScraperService = {
     proc: Pick<ScrapedProcesso, 'suapId'>,
     tenantId: string,
     log: SyncProgressCallback,
-    options: { force?: boolean } = {},
+    options: {
+      force?: boolean;
+      inputStrategy?: 'full' | 'eligible_documents';
+      inputDocumentIds?: string[];
+      stageMetrics?: Record<string, unknown>;
+    } = {},
   ): Promise<AiExtractionQueueResult> {
     const { data: existing, error: fetchError } = await supabase
       .from('processos')
@@ -453,7 +666,8 @@ export const suapScraperService = {
       .single();
 
     if (fetchError) throw fetchError;
-    if (!existing?.pdf_url) {
+    const inputStrategy = options.inputStrategy || 'full';
+    if (inputStrategy === 'full' && !existing?.pdf_url) {
       log(`[${proc.suapId}] PDF ausente. Baixe o PDF antes da extracao por IA.`);
       return { queued: false, status: 'pdf_missing' };
     }
@@ -464,9 +678,23 @@ export const suapScraperService = {
     }
 
     log(`[${proc.suapId}] Executando extracao por Inteligencia Artificial...`);
-    const { data: aiRes, error: aiErr } = await supabase.functions.invoke('process-pdf', {
-      body: { suap_id: proc.suapId },
-    });
+    const aiInvocation = inputStrategy === 'eligible_documents'
+      ? supabase.functions.invoke('process-pdf', {
+          body: {
+            suap_id: proc.suapId,
+            input_strategy: inputStrategy,
+            input_document_ids: options.inputDocumentIds || [],
+            stage_metrics: options.stageMetrics || {},
+          },
+        })
+      : options.stageMetrics
+        ? supabase.functions.invoke('process-pdf', {
+            body: { suap_id: proc.suapId, stage_metrics: options.stageMetrics },
+          })
+        : supabase.functions.invoke('process-pdf', {
+            body: { suap_id: proc.suapId },
+          });
+    const { data: aiRes, error: aiErr } = await aiInvocation;
 
     if (aiErr) {
       throw new Error(`Extracao por IA falhou: ${aiErr.message}`);
@@ -479,6 +707,83 @@ export const suapScraperService = {
     return {
       queued: Boolean(aiRes?.queued),
       status: typeof aiRes?.status === 'string' ? aiRes.status : 'queued_extraction',
+    };
+  },
+
+  async runIndividualDocumentPilotForProcess(
+    proc: ScrapedProcesso | SyncedProcesso,
+    suapSessionId: string,
+    tenantId: string,
+    log: SyncProgressCallback,
+  ): Promise<IndividualDocumentPilotResult> {
+    const startedAt = Date.now();
+    let fullPdfError: Error | null = null;
+    const fullPdfPromise = this.downloadPdfForProcess(proc, suapSessionId, tenantId, log, { force: true })
+      .catch((error) => {
+        const normalizedError = error instanceof Error ? error : new Error(String(error));
+        fullPdfError = normalizedError;
+        log(`[${proc.suapId}] Piloto: PDF completo indisponível para fallback (${normalizedError.message}).`);
+        return null;
+      });
+
+    let inventory: IndividualDocumentInventory;
+    try {
+      inventory = await syncIndividualDocumentInventory(proc, suapSessionId, tenantId, log);
+    } catch (error) {
+      log(`[${proc.suapId}] Piloto: inventário indisponível; usando PDF completo como fallback.`);
+      await fullPdfPromise;
+      if (fullPdfError) throw fullPdfError;
+      const queued = await this.runAiExtractionForProcess(proc, tenantId, log, {
+        force: true,
+        stageMetrics: { strategy_fallback: 'full', total_ms: Date.now() - startedAt },
+      });
+      return { ...queued, includedDocuments: 0, excludedDocuments: 0, usedFullPdfFallback: true };
+    }
+
+    const downloadStartedAt = Date.now();
+    const downloads = await downloadEligibleIndividualDocuments(
+      proc,
+      suapSessionId,
+      tenantId,
+      inventory.included,
+      log,
+    );
+    const stageMetrics = {
+      inventory_ms: downloadStartedAt - startedAt,
+      documents_download_ms: Date.now() - downloadStartedAt,
+      selected_documents: inventory.included.length,
+      ignored_documents: inventory.excluded.length,
+      selected_document_bytes: downloads.downloaded.reduce((total, document) => total + (document.byteSize || 0), 0),
+    };
+
+    if (inventory.included.length === 0 || downloads.failed.length > 0 || downloads.downloaded.length !== inventory.included.length) {
+      const failedTitles = downloads.failed.map(({ document }) => document.title).join(', ');
+      log(`[${proc.suapId}] Piloto: peça relevante indisponível${failedTitles ? ` (${failedTitles})` : ''}; aguardando PDF completo.`);
+      await fullPdfPromise;
+      if (fullPdfError) throw new Error(`Os PDFs individuais falharam e o fallback completo não ficou disponível: ${fullPdfError.message}`);
+      const queued = await this.runAiExtractionForProcess(proc, tenantId, log, {
+        force: true,
+        stageMetrics: { ...stageMetrics, strategy_fallback: 'full', total_ms: Date.now() - startedAt },
+      });
+      return {
+        ...queued,
+        includedDocuments: inventory.included.length,
+        excludedDocuments: inventory.excluded.length,
+        usedFullPdfFallback: true,
+      };
+    }
+
+    const queued = await this.runAiExtractionForProcess(proc, tenantId, log, {
+      force: true,
+      inputStrategy: 'eligible_documents',
+      inputDocumentIds: downloads.downloaded.map((document) => document.id),
+      stageMetrics: { ...stageMetrics, total_ms_until_queue: Date.now() - startedAt },
+    });
+    return {
+      ...queued,
+      includedDocuments: inventory.included.length,
+      excludedDocuments: inventory.excluded.length,
+      usedFullPdfFallback: false,
     };
   },
 

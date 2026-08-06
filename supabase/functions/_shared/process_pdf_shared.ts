@@ -141,6 +141,7 @@ export type ExtractionPayload = {
 };
 
 export type ProcessRecord = Record<string, unknown>;
+export type InputStrategy = 'full' | 'eligible_documents';
 export type ExtractionJobRow = {
   id: string;
   tenant_id: string;
@@ -150,6 +151,9 @@ export type ExtractionJobRow = {
   lease_expires_at: string | null;
   context_text: string | null;
   provider_order: unknown;
+  input_strategy: InputStrategy;
+  input_document_ids: string[];
+  current_run_id: string | null;
   last_error_code: string | null;
   last_error_message: string | null;
   result_provider: string | null;
@@ -848,12 +852,26 @@ export async function fetchProcessRecord(tenantId: string, suapId: string) {
   return processo as ProcessRecord;
 }
 
-export async function enqueueJob(tenantId: string, suapId: string, contextText: string | null) {
+export type EnqueueJobOptions = {
+  inputStrategy?: InputStrategy;
+  inputDocumentIds?: string[];
+  stageMetrics?: Record<string, unknown>;
+};
+
+export async function enqueueJob(
+  tenantId: string,
+  suapId: string,
+  contextText: string | null,
+  options: EnqueueJobOptions = {},
+) {
   const { data, error } = await supabase.rpc("enqueue_process_extraction_job", {
     p_tenant_id: tenantId,
     p_suap_id: suapId,
     p_context_text: contextText,
     p_provider_order: ["gemini", "openai", "openrouter"],
+    p_input_strategy: options.inputStrategy ?? "full",
+    p_input_document_ids: options.inputDocumentIds ?? [],
+    p_stage_metrics: options.stageMetrics ?? {},
   });
   if (error || !data) throw new Error(error?.message ?? "Failed to enqueue extraction job.");
   return (Array.isArray(data) ? data[0] : data) as ExtractionJobRow;
@@ -875,6 +893,15 @@ export async function updateJob(jobId: string, patch: Partial<ExtractionJobRow>)
     .from("process_extraction_jobs")
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq("id", jobId);
+  if (error) throw new Error(error.message);
+}
+
+export async function updateExtractionRun(runId: string | null, patch: Record<string, unknown>) {
+  if (!runId) return;
+  const { error } = await supabase
+    .from("process_extraction_runs")
+    .update(patch)
+    .eq("id", runId);
   if (error) throw new Error(error.message);
 }
 

@@ -974,6 +974,37 @@ export default function Suap() {
     }
   };
 
+  const handleIndividualDocumentPilot = async (processo: SuapProcesso) => {
+    if (!session?.user?.id) return;
+    const suapSessionId = getSuapSessionId();
+    if (!suapSessionId) return;
+
+    const actionId = `${processo.id}:pilot`;
+    setProcessActionId(actionId);
+    const loadingToast = toast.loading('Preparando extração com PDFs individuais...');
+    try {
+      const result = await suapScraperService.runIndividualDocumentPilotForProcess(
+        toScrapedProcess(processo),
+        suapSessionId,
+        session.user.id,
+        (message) => console.info(message),
+      );
+      const summary = `${result.includedDocuments} documento(s) útil(eis), ${result.excludedDocuments} ignorado(s)`;
+      toast.success(
+        result.usedFullPdfFallback
+          ? `Peça relevante indisponível; extração enfileirada com PDF completo (${summary}).`
+          : `Extração do piloto enfileirada com PDFs individuais (${summary}).`,
+        { id: loadingToast },
+      );
+      await refetch();
+    } catch (error) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : 'Falha no piloto de PDFs individuais.', { id: loadingToast });
+    } finally {
+      setProcessActionId(null);
+    }
+  };
+
   const runBulkAction = async (action: ProcessAction) => {
     if (!session?.user?.id || selectedProcesses.length === 0) return;
 
@@ -1396,6 +1427,7 @@ export default function Suap() {
                   const isSelected = selectedProcessIds.has(processo.id);
                   const isDownloading = processActionId === `${processo.id}:download`;
                   const isExtractingAi = processActionId === `${processo.id}:ai`;
+                  const isExtractingIndividual = processActionId === `${processo.id}:pilot`;
                   const isConcluded = isProcessConcluded(processo);
                   const processLabel = processo.numProcesso || processo.suapId || 'Processo sem SUAP ID';
                   const valorLiquido = processo.dadosCompletos?.val_nf;
@@ -1558,6 +1590,18 @@ export default function Suap() {
                             onClick={() => void handleDownloadPdfStage(processo, Boolean(processo.pdfUrl))}
                           >
                             <FileDown className={cn('h-4 w-4', isDownloading && 'animate-pulse')} />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            title="Extrair com PDFs individuais — piloto"
+                            aria-label={`Extrair com PDFs individuais — piloto: ${processLabel}`}
+                            className="h-8 w-8 text-violet-600 hover:bg-violet-50 hover:text-violet-700"
+                            disabled={isExtractingIndividual || processActionId !== null}
+                            onClick={() => void handleIndividualDocumentPilot(processo)}
+                          >
+                            <Sparkles className={cn('h-4 w-4', isExtractingIndividual && 'animate-pulse')} />
                           </Button>
                           <Button
                             type="button"

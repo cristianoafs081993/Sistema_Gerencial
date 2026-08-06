@@ -90,6 +90,18 @@ Almoxarifado:
 - o fluxo deve proteger entrada, saída, transferência e custo médio da origem;
 - a UI deve cobrir estado vazio, filtros, cadastro de item e lançamento de movimento.
 
+## Piloto SUAP por PDFs individuais
+
+Cobertura mínima obrigatória do piloto manual:
+
+- parser do HTML e classificação em português com variações de acento; documentos desconhecidos devem permanecer incluídos;
+- limite de quatro downloads concorrentes e falha de qualquer documento elegível, que deve forçar fallback completo sem extração parcial silenciosa;
+- bloqueio de URLs externas, caminhos de documento sem `?original=sim` e parâmetros arbitrários no `suap-proxy`;
+- migration com inventário e histórico isolados por `tenant_id` e RLS; endpoint deve validar os IDs contra o processo/tenant antes de enfileirar;
+- regressão do PDF completo, extensão SUAP, Editor de Documentos, PDFs pesados por blocos e múltiplas notas fiscais.
+
+Rollout: executar A/B manual em 10 processos de pagamento representativos. Promover a estratégia apenas se a mediana até `success` ou `incomplete_extraction` reduzir pelo menos 40% e os campos relevantes permanecerem iguais ou mais completos após revisão humana.
+
 ## Regressao da extensao Suape
 
 A pasta corrente e centralizada por `src/test/extensionFixtures.ts`. As suites `suapExtensionPackage`, `suapProcessDocumentExtension`, `suapTextExpander`, `suapExtensionDispatch`, `SuapExtensionProcessInfo`, `suapPlanContentScript` e `suapCloneAutomation` protegem manifesto e rotas, painel de processo, bridge segura, sincronizacao, Financeiro, atalhos, popup, Plano de Atividades e clonagem.

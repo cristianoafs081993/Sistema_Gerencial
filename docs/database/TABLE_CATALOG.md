@@ -1329,11 +1329,45 @@ Observações operacionais:
 - Apenas caixas selecionadas e lidas com sucesso são reconciliadas; falhas e caixas não selecionadas não alteram vínculos.
 - Uma caixa vazia é um inventário válido e remove seus vínculos anteriores.
 
+### `suap_processo_documentos`
+
+Finalidade:
+
+- Inventário por processo dos PDFs individuais localizados no HTML do SUAP para o piloto manual de extração.
+
+Campos-chave:
+
+- `tenant_id`, `processo_id`, `suap_documento_id` (únicos por documento);
+- `ordem`, `titulo`, `tipo`, `url_original`;
+- `classificacao` e `motivo_classificacao`;
+- `download_status`, `storage_path`, `byte_size`, `page_count`, `download_error` e `downloaded_at`.
+
+Observações operacionais e RLS:
+
+- A política de `FOR ALL` restringe leitura e escrita a `auth.uid() = tenant_id`.
+- Somente documentos `included` e `downloaded` podem entrar em uma extração `eligible_documents`; os títulos desconhecidos entram por padrão.
+
+### `process_extraction_runs`
+
+Finalidade:
+
+- Histórico imutável de cada solicitação de extração, separado do job reutilizável por processo.
+
+Campos-chave:
+
+- `job_id`, `tenant_id`, `suap_id`, `input_strategy`, `input_document_ids` e `status`;
+- contagem, bytes e páginas da entrada; métricas de etapas; provedor; fallback; snapshot do resultado e erro.
+
+Observações operacionais e RLS:
+
+- A RLS de leitura permite somente o próprio `tenant_id`.
+- `process_extraction_jobs.current_run_id` aponta para a execução ativa/mais recente, sem substituir os históricos anteriores.
+
 ### Storage Bucket: `suap-pdfs`
 
 Finalidade:
 
-- Armazenamento de arquivos PDF completos de processos do SUAP baixados durante a sincronização nativa.
+- Armazenamento do PDF completo canônico em `{tenant_id}/{suap_id}.pdf` e, no piloto, das peças elegíveis em `{tenant_id}/{suap_id}/documents/{suap_documento_id}.pdf`.
 
 Observações operacionais e RLS:
 

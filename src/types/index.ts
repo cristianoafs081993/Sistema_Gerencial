@@ -349,6 +349,8 @@ export interface SuapWorkflowConclusao {
 export interface SuapDadosCompletos {
   extraction_job?: {
     provider?: string;
+    input_strategy?: 'full' | 'eligible_documents';
+    run_id?: string;
     used_async_worker?: boolean;
     last_error_code?: string;
     last_error_message?: string;
@@ -363,6 +365,25 @@ export interface SuapDadosCompletos {
   dados_bancarios?: SuapDadosBancarios;
   retencoes_tributarias?: SuapRetencoesTributarias;
   workflow?: SuapWorkflowConclusao;
+}
+
+export interface SuapProcessDocument {
+  id: string;
+  processoId: string;
+  tenantId?: string;
+  suapDocumentId: string;
+  order: number;
+  title: string;
+  documentType?: string;
+  originalUrl: string;
+  classification: 'included' | 'excluded';
+  classificationReason?: string;
+  downloadStatus: 'pending' | 'downloading' | 'downloaded' | 'failed';
+  storagePath?: string;
+  byteSize?: number;
+  pageCount?: number;
+  downloadError?: string;
+  downloadedAt?: Date;
 }
 
 export interface SuapProcesso {

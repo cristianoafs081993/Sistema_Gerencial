@@ -67,9 +67,10 @@ Chamador:
 
 Uso:
 
-- `process-pdf` autentica o usuario, valida o processo e enfileira a extracao do PDF sincronizado no bucket `suap-pdfs`
-- `process-pdf-worker` processa a fila, atualiza `processos` e grava `dados_completos.extraction_job`; a ordem de provedores e Gemini com PDF inteiro, Gemini por blocos, OpenAI com PDF e OpenRouter para reparo final do JSON. A OpenAI tambem repete a tentativa por blocos quando o PDF inteiro excede sua janela de contexto; a falha final registra explicitamente a tentativa primaria do Gemini e a do fallback. O prompt exige todas as notas fiscais/DANFE encontradas e, quando a resposta valida traz no maximo uma nota, o worker executa uma verificacao complementar no PDF completo e mescla o resultado sem duplicatas. A persistencia tambem preserva notas ja armazenadas durante reprocessamentos incompletos.
-- o fluxo SUAP padrao envia apenas `suap_id` para a Edge Function; antes da IA o frontend persiste somente `suap_id`, `url`, `caixa` e, quando encontrado na listagem, `num_processo`. A resposta `202` confirma somente o enfileiramento; o frontend acompanha `processos.status` ate o resultado final e exibe falhas tecnicas registradas em `dados_completos.extraction_job`
+- `process-pdf` autentica o usuário, valida o processo e, por padrão, enfileira a estratégia `full` com o PDF canônico de `processos.pdf_url` no bucket `suap-pdfs`.
+- No piloto manual de `/suap`, `input_strategy: "eligible_documents"` aceita somente IDs do inventário do próprio tenant que estejam classificados como `included`, baixados e com `storage_path`; a função recusa itens ausentes, não elegíveis ou uma segunda estratégia enquanto outra estiver em processamento.
+- `process-pdf-worker` une temporariamente os PDFs elegíveis na ordem do inventário e preserva a mesma inspeção de peso, divisão em blocos, ordem Gemini/OpenAI/OpenRouter e consolidação de notas fiscais. A execução grava em `process_extraction_runs` os documentos, bytes, páginas, tempos recebidos, provedor, fallback, resultado ou falha; `dados_completos.extraction_job` recebe `run_id` e estratégia.
+- O fluxo padrão, a sincronização automática e a extensão continuam enviando apenas `suap_id` e usando o PDF completo. A resposta `202` confirma somente o enfileiramento; o frontend acompanha `processos.status` até o resultado final.
 
 Dependencias:
 
@@ -137,7 +138,7 @@ Dependencias:
 Observação:
 
 - Possui política de segurança interna que valida a sessão do usuário no Supabase
-- Restringe o proxy aos caminhos `/processo_eletronico/*` e `/djtools/*` no SUAP
+- Restringe o proxy à origem fixa `https://suap.ifrn.edu.br`, aos caminhos de processo e Celery já usados e, para anexos individuais, exclusivamente a `/documento_eletronico/visualizar_documento(_digitalizado)/<id>/?original=sim`; URLs externas, parâmetros adicionais e caminhos arbitrários são recusados.
 
 ### `gerar-contrato-licitacao`
 

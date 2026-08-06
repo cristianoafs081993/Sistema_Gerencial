@@ -255,6 +255,14 @@ Mostrar a linhagem operacional dos dados de forma curta:
 - reconciliação: somente caixas selecionadas e lidas com sucesso removem vínculos de processos ausentes; processos e PDFs não são apagados
 - consumo: `suapProcessosService.getAll` retorna somente processos com vínculo ativo, agregando as caixas para a UI de `/suap`
 
+### Processos SUAP: piloto por PDFs individuais
+
+- entrada adicional: HTML da página de processo -> `parseSuapProcessDocumentManifest` -> `suap_processo_documentos`;
+- seleção: títulos classificados como `included` -> até quatro downloads via `suap-proxy` -> `suap-pdfs/{tenant}/{suap}/documents/*`;
+- fallback: falha de qualquer peça elegível -> PDF completo canônico gerado em paralelo -> estratégia `full`;
+- extração: `process-pdf` valida inventário e tenant -> `process_extraction_jobs`/`process_extraction_runs` -> worker une PDFs temporariamente -> `processos.dados_completos`;
+- comparação A/B: usar `process_extraction_runs` para mediana até `success`/`incomplete_extraction`, bytes, páginas, provedor/fallback e completude de campos nos 10 processos representativos.
+
 ### Liquidacoes e fonte SOF
 
 - arquivo de liquidacoes

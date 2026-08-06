@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { PDFDocument } from "npm:pdf-lib@1.17.1";
 import {
   MAX_JOB_ATTEMPTS,
   WORKER_LEASE_SECONDS,
@@ -24,6 +25,7 @@ import {
   splitPdfIntoChunks,
   supabase,
   updateChunk,
+  updateExtractionRun,
   updateJob,
   updateProcessStatus,
   validatePayload,
@@ -53,6 +55,11 @@ async function markJobCompleted(jobId: string, provider: string) {
   });
 }
 
+function usedFallbackProvider(job: ExtractionJobRow, provider: string) {
+  const providerOrder = Array.isArray(job.provider_order) ? job.provider_order : [];
+  return providerOrder.length > 0 && String(providerOrder[0]) !== provider;
+}
+
 async function markJobFailed(job: ExtractionJobRow, processo: ProcessRecord, code: string, message: string, retryable = false) {
   const shouldRetry = retryable && job.attempt_count < MAX_JOB_ATTEMPTS;
   const processStatus = shouldRetry ? "queued_extraction" : "extraction_failed";
@@ -63,6 +70,12 @@ async function markJobFailed(job: ExtractionJobRow, processo: ProcessRecord, cod
     finished_at: shouldRetry ? null : new Date().toISOString(),
     last_error_code: code,
     last_error_message: message,
+  });
+  await updateExtractionRun(job.current_run_id, {
+    status: "failed",
+    error_code: code,
+    error_message: message,
+    finished_at: new Date().toISOString(),
   });
 
   const updatePayload = buildUpdatePayload(processo, {
@@ -85,6 +98,8 @@ async function markJobFailed(job: ExtractionJobRow, processo: ProcessRecord, cod
   updatePayload.dados_completos = {
     ...existingDados,
     extraction_job: {
+      run_id: job.current_run_id,
+      input_strategy: job.input_strategy,
       last_error_code: code,
       last_error_message: message,
       updated_at: new Date().toISOString(),
@@ -141,6 +156,8 @@ async function persistSuccess(
   updatePayload.dados_completos = {
     ...updatePayload.dados_completos,
     extraction_job: {
+      run_id: job.current_run_id,
+      input_strategy: job.input_strategy,
       provider,
       used_async_worker: true,
       updated_at: new Date().toISOString(),
@@ -155,6 +172,17 @@ async function persistSuccess(
   if (error) throw new Error(error.message);
 
   await markJobCompleted(job.id, provider);
+  await updateExtractionRun(job.current_run_id, {
+    status: "completed",
+    provider,
+    used_fallback: usedFallbackProvider(job, provider),
+    result_snapshot: {
+      status: processStatus,
+      validation: validation.ok ? "ok" : validation.reason,
+      extracted: completePayload,
+    },
+    finished_at: new Date().toISOString(),
+  });
 }
 
 function toError(error: unknown) {
@@ -458,23 +486,98 @@ async function runHeavyPdfPath(job: ExtractionJobRow, processo: ProcessRecord, p
   throw geminiFailure;
 }
 
+type WorkerPdfInput = {
+  bytes: Uint8Array;
+  documentCount: number;
+  byteSize: number;
+  pageCount: number;
+};
+
+async function loadEligibleDocumentPdfInput(job: ExtractionJobRow, processo: ProcessRecord): Promise<WorkerPdfInput> {
+  const requestedIds = [...new Set((job.input_document_ids || []).map(String))];
+  if (requestedIds.length === 0) throw new Error("Eligible document input is empty");
+
+  const { data: documents, error } = await supabase
+    .from("suap_processo_documentos")
+    .select("id, ordem, classificacao, download_status, storage_path")
+    .eq("tenant_id", job.tenant_id)
+    .eq("processo_id", String(processo.id))
+    .in("id", requestedIds)
+    .order("ordem", { ascending: true });
+  if (error) throw new Error(error.message);
+  if (!documents || documents.length !== requestedIds.length) {
+    throw new Error("Eligible document inventory changed before extraction");
+  }
+  if (documents.some((document) => (
+    document.classificacao !== "included"
+    || document.download_status !== "downloaded"
+    || !document.storage_path
+  ))) {
+    throw new Error("Eligible document input is incomplete");
+  }
+
+  const merged = await PDFDocument.create();
+  let byteSize = 0;
+  let pageCount = 0;
+  for (const document of documents) {
+    const documentBytes = await downloadPdfBytes(String(document.storage_path));
+    const source = await PDFDocument.load(documentBytes);
+    const sourcePages = await merged.copyPages(source, source.getPageIndices());
+    sourcePages.forEach((page) => merged.addPage(page));
+    const documentPages = source.getPageCount();
+    byteSize += documentBytes.length;
+    pageCount += documentPages;
+
+    const { error: updateDocumentError } = await supabase
+      .from("suap_processo_documentos")
+      .update({ page_count: documentPages })
+      .eq("id", document.id)
+      .eq("tenant_id", job.tenant_id);
+    if (updateDocumentError) throw new Error(updateDocumentError.message);
+  }
+
+  return {
+    bytes: await merged.save(),
+    documentCount: documents.length,
+    byteSize,
+    pageCount,
+  };
+}
+
 async function processJob(job: ExtractionJobRow) {
   const processo = await fetchProcessRecord(job.tenant_id, job.suap_id);
-  if (!processo?.pdf_url) throw new Error("PDF not found");
+  const inputStartedAt = Date.now();
+  await updateExtractionRun(job.current_run_id, {
+    status: "processing",
+    started_at: new Date().toISOString(),
+  });
 
+  let input: WorkerPdfInput;
+  if (job.input_strategy === "eligible_documents") {
+    input = await loadEligibleDocumentPdfInput(job, processo);
+  } else {
+    if (!processo?.pdf_url) throw new Error("PDF not found");
+    const bytes = await downloadPdfBytes(String(processo.pdf_url));
+    input = { bytes, documentCount: 1, byteSize: bytes.length, pageCount: 0 };
+  }
+  await extendLease(job.id);
+
+  const inspection = await inspectPdf(input.bytes);
+  await updateExtractionRun(job.current_run_id, {
+    input_document_count: input.documentCount,
+    input_byte_size: input.byteSize,
+    input_page_count: input.pageCount || inspection.pageCount,
+  });
+  await extendLease(job.id);
   await updateProcessStatus(job.tenant_id, job.suap_id, "processing_extraction");
-  const pdfBytes = await downloadPdfBytes(String(processo.pdf_url));
-  await extendLease(job.id);
 
-  const inspection = await inspectPdf(pdfBytes);
-  await extendLease(job.id);
-
+  console.log(`[process-pdf-worker] Prepared ${job.input_strategy} input in ${Date.now() - inputStartedAt}ms`);
   if (inspection.isHeavy) {
-    await runHeavyPdfPath(job, processo, pdfBytes, cleanString(job.context_text));
+    await runHeavyPdfPath(job, processo, input.bytes, cleanString(job.context_text));
     return;
   }
 
-  await runLightPdfPath(job, processo, pdfBytes, cleanString(job.context_text));
+  await runLightPdfPath(job, processo, input.bytes, cleanString(job.context_text));
 }
 
 Deno.serve(async (req: Request) => {

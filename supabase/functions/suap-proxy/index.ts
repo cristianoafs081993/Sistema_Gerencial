@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
+import { isAllowedSuapProxyPath } from '../_shared/suap_proxy_paths.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -195,7 +196,7 @@ Deno.serve(async (req) => {
 
     // Validação de segurança simples para garantir que o proxy só acesse endpoints permitidos do SUAP
     const cleanPath = String(path).trim();
-    if (!cleanPath.startsWith('/processo_eletronico/') && !cleanPath.startsWith('/djtools/')) {
+    if (!isAllowedSuapProxyPath(cleanPath)) {
       return new Response(JSON.stringify({ error: 'Caminho não permitido no SUAP' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
