@@ -31,7 +31,7 @@ function createRegistro(overrides: Partial<RetencaoEfdReinfRegistro> = {}): Rete
     dhProcesso: '230010001',
     dhEstado: 'RN',
     dhUgPagadora: '153103',
-    dhItemUgPagadora: '158155',
+    dhItemUgPagadora: '158366',
     dhCredorDocumento: '12345678000190',
     dhCredorNome: 'Fornecedor A',
     dhSituacao: 'DDF025',
@@ -58,7 +58,7 @@ describe('retencoesEfdReinfImportService', () => {
       [
         'linha ignorada',
         'Documento Habil\tDH - Processo\tDH - Estado\tDH - UG Pagadora\tDH Item - UG Pagadora\tDH - Credor Documento\tDH - Credor Nome\tDH - Situacao\tDH - Data Emissao Doc.Origem\tDH - Dia Pagamento\tDH Item - Dia Vencimento\tDH Item - Dia Pagamento\tDH Item - Liquidado\tDH - Valor Doc.Origem\tMetrica\tValor Retencao',
-        '2026DH0001\t230010001\tRN\t153103\t158155\t12345678000190\tFornecedor A\tDDF025\t01/03/2026\t15/03/2026\t20/04/2026\t20/04/2026\tSim\t1.000,00\tINSS\t110,00',
+        '2026DH0001\t230010001\tRN\t153103\t158366\t12345678000190\tFornecedor A\tDDF025\t01/03/2026\t15/03/2026\t20/04/2026\t20/04/2026\tSim\t1.000,00\tINSS\t110,00',
       ].join('\n'),
     );
 
@@ -69,7 +69,7 @@ describe('retencoesEfdReinfImportService', () => {
         dhProcesso: '230010001',
         dhEstado: 'RN',
         dhUgPagadora: '153103',
-        dhItemUgPagadora: '158155',
+        dhItemUgPagadora: '158366',
         dhCredorDocumento: '12345678000190',
         dhCredorNome: 'Fornecedor A',
         dhSituacao: 'DDF025',
@@ -103,7 +103,7 @@ describe('retencoesEfdReinfImportService', () => {
       expectedRule: 'DDF025',
       percentualRetencao: 11,
     });
-    expect(validation.issues).toContain('DH Item - UG Pagadora deve ser 158155.');
+    expect(validation.issues).toContain('DH Item - UG Pagadora deve ser 158366.');
   });
 
   it.each(['DDR001', 'DGR001'])(
@@ -122,7 +122,7 @@ describe('retencoesEfdReinfImportService', () => {
         expectedDate: null,
         expectedRule: null,
       });
-      expect(validation.issues).not.toContain('DH Item - UG Pagadora deve ser 158155.');
+      expect(validation.issues).not.toContain('DH Item - UG Pagadora deve ser 158366.');
     },
   );
 

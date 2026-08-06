@@ -198,187 +198,7 @@ Observacoes:
 Observacao para a aba RAP do dashboard:
 
 - os cards de topo devem usar os campos proprios de RAP do empenho
-- separar `inscrito` e `reinscrito` pelo ano do empenho:
-  - ano imediatamente anterior ao exercicio corrente: usar a base inscrita do RAP
-  - anos anteriores a esse: tratar como `reinscrito`
-- `restos a pagar pagos` deve ser somado ao valor de `valor_liquidado_a_pagar` para representar o total liquidado/executado no exercicio corrente
-- `restos a pagar a pagar` deve ser tratado como o saldo atual do empenho RAP
-- em `Empenhos.tsx`, o `HeaderActions` agora separa as acoes em `Importar Empenhos` e `Importar Saldo RAP`
-- no upload de `Empenhos.tsx`, o CSV dedicado de RAP com `NE CCor` + `Metrica` atualiza `saldo_rap_oficial` diretamente sem limpar os demais campos do RAP ja existentes
-- quando o upload vier pelo CSV legado combinado, a coluna `RESTOS A PAGAR NAO PROCES. LIQUIDADOS A PAGAR` continua alimentando `valor_liquidado_a_pagar` tambem para RAP e e descontada do `saldo_rap_oficial`
-- quando o saldo oficial nao vier preenchido, derivar o saldo pela base vigente do RAP menos o valor executado no ano
-- a mesma regra deve valer para dashboard, tela de empenhos, agrupamentos e contratos vinculados
-- nao reutilizar `valor` ou `valorPagoOficial` como substitutos desses totais na agregacao da aba RAP
-- a aba RAP tambem possui a visao `Evolucao anual dos restos a pagar`, carregada por `DashboardRapAnnualEvolutionPanel.tsx` via `rapHistoricoAnualService`
-- essa visao usa `rap_historico_anual`, le o ultimo lote importado, seleciona a UG `158366` por padrao quando ela estiver disponivel, permite trocar a UG e exibe itens `35`, `40`, `41` como composicao anual e item `50` como total; se o item `50` estiver ausente em algum ano, o total e derivado da soma dos componentes
-- a importacao do historico anual fica restrita a superadmin e nao altera a tabela `empenhos`
-
-Observacao para a aba de exercicio atual do dashboard:
-
-- o grafico `Evolucao da Execucao` deve mostrar `Planejado` como total acumulado desde o primeiro mes do eixo, nao pela data de cadastro das atividades
-- a linha `Empenhado` usa, nesta ordem, `contratos_api_empenhos.data_emissao` casada pelo numero da NE, `empenhos.historicoOperacoes` quando houver historico com data e a soma das operacoes fechar com `empenhos.valor` (tratando `ANULACAO` como valor negativo), e `empenhos.dataEmpenho` apenas como fallback; isso evita que bases antigas importadas com data de cadastro concentrem tudo no mes errado e garante que o ultimo ponto bata com o funil
-- a linha `Liquidado` usa NPs/documentos de liquidacao de `documentos_habeis` vinculadas por `empenho_numero`; quando nao houver NP vinculada para a NE, usa liquidacoes publicas da API de contratos por empenho (`data_liquidacao` ou `data_emissao`) como fonte de data; em ambos os casos, as datas distribuem o valor no tempo e o total final e escalado para fechar com o liquidado oficial do funil; `ultimaAtualizacaoSiafi` nao deve ser usado como data mensal para evitar concentrar liquidacoes no mes da sincronizacao
-- sem filtro final de data, o eixo deve preencher meses vazios ate o mes atual
-
-Observacao para a aba de contratos do dashboard:
-
-- o dashboard apresenta as abas `Orçamento`, `RAP` e `Contratos`, nessa ordem
-- o grafico `Gasto Mensal por Contrato` fica em aba propria, separado da analise de `Orçamento` e de `RAP`; suas consultas so sao habilitadas quando essa aba e ativada, e o botao de filtros permanece no header como nas demais abas
-- o grafico `Gasto Mensal por Contrato` usa `contratos_api` para listar contratos ativos e consulta `contratos_api_faturas` pelo periodo do filtro do header, aplicado sobre `data_emissao`; quando o filtro de periodo esta vazio, usa o ano atual para reduzir volume carregado na abertura da aba
-- nesse grafico, o valor mensal consolidado de faturas do contrato usa `valor_liquido` com fallback para `valor_bruto` e apresenta o valor total acumulado sem distinção de situação (executado ou pendente)
-- a competencia da fatura e resolvida por `mes_referencia`/`ano_referencia`, pelos campos `mesref`/`anoref` do `raw_data` ou pela maior entrada de `raw_data.dados_referencia[]`; a data de emissao continua sendo a evidencia principal para saber se o mes atual ja recebeu nota.
-- a seleção múltipla de contratos é feita diretamente no **Heatmap de Cobertura de Empenhos**, que fica posicionado no topo da aba como painel interativo principal de controle, substituindo a antiga faixa de botões arredondados.
-- o Heatmap inicia filtrado por `Servicos Continuados (Mao de Obra Exclusiva)`; os demais grupos de contratos continuam disponiveis no seletor.
-- o clique (onClick) nas células do Heatmap atua como filtro de alternância (toggle) de seleção dos contratos, atualizando instantaneamente os outros gráficos e projeções logo abaixo (o gráfico de Gasto Mensal e a Projeção de Cobertura por Contrato). Os contratos desmarcados são renderizados com estilo visual esmaecido (cinza-claro tracejado e opaco) para indicar inatividade, mantendo o Heatmap como grid completo de todos os contratos ativos carregados.
-- o bullet chart de projecao por contrato exibe o `Saldo` real dos empenhos vinculados em `saldoEmpenhos`; `Liquidado` soma as faturas do periodo selecionado e `Projetado` soma esse realizado a uma media por nota calculada nos doze meses completos anteriores.
-- a media por nota usa mediana/MAD (escore robusto 3,5) para desconsiderar notas atipicas, como repactuacoes; quando ha poucas notas, MAD zero ou nenhum valor valido apos o filtro, a mediana original e usada. As notas descartadas permanecem no historico e no `Liquidado`.
-- o mes atual sem nota emitida entra como mes restante consumidor de recursos; quando ha nota, o valor real encerra o mes e nao recebe uma nova parcela media. A quantidade de notas totais, usadas e desconsideradas, a media, a ultima emissao e a ultima competencia aparecem no hover.
-- o bullet chart apresenta os valores na ordem `Saldo`, `Liquidado` e `Projetado`, com hover de rastreabilidade contendo liquidacoes consideradas, empenhos vinculados, saldo dos empenhos e estatisticas da janela historica. Na base do grafico, exibe a "Provavel necessidade de empenho" (projetado - (liquidado + saldo dos empenhos)) e a "Cobertura provavel ate" (mes estimado em que o saldo seria suficiente no ritmo filtrado).
-- o **Heatmap de Cobertura de Empenhos** mapeia a razão `(Liquidado + Saldo dos empenhos) / Projetado`, classificando os contratos ativos em faixas de intensidade de cobertura: Sem Gasto / Vazio (0%), Crítico / Baixo (< 70%), Atenção / Médio (70% - 99%), Adequado / Alto (100% - 149%) e Máximo (>= 150%), com HoverCards de detalhamento financeiro completo.
-
-### Financeiro
-
-`Financeiro.tsx` -> `parseFinanceiroCsv` / `saveFinanceiroRows` -> `financeiro_fonte_vinculacao`
-
-### LC
-
-`LC.tsx` -> `parseLCCsv` / `saveLCRows` -> `lc_credores`
-
-### PFs
-
-`PFImportDialog.tsx` -> `importPFs` -> `pf_solicitacao` / `pf_aprovacao` / `pf_liberacao` -> views -> `RastreabilidadePFs/index.tsx`
-
-### Documentos habeis
-
-`LiquidacoesPagamentos.tsx` -> `JsonImportDialog` -> `transparenciaService.import*` -> `documentos_habeis*`
-
-### Retencoes FD-Reinf
-
-`RetencoesFdReinfDesign.tsx` -> `retencoesEfdReinfImportService` -> `retencoes_efd_reinf` + `documentos_habeis_itens`
-
-Observacoes:
-
-- a tela carrega a ultima base importada de `retencoes_efd_reinf`
-- para situacoes `DDF025`, `DDF055`, `DDF021` e `DDF050`, o service marca `Prazo inconsistente` quando `DH Item - Dia Vencimento` ou `DH Item - Dia Pagamento` fica antes de `DH - Dia Pagamento` ou depois do dia 20 do mes seguinte a `DH - Dia Pagamento`
-- o checkbox de correcao atualiza `retencoes_efd_reinf.correcao_realizada`; registros marcados deixam os filtros e contadores de pendencias abertas, mas seguem visiveis na auditoria geral
-
-### Contratos
-
-`Contratos.tsx` -> `contratosApiService.getContratosApi(true)` -> `contratos_api`
-
-Complemento local:
-
-`useData()` -> `contratos` / `contratos_empenhos` quando houver match por numero normalizado
-
-Sincronizacao:
-
-`sync-contratos-comprasnet` -> `contratos_api*` -> `contratosApiService` -> lista e drawer de detalhes em `Contratos.tsx`
-
-Observacao:
-
-- a lista principal usa contratos sincronizados da API; a tela oferece um controle de visualização (`viewFilter`) com três opções: "Todos" (filtrando apenas `situacao_derivada = true`), "Favoritos" (favoritos do usuário) e "Vencidos (120d)" (contratos cuja vigência expirou nos últimos 120 dias). Contratos com faturas abertas (qualquer situação diferente de "Pago" e "Siafi Apropriado") recebem destaque visual na linha da tabela (fundo âmbar suave e borda lateral esquerda âmbar), além de um badge com pulso de animação ("Invoice Aberta") contendo um tooltip detalhado das faturas pendentes.
-- o upload manual XLSX foi removido da tela; superadmin ve a ultima sincronizacao e pode acionar "Atualizar Comprasnet" para antecipar o cron diario
-- `situacao_derivada`, `vigencia_inicio_derivada`, `vigencia_fim_derivada` e `situacao_derivada_motivo` sao calculados na sincronizacao pela maior vigencia valida do historico; rescisao/cancelamento inativa o contrato. Sem termo com data final, um contrato que a API informa ativo e cuja vigencia ja iniciou permanece ativo com motivo `fallback_sem_historico_vigente_sem_data_final`; nos demais casos sem historico, usa `vigencia_fim` da listagem como fallback registrado
-- contratos da UG `158366` entram se ativos pela regra derivada; contratos da UG `158155` so entram se houver evidencia operacional estruturada do campus, como empenho ou fatura com UG/contratante `158366`, registrada em `campus_scope_reason`
-- o historico da API (`contratos_api_historico`) aparece no drawer com assinatura, aditivos, apostilamentos e rescisao
-- contratos com origem `158155` recebem sinalizacao de Reitoria; a execucao operacional deve ser lida pela UG do campus `158366`
-- Valor Total da lista usa o historico da API como fonte principal quando houver match, somando `valor_inicial` de cada termo: assinatura, aditivos, apostilamentos ou termos equivalentes. `valor_global` da API nao entra nessa metrica. Sem historico com `valor_inicial`, usa `contratos.valor` como fallback
-- Valor Empenhado usa o empenhado original da API quando existir, ou o valor original do empenho local como fallback; RAP inscrito/reinscrito fica como detalhe separado. Os badges/popovers de empenhos da lista principal mostram os vínculos locais de `empenhos` + `contratos_empenhos` e, quando houver match API, também exibem empenhos de `contratos_api_empenhos` que ainda não existem no vínculo local; valores CSV/SIAFI locais continuam prevalecendo quando o mesmo número existir nas duas fontes
-- a coluna/card `Saldo dos empenhos` soma o saldo dos empenhos locais vinculados com o saldo dos empenhos que existem apenas na API. Para RAP local usa `getRapSaldoAtual`; para RAP API usa `rp_a_pagar` ou saldo derivado de `rp_inscrito - (rppago + rpliquidado)`; para empenho de exercício usa `valor_a_liquidar`
-- quando um empenho da API corresponder a um empenho já existente no SIAFI local, inclusive quando a API trouxer prefixo de UG/gestão antes de `AAAA NEXXXXXX`, o saldo local prevalece na lista de contratos. Isso evita somar `valor_a_liquidar` antigo da API para RAP já zerado na tela de empenhos
-- Para empenho RAP vindo apenas da API, o popover nao mistura `aliquidar`/`pago` do exercicio com RAP: usa `rp_inscrito` e `raw_data.rpaliquidar` como base, `raw_data.rppago + raw_data.rpliquidado` como liquidado/pago de RAP e `rp_a_pagar` ou saldo derivado como saldo atual
-- para empenho antigo vindo apenas da API, `rp_a_pagar = 0` e saldo zero valido e nao deve cair para `valor_a_liquidar`; esse campo de exercicio pode ficar defasado em restos a pagar ja quitados
-- no drawer, a secao de itens usa `contratos_api_itens.historico_item` para somar o valor contratado por item quando a API traz historico de assinatura/aditivos; `contratos_api_itens.valor_total` e apenas fallback quando nao houver historico do item
-- no drawer de contratos com origem Reitoria, as faturas sincronizadas continuam preservadas, mas a UI filtra por `contratos_api_faturas.raw_data.contratante` e exibe somente as faturas do campus `158366` quando esse campo vier preenchido
-- no drawer, cada item tambem exibe o detalhamento do `historico_item` com tipo do termo, data, quantidade, valor unitario e valor total quando a API trouxer esses campos
-- no resumo de itens do drawer, `Contratado` e `Executado` mostram tambem quantidade agregada: quantidade contratada pela soma de `historico_item[].quantidade` quando existir, e quantidade executada pela soma de `quantidade_faturado` nas faturas `Pago` ou `Siafi Apropriado`
-- nas faturas associadas com `dados_item_faturado`, o drawer exibe quantidade faturada e valor unitario faturado alem do valor total do item
-- a execucao por item soma faturas com situacao `Pago` ou `Siafi Apropriado` e vinculo `dados_item_faturado`
-- faturas sem item vinculado ficam em grupo separado e nao entram na execucao oficial por item
-- no modal de empenho, a secao `Liquidações` nao depende dessa sincronizacao local; ela le o cache dedicado de faturas por empenho e, quando o cache esta ausente ou vencido, chama a Edge Function aguardando as linhas atualizadas antes de cair para resultado vazio. A exibicao usa `raw_data.contratoEmpenho.unidade_gestora` para manter faturas de contratos da Reitoria quando o empenho e da UG `158366`, e usa `raw_data.fatura.contratante` apenas para esconder faturas claramente pertencentes a outro campus; a coluna `Valor` usa `valor_bruto` da API
-
-### Pregoes IFRN
-
-`App.tsx` -> `LicitacoesPregoes.tsx` -> `licitacoesPncpService` -> `licitacoes_pncp`
-
-Sincronizacao:
-
-`sync-licitacoes-pncp` -> PNCP `/v1/contratacoes/publicacao` e `/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}` -> `licitacoes_pncp`
-
-Observacoes:
-
-- a rota `/licitacoes-pregoes` fica no grupo Contratos e abre mostrando todas as UASGs materializadas do IFRN
-- a tela lista pregoes materializados e apresenta filtros rotulados/responsivos por UASG opcional, objeto especifico, periodo, situacao, SRP, prazo de propostas e texto livre
-- a UASG aceita qualquer codigo manual; a function resolve o CNPJ primeiro pelo catalogo interno IFRN e, se a UASG nao estiver no catalogo, pelo Compras.gov.br antes de consultar o PNCP
-- o botao `Sincronizar UASGs IFRN` usa o catalogo interno com as UASGs `152711`, `152756`, `152757`, `154582`, `154838`, `154839`, `154840`, `158155`, `158365`, `158366`, `158367`, `158368`, `158369`, `158370`, `158371`, `158372`, `158373`, `158374`, `158375`; no frontend, a chamada e feita em lotes por UASG para evitar timeout de uma chamada unica
-- o drawer exibe os dados completos armazenados do PNCP, itens materializados quando existirem em `raw_data.itens`, links PNCP/Compras.gov.br e informacao complementar
-- o botao `Buscar no PNCP` sem UASG consulta/materializa pelo CNPJ institucional `10877412000168`, descobrindo todas as unidades publicadas no periodo; quando uma UASG e informada, a busca fica restrita a ela
-- o filtro `Item no PNCP` pesquisa itens ja salvos em `raw_data.itens`; ao acionar `Buscar no PNCP` com esse filtro, a Edge Function consulta o endpoint de itens da contratacao, grava os itens no cache local e retorna somente contratacoes cujo item corresponda ao termo
-- a pagina prioriza filtros e tabela operacional; o card de resumo e ultima sincronizacao nao e exibido
-
-### Atas e ARP
-
-`App.tsx` -> `AtasRegistroPrecos.tsx` -> `atasRegistroPrecosService` -> `atas_registro_precos_resumo`
-
-Sincronizacao:
-
-`sync-atas-registro-precos` -> Compras.gov.br `modulo-arp/*` -> `atas_registro_precos`, `atas_registro_precos_itens`, `atas_registro_precos_unidades`, `atas_registro_precos_adesoes`
-
-Observacoes:
-
-- a rota `/atas-registro-precos` fica no grupo Licitacoes
-- a pagina prioriza filtros e tabela operacional; o card de resumo e ultima sincronizacao nao e exibido
-- a tela lista atas materializadas e filtra por UASG, vinculo (`gerenciadora`, `participante`, `aderente` ou qualquer vinculo), periodo e texto
-- a pesquisa textual inclui item e fornecedor ja materializados; quando a correspondencia vem de um item, a lista identifica o item/fornecedor e sinaliza atas sem itens carregados para deixar clara a cobertura do cache local
-- a coluna `Vinculos` mostra a contagem como `participante(s)` e exibe, no hover, as UASGs participantes materializadas pela view
-- o botao `Buscar ARP` consulta/materializa a UASG e o periodo informados
-- quando o vinculo selecionado e `Participante` e a UASG pertence ao catalogo IFRN, `Buscar ARP` sincroniza o catalogo IFRN em lotes com `includeParticipantes=true`; a API dos Dados Abertos nao permite buscar participantes diretamente por UASG, entao o filtro funciona sobre o cache local de unidades participantes
-- quando o vinculo selecionado e `Aderente` e a UASG pertence ao catalogo IFRN, `Buscar ARP` tambem sincroniza o catalogo IFRN em lotes, mas envia a UASG digitada como `adesaoUnidadeCodigos`; assim a busca encontra adesoes do campus a atas gerenciadas por outras UASGs IFRN
-- o botao `Sincronizar UASGs IFRN` usa o catalogo interno compartilhado com pregoes PNCP e chama a Edge Function em lotes por UASG para evitar timeout de uma chamada unica; falhas de uma UASG sao agregadas como sucesso parcial e nao interrompem as demais UASGs do lote
-- o drawer exibe metadados da ata e itens materializados; participantes e adesoes sao agregados pela view `atas_registro_precos_resumo`
-- a API do Compras.gov.br pode retornar falhas pontuais; nesses casos, a Edge Function preserva sucesso parcial e registra detalhes em `atas_registro_precos_sync_runs`
-- quando o Compras.gov.br falha durante `Buscar ARP`, a tela recarrega mesmo assim a view local `atas_registro_precos_resumo`, para exibir atas ja materializadas no cache em vez de deixar a lista vazia por indisponibilidade externa
-
-### Favoritos
-
-`Empenhos.tsx` / `Contratos.tsx` -> `useUserFavorites()` -> `user_favorites`
-
-Observacoes:
-
-- favoritos sao pessoais por usuario autenticado do Supabase
-- as telas exibem uma estrela por linha e um filtro `Todos/Favoritos`
-- favoritos de contratos podem referenciar `contratos` locais ou `contratos_api` sincronizados; a tabela `user_favorites` registra a origem em `contrato_id` ou `contrato_api_id`, permitindo favoritar uma linha da API mesmo sem espelho local
-
-### Editor de Documentos
-
-`EditorDocumentos.tsx` -> `suapProcessosService.getAll` -> `processos`
-
-Observacoes:
-
-- a grade de processos sincronizados do editor tenta leitura publica via `supabase-js` e cai para REST anonimo quando necessario
-- a escolha entre `Despacho de Liquidacao`, `ETP - Servicos Continuos`, `Termo de Referencia - Compras`, `Mapa de Risco da Licitacao` e `Contrato de Servico IFRN` vem da sidebar global, usando as rotas `/editor-documentos/:modelId`; o mapa de risco existe como tipo tecnico, mas o fluxo principal o expõe apos um ETP aberto no editor
-- na grade do Editor, o clique no corpo do card abre os detalhes e o checkbox lateral alterna a selecao; despachos aceitam multiplos processos selecionados, Contrato/Termo exigem exatamente um, e o ETP aceita um processo ou objeto manual
-- o detalhe do processo no Editor pode abrir o PDF sincronizado pelo bucket `suap-pdfs` usando URL assinada via `suapProcessosService.getPdfSignedUrl`
-- a opcao `Despacho de Liquidacao` continua usando `documentGeneration.ts` com dados de `processos`, `empenhos`, `contratos` e `contratos_api`; para bolsa/PF, a minuta usa redacao com projeto apenas quando houver referencia explicita a projeto, e usa modelo sem projeto/edital quando essa referencia nao existir
-- o `GeradorDocumentos.tsx` manual possui finalidade propria `Bolsa sem projeto`, sem campos de projeto ou edital, alinhada ao mesmo modelo de despacho sem projeto usado pelo editor
-- a copia de despachos e CDOs para o SUAP passa por `suapClipboard.ts`, que envia `text/html` com paragrafos/tabelas normalizados para o Tiny e `text/plain` como fallback
-- o clone automatico de despacho no SUAP usa `suapCloneAutomation.ts` para abrir o modelo `1026154` com assunto e HTML do documento no fragmento da URL; a extensao `suap-atividades-extension` roda dentro de `suap.ifrn.edu.br`, preenche o campo `assunto` e, apos a tela `visualizar_documento/{id}`, espera a tela e o editor Tiny terminarem de carregar antes de abrir `Editar > Texto` e preencher o corpo; a colagem so e confirmada quando o conteudo esperado foi lido novamente pelo editor. No `/gerador-documentos`, esse fluxo abre direto em modo de revisao, sem confirmacao intermediaria e sem tentativa de salvar automaticamente
-- em `/gerador-documentos`, `Clonar` abre somente a URL-base do modelo no SUAP, sem payload e sem depender da extensao; `Clonar e preencher no Suap` envia o payload da automacao em modo de revisao diretamente
-- a opcao `Contrato de Servico IFRN` baixa o PDF sincronizado do processo, extrai texto com `pdfjs-dist`, identifica paginas candidatas de modelo contratual e envia o modelo escolhido com trechos de apoio para a Edge Function `gerar-contrato-licitacao`
-- a opcao `Termo de Referencia - Compras` exige um modelo DOCX ativo em `document_templates`, analisa o PDF sincronizado do processo com `pdfjs-dist` quando houver processo, aceita contexto vindo de ETP editado como fonte `ETP editado no editor` e de mapa de risco editado como fonte `Mapa de Risco editado no editor`, pede sugestoes de respostas com fonte explicita a Edge Function `sugerir-respostas-termo-referencia`, apresenta aprovacao em lote das sugestoes, mostra pendencias restantes no questionario derivado do modelo AGU, envia respostas/pulos com o template e os trechos relevantes para a Edge Function `gerar-termo-referencia-compras` e libera download do DOCX final montado sobre esse modelo
-- a opcao `Estudo Tecnico Preliminar - Servicos Continuos` nao usa `document_templates` no v1; ela aceita um processo SUAP sincronizado ou a digitacao manual do objeto da licitacao, analisa o PDF do processo quando existir texto pesquisavel, aceita ate 5 anexos auxiliares locais de ate 20 MB cada nos formatos PDF, XLSX, XLS, ODS, CSV, TXT, MD e DOCX, extrai texto desses anexos no navegador com `pdfjs-dist`, `xlsx`, `cfb` e `TextDecoder`, adiciona contexto institucional do campus como apoio natural para escala/logistica/continuidade sem trata-lo como anexo ou fonte explicita, pede sugestoes com fonte explicita a Edge Function `sugerir-respostas-etp-servicos-continuos` apenas com trechos tecnicos do processo, mostra um questionario fixo de ETP para servicos continuos, permite gerar texto por secao via `gerar-texto-etp-secao` com poucas notas ou mesmo sem digitacao previa, e envia respostas/pulos para a Edge Function `gerar-etp-servicos-continuos`
-- anexos auxiliares do ETP, como convencao coletiva, planilha de custos ou memoria em DOCX/TXT, nao sao enviados brutos, nao vao para Storage e nao sao persistidos; o frontend envia apenas snippets com `sourceType`, `sourceName`, `sourceLabel`, `pageNumber` opcional, `kind` e `excerpt`; snippets institucionais usam `sourceType: "institucional"` e devem enriquecer a redacao sem aparecer como "anexo", "fonte" ou referencia textual no documento
-- anexos auxiliares opcionais sao apoio de busca para informacoes pontuais, assim como o contexto institucional; eles nao definem o foco, o escopo ou a narrativa principal do ETP. O processo, o objeto informado e as respostas aprovadas pelo usuario continuam sendo as fontes que orientam o documento
-- anexos auxiliares nao entram no preenchimento automatico do questionario do ETP; uma CCT, planilha ou memoria pode apoiar a redacao pontual depois, mas nao deve gerar sugestoes automaticas como foco da pergunta
-- o ETP gerado fica como rascunho editavel no editor e oferece acoes de copiar documento, copiar secoes e `Prosseguir para Mapa de Risco`; o mapa chama `riskMapsService` e a Edge Function `gerar-mapa-riscos-licitacao`, com fallback local, gerando HTML editavel com tabela de riscos por fase, risco, causa, dano, probabilidade, impacto, nivel, acoes e responsavel
-- o mapa de risco gerado oferece `Prosseguir para Termo de Referencia`; ao prosseguir, o TR usa o `editorContent` atual do ETP e do mapa, incluindo edicoes do usuario, e pode iniciar sem processo SUAP, mas continua bloqueando quando nao houver modelo DOCX ativo
-- no ETP, marcadores como `[CAMPO PENDENTE]` e `[CAMPO PENDENTE: ...]` sao destacados em vermelho no editor e no HTML copiado; o texto simples e o contexto enviado ao TR continuam sem depender dessa marcacao visual
-- o contexto institucional do `Campus Currais Novos` identifica a unidade demandante real; a IA nao deve transformar esse campus em exemplo dentro de placeholder de unidade demandante
-- a cada geracao de ETP, Mapa de Risco, Termo de Referencia ou Minuta de Contrato, o frontend cria uma versao em `licitacao_document_artifacts`; edicoes no editor atualizam a versao aberta com debounce, e a pagina `/artefatos-licitacao` lista, filtra, copia, exclui e abre artefatos no editor
-- anexos locais auxiliares continuam nao persistidos e nao vao para Storage; nao ha OCR nesta versao
-- o questionario do Termo de Referencia abre em modal sobre o editor; primeiro revisa sugestoes da IA em lote e depois mostra uma pergunta pendente por vez, avancando apos selecao, pulo ou salvamento de campo aberto para reduzir poluicao visual
-- no modal do questionario, o progresso principal fica concentrado no cabecalho com barra e chips de status; o card da pergunta evita repetir contadores e, para campos abertos, esconde o badge generico `Campo`
-- nos campos abertos do Termo de Referencia, o modal traduz lacunas genericas do modelo em orientacoes operacionais, mostrando uma orientacao curta e o campo original do modelo em uma caixa fixa compacta
+- separar `…6485 tokens truncated…peracionais, mostrando uma orientacao curta e o campo original do modelo em uma caixa fixa compacta
 - no modal do Termo de Referencia, a tela mostra apenas copy resumida e operacional; o texto original do modelo AGU, com artigos e redacao integral, fica disponivel na dica nativa do navegador ao passar o mouse ou focar perguntas e opcoes, evitando duplicacao visual
 - quando uma clausula exclusiva ou opcional traz lacunas no proprio texto, o modal permite escolher a alternativa e preencher esses placeholders na mesma etapa, antes de avancar para a proxima pergunta; quando a alternativa exige complemento operacional mas nao traz placeholder explicito, como `As parcelas serao entregues nos seguintes prazos e condicoes`, o modal abre um campo suplementar e a Edge Function anexa esse complemento ao texto final; se a propria clausula trouxer alternativas inline separadas por `OU`, como `Estudo Tecnico Preliminar` ou `Nota Tecnica`, o modal troca os campos livres por uma escolha direta; ao escolher `Nota Tecnica`, abre campo para informar o numero da nota e a resposta final segue para a Edge Function com `selectedOptionId` e os valores inline da clausula
 - no parser do TR, um `OU` entre clausulas pode agrupar varios paragrafos consecutivos da mesma alternativa, como uma clausula principal seguida de incisos `I)`, `II)` e similares; o questionario e o DOCX final tratam esse conjunto como uma unica opcao logica, sem quebrar os subitens
@@ -393,7 +213,7 @@ Observacoes:
 - as telas [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx) e [Suap.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Suap.tsx) expõem no header o botao `Baixar extensão`, apontando para a extensao SUAP Scraper no GitHub
 - a tela [Suap.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Suap.tsx) passou a reutilizar a sessao global do app vinda de `AuthContext`
 - na página SUAP `plan_estrategico/plano_concluido/8/`, a extensão injeta o resumo por dimensão e consulta diretamente o Supabase REST, sem iframe nem dependência de uma guia do SIAGES. O usuário autentica a extensão uma vez no popup; o JWT de curta duração fica no armazenamento privado da extensão, é renovado por refresh token e é enviado ao banco nas consultas de `atividades`, `descentralizacoes` e `empenhos`. As RLS dessas tabelas aplicam o `org_id` contido no JWT, sem chave de serviço no navegador.
-- o resumo do plano usa `atividades.valor_total` como planejado, os lançamentos detalhados de `descentralizacoes.valor` como descentralizado e `empenhos` de exercício não cancelados como empenhado. Por dimensão, `A descentralizar = planejado - descentralizado` e `A empenhar = descentralizado - empenhado`; valores negativos permanecem visíveis para evidenciar execução acima da base. O payload inclui os registros de cada drill-down: planejado, descentralizado e empenhado vêm dessas tabelas; `A descentralizar` identifica na própria página do SUAP as atividades cujo campo `Saldo disponível para empenho da atividade (R$)` seja positivo. O seletor local apenas oculta/restaura esses blocos de atividade, sem alterar dados ou navegação do SUAP.
+- o resumo do plano usa `atividades.valor_total` como planejado, os lançamentos detalhados de `descentralizacoes.valor` como descentralizado e `empenhos` de exercício não cancelados como empenhado. Por dimensão, `A descentralizar = planejado - descentralizado` e `A empenhar = descentralizado - empenhado`; valores negativos permanecem visíveis para evidenciar execução acima da base. O payload inclui os registros de cada drill-down: planejado, descentralizado e empenhado vêm dessas tabelas; `A descentralizar` identifica na própria página do SUAP as atividades cujo campo `Saldo disponível para empenho da atividade (R$)` seja positivo. A extensão também injeta uma barra local, isolada por CSS, para filtrar todas as linhas por texto, ordenar por qualquer cabeçalho e ocultar apenas linhas cujo saldo disponível da atividade seja zero; os controles não alteram dados nem navegação do SUAP.
 - a pagina [Auth.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Auth.tsx) centraliza login, convite e redefinicao de senha
 - convites e criacao direta de usuarios ficam centralizados em `/controle-usuarios` e usam a Edge Function `admin-users`
 - a origem do link de convite usa `VITE_APP_ORIGIN` quando configurada; se o resultado apontar para `localhost` ou loopback, o envio é bloqueado no frontend
@@ -481,7 +301,7 @@ Quando existem duas ou mais notas fiscais validas, o resumo da extensao oculta r
 
 `process-document.js` injeta o painel somente nas duas rotas de processo do SUAP. O iframe oculto `/suap-extension/process-info` recebe contexto e sessao por `postMessage`, valida origem e janela, consulta ou cadastra o processo, solicita o PDF ao content script quando necessario, armazena-o no bucket `suap-pdfs` e enfileira a extracao existente `process-pdf`. Snapshots e progresso retornam ao painel sem bloquear Financeiro, Atalhos ou IA. No resumo, empenhos sao normalizados para `AAAANExxxxxx`, inclusive quando chegam com prefixo UG/gestao ou como objeto, e equivalentes sao exibidos uma unica vez; entradas que nao contenham o padrao completo sao ignoradas. O resumo remove os metadados operacionais `Status` e `Atualizado` e renderiza cada nota fiscal em sua propria linha. As liquidacoes do card financeiro ficam recolhidas por empenho e so sao exibidas quando o usuario expande o empenho.
 
-O script `plan-summary.js` permanece isolado na rota exata do Plano de Atividades concluido 8. `text-expander.js` e global e atua apenas no campo textual em edicao, sem ler nem modificar filtros, metricas ou drill-downs do plano.
+O script `plan-summary.js` permanece isolado na rota exata do Plano de Atividades concluido 8. Ele acrescenta o filtro local `Exibir somente atividades com saldo` ao card de filtros nativo do SUAP e transforma os cabeçalhos das tabelas originais em controles de ordenação. `text-expander.js` e global e atua apenas no campo textual em edicao, sem ler nem modificar filtros, metricas ou drill-downs do plano.
 
 ### Almoxarifado
 
@@ -499,3 +319,11 @@ A página carrega contexto e workspace em consultas separadas; os dados independ
 - A exclusao de requisicoes valida o numero de linhas afetadas; quando a RLS impede a operacao, a interface exibe o motivo em vez de confirmar uma exclusao inexistente.
 
 - O fluxo de itens da requisicao nao aceita um status de cache not_found isolado como vazio definitivo: revalida pela Edge Function e usa o Portal diretamente antes de habilitar o cadastro manual.
+O mesmo fluxo injeta abaixo do acordeao Legenda o acordeao nativo Resumo financeiro por dimensao, calculado pelas quatro colunas financeiras das tabelas originais.
+
+## Sincronização do Plano SUAP no Campus
+
+`/planejamento/campus` carrega os dados locais imediatamente e monta `SuapPlanSyncCard`. Ao entrar, o card chama `sync-suap-plan` em segundo plano; ao concluir, a tabela é recarregada. A primeira captura é uma prévia com contagem de novas, atualizadas e arquivadas; a aplicação ocorre após a confirmação do espelho inicial.
+
+O parser lê todas as tabelas de atividades do Plano 8, inclusive linhas com `hidden`, usando o ID do link `listar_requisicoes_despesa/8/<id>/` como chave estável. A extensão 1.9.13 apenas injeta um pedido de sincronização na rota Campus; o backend continua funcionando sem extensão.
+

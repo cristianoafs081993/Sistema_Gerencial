@@ -48,9 +48,12 @@ Thumbs.db
 .claude/settings.local.json
 .aios/install-log.txt
 
-.vercel
-.env*.local
-vite.config.ts.timestamp-*.mjs
 .codex-temp/
 scratch/
+tmp_*
+tmp/
+output/
+extracted_suap_cookies.json
+download_obs.html
+
 

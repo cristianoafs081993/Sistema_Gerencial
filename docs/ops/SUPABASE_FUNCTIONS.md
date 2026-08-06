@@ -138,7 +138,7 @@ Dependencias:
 Observação:
 
 - Possui política de segurança interna que valida a sessão do usuário no Supabase
-- Restringe o proxy à origem fixa `https://suap.ifrn.edu.br`, aos caminhos de processo e Celery já usados e, para anexos individuais, exclusivamente a `/documento_eletronico/visualizar_documento(_digitalizado)/<id>/?original=sim`; URLs externas, parâmetros adicionais e caminhos arbitrários são recusados. Essa rota individual é retornada em base64 mesmo quando o SUAP a anuncia como `attachment` ou `application/octet-stream`, evitando que um PDF válido seja interpretado como texto.
+- Restringe o proxy ? origem fixa `https://suap.ifrn.edu.br`, aos caminhos de processo e Celery j? usados e, para anexos individuais, exclusivamente a `/documento_eletronico/visualizar_documento(_digitalizado)/<id>/?original=sim`; URLs externas, par?metros adicionais e caminhos arbitr?rios s?o recusados. Essa rota individual ? retornada em base64 mesmo quando o SUAP a anuncia como `attachment` ou `application/octet-stream`, evitando que um PDF v?lido seja interpretado como texto.
 
 ### `gerar-contrato-licitacao`
 
@@ -714,3 +714,13 @@ Para a automacao do Gmail:
 - refresh-comprasnet-liquidacoes-cache pode ser acionada em background pela requisicao de compra; a UI recebe o saldo base do subitem sem aguardar a funcao e invalida a consulta quando a atualizacao termina.
 
 - A leitura inicial do cache de itens revalida status not_found pela function e confirma o vazio via consulta direta quando necessario.
+
+## sync-suap-plan
+
+- Função autenticada para sincronizar o Plano 8 do SUAP com a visão Campus do SIAGES.
+- Ações: `connect`, `connect-cookie`, `sync`, `apply`, `status` e `disconnect`.
+- A sessão SUAP é cifrada no backend em `suap_connections`; o navegador recebe apenas um identificador opaco e nunca persiste matrícula, senha ou cookie.
+- A captura aceita somente a URL canônica do Plano 8, valida a sessão, inclui linhas ocultas e grava snapshots antes da reconciliação transacional.
+- A primeira execução fica em `preview`; depois da conferência, `apply_suap_plan_snapshot` atualiza/inclui os registros e arquiva os ausentes sem exclusão física.
+- O proxy tamb?m permite exclusivamente `/plan_estrategico/plano_concluido/8/` sem par?metros adicionais.
+

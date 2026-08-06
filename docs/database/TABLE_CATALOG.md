@@ -596,195 +596,7 @@ Campos-chave:
 
 Observações operacionais:
 
-- `candidates` preserva em JSONB preço original, preço comparável, fonte, compra, fornecedor, pontuação, seleção e justificativa de exclusão
-- o snapshot evita que alterações futuras da API apaguem a memória de cálculo já salva
-- a tabela filha herda o controle de acesso por vínculo com `price_researches`
-
-Consumido por:
-
-- `src/services/priceResearch.ts`
-- `src/pages/PesquisaPrecos.tsx`
-
-### `price_research_ead_videos`
-
-Finalidade:
-
-- catalogo global de aulas EAD do modulo Pesquisa de Precos, exibidas em `/pesquisa-precos/ead`
-
-Campos-chave:
-
-- `id`
-- `title`
-- `description`
-- `youtube_url`
-- `youtube_video_id`
-- `sort_order`
-- `is_active`
-- `created_by`
-- `created_by_email`
-
-Observacoes operacionais:
-
-- usuarios autenticados leem apenas aulas ativas; superadministradores leem todas e podem cadastrar, editar, ativar/desativar, ordenar e excluir
-- a tabela guarda somente metadados e o ID do video; o frontend monta o iframe com `youtube-nocookie.com`
-- nao ha uso de chave da API do YouTube
-
-Consumido por:
-
-- `src/services/priceResearchEad.ts`
-- `src/pages/PriceResearchEad.tsx`
-
-### `suppliers`
-
-Finalidade:
-
-- cadastro de fornecedores por órgão para cotação, envio de e-mails e mapa de regularidade
-
-Campos-chave:
-
-- `id`
-- `org_id`
-- `name`
-- `document`
-- `email`
-- `phone`
-- `contact_name`
-- `notes`
-- `city`
-- `uf`
-- `status_regularidade`
-
-Consumido por:
-
-- `src/services/priceResearchEmail.ts`
-- `src/pages/CadastroFornecedores.tsx`
-
-Observações operacionais:
-
-- fornecedores são isolados por `org_id`; usuários de um órgão não veem fornecedores cadastrados por outro órgão
-- a migration `20260712193000_scope_suppliers_by_org.sql` migra registros antigos para o órgão padrão `ifrn-cn` e troca a unicidade de `document` para o escopo `(org_id, document)`
-
-### `supplier_certificates`
-
-Finalidade:
-
-- histórico de certidões e consultas de regularidade/idoneidade de fornecedores (TCU, CNJ, CEIS, CNEP, RFB, FGTS, CNDT, Falência)
-
-Campos-chave:
-
-- `id`
-- `supplier_id`
-- `tipo_certidao`
-- `numero_certidao`
-- `situacao`
-- `data_emissao`
-- `data_validade`
-- `pdf_url`
-- `detalhes_sancao`
-
-Consumido por:
-
-- `src/services/supplierCompliance.ts`
-- `src/pages/CadastroFornecedores.tsx`
-
-Observações operacionais:
-
-- o acesso herda o escopo do fornecedor vinculado em `suppliers`
-
-### `financeiro_fonte_vinculacao`
-
-- saldo financeiro por fonte/vinculacao carregado por arquivo
-
-### `lc_credores`
-
-- base da lista de credores carregada por arquivo
-
-### `retencoes_efd_reinf`
-
-- base dedicada de auditoria FD-Reinf
-- inclui `correcao_realizada` para retirar alertas ja tratados da lista de pendencias abertas sem apagar a inconsistencia original importada
-
-### `email_csv_ingestion_runs`
-
-- trilha operacional da ingestao automatica de anexos CSV vindos do Gmail
-- guarda `message_id`, hash do anexo, pipeline detectado, status, volumetria e erro
-- usada para idempotencia e auditoria da automacao por e-mail
-
-### `document_templates`
-
-Finalidade:
-
-- catalogo versionado dos modelos DOCX usados pelos fluxos assistidos do editor
-
-Campos-chave:
-
-- `id`
-- `code`
-- `name`
-- `version_label`
-- `file_name`
-- `mime_type`
-- `template_base64`
-- `template_text`
-- `editable_blocks`
-- `questionnaire_schema`
-- `status`
-- `created_by_email`
-- `created_at`
-- `updated_at`
-
-Consumido por:
-
-- [documentTemplates.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/documentTemplates.ts)
-- [referenceTerms.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/referenceTerms.ts)
-- [ModelosDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/ModelosDocumentos.tsx)
-- [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx)
-
-Observacoes operacionais:
-
-- a versao atual do Termo de Referencia - Compras fica em `status = active`, com indice unico por `code`
-- a tabela guarda o binario do DOCX em base64, o texto integral extraido do modelo, os blocos editaveis detectados localmente e o questionario revisavel do modelo
-- `questionnaire_schema` armazena perguntas derivadas de clausulas `OU`, lacunas entre colchetes e trechos opcionais; o editor envia as respostas para a Edge Function antes da geracao final do Termo de Referencia
-- leitura e liberada para `authenticated`; escrita fica restrita ao superadministrador por RLS
-- `updated_at` e mantido por trigger `trg_update_document_templates_updated_at`
-
-## Base semantica do Consultor
-
-### `normativos`
-
-- catalogo de documentos normativos ingeridos pelo pipeline local [normativos-pipeline](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/normativos-pipeline)
-- guarda tipo, titulo, numero, ano, `url_origem`, vigencia, `data_ingestao`, `hash_conteudo` e metadados
-- usada para deduplicacao por hash antes de gerar novos chunks
-
-### `normativos_chunks`
-
-- chunks textuais com embedding vetorial `vector(768)`
-- cada chunk referencia `normativos.id`
-- consultada pela RPC `buscar_normativos` por similaridade vetorial
-
-### `normativos_log`
-
-- trilha de execucao da pipeline de normativos
-- guarda titulo, status, quantidade de chunks, mensagem e data da execucao
-- deve ser consultada junto do backlog em [NORMATIVOS_CONSULTOR_INGESTION.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/integrations/NORMATIVOS_CONSULTOR_INGESTION.md)
-
-### RPC `buscar_normativos`
-
-- recebe `query_embedding vector(768)`
-- aplica filtros opcionais por tipo e vigencia
-- retorna trechos de `normativos_chunks` com metadados do normativo
-
-## Autorizacao de telas
-
-### `screen_groups` e `app_screens`
-
-Finalidade:
-
-- catalogo dos grupos de telas e das rotas protegidas pelo frontend
-
-Observacoes operacionais:
-
-- o catalogo deve ficar alinhado com `src/lib/appScreens.ts`
+- `candidates`…1499 tokens truncated…reens.ts`
 - `/auth` nao entra nesse catalogo porque e rota publica
 - `/controle-usuarios`, `/design-system-preview` e `/modelos-documentos` ficam marcadas como telas administrativas
 
@@ -1395,3 +1207,18 @@ Consumido por src/services/inventory.ts e src/pages/Almoxarifado.tsx.
 - A RLS de `terceirizados` e `terceirizado_permissions` tambem reconhece o grupo `assistencia`, que possui acesso explicito ao cadastro e a gestao de vinculos em `/cadastro-terceirizados`.
 
 - A politica de exclusao de requisicoes_compra permite ao criador remover registros em draft ou rejected, mantendo a exclusao por gestores e superadministradores.
+
+## Sincronização do Plano SUAP
+
+### `suap_connections`
+Sessões SUAP cifradas, de curta duração, vinculadas ao usuário e ao órgão. A tabela tem RLS e não concede leitura ao cliente; somente a Edge Function usa o conteúdo cifrado.
+
+### `suap_plan_sync_runs`
+Histórico das capturas do Plano 8: modo (`preview`/`apply`), status, checksum, contagens, tempos e erro.
+
+### `suap_plan_activity_snapshots`
+Snapshot normalizado e bruto de cada atividade capturada, por execução e ID estável do SUAP.
+
+### Campos de sincronização em `atividades`
+`sync_source`, `suap_plan_id`, `suap_activity_id`, `sync_active` e `sync_last_seen_run_id` permitem upsert idempotente e arquivamento lógico dos itens ausentes.
+

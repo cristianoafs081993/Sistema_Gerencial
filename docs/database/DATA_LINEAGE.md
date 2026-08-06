@@ -358,3 +358,12 @@ Mostrar a linhagem operacional dos dados de forma curta:
 App.tsx  Almoxarifado.tsx  inventoryService  post_stock_movement  stock_movements / stock_movement_items  stock_balances.
 
 Cadastros seguem inventoryService  operational_entities / measurement_units / catalog_items / warehouses. O saldo é sempre derivado do razão; não existe edição direta.
+
+## Plano 8 do SUAP → Campus
+
+- origem: HTML autenticado de `/plan_estrategico/plano_concluido/8/`;
+- parser: `src/services/suapPlanParser.ts`, que ignora a tabela-resumo e lê as 12 tabelas de atividades, inclusive linhas ocultas;
+- auditoria: `suap_plan_sync_runs` e `suap_plan_activity_snapshots`;
+- materialização: função SQL `apply_suap_plan_snapshot` grava `atividades` com `sync_source = suap_plan_8`;
+- ausência na captura: `sync_active = false`, preservando o registro e o histórico.
+

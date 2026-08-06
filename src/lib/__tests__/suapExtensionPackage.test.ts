@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.8');
+    expect(manifest.version).toBe('1.9.13');
     expect(manifest.host_permissions).toContain('<all_urls>');
     expect(manifest.permissions).toEqual(expect.arrayContaining(['activeTab', 'scripting', 'storage', 'alarms']));
     expect(manifest.background).toEqual({ service_worker: 'background.js' });
@@ -24,6 +24,7 @@ describe('pacote da extensao Suape 1.9', () => {
     ]);
     expect(plan.matches).toEqual(['https://suap.ifrn.edu.br/plan_estrategico/plano_concluido/8/']);
     expect(plan.js).toEqual(['plan-summary.js']);
+    expect(fs.readFileSync(extensionFixturePath('plan-summary.js'), 'utf8')).toContain('siages-plan-column-sort');
     expect(process.matches).not.toContain(plan.matches[0]);
   });
 
@@ -60,3 +61,5 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(backgroundScript).toContain('chrome.alarms.create');
   });
 });
+
+

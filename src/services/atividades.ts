@@ -5,7 +5,7 @@ import { Atividade } from '@/types';
 import { normalizeActivityName, normalizeFunctionalComponentName } from '@/utils/functionalComponentLabels';
 import { resolveTipoAtividade } from '@/utils/atividadeScopes';
 
-const ATIVIDADES_SELECT = 'id,dimensao,dimensao_id,componente_funcional,componente_funcional_id,processo,tipo_atividade,atividade,descricao,valor_total,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,created_at,updated_at';
+const ATIVIDADES_SELECT = 'id,dimensao,dimensao_id,componente_funcional,componente_funcional_id,processo,tipo_atividade,atividade,descricao,valor_total,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,sync_active,created_at,updated_at';
 
 type AtividadeRow = {
     id: string;
@@ -23,6 +23,7 @@ type AtividadeRow = {
     natureza_despesa: string;
     natureza_despesa_id?: string | null;
     plano_interno: string;
+    sync_active?: boolean | null;
     created_at: string;
     updated_at: string;
 };
@@ -43,6 +44,7 @@ const mapAtividadeRow = (item: AtividadeRow): Atividade => ({
     naturezaDespesa: item.natureza_despesa,
     naturezaDespesaId: item.natureza_despesa_id || undefined,
     planoInterno: item.plano_interno,
+    syncActive: item.sync_active !== false,
     createdAt: new Date(item.created_at),
     updatedAt: new Date(item.updated_at),
 });
@@ -155,3 +157,5 @@ export const atividadesService = {
         if (error) throw error;
     },
 };
+
+

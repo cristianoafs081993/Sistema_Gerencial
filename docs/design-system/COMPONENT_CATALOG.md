@@ -72,6 +72,7 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 - `RequisicaoCompra`: pagina operacional que apresenta "Gestão de Requisições de Compra" no header global por meio de `HeaderSubtitle`, sem repetir o titulo na area de conteudo. O formulario usa filtro separado de favorecido e `Empenho / Nota de Empenho` em `Popover + Command` com selecao multipla, relevancia para numero completo da NE, contador no trigger e badges removiveis; os itens ficam agrupados por NE selecionada com saldo, carregamento e botao `Adicionar Item` em cada grupo.
 - `Layout`: sidebar global compacta com campo de busca visual, grupos expansivos, submenus expansivos, indicador ativo lateral e drawer mobile.
 - `SuapeProcessToolkit` (extensao 1.9): painel lateral prefixado por `suape-`, com abas Resumo, Financeiro, Atalhos, IA e Configuracoes. Usa superficie e tokens proprios para nao alterar o CSS do SUAP; o formulario de autenticacao reforca localmente layout, visibilidade e dimensoes para resistir aos estilos globais legados do SUAP. Financeiro preserva o conteudo funcional anterior e IA abre o gerador existente.
+- `SuapePlanTableHeaders` (extensão 1.9): cabeçalhos das tabelas originais do Plano de Atividades concluído 8 viram botões de ordenação acessíveis, com indicador visual reforçado. O filtro `Exibir somente atividades com saldo` permanece no card nativo de filtros do SUAP.
 
 ## Regra pratica
 
@@ -82,3 +83,4 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 - KPI: `StatCard` com `tone` ou `stitchColor` legado.
 
 - Almoxarifado: página operacional que combina HeaderActions, StatCard, FilterPanel, DataTablePanel, Tabs e Dialog para catálogo, saldos e movimentos, com estados explícitos de estoque crítico.
+O acordeao Resumo financeiro por dimensao segue a estrutura nativa do SUAP e exibe os totais das quatro colunas financeiras agrupados por dimensao.

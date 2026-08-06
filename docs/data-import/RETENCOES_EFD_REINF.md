@@ -60,7 +60,7 @@ Este ponto deve ser tratado como debito de documentacao e de UX.
 
 ### Critica
 
-- `DH Item - UG Pagadora` deve ser `158155`
+- `DH Item - UG Pagadora` deve ser `158366`
 - linhas com `DH - Situacao` igual a `DDR001` ou `DGR001` sao ignoradas nessa critica de UG
 
 ### Aviso

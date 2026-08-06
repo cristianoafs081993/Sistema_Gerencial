@@ -4,6 +4,9 @@
   const PANEL_ID = 'siages-suap-plan-summary';
   const FRAME_ID = 'siages-suap-plan-summary-frame';
   const STYLE_ID = 'siages-suap-plan-summary-style';
+  const FILTER_TOGGLE_ID = 'siages-suap-plan-balance-filter';
+  const DIMENSION_SUMMARY_ID = 'siages-suap-plan-dimension-summary';
+  const TABLE_MARKER = 'data-siages-plan-table';
   const SIAGES_APP_ORIGIN_STORAGE_KEY = 'siages-app-origin';
   const DEFAULT_SIAGES_APP_ORIGIN = 'https://www.siages.com.br';
   const LEGACY_SIAGES_APP_ORIGIN = 'https://sistema-gerencial-gamma.vercel.app';
@@ -18,6 +21,8 @@
     summary: null,
     detail: null,
     hiddenState: new Map(),
+    tableEnhancements: new Map(),
+    tableTools: { hideZeroBalances: false, sortColumn: null, sortDirection: 'asc' },
     retry: null,
     cleanupRequest: null,
   };
@@ -229,6 +234,247 @@
     return blocks;
   }
 
+  function getTableHeaders(table) {
+    return Array.from(table.querySelectorAll('thead th')).map((header) => cleanText(header.textContent));
+  }
+
+  function getTableColumnIndex(table, normalizedLabel) {
+    return getTableHeaders(table).findIndex((header) => {
+      const normalized = normalizeText(header);
+      return normalized === normalizedLabel || normalized.startsWith(normalizedLabel);
+    });
+  }
+
+  function getPlanTables() {
+    return Array.from(document.querySelectorAll('main table, #content table, .content table'))
+      .filter((table) => table.tBodies.length > 0 && getTableColumnIndex(table, BALANCE_LABEL) >= 0);
+  }
+
+  function getTableNumericValue(value) {
+    const compact = cleanText(value).replace(/\s/g, '');
+    if (!/^-?(?:R\$)?\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?$/.test(compact)
+      && !/^-?\d+(?:[.,]\d+)?$/.test(compact)) return null;
+    return parseCurrency(compact);
+  }
+
+  function getTableCellValue(row, columnIndex) {
+    return cleanText(row.cells[columnIndex]?.textContent);
+  }
+
+  function isZeroBalanceRow(row, balanceColumnIndex) {
+    const rawValue = getTableCellValue(row, balanceColumnIndex);
+    return Math.abs(parseCurrency(rawValue)) < 0.005;
+  }
+
+  function getPlanTableDimension(table, fallbackIndex) {
+    const button = table.closest('.accordion-item')?.querySelector('.accordion-header button');
+    return cleanText(button?.textContent) || `Dimensão ${fallbackIndex + 1}`;
+  }
+
+  function collectPlanDimensionSummary() {
+    const dimensions = new Map();
+    let fallbackIndex = 0;
+    state.tableEnhancements.forEach((stateForTable) => {
+      const table = stateForTable.table;
+      const dimensionLabel = getPlanTableDimension(table, fallbackIndex);
+      fallbackIndex += 1;
+      if (!dimensions.has(dimensionLabel)) {
+        dimensions.set(dimensionLabel, {
+          dimensao: dimensionLabel,
+          valorAtualizado: 0,
+          valorEmpenhado: 0,
+          requisicoes: 0,
+          saldoDisponivel: 0,
+        });
+      }
+      const summary = dimensions.get(dimensionLabel);
+      const updatedColumn = getTableColumnIndex(table, 'valor atualizado da atividade r');
+      const committedColumn = getTableColumnIndex(table, 'valor empenhado da atividade r');
+      const requisitionsColumn = getTableColumnIndex(table, 'valor de requisicoes de despesas em tramitacao');
+      stateForTable.rows.forEach((row) => {
+        summary.valorAtualizado += parseCurrency(getTableCellValue(row, updatedColumn));
+        summary.valorEmpenhado += parseCurrency(getTableCellValue(row, committedColumn));
+        summary.requisicoes += parseCurrency(getTableCellValue(row, requisitionsColumn));
+        summary.saldoDisponivel += parseCurrency(getTableCellValue(row, stateForTable.balanceColumnIndex));
+      });
+    });
+    return Array.from(dimensions.values());
+  }
+
+  function renderPlanDimensionSummary() {
+    const dimensions = collectPlanDimensionSummary();
+    document.getElementById(DIMENSION_SUMMARY_ID)?.remove();
+    if (dimensions.length === 0) return dimensions;
+
+    const legendButton = Array.from(document.querySelectorAll('.accordion-header button'))
+      .find((button) => normalizeText(button.textContent) === 'legenda');
+    const legendAccordion = legendButton?.closest('.accordion');
+    if (!legendAccordion) return dimensions;
+
+    const accordion = document.createElement('div');
+    accordion.id = DIMENSION_SUMMARY_ID;
+    accordion.className = 'accordion siages-plan-dimension-summary';
+    accordion.setAttribute('aria-label', 'Resumo financeiro por dimensão');
+    const item = createElement('div', undefined, 'accordion-item');
+    const header = createElement('h2', undefined, 'accordion-header');
+    const button = createElement('button', 'Resumo financeiro por dimensão', 'accordion-button');
+    button.type = 'button';
+    button.setAttribute('data-bs-toggle', 'collapse');
+    button.setAttribute('data-bs-target', '#siages-suap-plan-dimension-summary-collapse');
+    button.setAttribute('aria-expanded', 'true');
+    button.setAttribute('aria-controls', 'siages-suap-plan-dimension-summary-collapse');
+    header.appendChild(button);
+
+    const collapse = createElement('div', undefined, 'accordion-collapse collapse show');
+    collapse.id = 'siages-suap-plan-dimension-summary-collapse';
+    const body = createElement('div', undefined, 'accordion-body');
+    const responsive = createElement('div', undefined, 'table-responsive');
+    const table = createElement('table', undefined, 'table siages-plan-dimension-summary-table');
+    const thead = document.createElement('thead');
+    const headRow = document.createElement('tr');
+    ['Dimensão', 'Valor atualizado da atividade (R$)', 'Valor empenhado da atividade (R$)', 'Valor de requisições de despesas em tramitação', 'Saldo disponível para empenho da atividade (R$)']
+      .forEach((label) => headRow.appendChild(createElement('th', label)));
+    thead.appendChild(headRow);
+    const tbody = document.createElement('tbody');
+    dimensions.forEach((dimension) => {
+      const row = document.createElement('tr');
+      row.appendChild(createElement('td', dimension.dimensao));
+      [dimension.valorAtualizado, dimension.valorEmpenhado, dimension.requisicoes, dimension.saldoDisponivel]
+        .forEach((value) => row.appendChild(createElement('td', formatCurrency(value), 'text-end')));
+      tbody.appendChild(row);
+    });
+    table.append(thead, tbody);
+    responsive.appendChild(table);
+    body.appendChild(responsive);
+    collapse.appendChild(body);
+    item.append(header, collapse);
+    accordion.appendChild(item);
+    legendAccordion.insertAdjacentElement('afterend', accordion);
+    return dimensions;
+  }
+  function renderPlanBalanceFilter() {
+    let toggle = document.getElementById(FILTER_TOGGLE_ID);
+    if (toggle) return toggle;
+
+    const form = document.querySelector('form#relatorioplanoatividade_form, form[name="relatorioplanoatividade_form"]');
+    const fieldset = form?.querySelector('fieldset.module.aligned, fieldset');
+    if (!fieldset) return null;
+
+    toggle = document.createElement('div');
+    toggle.id = FILTER_TOGGLE_ID;
+    toggle.className = 'form-row siages-plan-filter-toggle';
+    const fieldBox = createElement('div', undefined, 'field-box-first');
+    const label = document.createElement('label');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = state.tableTools.hideZeroBalances;
+    checkbox.addEventListener('change', () => {
+      state.tableTools.hideZeroBalances = checkbox.checked;
+      applyPlanTableFilters();
+    });
+    label.append(checkbox, document.createTextNode('Exibir somente atividades com saldo'));
+    fieldBox.appendChild(label);
+    toggle.appendChild(fieldBox);
+    fieldset.appendChild(toggle);
+    return toggle;
+  }
+
+  function updateTableHeaderSort(stateForTable) {
+    stateForTable.headers.forEach((header, index) => {
+      const button = header.querySelector('.siages-plan-column-sort');
+      if (!button) return;
+      const isActive = state.tableTools.sortColumn === index;
+      header.setAttribute('aria-sort', isActive ? (state.tableTools.sortDirection === 'asc' ? 'ascending' : 'descending') : 'none');
+      button.dataset.direction = isActive ? state.tableTools.sortDirection : 'none';
+      button.title = `Ordenar por ${stateForTable.headerLabels[index]}${isActive ? (state.tableTools.sortDirection === 'asc' ? ', crescente' : ', decrescente') : ''}`;
+    });
+  }
+
+  function sortPlanTable(stateForTable) {
+    const columnIndex = state.tableTools.sortColumn;
+    if (!Number.isInteger(columnIndex) || columnIndex < 0 || columnIndex >= stateForTable.headerLabels.length) return;
+    const direction = state.tableTools.sortDirection === 'desc' ? -1 : 1;
+    const rows = [...stateForTable.rows].sort((left, right) => {
+      const leftValue = getTableCellValue(left, columnIndex);
+      const rightValue = getTableCellValue(right, columnIndex);
+      const leftNumeric = getTableNumericValue(leftValue);
+      const rightNumeric = getTableNumericValue(rightValue);
+      if (leftNumeric !== null && rightNumeric !== null && leftNumeric !== rightNumeric) return (leftNumeric - rightNumeric) * direction;
+      const compared = leftValue.localeCompare(rightValue, 'pt-BR', { numeric: true, sensitivity: 'base' });
+      return compared !== 0 ? compared * direction : stateForTable.originalOrder.get(left) - stateForTable.originalOrder.get(right);
+    });
+    stateForTable.tbody.append(...rows);
+  }
+
+  function applyPlanTableFilters() {
+    let visibleRows = 0;
+    let totalRows = 0;
+    state.tableEnhancements.forEach((stateForTable) => {
+      sortPlanTable(stateForTable);
+      stateForTable.rows.forEach((row) => {
+        const originalHidden = stateForTable.originalHidden.get(row) || false;
+        const hasZeroBalance = isZeroBalanceRow(row, stateForTable.balanceColumnIndex);
+        row.hidden = originalHidden || (state.tableTools.hideZeroBalances && hasZeroBalance);
+        totalRows += 1;
+        if (!row.hidden) visibleRows += 1;
+      });
+      updateTableHeaderSort(stateForTable);
+    });
+    return { visibleRows, totalRows };
+  }
+
+  function setPlanTableSort(columnIndex) {
+    if (state.tableTools.sortColumn === columnIndex) {
+      state.tableTools.sortDirection = state.tableTools.sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      state.tableTools.sortColumn = columnIndex;
+      state.tableTools.sortDirection = 'asc';
+    }
+    applyPlanTableFilters();
+  }
+
+  function enhancePlanTables() {
+    ensureStyles();
+    const tables = getPlanTables();
+    state.tableEnhancements.forEach((stateForTable, table) => {
+      if (!document.documentElement.contains(table)) state.tableEnhancements.delete(table);
+    });
+    if (tables.length === 0) return { tableCount: 0, visibleRows: 0, totalRows: 0 };
+
+    tables.forEach((table) => {
+      if (state.tableEnhancements.has(table)) return;
+      const tbody = table.tBodies[0];
+      const headers = Array.from(table.querySelectorAll('thead th'));
+      const stateForTable = {
+        table,
+        tbody,
+        headers,
+        headerLabels: getTableHeaders(table),
+        rows: Array.from(tbody.rows),
+        originalOrder: new Map(),
+        originalHidden: new Map(),
+        balanceColumnIndex: getTableColumnIndex(table, BALANCE_LABEL),
+      };
+      stateForTable.rows.forEach((row, index) => {
+        stateForTable.originalOrder.set(row, index);
+        stateForTable.originalHidden.set(row, row.hidden);
+      });
+      headers.forEach((header, index) => {
+        const button = createElement('button', stateForTable.headerLabels[index], 'siages-plan-column-sort');
+        button.type = 'button';
+        button.addEventListener('click', () => setPlanTableSort(index));
+        header.replaceChildren(button);
+        header.setAttribute('aria-sort', 'none');
+      });
+      table.setAttribute(TABLE_MARKER, 'true');
+      state.tableEnhancements.set(table, stateForTable);
+    });
+
+    renderPlanBalanceFilter();
+    renderPlanDimensionSummary();
+    return { tableCount: tables.length, ...applyPlanTableFilters() };
+  }
+
   function getStoredValue(key) {
     return new Promise((resolve) => {
       if (!window.chrome?.storage?.local?.get) {
@@ -337,12 +583,30 @@
       #${PANEL_ID} .siages-plan-header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 18px; border-bottom:1px solid #e5ece6; }
       #${PANEL_ID} .siages-plan-header h2 { margin:0; font-size:17px; color:#14532d; }
       #${PANEL_ID} .siages-plan-header p { margin:3px 0 0; color:#526156; font-size:13px; }
-      #${PANEL_ID} .siages-plan-switch { display:flex; align-items:center; gap:8px; min-height:32px; color:#243526; font-weight:600; cursor:pointer; }
-      #${PANEL_ID} .siages-plan-switch input { width:18px; height:18px; accent-color:#177d32; cursor:pointer; }
       #${PANEL_ID} .siages-plan-status { margin:0; padding:12px 18px; color:#526156; }
       #${PANEL_ID} .siages-plan-status[role="alert"] { color:#991b1b; background:#fef2f2; }
       #${PANEL_ID} .siages-plan-retry { margin:0 18px 16px; min-height:36px; border:1px solid #177d32; border-radius:7px; padding:6px 12px; background:#fff; color:#14532d; font:inherit; font-weight:700; cursor:pointer; }
       #${PANEL_ID} .siages-plan-retry:hover { background:#f0f9f1; }
+      #relatorioplanoatividade_form #${FILTER_TOGGLE_ID} { min-width:250px; }
+      #relatorioplanoatividade_form #${FILTER_TOGGLE_ID} label { display:flex; align-items:center; gap:7px; min-height:34px; margin:0; cursor:pointer; }
+      #relatorioplanoatividade_form #${FILTER_TOGGLE_ID} input { width:16px; height:16px; margin:0; accent-color:#177d32; cursor:pointer; }
+      #${DIMENSION_SUMMARY_ID} { margin-top:16px; border:1px solid #353535; border-radius:6px; background:#1b1b1b; color:#f5f5f5; overflow:hidden; }
+      #${DIMENSION_SUMMARY_ID} .accordion-item { border:0; background:#1b1b1b; }
+      #${DIMENSION_SUMMARY_ID} .accordion-header { background:#1b1b1b; }
+      #${DIMENSION_SUMMARY_ID} .accordion-button, #${DIMENSION_SUMMARY_ID} .accordion-button:not(.collapsed) { background:#1b1b1b; color:#18c7bd; box-shadow:none; }
+      #${DIMENSION_SUMMARY_ID} .accordion-button:focus { box-shadow:inset 0 0 0 2px rgba(24,199,189,.35); }
+      #${DIMENSION_SUMMARY_ID} .accordion-body { padding:16px 10px 10px; background:#1b1b1b; color:#f5f5f5; }
+      #${DIMENSION_SUMMARY_ID} .table-responsive { margin:0; }
+      #${DIMENSION_SUMMARY_ID} table { width:100%; margin:0; border-collapse:collapse; background:#242424 !important; color:#f5f5f5 !important; --bs-table-bg:#242424; --bs-table-color:#f5f5f5; --bs-table-border-color:#454545; }
+      #${DIMENSION_SUMMARY_ID} thead th { background:#343434 !important; color:#ffffff !important; border:1px solid #4b4b4b; padding:10px 8px; font-size:12px; font-weight:700; line-height:1.2; vertical-align:middle; }
+      #${DIMENSION_SUMMARY_ID} tbody td { background:#242424 !important; color:#f5f5f5 !important; border:1px solid #454545; padding:10px 8px; font-size:13px; vertical-align:middle; }
+      #${DIMENSION_SUMMARY_ID} tbody tr:nth-child(even) td { background:#292929 !important; }
+      #${DIMENSION_SUMMARY_ID} tbody tr:hover td { background:#303030 !important; }
+      #${DIMENSION_SUMMARY_ID} .text-end { color:#ffffff; font-variant-numeric:tabular-nums; }
+      table[${TABLE_MARKER}="true"] .siages-plan-column-sort { display:inline-flex; align-items:center; gap:7px; width:100%; border:0; padding:2px 0; background:transparent; color:#f8fafc !important; font:inherit; font-weight:inherit; text-align:inherit; cursor:pointer; }
+      table[${TABLE_MARKER}="true"] .siages-plan-column-sort::after { content:\\2195; color:#e2e8f0; font-size:15px; font-weight:800; line-height:1; margin-left:7px; text-shadow:0 1px 1px rgba(0,0,0,.65); }
+      table[${TABLE_MARKER}="true"] .siages-plan-column-sort[data-direction="asc"]::after { content:\\2191; color:#facc15; font-size:16px; font-weight:900; }
+      table[${TABLE_MARKER}="true"] .siages-plan-column-sort[data-direction="desc"]::after { content:\\2193; color:#facc15; font-size:16px; font-weight:900; }
       #${PANEL_ID} .siages-plan-retry:focus-visible, #${PANEL_ID} .siages-plan-value:focus-visible, #${PANEL_ID} .siages-plan-detail-close:focus-visible { outline:3px solid #60a5fa; outline-offset:2px; }
       #${PANEL_ID} .siages-plan-table-wrap { overflow-x:auto; }
       #${PANEL_ID} table { width:100%; min-width:920px; border-collapse:collapse; }
@@ -362,7 +626,7 @@
       #${PANEL_ID} .siages-plan-detail-table { min-width:0; background:#fff; border:1px solid #dce8de; border-radius:8px; overflow:hidden; }
       #${PANEL_ID} .siages-plan-detail-table th, #${PANEL_ID} .siages-plan-detail-table td { padding:9px 10px; font-size:12px; }
       #${PANEL_ID} .siages-plan-empty { margin:0; color:#526156; }
-      @media (max-width: 640px) { #${PANEL_ID} .siages-plan-header { align-items:flex-start; flex-direction:column; } #${PANEL_ID} .siages-plan-switch { font-size:13px; } }
+      @media (max-width: 640px) { #${PANEL_ID} .siages-plan-header { align-items:flex-start; flex-direction:column; } }
     `;
     document.head.appendChild(style);
   }
@@ -496,13 +760,7 @@
       createElement('h2', 'Resumo por dimensão'),
       createElement('p', 'Dados consultados diretamente no banco para o plano de atividades 2026.'),
     );
-    const switchLabel = createElement('label', undefined, 'siages-plan-switch');
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.checked = state.hiddenState.size > 0;
-    checkbox.addEventListener('change', () => applyBalanceFilter(checkbox.checked));
-    switchLabel.append(checkbox, document.createTextNode('Somente atividades com saldo para empenho'));
-    header.append(titleGroup, switchLabel);
+    header.appendChild(titleGroup);
 
     const status = createElement('p', summary.dimensoes.length ? '' : 'Nenhuma dimensão foi encontrada no SIAGES.', 'siages-plan-status');
     status.setAttribute('aria-live', 'polite');
@@ -620,6 +878,7 @@
 
   function requestSummary() {
     if (!PLAN_PATH.test(window.location.pathname)) return;
+    enhancePlanTables();
     state.cleanupRequest?.();
     document.getElementById(FRAME_ID)?.remove();
     renderLoading();
@@ -631,6 +890,19 @@
   function dispose() {
     state.cleanupRequest?.();
     applyBalanceFilter(false);
+    state.tableEnhancements.forEach((stateForTable) => {
+      stateForTable.tbody.append(...stateForTable.rows);
+      stateForTable.rows.forEach((row) => { row.hidden = stateForTable.originalHidden.get(row) || false; });
+      stateForTable.headers.forEach((header, index) => {
+        header.textContent = stateForTable.headerLabels[index];
+        header.removeAttribute('aria-sort');
+      });
+      stateForTable.table.removeAttribute(TABLE_MARKER);
+    });
+    state.tableEnhancements.clear();
+    document.getElementById(STYLE_ID)?.remove();
+    document.getElementById(DIMENSION_SUMMARY_ID)?.remove();
+    document.getElementById(FILTER_TOGGLE_ID)?.remove();
     document.getElementById(PANEL_ID)?.remove();
   }
 
@@ -643,9 +915,15 @@
     fetchDirectPlanSummary,
     collectActivityBlocks,
     applyBalanceFilter,
+    getPlanTables,
+    collectPlanDimensionSummary,
+    renderPlanDimensionSummary,
+    enhancePlanTables,
+    applyPlanTableFilters,
+    setPlanTableSort,
     renderSummary,
     requestSummary,
     dispose,
   };
-  if (!window.__SIAGES_SUAP_PLAN_TEST__) requestSummary();
+  if (!window.__SIAGES_SUAP_PLAN_TEST__) enhancePlanTables();
 })();

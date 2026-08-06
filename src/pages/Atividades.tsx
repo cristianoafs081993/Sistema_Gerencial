@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { Filter, Pencil, Plus, Search, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
@@ -9,6 +9,7 @@ import { StatCard } from '@/components/StatCard';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { TablePagination } from '@/components/design-system/TablePagination';
 import { AtividadeDialog } from '@/components/modals/AtividadeDialog';
+import { SuapPlanSyncCard } from '@/components/suap/SuapPlanSyncCard';
 import { ConfirmDialog } from '@/components/modals/ConfirmDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -143,11 +144,11 @@ export default function Atividades() {
   const resolvedScope = isPlanningScope(scope) ? scope : DEFAULT_SCOPE;
   const currentView = planningViewByScope[resolvedScope];
   const scopedAtividades = useMemo(
-    () => atividades.filter((atividade) => atividade.tipoAtividade === currentView.scope),
-    [atividades, currentView.scope],
+    () => atividades.filter((atividade) => atividade.tipoAtividade === currentView.scope && (resolvedScope !== 'campus' || atividade.syncActive !== false)),
+    [atividades, currentView.scope, resolvedScope],
   );
 
-  const fetchAtividades = async () => {
+  const fetchAtividades = useCallback(async () => {
     try {
       setIsPageLoading(true);
       const data = await atividadesService.getAll();
@@ -158,11 +159,11 @@ export default function Atividades() {
     } finally {
       setIsPageLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void fetchAtividades();
-  }, []);
+  }, [fetchAtividades]);
 
   useEffect(() => {
     setSelectedIds(new Set());
@@ -176,6 +177,10 @@ export default function Atividades() {
   useEffect(() => {
     setPage(1);
   }, [searchTerm, filterDimensao, filterComponente, filterOrigem, perPage]);
+
+  const handleSuapSynced = useCallback(() => {
+    void fetchAtividades();
+  }, [fetchAtividades]);
 
   const filteredAtividades = useMemo(
     () =>
@@ -389,6 +394,8 @@ export default function Atividades() {
           isLoading={isPageLoading}
         />
       </div>
+
+      {resolvedScope === 'campus' ? <SuapPlanSyncCard onSynced={handleSuapSynced} /> : null}
 
       <FilterPanel className="shadow-sm">
         <CardContent className="p-0">
@@ -677,3 +684,9 @@ export default function Atividades() {
     </div>
   );
 }
+
+
+
+
+
+

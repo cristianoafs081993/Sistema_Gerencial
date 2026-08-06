@@ -2,102 +2,102 @@ function cleanText(text) {
   return text ? text.replace(/\s+/g, ' ').trim() : '';
 }
 
+function foldText(text) {
+  return cleanText(text).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
 function parseCurrency(str) {
-  if (!str) return 0;
-  const cleanStr = str.replace(/[R$\s.]/g, '').replace(',', '.');
-  const num = parseFloat(cleanStr);
-  return Number.isNaN(num) ? 0 : num;
+  const value = cleanText(str).replace(/[^\d,.-]/g, '');
+  if (!value) return 0;
+  const comma = value.lastIndexOf(',');
+  const dot = value.lastIndexOf('.');
+  const normalized = comma >= 0 && (dot < 0 || comma > dot)
+    ? value.replace(/\./g, '').replace(',', '.')
+    : value.replace(/,/g, '');
+  const number = Number(normalized);
+  return Number.isFinite(number) ? number : 0;
 }
 
 function parsePTRES(text) {
-  if (!text) return '';
-  const match = text.match(/\b\d{6}\b/);
-  return match ? match[0] : text;
+  const value = cleanText(text);
+  return value.match(/\b\d{6}\b/)?.[0] || value;
+}
+
+function isSummaryTable(table) {
+  return table.matches('[data-siages-plan-dimension-summary="true"], #siages-suap-plan-dimension-summary, .siages-plan-dimension-summary') ||
+    Boolean(table.closest('[data-siages-plan-dimension-summary="true"], #siages-suap-plan-dimension-summary, .siages-plan-dimension-summary'));
+}
+
+function extractSuapActivityId(row) {
+  const link = row.querySelector('a[href*="/plan_estrategico/listar_requisicoes_despesa/8/"]');
+  return link?.getAttribute('href')?.match(/\/plan_estrategico\/listar_requisicoes_despesa\/8\/(\d+)\/?/)?.[1] || '';
 }
 
 function extractDataFromPage() {
-  const atividades = [];
-  let currentDimensao = 'EN - Ensino';
-  let currentComponente = 'Desconhecido';
-
+  if (/^\/plan_estrategico\/plano_concluido\/8\/?$/.test(window.location.pathname)) return [];
+  const activities = new Map();
+  let currentDimension = 'EN - Ensino';
+  let currentComponent = '-';
   const contentBody = document.querySelector('.content-body, .panel-body, body');
   if (!contentBody) return [];
 
-  Array.from(contentBody.querySelectorAll('h2, h3, h4, table')).forEach((el) => {
-    if (el.tagName.startsWith('H')) {
-      const text = cleanText(el.innerText);
-      if (text.match(/^[A-Z]{2}\s*-/)) {
-        currentDimensao = text;
-      } else if (text.length > 5 && !text.toUpperCase().includes('TOTAL')) {
-        currentComponente = text;
-      }
+  Array.from(contentBody.querySelectorAll('h2, h3, h4, h5, h6, table')).forEach((element) => {
+    if (element.tagName.startsWith('H')) {
+      const heading = cleanText(element.textContent);
+      if (/^[A-Z]{2}\s*-/.test(heading)) currentDimension = heading;
+      else if (heading.length > 5 && !foldText(heading).includes('total')) currentComponent = heading;
+      return;
     }
 
-    if (el.tagName === 'TABLE') {
-      const headers = Array.from(el.querySelectorAll('th')).map((th) => cleanText(th.innerText).toLowerCase());
-      const isAtividadeTable = headers.some((header) => header.includes('atividade') || header.includes('meta'));
+    const table = element;
+    if (isSummaryTable(table)) return;
+    const headers = Array.from(table.querySelectorAll('thead th, tr:first-child th')).map((cell) => foldText(cell.textContent));
+    const hasPlanColumns = headers.some((header) => header.includes('origem de recurso')) &&
+      headers.some((header) => header.includes('plano interno')) &&
+      headers.some((header) => header.includes('valor atualizado da atividade'));
+    if (!hasPlanColumns) return;
 
-      if (isAtividadeTable) {
-        const idxAtividade = headers.findIndex((header) =>
-          header.includes('atividade') || header.includes('ação') || header.includes('meta')
-        );
-        const idxDescricao = headers.findIndex((header) => header.includes('descrição') || header.includes('detalhe'));
-        const idxValor = headers.findIndex((header) => header.includes('valor') || header.includes('orçamento') || header.includes('financeiro'));
-        const idxOrigem = headers.findIndex((header) => header.includes('origem') || header.includes('recurso'));
-        const idxNatureza = headers.findIndex((header) => header.includes('natureza') || header.includes('despesa'));
-        const idxPlano = headers.findIndex((header) => header.includes('plano interno') || header.includes('pi'));
-        const idxProcesso = headers.findIndex((header) => header.includes('processo'));
-        const idxComponente = headers.findIndex((header) => header.includes('componente') || header.includes('funcional'));
-        const idxDimensao = headers.findIndex((header) => header.includes('dimensão'));
-        const tbody = el.querySelector('tbody') || el;
-        const rows = Array.from(tbody.querySelectorAll('tr'));
+    const indexOf = (...needles) => headers.findIndex((header) => needles.some((needle) => header.includes(needle)));
+    const activityIndex = indexOf('atividade');
+    const descriptionIndex = indexOf('descricao', 'detalhe');
+    const valueIndex = indexOf('valor atualizado da atividade');
+    const originIndex = indexOf('origem de recurso');
+    const planIndex = indexOf('plano interno');
+    const natureIndex = indexOf('natureza', 'despesa');
+    const processIndex = indexOf('processo');
+    const componentIndex = indexOf('componente funcional');
+    const dimensionIndex = indexOf('dimensao');
 
-        rows.forEach((tr) => {
-          const cols = tr.querySelectorAll('td');
-          if (cols.length <= 2) return;
+    Array.from(table.tBodies.length ? table.tBodies : [table]).flatMap((body) => Array.from(body.querySelectorAll('tr'))).forEach((row) => {
+      const cells = Array.from(row.querySelectorAll('td')).map((cell) => cleanText(cell.textContent));
+      const activity = cells[activityIndex] || '';
+      const id = extractSuapActivityId(row);
+      if (!activity || foldText(activity) === 'total' || !id) return;
 
-          const atividadeVal = idxAtividade >= 0 && cols[idxAtividade]
-            ? cleanText(cols[idxAtividade].innerText)
-            : cleanText(cols[0].innerText);
-
-          if (!atividadeVal || atividadeVal.toLowerCase() === 'total') return;
-
-          const dimensaoVal = idxDimensao >= 0 && cols[idxDimensao]
-            ? cleanText(cols[idxDimensao].innerText)
-            : currentDimensao;
-          const componenteVal = idxComponente >= 0 && cols[idxComponente]
-            ? cleanText(cols[idxComponente].innerText)
-            : currentComponente;
-          const descricaoVal = idxDescricao >= 0 && cols[idxDescricao]
-            ? cleanText(cols[idxDescricao].innerText)
-            : atividadeVal;
-          const valorVal = idxValor >= 0 && cols[idxValor] ? parseCurrency(cols[idxValor].innerText) : 0;
-          const origemValRaw = idxOrigem >= 0 && cols[idxOrigem]
-            ? cleanText(cols[idxOrigem].innerText)
-            : '0100000000 - TESOURO';
-          const naturezaVal = idxNatureza >= 0 && cols[idxNatureza]
-            ? cleanText(cols[idxNatureza].innerText)
-            : '339000 - APLIC. DIRETAS';
-          const planoValRaw = idxPlano >= 0 && cols[idxPlano] ? cleanText(cols[idxPlano].innerText) : '';
-          const processoVal = idxProcesso >= 0 && cols[idxProcesso] ? cleanText(cols[idxProcesso].innerText) : '';
-
-          atividades.push({
-            dimensao: dimensaoVal,
-            componenteFuncional: componenteVal,
-            processo: processoVal !== '' ? processoVal : null,
-            atividade: atividadeVal.substring(0, 200),
-            descricao: descricaoVal,
-            valorTotal: valorVal,
-            origemRecurso: parsePTRES(origemValRaw),
-            naturezaDespesa: naturezaVal,
-            planoInterno: parsePTRES(planoValRaw),
-          });
-        });
-      }
-    }
+      const dimension = dimensionIndex >= 0 ? cells[dimensionIndex] || currentDimension : currentDimension;
+      const component = componentIndex >= 0 ? cells[componentIndex] || '-' : currentComponent || '-';
+      const item = {
+        suapActivityId: id,
+        dimensao: dimension,
+        componenteFuncional: component,
+        processo: processIndex >= 0 ? cells[processIndex] || null : null,
+        atividade: activity.substring(0, 200),
+        descricao: descriptionIndex >= 0 ? cells[descriptionIndex] || activity : activity,
+        valorTotal: valueIndex >= 0 ? parseCurrency(cells[valueIndex]) : 0,
+        origemRecurso: originIndex >= 0 ? parsePTRES(cells[originIndex]) : '',
+        naturezaDespesa: natureIndex >= 0 ? cells[natureIndex] : '',
+        planoInterno: planIndex >= 0 ? cells[planIndex] : '',
+      };
+      activities.set(`suap:8:${id}`, item);
+    });
   });
 
-  return atividades;
+  return Array.from(activities.values());
 }
 
+if (window.__SIAGES_SUAP_EXTENSION_TEST__) window.__siagesExtractPlanActivities = extractDataFromPage;
 extractDataFromPage();
+
+
+
+

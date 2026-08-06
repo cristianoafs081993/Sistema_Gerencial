@@ -1,4 +1,4 @@
-﻿import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx';
 import { endOfMonth, format, isValid, parse, parseISO } from 'date-fns';
 
 import { supabase } from '@/lib/supabase';
@@ -132,11 +132,18 @@ async function readCsvRows(file: File): Promise<string[][]> {
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n');
 
-  return text
+  const lines = text
     .split('\n')
     .map((line) => line.trimEnd())
-    .filter((line) => line.length > 0)
-    .map((line) => splitCsvLine(line, '\t'));
+    .filter((line) => line.length > 0);
+
+  if (lines.length === 0) return [];
+
+  // Detecta o delimitador buscando na linha do cabeçalho ou nas primeiras linhas
+  const sample = lines.slice(0, 10).join('\n');
+  const delimiter = sample.includes('\t') ? '\t' : sample.includes(';') ? ';' : ',';
+
+  return lines.map((line) => splitCsvLine(line, delimiter));
 }
 
 function normalizeHeader(value: unknown) {
@@ -289,37 +296,74 @@ export async function parseRetencoesEfdReinfCsv(file: File): Promise<RetencaoEfd
 
   const headerRowIndex = normalizedRows.findIndex((row) => {
     const normalized = row.map(normalizeHeader);
-    return normalized.includes('documento habil') && normalized.includes('dh - situacao');
+    return normalized.includes('documento habil') && normalized.some((col) => col.includes('situacao'));
   });
 
   if (headerRowIndex === -1) {
     throw new Error('Nao foi possivel localizar o cabecalho do arquivo de retencoes EFD-Reinf.');
   }
 
+  const rawHeaders = normalizedRows[headerRowIndex].map(normalizeHeader);
+  const docHabilIdx = rawHeaders.findIndex((h) => h.includes('documento habil'));
+  const processoIdx = rawHeaders.findIndex((h) => h.includes('processo'));
+  const estadoIdx = rawHeaders.findIndex((h) => h.includes('estado'));
+  const ugPagadoraIdx = rawHeaders.findIndex((h) => h === 'dh - ug pagadora' || h === 'ug pagadora');
+  const itemUgPagadoraIdx = rawHeaders.findIndex((h) => h.includes('item') && h.includes('ug pagadora'));
+  const credorDocIdx = rawHeaders.findIndex((h) => h.includes('credor') && !h.includes('nome'));
+
+  // Se o cabeçalho tem uma coluna vazia logo após Credor, essa coluna em branco é o Credor Nome
+  let credorNomeIdx = rawHeaders.findIndex((h) => h.includes('credor') && h.includes('nome'));
+  if (credorNomeIdx === -1 && credorDocIdx !== -1 && rawHeaders[credorDocIdx + 1] === '') {
+    credorNomeIdx = credorDocIdx + 1;
+  }
+
+  const situacaoIdx = rawHeaders.findIndex((h) => h.includes('situacao'));
+  const emissaoIdx = rawHeaders.findIndex((h) => h.includes('emissao'));
+  const diaPgtoIdx = rawHeaders.findIndex((h) => h.includes('dia pagamento') && !h.includes('item'));
+  const itemVencimentoIdx = rawHeaders.findIndex((h) => h.includes('item') && h.includes('vencimento'));
+  const itemPgtoIdx = rawHeaders.findIndex((h) => h.includes('item') && h.includes('pagamento'));
+  const itemLiquidadoIdx = rawHeaders.findIndex((h) => h.includes('liquidado'));
+  const valorDocOrigemIdx = rawHeaders.findIndex((h) => h.includes('valor doc') || h.includes('valor doc.origem'));
+  const metricaIdx = rawHeaders.findIndex((h) => h.includes('metrica'));
+  
+  // O valor da retenção pode ser uma coluna chamada "valor retencao" ou a última coluna (inclusive se o cabeçalho estiver vazio no final)
+  let valorRetencaoIdx = rawHeaders.findIndex((h) => h.includes('retencao') || h.includes('retida'));
+
   return normalizedRows
     .slice(headerRowIndex + 1)
     .map((row, index): RetencaoEfdReinfRegistro | null => {
-      const documentoHabil = String(row[0] || '').trim();
+      const getVal = (idx: number) => (idx >= 0 && idx < row.length ? String(row[idx] || '').trim() : '');
+
+      const documentoHabil = docHabilIdx >= 0 ? getVal(docHabilIdx) : String(row[0] || '').trim();
       if (!documentoHabil) return null;
+
+      // Se valorRetencaoIdx não foi identificado no cabeçalho, tenta usar a última coluna que contém valor numérico
+      let rawValorRetencao = valorRetencaoIdx >= 0 ? getVal(valorRetencaoIdx) : '';
+      if (!rawValorRetencao && row.length > 15) {
+        rawValorRetencao = String(row[15] || '').trim();
+      }
+      if (!rawValorRetencao && row.length > 0) {
+        rawValorRetencao = String(row[row.length - 1] || '').trim();
+      }
 
       return {
         sourceIndex: index + 1,
         documentoHabil,
-        dhProcesso: String(row[1] || '').trim(),
-        dhEstado: String(row[2] || '').trim(),
-        dhUgPagadora: String(row[3] || '').trim(),
-        dhItemUgPagadora: String(row[4] || '').trim(),
-        dhCredorDocumento: String(row[5] || '').trim(),
-        dhCredorNome: String(row[6] || '').trim(),
-        dhSituacao: String(row[7] || '').trim().toUpperCase(),
-        dhDataEmissaoDocOrigem: toIsoDate(row[8]),
-        dhDiaPagamento: toIsoDate(row[9]),
-        dhItemDiaVencimento: toIsoDate(row[10]),
-        dhItemDiaPagamento: toIsoDate(row[11]),
-        dhItemLiquidado: toBooleanLiquidado(row[12]),
-        dhValorDocOrigem: parseCurrencyBR(row[13]),
-        metrica: String(row[14] || '').trim(),
-        valorRetencao: parseCurrencyBR(row[15]),
+        dhProcesso: getVal(processoIdx >= 0 ? processoIdx : 1),
+        dhEstado: getVal(estadoIdx >= 0 ? estadoIdx : 2),
+        dhUgPagadora: getVal(ugPagadoraIdx >= 0 ? ugPagadoraIdx : 3),
+        dhItemUgPagadora: getVal(itemUgPagadoraIdx >= 0 ? itemUgPagadoraIdx : 4),
+        dhCredorDocumento: getVal(credorDocIdx >= 0 ? credorDocIdx : 5),
+        dhCredorNome: getVal(credorNomeIdx >= 0 ? credorNomeIdx : 6),
+        dhSituacao: getVal(situacaoIdx >= 0 ? situacaoIdx : 7).toUpperCase(),
+        dhDataEmissaoDocOrigem: toIsoDate(getVal(emissaoIdx >= 0 ? emissaoIdx : 8)),
+        dhDiaPagamento: toIsoDate(getVal(diaPgtoIdx >= 0 ? diaPgtoIdx : 9)),
+        dhItemDiaVencimento: toIsoDate(getVal(itemVencimentoIdx >= 0 ? itemVencimentoIdx : 10)),
+        dhItemDiaPagamento: toIsoDate(getVal(itemPgtoIdx >= 0 ? itemPgtoIdx : 11)),
+        dhItemLiquidado: toBooleanLiquidado(getVal(itemLiquidadoIdx >= 0 ? itemLiquidadoIdx : 12)),
+        dhValorDocOrigem: parseCurrencyBR(getVal(valorDocOrigemIdx >= 0 ? valorDocOrigemIdx : 13)),
+        metrica: getVal(metricaIdx >= 0 ? metricaIdx : 14),
+        valorRetencao: parseCurrencyBR(rawValorRetencao),
         correcaoRealizada: false,
       };
     })
@@ -334,7 +378,7 @@ export function validateRetencaoEfdReinfRow(
   const itemUgPagadora = (row.dhItemUgPagadora || '').replace(/\D/g, '');
   const situacao = row.dhSituacao.trim().toUpperCase();
   const shouldIgnoreUgCritica = SITUACOES_IGNORADAS_REGRA_UG_CRITICA.has(situacao);
-  const hasCriticalUgPagadora = !shouldIgnoreUgCritica && itemUgPagadora !== '158155';
+  const hasCriticalUgPagadora = !shouldIgnoreUgCritica && itemUgPagadora !== '158366';
 
   let expectedRule: 'DDF025' | 'DDF055' | 'DDF021' | 'DDF050' | null = null;
   let expectedDate: string | null = null;
@@ -372,7 +416,7 @@ export function validateRetencaoEfdReinfRow(
   }
 
   if (hasCriticalUgPagadora) {
-    issues.unshift('DH Item - UG Pagadora deve ser 158155.');
+    issues.unshift('DH Item - UG Pagadora deve ser 158366.');
   }
 
   const percentualRetencao =

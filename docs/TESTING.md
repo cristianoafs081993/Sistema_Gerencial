@@ -96,7 +96,7 @@ Cobertura mínima obrigatória do piloto manual:
 
 - parser do HTML e classificação em português com variações de acento; documentos desconhecidos devem permanecer incluídos;
 - limite de quatro downloads concorrentes, falha de download registrada por título/erro e prioridade da primeira extração com os PDFs úteis já disponíveis; o PDF completo só pode ser enfileirado depois como complementação de resultado incompleto ou sem nota fiscal utilizável;
-- bloqueio de URLs externas, caminhos de documento sem `?original=sim` e parâmetros arbitrários no `suap-proxy`;
+- bloqueio de URLs externas, caminhos de documento sem `?original=sim` e par?metros arbitr?rios no `suap-proxy`;
 - migration com inventário e histórico isolados por `tenant_id` e RLS; endpoint deve validar os IDs contra o processo/tenant antes de enfileirar;
 - regressão do PDF completo, extensão SUAP, Editor de Documentos, PDFs pesados por blocos e múltiplas notas fiscais.
 
@@ -105,6 +105,8 @@ Rollout: executar A/B manual em 10 processos de pagamento representativos. Promo
 ## Regressao da extensao Suape
 
 A pasta corrente e centralizada por `src/test/extensionFixtures.ts`. As suites `suapExtensionPackage`, `suapProcessDocumentExtension`, `suapTextExpander`, `suapExtensionDispatch`, `SuapExtensionProcessInfo`, `suapPlanContentScript` e `suapCloneAutomation` protegem manifesto e rotas, painel de processo, bridge segura, sincronizacao, Financeiro, atalhos, popup, Plano de Atividades e clonagem.
+
+- No Plano de Atividades concluído 8, cobrir a ordenação nos cabeçalhos das tabelas originais e o checkbox `Exibir somente atividades com saldo` inserido no card nativo de filtros, sem esconder linhas com saldo positivo.
 
 Antes de publicar uma nova versao, execute as suites focadas, `src/__tests__/encoding.test.ts`, `npm test`, `npm run build` e `npm run check`; em seguida compare os arquivos do diretorio da extensao com o ZIP gerado.
 
@@ -122,3 +124,9 @@ A correcao de compatibilidade do login foi publicada no pacote como `1.9.2`, per
 - `supabase migration list`: historico local e remoto alinhado;
 - `supabase functions deploy process-pdf`: deploy de validacao concluido no projeto vinculado;
 - `npm run check`: bloqueado no lint global por cinco erros preexistentes fora do escopo, em `AuditLog.tsx`, `ControleOrgaos.tsx` e `supabase/functions/pesquisar-precos/index.ts`; as etapas de testes e build foram executadas separadamente e aprovadas.
+Tambem validar o quadro Resumo financeiro por dimensao abaixo da Legenda, com uma linha por dimensao e os quatro totais financeiros.
+
+## Sincronização SUAP → Campus
+
+Os testes do parser cobrem acentos, moeda brasileira, IDs de atividades e linhas ocultas. A suíte de segurança cobre a permissão exclusiva do caminho canônico do Plano 8 no proxy. O fluxo remoto deve ser validado com HTML fixture para prévia, aplicação idempotente, alteração de valor, nova atividade, arquivamento e falha sem commit parcial.
+

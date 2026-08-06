@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Suape - Canivete Suico do IFRN",
-  "version": "1.9.8",
+  "version": "1.9.13",
   "description": "Resumo de processos, dados financeiros, atalhos e documentos com IA dentro do SUAP.",
   "permissions": [
     "activeTab",
@@ -20,14 +20,22 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["text-expander.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "text-expander.js"
+      ],
       "run_at": "document_idle",
       "all_frames": true
     },
     {
-      "matches": ["https://suap.ifrn.edu.br/documento_eletronico/*"],
-      "js": ["clone-document.js"],
+      "matches": [
+        "https://suap.ifrn.edu.br/documento_eletronico/*"
+      ],
+      "js": [
+        "clone-document.js"
+      ],
       "run_at": "document_idle"
     },
     {
@@ -35,14 +43,32 @@
         "https://suap.ifrn.edu.br/processo_eletronico/processo/*",
         "https://suap.ifrn.edu.br/processo_eletronico/visualizar_processo/*"
       ],
-      "css": ["process-toolkit.css"],
-      "js": ["process-document.js"],
+      "css": [
+        "process-toolkit.css"
+      ],
+      "js": [
+        "process-document.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://suap.ifrn.edu.br/plan_estrategico/plano_concluido/8/"],
-      "js": ["plan-summary.js"],
+      "matches": [
+        "https://suap.ifrn.edu.br/plan_estrategico/plano_concluido/8/"
+      ],
+      "js": [
+        "plan-summary.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.siages.com.br/planejamento/campus"
+      ],
+      "js": [
+        "siages-plan-sync.js"
+      ],
       "run_at": "document_idle"
     }
   ]
 }
+
