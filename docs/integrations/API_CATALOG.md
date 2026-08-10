@@ -645,11 +645,12 @@ Observações operacionais:
 
 - O consumo do cache de itens de empenho revalida registros not_found e faz fallback direto ao Portal da Transparencia para evitar que uma falha transitoria oculte subitens reais.
 
-## Sincronização do Plano SUAP
+## Sincronizacao do Plano SUAP
 
 - Endpoint: `POST /functions/v1/sync-suap-plan`, sempre autenticado pelo JWT do SIAGES.
-- `connect` recebe matrícula/senha apenas durante a conexão e devolve `connectionId`; `connect-cookie` aceita uma sessão SUAP existente. `sync` busca o Plano 8; `status` consulta a última execução; `apply` aplica uma prévia; `disconnect` revoga a sessão.
-- A URL aceita pelo proxy é fixa e não admite query string, host externo ou caminho arbitrário.
-- O Campus não depende da extensão; a extensão apenas dispara `siages:suap-plan-sync-request` na entrada da rota.
-
-- O popup da extensao e somente acionador: abre/ativa o Campus e envia uma mensagem para o content script; credenciais e captura do SUAP permanecem no backend/card autenticado.
+- Acoes: `connect`, `connect-cookie`, `sync`, `sync-html`, `apply`, `status` e `disconnect`.
+- `sync` usa a sessao SUAP cifrada no backend. `sync-html` recebe somente o HTML capturado da URL canonica do Plano 8 e nao exige `suap_connections` nem novo login SUAP.
+- O HTML enviado pela extensao e validado por host/caminho, tamanho maximo de 15 MB e parser com IDs estaveis; URLs arbitrarias e conteudo incompleto sao rejeitados.
+- A primeira execucao fica em `preview`; depois da conferencia, `apply_suap_plan_snapshot` atualiza/inclui os registros e arquiva os ausentes sem exclusao fisica.
+- O Campus nao depende da extensao. Quando a extensao e usada no popup, ela captura a aba SUAP atual e envia o HTML ao backend; na pagina Campus ela apenas dispara `siages:suap-plan-sync-request`.
+- O popup mantem o `runId` da previa em `chrome.storage.local` e oferece a aplicacao explicita pelo mesmo endpoint, sem abrir uma aba do SIAGES.

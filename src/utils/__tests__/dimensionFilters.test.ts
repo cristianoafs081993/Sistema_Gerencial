@@ -10,6 +10,8 @@ describe('dimensionFilters', () => {
   it('extracts the code from full dimension labels', () => {
     expect(extractDimensionCode('AD - Administracao')).toBe('AD');
     expect(extractDimensionCode('AE - Atividades Estudantis')).toBe('AE');
+    expect(extractDimensionCode('ad - administracao')).toBe('AD');
+    expect(extractDimensionCode('\u0041dministra\u00e7\u00e3o')).toBe('AD');
   });
 
   it('extracts the code from plan internal suffixes', () => {
@@ -35,6 +37,15 @@ describe('dimensionFilters', () => {
         planInternal: 'L20RLP99GON',
         description: 'MACROPROCESSO GO-GOVERNANCA',
         filterValue: 'GO',
+      }),
+    ).toBe(true);
+  });
+
+  it('accepts the full dimension label as the selected filter', () => {
+    expect(
+      matchesDimensionFilter({
+        dimensionValue: 'AD - Administracao',
+        filterValue: 'AD - Administra\u00e7\u00e3o',
       }),
     ).toBe(true);
   });

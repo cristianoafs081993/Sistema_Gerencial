@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
+import { DOMParser as LinkedomDOMParser } from 'npm:linkedom@0.18.13';
 
 import { parseSuapPlanHtml, type SuapPlanActivity } from '../../../src/services/suapPlanParser.ts';
 
@@ -15,12 +16,14 @@ const corsHeaders = {
 };
 
 type SyncBody = {
-  action?: 'connect' | 'connect-cookie' | 'sync' | 'apply' | 'status' | 'disconnect';
+  action?: 'connect' | 'connect-cookie' | 'sync' | 'sync-html' | 'apply' | 'status' | 'disconnect';
   username?: string;
   password?: string;
   sessionId?: string;
   runId?: string;
   mode?: 'preview' | 'apply';
+  html?: string;
+  sourceUrl?: string;
 };
 
 type AuthenticatedUser = { id: string; orgId: string };
@@ -234,6 +237,16 @@ function syncKey(dimensao: string, atividade: string): string {
   return `${fold(dimensao)}|${fold(atividade)}`;
 }
 
+function isPlanSourceUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.hostname === 'suap.ifrn.edu.br'
+      && !url.search && !url.hash
+      && /^\/plan_estrategico\/plano_concluido\/8\/?$/.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
 async function previewDiff(service: ReturnType<typeof createClient>, user: AuthenticatedUser, activities: SuapPlanActivity[]) {
   const ids = activities.map((activity) => activity.suapActivityId);
   const incoming = new Set(ids);
@@ -328,11 +341,20 @@ Deno.serve(async (request) => {
       return jsonResponse({ status: 'success', runId: body.runId, ...(data ?? {}) });
     }
 
-    if (action !== 'sync') return jsonResponse({ error: 'Ação desconhecida.' }, 400);
+    const htmlSync = action === 'sync-html';
+    if (action !== 'sync' && !htmlSync) return jsonResponse({ error: 'Acao desconhecida.' }, 400);
 
-    const connection = await getConnection(service, user);
-    if (!connection) return jsonResponse({ status: 'reauth_required', error: 'Conecte-se ao SUAP para sincronizar.' }, 401);
-
+    let connection: Awaited<ReturnType<typeof getConnection>> = null;
+    let html = '';
+    if (htmlSync) {
+      const sourceUrl = String(body.sourceUrl ?? SOURCE_URL);
+      if (!isPlanSourceUrl(sourceUrl)) return jsonResponse({ error: 'A URL de origem precisa ser exatamente o Plano 8 do SUAP.' }, 400);
+      html = String(body.html ?? '');
+      if (!html || html.length > 15 * 1024 * 1024) return jsonResponse({ error: 'HTML do Plano 8 ausente ou maior que o limite permitido.' }, 413);
+    } else {
+      connection = await getConnection(service, user);
+      if (!connection) return jsonResponse({ status: 'reauth_required', error: 'Conecte-se ao SUAP para sincronizar.' }, 401);
+    }
     const { data: running } = await service
       .from('suap_plan_sync_runs')
       .select('id,started_at')
@@ -345,18 +367,18 @@ Deno.serve(async (request) => {
       .limit(1)
       .maybeSingle();
     if (running) return jsonResponse({ status: 'already_running', runId: running.id }, 409);
-
-    const sessionId = await decryptSession(connection.session_ciphertext);
-    const response = await fetch(SOURCE_URL, {
-      headers: { Cookie: `sessionid=${sessionId}`, Accept: 'text/html', 'User-Agent': 'SIAGES SUAP Sync/1.0' },
-    });
-    const html = await response.text();
-    if (!response.ok || /<input[^>]+type=["']password["']/i.test(html) || /\/accounts\/login\//i.test(html)) {
-      await service.from('suap_connections').update({ revoked_at: new Date().toISOString() }).eq('id', connection.id);
-      return jsonResponse({ status: 'reauth_required', error: 'Sessão do SUAP expirada.' }, 401);
+    if (!htmlSync) {
+      const sessionId = await decryptSession(connection!.session_ciphertext);
+      const response = await fetch(SOURCE_URL, {
+        headers: { Cookie: `sessionid=${sessionId}`, Accept: 'text/html', 'User-Agent': 'SIAGES SUAP Sync/1.0' },
+      });
+      html = await response.text();
+      if (!response.ok || /<input[^>]+type=["']password["']/i.test(html) || /\/accounts\/login\//i.test(html)) {
+        await service.from('suap_connections').update({ revoked_at: new Date().toISOString() }).eq('id', connection!.id);
+        return jsonResponse({ status: 'reauth_required', error: 'Sessao do SUAP expirada.' }, 401);
+      }
     }
-
-    const parsed = parseSuapPlanHtml(html);
+    const parsed = parseSuapPlanHtml(html, LinkedomDOMParser);
     const checksum = hex(await sha256Text(JSON.stringify(parsed.activities)));
     const hasAppliedRun = Boolean((await service
       .from('suap_plan_sync_runs')
@@ -401,7 +423,7 @@ Deno.serve(async (request) => {
 
       const { data: applied, error: applyError } = await service.rpc('apply_suap_plan_snapshot', { p_run_id: run.id });
       if (applyError) throw applyError;
-      await service.from('suap_connections').update({ last_validated_at: new Date().toISOString() }).eq('id', connection.id);
+      if (connection) await service.from('suap_connections').update({ last_validated_at: new Date().toISOString() }).eq('id', connection.id);
       return jsonResponse({ status: 'success', runId: run.id, sourceCount: parsed.activities.length, ...(applied ?? {}) });
     } catch (error) {
       await service.from('suap_plan_sync_runs').update({

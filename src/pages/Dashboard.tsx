@@ -985,6 +985,8 @@ export default function Dashboard() {
     const filteredAtividades = atividades.filter((atividade) => {
       const matchDimensao = matchesDimensionFilter({
         dimensionValue: atividade.dimensao,
+        planInternal: atividade.planoInterno,
+        description: atividade.descricao,
         filterValue: effectiveFilterDimensao,
       });
       const matchOrigem = filterOrigem === 'all' || atividade.origemRecurso === filterOrigem;
@@ -1031,6 +1033,8 @@ export default function Dashboard() {
     const filteredDescentralizacoes = descentralizacoes.filter((descentralizacao) => {
       const matchDimensao = matchesDimensionFilter({
         dimensionValue: descentralizacao.dimensao,
+        planInternal: descentralizacao.planoInterno,
+        description: descentralizacao.descricao,
         filterValue: effectiveFilterDimensao,
       });
       const matchOrigem = filterOrigem === 'all' || descentralizacao.origemRecurso === filterOrigem;
@@ -1508,6 +1512,8 @@ export default function Dashboard() {
     resumoDescentralizacoes.forEach((descentralizacao) => {
       const matchesDimensao = matchesDimensionFilter({
         dimensionValue: descentralizacao.dimensao,
+        planInternal: descentralizacao.planoInterno,
+        description: descentralizacao.descricao,
         filterValue: effectiveFilterDimensao,
       });
       const matchesOrigem = filterOrigem === 'all' || descentralizacao.origemRecurso === filterOrigem;

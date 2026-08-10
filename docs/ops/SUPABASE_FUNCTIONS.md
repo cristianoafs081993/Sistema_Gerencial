@@ -717,9 +717,12 @@ Para a automacao do Gmail:
 
 ## sync-suap-plan
 
-- Função autenticada para sincronizar o Plano 8 do SUAP com a visão Campus do SIAGES.
-- Ações: `connect`, `connect-cookie`, `sync`, `apply`, `status` e `disconnect`.
-- A sessão SUAP é cifrada no backend em `suap_connections`; o navegador recebe apenas um identificador opaco e nunca persiste matrícula, senha ou cookie.
-- A captura aceita somente a URL canônica do Plano 8, valida a sessão, inclui linhas ocultas e grava snapshots antes da reconciliação transacional.
-- A primeira execução fica em `preview`; depois da conferência, `apply_suap_plan_snapshot` atualiza/inclui os registros e arquiva os ausentes sem exclusão física.
-- O proxy tamb?m permite exclusivamente `/plan_estrategico/plano_concluido/8/` sem par?metros adicionais.
+- Funcao autenticada para sincronizar o Plano 8 do SUAP com a visao Campus do SIAGES.
+- Acoes: `connect`, `connect-cookie`, `sync`, `sync-html`, `apply`, `status` e `disconnect`.
+- A sessao SUAP e cifrada no backend em `suap_connections`; o navegador recebe apenas um identificador opaco e nunca persiste matricula, senha ou cookie.
+- `sync-html` aceita somente o HTML da pagina canonica do Plano 8, com limite de 15 MB, e permite que a extensao envie a captura da aba SUAP ja autenticada sem abrir o SIAGES ou exigir novo login SUAP.
+- A captura inclui linhas ocultas, valida IDs e grava snapshots antes da reconciliacao transacional.
+- O worker Deno usa linkedom como parser HTML injetado; o parser do navegador continua usando DOMParser nativo.
+- A dimensao de cada atividade e resolvida pela secao estrutural (accordion) que contem a tabela; o parser nao depende da ordem global de headings, que varia entre runtimes DOM.
+- A primeira execucao fica em `preview`; depois da conferencia, `apply_suap_plan_snapshot` atualiza/inclui os registros e arquiva os ausentes sem exclusao fisica.
+- O proxy continua aceitando exclusivamente `/plan_estrategico/plano_concluido/8/` sem parametros adicionais.

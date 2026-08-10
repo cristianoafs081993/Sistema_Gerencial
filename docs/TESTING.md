@@ -95,6 +95,7 @@ Almoxarifado:
 Cobertura mínima obrigatória do piloto manual:
 
 - parser do HTML e classificação em português com variações de acento; documentos desconhecidos devem permanecer incluídos;
+- associacao estrutural de tabelas a dimensoes (fixture com AD e TI), incluindo execucao no parser linkedom da Edge Function;
 - limite de quatro downloads concorrentes, falha de download registrada por título/erro e prioridade da primeira extração com os PDFs úteis já disponíveis; o PDF completo só pode ser enfileirado depois como complementação de resultado incompleto ou sem nota fiscal utilizável;
 - bloqueio de URLs externas, caminhos de documento sem `?original=sim` e par?metros arbitr?rios no `suap-proxy`;
 - migration com inventário e histórico isolados por `tenant_id` e RLS; endpoint deve validar os IDs contra o processo/tenant antes de enfileirar;
@@ -126,8 +127,12 @@ A correcao de compatibilidade do login foi publicada no pacote como `1.9.2`, per
 - `npm run check`: bloqueado no lint global por cinco erros preexistentes fora do escopo, em `AuditLog.tsx`, `ControleOrgaos.tsx` e `supabase/functions/pesquisar-precos/index.ts`; as etapas de testes e build foram executadas separadamente e aprovadas.
 Tambem validar o quadro Resumo financeiro por dimensao abaixo da Legenda, com uma linha por dimensao e os quatro totais financeiros.
 
-## Sincronização SUAP → Campus
+## Sincronizacao SUAP -> Campus
 
-Os testes do parser cobrem acentos, moeda brasileira, IDs de atividades e linhas ocultas. A suíte de segurança cobre a permissão exclusiva do caminho canônico do Plano 8 no proxy. O fluxo remoto deve ser validado com HTML fixture para prévia, aplicação idempotente, alteração de valor, nova atividade, arquivamento e falha sem commit parcial.
+Os testes do parser cobrem acentos, moeda brasileira, IDs de atividades e linhas ocultas. A suite de seguranca cobre a permissao exclusiva do caminho canonico do Plano 8 no proxy. O fluxo remoto deve ser validado com HTML fixture para previa, aplicacao idempotente, alteracao de valor, nova atividade, arquivamento e falha sem commit parcial.
 
-- O popup da extensao deve abrir/ativar `/planejamento/campus`, enviar `siages:suap-plan-sync-request` e nunca executar `content.js` para inserir atividades diretamente.
+- O popup na aba SUAP deve usar `chrome.scripting.executeScript`, enviar `action: "sync-html"` com HTML e `sourceUrl`, e nunca inserir linhas diretamente.
+- Apos uma previa, o popup deve exibir `Aplicar conferencia`, enviar `action: "apply"` com o `runId` persistido e ocultar o botao somente apos sucesso.
+- Na aba Campus, o popup pode reenviar `siages:suap-plan-sync-request`; a sincronizacao automatica deve continuar funcionando sem extensao.
+- Testar HTML ausente, URL externa, HTML acima de 15 MB e resposta 401/500 com mensagem segura.
+- Verificar que a Edge Function consegue interpretar o HTML no runtime Deno sem depender de DOMParser global.

@@ -22,6 +22,28 @@ const html = `
   </main>`;
 
 describe('parseSuapPlanHtml', () => {
+  it('associa cada tabela ao cabecalho de sua propria dimensao', () => {
+    const multiDimensionHtml = `
+      <div class="accordion-item">
+        <h2>AD - AdministraÃ§Ã£o</h2>
+        <div><table><thead><tr><th>Atividade</th><th>Valor atualizado da atividade</th><th>OpÃ§Ãµes</th></tr></thead>
+          <tbody><tr><td>Compra AD</td><td>R$ 10,00</td><td><a href="/plan_estrategico/listar_requisicoes_despesa/8/1/">Detalhar</a></td></tr></tbody>
+        </table></div>
+      </div>
+      <div class="accordion-item">
+        <h2>TI - Tecnologia da InformaÃ§Ã£o e ComunicaÃ§Ã£o</h2>
+        <div><table><thead><tr><th>Atividade</th><th>Valor atualizado da atividade</th><th>OpÃ§Ãµes</th></tr></thead>
+          <tbody><tr><td>Compra TI</td><td>R$ 20,00</td><td><a href="/plan_estrategico/listar_requisicoes_despesa/8/2/">Detalhar</a></td></tr></tbody>
+        </table></div>
+      </div>`;
+
+    const result = parseSuapPlanHtml(multiDimensionHtml);
+    expect(result.activities.map((activity) => activity.dimensao)).toEqual([
+      'AD - AdministraÃ§Ã£o',
+      'TI - Tecnologia da InformaÃ§Ã£o e ComunicaÃ§Ã£o',
+    ]);
+  });
+
   it('extrai linhas ocultas e normaliza valores brasileiros', () => {
     const result = parseSuapPlanHtml(html);
     expect(result.activities).toHaveLength(1);

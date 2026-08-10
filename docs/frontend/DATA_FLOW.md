@@ -321,10 +321,13 @@ A página carrega contexto e workspace em consultas separadas; os dados independ
 - O fluxo de itens da requisicao nao aceita um status de cache not_found isolado como vazio definitivo: revalida pela Edge Function e usa o Portal diretamente antes de habilitar o cadastro manual.
 O mesmo fluxo injeta abaixo do acordeao Legenda o acordeao nativo Resumo financeiro por dimensao, calculado pelas quatro colunas financeiras das tabelas originais.
 
-## Sincronização do Plano SUAP no Campus
+## Sincronizacao do Plano SUAP no Campus
 
-`/planejamento/campus` carrega os dados locais imediatamente e monta `SuapPlanSyncCard`. Ao entrar, o card chama `sync-suap-plan` em segundo plano; ao concluir, a tabela é recarregada. A primeira captura é uma prévia com contagem de novas, atualizadas e arquivadas; a aplicação ocorre após a confirmação do espelho inicial.
+`/planejamento/campus` carrega os dados locais imediatamente e monta `SuapPlanSyncCard`. Ao entrar, o card chama `sync-suap-plan` em segundo plano; ao concluir, a tabela e recarregada. A primeira captura e uma previa com contagem de novas, atualizadas e arquivadas; a aplicacao ocorre apos a confirmacao do espelho inicial.
 
-O parser lê todas as tabelas de atividades do Plano 8, inclusive linhas com `hidden`, usando o ID do link `listar_requisicoes_despesa/8/<id>/` como chave estável. A extensão 1.9.14 apenas injeta um pedido de sincronização na rota Campus; o backend continua funcionando sem extensão.
+O parser le todas as tabelas de atividades do Plano 8, inclusive linhas com `hidden`, usando o ID do link `listar_requisicoes_despesa/8/<id>/` como chave estavel. A extensao continua opcional para o fluxo automatico do Campus.
 
-- O popup da extensao nao le tabelas nem grava `atividades`: ao clicar, abre ou ativa `/planejamento/campus` e envia apenas a mensagem `siages:suap-plan-sync-request`; o card Campus usa a sessao do SIAGES e chama `sync-suap-plan`.
+- No acionamento manual pelo popup, estando na pagina do Plano 8, a extensao captura `document.documentElement.outerHTML` da aba SUAP ja autenticada e envia apenas `{ action: "sync-html", html, sourceUrl }` para `sync-suap-plan` com o JWT do SIAGES. Nao abre outra aba e nao pede novo login SUAP.
+- Se a resposta for `preview`, o popup guarda o `runId` e habilita `Aplicar conferencia`; a aplicacao explicita chama `action: "apply"` sem abrir o SIAGES.
+- Na pagina Campus, a extensao permanece apenas como acionador da mensagem `siages:suap-plan-sync-request`; o card e o backend continuam funcionando sem a extensao.
+- O HTML aceito e limitado ao host e caminho canonicos do Plano 8 e a 15 MB; o parser rejeita tabela ausente, ID duplicado ou captura sem atividades.

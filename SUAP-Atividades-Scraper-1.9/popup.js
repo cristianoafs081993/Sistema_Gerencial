@@ -3,10 +3,12 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const SAVINGS_EVENT_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/record-automation-savings-event`;
 const SECRET_STORAGE_KEY = 'automation-event-secret';
 const EXTENSION_SESSION_STORAGE_KEY = 'siages-extension-session';
+const PLAN_PREVIEW_STORAGE_KEY = 'siages-suap-plan-preview';
 
 const statusEl = document.getElementById('status');
 const btnExtractEn = document.getElementById('btn-extract-en');
 const btnExtractAll = document.getElementById('btn-extract-all');
+const btnApplyPlan = document.getElementById('btn-apply-plan');
 const automationSecretInput = document.getElementById('automation-secret');
 const extensionAuthEmailInput = document.getElementById('extension-auth-email');
 const extensionAuthPasswordInput = document.getElementById('extension-auth-password');
@@ -154,24 +156,102 @@ function delay(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-async function requestCampusSync() {
-  const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!activeTab?.url || (!isSuapPlanUrl(activeTab.url) && !isCampusUrl(activeTab.url))) {
-    throw new Error('Abra o Plano 8 do SUAP ou a pagina Campus do SIAGES antes de sincronizar.');
+async function capturePlanHtml(tab) {
+  if (!tab?.id) throw new Error('Nao foi possivel acessar a aba do SUAP.');
+  const results = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: () => ({ url: window.location.href, html: document.documentElement?.outerHTML || '' }),
+  });
+  const captured = results?.[0]?.result;
+  if (!captured?.html) throw new Error('A pagina do SUAP ainda nao terminou de carregar. Recarregue e tente novamente.');
+  return captured;
+}
+
+async function sendCapturedPlanSync(captured) {
+  const session = await getStoredExtensionSession();
+  if (!session?.accessToken) throw new Error('Entre no SIAGES no popup da extensao antes de sincronizar.');
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/sync-suap-plan`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${session.accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      action: 'sync-html',
+      html: captured.html,
+      sourceUrl: captured.url,
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.error || `Falha no sincronizador SUAP (HTTP ${response.status}).`);
+  return payload;
+}
+
+async function setPlanPreview(run) {
+  if (run?.runId) {
+    await chrome.storage.local.set({ [PLAN_PREVIEW_STORAGE_KEY]: run });
+  } else {
+    await chrome.storage.local.remove(PLAN_PREVIEW_STORAGE_KEY);
   }
+  await updatePlanPreviewButton();
+}
 
-  let campusTab = isCampusUrl(activeTab.url) ? activeTab : null;
-  if (!campusTab) {
-    const campusTabs = await chrome.tabs.query({ url: ['https://www.siages.com.br/planejamento/campus*'] });
-    campusTab = campusTabs[0] || await chrome.tabs.create({ url: 'https://www.siages.com.br/planejamento/campus' });
+async function updatePlanPreviewButton() {
+  const stored = await chrome.storage.local.get(PLAN_PREVIEW_STORAGE_KEY);
+  let preview = stored[PLAN_PREVIEW_STORAGE_KEY];
+  if (!preview?.runId) {
+    try {
+      const session = await getStoredExtensionSession();
+      if (session?.accessToken) {
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/sync-suap-plan`, {
+          method: 'POST',
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${session.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ action: 'status' }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (response.ok && payload?.run?.status === 'preview') {
+          preview = { ...payload.run, runId: payload.run.id };
+          await chrome.storage.local.set({ [PLAN_PREVIEW_STORAGE_KEY]: preview });
+        }
+      }
+    } catch {
+      // O botao continua oculto quando nao ha sessao ou a consulta de status falha.
+    }
   }
-
-  if (!campusTab?.id) throw new Error('Nao foi possivel abrir a pagina Campus do SIAGES.');
-  await chrome.tabs.update(campusTab.id, { active: true });
-  await delay(900);
-
+  const hasPreview = Boolean(preview?.runId || preview?.id);
+  btnApplyPlan.hidden = !hasPreview;
+  btnApplyPlan.disabled = !hasPreview;
+}
+async function applyPlanPreview() {
+  const stored = await chrome.storage.local.get(PLAN_PREVIEW_STORAGE_KEY);
+  const preview = stored[PLAN_PREVIEW_STORAGE_KEY];
+  const runId = preview?.runId || preview?.id;
+  if (!runId) throw new Error('Nenhuma conferencia pendente para aplicar.');
+  const session = await getStoredExtensionSession();
+  if (!session?.accessToken) throw new Error('Entre no SIAGES no popup da extensao antes de aplicar.');
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/sync-suap-plan`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${session.accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ action: 'apply', runId }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.error || `Falha ao aplicar a conferencia (HTTP ${response.status}).`);
+  await setPlanPreview(null);
+  return payload;
+}
+async function requestCampusSync(tab) {
+  if (!tab?.id) throw new Error('Nao foi possivel acessar a pagina Campus do SIAGES.');
   try {
-    await chrome.tabs.sendMessage(campusTab.id, { type: 'siages:suap-plan-sync-request' });
+    await chrome.tabs.sendMessage(tab.id, { type: 'siages:suap-plan-sync-request' });
   } catch {
     // A carga inicial do script ja dispara a sincronizacao; a mensagem pode chegar antes do listener.
   }
@@ -181,18 +261,52 @@ async function handleExtraction() {
   try {
     btnExtractEn.disabled = true;
     btnExtractAll.disabled = true;
+    btnApplyPlan.disabled = true;
     statusEl.innerHTML = '';
-    log('Abrindo o Campus do SIAGES...', 'info');
-    await requestCampusSync();
-    log('Solicitacao enviada. Acompanhe a previa e a aplicacao no card de sincronizacao do Campus.', 'success');
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!activeTab?.url || (!isSuapPlanUrl(activeTab.url) && !isCampusUrl(activeTab.url))) {
+      throw new Error('Abra o Plano 8 do SUAP ou a pagina Campus do SIAGES antes de sincronizar.');
+    }
+
+    if (isSuapPlanUrl(activeTab.url)) {
+      log('Capturando o HTML do Plano 8 na aba SUAP ja autenticada...', 'info');
+      const captured = await capturePlanHtml(activeTab);
+      const result = await sendCapturedPlanSync(captured);
+      if (result.status === 'preview') {
+        log(`${result.sourceCount || 0} atividades encontradas: ${result.inserted || 0} novas, ${result.updated || 0} atualizadas, ${result.archived || 0} serao arquivadas.`, 'success');
+        await setPlanPreview(result);
+        log('A captura foi registrada em modo de conferencia. Clique em Aplicar conferencia para atualizar o SIAGES.', 'info');
+      } else {
+        log(`Sincronizacao concluida: ${result.inserted || 0} novas, ${result.updated || 0} atualizadas, ${result.archived || 0} arquivadas.`, 'success');
+      }
+      return;
+    }
+
+    log('Solicitando sincronizacao ao card do Campus...', 'info');
+    await requestCampusSync(activeTab);
+    log('Solicitacao enviada. Acompanhe a previa e a aplicacao no card do Campus.', 'success');
   } catch (error) {
     console.error('Sync request error:', error);
     log(error instanceof Error ? error.message : 'Nao foi possivel solicitar a sincronizacao.', 'error');
   } finally {
     btnExtractEn.disabled = false;
     btnExtractAll.disabled = false;
+    await updatePlanPreviewButton();
   }
 }
-
 btnExtractEn.addEventListener('click', () => { void handleExtraction(); });
 btnExtractAll.addEventListener('click', () => { void handleExtraction(); });
+btnApplyPlan.addEventListener('click', async () => {
+  try {
+    btnApplyPlan.disabled = true;
+    statusEl.innerHTML = '';
+    log('Aplicando a conferencia no SIAGES...', 'info');
+    const result = await applyPlanPreview();
+    log(`Aplicacao concluida: ${result.inserted || 0} novas, ${result.updated || 0} atualizadas, ${result.archived || 0} arquivadas.`, 'success');
+  } catch (error) {
+    console.error('Apply preview error:', error);
+    log(error instanceof Error ? error.message : 'Nao foi possivel aplicar a conferencia.', 'error');
+    await updatePlanPreviewButton();
+  }
+});
+void updatePlanPreviewButton();

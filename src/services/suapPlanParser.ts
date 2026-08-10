@@ -15,6 +15,8 @@ export type SuapPlanParseResult = {
   dimensions: string[];
 };
 
+type HtmlParserConstructor = new () => { parseFromString: (html: string, type: string) => Document | null };
+
 function normalizeText(value: string | null | undefined): string {
   return (value ?? '').replace(/\s+/g, ' ').trim();
 }
@@ -63,8 +65,37 @@ function findColumn(headers: string[], ...needles: string[]): number {
   return headers.findIndex((header) => needles.some((needle) => header.includes(needle)));
 }
 
-export function parseSuapPlanHtml(html: string): SuapPlanParseResult {
-  const parser = new DOMParser();
+function findDimensionForTable(table: HTMLTableElement): string {
+  let ancestor = table.parentElement;
+  while (ancestor) {
+    const directHeading = Array.from(ancestor.children)
+      .filter((child) => /^H[1-6]$/.test(child.tagName))
+      .map((child) => extractDimension(child.textContent ?? ''))
+      .find((value): value is string => Boolean(value));
+    if (directHeading) return directHeading;
+
+    ancestor = ancestor.parentElement;
+  }
+
+  let current: Element | null = table;
+  while (current?.parentElement) {
+    let sibling = current.previousElementSibling;
+    while (sibling) {
+      const siblingHeading = Array.from(sibling.querySelectorAll('h1,h2,h3,h4,h5,h6'))
+        .map((heading) => extractDimension(heading.textContent ?? ''))
+        .filter((value): value is string => Boolean(value))
+        .at(-1);
+      if (siblingHeading) return siblingHeading;
+      sibling = sibling.previousElementSibling;
+    }
+    current = current.parentElement;
+  }
+
+  return '';
+}
+
+export function parseSuapPlanHtml(html: string, Parser: HtmlParserConstructor = DOMParser): SuapPlanParseResult {
+  const parser = new Parser();
   const document = parser.parseFromString(html, 'text/html');
   if (!document) throw new Error('HTML do SUAP inválido.');
   if (document.querySelector('form[action*="/accounts/login/"], input[type="password"]')) {
@@ -85,15 +116,12 @@ export function parseSuapPlanHtml(html: string): SuapPlanParseResult {
     const origemIndex = findColumn(headers, 'origem de recurso');
     const planoIndex = findColumn(headers, 'plano interno');
     const componenteIndex = findColumn(headers, 'componente funcional');
-    const rows = Array.from(table.tBodies.length ? table.tBodies : [table]).flatMap((body) =>
+    const tableBodies = table.tBodies ? Array.from(table.tBodies) : [];
+    const rows = (tableBodies.length ? tableBodies : [table]).flatMap((body) =>
       Array.from(body.querySelectorAll<HTMLTableRowElement>('tr')),
     );
 
-    const previousHeadings = Array.from(document.querySelectorAll('h1,h2,h3,h4,h5,h6'))
-      .filter((heading) => Boolean(heading.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING))
-      .map((heading) => extractDimension(heading.textContent ?? ''))
-      .filter((value): value is string => Boolean(value));
-    const dimension = previousHeadings.at(-1) ?? extractDimension(table.parentElement?.textContent ?? '') ?? '';
+    const dimension = findDimensionForTable(table) || extractDimension(table.parentElement?.textContent ?? '') || '';
     if (dimension) dimensions.add(dimension);
 
     for (const row of rows) {
@@ -101,7 +129,8 @@ export function parseSuapPlanHtml(html: string): SuapPlanParseResult {
       if (!suapActivityId) continue;
       if (seenIds.has(suapActivityId)) throw new Error(`Atividade SUAP duplicada: ${suapActivityId}.`);
 
-      const cells = Array.from(row.cells).map((cell) => normalizeText(cell.textContent));
+      const rowCells = row.cells ? Array.from(row.cells) : Array.from(row.querySelectorAll('td, th'));
+      const cells = rowCells.map((cell) => normalizeText(cell.textContent));
       const atividade = cells[activityIndex] ?? '';
       if (!atividade || foldText(atividade) === 'total') continue;
       const origemRecursoRaw = cells[origemIndex] ?? '';

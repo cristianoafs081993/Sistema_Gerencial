@@ -177,7 +177,7 @@
     root.innerHTML = `
       <div class="suape-shell">
         <header class="suape-header">
-          <div class="suape-brand"><span class="suape-logo">S</span><div><strong>Suape</strong><small>Canivete suíço do IFRN · v1.9.15</small></div></div>
+          <div class="suape-brand"><div><strong>SIAGES</strong><small>Sistema Integrado de Administração e Gestão Estratégica</small></div></div>
           <button type="button" class="suape-icon-button" data-action="collapse" aria-label="Minimizar painel" title="Minimizar painel">−</button>
           <button type="button" class="suape-icon-button" data-action="maximize" aria-label="Maximizar painel" title="Maximizar painel">⛶</button>
         </header>
@@ -224,7 +224,7 @@
       root.dataset.maximized = String(state.maximized);
       const button = root.querySelector('[data-action="collapse"]');
       if (button) {
-        button.textContent = state.collapsed ? '⌄' : '−';
+        button.textContent = state.collapsed ? '+' : '−';
         button.setAttribute('aria-label', state.collapsed ? 'Expandir painel' : 'Minimizar painel');
         button.setAttribute('title', state.collapsed ? 'Expandir painel' : 'Minimizar painel');
       }
@@ -247,7 +247,7 @@
       root.dataset.collapsed = String(state.collapsed);
       const collapseButton = root.querySelector('[data-action="collapse"]');
       if (collapseButton) {
-        collapseButton.textContent = state.collapsed ? '⌄' : '−';
+        collapseButton.textContent = state.collapsed ? '+' : '−';
         collapseButton.setAttribute('aria-label', state.collapsed ? 'Expandir painel' : 'Minimizar painel');
         collapseButton.setAttribute('title', state.collapsed ? 'Expandir painel' : 'Minimizar painel');
       }

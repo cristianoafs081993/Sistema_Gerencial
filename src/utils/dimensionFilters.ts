@@ -10,9 +10,10 @@ export const normalizeDimensionText = (value: string) =>
 export const extractDimensionCode = (value?: string | null) => {
   if (!value) return null;
 
-  const directMatch = value.match(/\b([A-Z]{2})\b/);
-  if (directMatch && DIMENSOES.some((dimension) => dimension.codigo === directMatch[1])) {
-    return directMatch[1];
+  const directMatch = value.match(/\b([A-Z]{2})\b/i);
+  const directCode = directMatch?.[1]?.toUpperCase();
+  if (directCode && DIMENSOES.some((dimension) => dimension.codigo === directCode)) {
+    return directCode;
   }
 
   const normalizedValue = normalizeDimensionText(value);
@@ -74,10 +75,11 @@ export const matchesDimensionFilter = ({
   description?: string | null;
   filterValue: string;
 }) => {
-  if (filterValue === 'all') return true;
+  const filterCode = extractDimensionCode(filterValue) || filterValue.trim().toUpperCase();
+  if (!filterCode || filterCode === 'ALL') return true;
 
   const recordCode = resolveRecordDimensionCode({ dimensionValue, planInternal, description });
-  if (recordCode) return recordCode === filterValue;
+  if (recordCode) return recordCode === filterCode;
 
   if (!dimensionValue?.trim()) return false;
 
