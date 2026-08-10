@@ -325,5 +325,6 @@ O mesmo fluxo injeta abaixo do acordeao Legenda o acordeao nativo Resumo finance
 
 `/planejamento/campus` carrega os dados locais imediatamente e monta `SuapPlanSyncCard`. Ao entrar, o card chama `sync-suap-plan` em segundo plano; ao concluir, a tabela é recarregada. A primeira captura é uma prévia com contagem de novas, atualizadas e arquivadas; a aplicação ocorre após a confirmação do espelho inicial.
 
-O parser lê todas as tabelas de atividades do Plano 8, inclusive linhas com `hidden`, usando o ID do link `listar_requisicoes_despesa/8/<id>/` como chave estável. A extensão 1.9.13 apenas injeta um pedido de sincronização na rota Campus; o backend continua funcionando sem extensão.
+O parser lê todas as tabelas de atividades do Plano 8, inclusive linhas com `hidden`, usando o ID do link `listar_requisicoes_despesa/8/<id>/` como chave estável. A extensão 1.9.14 apenas injeta um pedido de sincronização na rota Campus; o backend continua funcionando sem extensão.
 
+- O popup da extensao nao le tabelas nem grava `atividades`: ao clicar, abre ou ativa `/planejamento/campus` e envia apenas a mensagem `siages:suap-plan-sync-request`; o card Campus usa a sessao do SIAGES e chama `sync-suap-plan`.

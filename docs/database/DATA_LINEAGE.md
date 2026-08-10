@@ -366,4 +366,3 @@ Cadastros seguem inventoryService  operational_entities / measurement_units / ca
 - auditoria: `suap_plan_sync_runs` e `suap_plan_activity_snapshots`;
 - materialização: função SQL `apply_suap_plan_snapshot` grava `atividades` com `sync_source = suap_plan_8`;
 - ausência na captura: `sync_active = false`, preservando o registro e o histórico.
-

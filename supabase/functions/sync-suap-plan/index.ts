@@ -229,21 +229,34 @@ async function createConnection(
   return data;
 }
 
+function syncKey(dimensao: string, atividade: string): string {
+  const fold = (value: string) => value.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return `${fold(dimensao)}|${fold(atividade)}`;
+}
+
 async function previewDiff(service: ReturnType<typeof createClient>, user: AuthenticatedUser, activities: SuapPlanActivity[]) {
   const ids = activities.map((activity) => activity.suapActivityId);
+  const incoming = new Set(ids);
+  const incomingKeys = new Set(activities.map((activity) => syncKey(activity.dimensao, activity.atividade)));
   const { data, error } = await service
     .from('atividades')
-    .select('suap_activity_id,sync_active')
+    .select('suap_activity_id,sync_active,sync_source,dimensao,atividade')
     .eq('org_id', user.orgId)
-    .eq('sync_source', 'suap_plan_8')
-    .eq('suap_plan_id', 8);
+    .eq('tipo_atividade', 'campus');
   if (error) throw error;
-  const current = new Set((data ?? []).map((row) => String(row.suap_activity_id)));
-  const incoming = new Set(ids);
+
+  const rows = data ?? [];
+  const canonical = rows.filter((row) => row.sync_source === 'suap_plan_8' && row.suap_activity_id);
+  const current = new Set(canonical.map((row) => String(row.suap_activity_id)));
+  const legacyArchived = rows.filter((row) =>
+    row.sync_active && !row.suap_activity_id && row.sync_source !== 'suap_plan_8' &&
+    incomingKeys.has(syncKey(String(row.dimensao ?? ''), String(row.atividade ?? ''))),
+  ).length;
+
   return {
     inserted: ids.filter((id) => !current.has(id)).length,
     updated: ids.filter((id) => current.has(id)).length,
-    archived: Array.from(current).filter((id) => !incoming.has(id)).length,
+    archived: Array.from(current).filter((id) => !incoming.has(id)).length + legacyArchived,
   };
 }
 

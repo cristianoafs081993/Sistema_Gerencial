@@ -1221,4 +1221,3 @@ Snapshot normalizado e bruto de cada atividade capturada, por execução e ID es
 
 ### Campos de sincronização em `atividades`
 `sync_source`, `suap_plan_id`, `suap_activity_id`, `sync_active` e `sync_last_seen_run_id` permitem upsert idempotente e arquivamento lógico dos itens ausentes.
-

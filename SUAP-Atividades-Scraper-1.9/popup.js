@@ -137,165 +137,62 @@ function log(msg, type = 'info') {
   statusEl.scrollTop = statusEl.scrollHeight;
 }
 
-async function supabaseFetch(path, options = {}) {
-  const url = `${SUPABASE_URL}/rest/v1/${path}`;
-  const headers = {
-    apikey: SUPABASE_KEY,
-    Authorization: `Bearer ${SUPABASE_KEY}`,
-    'Content-Type': 'application/json',
-    Prefer: 'return=representation',
-  };
-
-  const response = await fetch(url, {
-    ...options,
-    headers: { ...headers, ...options.headers },
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Supabase Error (${response.status}): ${errorText}`);
-  }
-
-  return response.status !== 204 ? await response.json() : null;
+function isCampusUrl(url) {
+  return /^https:\/\/www\.siages\.com\.br\/planejamento\/campus(?:[?#].*)?$/.test(url || '');
 }
 
-async function recordSavingsEvent(count) {
-  const secret = automationSecretInput.value.trim();
-  localStorage.setItem(SECRET_STORAGE_KEY, secret);
-
-  if (!secret || count <= 0) {
-    log('Evento de economia de tempo não registrado: segredo não configurado.', 'info');
-    return;
+function isSuapPlanUrl(url) {
+  try {
+    const parsed = new URL(url || '');
+    return parsed.hostname === 'suap.ifrn.edu.br' && /^\/plan_estrategico\/plano_concluido\/8\/?$/.test(parsed.pathname);
+  } catch {
+    return false;
   }
-
-  const response = await fetch(SAVINGS_EVENT_FUNCTION_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-automation-event-secret': secret,
-    },
-    body: JSON.stringify({
-      scenarioId: 'suap-processos',
-      source: 'suap-atividades-extension',
-      eventName: 'atividades_sincronizadas',
-      occurredAt: new Date().toISOString(),
-      metadata: { count },
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Falha ao registrar economia de tempo (${response.status}): ${errorText}`);
-  }
-
-  log(`Evento de economia registrado para ${count} atividade(s).`, 'success');
 }
 
-async function getExistingActivities() {
-  const data = await supabaseFetch('atividades?select=dimensao,atividade,componente_funcional');
-  const set = new Set();
-  if (data) {
-    data.forEach((item) => {
-      set.add(`${item.dimensao}|${item.componente_funcional}|${item.atividade}`.trim().toLowerCase());
-    });
+function delay(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function requestCampusSync() {
+  const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!activeTab?.url || (!isSuapPlanUrl(activeTab.url) && !isCampusUrl(activeTab.url))) {
+    throw new Error('Abra o Plano 8 do SUAP ou a pagina Campus do SIAGES antes de sincronizar.');
   }
-  return set;
+
+  let campusTab = isCampusUrl(activeTab.url) ? activeTab : null;
+  if (!campusTab) {
+    const campusTabs = await chrome.tabs.query({ url: ['https://www.siages.com.br/planejamento/campus*'] });
+    campusTab = campusTabs[0] || await chrome.tabs.create({ url: 'https://www.siages.com.br/planejamento/campus' });
+  }
+
+  if (!campusTab?.id) throw new Error('Nao foi possivel abrir a pagina Campus do SIAGES.');
+  await chrome.tabs.update(campusTab.id, { active: true });
+  await delay(900);
+
+  try {
+    await chrome.tabs.sendMessage(campusTab.id, { type: 'siages:suap-plan-sync-request' });
+  } catch {
+    // A carga inicial do script ja dispara a sincronizacao; a mensagem pode chegar antes do listener.
+  }
 }
 
-async function insertActivities(activities) {
-  if (activities.length === 0) return 0;
-
-  const now = new Date().toISOString();
-  const payload = activities.map((activity) => ({
-    dimensao: activity.dimensao,
-    componente_funcional: activity.componenteFuncional,
-    processo: activity.processo || '',
-    atividade: activity.atividade,
-    descricao: activity.descricao,
-    valor_total: activity.valorTotal,
-    origem_recurso: activity.origemRecurso,
-    natureza_despesa: activity.naturezaDespesa,
-    plano_interno: activity.planoInterno,
-    created_at: now,
-    updated_at: now,
-  }));
-
-  const result = await supabaseFetch('atividades', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-
-  return result ? result.length : 0;
-}
-
-async function handleExtraction(filterDimension = null) {
+async function handleExtraction() {
   try {
     btnExtractEn.disabled = true;
     btnExtractAll.disabled = true;
     statusEl.innerHTML = '';
-
-    log('Verificando aba ativa...', 'info');
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
-    if (!tab.url.includes('suap.ifrn.edu.br')) {
-      throw new Error('Você precisa estar na página do SUAP.');
-    }
-
-    log('Injetando script...', 'info');
-    const results = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ['content.js'],
-    });
-
-    if (!results || !results[0] || !results[0].result) {
-      throw new Error('Nenhum dado retornado do SUAP.');
-    }
-
-    let scrapedData = results[0].result;
-
-    if (filterDimension) {
-      scrapedData = scrapedData.filter((activity) => activity.dimensao.includes(filterDimension));
-      log(`Filtradas ${scrapedData.length} atividades para a dimensão ${filterDimension}.`, 'info');
-    } else {
-      log(`Encontradas ${scrapedData.length} atividades em todas as dimensões.`, 'info');
-    }
-
-    if (scrapedData.length === 0) {
-      throw new Error('Nenhuma atividade encontrada na página.');
-    }
-
-    log('Buscando atividades existentes...', 'info');
-    const existingSet = await getExistingActivities();
-    const newActivities = [];
-    const skippedActivities = [];
-
-    scrapedData.forEach((item) => {
-      const key = `${item.dimensao}|${item.componenteFuncional}|${item.atividade}`.trim().toLowerCase();
-      if (existingSet.has(key)) {
-        skippedActivities.push(item);
-      } else {
-        newActivities.push(item);
-      }
-    });
-
-    log(`Foi verificado que ${skippedActivities.length} atividades já existem no banco.`, 'info');
-
-    if (newActivities.length > 0) {
-      log(`Inserindo ${newActivities.length} novas atividades...`, 'info');
-      const insertedCount = await insertActivities(newActivities);
-      log(`Sucesso! ${insertedCount} novas atividades foram cadastradas.`, 'success');
-      await recordSavingsEvent(insertedCount);
-    } else {
-      log('Nenhuma nova atividade para inserir. Todas já estão no banco.', 'success');
-    }
+    log('Abrindo o Campus do SIAGES...', 'info');
+    await requestCampusSync();
+    log('Solicitacao enviada. Acompanhe a previa e a aplicacao no card de sincronizacao do Campus.', 'success');
   } catch (error) {
-    console.error('Extraction error:', error);
-    log(error.message, 'error');
+    console.error('Sync request error:', error);
+    log(error instanceof Error ? error.message : 'Nao foi possivel solicitar a sincronizacao.', 'error');
   } finally {
     btnExtractEn.disabled = false;
     btnExtractAll.disabled = false;
   }
 }
 
-btnExtractEn.addEventListener('click', () => handleExtraction('EN - Ensino'));
-btnExtractAll.addEventListener('click', () => handleExtraction(null));
+btnExtractEn.addEventListener('click', () => { void handleExtraction(); });
+btnExtractAll.addEventListener('click', () => { void handleExtraction(); });

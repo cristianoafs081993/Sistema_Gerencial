@@ -186,9 +186,9 @@ const COMPONENTES_POR_DIMENSAO_BRUTOS: Record<string, string[]> = {
     'Educação e Interseccionalidades em Direitos Humanos - Educação Especial Inclusiva',
     'Educação e Interseccionalidades em Direitos Humanos - Educação para as Relações Étnico-Raciais',
     'Educação e Interseccionalidades em Direitos Humanos - Educação em Gênero e Diversidades',
-    'Tecnologias Educacionais e Educa??o a Dist?ncia - Tecnologias Educacionais e Educa??o a Dist?ncia',
-    'Tecnologias Educacionais e Educa??o a Dist?ncia - Programas de Educa??o a Dist?ncia e Ensino H?brido',
-    'Tecnologias Educacionais e Educa??o a Dist?ncia - Recursos e Tecnologias Educacionais',
+    'Tecnologias Educacionais e Educação a Distância - Tecnologias Educacionais e Educação a Distância',
+    'Tecnologias Educacionais e Educação a Distância - Programas de Educação a Distância e Ensino Híbrido',
+    'Tecnologias Educacionais e Educação a Distância - Recursos e Tecnologias Educacionais',
     'Administração Acadêmica - Administração Acadêmica',
     'Administração Acadêmica - Sistemas de Administração Acadêmica',
     'Administração Acadêmica - Rotinas e Processos Acadêmicos',
@@ -527,5 +527,3 @@ export interface RequisicaoCompra {
 export interface RequisicaoCompraRecord extends RequisicaoCompra {
   items: RequisicaoCompraItem[];
 }
-
-

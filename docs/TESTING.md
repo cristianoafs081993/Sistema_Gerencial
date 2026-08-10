@@ -130,3 +130,4 @@ Tambem validar o quadro Resumo financeiro por dimensao abaixo da Legenda, com um
 
 Os testes do parser cobrem acentos, moeda brasileira, IDs de atividades e linhas ocultas. A suíte de segurança cobre a permissão exclusiva do caminho canônico do Plano 8 no proxy. O fluxo remoto deve ser validado com HTML fixture para prévia, aplicação idempotente, alteração de valor, nova atividade, arquivamento e falha sem commit parcial.
 
+- O popup da extensao deve abrir/ativar `/planejamento/campus`, enviar `siages:suap-plan-sync-request` e nunca executar `content.js` para inserir atividades diretamente.

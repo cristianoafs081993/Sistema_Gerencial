@@ -304,6 +304,7 @@ describe('process-document 1.9', () => {
     document.head.appendChild(hostileStyle);
     const api = loadProcessScript();
     await api.installToolkit();
+    api.toggleMaximized();
     api.selectTab('shortcuts');
 
     const root = document.getElementById('siages-suap-toolkit')!;

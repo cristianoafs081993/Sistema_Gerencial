@@ -652,3 +652,4 @@ Observações operacionais:
 - A URL aceita pelo proxy é fixa e não admite query string, host externo ou caminho arbitrário.
 - O Campus não depende da extensão; a extensão apenas dispara `siages:suap-plan-sync-request` na entrada da rota.
 
+- O popup da extensao e somente acionador: abre/ativa o Campus e envia uma mensagem para o content script; credenciais e captura do SUAP permanecem no backend/card autenticado.

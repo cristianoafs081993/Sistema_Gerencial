@@ -11,20 +11,20 @@ type Props = { onSynced: () => void };
 
 function statusLabel(status: SuapPlanSyncStatus['status'] | null) {
   if (status === 'running') return 'Sincronizando...';
-  if (status === 'preview') return 'ConferÃƒÆ’Ã‚Âªncia pendente';
+  if (status === 'preview') return 'Conferência pendente';
   if (status === 'success') return 'Sincronizado';
-  if (status === 'failed') return 'Falha na sincronizaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o';
+  if (status === 'failed') return 'Falha na sincronização';
   if (status === 'reauth_required') return 'Conecte-se ao SUAP';
-  return 'Aguardando conexÃƒÆ’Ã‚Â£o';
+  return 'Aguardando conexão';
 }
 
 function syncResultMessage(result: SuapPlanSyncResult) {
   if (result.status === 'preview') {
-    return `${result.sourceCount ?? 0} atividades encontradas. ${result.inserted ?? 0} novas, ${result.updated ?? 0} atualizaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Âµes e ${result.archived ?? 0} serÃƒÆ’Ã‚Â£o arquivadas.`;
+    return `${result.sourceCount ?? 0} atividades encontradas. ${result.inserted ?? 0} novas, ${result.updated ?? 0} atualizações e ${result.archived ?? 0} serão arquivadas.`;
   }
   if (result.status === 'success') return 'Dados do SUAP aplicados ao planejamento Campus.';
-  if (result.status === 'already_running') return 'JÃƒÆ’Ã‚Â¡ existe uma sincronizaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o em andamento.';
-  return result.error ?? 'ÃƒÆ’Ã¢â‚¬Â° necessÃƒÆ’Ã‚Â¡rio conectar-se ao SUAP.';
+  if (result.status === 'already_running') return 'Já existe uma sincronização em andamento.';
+  return result.error ?? 'É necessário conectar-se ao SUAP.';
 }
 
 export function SuapPlanSyncCard({ onSynced }: Props) {
@@ -41,9 +41,9 @@ export function SuapPlanSyncCard({ onSynced }: Props) {
     try {
       const response = await suapPlanSyncService.status();
       setStatus(response.run);
-      if (response.run?.status === 'success') setMessage('ÃƒÆ’Ã…Â¡ltima execuÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o concluÃƒÆ’Ã‚Â­da com sucesso.');
+      if (response.run?.status === 'success') setMessage('Última execução concluída com sucesso.');
     } catch {
-      // A consulta de status nÃƒÆ’Ã‚Â£o deve impedir a tabela de abrir.
+      // A consulta de status não deve impedir a tabela de abrir.
     }
   }, []);
 
@@ -63,7 +63,7 @@ export function SuapPlanSyncCard({ onSynced }: Props) {
       }
       await refreshStatus();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Falha na sincronizaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o.');
+      setMessage(error instanceof Error ? error.message : 'Falha na sincronização.');
       setShowConnection(true);
     } finally {
       setIsBusy(false);
@@ -103,10 +103,10 @@ export function SuapPlanSyncCard({ onSynced }: Props) {
         setSessionId('');
       }
       setShowConnection(false);
-      setMessage('ConexÃƒÆ’Ã‚Â£o SUAP validada. Iniciando conferÃƒÆ’Ã‚Âªncia...');
+      setMessage('Conexão SUAP validada. Iniciando conferência...');
       await runSync();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'NÃƒÆ’Ã‚Â£o foi possÃƒÆ’Ã‚Â­vel conectar ao SUAP.');
+      setMessage(error instanceof Error ? error.message : 'Não foi possível conectar ao SUAP.');
     } finally {
       setIsBusy(false);
     }
@@ -122,7 +122,7 @@ export function SuapPlanSyncCard({ onSynced }: Props) {
       onSynced();
       await refreshStatus();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'NÃƒÆ’Ã‚Â£o foi possÃƒÆ’Ã‚Â­vel aplicar a conferÃƒÆ’Ã‚Âªncia.');
+      setMessage(error instanceof Error ? error.message : 'Não foi possível aplicar a conferência.');
     } finally {
       setIsBusy(false);
     }
@@ -136,7 +136,7 @@ export function SuapPlanSyncCard({ onSynced }: Props) {
       <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3">
         <div className="flex items-center gap-2">
           <CloudDownload className="h-4 w-4 text-primary" />
-          <CardTitle className="text-sm font-bold">SincronizaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o SUAP ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Campus</CardTitle>
+          <CardTitle className="text-sm font-bold">Sincronização SUAP — Campus</CardTitle>
         </div>
         <Badge variant="outline" className="gap-1 text-[10px] uppercase tracking-wide">
           {status?.status === 'running' ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
@@ -144,14 +144,14 @@ export function SuapPlanSyncCard({ onSynced }: Props) {
         </Badge>
       </CardHeader>
       <CardContent className="space-y-3 pt-0 text-xs text-muted-foreground">
-        <p>{message || 'Os dados atuais permanecem visÃƒÆ’Ã‚Â­veis enquanto o Plano 8 ÃƒÆ’Ã‚Â© consultado em segundo plano.'}</p>
+        <p>{message || 'Os dados atuais permanecem visíveis enquanto o Plano 8 é consultado em segundo plano.'}</p>
 
         {isPreview ? (
           <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-900">
             <ShieldAlert className="h-4 w-4 shrink-0" />
-            <span className="flex-1">Revise a conferÃƒÆ’Ã‚Âªncia antes de aplicar o primeiro espelho.</span>
+            <span className="flex-1">Revise a conferência antes de aplicar o primeiro espelho.</span>
             <Button type="button" size="sm" onClick={() => void applyPreview()} disabled={isBusy}>
-              <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Aplicar conferÃƒÆ’Ã‚Âªncia
+              <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Aplicar conferência
             </Button>
           </div>
         ) : null}

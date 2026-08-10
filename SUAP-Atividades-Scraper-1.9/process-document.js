@@ -177,7 +177,7 @@
     root.innerHTML = `
       <div class="suape-shell">
         <header class="suape-header">
-          <div class="suape-brand"><span class="suape-logo">S</span><div><strong>Suape</strong><small>Canivete suíço do IFRN · v1.9.2</small></div></div>
+          <div class="suape-brand"><span class="suape-logo">S</span><div><strong>Suape</strong><small>Canivete suíço do IFRN · v1.9.15</small></div></div>
           <button type="button" class="suape-icon-button" data-action="collapse" aria-label="Minimizar painel" title="Minimizar painel">−</button>
           <button type="button" class="suape-icon-button" data-action="maximize" aria-label="Maximizar painel" title="Maximizar painel">⛶</button>
         </header>
@@ -256,6 +256,10 @@
         maxButton.textContent = state.maximized ? '🗗' : '⛶';
         maxButton.setAttribute('aria-label', state.maximized ? 'Restaurar tamanho' : 'Maximizar painel');
         maxButton.setAttribute('title', state.maximized ? 'Restaurar tamanho' : 'Maximizar painel');
+      }
+      const shortcutsTab = root.querySelector('.suape-tab[data-tab="shortcuts"]');
+      if (shortcutsTab) {
+        shortcutsTab.style.setProperty('display', state.maximized ? 'flex' : 'none', 'important');
       }
     }
   }
@@ -469,7 +473,11 @@
 
   function isolateTabTitles(root) {
     const force = (element, styles) => Object.entries(styles).forEach(([property, value]) => element.style.setProperty(property, value, 'important'));
-    root.querySelectorAll('.suape-tab').forEach((tab) => force(tab, { display: 'flex', 'align-items': 'center', 'justify-content': 'center', 'grid-area': 'auto', 'grid-column': 'auto', 'grid-row': 'auto', float: 'none', position: 'static', width: 'auto', 'min-width': '0', 'writing-mode': 'horizontal-tb', 'text-orientation': 'mixed', 'white-space': 'nowrap', 'text-align': 'center' }));
+    root.querySelectorAll('.suape-tab').forEach((tab) => {
+      const isShortcuts = tab.dataset.tab === 'shortcuts';
+      const displayVal = (isShortcuts && !state.maximized) ? 'none' : 'flex';
+      force(tab, { display: displayVal, 'align-items': 'center', 'justify-content': 'center', 'grid-area': 'auto', 'grid-column': 'auto', 'grid-row': 'auto', float: 'none', position: 'static', width: 'auto', 'min-width': '0', 'writing-mode': 'horizontal-tb', 'text-orientation': 'mixed', 'white-space': 'nowrap', 'text-align': 'center' });
+    });
   }
 
   function renderSettings() {
@@ -552,12 +560,50 @@
     }).catch((error) => { state.syncStatus = { stage: 'error', message: error instanceof Error ? error.message : 'Não foi possível autenticar.', retryable: false }; renderSummary(); renderFinanceEmpty(state.syncStatus.message); });
   }
 
+  function fitToolkitToHost(host, root) {
+    if (!host || !root) return;
+    let target = host;
+    let style = window.getComputedStyle(target);
+    let pt = parseFloat(style.paddingTop) || 0;
+    let pr = parseFloat(style.paddingRight) || 0;
+    let pl = parseFloat(style.paddingLeft) || 0;
+
+    if ((pt === 0 && pr === 0 && pl === 0) && target.parentElement) {
+      const parentStyle = window.getComputedStyle(target.parentElement);
+      const parentPt = parseFloat(parentStyle.paddingTop) || 0;
+      const parentPr = parseFloat(parentStyle.paddingRight) || 0;
+      const parentPl = parseFloat(parentStyle.paddingLeft) || 0;
+      if (parentPt > 0 || parentPr > 0 || parentPl > 0) {
+        target = target.parentElement;
+        style = parentStyle;
+        pt = parentPt; pr = parentPr; pl = parentPl;
+      }
+    }
+
+    if (pt > 0 || pr > 0 || pl > 0) {
+      root.style.setProperty('margin-top', `-${pt}px`, 'important');
+      root.style.setProperty('margin-right', `-${pr}px`, 'important');
+      root.style.setProperty('margin-left', `-${pl}px`, 'important');
+      root.style.setProperty('width', `calc(100% + ${pl + pr}px)`, 'important');
+      root.style.setProperty('max-width', `calc(100% + ${pl + pr}px)`, 'important');
+    }
+
+    const borderRadius = style.borderRadius;
+    if (borderRadius && borderRadius !== '0px') {
+      const shell = root.querySelector('.suape-shell');
+      if (shell) {
+        shell.style.borderTopLeftRadius = borderRadius;
+        shell.style.borderTopRightRadius = borderRadius;
+      }
+    }
+  }
+
   async function installToolkit() {
     if (!getProcessId() || document.getElementById(ROOT_ID)) return;
     const [theme, collapsed, storedSnippets] = await Promise.all([storageGet('local', THEME_KEY, 'dark'), storageGet('local', COLLAPSED_KEY, false), storageGet('sync', SNIPPETS_KEY, null)]);
     state.theme = theme === 'light' ? 'light' : 'dark'; state.collapsed = Boolean(collapsed); state.snippets = storedSnippets && Object.keys(storedSnippets).length ? storedSnippets : { ...DEFAULT_SNIPPETS };
     if (!storedSnippets) await storageSet('sync', { [SNIPPETS_KEY]: state.snippets });
-    const root = buildShell(); isolateTabTitles(root); const host = findToolkitHost(); host.prepend(root); renderSummary({ process: null, fallback: { suapId: getProcessId(), processNumber: getProcessNumber(), processUrl: location.href } }); renderShortcuts(); renderAiPanel(); renderSettings(); selectTab('summary'); openProcessBridge();
+    const root = buildShell(); isolateTabTitles(root); const host = findToolkitHost(); host.prepend(root); fitToolkitToHost(host, root); renderSummary({ process: null, fallback: { suapId: getProcessId(), processNumber: getProcessNumber(), processUrl: location.href } }); renderShortcuts(); renderAiPanel(); renderSettings(); selectTab('summary'); openProcessBridge();
   }
   globalThis.chrome?.storage?.onChanged?.addListener((changes, area) => { if (area === 'sync' && changes[SNIPPETS_KEY]) { state.snippets = changes[SNIPPETS_KEY].newValue || { ...DEFAULT_SNIPPETS }; renderShortcuts(); } });
   window.__siagesSuapProcessDocument = { getProcessId, getProcessNumber, buildContext, installToolkit, installButton: installToolkit, installFinancePanel: openProcessBridge, openFinanceBridge: openProcessBridge, renderFinanceSummary, openModal, closeModal, downloadProcessPdfFromSuap, normalizeSnippetKey, selectTab, retrySync, toggleTheme, toggleMaximized, toggleCollapsed };

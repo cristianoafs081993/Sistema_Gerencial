@@ -723,4 +723,3 @@ Para a automacao do Gmail:
 - A captura aceita somente a URL canônica do Plano 8, valida a sessão, inclui linhas ocultas e grava snapshots antes da reconciliação transacional.
 - A primeira execução fica em `preview`; depois da conferência, `apply_suap_plan_snapshot` atualiza/inclui os registros e arquiva os ausentes sem exclusão física.
 - O proxy tamb?m permite exclusivamente `/plan_estrategico/plano_concluido/8/` sem par?metros adicionais.
-
