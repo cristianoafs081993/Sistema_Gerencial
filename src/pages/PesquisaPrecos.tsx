@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { cn } from '@/lib/utils';
 import { HeaderSubtitle } from '@/components/HeaderParts';
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
@@ -297,6 +298,14 @@ export default function PesquisaPrecos() {
   const [itemPanelMode, setItemPanelMode] = useState<'config' | 'curation'>('config');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+  const [visibleSuggestionsLimit, setVisibleSuggestionsLimit] = useState(15);
+
+  const handleSuggestionsScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
+    if (scrollHeight - scrollTop - clientHeight < 60) {
+      setVisibleSuggestionsLimit((prev) => prev + 15);
+    }
+  };
 
   const currentIndex = items.findIndex((item) => item.localId === selectedItemId);
 
@@ -1179,6 +1188,7 @@ export default function PesquisaPrecos() {
   };
 
   const suggestCatalogForItem = async (item: PriceResearchItem) => {
+    setVisibleSuggestionsLimit(15);
     updateItem(item.localId, {
       catalogMatchStatus: 'searching',
       catalogMatchError: undefined,
@@ -2862,27 +2872,50 @@ export default function PesquisaPrecos() {
 
                       {selectedItem.catalogSuggestions && selectedItem.catalogSuggestions.length > 0 && (
                         <div className="mt-4 space-y-3 rounded-radius-lg border border-sebrae-blue/20 bg-sebrae-blue/[0.04] p-4">
-                          <div>
-                            <h4 className="font-ui text-sm font-semibold text-sebrae-navy">Códigos Semelhantes Identificados no Catálogo</h4>
-                            <p className="font-ui text-xs text-sebrae-blue">Selecione uma das opções para usá-la como filtro da consulta.</p>
+                          <div className="flex items-center justify-between gap-2">
+                            <div>
+                              <h4 className="font-ui text-sm font-semibold text-sebrae-navy">Códigos Semelhantes Identificados no Catálogo</h4>
+                              <p className="font-ui text-xs text-sebrae-blue">Selecione uma das opções para usá-la como filtro da consulta.</p>
+                            </div>
+                            <span className="font-ui text-xs font-medium text-text-muted shrink-0">
+                              {Math.min(visibleSuggestionsLimit, selectedItem.catalogSuggestions.length)} de {selectedItem.catalogSuggestions.length}
+                            </span>
                           </div>
-                          <div className="grid gap-3 md:grid-cols-2">
-                            {selectedItem.catalogSuggestions.map((suggestion) => {
+                          <div
+                            className="max-h-[380px] overflow-y-auto rounded-md border border-border-default bg-surface-card divide-y divide-border-default shadow-sm"
+                            onScroll={handleSuggestionsScroll}
+                          >
+                            {selectedItem.catalogSuggestions.slice(0, visibleSuggestionsLimit).map((suggestion) => {
                               const isActive = selectedItem.catalogCode === suggestion.code;
                               return (
-                                <div key={suggestion.code} className="rounded-radius-md border border-border-default bg-surface-card p-3 flex flex-col justify-between gap-3 shadow-sm hover:border-primary/45 transition-colors">
-                                  <div>
-                                    <div className="flex items-center gap-1.5">
-                                      <Badge variant="outline" className="text-xs">{suggestion.code}</Badge>
-                                      <Badge variant="secondary" className="text-[10px]">{suggestion.score}% aderente</Badge>
-                                    </div>
-                                    <p className="mt-2 font-ui text-xs font-bold text-text-primary leading-relaxed">{suggestion.description}</p>
-                                    <p className="mt-1 font-ui text-[10px] text-text-muted leading-relaxed">{suggestion.reason}</p>
+                                <div
+                                  key={suggestion.code}
+                                  className={cn(
+                                    "flex items-center justify-between p-3 gap-3 transition-colors hover:bg-slate-50/80",
+                                    isActive && "bg-emerald-50/60 hover:bg-emerald-50"
+                                  )}
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                    <Badge variant="outline" className="font-mono text-xs shrink-0">
+                                      {suggestion.code}
+                                    </Badge>
+                                    <p className="font-ui text-xs font-semibold text-text-primary leading-relaxed break-words min-w-0 flex-1">
+                                      {suggestion.description}
+                                    </p>
                                   </div>
+
                                   <Button
                                     type="button"
-                                    size="sm"
-                                    variant={isActive ? 'secondary' : 'outline'}
+                                    size="icon"
+                                    variant={isActive ? 'default' : 'outline'}
+                                    className={cn(
+                                      "h-8 w-8 shrink-0 rounded-md transition-all",
+                                      isActive
+                                        ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-sm"
+                                        : "hover:bg-primary/10 hover:text-primary hover:border-primary/40"
+                                    )}
+                                    aria-label={isActive ? "Código ativo" : "Usar este código"}
+                                    title={isActive ? "Código ativo" : "Usar este código"}
                                     onClick={() => updateItem(selectedItem.localId, {
                                       catalogType: suggestion.catalogType,
                                       catalogCode: suggestion.code,
@@ -2891,7 +2924,7 @@ export default function PesquisaPrecos() {
                                       searchError: undefined,
                                     })}
                                   >
-                                    {isActive ? 'Código Ativo' : 'Usar este código'}
+                                    {isActive ? <Check className="h-4 w-4 stroke-[2.5]" /> : <Check className="h-4 w-4" />}
                                   </Button>
                                 </div>
                               );

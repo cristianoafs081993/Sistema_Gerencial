@@ -100,6 +100,16 @@ describe('process-document 1.9', () => {
     expect(root?.dataset.theme).toBe('dark');
   });
 
+  it('prioriza a selecao do elemento aside.right quando presente no SUAP', async () => {
+    document.body.innerHTML = '<main><aside class="right"><div class="box">Trâmites</div></aside><p>Processo 23035.000001.2026-11</p></main>';
+    const api = loadProcessScript();
+    await api.installToolkit();
+
+    const root = document.getElementById('siages-suap-toolkit');
+    const asideRight = document.querySelector('aside.right');
+    expect(asideRight?.firstElementChild).toBe(root);
+  });
+
   it('persiste recolhimento e troca de tema sem alterar o body do SUAP', async () => {
     const api = loadProcessScript();
     await api.installToolkit();
@@ -107,13 +117,32 @@ describe('process-document 1.9', () => {
     const originalBodyClass = document.body.className;
 
     (root.querySelector('[data-action="collapse"]') as HTMLButtonElement).click();
-    (root.querySelector('[data-action="theme"]') as HTMLButtonElement).click();
+    await api.toggleTheme();
 
     await waitFor(() => expect(root.dataset.collapsed).toBe('true'));
     expect(root.dataset.theme).toBe('light');
     expect(localValues['siages-toolkit-collapsed']).toBe(true);
     expect(localValues['siages-toolkit-theme']).toBe('light');
     expect(document.body.className).toBe(originalBodyClass);
+  });
+
+  it('alterna o estado maximizado pelo botao do cabecalho e pela tecla Escape', async () => {
+    const api = loadProcessScript();
+    await api.installToolkit();
+    const root = document.getElementById('siages-suap-toolkit')!;
+    const maxBtn = root.querySelector('[data-action="maximize"]') as HTMLButtonElement;
+
+    maxBtn.click();
+    expect(root.dataset.maximized).toBe('true');
+    expect(maxBtn.getAttribute('aria-label')).toBe('Restaurar tamanho');
+
+    api.selectTab('shortcuts');
+    expect(root.querySelector('[data-tab="shortcuts"]')?.getAttribute('aria-selected')).toBe('true');
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(root.dataset.maximized).toBe('false');
+    expect(maxBtn.getAttribute('aria-label')).toBe('Maximizar painel');
+    expect(root.querySelector('[data-tab="summary"]')?.getAttribute('aria-selected')).toBe('true');
   });
 
   it('renderiza snapshot com copia individual e lista de empenhos', async () => {

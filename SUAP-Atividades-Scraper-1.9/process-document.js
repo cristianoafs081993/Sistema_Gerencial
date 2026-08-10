@@ -18,7 +18,7 @@
     '/atpub': 'Atenciosamente, servidor público do IFRN – Campus Currais Novos',
   };
   const state = {
-    activeTab: 'summary', theme: 'dark', collapsed: false, snapshot: null,
+    activeTab: 'summary', theme: 'dark', collapsed: false, maximized: false, snapshot: null,
     syncStatus: { stage: 'checking', message: 'Preparando a consulta do processo...' }, snippets: { ...DEFAULT_SNIPPETS }, editingKey: null,
   };
 
@@ -145,6 +145,8 @@
   }
 
   function findToolkitHost() {
+    const directAside = document.querySelector('aside.right, .right-col, aside[class*="right"]');
+    if (directAside) return directAside;
     const candidates = Array.from(document.querySelectorAll('aside, .right-col, [class*="right"], [id*="right"], section, article, .box, .card, .panel'));
     let best = null; let bestScore = -1;
     candidates.forEach((element) => {
@@ -158,7 +160,11 @@
       if (rect?.left > innerWidth * .45) score += 20;
       if (score > bestScore) { best = element; bestScore = score; }
     });
-    return bestScore > 0 ? best : (document.querySelector('main, #content, .content, #main, [role="main"]') || document.body);
+    if (bestScore > 0 && best) {
+      const parentAside = best.closest('aside.right, aside, .right-col, [class*="right"]');
+      return parentAside || best;
+    }
+    return document.querySelector('main, #content, .content, #main, [role="main"]') || document.body;
   }
 
   function buildShell() {
@@ -166,13 +172,14 @@
     root.id = ROOT_ID;
     root.dataset.theme = state.theme;
     root.dataset.collapsed = String(state.collapsed);
+    root.dataset.maximized = String(state.maximized);
     root.setAttribute('aria-label', 'Suape - ferramentas do processo');
     root.innerHTML = `
       <div class="suape-shell">
         <header class="suape-header">
           <div class="suape-brand"><span class="suape-logo">S</span><div><strong>Suape</strong><small>Canivete suíço do IFRN · v1.9.2</small></div></div>
-          <button type="button" class="suape-icon-button" data-action="theme" aria-label="Alternar tema">◐</button>
-          <button type="button" class="suape-icon-button" data-action="collapse" aria-label="Recolher painel">⌃</button>
+          <button type="button" class="suape-icon-button" data-action="collapse" aria-label="Minimizar painel" title="Minimizar painel">−</button>
+          <button type="button" class="suape-icon-button" data-action="maximize" aria-label="Maximizar painel" title="Maximizar painel">⛶</button>
         </header>
         <nav class="suape-tabs" role="tablist" aria-label="Ferramentas">
           <button class="suape-tab" role="tab" data-tab="summary" aria-selected="true">Resumo</button>
@@ -189,8 +196,8 @@
           <section class="suape-panel" data-panel="settings" data-active="false"></section>
         </div>
       </div>`;
-    root.querySelector('[data-action="theme"]').addEventListener('click', toggleTheme);
     root.querySelector('[data-action="collapse"]').addEventListener('click', toggleCollapsed);
+    root.querySelector('[data-action="maximize"]').addEventListener('click', toggleMaximized);
     root.querySelectorAll('[data-tab]').forEach((button) => button.addEventListener('click', () => selectTab(button.dataset.tab)));
     return root;
   }
@@ -210,15 +217,51 @@
   }
   async function toggleCollapsed() {
     state.collapsed = !state.collapsed;
+    if (state.collapsed && state.maximized) { state.maximized = false; }
     const root = document.getElementById(ROOT_ID);
     if (root) {
       root.dataset.collapsed = String(state.collapsed);
+      root.dataset.maximized = String(state.maximized);
       const button = root.querySelector('[data-action="collapse"]');
-      button.textContent = state.collapsed ? '⌄' : '⌃';
-      button.setAttribute('aria-label', state.collapsed ? 'Expandir painel' : 'Recolher painel');
+      if (button) {
+        button.textContent = state.collapsed ? '⌄' : '−';
+        button.setAttribute('aria-label', state.collapsed ? 'Expandir painel' : 'Minimizar painel');
+        button.setAttribute('title', state.collapsed ? 'Expandir painel' : 'Minimizar painel');
+      }
+      const maxButton = root.querySelector('[data-action="maximize"]');
+      if (maxButton) {
+        maxButton.textContent = state.maximized ? '🗗' : '⛶';
+        maxButton.setAttribute('aria-label', state.maximized ? 'Restaurar tamanho' : 'Maximizar painel');
+        maxButton.setAttribute('title', state.maximized ? 'Restaurar tamanho' : 'Maximizar painel');
+      }
     }
     await storageSet('local', { [COLLAPSED_KEY]: state.collapsed });
   }
+  function toggleMaximized() {
+    state.maximized = !state.maximized;
+    if (state.maximized && state.collapsed) { state.collapsed = false; }
+    if (!state.maximized && state.activeTab === 'shortcuts') { selectTab('summary'); }
+    const root = document.getElementById(ROOT_ID);
+    if (root) {
+      root.dataset.maximized = String(state.maximized);
+      root.dataset.collapsed = String(state.collapsed);
+      const collapseButton = root.querySelector('[data-action="collapse"]');
+      if (collapseButton) {
+        collapseButton.textContent = state.collapsed ? '⌄' : '−';
+        collapseButton.setAttribute('aria-label', state.collapsed ? 'Expandir painel' : 'Minimizar painel');
+        collapseButton.setAttribute('title', state.collapsed ? 'Expandir painel' : 'Minimizar painel');
+      }
+      const maxButton = root.querySelector('[data-action="maximize"]');
+      if (maxButton) {
+        maxButton.textContent = state.maximized ? '🗗' : '⛶';
+        maxButton.setAttribute('aria-label', state.maximized ? 'Restaurar tamanho' : 'Maximizar painel');
+        maxButton.setAttribute('title', state.maximized ? 'Restaurar tamanho' : 'Maximizar painel');
+      }
+    }
+  }
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && state.maximized) { toggleMaximized(); }
+  });
 
   function panel(name) { return document.querySelector(`#${ROOT_ID} [data-panel="${name}"]`); }
   function appendCopyRow(container, label, value, mono = false) {
@@ -517,6 +560,6 @@
     const root = buildShell(); isolateTabTitles(root); const host = findToolkitHost(); host.prepend(root); renderSummary({ process: null, fallback: { suapId: getProcessId(), processNumber: getProcessNumber(), processUrl: location.href } }); renderShortcuts(); renderAiPanel(); renderSettings(); selectTab('summary'); openProcessBridge();
   }
   globalThis.chrome?.storage?.onChanged?.addListener((changes, area) => { if (area === 'sync' && changes[SNIPPETS_KEY]) { state.snippets = changes[SNIPPETS_KEY].newValue || { ...DEFAULT_SNIPPETS }; renderShortcuts(); } });
-  window.__siagesSuapProcessDocument = { getProcessId, getProcessNumber, buildContext, installToolkit, installButton: installToolkit, installFinancePanel: openProcessBridge, openFinanceBridge: openProcessBridge, renderFinanceSummary, openModal, closeModal, downloadProcessPdfFromSuap, normalizeSnippetKey, selectTab, retrySync };
+  window.__siagesSuapProcessDocument = { getProcessId, getProcessNumber, buildContext, installToolkit, installButton: installToolkit, installFinancePanel: openProcessBridge, openFinanceBridge: openProcessBridge, renderFinanceSummary, openModal, closeModal, downloadProcessPdfFromSuap, normalizeSnippetKey, selectTab, retrySync, toggleTheme, toggleMaximized, toggleCollapsed };
   if (!window.__SIAGES_SUAP_PROCESS_TEST__) void installToolkit();
 })();

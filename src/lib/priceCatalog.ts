@@ -118,7 +118,7 @@ export function rankCatalogEntries(
   description: string,
   catalogType: PriceCatalogType,
   entries: CompactCatalogEntry[],
-  limit = 5,
+  limit = 50,
 ) {
   const normalizedQuery = normalizeCatalogText(description);
   const queryTokens = [...new Set(tokenize(description))];
@@ -205,7 +205,7 @@ export function rankCatalogEntries(
 export async function findCatalogSuggestionsDirect(
   description: string,
   catalogType: PriceCatalogType,
-  limit = 5,
+  limit = 50,
 ) {
   const catalog = await loadCatalog(catalogType);
   return rankCatalogEntries(description, catalogType, catalog.entries, limit);

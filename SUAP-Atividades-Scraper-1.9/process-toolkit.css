@@ -1,41 +1,41 @@
 #siages-suap-toolkit {
-  --suape-bg: #101722;
-  --suape-surface: #17212f;
-  --suape-surface-2: #1d2a3a;
-  --suape-border: #314156;
-  --suape-text: #eef4f8;
-  --suape-muted: #9aabbc;
-  --suape-primary: #34d399;
+  --suape-bg: #18181b;
+  --suape-surface: #27272a;
+  --suape-surface-2: #3f3f46;
+  --suape-border: #3f3f46;
+  --suape-text: #f4f4f5;
+  --suape-muted: #a1a1aa;
+  --suape-primary: #2dd4bf;
   --suape-primary-strong: #059669;
-  --suape-primary-soft: rgba(52, 211, 153, 0.13);
-  --suape-danger: #fb7185;
+  --suape-primary-soft: rgba(45, 212, 191, 0.12);
+  --suape-danger: #f87171;
   all: initial;
   box-sizing: border-box;
   display: block;
   width: 100%;
-  min-width: 280px;
+  max-width: 100%;
+  min-width: 0;
   margin: 0 0 16px;
   color: var(--suape-text);
   font: 13px/1.45 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
-  position: sticky;
-  top: 12px;
-  z-index: 50;
+  position: relative;
+  z-index: 5;
 }
 #siages-suap-toolkit[data-theme="light"] {
-  --suape-bg: #f7faf9;
+  --suape-bg: #f8fafc;
   --suape-surface: #ffffff;
-  --suape-surface-2: #f1f5f4;
-  --suape-border: #d9e3df;
-  --suape-text: #13231f;
-  --suape-muted: #60716c;
-  --suape-primary: #087f5b;
-  --suape-primary-strong: #047857;
-  --suape-primary-soft: #e8f7f0;
-  --suape-danger: #be123c;
+  --suape-surface-2: #f1f5f9;
+  --suape-border: #e2e8f0;
+  --suape-text: #0f172a;
+  --suape-muted: #64748b;
+  --suape-primary: #006633;
+  --suape-primary-strong: #004d26;
+  --suape-primary-soft: rgba(0, 102, 51, 0.08);
+  --suape-danger: #dc2626;
 }
 #siages-suap-toolkit *, #siages-suap-toolkit *::before, #siages-suap-toolkit *::after { box-sizing: border-box; }
 #siages-suap-toolkit button, #siages-suap-toolkit input, #siages-suap-toolkit textarea { font: inherit; }
-.suape-shell { overflow: hidden; border: 1px solid var(--suape-border); border-radius: 14px; background: var(--suape-bg); box-shadow: 0 18px 44px rgba(2, 8, 23, .22); color: var(--suape-text); }
+.suape-shell { overflow: hidden; border: 1px solid var(--suape-border); border-radius: 8px; background: var(--suape-surface); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); color: var(--suape-text); width: 100%; box-sizing: border-box; }
 .suape-header { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 10px 12px; border-bottom: 1px solid var(--suape-border); background: var(--suape-surface); }
 .suape-brand { display: flex; min-width: 0; flex: 1; align-items: center; gap: 9px; }
 .suape-logo { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 9px; background: var(--suape-primary-soft); color: var(--suape-primary); font-weight: 900; }
@@ -43,8 +43,10 @@
 .suape-brand small { display: block; color: var(--suape-muted); font-size: 10px; }
 .suape-icon-button { display: inline-grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--suape-border); border-radius: 8px; background: transparent; color: var(--suape-muted); cursor: pointer; }
 .suape-icon-button:hover, .suape-icon-button:focus-visible { border-color: var(--suape-primary); color: var(--suape-primary); outline: none; box-shadow: 0 0 0 3px var(--suape-primary-soft); }
-.suape-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-bottom: 1px solid var(--suape-border); background: var(--suape-surface); }
-.suape-tab { display: flex !important; min-width: 0; min-height: 36px; align-items: center; justify-content: center; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--suape-muted); cursor: pointer; padding: 10px 2px 8px; font-size: 10px; font-weight: 700; line-height: 1.1; letter-spacing: -.01em; text-align: center; white-space: nowrap; writing-mode: horizontal-tb !important; text-orientation: mixed !important; overflow: hidden; text-overflow: ellipsis; }
+.suape-tabs { display: flex; width: 100%; border-bottom: 1px solid var(--suape-border); background: var(--suape-surface); }
+.suape-tab { display: flex !important; flex: 1 1 0; min-width: 0; min-height: 36px; align-items: center; justify-content: center; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--suape-muted); cursor: pointer; padding: 9px 4px 8px; font-size: 11px; font-weight: 700; line-height: 1.1; letter-spacing: -.01em; text-align: center; white-space: nowrap; writing-mode: horizontal-tb !important; text-orientation: mixed !important; overflow: hidden; text-overflow: ellipsis; }
+#siages-suap-toolkit:not([data-maximized="true"]) .suape-tab[data-tab="shortcuts"] { display: none !important; }
+#siages-suap-toolkit[data-maximized="true"] .suape-tab[data-tab="shortcuts"] { display: flex !important; }
 .suape-tab:hover, .suape-tab:focus-visible { color: var(--suape-text); outline: none; background: var(--suape-primary-soft); }
 .suape-tab[aria-selected="true"] { border-bottom-color: var(--suape-primary); color: var(--suape-primary); }
 .suape-panel { display: none; max-height: min(680px, calc(100vh - 120px)); overflow: auto; padding: 12px; background: var(--suape-bg); scrollbar-width: thin; }
@@ -172,8 +174,44 @@ textarea.suape-input { min-height: 72px; resize: vertical; }
 #siages-suap-toolkit[data-collapsed="true"] .suape-tabs,
 #siages-suap-toolkit[data-collapsed="true"] .suape-panels,
 #siages-suap-toolkit[data-collapsed="true"] .suape-brand small { display: none; }
-#siages-suap-toolkit[data-collapsed="true"] { width: min(100%, 280px); }
-#siages-suap-toolkit[data-collapsed="true"] .suape-shell { border-radius: 11px; }
+#siages-suap-toolkit[data-collapsed="true"] { width: 100%; max-width: 100%; }
+#siages-suap-toolkit[data-collapsed="true"] .suape-shell { border-radius: 8px; }
+#siages-suap-toolkit[data-maximized="true"] {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  z-index: 2147483646 !important;
+  background: rgba(15, 23, 42, 0.65) !important;
+  backdrop-filter: blur(4px);
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 20px !important;
+  margin: 0 !important;
+}
+#siages-suap-toolkit[data-maximized="true"] .suape-shell {
+  width: min(1200px, 96vw) !important;
+  height: min(850px, 92vh) !important;
+  max-height: 92vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  border-radius: 12px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4) !important;
+}
+#siages-suap-toolkit[data-maximized="true"] .suape-panels {
+  flex: 1 !important;
+  min-height: 0 !important;
+}
+#siages-suap-toolkit[data-maximized="true"] .suape-panel {
+  max-height: none !important;
+  height: 100% !important;
+  overflow: auto !important;
+}
 @media (max-width: 720px) {
   #siages-suap-toolkit { position: static; min-width: 0; }
   .suape-panel { max-height: none; }

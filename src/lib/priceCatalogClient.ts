@@ -42,7 +42,7 @@ function getMatcherWorker() {
 export function findCatalogSuggestions(
   description: string,
   catalogType: PriceCatalogType,
-  limit = 5,
+  limit = 50,
 ) {
   if (typeof Worker === 'undefined') {
     return findCatalogSuggestionsDirect(description, catalogType, limit);
