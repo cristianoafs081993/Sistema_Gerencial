@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Suape - Canivete Suico do IFRN",
-  "version": "1.9.15",
+  "version": "1.9.16",
   "description": "Resumo de processos, dados financeiros, atalhos e documentos com IA dentro do SUAP.",
   "permissions": [
     "activeTab",
@@ -41,7 +41,9 @@
     {
       "matches": [
         "https://suap.ifrn.edu.br/processo_eletronico/processo/*",
-        "https://suap.ifrn.edu.br/processo_eletronico/visualizar_processo/*"
+        "https://suap.ifrn.edu.br/processo_eletronico/visualizar_processo/*",
+        "https://suap.ifrn.edu.br/documento_eletronico/visualizar_documento/*",
+        "https://suap.ifrn.edu.br/documento_eletronico/*"
       ],
       "css": [
         "process-toolkit.css"

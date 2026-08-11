@@ -47,8 +47,28 @@
     return numbers;
   }
   function getProcessId() {
-    const match = location.pathname.match(/^\/processo_eletronico\/(?:processo|visualizar_processo)\/(\d+)\/?$/);
-    return match ? match[1] : null;
+    const directMatch = location.pathname.match(/^\/processo_eletronico\/(?:processo|visualizar_processo)\/(\d+)\/?$/);
+    if (directMatch) return directMatch[1];
+
+    const urlParams = new URLSearchParams(location.search);
+    const paramId = urlParams.get('processo') || urlParams.get('processo_id') || urlParams.get('suapId');
+    if (paramId && /^\d+$/.test(paramId)) return paramId;
+
+    const processLink = document.querySelector('a[href*="/processo_eletronico/processo/"], a[href*="/processo_eletronico/visualizar_processo/"]');
+    if (processLink) {
+      const match = processLink.getAttribute('href')?.match(/\/processo_eletronico\/(?:processo|visualizar_processo)\/(\d+)\/?/);
+      if (match) return match[1];
+    }
+
+    if (document.referrer) {
+      const refMatch = document.referrer.match(/\/processo_eletronico\/(?:processo|visualizar_processo)\/(\d+)\/?/);
+      if (refMatch) return refMatch[1];
+    }
+
+    const docMatch = location.pathname.match(/^\/documento_eletronico\/(?:documento|visualizar_documento)\/(\d+)\/?$/);
+    if (docMatch) return docMatch[1];
+
+    return null;
   }
   function getProcessNumber() {
     const match = cleanText(document.body?.innerText || document.body?.textContent || '').match(/\b\d{5}\.\d{6}(?:[./])\d{4}-\d{2}\b/);

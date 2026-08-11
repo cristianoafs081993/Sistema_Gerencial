@@ -85,6 +85,12 @@ describe('process-document 1.9', () => {
     window.history.replaceState(null, '', '/processo_eletronico/visualizar_processo/654/');
     api = loadProcessScript();
     expect(api.getProcessId()).toBe('654');
+
+    delete (window as typeof window & Record<string, unknown>).__siagesSuapProcessDocument;
+    document.body.innerHTML = '<main><a href="/processo_eletronico/processo/789/">Processo 23035.000001.2026-11</a></main>';
+    window.history.replaceState(null, '', '/documento_eletronico/visualizar_documento/1116308/');
+    api = loadProcessScript();
+    expect(api.getProcessId()).toBe('789');
   });
 
   it('injeta uma unica vez no topo da lateral e cria as cinco abas', async () => {

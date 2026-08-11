@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.15');
+    expect(manifest.version).toBe('1.9.16');
     expect(manifest.host_permissions).toContain('<all_urls>');
     expect(manifest.permissions).toEqual(expect.arrayContaining(['activeTab', 'scripting', 'storage', 'alarms']));
     expect(manifest.background).toEqual({ service_worker: 'background.js' });
@@ -21,6 +21,8 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(process.matches).toEqual([
       'https://suap.ifrn.edu.br/processo_eletronico/processo/*',
       'https://suap.ifrn.edu.br/processo_eletronico/visualizar_processo/*',
+      'https://suap.ifrn.edu.br/documento_eletronico/visualizar_documento/*',
+      'https://suap.ifrn.edu.br/documento_eletronico/*',
     ]);
     expect(plan.matches).toEqual(['https://suap.ifrn.edu.br/plan_estrategico/plano_concluido/8/']);
     expect(plan.js).toEqual(['plan-summary.js']);
