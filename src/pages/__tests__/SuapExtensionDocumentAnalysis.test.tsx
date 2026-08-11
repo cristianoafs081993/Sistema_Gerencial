@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import SuapExtensionDocumentAnalysis from '@/pages/SuapExtensionDocumentAnalysis';
@@ -76,8 +76,12 @@ describe('SuapExtensionDocumentAnalysis', () => {
     });
 
     expect(await screen.findByText('O documento precisa de ajustes.')).toBeInTheDocument();
-    expect(screen.getByText('Memória de cálculo')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Mem/ })).toBeInTheDocument();
+    expect(screen.queryByText('A quantidade foi calculada...')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Mem/ }));
     expect(screen.getByText('A quantidade foi calculada...')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Baixar análise' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Imprimir' })).toBeInTheDocument();
     expect(analyzeSuapDocument).toHaveBeenCalledWith(expect.objectContaining({ documentType: 'tr', documentTitle: 'Termo de Referência: TR 2/2026', pageCount: 1 }));
     expect(stopAutoRefresh).toHaveBeenCalledOnce();
     expect(screen.queryByText(/editar|aplicar automaticamente/i)).not.toBeInTheDocument();

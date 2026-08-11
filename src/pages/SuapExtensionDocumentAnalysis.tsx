@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, ExternalLink, FileSearch, Info, Loader2, ShieldCheck, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Download, ExternalLink, FileSearch, Info, Loader2, Printer, ShieldCheck, X } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import * as pdfWorkerAsset from 'pdfjs-dist/build/pdf.worker.min.js?url';
 
 import { Button } from '@/components/ui/button';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import {
   getSuapExtensionDocumentAnalysisContext,
   isValidSuapExtensionDocumentPdfResult,
@@ -20,6 +21,7 @@ import {
   analyzeSuapDocument,
 } from '@/services/suapDocumentReview';
 import type { SuapDocumentReviewFinding, SuapDocumentReviewResult } from '@/lib/suapDocumentReview';
+import { downloadSuapDocumentReview, printSuapDocumentReview } from '@/lib/suapDocumentReviewExport';
 import { supabase } from '@/lib/supabase';
 
 const bundledWorkerUrl = (pdfWorkerAsset as { default?: unknown }).default;
@@ -199,7 +201,7 @@ export default function SuapExtensionDocumentAnalysis() {
 
           {!result && !error && <LoadingState message={status} />}
           {error && <ErrorState message={error} onRetry={() => setRetryCount((current) => current + 1)} />}
-          {result && <ReviewResult result={result} />}
+          {result && <ReviewResult result={result} documentTitle={context?.documentTitle || documentLabel} />}
         </div>
       </div>
     </main>
@@ -214,7 +216,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
   return <div className="flex min-h-72 flex-col items-center justify-center gap-4 rounded-xl border border-red-900/60 bg-red-950/20 p-6 text-center"><AlertTriangle className="h-8 w-8 text-red-300" /><p className="max-w-lg text-sm text-red-100">{message}</p><Button onClick={onRetry} className="bg-teal-600 text-white hover:bg-teal-500">Tentar novamente</Button></div>;
 }
 
-function ReviewResult({ result }: { result: SuapDocumentReviewResult }) {
+function ReviewResult({ result, documentTitle }: { result: SuapDocumentReviewResult; documentTitle: string }) {
   const statusLabel = {
     critical: 'Pontos críticos encontrados',
     attention: 'Revisão requer atenção',
@@ -225,30 +227,40 @@ function ReviewResult({ result }: { result: SuapDocumentReviewResult }) {
     <section className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2"><StatusIcon status={result.status} /><h2 className="font-semibold text-white">{statusLabel}</h2></div>
-        <span className="text-xs text-zinc-500">Consultado em {new Date(result.checkedAt).toLocaleString('pt-BR')}</span>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <span className="text-xs text-zinc-500">Consultado em {new Date(result.checkedAt).toLocaleString('pt-BR')}</span>
+          <Button type="button" variant="outline" size="sm" className="border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 hover:text-white" onClick={() => downloadSuapDocumentReview(result, documentTitle)}><Download /> Baixar análise</Button>
+          <Button type="button" variant="outline" size="sm" className="border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 hover:text-white" onClick={() => printSuapDocumentReview(result, documentTitle)}><Printer /> Imprimir</Button>
+        </div>
       </div>
       <p className="mt-3 text-sm leading-6 text-zinc-300">{result.summary}</p>
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{(['critical', 'high', 'medium', 'low'] as const).map((severity) => <div key={severity} className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2"><div className="text-xs capitalize text-zinc-500">{severity === 'critical' ? 'Críticos' : severity === 'high' ? 'Altos' : severity === 'medium' ? 'Médios' : 'Baixos'}</div><div className="mt-1 text-xl font-semibold text-white">{result.counts[severity]}</div></div>)}</div>
     </section>
     <section className="space-y-3">
       <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-zinc-400">Achados e sugestões</h2>
-      {result.findings.length ? result.findings.map((finding, index) => <FindingCard key={finding.id || index} finding={finding} />) : <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-5 text-sm text-zinc-400">Nenhum achado foi retornado. Consulte as limitações abaixo antes de concluir a revisão.</div>}
+      {result.findings.length ? <Accordion type="multiple" className="space-y-3">
+        {result.findings.map((finding, index) => <FindingCard key={finding.id || index} finding={finding} index={index} />)}
+      </Accordion> : <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-5 text-sm text-zinc-400">Nenhum achado foi retornado. Consulte as limitações abaixo antes de concluir a revisão.</div>}
     </section>
     <SourcesSection result={result} />
   </div>;
 }
 
-function FindingCard({ finding }: { finding: SuapDocumentReviewFinding }) {
-  return <article className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-5">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="mb-1 text-xs font-semibold uppercase tracking-[0.1em] text-teal-300">{finding.category}</div><h3 className="font-semibold text-white">{finding.title}</h3></div><SeverityBadge severity={finding.severity} /></div>
-    {finding.page && <p className="mt-3 text-xs text-zinc-500">Página {finding.page} · Confiança {finding.confidence}</p>}
-    {finding.excerpt && <blockquote className="mt-3 border-l-2 border-zinc-700 pl-3 text-sm italic text-zinc-400">“{finding.excerpt}”</blockquote>}
-    <div className="mt-4 grid gap-4 text-sm text-zinc-300 md:grid-cols-2"><div><strong className="text-zinc-100">Problema</strong><p className="mt-1 leading-6">{finding.problem}</p></div><div><strong className="text-zinc-100">Recomendação</strong><p className="mt-1 leading-6">{finding.recommendation}</p></div></div>
-    {finding.suggestedText && <div className="mt-4 rounded-lg border border-teal-900/70 bg-teal-950/20 p-3"><div className="text-xs font-semibold uppercase tracking-[0.1em] text-teal-300">Texto sugerido</div><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-teal-50">{finding.suggestedText}</p></div>}
-    {finding.legalBases.length > 0 && <div className="mt-4 flex flex-wrap gap-2">{finding.legalBases.map((source) => <SourceLink key={`${source.url}-${source.reference}`} source={source} />)}</div>}
-  </article>;
+function FindingCard({ finding, index }: { finding: SuapDocumentReviewFinding; index: number }) {
+  const value = finding.id || `finding-${index}`;
+  return <AccordionItem value={value} className="rounded-xl border border-zinc-800 bg-zinc-950/40 px-5 data-[state=open]:bg-zinc-950/70">
+    <AccordionTrigger className="gap-3 py-4 text-left hover:no-underline">
+      <span className="min-w-0 flex-1"><span className="mb-1 block text-xs font-semibold uppercase tracking-[0.1em] text-teal-300">{finding.category}</span><span className="block font-semibold text-white">{finding.title}</span><span className="mt-1 block text-xs font-normal text-zinc-500">{finding.page ? `Página ${finding.page} · ` : ''}Confiança {finding.confidence}</span></span>
+      <SeverityBadge severity={finding.severity} />
+    </AccordionTrigger>
+    <AccordionContent className="text-zinc-300">
+      {finding.excerpt && <blockquote className="border-l-2 border-zinc-700 pl-3 text-sm italic text-zinc-400">“{finding.excerpt}”</blockquote>}
+      <div className="mt-4 grid gap-4 text-sm md:grid-cols-2"><div><strong className="text-zinc-100">Problema</strong><p className="mt-1 leading-6">{finding.problem}</p></div><div><strong className="text-zinc-100">Recomendação</strong><p className="mt-1 leading-6">{finding.recommendation}</p></div></div>
+      {finding.suggestedText && <div className="mt-4 rounded-lg border border-teal-900/70 bg-teal-950/20 p-3"><div className="text-xs font-semibold uppercase tracking-[0.1em] text-teal-300">Texto sugerido</div><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-teal-50">{finding.suggestedText}</p></div>}
+      {finding.legalBases.length > 0 && <div className="mt-4 flex flex-wrap gap-2">{finding.legalBases.map((source) => <SourceLink key={`${source.url}-${source.reference}`} source={source} />)}</div>}
+    </AccordionContent>
+  </AccordionItem>;
 }
-
 function SourcesSection({ result }: { result: SuapDocumentReviewResult }) {
   return <section className="grid gap-4 md:grid-cols-2"><div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-5"><div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white"><ExternalLink className="h-4 w-4 text-teal-300" /> Fontes consultadas</div><div className="space-y-2">{result.sources.length ? result.sources.map((source) => <SourceLink key={`${source.url}-${source.reference}`} source={source} block />) : <p className="text-sm text-zinc-500">Nenhuma fonte foi retornada com a análise.</p>}</div></div><div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-5"><div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white"><Info className="h-4 w-4 text-teal-300" /> Limitações</div>{result.limitations.length ? <ul className="list-disc space-y-2 pl-5 text-sm leading-6 text-zinc-400">{result.limitations.map((item) => <li key={item}>{item}</li>)}</ul> : <p className="text-sm text-zinc-500">A análise não registrou limitações adicionais.</p>}</div></section>;
 }

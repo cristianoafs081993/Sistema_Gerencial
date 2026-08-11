@@ -434,7 +434,7 @@ Opcionais:
 
 ### Revisão de documentos de licitação
 
-A função `analisar-documento-licitacao` exige `GEMINI_API_KEY`. O modelo pode ser ajustado por `GEMINI_SUAP_DOCUMENT_REVIEW_MODEL`; o padrão versionado é `gemini-2.5-flash`. O PDF recebido é temporário e limitado a 20 MB/200 páginas. A função não usa a base local de normativos e consulta somente fontes oficiais online.
+A função `analisar-documento-licitacao` usa `OPENAI_API_KEY` como rota principal; o modelo pode ser ajustado por `OPENAI_SUAP_DOCUMENT_REVIEW_MODEL`, com default `gpt-5.6-luna`. Em caso de ausência ou falha da OpenAI, usa `GEMINI_API_KEY` como fallback, com `GEMINI_SUAP_DOCUMENT_REVIEW_MODEL` e default `gemini-2.5-flash`. O PDF recebido é temporário e limitado a 20 MB/200 páginas. A função não usa a base local de normativos e consulta somente fontes oficiais online.
 
 ### Consultor
 

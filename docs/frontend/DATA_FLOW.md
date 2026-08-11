@@ -327,7 +327,7 @@ Nas rotas de processo do SUAP, `process-document.js` observa links de documentos
 
 O botão `siages-suap-document-ai-button` é inserido dentro do mesmo card/linha do link original. O clique abre `/suap-extensao/documento-analise`, envia o contexto validado por `postMessage` e responde à solicitação do iframe baixando o documento com os cookies da aba SUAP. O PDF não é gravado no SUAP, storage ou histórico do SIAGES.
 
-A rota estabelece uma sessão efêmera, chama `analisar-documento-licitacao` e exibe achados, sugestões, limitações e fontes. A análise não edita o documento nem consulta `normativos`, `normativos_chunks` ou `buscar_normativos`.
+A rota estabelece uma sessão efêmera, chama `analisar-documento-licitacao` e exibe achados, sugestões, limitações e fontes. Os achados aparecem em acordeões fechados inicialmente; a tela permite baixar uma análise HTML independente e abrir uma versão própria para impressão/Salvar como PDF. A análise não edita o documento nem consulta `normativos`, `normativos_chunks` ou `buscar_normativos`.
 
 ## Sincronizacao do Plano SUAP no Campus
 

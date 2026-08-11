@@ -721,10 +721,12 @@ Function versionada para revisão temporária de Termo de Referência e Estudo T
 
 - `verify_jwt = false` no `supabase/config.toml`; a função valida o bearer token internamente com `supabase.auth.getUser`.
 - Recebe `documentType`, `documentTitle`, `processNumber`, `pageCount` opcional e `pdfBase64` de até 20 MB/200 páginas.
-- Usa PDF inline no Gemini com grounding de busca e limita as fontes aos domínios oficiais `planalto.gov.br`, `gov.br` e `in.gov.br`.
+- Usa PDF inline na OpenAI Responses API como rota principal; quando a chave estiver ausente ou a chamada falhar, usa Gemini `generateContent` como fallback.
+- A OpenAI usa `OPENAI_SUAP_DOCUMENT_REVIEW_MODEL`, com default `gpt-5.6-luna`; o fallback Gemini usa `GEMINI_SUAP_DOCUMENT_REVIEW_MODEL`, com default `gemini-2.5-flash` e grounding de busca oficial.
+- O parser de resposta repara quebras de linha, tabulações e outros caracteres de controle literais dentro de strings antes da validação JSON, pois os modelos podem emitir esse formato mesmo quando solicitados a escapar esses caracteres.
 - Não consulta nem persiste dados em `normativos`, `normativos_chunks`, `buscar_normativos`, storage ou tabelas de histórico.
 - Retorna status, resumo, achados com severidade/página, texto sugerido, bases legais, fontes consultadas e limitações.
-- O segredo `GEMINI_API_KEY` e o modelo opcional `GEMINI_SUAP_DOCUMENT_REVIEW_MODEL` são lidos apenas no ambiente da Edge Function.
+- Os segredos `OPENAI_API_KEY` e `GEMINI_API_KEY`, além dos modelos opcionais, são lidos apenas no ambiente da Edge Function.
 
 ## sync-suap-plan
 

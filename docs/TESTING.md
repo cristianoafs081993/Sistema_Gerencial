@@ -108,7 +108,8 @@ Rollout: executar A/B manual em 10 processos de pagamento representativos. Promo
 - `suapDocumentReview.test.ts` cobre classificação por acento/caixa/sigla, rejeição de aprovação/anexo, normalização de resposta e allowlist de fontes.
 - `suapExtensionDispatch.test.ts` cobre origem, janela, processo, documento, caminho `?original=sim` e correspondência do PDF ao documento selecionado.
 - `suapProcessDocumentExtension.test.ts` cobre ícone dentro do card, ausência de falso positivo e idempotência após nova varredura.
-- `SuapExtensionDocumentAnalysis.test.tsx` cobre contexto, sessão, solicitação do PDF, chamada da função, achado com fonte e ausência de edição automática.
+- `SuapExtensionDocumentAnalysis.test.tsx` cobre contexto, sessão, solicitação do PDF, chamada da função, achado com fonte, acordeão inicialmente fechado, ações de baixar/imprimir e ausência de edição automática.
+- `suapDocumentReviewExport.test.ts` cobre a geração do HTML independente da análise e o escape do conteúdo textual.
 - O mesmo teste simula o worker do pdf.js desanexando o `ArrayBuffer`; o fluxo deve preservar uma cópia para a contagem de páginas e outra para a codificação do PDF.
 - Antes do deploy, validar manualmente um TR, um ETP, um termo de aprovação, um PDF inválido, sessão ausente, documento acima de 20 MB e PDF acima de 200 páginas.
 
