@@ -12,6 +12,8 @@ type ExtensionApi = {
   renderFinanceSummary: (summary: unknown) => void;
   openModal: () => void;
   closeModal: () => void;
+  disposeDocumentAnalysis?: () => void;
+  scanDocumentCards?: () => void;
   selectTab: (tab: string) => void;
   normalizeSnippetKey: (value: string) => string;
 };
@@ -67,6 +69,7 @@ describe('process-document 1.9', () => {
 
   afterEach(() => {
     const testWindow = window as typeof window & Record<string, unknown>;
+    (testWindow.__siagesSuapProcessDocument as ExtensionApi | undefined)?.disposeDocumentAnalysis?.();
     delete testWindow.__SIAGES_SUAP_PROCESS_TEST__;
     delete testWindow.__siagesSuapProcessDocument;
     delete testWindow.chrome;
@@ -98,6 +101,21 @@ describe('process-document 1.9', () => {
     expect(root?.querySelectorAll('[role="tab"]')).toHaveLength(5);
     expect(root?.querySelector('[data-tab="summary"]')?.getAttribute('aria-selected')).toBe('true');
     expect(root?.dataset.theme).toBe('dark');
+  });
+
+  it('insere o icone de analise dentro do card apenas para TR ou ETP', async () => {
+    document.body.innerHTML = '<main><aside id="timeline"><div>Recebido por COFINC/CN</div></aside><section id="document-card" class="card"><a href="https://suap.ifrn.edu.br/documento_eletronico/visualizar_documento/987/">Termo de Referência: TR 2/2026</a><div>TERMO DE APROVAÇÃO do TERMO DE REFERÊNCIA</div></section><section class="card"><a href="https://suap.ifrn.edu.br/documento_eletronico/visualizar_documento/988/">TERMO DE APROVAÇÃO do TERMO DE REFERÊNCIA</a></section></main>';
+    const api = loadProcessScript();
+    await api.installToolkit();
+
+    const card = document.getElementById('document-card')!;
+    expect(card.querySelectorAll('.siages-suap-document-ai-slot')).toHaveLength(1);
+    expect(card.querySelector('.siages-suap-document-ai-button')).toHaveAttribute('aria-label', 'Analisar Termo de Referência com IA');
+    expect(card.querySelector('.siages-suap-document-ai-slot')?.previousElementSibling).toBe(card.querySelector('a'));
+    expect(document.querySelectorAll('.siages-suap-document-ai-slot')).toHaveLength(1);
+
+    api.scanDocumentCards();
+    expect(card.querySelectorAll('.siages-suap-document-ai-slot')).toHaveLength(1);
   });
 
   it('prioriza a selecao do elemento aside.right quando presente no SUAP', async () => {

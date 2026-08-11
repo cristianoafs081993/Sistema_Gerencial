@@ -219,3 +219,51 @@ textarea.suape-input { min-height: 72px; resize: vertical; }
   .suape-panel { max-height: none; }
   .suape-data-row { grid-template-columns: 84px minmax(0, 1fr) 28px; }
 }
+
+.siages-suap-document-ai-slot {
+  --suape-bg: #18181b;
+  --suape-surface: #27272a;
+  --suape-border: #3f3f46;
+  --suape-text: #f4f4f5;
+  --suape-muted: #a1a1aa;
+  --suape-primary: #2dd4bf;
+  --suape-primary-soft: rgba(45, 212, 191, 0.12);
+  all: initial;
+  display: inline-flex !important;
+  align-items: center !important;
+  vertical-align: middle !important;
+  margin: 0 0 0 8px !important;
+  font: 13px/1.45 Inter, system-ui, -apple-system, "Segoe UI", sans-serif !important;
+}
+.siages-suap-document-ai-slot[data-theme="light"] {
+  --suape-bg: #f8fafc;
+  --suape-surface: #ffffff;
+  --suape-border: #e2e8f0;
+  --suape-text: #0f172a;
+  --suape-muted: #64748b;
+  --suape-primary: #006633;
+  --suape-primary-soft: rgba(0, 102, 51, 0.08);
+}
+.siages-suap-document-ai-slot *, .siages-suap-document-ai-slot *::before, .siages-suap-document-ai-slot *::after { box-sizing: border-box !important; }
+.siages-suap-document-ai-button {
+  all: initial;
+  display: inline-flex !important;
+  width: 28px !important;
+  height: 28px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 1px solid var(--suape-border) !important;
+  border-radius: 8px !important;
+  background: var(--suape-surface) !important;
+  color: var(--suape-primary) !important;
+  cursor: pointer !important;
+  font: inherit !important;
+  line-height: 1 !important;
+  padding: 0 !important;
+  transition: border-color .15s ease, background .15s ease, transform .15s ease !important;
+}
+.siages-suap-document-ai-button svg { width: 16px !important; height: 16px !important; fill: currentColor !important; }
+.siages-suap-document-ai-button:hover, .siages-suap-document-ai-button:focus-visible { border-color: var(--suape-primary) !important; background: var(--suape-primary-soft) !important; outline: none !important; box-shadow: 0 0 0 3px var(--suape-primary-soft) !important; transform: translateY(-1px); }
+.siages-suap-document-ai-button:disabled { cursor: wait !important; opacity: .7 !important; transform: none !important; }
+.siages-suap-document-ai-button[data-state="loading"] svg { animation: siages-suap-document-ai-spin .9s linear infinite; }
+@keyframes siages-suap-document-ai-spin { to { transform: rotate(360deg); } }

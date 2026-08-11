@@ -40,11 +40,13 @@ const Suap = lazy(() => import('./pages/Suap'));
 const SuapCallback = lazy(() => import('./pages/SuapCallback'));
 const SuapExtensionDispatch = lazy(() => import('./pages/SuapExtensionDispatch'));
 const SuapExtensionProcessInfo = lazy(() => import('./pages/SuapExtensionProcessInfo'));
+const SuapExtensionDocumentAnalysis = lazy(() => import('./pages/SuapExtensionDocumentAnalysis'));
 const SuapExtensionPlanSummary = lazy(() => import('./pages/SuapExtensionPlanSummary'));
 const EconomiaTempo = lazy(() => import('./pages/EconomiaTempo'));
 const ControleUsuarios = lazy(() => import('./pages/ControleUsuarios'));
 const ModelosDocumentos = lazy(() => import('./pages/ModelosDocumentos'));
 const DesignSystemPreview = lazy(() => import('./pages/DesignSystemPreview'));
+const DashboardCloudscapePreview = lazy(() => import('./pages/DashboardCloudscapePreview'));
 const ManutencaoAdmin = lazy(() => import('./pages/ManutencaoAdmin'));
 const Almoxarifado = lazy(() => import('./pages/Almoxarifado'));
 const ControleOrgaos = lazy(() => import('./pages/ControleOrgaos'));
@@ -97,6 +99,7 @@ const App = () => (
               <Route path="/suap-callback" element={<SuapCallback />} />
               <Route element={<SuapExtensionFrameShell />}>
                 <Route path="/suap-extensao/processo-info" element={<SuapExtensionProcessInfo />} />
+                <Route path="/suap-extensao/documento-analise" element={<SuapExtensionDocumentAnalysis />} />
               </Route>
               <Route element={<AppShell />}>
                 <Route path="/suap" element={<Suap />} />
@@ -145,6 +148,7 @@ const App = () => (
                   <Route path="/controle-usuarios" element={<ControleUsuarios />} />
                   <Route path="/modelos-documentos" element={<ModelosDocumentos />} />
                   <Route path="/design-system-preview" element={<DesignSystemPreview />} />
+                  <Route path="/dashboard-cloudscape-preview" element={<DashboardCloudscapePreview />} />
                   <Route path="/manutencao" element={<ManutencaoAdmin />} />
                   <Route path="/almoxarifado" element={<Almoxarifado />} />
                   {/* Multi-órgão e auditoria — apenas superadmin */}

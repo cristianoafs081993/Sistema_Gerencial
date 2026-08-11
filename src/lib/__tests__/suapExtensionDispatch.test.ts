@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 
 import {
   getSuapExtensionPlanContext,
+  getSuapExtensionDocumentAnalysisContext,
   getSuapExtensionProcessContext,
   isValidSuapExtensionPlanContext,
   isValidSuapExtensionPlanSummaryPayload,
   isValidSuapExtensionProcessContext,
   isValidSuapExtensionProcessPdfResult,
   isValidSuapExtensionProcessRetry,
+  isValidSuapExtensionDocumentAnalysisContext,
+  isValidSuapExtensionDocumentPdfResult,
   SUAP_EXTENSION_ORIGIN,
 } from '@/lib/suapExtensionDispatch';
 
@@ -130,5 +133,44 @@ describe('suapExtensionDispatch', () => {
     expect(isValidSuapExtensionProcessRetry(new MessageEvent('message', {
       origin: SUAP_EXTENSION_ORIGIN, source: expectedSource, data: retryMessage,
     }), expectedSource, '999')).toBe(false);
+  });
+
+  it('valida o contexto de análise e mantém o PDF preso ao documento selecionado', () => {
+    const expectedSource = window.parent;
+    const contextMessage = {
+      source: 'siages-suap-extension',
+      type: 'siages:suap-document-analysis-context',
+      version: 1,
+      payload: {
+        suapId: '12345',
+        processNumber: '23035.000001.2026-11',
+        processUrl: 'https://suap.ifrn.edu.br/processo_eletronico/processo/12345/',
+        documentId: '987',
+        documentTitle: 'Termo de Referência: TR 2/2026',
+        documentType: 'tr',
+        documentOriginalPath: '/documento_eletronico/visualizar_documento/987/?original=sim',
+      },
+    };
+    const event = new MessageEvent('message', { origin: SUAP_EXTENSION_ORIGIN, source: expectedSource, data: contextMessage });
+
+    expect(isValidSuapExtensionDocumentAnalysisContext(contextMessage)).toBe(true);
+    expect(getSuapExtensionDocumentAnalysisContext(event, expectedSource)).toMatchObject({ documentId: '987', documentType: 'tr' });
+    expect(isValidSuapExtensionDocumentAnalysisContext({
+      ...contextMessage,
+      payload: { ...contextMessage.payload, documentOriginalPath: 'https://evil.example/987.pdf' },
+    })).toBe(false);
+
+    const pdfMessage = {
+      source: 'siages-suap-extension',
+      type: 'siages:suap-document-pdf-result',
+      version: 1,
+      payload: { suapId: '12345', documentId: '987', bytes: new ArrayBuffer(8) },
+    };
+    expect(isValidSuapExtensionDocumentPdfResult(new MessageEvent('message', {
+      origin: SUAP_EXTENSION_ORIGIN, source: expectedSource, data: pdfMessage,
+    }), expectedSource, '12345', '987')).toBe(true);
+    expect(isValidSuapExtensionDocumentPdfResult(new MessageEvent('message', {
+      origin: SUAP_EXTENSION_ORIGIN, source: expectedSource, data: pdfMessage,
+    }), expectedSource, '12345', '999')).toBe(false);
   });
 });

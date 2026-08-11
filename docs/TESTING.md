@@ -103,6 +103,15 @@ Cobertura mínima obrigatória do piloto manual:
 
 Rollout: executar A/B manual em 10 processos de pagamento representativos. Promover a estratégia apenas se a mediana até `success` ou `incomplete_extraction` reduzir pelo menos 40% e os campos relevantes permanecerem iguais ou mais completos após revisão humana.
 
+## Revisão inteligente de TR e ETP
+
+- `suapDocumentReview.test.ts` cobre classificação por acento/caixa/sigla, rejeição de aprovação/anexo, normalização de resposta e allowlist de fontes.
+- `suapExtensionDispatch.test.ts` cobre origem, janela, processo, documento, caminho `?original=sim` e correspondência do PDF ao documento selecionado.
+- `suapProcessDocumentExtension.test.ts` cobre ícone dentro do card, ausência de falso positivo e idempotência após nova varredura.
+- `SuapExtensionDocumentAnalysis.test.tsx` cobre contexto, sessão, solicitação do PDF, chamada da função, achado com fonte e ausência de edição automática.
+- O mesmo teste simula o worker do pdf.js desanexando o `ArrayBuffer`; o fluxo deve preservar uma cópia para a contagem de páginas e outra para a codificação do PDF.
+- Antes do deploy, validar manualmente um TR, um ETP, um termo de aprovação, um PDF inválido, sessão ausente, documento acima de 20 MB e PDF acima de 200 páginas.
+
 ## Regressao da extensao Suape
 
 A pasta corrente e centralizada por `src/test/extensionFixtures.ts`. As suites `suapExtensionPackage`, `suapProcessDocumentExtension`, `suapTextExpander`, `suapExtensionDispatch`, `SuapExtensionProcessInfo`, `suapPlanContentScript` e `suapCloneAutomation` protegem manifesto e rotas, painel de processo, bridge segura, sincronizacao, Financeiro, atalhos, popup, Plano de Atividades e clonagem.

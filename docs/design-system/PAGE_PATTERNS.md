@@ -95,3 +95,16 @@ Na etapa final, a prévia deve reutilizar o mesmo documento HTML da exportação
 ## Padrao 7: painel embarcado em sistema externo
 
 O painel da extensao usa namespace CSS exclusivo, ocupa primeiro a coluna lateral/timeline e cai para o conteudo principal quando ela nao existe. Dark e o modo inicial; light e recolhimento sao preferencias persistidas. A navegacao inicia em Resumo e preserva a disponibilidade independente das ferramentas durante sincronizacoes longas.
+
+## Padrao 8: dashboard Cloudscape-inspired (prototipo)
+
+Para validacoes de layout sem risco para a rota oficial, usar uma rota isolada com:
+
+1. cabecalho de contexto com titulo, subtitulo e acoes de retorno/atualizacao;
+2. abas compactas para os recortes principais do painel;
+3. filtros globais em drawer lateral, com contagem de filtros ativos e limpeza explicita;
+4. KPIs em paineis densos, neutros e comparaveis, mantendo o verde institucional nos estados ativos;
+5. `ChartPanel`/Recharts preservados quando os graficos existentes ja atendem a necessidade;
+6. tabelas de apoio com dados do `DataContext`, estados vazios e leitura tabular.
+
+A implementacao de referencia esta em `/dashboard-cloudscape-preview`; a rota `/` permanece o dashboard de producao.

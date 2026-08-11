@@ -74,6 +74,10 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 - `SuapeProcessToolkit` (extensao 1.9): painel lateral prefixado por `suape-`, inserido no topo do `<aside class="right">` da página de processos do SUAP, exibindo 4 abas no modo lateral (Resumo, Financeiro, IA e Configurações) e habilitando a 5ª aba (Atalhos) exclusivamente na visualização maximizada (`data-maximized="true"`). O cabeçalho possui botões de Minimizar (`−`/`⌄`) e Maximizar (`⛶`/`🗗`); a troca de tema permanece exclusiva na aba Configurações. Utiliza os tokens e paleta do Design System do SUAP (verde IFRN e superfícies neutras no modo claro/escuro) com distribuição limpa e sem sobreposição de texto.
 - `SuapePlanTableHeaders` (extensão 1.9): cabeçalhos das tabelas originais do Plano de Atividades concluído 8 viram botões de ordenação acessíveis, com indicador visual reforçado. O filtro `Exibir somente atividades com saldo` permanece no card nativo de filtros do SUAP.
 
+### Revisão de documentos SUAP
+
+`siages-suap-document-ai-button` é um botão iconográfico compacto inserido dentro do card nativo do documento. Usa foco visível, `aria-label`, estado de carregamento e os mesmos tokens isolados `--suape-*` do toolkit. O modal de análise é exibido no iframe do SIAGES e mantém a página SUAP ao fundo. Os resultados são somente leitura: achados, fontes, limitações e texto sugerido, sem aplicação automática.
+
 ## Regra pratica
 
 - Filtros: `FilterPanel`.
