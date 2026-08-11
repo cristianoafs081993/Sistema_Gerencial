@@ -59,3 +59,7 @@ Tokens principais:
 - Preservar a paleta verde institucional e as cores analiticas do dashboard.
 - Nao criar componentes visuais ad hoc quando houver componente em `src/components/design-system`.
 - Se uma mudanca alterar comportamento visual real, atualizar este documento e os arquivos em `docs/design-system`.
+
+## Prototipo Cloudscape-inspired isolado
+
+A rota `/dashboard-cloudscape-preview` e um prototipo navegavel separado do dashboard oficial (`/`). Ela combina um shell operacional inspirado no Cloudscape (cabecalho compacto, abas, paineis neutros e filtros em drawer) com os tokens institucionais existentes. Os KPIs, tabelas e filtros consomem o `DataContext` real; os graficos continuam em Recharts para preservar a leitura atual. O prototipo nao altera a navegacao nem o comportamento da rota de producao.

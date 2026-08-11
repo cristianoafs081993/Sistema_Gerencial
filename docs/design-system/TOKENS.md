@@ -59,4 +59,6 @@ Os tokens visuais do antigo `src/manus-stage1.css` foram completamente incorpora
 
 ## Tokens isolados da extensao Suape
 
+Os botões externos aos cards do toolkit, usados na revisão de TR/ETP, repetem os tokens `--suape-bg`, `--suape-surface`, `--suape-border`, `--suape-text`, `--suape-muted`, `--suape-primary` e `--suape-primary-soft` em `.siages-suap-document-ai-slot`. A classe usa `all: initial` e reset local para não receber estilos globais do SUAP; `data-theme="light"` acompanha o tema persistido da extensão.
+
 O arquivo `process-toolkit.css` define tokens semânticos alinhados ao Design System do SUAP sob `#siages-suap-toolkit`: `--suape-bg`, `--suape-surface`, `--suape-surface-2`, `--suape-border`, `--suape-text`, `--suape-muted`, `--suape-primary` (verde IFRN / ciano escuro), `--suape-primary-strong`, `--suape-primary-soft` e `--suape-danger`. O atributo `data-theme="light"` troca estes valores para paletas neutras e verdes oficiais; nenhuma variável global ou regra nativa do SUAP é sobrescrita e a largura permanece 100% contida no `<aside class="right">`.

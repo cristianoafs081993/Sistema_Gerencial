@@ -432,6 +432,10 @@ Opcionais:
 
 - `EMAIL_REPLY_TO` — Endereço de e-mail padrão para respostas dos fornecedores
 
+### Revisão de documentos de licitação
+
+A função `analisar-documento-licitacao` exige `GEMINI_API_KEY`. O modelo pode ser ajustado por `GEMINI_SUAP_DOCUMENT_REVIEW_MODEL`; o padrão versionado é `gemini-2.5-flash`. O PDF recebido é temporário e limitado a 20 MB/200 páginas. A função não usa a base local de normativos e consulta somente fontes oficiais online.
+
 ### Consultor
 
 O frontend chama a function `consultor`, mas a implementacao nao foi localizada neste repo nesta rodada.

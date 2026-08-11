@@ -321,6 +321,14 @@ A página carrega contexto e workspace em consultas separadas; os dados independ
 - O fluxo de itens da requisicao nao aceita um status de cache not_found isolado como vazio definitivo: revalida pela Edge Function e usa o Portal diretamente antes de habilitar o cadastro manual.
 O mesmo fluxo injeta abaixo do acordeao Legenda o acordeao nativo Resumo financeiro por dimensao, calculado pelas quatro colunas financeiras das tabelas originais.
 
+## Revisão de TR e ETP nos cards do SUAP
+
+Nas rotas de processo do SUAP, `process-document.js` observa links de documentos e classifica somente Termo de Referência (`TR`) ou Estudo Técnico Preliminar (`ETP`). O classificador ignora termos de aprovação, anexos e documentos sem identificação segura.
+
+O botão `siages-suap-document-ai-button` é inserido dentro do mesmo card/linha do link original. O clique abre `/suap-extensao/documento-analise`, envia o contexto validado por `postMessage` e responde à solicitação do iframe baixando o documento com os cookies da aba SUAP. O PDF não é gravado no SUAP, storage ou histórico do SIAGES.
+
+A rota estabelece uma sessão efêmera, chama `analisar-documento-licitacao` e exibe achados, sugestões, limitações e fontes. A análise não edita o documento nem consulta `normativos`, `normativos_chunks` ou `buscar_normativos`.
+
 ## Sincronizacao do Plano SUAP no Campus
 
 `/planejamento/campus` carrega os dados locais imediatamente e monta `SuapPlanSyncCard`. Ao entrar, o card chama `sync-suap-plan` em segundo plano; ao concluir, a tabela e recarregada. A primeira captura e uma previa com contagem de novas, atualizadas e arquivadas; a aplicacao ocorre apos a confirmacao do espelho inicial.

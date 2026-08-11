@@ -1,4 +1,5 @@
 import type { SuapPlanSummary } from '@/services/suapPlanSummary';
+import type { SuapDocumentReviewType } from '@/lib/suapDocumentReview';
 import type { SuapProcesso } from '@/types';
 
 export const SUAP_EXTENSION_ORIGIN = 'https://suap.ifrn.edu.br';
@@ -46,6 +47,65 @@ export const SUAP_EXTENSION_PROCESS_PDF_REQUEST_TYPE = 'siages:suap-process-pdf-
 export const SUAP_EXTENSION_PROCESS_PDF_RESULT_TYPE = 'siages:suap-process-pdf-result' as const;
 export const SUAP_EXTENSION_PROCESS_RETRY_TYPE = 'siages:suap-process-retry' as const;
 
+export type SuapExtensionDocumentAnalysisContext = {
+  suapId: string;
+  processNumber?: string;
+  processUrl: string;
+  documentId: string;
+  documentTitle: string;
+  documentType: SuapDocumentReviewType;
+  documentOriginalPath: string;
+  extensionSession?: {
+    accessToken: string;
+    refreshToken: string;
+  };
+};
+
+export type SuapExtensionDocumentAnalysisContextMessage = {
+  source: 'siages-suap-extension';
+  type: 'siages:suap-document-analysis-context';
+  version: 1;
+  payload: SuapExtensionDocumentAnalysisContext;
+};
+
+export const SUAP_EXTENSION_DOCUMENT_ANALYSIS_READY_MESSAGE = {
+  source: 'siages',
+  type: 'siages:suap-document-analysis-ready',
+  version: 1,
+} as const;
+
+export const SUAP_EXTENSION_DOCUMENT_ANALYSIS_CLOSE_MESSAGE = {
+  source: 'siages',
+  type: 'siages:suap-document-analysis-close',
+  version: 1,
+} as const;
+
+export const SUAP_EXTENSION_DOCUMENT_PDF_REQUEST_TYPE = 'siages:suap-document-pdf-request' as const;
+export const SUAP_EXTENSION_DOCUMENT_PDF_RESULT_TYPE = 'siages:suap-document-pdf-result' as const;
+
+export type SuapExtensionDocumentPdfRequestMessage = {
+  source: 'siages';
+  type: typeof SUAP_EXTENSION_DOCUMENT_PDF_REQUEST_TYPE;
+  version: 1;
+  payload: {
+    suapId: string;
+    documentId: string;
+    documentOriginalPath: string;
+  };
+};
+
+export type SuapExtensionDocumentPdfResultMessage = {
+  source: 'siages-suap-extension';
+  type: typeof SUAP_EXTENSION_DOCUMENT_PDF_RESULT_TYPE;
+  version: 1;
+  payload: {
+    suapId: string;
+    documentId: string;
+    bytes?: ArrayBuffer;
+    error?: string;
+  };
+};
+
 export type SuapExtensionProcessSnapshot = {
   process: SuapProcesso | null;
   fallback: {
@@ -85,6 +145,89 @@ export function isValidSuapExtensionProcessPdfResult(
     message.version === 1 &&
     Boolean(payload) &&
     payload?.suapId === expectedSuapId &&
+    (payload.bytes instanceof ArrayBuffer || typeof payload.error === 'string');
+}
+
+const SUPPORTED_DOCUMENT_PATH = /^\/documento_eletronico\/visualizar_documento(?:_digitalizado)?\/(\d+)\/?$/;
+
+export function isValidSuapExtensionDocumentAnalysisContext(value: unknown): value is SuapExtensionDocumentAnalysisContextMessage {
+  if (!value || typeof value !== 'object') return false;
+  const message = value as Partial<SuapExtensionDocumentAnalysisContextMessage>;
+  const payload = message.payload;
+  if (
+    message.source !== 'siages-suap-extension' ||
+    message.type !== 'siages:suap-document-analysis-context' ||
+    message.version !== 1 ||
+    !payload ||
+    typeof payload !== 'object' ||
+    typeof payload.suapId !== 'string' ||
+    !/^\d+$/.test(payload.suapId) ||
+    typeof payload.processUrl !== 'string' ||
+    typeof payload.documentId !== 'string' ||
+    !/^\d+$/.test(payload.documentId) ||
+    typeof payload.documentTitle !== 'string' ||
+    !payload.documentTitle.trim() ||
+    payload.documentTitle.length > 4000 ||
+    (payload.documentType !== 'tr' && payload.documentType !== 'etp') ||
+    typeof payload.documentOriginalPath !== 'string' ||
+    (payload.processNumber !== undefined && typeof payload.processNumber !== 'string') ||
+    (payload.extensionSession !== undefined && (
+      typeof payload.extensionSession !== 'object' ||
+      typeof payload.extensionSession.accessToken !== 'string' ||
+      typeof payload.extensionSession.refreshToken !== 'string' ||
+      !payload.extensionSession.accessToken ||
+      !payload.extensionSession.refreshToken ||
+      payload.extensionSession.accessToken.length > 10000 ||
+      payload.extensionSession.refreshToken.length > 10000
+    ))
+  ) return false;
+
+  try {
+    const processUrl = new URL(payload.processUrl);
+    const documentUrl = new URL(payload.documentOriginalPath, SUAP_EXTENSION_ORIGIN);
+    const processId = SUPPORTED_PROCESS_PATH.exec(processUrl.pathname)?.[1];
+    const documentId = SUPPORTED_DOCUMENT_PATH.exec(documentUrl.pathname)?.[1];
+    const queryKeys = [...documentUrl.searchParams.keys()];
+    return processUrl.origin === SUAP_EXTENSION_ORIGIN &&
+      processId === payload.suapId &&
+      documentUrl.origin === SUAP_EXTENSION_ORIGIN &&
+      documentId === payload.documentId &&
+      queryKeys.length === 1 &&
+      documentUrl.searchParams.get('original') === 'sim';
+  } catch {
+    return false;
+  }
+}
+
+export function getSuapExtensionDocumentAnalysisContext(
+  event: MessageEvent,
+  expectedSource: WindowProxy | null,
+): SuapExtensionDocumentAnalysisContext | null {
+  if (event.origin !== SUAP_EXTENSION_ORIGIN || event.source !== expectedSource || !isValidSuapExtensionDocumentAnalysisContext(event.data)) {
+    return null;
+  }
+  const { extensionSession, ...payload } = event.data.payload;
+  return {
+    ...payload,
+    ...(extensionSession ? { extensionSession } : {}),
+  };
+}
+
+export function isValidSuapExtensionDocumentPdfResult(
+  event: MessageEvent,
+  expectedSource: WindowProxy | null,
+  expectedSuapId: string,
+  expectedDocumentId: string,
+): event is MessageEvent<SuapExtensionDocumentPdfResultMessage> {
+  if (event.origin !== SUAP_EXTENSION_ORIGIN || event.source !== expectedSource) return false;
+  const message = event.data as Partial<SuapExtensionDocumentPdfResultMessage> | null;
+  const payload = message?.payload;
+  return message?.source === 'siages-suap-extension' &&
+    message.type === SUAP_EXTENSION_DOCUMENT_PDF_RESULT_TYPE &&
+    message.version === 1 &&
+    Boolean(payload) &&
+    payload?.suapId === expectedSuapId &&
+    payload?.documentId === expectedDocumentId &&
     (payload.bytes instanceof ArrayBuffer || typeof payload.error === 'string');
 }
 

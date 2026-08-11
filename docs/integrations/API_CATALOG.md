@@ -645,6 +645,15 @@ Observações operacionais:
 
 - O consumo do cache de itens de empenho revalida registros not_found e faz fallback direto ao Portal da Transparencia para evitar que uma falha transitoria oculte subitens reais.
 
+## Revisão normativa de documentos SUAP
+
+`process-document.js` -> iframe `/suap-extensao/documento-analise` -> `analisar-documento-licitacao` -> Gemini `generateContent` com PDF inline e grounding de busca.
+
+- A extensão fornece o PDF diretamente da aba autenticada do SUAP; não envia cookies ao SIAGES ou ao Gemini.
+- O backend aceita somente tipos `tr`/`etp`, autentica o usuário pelo JWT e valida o PDF antes do processamento.
+- Fontes permitidas para citações: Planalto, Portal de Compras do Governo Federal e Imprensa Nacional. A resposta informa data de consulta e limitações.
+- O resultado é efêmero, não altera documentos do SUAP e não depende da base local de normativos.
+
 ## Sincronizacao do Plano SUAP
 
 - Endpoint: `POST /functions/v1/sync-suap-plan`, sempre autenticado pelo JWT do SIAGES.

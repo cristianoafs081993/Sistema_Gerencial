@@ -119,6 +119,10 @@ vi.mock('@/pages/SuapExtensionProcessInfo', () => ({
   default: () => <div>suap-extension-process-info-page</div>,
 }));
 
+vi.mock('@/pages/SuapExtensionDocumentAnalysis', () => ({
+  default: () => <div>suap-extension-document-analysis-page</div>,
+}));
+
 vi.mock('@/pages/SuapExtensionPlanSummary', () => ({
   default: () => <div>suap-extension-plan-summary-page</div>,
 }));
@@ -235,6 +239,15 @@ describe('App routes', () => {
     render(<App />);
 
     expect(await screen.findByText('suap-extension-process-info-page')).toBeInTheDocument();
+    expect(screen.queryByTestId('app-layout')).not.toBeInTheDocument();
+  });
+
+  it('renderiza a rota leve de analise de documento SUAP sem layout global', async () => {
+    window.history.pushState({}, '', '/suap-extensao/documento-analise');
+
+    render(<App />);
+
+    expect(await screen.findByText('suap-extension-document-analysis-page')).toBeInTheDocument();
     expect(screen.queryByTestId('app-layout')).not.toBeInTheDocument();
   });
 

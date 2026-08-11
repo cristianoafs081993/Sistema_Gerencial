@@ -715,6 +715,17 @@ Para a automacao do Gmail:
 
 - A leitura inicial do cache de itens revalida status not_found pela function e confirma o vazio via consulta direta quando necessario.
 
+## analisar-documento-licitacao
+
+Function versionada para revisão temporária de Termo de Referência e Estudo Técnico Preliminar recebidos da extensão SUAP.
+
+- `verify_jwt = false` no `supabase/config.toml`; a função valida o bearer token internamente com `supabase.auth.getUser`.
+- Recebe `documentType`, `documentTitle`, `processNumber`, `pageCount` opcional e `pdfBase64` de até 20 MB/200 páginas.
+- Usa PDF inline no Gemini com grounding de busca e limita as fontes aos domínios oficiais `planalto.gov.br`, `gov.br` e `in.gov.br`.
+- Não consulta nem persiste dados em `normativos`, `normativos_chunks`, `buscar_normativos`, storage ou tabelas de histórico.
+- Retorna status, resumo, achados com severidade/página, texto sugerido, bases legais, fontes consultadas e limitações.
+- O segredo `GEMINI_API_KEY` e o modelo opcional `GEMINI_SUAP_DOCUMENT_REVIEW_MODEL` são lidos apenas no ambiente da Edge Function.
+
 ## sync-suap-plan
 
 - Funcao autenticada para sincronizar o Plano 8 do SUAP com a visao Campus do SIAGES.
