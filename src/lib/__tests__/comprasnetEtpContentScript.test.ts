@@ -32,4 +32,14 @@ describe('content script do ETP Comprasnet', () => {
     const fields = await testWindow.__siagesComprasnetEtp?.collectFields('current');
     expect(fields).toEqual([{ id: 'necessidade', title: 'Descrição da necessidade', existingHtml: '<p>Conteúdo atual</p>', existingText: 'Conteúdo atual' }]);
   });
+
+  it('não insere o botão em uma cópia oculta das ações', () => {
+    document.body.innerHTML = '<main><h1>Estudo Técnico Preliminar</h1><div style="display:none"><button class="br-button">Concluir ETP</button></div><div id="visible-actions"><button class="br-button primary">Concluir ETP</button></div></main>';
+    window.eval(readFileSync(extensionFixturePath('comprasnet-etp.js'), 'utf8'));
+    const testWindow = window as typeof window & { __siagesComprasnetEtp?: { install: () => void } };
+    testWindow.__siagesComprasnetEtp?.install();
+
+    expect(document.querySelector('#visible-actions #siages-comprasnet-etp-open')).toBeTruthy();
+    expect(document.querySelector('div[style="display:none"] #siages-comprasnet-etp-open')).toBeNull();
+  });
 });

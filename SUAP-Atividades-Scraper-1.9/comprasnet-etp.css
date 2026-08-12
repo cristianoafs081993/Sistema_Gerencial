@@ -9,6 +9,9 @@
 }
 
 #siages-comprasnet-etp-open {
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
   margin-left: .5rem;
   white-space: nowrap;
 }
@@ -52,4 +55,3 @@
   #siages-comprasnet-etp-modal { width: 100vw; height: 100vh; border-radius: 0; }
   #siages-comprasnet-etp-open { margin-left: 0; margin-top: .5rem; }
 }
-

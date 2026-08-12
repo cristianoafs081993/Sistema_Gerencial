@@ -56,6 +56,15 @@
     return element;
   }
 
+  function isVisible(element) {
+    if (!element || !element.isConnected) return false;
+    for (let current = element; current && current !== document.documentElement; current = current.parentElement) {
+      const style = getComputedStyle(current);
+      if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+    }
+    return true;
+  }
+
   function sendToFrame(type, payload) {
     if (!iframe?.contentWindow) return;
     iframe.contentWindow.postMessage({ source: 'siages', type, version: 1, payload }, SIAGES_ORIGIN);
@@ -358,10 +367,12 @@
     openButton.setAttribute('aria-label', 'Escrever ETP com inteligência artificial');
     openButton.addEventListener('click', openModal);
 
-    const conclude = Array.from(document.querySelectorAll('button, .br-button')).find((element) => normalize(element.textContent).toLowerCase().includes('concluir etp'));
+    const concludeCandidates = Array.from(document.querySelectorAll('button, .br-button'))
+      .filter((element) => normalize(element.textContent).toLowerCase().includes('concluir etp'));
+    const conclude = concludeCandidates.find(isVisible);
     if (conclude?.parentElement) conclude.parentElement.insertBefore(openButton, conclude);
     else {
-      const heading = Array.from(document.querySelectorAll('h1,h2,h3')).find((element) => normalize(element.textContent).toLowerCase().includes('estudo técnico preliminar'));
+      const heading = Array.from(document.querySelectorAll('h1,h2,h3')).find((element) => isVisible(element) && normalize(element.textContent).toLowerCase().includes('estudo técnico preliminar'));
       (heading?.parentElement || document.body).appendChild(openButton);
     }
 
