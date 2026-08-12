@@ -31,6 +31,54 @@ function storageArea(values: Record<string, unknown>) {
   };
 }
 
+function authRuntime(chromeApi: { storage: { local: ReturnType<typeof storageArea> } }) {
+  return {
+    lastError: undefined,
+    sendMessage: vi.fn((message: { type: string; email?: string; password?: string }, callback: (response: unknown) => void) => {
+      void (async () => {
+        try {
+          if (message.type === 'get-session') {
+            callback({ ok: true, session: localValues['siages-extension-session'] || null });
+            return;
+          }
+          if (message.type === 'sign-out') {
+            await new Promise<void>((resolve) => chromeApi.storage.local.remove('siages-extension-session', resolve));
+            callback({ ok: true, session: null });
+            return;
+          }
+          if (message.type !== 'sign-in') {
+            callback({ ok: false, error: 'Operação de autenticação desconhecida.' });
+            return;
+          }
+
+          const response = await fetch('https://mnqhwyrzhgykjlyyqodd.supabase.co/auth/v1/token?grant_type=password', {
+            method: 'POST',
+            body: JSON.stringify({ email: message.email, password: message.password }),
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            const code = String(payload?.error || payload?.code || '').toLowerCase();
+            const error = response.status === 400 || response.status === 401 || code === 'invalid_grant' || code === 'invalid_credentials'
+              ? 'E-mail ou senha do SIAGES inválidos. Confirme o acesso no SIAGES ou redefina a senha.'
+              : `Não foi possível autenticar no SIAGES (HTTP ${response.status}).`;
+            callback({ ok: false, error });
+            return;
+          }
+          const session = {
+            accessToken: payload.access_token,
+            refreshToken: payload.refresh_token,
+            expiresAt: Math.floor(Date.now() / 1000) + Number(payload.expires_in || 3600),
+          };
+          await new Promise<void>((resolve) => chromeApi.storage.local.set({ 'siages-extension-session': session }, resolve));
+          callback({ ok: true, session });
+        } catch (error) {
+          callback({ ok: false, error: error instanceof Error ? error.message : String(error) });
+        }
+      })();
+    }),
+  };
+}
+
 function loadProcessScript() {
   const testWindow = window as typeof window & {
     __SIAGES_SUAP_PROCESS_TEST__?: boolean;
@@ -38,9 +86,11 @@ function loadProcessScript() {
     chrome?: unknown;
   };
   testWindow.__SIAGES_SUAP_PROCESS_TEST__ = true;
-  testWindow.chrome = {
+  const chromeApi = {
     storage: { local: storageArea(localValues), sync: storageArea(syncValues), onChanged: { addListener: vi.fn() } },
   };
+  testWindow.chrome = { ...chromeApi, runtime: authRuntime(chromeApi) };
+  window.eval(readFileSync(extensionFixturePath('extension-auth-client.js'), 'utf8'));
   window.eval(readFileSync(extensionFixturePath('process-document.js'), 'utf8'));
   if (!testWindow.__siagesSuapProcessDocument) throw new Error('Content script nao carregado.');
   return testWindow.__siagesSuapProcessDocument;
@@ -72,6 +122,7 @@ describe('process-document 1.9', () => {
     (testWindow.__siagesSuapProcessDocument as ExtensionApi | undefined)?.disposeDocumentAnalysis?.();
     delete testWindow.__SIAGES_SUAP_PROCESS_TEST__;
     delete testWindow.__siagesSuapProcessDocument;
+    delete testWindow.SiagesExtensionAuth;
     delete testWindow.chrome;
     document.body.innerHTML = '';
     vi.restoreAllMocks();
@@ -372,7 +423,7 @@ describe('process-document 1.9', () => {
     await waitFor(() => expect(localValues['siages-extension-session']).toMatchObject({
       accessToken: 'novo-access', refreshToken: 'novo-refresh',
     }));
-    expect(form.querySelector('[data-auth-message]')).toHaveTextContent('Sessão ativa.');
+    await waitFor(() => expect(form.querySelector('[data-auth-message]')).toHaveTextContent('Sessão ativa.'));
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/auth/v1/token?grant_type=password'), expect.objectContaining({ method: 'POST' }));
   });
 

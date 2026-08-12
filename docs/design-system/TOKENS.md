@@ -57,6 +57,17 @@ Os tokens visuais do antigo `src/manus-stage1.css` foram completamente incorpora
 - `table-pagination`: rodapé de tabela paginada com layout otimizado.
 - `Layout`: sidebar global com indicador lateral verde no link ativo, cabeçalhos de grupo em caixa alta e cabeçalho com efeito de vidro.
 
+## Tokens dinâmicos do Comprasnet
+
+O painel `ComprasnetEtpAssistant` não reutiliza tokens `--suape-*` nem os tokens globais do GovAnalytics. O content script lê os valores computados de `body`, botões `br-button` e campos nativos da página oficial e envia ao iframe:
+
+- `--comprasnet-font-family` e `--comprasnet-font-size`;
+- `--comprasnet-text`, `--comprasnet-muted`, `--comprasnet-surface` e `--comprasnet-background`;
+- `--comprasnet-border`, `--comprasnet-primary`, `--comprasnet-primary-text`;
+- `--comprasnet-secondary`, `--comprasnet-secondary-text`, `--comprasnet-focus` e `--comprasnet-radius`.
+
+Os valores possuem fallback neutro para testes e alterações de versão do site. O namespace é restrito à rota `/comprasnet-extensao/etp` e não altera variáveis globais do Comprasnet.
+
 ## Tokens isolados da extensao Suape
 
 Os botões externos aos cards do toolkit, usados na revisão de TR/ETP, repetem os tokens `--suape-bg`, `--suape-surface`, `--suape-border`, `--suape-text`, `--suape-muted`, `--suape-primary` e `--suape-primary-soft` em `.siages-suap-document-ai-slot`. A classe usa `all: initial` e reset local para não receber estilos globais do SUAP; `data-theme="light"` acompanha o tema persistido da extensão.

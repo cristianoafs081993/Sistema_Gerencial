@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Suape - Canivete Suico do IFRN",
-  "version": "1.9.17",
-  "description": "Resumo de processos, dados financeiros, atalhos e documentos com IA dentro do SUAP.",
+  "version": "1.9.20",
+  "description": "Resumo de processos, dados financeiros, atalhos e documentos com IA no SUAP e no Comprasnet.",
   "permissions": [
     "activeTab",
     "scripting",
@@ -49,6 +49,7 @@
         "process-toolkit.css"
       ],
       "js": [
+        "extension-auth-client.js",
         "process-document.js"
       ],
       "run_at": "document_idle"
@@ -58,6 +59,7 @@
         "https://suap.ifrn.edu.br/plan_estrategico/plano_concluido/8/"
       ],
       "js": [
+        "extension-auth-client.js",
         "plan-summary.js"
       ],
       "run_at": "document_idle"
@@ -70,7 +72,19 @@
         "siages-plan-sync.js"
       ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://cnetmobile.estaleiro.serpro.gov.br/comprasnet-artefatos-web/artefatos/edit/*"
+      ],
+      "css": [
+        "comprasnet-etp.css"
+      ],
+      "js": [
+        "extension-auth-client.js",
+        "comprasnet-etp.js"
+      ],
+      "run_at": "document_idle"
     }
   ]
 }
-

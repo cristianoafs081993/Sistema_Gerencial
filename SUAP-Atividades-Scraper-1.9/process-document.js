@@ -7,9 +7,7 @@
   const BRIDGE_FRAME_ID = 'siages-suap-finance-frame';
   const FINANCE_PANEL_ID = 'siages-suap-finance-panel';
   const SIAGES_ORIGIN = 'https://www.siages.com.br';
-  const SUPABASE_URL = 'https://mnqhwyrzhgykjlyyqodd.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ucWh3eXJ6aGd5a2pseXlxb2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNzk4NjIsImV4cCI6MjA4NTg1NTg2Mn0.g9h5nF0l8yKG-yjQRI8i_mq084IzKTrH64F2FpreVIg';
-  const SESSION_KEY = 'siages-extension-session';
   const THEME_KEY = 'siages-toolkit-theme';
   const COLLAPSED_KEY = 'siages-toolkit-collapsed';
   const SNIPPETS_KEY = 'siages-snippets';
@@ -113,13 +111,6 @@
       storage.set(values, resolve);
     });
   }
-  function storageRemove(area, key) {
-    return new Promise((resolve) => {
-      const storage = globalThis.chrome?.storage?.[area];
-      if (!storage?.remove) return resolve();
-      storage.remove(key, resolve);
-    });
-  }
   function isExtensionContextInvalidated(error) {
     return String(error?.message || error || '').toLowerCase().includes('extension context invalidated');
   }
@@ -127,21 +118,10 @@
     if (isExtensionContextInvalidated(error)) return 'A extens\u00e3o foi atualizada. Recarregue a p\u00e1gina do SUAP e tente novamente.';
     return error instanceof Error ? error.message : 'Falha na autenticacao.';
   }
-  function getInvalidCredentialsMessage() {
-    return 'E-mail ou senha do SIAGES inv\u00e1lidos. Confirme o acesso no SIAGES ou redefina a senha.';
-  }
   async function getExtensionSession() {
-    const storedSession = await storageGet('local', SESSION_KEY, null);
-    if (!storedSession?.accessToken || !storedSession?.refreshToken) throw new Error('Entre no SIAGES pela aba Configurações.');
-    if (Number(storedSession.expiresAt || 0) > (Date.now() / 1000) + 60) return storedSession;
-    const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
-      method: 'POST', headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: storedSession.refreshToken }),
-    });
-    if (!response.ok) throw new Error('A sessão expirou. Entre novamente na aba Configurações.');
-    const payload = await response.json();
-    const session = { accessToken: payload.access_token, refreshToken: payload.refresh_token, expiresAt: Math.floor(Date.now() / 1000) + Number(payload.expires_in || 3600) };
-    await storageSet('local', { [SESSION_KEY]: session });
+    if (!globalThis.SiagesExtensionAuth?.getSession) throw new Error('O serviço de autenticação da extensão não está disponível.');
+    const session = await globalThis.SiagesExtensionAuth.getSession();
+    if (!session?.accessToken || !session?.refreshToken) throw new Error('Entre no SIAGES pela aba Configurações.');
     return session;
   }
   function buildContext(session) {
@@ -535,12 +515,16 @@
     isolateAuthFormLayout(form); form.addEventListener('submit', signIn); form.querySelector('[data-signout]').addEventListener('click', signOut); authSection.appendChild(form); container.appendChild(authSection); void updateAuthStatus(form);
   }
   async function updateAuthStatus(form) {
-    const message = form.querySelector('[data-auth-message]'); const session = await storageGet('local', SESSION_KEY, null);
+    const requestId = String(Number(form.dataset.authStatusRequest || 0) + 1);
+    form.dataset.authStatusRequest = requestId;
+    const message = form.querySelector('[data-auth-message]'); const session = await globalThis.SiagesExtensionAuth?.getSession();
+    if (form.dataset.authStatusRequest !== requestId) return;
     message.dataset.state = session?.accessToken ? 'success' : '';
     message.textContent = session?.accessToken ? 'Sessão ativa. Os dados usam as permissões do seu usuário.' : 'Entre para consultar e sincronizar processos.';
   }
   async function signIn(event) {
     event.preventDefault(); const form = event.currentTarget; const message = form.querySelector('[data-auth-message]'); const button = form.querySelector('button[type="submit"]');
+    form.dataset.authStatusRequest = String(Number(form.dataset.authStatusRequest || 0) + 1);
     const emailInput = form.querySelector('input[name="email"]'); const passwordInput = form.querySelector('input[name="password"]');
     const email = emailInput?.value.trim() || ''; const password = passwordInput?.value || '';
     message.dataset.state = 'error';
@@ -548,19 +532,12 @@
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { message.textContent = 'Use o e-mail cadastrado no SIAGES. A matrícula do SUAP não autentica neste campo.'; return; }
     button.disabled = true; message.dataset.state = 'loading'; message.textContent = 'Autenticando...';
     try {
-      const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, { method: 'POST', headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        const code = String(payload?.error || payload?.code || '').toLowerCase();
-        if (response.status === 400 || response.status === 401 || code === 'invalid_grant' || code === 'invalid_credentials') throw new Error(getInvalidCredentialsMessage());
-        throw new Error(`Não foi possível autenticar no SIAGES (HTTP ${response.status}).`);
-      }
-      if (!payload.access_token || !payload.refresh_token) throw new Error('O SIAGES não devolveu uma sessão válida.');
-      await storageSet('local', { [SESSION_KEY]: { accessToken: payload.access_token, refreshToken: payload.refresh_token, expiresAt: Math.floor(Date.now() / 1000) + Number(payload.expires_in || 3600) } });
+      if (!globalThis.SiagesExtensionAuth?.signIn) throw new Error('O serviço de autenticação da extensão não está disponível.');
+      await globalThis.SiagesExtensionAuth.signIn(email, password);
       if (passwordInput) passwordInput.value = ''; message.dataset.state = 'success'; message.textContent = 'Sessão ativa.'; restartBridge();
     } catch (error) { message.dataset.state = 'error'; message.textContent = formatAuthError(error); } finally { button.disabled = false; }
   }
-  async function signOut(event) { const form = event.currentTarget.closest('form'); await storageRemove('local', SESSION_KEY); const message = form.querySelector('[data-auth-message]'); message.dataset.state = ''; message.textContent = 'Sessão encerrada.'; }
+  async function signOut(event) { const form = event.currentTarget.closest('form'); const message = form.querySelector('[data-auth-message]'); try { if (!globalThis.SiagesExtensionAuth?.signOut) throw new Error('O serviço de autenticação da extensão não está disponível.'); await globalThis.SiagesExtensionAuth.signOut(); message.dataset.state = ''; message.textContent = 'Sessão encerrada.'; } catch (error) { message.dataset.state = 'error'; message.textContent = formatAuthError(error); } }
 
   function closeModal() { document.getElementById(MODAL_ID)?.remove(); }
 

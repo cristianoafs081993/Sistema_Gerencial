@@ -631,6 +631,16 @@ Observações operacionais:
 - quando não houver segredo ou a chamada Gemini falhar, a ordenação heurística determinística continua funcionando;
 - a function exige sessão Supabase autenticada e limita a chamada a 25 itens.
 
+## gerar-etp-comprasnet
+
+Function chamada pela extensão na rota oficial de edição de ETP.
+
+- Entrada: objeto/contexto manual, processo opcional, questionário geral com 13 seções textuais, conteúdo existente e snippets de processo/anexos.
+- Saída: prévia com seções, alertas, pendências, campos e modelo utilizado.
+- Usa Gemini `gemini-2.5-flash-lite` com fallback para `gemini-2.5-flash`; sem chave, retorna rascunho local determinístico.
+- Não grava anexos, textos gerados, campos estruturados ou status de conclusão.
+- A extensão sanitiza o HTML e controla a aplicação; a function nunca acessa o certificado ou a sessão do Comprasnet.
+
 ## Ponte da extensao Suape 1.9
 
 - Origem SIAGES fixa: `https://www.siages.com.br`.
@@ -639,6 +649,7 @@ Observações operacionais:
 - PDF: o iframe solicita a geracao ao content script; a resposta aceita somente a origem, a janela e o `suapId` esperados e transporta um `ArrayBuffer`, nunca tokens.
 - Persistencia: `suapScraperService.storePdfBytesForProcess` grava o PDF no bucket existente `suap-pdfs`; a fila continua sendo a Edge Function existente `process-pdf`.
 - Autenticacao da extensao: o popup e o painel usam o grant `password` de `/auth/v1/token` com a mesma anon key vigente do projeto; o campo deve receber o e-mail cadastrado no Supabase Auth do SIAGES (nao a matricula do SUAP). Respostas `401` sao exibidas como credencial SIAGES recusada.
+- Persistencia da sessao (extensao 1.9.20): o service worker e o unico responsavel por renovar o `refresh_token`, com serializacao para impedir renovacoes concorrentes. A sessao permanece armazenada em falhas de rede ou de renovacao e so e removida pelo logout explicito.
 - Nao foram adicionados endpoints, migrations ou Edge Functions.
 
 - O callback suap-token-exchange tambem procura a matricula normalizada em registros legados de terceirizados; perfis do grupo terceirizado sao direcionados a /requisicao-compra. Na consulta de requisicao, a ausencia de cache de liquidacoes dispara atualizacao assincrona e nao bloqueia a exibicao do saldo base do subitem.

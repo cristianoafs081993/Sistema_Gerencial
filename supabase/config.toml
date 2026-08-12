@@ -22,6 +22,9 @@ verify_jwt = false
 [functions.gerar-etp-servicos-continuos]
 verify_jwt = false
 
+[functions.gerar-etp-comprasnet]
+verify_jwt = false
+
 [functions.sugerir-respostas-etp-servicos-continuos]
 verify_jwt = false
 

@@ -113,9 +113,18 @@ Rollout: executar A/B manual em 10 processos de pagamento representativos. Promo
 - O mesmo teste simula o worker do pdf.js desanexando o `ArrayBuffer`; o fluxo deve preservar uma cópia para a contagem de páginas e outra para a codificação do PDF.
 - Antes do deploy, validar manualmente um TR, um ETP, um termo de aprovação, um PDF inválido, sessão ausente, documento acima de 20 MB e PDF acima de 200 páginas.
 
+## Regressao da extensao Comprasnet ETP
+
+- `comprasnetEtpQuestionnaire.test.ts` protege o questionário geral e a exclusão de campos estruturados.
+- `comprasnetEtpContentScript.test.ts` verifica injeção única, preservação do `body`, leitura do CKEditor e ausência de acionamento de `Concluir ETP`.
+- `suapExtensionPackage.test.ts` verifica o manifesto, a rota oficial do Comprasnet, o CSS isolado e os scripts da extensão.
+- A validação manual deve cobrir seção atual, ETP completo, campo preenchido, campo vazio, sessão expirada, autosave ausente, anexos e viewport estreito.
+
 ## Regressao da extensao Suape
 
 A pasta corrente e centralizada por `src/test/extensionFixtures.ts`. As suites `suapExtensionPackage`, `suapProcessDocumentExtension`, `suapTextExpander`, `suapExtensionDispatch`, `SuapExtensionProcessInfo`, `suapPlanContentScript` e `suapCloneAutomation` protegem manifesto e rotas, painel de processo, bridge segura, sincronizacao, Financeiro, atalhos, popup, Plano de Atividades e clonagem.
+
+- `suapExtensionAuth.test.ts` cobre a sessão persistente da extensão: renovação concorrente serializada, preservação da sessão quando a renovação falha e logout explícito durante uma renovação em andamento. `suapExtensionPackage.test.ts` também garante que o service worker, o popup e os content scripts usem a mesma anon key do projeto.
 
 - No Plano de Atividades concluído 8, cobrir a ordenação nos cabeçalhos das tabelas originais e o checkbox `Exibir somente atividades com saldo` inserido no card nativo de filtros, sem esconder linhas com saldo positivo.
 

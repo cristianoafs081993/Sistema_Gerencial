@@ -728,6 +728,14 @@ Function versionada para revisão temporária de Termo de Referência e Estudo T
 - Retorna status, resumo, achados com severidade/página, texto sugerido, bases legais, fontes consultadas e limitações.
 - Os segredos `OPENAI_API_KEY` e `GEMINI_API_KEY`, além dos modelos opcionais, são lidos apenas no ambiente da Edge Function.
 
+## gerar-etp-comprasnet
+
+- Function versionada para gerar prévias gerais de ETP destinadas à revisão na extensão do Comprasnet.
+- Recebe somente JSON com processo opcional, objeto, perguntas, respostas existentes e snippets de contexto.
+- Usa `GEMINI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`; o modelo padrão é `gemini-2.5-flash-lite`, com fallback para `gemini-2.5-flash`.
+- Não cria tabelas, migrations, arquivos ou histórico permanente.
+- Após alterações, publicar com `supabase functions deploy gerar-etp-comprasnet`.
+
 ## sync-suap-plan
 
 - Funcao autenticada para sincronizar o Plano 8 do SUAP com a visao Campus do SIAGES.

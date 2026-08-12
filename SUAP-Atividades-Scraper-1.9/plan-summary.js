@@ -12,7 +12,6 @@
   const LEGACY_SIAGES_APP_ORIGIN = 'https://sistema-gerencial-gamma.vercel.app';
   const SUPABASE_URL = 'https://mnqhwyrzhgykjlyyqodd.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ucWh3eXJ6aGd5a2pseXlxb2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNzk4NjIsImV4cCI6MjA4NTg1NTg2Mn0.g9h5nF0l8yKG-yjQRI8i_mq084IzKTrH64F2FpreVIg';
-  const EXTENSION_SESSION_STORAGE_KEY = 'siages-extension-session';
   const PLAN_PATH = /^\/plan_estrategico\/plano_concluido\/8\/?$/;
   const BALANCE_LABEL = 'saldo disponivel para empenho da atividade r';
   const DIMENSION_CODES = new Set(['AD', 'AE', 'CI', 'EN', 'EX', 'GE', 'GO', 'GP', 'IE', 'IN', 'PI', 'TI']);
@@ -475,67 +474,13 @@
     return { tableCount: tables.length, ...applyPlanTableFilters() };
   }
 
-  function getStoredValue(key) {
-    return new Promise((resolve) => {
-      if (!window.chrome?.storage?.local?.get) {
-        resolve(undefined);
-        return;
-      }
-      chrome.storage.local.get(key, (stored) => resolve(stored?.[key]));
-    });
-  }
-
-  function setStoredValue(key, value) {
-    return new Promise((resolve) => {
-      if (!window.chrome?.storage?.local?.set) {
-        resolve();
-        return;
-      }
-      chrome.storage.local.set({ [key]: value }, resolve);
-    });
-  }
-
-  function removeStoredValue(key) {
-    return new Promise((resolve) => {
-      if (!window.chrome?.storage?.local?.remove) {
-        resolve();
-        return;
-      }
-      chrome.storage.local.remove(key, resolve);
-    });
-  }
-
-  async function refreshExtensionSession(refreshToken) {
-    const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
-      method: 'POST',
-      headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    });
-    if (!response.ok) throw new Error('A sessão da extensão expirou. Abra o popup e entre novamente.');
-    const payload = await response.json();
-    const session = {
-      accessToken: payload.access_token,
-      refreshToken: payload.refresh_token,
-      expiresAt: Math.floor(Date.now() / 1000) + Number(payload.expires_in || 3600),
-    };
-    await setStoredValue(EXTENSION_SESSION_STORAGE_KEY, session);
-    return session;
-  }
-
   async function getExtensionSession() {
-    const session = await getStoredValue(EXTENSION_SESSION_STORAGE_KEY);
-    if (!session?.accessToken || !session?.refreshToken) {
+    if (!globalThis.SiagesExtensionAuth?.getSession) throw new Error('O serviço de autenticação da extensão não está disponível.');
+    const currentSession = await globalThis.SiagesExtensionAuth.getSession();
+    if (!currentSession?.accessToken || !currentSession?.refreshToken) {
       throw new Error('Autentique a extensão no popup para consultar os dados do banco.');
     }
-    if (Number(session.expiresAt || 0) <= (Date.now() / 1000) + 60) {
-      try {
-        return await refreshExtensionSession(session.refreshToken);
-      } catch (error) {
-        await removeStoredValue(EXTENSION_SESSION_STORAGE_KEY);
-        throw error;
-      }
-    }
-    return session;
+    return currentSession;
   }
 
   async function fetchTableRows(table, select, order, session) {
@@ -552,8 +497,7 @@
       });
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
-          await removeStoredValue(EXTENSION_SESSION_STORAGE_KEY);
-          throw new Error('A sessão da extensão não tem acesso a estes dados. Entre novamente no popup.');
+          throw new Error('A sessão da extensão não tem acesso a estes dados. Verifique as permissões do usuário ou tente novamente.');
         }
         throw new Error(`Falha ao consultar ${table} no banco (${response.status}).`);
       }
