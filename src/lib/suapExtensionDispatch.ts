@@ -55,6 +55,7 @@ export type SuapExtensionDocumentAnalysisContext = {
   documentTitle: string;
   documentType: SuapDocumentReviewType;
   documentOriginalPath: string;
+  reviewMode?: 'latest';
   extensionSession?: {
     accessToken: string;
     refreshToken: string;
@@ -170,6 +171,7 @@ export function isValidSuapExtensionDocumentAnalysisContext(value: unknown): val
     payload.documentTitle.length > 4000 ||
     (payload.documentType !== 'tr' && payload.documentType !== 'etp') ||
     typeof payload.documentOriginalPath !== 'string' ||
+    (payload.reviewMode !== undefined && payload.reviewMode !== 'latest') ||
     (payload.processNumber !== undefined && typeof payload.processNumber !== 'string') ||
     (payload.extensionSession !== undefined && (
       typeof payload.extensionSession !== 'object' ||

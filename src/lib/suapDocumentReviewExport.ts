@@ -114,22 +114,62 @@ export function downloadSuapDocumentReview(result: SuapDocumentReviewResult, doc
   URL.revokeObjectURL(url);
 }
 
-export function printSuapDocumentReview(result: SuapDocumentReviewResult, documentTitle: string) {
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) return false;
-  printWindow.opener = null;
-
+function printHtmlInWindow(printWindow: Window, html: string) {
   let printed = false;
   const print = () => {
     if (printed) return;
-    printed = true;
-    printWindow.focus();
-    printWindow.print();
+    try {
+      printWindow.focus();
+      printWindow.print();
+      printed = true;
+    } catch {
+      // Alguns navegadores só liberam a impressão depois que a janela termina de carregar.
+    }
   };
   printWindow.addEventListener('load', print, { once: true });
   printWindow.document.open();
-  printWindow.document.write(buildSuapDocumentReviewHtml(result, documentTitle));
+  printWindow.document.write(html);
   printWindow.document.close();
+  print();
   window.setTimeout(print, 250);
+}
+
+function printHtmlInHiddenFrame(html: string) {
+  const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.position = 'fixed';
+  frame.style.width = '1px';
+  frame.style.height = '1px';
+  frame.style.border = '0';
+  frame.style.opacity = '0';
+  frame.style.pointerEvents = 'none';
+  let printed = false;
+  const print = () => {
+    if (printed) return;
+    try {
+      frame.contentWindow?.focus();
+      frame.contentWindow?.print();
+      printed = true;
+      window.setTimeout(() => frame.remove(), 2000);
+    } catch {
+      // Alguns navegadores liberam a impressão somente depois do carregamento do iframe.
+    }
+  };
+  frame.addEventListener('load', print, { once: true });
+  document.body.appendChild(frame);
+  frame.contentDocument?.open();
+  frame.contentDocument?.write(html);
+  frame.contentDocument?.close();
+  window.setTimeout(print, 250);
+}
+export function printSuapDocumentReview(result: SuapDocumentReviewResult, documentTitle: string) {
+  const html = buildSuapDocumentReviewHtml(result, documentTitle);
+  const printWindow = window.open('', '_blank');
+  if (printWindow) {
+    printHtmlInWindow(printWindow, html);
+    return true;
+  }
+
+  printHtmlInHiddenFrame(html);
   return true;
 }

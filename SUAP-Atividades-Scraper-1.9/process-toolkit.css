@@ -231,6 +231,7 @@ textarea.suape-input { min-height: 72px; resize: vertical; }
   all: initial;
   display: inline-flex !important;
   align-items: center !important;
+  gap: 6px !important;
   vertical-align: middle !important;
   margin: 0 0 0 8px !important;
   font: 13px/1.45 Inter, system-ui, -apple-system, "Segoe UI", sans-serif !important;

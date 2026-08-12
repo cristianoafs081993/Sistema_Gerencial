@@ -117,6 +117,8 @@ describe('process-document 1.9', () => {
     const card = document.getElementById('document-card')!;
     expect(card.querySelectorAll('.siages-suap-document-ai-slot')).toHaveLength(1);
     expect(card.querySelector('.siages-suap-document-ai-button')).toHaveAttribute('aria-label', 'Analisar Termo de Referência com IA');
+    expect(card.querySelectorAll('.siages-suap-document-ai-button')).toHaveLength(2);
+    expect(card.querySelector('[data-action="view-saved-analysis"]')).toHaveAttribute('aria-label', 'Consultar última análise salva de Termo de Referência');
     expect(card.querySelector('.siages-suap-document-ai-slot')?.previousElementSibling).toBe(card.querySelector('a'));
     expect(document.querySelectorAll('.siages-suap-document-ai-slot')).toHaveLength(1);
 
@@ -274,6 +276,7 @@ describe('process-document 1.9', () => {
     api.openModal();
     expect(document.querySelectorAll('#siages-suap-dispatch-modal')).toHaveLength(1);
     expect(document.getElementById('siages-suap-dispatch-frame')).toBeTruthy();
+    expect(document.querySelector('#siages-suap-dispatch-modal button')).toBeNull();
     api.closeModal();
     expect(document.getElementById('siages-suap-dispatch-modal')).toBeNull();
   });

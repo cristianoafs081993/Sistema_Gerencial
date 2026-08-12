@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import SuapExtensionDocumentAnalysis from '@/pages/SuapExtensionDocumentAnalysis';
 import { isValidSuapExtensionDocumentPdfResult, SUAP_EXTENSION_ORIGIN } from '@/lib/suapExtensionDispatch';
@@ -8,8 +8,9 @@ const mocks = vi.hoisted(() => ({
   setSession: vi.fn(),
   stopAutoRefresh: vi.fn(),
   analyzeSuapDocument: vi.fn(),
+  getLatestSuapDocumentReview: vi.fn(),
 }));
-const { setSession, stopAutoRefresh, analyzeSuapDocument } = mocks;
+const { setSession, stopAutoRefresh, analyzeSuapDocument, getLatestSuapDocumentReview } = mocks;
 
 vi.mock('@/lib/supabase', () => ({
   supabase: { auth: { setSession: mocks.setSession, stopAutoRefresh: mocks.stopAutoRefresh } },
@@ -19,6 +20,7 @@ vi.mock('@/services/suapDocumentReview', () => ({
   SUAP_DOCUMENT_REVIEW_MAX_BYTES: 20 * 1024 * 1024,
   SUAP_DOCUMENT_REVIEW_MAX_PAGES: 200,
   analyzeSuapDocument: mocks.analyzeSuapDocument,
+  getLatestSuapDocumentReview: mocks.getLatestSuapDocumentReview,
 }));
 
 vi.mock('pdfjs-dist', () => ({
@@ -30,9 +32,12 @@ vi.mock('pdfjs-dist', () => ({
 }));
 
 describe('SuapExtensionDocumentAnalysis', () => {
+  afterEach(() => window.localStorage.clear());
+
   beforeEach(() => {
     vi.clearAllMocks();
     setSession.mockResolvedValue({ data: { session: { user: { id: 'user-1' } } }, error: null });
+    getLatestSuapDocumentReview.mockResolvedValue(null);
     analyzeSuapDocument.mockResolvedValue({
       documentType: 'tr', checkedAt: '2026-08-10T12:00:00.000Z', status: 'attention',
       summary: 'O documento precisa de ajustes.',
@@ -82,8 +87,40 @@ describe('SuapExtensionDocumentAnalysis', () => {
     expect(screen.getByText('A quantidade foi calculada...')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Baixar análise' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Imprimir' })).toBeInTheDocument();
-    expect(analyzeSuapDocument).toHaveBeenCalledWith(expect.objectContaining({ documentType: 'tr', documentTitle: 'Termo de Referência: TR 2/2026', pageCount: 1 }));
+    expect(screen.getByRole('button', { name: 'Ativar modo claro' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Ativar modo claro' }));
+    expect(screen.getByRole('button', { name: 'Ativar modo escuro' })).toBeInTheDocument();
+    expect(screen.getByRole('main')).toHaveClass('bg-slate-100');
+    expect(analyzeSuapDocument).toHaveBeenCalledWith(expect.objectContaining({ suapId: '12345', documentId: '987', documentType: 'tr', documentTitle: 'Termo de Referência: TR 2/2026', pageCount: 1 }));
     expect(stopAutoRefresh).toHaveBeenCalledOnce();
     expect(screen.queryByText(/editar|aplicar automaticamente/i)).not.toBeInTheDocument();
+  });
+
+  it('carrega a última análise pelo modo de consulta sem solicitar o PDF', async () => {
+    getLatestSuapDocumentReview.mockResolvedValue({
+      documentType: 'tr', checkedAt: '2026-08-10T12:00:00.000Z', status: 'no_major_finding', summary: 'Análise salva disponível.',
+      counts: { critical: 0, high: 0, medium: 0, low: 0 }, findings: [], sources: [], limitations: [],
+    });
+    render(<SuapExtensionDocumentAnalysis />);
+
+    await act(async () => {
+      window.dispatchEvent(new MessageEvent('message', {
+        origin: SUAP_EXTENSION_ORIGIN,
+        source: window.parent,
+        data: {
+          source: 'siages-suap-extension', type: 'siages:suap-document-analysis-context', version: 1,
+          payload: {
+            suapId: '12345', processNumber: '23035.000001.2026-11', processUrl: 'https://suap.ifrn.edu.br/processo_eletronico/processo/12345/',
+            documentId: '987', documentTitle: 'Termo de Referência: TR 2/2026', documentType: 'tr',
+            documentOriginalPath: '/documento_eletronico/visualizar_documento/987/?original=sim', reviewMode: 'latest',
+            extensionSession: { accessToken: 'access', refreshToken: 'refresh' },
+          },
+        },
+      }));
+    });
+
+    expect(await screen.findByText('Análise salva disponível.')).toBeInTheDocument();
+    expect(getLatestSuapDocumentReview).toHaveBeenCalledWith({ suapId: '12345', documentId: '987', documentType: 'tr' });
+    expect(analyzeSuapDocument).not.toHaveBeenCalled();
   });
 });

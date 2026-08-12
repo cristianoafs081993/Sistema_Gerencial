@@ -1221,3 +1221,20 @@ Snapshot normalizado e bruto de cada atividade capturada, por execução e ID es
 
 ### Campos de sincronização em `atividades`
 `sync_source`, `suap_plan_id`, `suap_activity_id`, `sync_active` e `sync_last_seen_run_id` permitem upsert idempotente e arquivamento lógico dos itens ausentes.
+
+### `suap_document_reviews`
+
+Finalidade:
+
+- Persistir cada analise concluida de TR/ETP iniciada pela extensao do SUAP, permitindo consultar a mais recente sem baixar o PDF novamente.
+
+Campos-chave:
+
+- `id`, `created_by`, `created_at`;
+- `suap_id`, `document_id`, `document_type`, `document_title`, `process_number`;
+- `checked_at` e `result` (JSONB normalizado da analise).
+
+RLS e indices:
+
+- leitura e insercao ficam restritas a `created_by = auth.uid()`;
+- indice por usuario, processo, documento e `checked_at` decrescente suporta a consulta do ultimo resultado.

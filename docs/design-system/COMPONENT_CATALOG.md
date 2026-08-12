@@ -76,7 +76,7 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 
 ### Revisão de documentos SUAP
 
-`siages-suap-document-ai-button` é um botão iconográfico compacto inserido dentro do card nativo do documento. Usa foco visível, `aria-label`, estado de carregamento e os mesmos tokens isolados `--suape-*` do toolkit. O modal de análise é exibido no iframe do SIAGES e mantém a página SUAP ao fundo. Os resultados são somente leitura: achados, fontes, limitações e texto sugerido, sem aplicação automática. Cada achado é exibido em uma seção colapsável fechada inicialmente; o resumo oferece ações para baixar a análise em HTML e abrir uma versão imprimível.
+`siages-suap-document-ai-button` é um botão iconográfico compacto inserido dentro do card nativo do documento. Usa foco visível, `aria-label`, estado de carregamento e os mesmos tokens isolados `--suape-*` do toolkit. O modal de análise é exibido no iframe do SIAGES e mantém a página SUAP ao fundo. Os resultados são somente leitura: achados, fontes, limitações e texto sugerido, sem aplicação automática. Cada achado é exibido em uma seção colapsável fechada inicialmente; o resumo oferece ações para baixar a análise em HTML, imprimir e alternar entre os modos claro e escuro. O fechamento é feito por um único botão iconográfico dentro do iframe.
 
 ## Regra pratica
 
@@ -88,3 +88,5 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 
 - Almoxarifado: página operacional que combina HeaderActions, StatCard, FilterPanel, DataTablePanel, Tabs e Dialog para catálogo, saldos e movimentos, com estados explícitos de estoque crítico.
 O acordeao Resumo financeiro por dimensao segue a estrutura nativa do SUAP e exibe os totais das quatro colunas financeiras agrupados por dimensao.
+
+- Na revisão de documentos SUAP, o ícone de histórico fica ao lado do ícone de geração e carrega a última análise salva sem baixar novamente o PDF.

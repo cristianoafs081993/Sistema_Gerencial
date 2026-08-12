@@ -366,3 +366,11 @@ Cadastros seguem inventoryService  operational_entities / measurement_units / ca
 - auditoria: `suap_plan_sync_runs` e `suap_plan_activity_snapshots`;
 - materialização: função SQL `apply_suap_plan_snapshot` grava `atividades` com `sync_source = suap_plan_8`;
 - ausência na captura: `sync_active = false`, preservando o registro e o histórico.
+
+## Analise e historico de documentos SUAP
+
+- entrada: PDF do TR/ETP baixado com os cookies da aba SUAP;
+- processamento: iframe `/suap-extensao/documento-analise` -> service `suapDocumentReview` -> Edge Function `analisar-documento-licitacao`;
+- persistencia: resultado normalizado em `suap_document_reviews`, associado ao usuario, `suap_id` e `document_id`;
+- consulta: o icone de historico envia `reviewMode = latest` e carrega a ultima linha salva, sem solicitar o PDF novamente;
+- exportacao: o resultado exibido pode ser baixado em HTML ou impresso no navegador.

@@ -576,8 +576,7 @@
   }
 
   function createDocumentReviewSlot(link, source, documentType, title) {
-    const existing = Array.from(document.querySelectorAll('[data-siages-suap-document-ai-id]'))
-      .some((element) => element.getAttribute('data-siages-suap-document-ai-id') === source.documentId);
+    const existing = Array.from(document.querySelectorAll('[data-siages-suap-document-ai-id]')).some((element) => element.getAttribute('data-siages-suap-document-ai-id') === source.documentId);
     if (existing) return;
 
     const slot = document.createElement('span');
@@ -585,31 +584,42 @@
     slot.dataset.siagesSuapDocumentAiId = source.documentId;
     slot.dataset.theme = state.theme;
     slot.setAttribute('data-document-type', documentType);
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'siages-suap-document-ai-button';
-    button.title = `Analisar ${documentReviewLabel(documentType)} com IA`;
-    button.setAttribute('aria-label', `Analisar ${documentReviewLabel(documentType)} com IA`);
-    button.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="m12 3 1.4 4.6L18 9l-4.6 1.4L12 15l-1.4-4.6L6 9l4.6-1.4L12 3Zm6.3 10.2.8 2.7 2.7.8-2.7.8-.8 2.7-.8-2.7-2.7-.8 2.7-.8.8-2.7ZM5.2 14l.7 2.1 2.1.7-2.1.7-.7 2.1-.7-2.1-2.1-.7 2.1-.7.7-2.1Z"/></svg>';
-    button.addEventListener('click', (event) => {
+
+    const analyzeButton = document.createElement('button');
+    analyzeButton.type = 'button';
+    analyzeButton.className = 'siages-suap-document-ai-button';
+    analyzeButton.dataset.action = 'analyze-document';
+    analyzeButton.title = `Analisar ${documentReviewLabel(documentType)} com IA`;
+    analyzeButton.setAttribute('aria-label', `Analisar ${documentReviewLabel(documentType)} com IA`);
+    analyzeButton.innerHTML = `<svg aria-hidden="true" viewBox="0 0 24 24" focusable="false"><path d="m12 3 1.4 4.6L18 9l-4.6 1.4L12 15l-1.4-4.6L6 9l4.6-1.4L12 3Zm6.3 10.2.8 2.7 2.7.8-2.7.8-.8 2.7-.8-2.7-2.7-.8 2.7-.8.8-2.7ZM5.2 14l.7 2.1 2.1.7-2.1.7-.7 2.1-.7-2.1-2.1-.7 2.1-.7.7-2.1Z"/></svg>`;
+    analyzeButton.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
-      setDocumentReviewButtonState(button, 'loading');
+      setDocumentReviewButtonState(analyzeButton, 'loading');
       void getExtensionSession().catch(() => null).then((session) => {
-        openDocumentAnalysisModal({
-          documentId: source.documentId,
-          documentTitle: title,
-          documentType,
-          documentOriginalPath: source.originalPath,
-          button,
-          session,
-        });
+        openDocumentAnalysisModal({ documentId: source.documentId, documentTitle: title, documentType, documentOriginalPath: source.originalPath, button: analyzeButton, session });
       });
     });
-    slot.appendChild(button);
+
+    const savedButton = document.createElement('button');
+    savedButton.type = 'button';
+    savedButton.className = 'siages-suap-document-ai-button';
+    savedButton.dataset.action = 'view-saved-analysis';
+    savedButton.title = `Consultar última análise salva de ${documentReviewLabel(documentType)}`;
+    savedButton.setAttribute('aria-label', `Consultar última análise salva de ${documentReviewLabel(documentType)}`);
+    savedButton.innerHTML = "<svg aria-hidden=\"true\" viewBox=\"0 0 24 24\" focusable=\"false\"><path d=\"M3 12a9 9 0 1 0 3-6.7\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/><path d=\"M3 4v4h4M12 7v5l3 2\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/></svg>";
+    savedButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setDocumentReviewButtonState(savedButton, 'loading');
+      void getExtensionSession().catch(() => null).then((session) => {
+        openDocumentAnalysisModal({ documentId: source.documentId, documentTitle: title, documentType, documentOriginalPath: source.originalPath, reviewMode: 'latest', button: savedButton, session });
+      });
+    });
+
+    slot.append(analyzeButton, savedButton);
     link.insertAdjacentElement('afterend', slot);
   }
-
   function scanDocumentCards() {
     if (!getProcessId()) return;
     const links = Array.from(document.querySelectorAll('a[href*="/documento_eletronico/visualizar_documento"]'));
@@ -669,6 +679,7 @@
         suapId: getProcessId(), processNumber: getProcessNumber(), processUrl: location.origin + location.pathname,
         documentId: documentInfo.documentId, documentTitle: documentInfo.documentTitle, documentType: documentInfo.documentType,
         documentOriginalPath: documentInfo.documentOriginalPath,
+        ...(documentInfo.reviewMode ? { reviewMode: documentInfo.reviewMode } : {}),
         ...(session ? { extensionSession: { accessToken: session.accessToken, refreshToken: session.refreshToken } } : {}),
       },
     };
@@ -680,10 +691,6 @@
     Object.assign(overlay.style, { position: 'fixed', inset: '0', zIndex: '2147483647', background: 'rgba(15,23,42,.68)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' });
     const modalPanel = document.createElement('div');
     Object.assign(modalPanel.style, { position: 'relative', width: 'min(1120px,96vw)', height: 'min(880px,94vh)', overflow: 'hidden', borderRadius: '12px', background: '#18181b', boxShadow: '0 25px 50px -12px rgba(0,0,0,.55)' });
-    const close = createElement('button', '', 'Fechar');
-    close.type = 'button';
-    close.setAttribute('aria-label', 'Fechar análise do documento');
-    Object.assign(close.style, { position: 'absolute', zIndex: '2', top: '10px', right: '10px', padding: '6px 10px', border: '1px solid rgba(255,255,255,.25)', borderRadius: '7px', background: 'rgba(24,24,27,.86)', color: '#fff', cursor: 'pointer' });
     const frame = document.createElement('iframe');
     frame.id = DOCUMENT_ANALYSIS_IFRAME_ID;
     frame.src = `${SIAGES_ORIGIN}/suap-extensao/documento-analise`;
@@ -721,21 +728,19 @@
       } finally { pdfInFlight = false; }
     };
     documentAnalysisCleanup = cleanup;
-    close.addEventListener('click', cleanup);
     frame.addEventListener('load', postContext);
     window.addEventListener('message', receive);
     overlay.addEventListener('click', (event) => { if (event.target === overlay) cleanup(); });
-    modalPanel.append(close, frame); overlay.appendChild(modalPanel); document.body.appendChild(overlay);
+    modalPanel.append(frame); overlay.appendChild(modalPanel); document.body.appendChild(overlay);
     return true;
   }
   function openModal() {
     if (document.getElementById(MODAL_ID)) return; const context = buildContext(); if (!context) return;
     const overlay = document.createElement('div'); overlay.id = MODAL_ID; overlay.setAttribute('role', 'dialog'); overlay.setAttribute('aria-modal', 'true'); Object.assign(overlay.style, { position: 'fixed', inset: '0', zIndex: '2147483647', background: 'rgba(15,23,42,.62)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' });
     const modalPanel = document.createElement('div'); Object.assign(modalPanel.style, { position: 'relative', width: 'min(1240px,96vw)', height: 'min(920px,94vh)', overflow: 'hidden', borderRadius: '12px', background: '#fff' });
-    const close = createElement('button', '', 'Fechar'); close.type = 'button'; Object.assign(close.style, { position: 'absolute', zIndex: '2', top: '12px', right: '12px', padding: '6px 10px' });
     const frame = document.createElement('iframe'); frame.id = IFRAME_ID; frame.src = `${SIAGES_ORIGIN}/suap-extensao/despacho`; frame.title = 'Gerador de Despacho de Liquidação do SIAGES'; frame.allow = 'clipboard-read; clipboard-write'; Object.assign(frame.style, { width: '100%', height: '100%', border: '0' });
     const receive = (event) => { if (isSiagesFrameMessage(event, frame, 'siages:suap-dispatch-ready')) frame.contentWindow?.postMessage(context, SIAGES_ORIGIN); if (isSiagesFrameMessage(event, frame, 'siages:suap-dispatch-close')) cleanup(); };
-    const cleanup = () => { window.removeEventListener('message', receive); closeModal(); }; close.addEventListener('click', cleanup); frame.addEventListener('load', () => frame.contentWindow?.postMessage(context, SIAGES_ORIGIN)); window.addEventListener('message', receive); overlay.addEventListener('click', (event) => { if (event.target === overlay) cleanup(); }); modalPanel.append(close, frame); overlay.appendChild(modalPanel); document.body.appendChild(overlay);
+    const cleanup = () => { window.removeEventListener('message', receive); closeModal(); }; frame.addEventListener('load', () => frame.contentWindow?.postMessage(context, SIAGES_ORIGIN)); window.addEventListener('message', receive); overlay.addEventListener('click', (event) => { if (event.target === overlay) cleanup(); }); modalPanel.append(frame); overlay.appendChild(modalPanel); document.body.appendChild(overlay);
   }
 
   async function downloadProcessPdfFromSuap(suapId, onProgress = () => undefined) {

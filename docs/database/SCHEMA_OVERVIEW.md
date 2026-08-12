@@ -199,3 +199,7 @@ Esta view aparece no frontend em [rastreabilidadePFs.ts](/C:/Users/crist/OneDriv
 - `verificar-conformidade`
 
 Esta function aparece em [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx), mas nao foi localizada em `supabase/functions` nesta rodada.
+
+## Revisoes de documentos SUAP
+
+A migration `20260812100000_create_suap_document_reviews.sql` cria `suap_document_reviews`, que guarda o resultado JSONB, metadados do documento, processo, tipo e data da ultima analise. A RLS permite leitura e insercao somente pelo usuario autenticado que criou o registro.

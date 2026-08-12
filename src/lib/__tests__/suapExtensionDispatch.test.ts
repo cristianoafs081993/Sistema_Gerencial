@@ -149,12 +149,15 @@ describe('suapExtensionDispatch', () => {
         documentTitle: 'Termo de Referência: TR 2/2026',
         documentType: 'tr',
         documentOriginalPath: '/documento_eletronico/visualizar_documento/987/?original=sim',
+        reviewMode: 'latest',
       },
     };
     const event = new MessageEvent('message', { origin: SUAP_EXTENSION_ORIGIN, source: expectedSource, data: contextMessage });
 
     expect(isValidSuapExtensionDocumentAnalysisContext(contextMessage)).toBe(true);
     expect(getSuapExtensionDocumentAnalysisContext(event, expectedSource)).toMatchObject({ documentId: '987', documentType: 'tr' });
+    expect(getSuapExtensionDocumentAnalysisContext(event, expectedSource)).toMatchObject({ reviewMode: 'latest' });
+    expect(isValidSuapExtensionDocumentAnalysisContext({ ...contextMessage, payload: { ...contextMessage.payload, reviewMode: 'unsupported' } })).toBe(false);
     expect(isValidSuapExtensionDocumentAnalysisContext({
       ...contextMessage,
       payload: { ...contextMessage.payload, documentOriginalPath: 'https://evil.example/987.pdf' },
