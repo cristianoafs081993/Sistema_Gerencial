@@ -31,7 +31,7 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(fs.readFileSync(extensionFixturePath('plan-summary.js'), 'utf8')).toContain('siages-plan-column-sort');
     expect(process.matches).not.toContain(plan.matches[0]);
     expect(comprasnet).toMatchObject({
-      matches: ['https://cnetmobile.estaleiro.serpro.gov.br/comprasnet-artefatos-web/artefatos/edit/*'],
+      matches: ['https://cnetmobile.estaleiro.serpro.gov.br/*'],
       css: ['comprasnet-etp.css'],
       js: ['extension-auth-client.js', 'comprasnet-etp.js'],
       run_at: 'document_idle',

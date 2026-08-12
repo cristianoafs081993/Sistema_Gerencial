@@ -75,7 +75,7 @@
     },
     {
       "matches": [
-        "https://cnetmobile.estaleiro.serpro.gov.br/comprasnet-artefatos-web/artefatos/edit/*"
+        "https://cnetmobile.estaleiro.serpro.gov.br/*"
       ],
       "css": [
         "comprasnet-etp.css"

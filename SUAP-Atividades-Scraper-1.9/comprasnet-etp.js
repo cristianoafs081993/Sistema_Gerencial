@@ -30,6 +30,9 @@
   let installed = false;
   let iframe = null;
   let overlay = null;
+  let root = null;
+  let openButton = null;
+  let routeWatcherStarted = false;
 
   function normalize(value) {
     return String(value || '').replace(/\s+/g, ' ').trim();
@@ -306,6 +309,35 @@
     if (overlay) overlay.hidden = true;
   }
 
+  function removeAssistant() {
+    openButton?.remove();
+    root?.remove();
+    openButton = null;
+    root = null;
+    iframe = null;
+    overlay = null;
+    installed = false;
+  }
+
+  function syncRoute() {
+    if (!isEtpRoute()) {
+      if (installed) removeAssistant();
+      return;
+    }
+    if (!installed || !document.getElementById('siages-comprasnet-etp-open')) {
+      if (installed) removeAssistant();
+      install();
+    }
+  }
+
+  function startRouteWatcher() {
+    if (routeWatcherStarted) return;
+    routeWatcherStarted = true;
+    window.addEventListener('popstate', syncRoute);
+    window.addEventListener('hashchange', syncRoute);
+    window.setInterval(syncRoute, 700);
+  }
+
   function openModal() {
     if (!overlay) return;
     overlay.hidden = false;
@@ -316,10 +348,10 @@
   function install() {
     if (installed || !isEtpRoute()) return;
     installed = true;
-    const root = createElement('div');
+    root = createElement('div');
     root.id = ROOT_ID;
 
-    const openButton = createElement('button', 'br-button secondary', 'Escrever ETP com IA');
+    openButton = createElement('button', 'br-button secondary', 'Escrever ETP com IA');
     openButton.id = 'siages-comprasnet-etp-open';
     openButton.type = 'button';
     openButton.setAttribute('aria-haspopup', 'dialog');
@@ -361,8 +393,9 @@
     });
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true });
-  else install();
+  startRouteWatcher();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', syncRoute, { once: true });
+  else syncRoute();
   if (globalThis.__SIAGES_COMPRASNET_ETP_TEST__) {
     globalThis.__siagesComprasnetEtp = { install, collectFields, getThemeTokens, closeModal };
   }
