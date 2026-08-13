@@ -33,6 +33,18 @@ describe('content script do ETP Comprasnet', () => {
     expect(fields).toEqual([{ id: 'necessidade', title: 'Descrição da necessidade', existingHtml: '<p>Conteúdo atual</p>', existingText: 'Conteúdo atual' }]);
   });
 
+  it('reconhece a seção ativa no menu Angular do Comprasnet', async () => {
+    document.body.innerHTML = '<main><div class="dropdown-item active"><a>4. Descrição dos Requisitos da Contratação</a></div><iframe class="cke_wysiwyg_frame"></iframe><button class="br-button primary">Concluir ETP</button></main>';
+    const frame = document.querySelector('iframe') as HTMLIFrameElement;
+    frame.contentDocument!.body.innerHTML = '<p>Requisitos atuais</p>';
+    window.eval(readFileSync(extensionFixturePath('comprasnet-etp.js'), 'utf8'));
+    const testWindow = window as typeof window & { __siagesComprasnetEtp?: { collectFields: (mode: string) => Promise<Array<{ id: string }>> } };
+
+    await expect(testWindow.__siagesComprasnetEtp?.collectFields('current')).resolves.toEqual([
+      { id: 'requisitos', title: 'Descrição dos Requisitos da Contratação', existingHtml: '<p>Requisitos atuais</p>', existingText: 'Requisitos atuais' },
+    ]);
+  });
+
   it('não insere o botão em uma cópia oculta das ações', () => {
     document.body.innerHTML = '<main><h1>Estudo Técnico Preliminar</h1><div style="display:none"><button class="br-button">Concluir ETP</button></div><div id="visible-actions"><button class="br-button primary">Concluir ETP</button></div></main>';
     window.eval(readFileSync(extensionFixturePath('comprasnet-etp.js'), 'utf8'));

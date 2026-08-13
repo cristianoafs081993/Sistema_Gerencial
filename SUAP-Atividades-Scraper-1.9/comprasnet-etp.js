@@ -110,10 +110,11 @@
 
   function currentSectionTitle() {
     const candidates = [
+      document.querySelector('.dropdown-item.active'),
       document.querySelector('.btn-section'),
       document.querySelector('[aria-current="page"]'),
       document.querySelector('h1, h2, h3'),
-    ].filter(Boolean);
+    ].filter((element) => element && isVisible(element));
     return normalize(candidates[0]?.textContent);
   }
 
@@ -124,7 +125,8 @@
 
   function findSectionLink(definition) {
     const target = definition.title.toLowerCase();
-    return Array.from(document.querySelectorAll('div.dropdown-item a, .dropdown-menu a, a, button'))
+    return Array.from(document.querySelectorAll('.dropdown-item, .dropdown-menu a, a, button'))
+      .filter((element) => isVisible(element) && !element.classList.contains('criar-campo'))
       .find((element) => normalize(element.textContent).toLowerCase() === target || normalize(element.textContent).toLowerCase().includes(target));
   }
 
