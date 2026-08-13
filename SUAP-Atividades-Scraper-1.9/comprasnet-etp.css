@@ -16,6 +16,14 @@
   white-space: nowrap;
 }
 
+#siages-comprasnet-etp-open.siages-comprasnet-etp-floating {
+  position: fixed !important;
+  top: 88px !important;
+  right: 24px !important;
+  z-index: 2147483645 !important;
+  margin: 0 !important;
+}
+
 #siages-comprasnet-etp-overlay {
   position: fixed;
   inset: 0;

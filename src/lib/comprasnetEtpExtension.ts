@@ -1,4 +1,5 @@
-export const COMPRASNET_EXTENSION_ORIGIN = 'https://www.siages.com.br';
+export const COMPRASNET_PAGE_ORIGIN = 'https://cnetmobile.estaleiro.serpro.gov.br';
+export const SIAGES_EXTENSION_ORIGIN = 'https://www.siages.com.br';
 export const COMPRASNET_ETP_READY_MESSAGE = 'siages:comprasnet-etp-ready';
 export const COMPRASNET_ETP_CONTEXT_MESSAGE = 'siages:comprasnet-etp-context';
 export const COMPRASNET_ETP_REQUEST_MESSAGE = 'siages:comprasnet-etp-request';
@@ -49,14 +50,13 @@ export type ComprasnetEtpResult =
   | { action: 'error'; ok: false; message: string; recoverable?: boolean };
 
 export function postComprasnetMessage(message: unknown) {
-  window.parent.postMessage(message, COMPRASNET_EXTENSION_ORIGIN);
+  window.parent.postMessage(message, COMPRASNET_PAGE_ORIGIN);
 }
 
 export function isComprasnetEtpMessage(event: MessageEvent, type: string) {
-  return event.origin === COMPRASNET_EXTENSION_ORIGIN &&
+  return event.origin === COMPRASNET_PAGE_ORIGIN &&
     event.source === window.parent &&
     event.data?.source === 'siages' &&
     event.data?.type === type &&
     event.data?.version === 1;
 }
-

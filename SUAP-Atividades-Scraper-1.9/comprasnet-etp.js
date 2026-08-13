@@ -328,6 +328,29 @@
     installed = false;
   }
 
+  function placeOpenButton() {
+    if (!openButton) return;
+    const concludeCandidates = Array.from(document.querySelectorAll('button, .br-button'))
+      .filter((element) => normalize(element.textContent).toLowerCase().includes('concluir etp'));
+    const conclude = concludeCandidates.find(isVisible);
+    if (conclude?.parentElement) {
+      openButton.classList.remove('siages-comprasnet-etp-floating');
+      conclude.parentElement.insertBefore(openButton, conclude);
+      return;
+    }
+
+    const heading = Array.from(document.querySelectorAll('h1,h2,h3,[role="heading"]'))
+      .find((element) => isVisible(element) && normalize(element.textContent).toLowerCase().includes('estudo técnico preliminar'));
+    if (heading?.parentElement) {
+      openButton.classList.remove('siages-comprasnet-etp-floating');
+      heading.parentElement.appendChild(openButton);
+      return;
+    }
+
+    openButton.classList.add('siages-comprasnet-etp-floating');
+    if (!openButton.isConnected) document.body.appendChild(openButton);
+  }
+
   function syncRoute() {
     if (!isEtpRoute()) {
       if (installed) removeAssistant();
@@ -337,6 +360,7 @@
       if (installed) removeAssistant();
       install();
     }
+    placeOpenButton();
   }
 
   function startRouteWatcher() {
@@ -367,14 +391,7 @@
     openButton.setAttribute('aria-label', 'Escrever ETP com inteligência artificial');
     openButton.addEventListener('click', openModal);
 
-    const concludeCandidates = Array.from(document.querySelectorAll('button, .br-button'))
-      .filter((element) => normalize(element.textContent).toLowerCase().includes('concluir etp'));
-    const conclude = concludeCandidates.find(isVisible);
-    if (conclude?.parentElement) conclude.parentElement.insertBefore(openButton, conclude);
-    else {
-      const heading = Array.from(document.querySelectorAll('h1,h2,h3')).find((element) => isVisible(element) && normalize(element.textContent).toLowerCase().includes('estudo técnico preliminar'));
-      (heading?.parentElement || document.body).appendChild(openButton);
-    }
+    placeOpenButton();
 
     overlay = createElement('div');
     overlay.id = OVERLAY_ID;
