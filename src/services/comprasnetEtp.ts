@@ -12,6 +12,7 @@ import {
   type ComprasnetEtpGenerationPreferences,
 } from '@/lib/comprasnetEtpPreferences';
 import type { SuapProcesso } from '@/types';
+import { COMPRASNET_ETP_INSTITUTIONAL_CONTEXT } from '@/lib/comprasnetEtpInstitutionalContext';
 
 export type ComprasnetEtpDraftField = {
   key: string;
@@ -52,6 +53,7 @@ export type GenerateComprasnetEtpParams = {
 function buildPayload(params: GenerateComprasnetEtpParams) {
   const answers = params.questionnaireAnswers || [];
   const contextSnippets = [
+    COMPRASNET_ETP_INSTITUTIONAL_CONTEXT,
     ...(params.analysis?.snippets || []).map((snippet) => ({ ...snippet, sourceType: snippet.sourceType || 'processo' as const })),
     ...(params.supplementalSnippets || []),
   ];

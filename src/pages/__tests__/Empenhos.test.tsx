@@ -142,4 +142,12 @@ describe('Empenhos', () => {
     expect(screen.getByRole('button', { name: /Importar Empenhos/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Importar Saldo RAP/i })).toBeInTheDocument();
   });
+
+  it('exibe a previa da descricao e metadados na tabela de execucao do ano atual', () => {
+    renderEmpenhos();
+
+    expect(screen.getAllByText('Descrição')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Empenho teste')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Tesouro • PI: PI-AD')[0]).toBeInTheDocument();
+  });
 });

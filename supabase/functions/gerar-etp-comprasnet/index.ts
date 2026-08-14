@@ -223,6 +223,7 @@ function buildPrompt(request: EtpRequest, questions: EtpQuestion[]) {
   const useProcess = preferences.sources.includes('processo');
   const useAttachments = preferences.sources.includes('anexos');
   const contextSnippets = (request.contextSnippets || []).filter((snippet) => {
+    if (snippet.sourceType === 'institucional' || snippet.kind === 'institucional') return true;
     if (snippet.sourceType === 'anexo') return useAttachments;
     return useProcess;
   });
