@@ -302,7 +302,8 @@ Observações:
 - O content script lê somente a tela ETP oficial, identifica as 13 seções textuais permitidas e envia o contexto ao iframe por `postMessage` com origem fixa.
 - O processo é buscado pelo número normalizado em `suapProcessosService`; quando há PDF sincronizado, a análise local alimenta a geração.
 - Anexos auxiliares são processados em memória por `preliminaryStudySupplementalAttachments`; os arquivos originais não são persistidos.
-- A prévia preserva campos existentes por padrão. A aplicação escreve no CKEditor, valida o texto e aguarda o autosave; `Concluir ETP` nunca é acionado.
+- A prévia pode cobrir o ETP completo como referência, mas a aplicação aceita exatamente a seção ativa no Comprasnet; não navega nem grava outras seções automaticamente. Após autosave bem-sucedido, o modal fecha e devolve o foco ao Comprasnet; `Concluir ETP` nunca é acionado.
+- Preferências de redação e checklist por seção são normalizados no iframe, content script e Edge Function. Apenas preferências não sensíveis são sincronizadas por `chrome.storage.sync`; processo, anexos, conteúdo atual e rascunhos ficam temporários em memória.
 - O modal usa tokens `--comprasnet-*` derivados dos estilos computados do Comprasnet e não altera o `body` ou tokens `suape-*`.
 
 ## Extensao Suape 1.9

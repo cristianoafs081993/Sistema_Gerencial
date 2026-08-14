@@ -635,10 +635,10 @@ Observações operacionais:
 
 Function chamada pela extensão na rota oficial de edição de ETP.
 
-- Entrada: objeto/contexto manual, processo opcional, questionário geral com 13 seções textuais, conteúdo existente e snippets de processo/anexos.
+- Entrada: objeto/contexto manual, processo opcional, questionário geral com 13 seções textuais, conteúdo existente, snippets de processo/anexos e `generationPreferences` validado (extensão, formato, ênfases, fontes, tratamento do texto e checklist por seção).
 - Saída: prévia com seções, alertas, pendências, campos e modelo utilizado.
 - Usa Gemini `gemini-2.5-flash-lite` com fallback para `gemini-2.5-flash`; sem chave, retorna rascunho local determinístico.
-- Não grava anexos, textos gerados, campos estruturados ou status de conclusão.
+- Não grava anexos, textos gerados, preferências, campos estruturados ou status de conclusão. Preferências persistentes são responsabilidade exclusiva da extensão em `chrome.storage.sync`.
 - A extensão sanitiza o HTML e controla a aplicação; a function nunca acessa o certificado ou a sessão do Comprasnet.
 
 ## Ponte da extensao Suape 1.9

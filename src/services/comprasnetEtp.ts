@@ -7,6 +7,10 @@ import {
 } from '@/lib/comprasnetEtpQuestionnaire';
 import type { DocumentContextSnippet } from '@/lib/documentContextSnippets';
 import type { PreliminaryStudyPdfAnalysis } from '@/lib/preliminaryStudyProcessPdf';
+import {
+  normalizeComprasnetEtpGenerationPreferences,
+  type ComprasnetEtpGenerationPreferences,
+} from '@/lib/comprasnetEtpPreferences';
 import type { SuapProcesso } from '@/types';
 
 export type ComprasnetEtpDraftField = {
@@ -42,6 +46,7 @@ export type GenerateComprasnetEtpParams = {
   analysis?: PreliminaryStudyPdfAnalysis | null;
   questionnaireAnswers?: ComprasnetEtpAnswer[];
   supplementalSnippets?: DocumentContextSnippet[];
+  generationPreferences?: ComprasnetEtpGenerationPreferences;
 };
 
 function buildPayload(params: GenerateComprasnetEtpParams) {
@@ -76,6 +81,7 @@ function buildPayload(params: GenerateComprasnetEtpParams) {
       sourceLabel: snippet.sourceLabel,
     })),
     analysisWarnings: params.analysis?.warnings || [],
+    generationPreferences: normalizeComprasnetEtpGenerationPreferences(params.generationPreferences),
   };
 }
 
@@ -139,4 +145,3 @@ export const comprasnetEtpService = {
     }
   },
 };
-

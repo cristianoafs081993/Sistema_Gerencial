@@ -112,6 +112,13 @@ function formatTraceDate(value: string | null) {
 }
 
 function getProjectionStatus(item: ContractProjectionBulletItem) {
+  if (item.projetado === 0) {
+    return {
+      label: 'Sem gasto',
+      className: 'border-slate-200 bg-slate-50 text-slate-600',
+    };
+  }
+
   if (item.percentualProjetado > 100) {
     return {
       label: 'Acima do saldo',
@@ -366,10 +373,10 @@ export function DashboardContractExecutionTab({
     // Ordenar do maior para o menor percentual de cobertura (ratio)
     return [...filtered].sort((a, b) => {
       const totalA = a.liquidado + a.saldoEmpenhos;
-      const ratioA = a.projetado > 0 ? (totalA / a.projetado) * 100 : 100;
+      const ratioA = a.projetado > 0 ? (totalA / a.projetado) * 100 : 0;
 
-const totalB = b.liquidado + b.saldoEmpenhos;
-      const ratioB = b.projetado > 0 ? (totalB / b.projetado) * 100 : 100;
+      const totalB = b.liquidado + b.saldoEmpenhos;
+      const ratioB = b.projetado > 0 ? (totalB / b.projetado) * 100 : 0;
 
       return ratioB - ratioA;
     });
@@ -435,11 +442,11 @@ const totalB = b.liquidado + b.saldoEmpenhos;
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                     {heatmapBullets.map((item) => {
                       const totalCapacidade = item.liquidado + item.saldoEmpenhos;
-                      const ratio = item.projetado > 0 ? (totalCapacidade / item.projetado) * 100 : 100;
+                      const ratio = item.projetado > 0 ? (totalCapacidade / item.projetado) * 100 : 0;
                       
                       const getCellColorClass = (percent: number) => {
                         if (percent === 0) {
-                          return 'bg-slate-50 border-slate-200/50 text-slate-350 opacity-60';
+                          return 'bg-slate-50 border-slate-200/60 text-slate-500 opacity-70 hover:bg-slate-100/70 hover:border-slate-300/60 shadow-xs';
                         }
                         if (percent < 80) {
                           // Gradação de Vermelho para níveis críticos
@@ -554,7 +561,7 @@ const totalB = b.liquidado + b.saldoEmpenhos;
                                 <span className="font-semibold text-text-muted">Cobertura Realizada</span>
                                 <span className={cn(
                                   'font-black',
-                                  ratio < 80 ? 'text-[#ef4444]' : ratio < 90 ? 'text-[#f97316]' : ratio < 100 ? 'text-[#b45309]' : 'text-[#16a34a]'
+                                  ratio === 0 ? 'text-slate-400' : ratio < 80 ? 'text-[#ef4444]' : ratio < 90 ? 'text-[#f97316]' : ratio < 100 ? 'text-[#b45309]' : 'text-[#16a34a]'
                                 )}>
                                   {ratio.toFixed(1)}%
                                 </span>
@@ -784,13 +791,17 @@ const totalB = b.liquidado + b.saldoEmpenhos;
                 <div className="space-y-4">
                   {contractProjectionBullets.map((item) => {
                     const totalCapacidade = item.liquidado + item.saldoEmpenhos;
-                    const ratio = item.projetado > 0 ? (totalCapacidade / item.projetado) * 100 : 100;
+                    const ratio = item.projetado > 0 ? (totalCapacidade / item.projetado) * 100 : 0;
                     
                     let statusColor = 'bg-emerald-600';
                     let statusBg = 'bg-emerald-50 text-emerald-700 border-emerald-100';
                     let statusText = 'Adequado';
 
-                    if (ratio < 70) {
+                    if (ratio === 0) {
+                      statusColor = 'bg-slate-400';
+                      statusBg = 'bg-slate-50 text-slate-600 border-slate-200';
+                      statusText = 'Sem Gasto';
+                    } else if (ratio < 70) {
                       statusColor = 'bg-rose-600';
                       statusBg = 'bg-rose-50 text-rose-700 border-rose-100';
                       statusText = 'Crítico';

@@ -96,7 +96,7 @@ Na etapa final, a prévia deve reutilizar o mesmo documento HTML da exportação
 
 O painel da extensao usa namespace CSS exclusivo, ocupa primeiro a coluna lateral/timeline e cai para o conteudo principal quando ela nao existe. Dark e o modo inicial; light e recolhimento sao preferencias persistidas. A navegacao inicia em Resumo e preserva a disponibilidade independente das ferramentas durante sincronizacoes longas.
 
-Para o Comprasnet, o launcher usa `br-button` junto às ações do ETP e abre um modal `br-modal` responsivo, sem alterar o layout da página. O iframe recebe tokens computados do site (`--comprasnet-*`) e aplica uma folha isolada com `br-card`, `br-input`, alertas e foco acessível. Não há tema escuro próprio e a ação `Concluir ETP` nunca é automatizada.
+Para o Comprasnet, o launcher usa `br-button` junto às ações do ETP e abre um modal `br-modal` responsivo, sem alterar o layout da página. O iframe recebe tokens computados do site (`--comprasnet-*`) e aplica uma folha isolada com `br-card`, `br-input`, alertas e foco acessível. A prévia total é uma referência de leitura; somente o card da seção aberta recebe controles de aplicação e as demais orientam o avanço manual no sistema externo. Não há tema escuro próprio e a ação `Concluir ETP` nunca é automatizada.
 
 ## Padrao 8: dashboard Cloudscape-inspired (prototipo)
 

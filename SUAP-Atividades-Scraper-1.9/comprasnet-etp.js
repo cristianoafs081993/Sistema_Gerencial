@@ -10,6 +10,7 @@
   const REQUEST_TYPE = 'siages:comprasnet-etp-request';
   const RESULT_TYPE = 'siages:comprasnet-etp-result';
   const CLOSE_TYPE = 'siages:comprasnet-etp-close';
+  const PREFERENCES_STORAGE_KEY = 'siages-comprasnet-etp-generation-preferences-v1';
 
   const FIELD_DEFINITIONS = [
     { id: 'necessidade', title: 'Descrição da necessidade' },
@@ -27,6 +28,40 @@
     { id: 'conclusao', title: 'Declaração de Viabilidade' },
   ];
 
+  const PREFERENCE_OPTIONS = {
+    length: ['curto', 'padrao', 'detalhado'],
+    format: ['corrido', 'corrido_topicos', 'topicos'],
+    emphases: ['tecnica', 'economica', 'operacional', 'sustentabilidade', 'competitividade'],
+    sources: ['processo', 'anexos', 'conteudo_atual'],
+    existingTextMode: ['complementar', 'melhorar', 'reescrever'],
+  };
+  const SECTION_CHECKLISTS = {
+    necessidade: ['impacto_sem_contratar', 'publico_afetado', 'evidencias_problema'],
+    requisitos: ['criterios_tecnicos', 'criterios_operacionais', 'requisitos_legais', 'criterios_aceitacao'],
+    mercado: ['alternativas', 'comparacao_tecnico_economica', 'justificativa_escolha'],
+    solucao: ['escopo_integrado', 'execucao_vigencia', 'resultados_esperados'],
+    quantitativos: ['memoria_calculo', 'metodologia_estimativa', 'restricao_sem_numeros_inventados'],
+    estimativa_valor: ['metodologia_pesquisa', 'fontes_consultadas', 'restricao_sem_valores_inventados'],
+    parcelamento: ['viabilidade_tecnica', 'viabilidade_economica', 'competitividade'],
+    correlatas: ['contratacoes_relacionadas', 'dependencias', 'inexistencia_confirmada'],
+    planejamento: ['pca', 'planejamento_institucional', 'alinhamento_estrategico'],
+    resultados: ['beneficios_publicos', 'eficiencia', 'indicadores_resultado'],
+    providencias: ['equipe_fiscalizacao', 'capacitacao', 'adequacoes_previas'],
+    ambiental: ['ciclo_vida', 'residuos_consumo', 'criterios_sustentabilidade'],
+    conclusao: ['viabilidade', 'condicionantes', 'pendencias_remanescentes'],
+  };
+  const DEFAULT_PREFERENCES = {
+    version: 1,
+    length: 'padrao',
+    paragraphCount: 3,
+    itemCount: 5,
+    format: 'corrido',
+    emphases: ['tecnica', 'operacional'],
+    sources: ['processo', 'anexos', 'conteudo_atual'],
+    existingTextMode: 'complementar',
+    sectionOverrides: {},
+  };
+
   let installed = false;
   let iframe = null;
   let overlay = null;
@@ -37,6 +72,54 @@
 
   function normalize(value) {
     return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function normalizePreferences(value) {
+    const input = value && typeof value === 'object' ? value : {};
+    const allowed = (key, fallback) => PREFERENCE_OPTIONS[key].includes(input[key]) ? input[key] : fallback;
+    const allowedList = (key, fallback) => {
+      const values = Array.isArray(input[key]) ? [...new Set(input[key].filter((item) => PREFERENCE_OPTIONS[key].includes(item)))] : [];
+      return values.length ? values : fallback;
+    };
+    const clamp = (raw, min, max, fallback) => {
+      const numeric = Number(raw);
+      return Number.isFinite(numeric) ? Math.min(max, Math.max(min, Math.round(numeric))) : fallback;
+    };
+    const rawOverrides = input.sectionOverrides && typeof input.sectionOverrides === 'object' ? input.sectionOverrides : {};
+    const sectionOverrides = {};
+    FIELD_DEFINITIONS.forEach((definition) => {
+      const checklist = Array.isArray(rawOverrides[definition.id]?.checklist)
+        ? [...new Set(rawOverrides[definition.id].checklist.filter((item) => SECTION_CHECKLISTS[definition.id].includes(item)))] : [];
+      if (checklist.length) sectionOverrides[definition.id] = { checklist };
+    });
+    return {
+      version: 1,
+      length: allowed('length', DEFAULT_PREFERENCES.length),
+      paragraphCount: clamp(input.paragraphCount, 1, 8, DEFAULT_PREFERENCES.paragraphCount),
+      itemCount: clamp(input.itemCount, 3, 12, DEFAULT_PREFERENCES.itemCount),
+      format: allowed('format', DEFAULT_PREFERENCES.format),
+      emphases: allowedList('emphases', DEFAULT_PREFERENCES.emphases),
+      sources: allowedList('sources', DEFAULT_PREFERENCES.sources),
+      existingTextMode: allowed('existingTextMode', DEFAULT_PREFERENCES.existingTextMode),
+      sectionOverrides,
+    };
+  }
+
+  function readPreferences() {
+    const storage = globalThis.chrome?.storage?.sync;
+    if (!storage?.get) return Promise.resolve(normalizePreferences(DEFAULT_PREFERENCES));
+    return new Promise((resolve) => storage.get(PREFERENCES_STORAGE_KEY, (result) => resolve(normalizePreferences(result?.[PREFERENCES_STORAGE_KEY]))));
+  }
+
+  function savePreferences(value) {
+    const preferences = normalizePreferences(value);
+    const storage = globalThis.chrome?.storage?.sync;
+    if (!storage?.set) return Promise.resolve(preferences);
+    return new Promise((resolve, reject) => storage.set({ [PREFERENCES_STORAGE_KEY]: preferences }, () => {
+      const error = globalThis.chrome?.runtime?.lastError;
+      if (error) reject(new Error(error.message));
+      else resolve(preferences);
+    }));
   }
 
   function normalizeProcessNumber(value) {
@@ -243,27 +326,18 @@
 
   async function applyFields(fields) {
     assertEtpPage();
-    const original = findDefinitionByCurrentSection();
-    const applied = [];
-    try {
-      for (const field of fields || []) {
-        const definition = FIELD_DEFINITIONS.find((item) => item.id === field.id);
-        if (!definition) continue;
-        await navigateToSection(definition);
-        const current = await waitForEditor();
-        if (current.text && !field.replaceExisting) continue;
-        const safeHtml = writeEditorHtml(field.html);
-        await waitForAutosave(safeHtml);
-        applied.push(field.id);
-      }
-      if (original) await navigateToSection(original);
-      return applied;
-    } catch (error) {
-      if (original) {
-        try { await navigateToSection(original); } catch { /* preserva a mensagem original */ }
-      }
-      throw new Error(`${error instanceof Error ? error.message : 'Falha ao aplicar o ETP'}${applied.length ? ` Seções aplicadas antes da falha: ${applied.join(', ')}.` : ''}`);
-    }
+    if (!Array.isArray(fields) || fields.length !== 1) throw new Error('A extensão aplica somente uma seção por vez. Avance manualmente no Comprasnet para aplicar outra seção.');
+    const field = fields[0];
+    const currentSection = findDefinitionByCurrentSection();
+    if (!currentSection) throw new Error('Não foi possível identificar a seção aberta no Comprasnet. Atualize a página e tente novamente.');
+    if (field.id !== currentSection.id) throw new Error(`A seção aberta é “${currentSection.title}”. Avance manualmente no Comprasnet antes de aplicar “${field.id}”.`);
+    if (!FIELD_DEFINITIONS.some((definition) => definition.id === field.id)) throw new Error('A seção solicitada não é compatível com esta tela do Comprasnet.');
+
+    const current = await waitForEditor();
+    if (current.text && !field.replaceExisting) return [];
+    const safeHtml = writeEditorHtml(field.html);
+    await waitForAutosave(safeHtml);
+    return [field.id];
   }
 
   async function buildContext(mode) {
@@ -285,6 +359,7 @@
       currentSectionId: current?.id,
       fields,
       theme: getThemeTokens(),
+      generationPreferences: await readPreferences(),
       ...(extensionSession ? { extensionSession } : {}),
     };
   }
@@ -308,7 +383,12 @@
       }
       if (payload?.action === 'apply') {
         const applied = await applyFields(payload.fields);
-        sendToFrame(RESULT_TYPE, { action: 'apply', ok: true, appliedFieldIds: applied, message: applied.length ? `Seções aplicadas: ${applied.join(', ')}.` : 'Nenhuma seção foi alterada: os campos já preenchidos foram preservados.' });
+        sendToFrame(RESULT_TYPE, { action: 'apply', ok: true, appliedFieldIds: applied, message: applied.length ? 'Seção salva. O modal será fechado para que você avance manualmente no Comprasnet.' : 'Nenhuma seção foi alterada: o conteúdo existente foi preservado.' });
+        return;
+      }
+      if (payload?.action === 'save-preferences') {
+        const preferences = await savePreferences(payload.preferences);
+        sendToFrame(RESULT_TYPE, { action: 'preferences', ok: true, preferences });
         return;
       }
       sendToFrame(RESULT_TYPE, { action: 'error', ok: false, message: 'A operação solicitada não é suportada.' });
@@ -433,6 +513,6 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', syncRoute, { once: true });
   else syncRoute();
   if (globalThis.__SIAGES_COMPRASNET_ETP_TEST__) {
-    globalThis.__siagesComprasnetEtp = { install, collectFields, getThemeTokens, closeModal };
+    globalThis.__siagesComprasnetEtp = { install, collectFields, applyFields, getThemeTokens, closeModal, readPreferences, savePreferences };
   }
 })();

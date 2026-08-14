@@ -1,3 +1,5 @@
+import type { ComprasnetEtpGenerationPreferences } from '@/lib/comprasnetEtpPreferences';
+
 export const COMPRASNET_PAGE_ORIGIN = 'https://cnetmobile.estaleiro.serpro.gov.br';
 export const SIAGES_EXTENSION_ORIGIN = 'https://www.siages.com.br';
 export const COMPRASNET_ETP_READY_MESSAGE = 'siages:comprasnet-etp-ready';
@@ -37,16 +39,19 @@ export type ComprasnetEtpPageContext = {
   currentSectionId?: string;
   fields: ComprasnetEtpFieldSnapshot[];
   theme: ComprasnetEtpThemeTokens;
+  generationPreferences: ComprasnetEtpGenerationPreferences;
   extensionSession?: { accessToken: string; refreshToken: string };
 };
 
 export type ComprasnetEtpRequest =
   | { action: 'snapshot'; mode: 'current' | 'whole' }
-  | { action: 'apply'; fields: Array<{ id: string; html: string; replaceExisting: boolean }> };
+  | { action: 'apply'; fields: Array<{ id: string; html: string; replaceExisting: boolean }> }
+  | { action: 'save-preferences'; preferences: ComprasnetEtpGenerationPreferences };
 
 export type ComprasnetEtpResult =
   | { action: 'snapshot'; ok: true; context: Omit<ComprasnetEtpPageContext, 'theme' | 'extensionSession'> }
   | { action: 'apply'; ok: true; appliedFieldIds: string[]; message: string }
+  | { action: 'preferences'; ok: true; preferences: ComprasnetEtpGenerationPreferences }
   | { action: 'error'; ok: false; message: string; recoverable?: boolean };
 
 export function postComprasnetMessage(message: unknown) {

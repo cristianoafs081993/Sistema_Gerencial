@@ -731,7 +731,7 @@ Function versionada para revisão temporária de Termo de Referência e Estudo T
 ## gerar-etp-comprasnet
 
 - Function versionada para gerar prévias gerais de ETP destinadas à revisão na extensão do Comprasnet.
-- Recebe somente JSON com processo opcional, objeto, perguntas, respostas existentes e snippets de contexto.
+- Recebe somente JSON com processo opcional, objeto, perguntas, respostas existentes, snippets de contexto e `generationPreferences`; a function normaliza opções e checklists permitidos antes de compor o prompt.
 - Usa `GEMINI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`; o modelo padrão é `gemini-2.5-flash-lite`, com fallback para `gemini-2.5-flash`.
 - Não cria tabelas, migrations, arquivos ou histórico permanente.
 - Após alterações, publicar com `supabase functions deploy gerar-etp-comprasnet`.

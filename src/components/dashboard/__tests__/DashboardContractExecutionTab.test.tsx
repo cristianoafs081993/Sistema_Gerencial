@@ -55,4 +55,60 @@ describe('DashboardContractExecutionTab', () => {
     expect(screen.getByText('Contrato exclusivo')).toBeInTheDocument();
     expect(screen.queryByText('Contrato geral')).not.toBeInTheDocument();
   });
+
+  it('exibe 0% de cobertura no card do heatmap quando nao ha liquidacao ou projecao em vez de 100%', () => {
+    const semGasto = createBullet({
+      id: 'sem-gasto',
+      label: '00071/2026 - ALERTA SERVICOS LTDA',
+      liquidado: 0,
+      projetado: 0,
+      saldoEmpenhos: 50000,
+      objeto: 'Serviço com dedicação exclusiva',
+    });
+
+    render(
+      <DashboardContractExecutionTab
+        isLoading={false}
+        contractExpenseData={[]}
+        contractExpenseOptions={[]}
+        contractExpenseSeries={[]}
+        selectedContractExpenseIds={[]}
+        contractProjectionBullets={[]}
+        allContractProjectionBullets={[semGasto]}
+        isContractExpenseLoading={false}
+        onToggleContractExpense={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('0%')).toBeInTheDocument();
+    expect(screen.queryByText('100%')).not.toBeInTheDocument();
+  });
+
+  it('exibe status Sem Gasto e 0.0% na projecao detalhada quando o contrato selecionado nao possui liquidacao', () => {
+    const semGasto = createBullet({
+      id: 'sem-gasto',
+      label: '00071/2026 - ALERTA SERVICOS LTDA',
+      liquidado: 0,
+      projetado: 0,
+      saldoEmpenhos: 50000,
+      objeto: 'Serviço com dedicação exclusiva',
+    });
+
+    render(
+      <DashboardContractExecutionTab
+        isLoading={false}
+        contractExpenseData={[]}
+        contractExpenseOptions={[]}
+        contractExpenseSeries={[]}
+        selectedContractExpenseIds={['sem-gasto']}
+        contractProjectionBullets={[semGasto]}
+        allContractProjectionBullets={[semGasto]}
+        isContractExpenseLoading={false}
+        onToggleContractExpense={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Sem Gasto')).toBeInTheDocument();
+    expect(screen.getByText('0.0%')).toBeInTheDocument();
+  });
 });

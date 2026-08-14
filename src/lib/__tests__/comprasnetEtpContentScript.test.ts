@@ -11,6 +11,7 @@ describe('content script do ETP Comprasnet', () => {
     const testWindow = window as typeof window & Record<string, unknown>;
     testWindow.__SIAGES_COMPRASNET_ETP_TEST__ = true;
     delete testWindow.__siagesComprasnetEtp;
+    delete (globalThis as typeof globalThis & { chrome?: unknown }).chrome;
   });
 
   it('injeta um único botão/modal sem alterar o body nem clicar em Concluir ETP', () => {
@@ -65,5 +66,36 @@ describe('content script do ETP Comprasnet', () => {
     testWindow.__siagesComprasnetEtp?.closeModal();
 
     expect(document.activeElement).toBe(openButton);
+  });
+
+  it('recusa escrita em outra seção sem navegar automaticamente', async () => {
+    window.eval(readFileSync(extensionFixturePath('comprasnet-etp.js'), 'utf8'));
+    const testWindow = window as typeof window & { __siagesComprasnetEtp?: { applyFields: (fields: Array<{ id: string; html: string; replaceExisting: boolean }>) => Promise<string[]> } };
+
+    await expect(testWindow.__siagesComprasnetEtp?.applyFields([
+      { id: 'requisitos', html: '<p>Novo texto</p>', replaceExisting: true },
+    ])).rejects.toThrow('Avance manualmente no Comprasnet');
+    expect((document.querySelector('iframe') as HTMLIFrameElement).contentDocument!.body.innerHTML).toBe('<p>Conteúdo atual</p>');
+  });
+
+  it('sincroniza somente preferências normalizadas no armazenamento da extensão', async () => {
+    let stored: Record<string, unknown> = {};
+    (globalThis as typeof globalThis & { chrome?: unknown }).chrome = {
+      storage: {
+        sync: {
+          get: (_key: string, callback: (value: Record<string, unknown>) => void) => callback(stored),
+          set: (value: Record<string, unknown>, callback: () => void) => { stored = { ...stored, ...value }; callback(); },
+        },
+      },
+      runtime: {},
+    };
+    window.eval(readFileSync(extensionFixturePath('comprasnet-etp.js'), 'utf8'));
+    const testWindow = window as typeof window & { __siagesComprasnetEtp?: { savePreferences: (value: unknown) => Promise<{ paragraphCount: number; sectionOverrides: Record<string, unknown> }>; readPreferences: () => Promise<{ paragraphCount: number }> } };
+
+    const saved = await testWindow.__siagesComprasnetEtp?.savePreferences({ paragraphCount: 99, processo: 'sigiloso', sectionOverrides: { necessidade: { checklist: ['publico_afetado', 'invalido'] } } });
+
+    expect(saved).toMatchObject({ paragraphCount: 8, sectionOverrides: { necessidade: { checklist: ['publico_afetado'] } } });
+    expect(JSON.stringify(stored)).not.toContain('sigiloso');
+    await expect(testWindow.__siagesComprasnetEtp?.readPreferences()).resolves.toMatchObject({ paragraphCount: 8 });
   });
 });

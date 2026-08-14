@@ -116,9 +116,10 @@ Rollout: executar A/B manual em 10 processos de pagamento representativos. Promo
 ## Regressao da extensao Comprasnet ETP
 
 - `comprasnetEtpQuestionnaire.test.ts` protege o questionário geral e a exclusão de campos estruturados.
-- `comprasnetEtpContentScript.test.ts` verifica injeção única, preservação do `body`, leitura do CKEditor e ausência de acionamento de `Concluir ETP`.
+- `comprasnetEtpPreferences.test.ts` verifica normalização, limites e que processo, anexos e rascunhos não integram a preferência persistida.
+- `comprasnetEtpContentScript.test.ts` verifica injeção única, preservação do `body`, leitura do CKEditor, aplicação exclusiva da seção aberta e ausência de acionamento de `Concluir ETP`.
 - `suapExtensionPackage.test.ts` verifica o manifesto, a rota oficial do Comprasnet, o CSS isolado e os scripts da extensão.
-- A validação manual deve cobrir seção atual, ETP completo, campo preenchido, campo vazio, sessão expirada, autosave ausente, anexos e viewport estreito.
+- A validação manual deve cobrir seção atual, prévia completa como referência, aplicação de uma única seção, campo preenchido, campo vazio, sessão expirada, autosave ausente, persistência apenas das preferências, anexos e viewport estreito.
 
 ## Regressao da extensao Suape
 

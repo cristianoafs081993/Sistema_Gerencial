@@ -37,9 +37,44 @@ type EtpRequest = {
   questionnaireAnswers?: EtpAnswer[];
   contextSnippets?: ContextSnippet[];
   analysisWarnings?: string[];
+  generationPreferences?: unknown;
 };
 
 type EtpSection = { id: string; title: string; html: string };
+
+type GenerationPreferences = {
+  version: 1;
+  length: 'curto' | 'padrao' | 'detalhado';
+  paragraphCount: number;
+  itemCount: number;
+  format: 'corrido' | 'corrido_topicos' | 'topicos';
+  emphases: Array<'tecnica' | 'economica' | 'operacional' | 'sustentabilidade' | 'competitividade'>;
+  sources: Array<'processo' | 'anexos' | 'conteudo_atual'>;
+  existingTextMode: 'complementar' | 'melhorar' | 'reescrever';
+  sectionOverrides: Record<string, { checklist: string[] }>;
+};
+
+const SECTION_CHECKLISTS: Record<string, string[]> = {
+  necessidade: ['impacto_sem_contratar', 'publico_afetado', 'evidencias_problema'],
+  requisitos: ['criterios_tecnicos', 'criterios_operacionais', 'requisitos_legais', 'criterios_aceitacao'],
+  mercado: ['alternativas', 'comparacao_tecnico_economica', 'justificativa_escolha'],
+  solucao: ['escopo_integrado', 'execucao_vigencia', 'resultados_esperados'],
+  quantitativos: ['memoria_calculo', 'metodologia_estimativa', 'restricao_sem_numeros_inventados'],
+  estimativa_valor: ['metodologia_pesquisa', 'fontes_consultadas', 'restricao_sem_valores_inventados'],
+  parcelamento: ['viabilidade_tecnica', 'viabilidade_economica', 'competitividade'],
+  correlatas: ['contratacoes_relacionadas', 'dependencias', 'inexistencia_confirmada'],
+  planejamento: ['pca', 'planejamento_institucional', 'alinhamento_estrategico'],
+  resultados: ['beneficios_publicos', 'eficiencia', 'indicadores_resultado'],
+  providencias: ['equipe_fiscalizacao', 'capacitacao', 'adequacoes_previas'],
+  ambiental: ['ciclo_vida', 'residuos_consumo', 'criterios_sustentabilidade'],
+  conclusao: ['viabilidade', 'condicionantes', 'pendencias_remanescentes'],
+};
+
+const DEFAULT_PREFERENCES: GenerationPreferences = {
+  version: 1, length: 'padrao', paragraphCount: 3, itemCount: 5, format: 'corrido',
+  emphases: ['tecnica', 'operacional'], sources: ['processo', 'anexos', 'conteudo_atual'],
+  existingTextMode: 'complementar', sectionOverrides: {},
+};
 
 const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -48,6 +83,33 @@ const jsonResponse = (body: unknown, status = 200) => new Response(JSON.stringif
 
 const collapseSpaces = (value?: string | null) => (value || '').replace(/\s+/g, ' ').trim();
 const stripJsonFence = (value: string) => value.trim().replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
+
+function normalizePreferences(value: unknown): GenerationPreferences {
+  const input = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  const select = <T extends string>(raw: unknown, allowed: readonly T[], fallback: T) => typeof raw === 'string' && allowed.includes(raw as T) ? raw as T : fallback;
+  const list = <T extends string>(raw: unknown, allowed: readonly T[], fallback: T[]) => {
+    const selected = Array.isArray(raw) ? [...new Set(raw.filter((item): item is T => typeof item === 'string' && allowed.includes(item as T)))] : [];
+    return selected.length ? selected : fallback;
+  };
+  const clamp = (raw: unknown, min: number, max: number, fallback: number) => Number.isFinite(Number(raw)) ? Math.min(max, Math.max(min, Math.round(Number(raw)))) : fallback;
+  const rawOverrides = input.sectionOverrides && typeof input.sectionOverrides === 'object' ? input.sectionOverrides as Record<string, unknown> : {};
+  const sectionOverrides = Object.fromEntries(Object.entries(SECTION_CHECKLISTS).map(([sectionId, allowed]) => {
+    const raw = rawOverrides[sectionId];
+    const checklist = raw && typeof raw === 'object' ? list((raw as Record<string, unknown>).checklist, allowed, []) : [];
+    return checklist.length ? [sectionId, { checklist }] : null;
+  }).filter((entry): entry is [string, { checklist: string[] }] => Boolean(entry)));
+  return {
+    version: 1,
+    length: select(input.length, ['curto', 'padrao', 'detalhado'], DEFAULT_PREFERENCES.length),
+    paragraphCount: clamp(input.paragraphCount, 1, 8, DEFAULT_PREFERENCES.paragraphCount),
+    itemCount: clamp(input.itemCount, 3, 12, DEFAULT_PREFERENCES.itemCount),
+    format: select(input.format, ['corrido', 'corrido_topicos', 'topicos'], DEFAULT_PREFERENCES.format),
+    emphases: list(input.emphases, ['tecnica', 'economica', 'operacional', 'sustentabilidade', 'competitividade'], DEFAULT_PREFERENCES.emphases),
+    sources: list(input.sources, ['processo', 'anexos', 'conteudo_atual'], DEFAULT_PREFERENCES.sources),
+    existingTextMode: select(input.existingTextMode, ['complementar', 'melhorar', 'reescrever'], DEFAULT_PREFERENCES.existingTextMode),
+    sectionOverrides,
+  };
+}
 
 async function requireAuthenticatedUser(request: Request) {
   const authorization = request.headers.get('Authorization');
@@ -157,21 +219,32 @@ function normalizeAiResult(raw: Record<string, unknown>, request: EtpRequest, qu
 }
 
 function buildPrompt(request: EtpRequest, questions: EtpQuestion[]) {
-  const institutional = (request.contextSnippets || []).filter((snippet) => snippet.sourceType === 'institucional' || snippet.kind === 'institucional');
-  const evidence = (request.contextSnippets || []).filter((snippet) => !institutional.includes(snippet));
+  const preferences = normalizePreferences(request.generationPreferences);
+  const useProcess = preferences.sources.includes('processo');
+  const useAttachments = preferences.sources.includes('anexos');
+  const contextSnippets = (request.contextSnippets || []).filter((snippet) => {
+    if (snippet.sourceType === 'anexo') return useAttachments;
+    return useProcess;
+  });
+  const institutional = contextSnippets.filter((snippet) => snippet.sourceType === 'institucional' || snippet.kind === 'institucional');
+  const evidence = contextSnippets.filter((snippet) => !institutional.includes(snippet));
+  const existingText = preferences.sources.includes('conteudo_atual') ? request.questionnaireAnswers || [] : [];
   return [
     'Você é um assistente especializado em contratações públicas brasileiras.',
     'Gere uma prévia de Estudo Técnico Preliminar geral para preenchimento posterior no Comprasnet, com base na Lei nº 14.133/2021 e na IN SEGES nº 58/2022.',
     'A resposta será revisada por servidor antes de ser aplicada. Escreva em português formal, claro, objetivo e editável.',
     'Não invente números, datas, valores, nomes, locais, quantitativos, fontes ou fatos. Quando faltar informação concreta, use [CAMPO PENDENTE: ...].',
     'Responda somente às seções e perguntas fornecidas. Não gere informações básicas, área requisitante, responsáveis, anexos, categoria ou outros campos estruturados.',
-    'Use o processo, o objeto e as respostas existentes como eixo principal. Use anexos apenas para confirmar dados pontuais e não transforme o texto em resumo de anexos.',
+    'Use apenas as fontes permitidas nas preferências. Não transforme anexos em resumo; use-os somente para confirmar dados pontuais.',
     'Quando houver conflito entre fontes, preserve o dado explicitamente informado pelo usuário/processo e registre a necessidade de validação.',
+    `Preferências de redação validadas: ${JSON.stringify(preferences)}.`,
+    `Respeite o formato ${preferences.format}; use aproximadamente ${preferences.paragraphCount} parágrafo(s) em texto corrido ou ${preferences.itemCount} item(ns) em tópicos, sem alongar texto sem evidência.`,
+    `Tratamento do conteúdo existente: ${preferences.existingTextMode}. Se faltar base para melhorar ou reescrever, mantenha a lacuna como [CAMPO PENDENTE: ...].`,
     'Responda apenas JSON válido no formato: {"status":"generated","warnings":["..."],"sections":[{"id":"...","title":"...","html":"<p>...</p>"}]}',
     `Processo: ${JSON.stringify(request.processo || {})}`,
     `Objeto ou contexto informado: ${request.manualObject || ''}`,
     `Perguntas e seções: ${JSON.stringify(questions)}`,
-    `Conteúdo textual já existente no ETP: ${JSON.stringify(request.questionnaireAnswers || [])}`,
+    `Conteúdo textual já existente no ETP: ${JSON.stringify(existingText)}`,
     `Contexto institucional: ${JSON.stringify(institutional)}`,
     `Trechos do processo e anexos auxiliares: ${JSON.stringify(evidence)}`,
   ].join('\n\n');

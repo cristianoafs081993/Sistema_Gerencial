@@ -16,11 +16,14 @@ O certificado digital e a sessão do Comprasnet permanecem exclusivamente no nav
 4. Para o modo ETP completo, navega somente pelas 13 seções textuais permitidas e devolve o conteúdo atual para revisão.
 5. O iframe consulta o processo sincronizado no SIAGES, analisa o PDF disponível e processa anexos auxiliares apenas em memória.
 6. `gerar-etp-comprasnet` gera a prévia geral do ETP.
-7. O usuário seleciona os campos e, explicitamente, autoriza a substituição de campos já preenchidos.
-8. O content script escreve no CKEditor, dispara os eventos necessários e aguarda a confirmação de salvamento automático.
+7. O usuário configura extensão, formato, ênfases, fontes permitidas, tratamento do texto existente e o checklist da seção aberta. Apenas essas preferências não sensíveis usam `chrome.storage.sync` na chave versionada `siages-comprasnet-etp-generation-preferences-v1`.
+8. A prévia pode conter o ETP completo para referência, mas somente a seção atualmente aberta no Comprasnet pode ser selecionada e aplicada. O usuário avança entre seções manualmente.
+9. O content script escreve no CKEditor, dispara os eventos necessários e aguarda a confirmação de salvamento automático.
 9. Avisos e pendências ficam recolhidos no ícone de alerta da prévia; após a aplicação bem-sucedida, o modal fecha e o foco retorna à página do Comprasnet.
 
 O fluxo nunca acessa nem aciona `Concluir ETP`.
+
+Processo, anexos, conteúdo existente e texto gerado permanecem somente em memória durante a abertura do modal; não entram no armazenamento sincronizado.
 
 ## Seções permitidas
 
@@ -48,5 +51,6 @@ O botão e o modal usam a nomenclatura visual do Design System Brasil/Comprasnet
 3. Verifique o botão adicional, o modal, o comportamento responsivo e o foco por teclado.
 4. Teste uma seção vazia e uma seção já preenchida; confirme a preservação padrão.
 5. Gere uma prévia com processo e anexos auxiliares.
-6. Aplique somente uma seção e confirme o autosave no Comprasnet.
-7. Verifique manualmente que `Concluir ETP` não foi acionado.
+6. Altere uma preferência, feche e reabra o modal; confirme que somente a preferência foi lembrada.
+7. Aplique somente a seção aberta, confirme o autosave e que o modal fecha devolvendo o foco para o Comprasnet.
+8. Verifique manualmente que `Concluir ETP` não foi acionado.

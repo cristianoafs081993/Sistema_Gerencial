@@ -19,6 +19,17 @@ import {
   type ComprasnetEtpAnswer,
 } from '@/lib/comprasnetEtpQuestionnaire';
 import {
+  comprasnetEtpEmphasisOptions,
+  comprasnetEtpExistingTextOptions,
+  comprasnetEtpFormatOptions,
+  comprasnetEtpLengthOptions,
+  comprasnetEtpSectionChecklists,
+  comprasnetEtpSourceOptions,
+  defaultComprasnetEtpGenerationPreferences,
+  normalizeComprasnetEtpGenerationPreferences,
+  type ComprasnetEtpGenerationPreferences,
+} from '@/lib/comprasnetEtpPreferences';
+import {
   analyzePreliminaryStudySupplementalAttachmentFile,
   PRELIMINARY_STUDY_SUPPLEMENTAL_ACCEPT,
   PRELIMINARY_STUDY_SUPPLEMENTAL_MAX_FILES,
@@ -38,6 +49,27 @@ type Stage = 'setup' | 'loading' | 'preview' | 'applying' | 'done';
 type FieldSelection = {
   selected: boolean;
   replaceExisting: boolean;
+};
+
+const preferenceLabels: Record<string, string> = {
+  curto: 'Curto', padrao: 'Padrão', detalhado: 'Detalhado',
+  corrido: 'Texto corrido', corrido_topicos: 'Texto com tópicos', topicos: 'Tópicos',
+  tecnica: 'Técnica', economica: 'Econômica', operacional: 'Operacional', sustentabilidade: 'Sustentabilidade', competitividade: 'Competitividade',
+  processo: 'Processo', anexos: 'Anexos', conteudo_atual: 'Conteúdo atual',
+  complementar: 'Complementar', melhorar: 'Melhorar', reescrever: 'Reescrever mediante confirmação',
+  impacto_sem_contratar: 'Impacto de não contratar', publico_afetado: 'Público afetado', evidencias_problema: 'Evidências do problema',
+  criterios_tecnicos: 'Critérios técnicos', criterios_operacionais: 'Critérios operacionais', requisitos_legais: 'Requisitos legais', criterios_aceitacao: 'Critérios de aceitação',
+  alternativas: 'Alternativas consideradas', comparacao_tecnico_economica: 'Comparação técnico-econômica', justificativa_escolha: 'Justificativa da escolha',
+  escopo_integrado: 'Escopo integrado', execucao_vigencia: 'Execução e vigência', resultados_esperados: 'Resultados esperados',
+  memoria_calculo: 'Memória de cálculo', metodologia_estimativa: 'Metodologia de estimativa', restricao_sem_numeros_inventados: 'Não inventar números',
+  metodologia_pesquisa: 'Metodologia da pesquisa', fontes_consultadas: 'Fontes consultadas', restricao_sem_valores_inventados: 'Não inventar valores',
+  viabilidade_tecnica: 'Viabilidade técnica', viabilidade_economica: 'Viabilidade econômica',
+  contratacoes_relacionadas: 'Contratações relacionadas', dependencias: 'Dependências', inexistencia_confirmada: 'Inexistência confirmada',
+  pca: 'PCA', planejamento_institucional: 'Planejamento institucional', alinhamento_estrategico: 'Alinhamento estratégico',
+  beneficios_publicos: 'Benefícios públicos', eficiencia: 'Eficiência', indicadores_resultado: 'Indicadores de resultado',
+  equipe_fiscalizacao: 'Equipe e fiscalização', capacitacao: 'Capacitação', adequacoes_previas: 'Adequações prévias',
+  ciclo_vida: 'Ciclo de vida', residuos_consumo: 'Resíduos e consumo', criterios_sustentabilidade: 'Critérios de sustentabilidade',
+  viabilidade: 'Viabilidade', condicionantes: 'Condicionantes', pendencias_remanescentes: 'Pendências remanescentes',
 };
 
 function postRequest(payload: Parameters<typeof postComprasnetMessage>[0]) {
@@ -80,9 +112,11 @@ export default function ComprasnetEtpExtension() {
   const [attachments, setAttachments] = useState<PreliminaryStudySupplementalAttachmentAnalysis[]>([]);
   const [draft, setDraft] = useState<ComprasnetEtpDraftResult | null>(null);
   const [selections, setSelections] = useState<Record<string, FieldSelection>>({});
+  const [preferences, setPreferences] = useState<ComprasnetEtpGenerationPreferences>(defaultComprasnetEtpGenerationPreferences);
   const [showReviewNotices, setShowReviewNotices] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const autoLookupDoneRef = useRef(false);
+  const preferencesSaveTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -94,6 +128,7 @@ export default function ComprasnetEtpExtension() {
         const nextContext = event.data.payload as ComprasnetEtpPageContext;
         if (!nextContext || !Array.isArray(nextContext.fields)) return;
         setContext(nextContext);
+        setPreferences(normalizeComprasnetEtpGenerationPreferences(nextContext.generationPreferences));
         setProcessNumber(nextContext.processNumber || '');
         setStatus('Contexto da página carregado.');
         return;
@@ -121,6 +156,10 @@ export default function ComprasnetEtpExtension() {
         window.setTimeout(() => {
           postComprasnetMessage({ source: 'siages', type: COMPRASNET_ETP_CLOSE_MESSAGE, version: 1 });
         }, 0);
+        return;
+      }
+      if (result.action === 'preferences') {
+        setPreferences(normalizeComprasnetEtpGenerationPreferences(result.preferences));
       }
     };
 
@@ -136,6 +175,7 @@ export default function ComprasnetEtpExtension() {
       window.clearTimeout(stop);
       window.clearInterval(interval);
       window.removeEventListener('message', handleMessage);
+      if (preferencesSaveTimerRef.current) window.clearTimeout(preferencesSaveTimerRef.current);
     };
   }, []);
 
@@ -205,13 +245,52 @@ export default function ComprasnetEtpExtension() {
   }, [context?.processNumber, lookupProcess, sessionReady]);
 
   const currentFields = useMemo(() => context?.fields || [], [context?.fields]);
-  const selectedFields = useMemo(() => currentFields.filter((field) => selections[field.id]?.selected), [currentFields, selections]);
+  const activeSectionId = context?.currentSectionId || currentFields[0]?.id;
+  const activeField = currentFields.find((field) => field.id === activeSectionId);
+  const activeSelection = activeSectionId ? selections[activeSectionId] || { selected: false, replaceExisting: false } : { selected: false, replaceExisting: false };
+
+  function updatePreferences(update: (current: ComprasnetEtpGenerationPreferences) => ComprasnetEtpGenerationPreferences) {
+    const next = normalizeComprasnetEtpGenerationPreferences(update(preferences));
+    setPreferences(next);
+    if (preferencesSaveTimerRef.current) window.clearTimeout(preferencesSaveTimerRef.current);
+    preferencesSaveTimerRef.current = window.setTimeout(() => postRequest({ action: 'save-preferences', preferences: next }), 350);
+  }
+
+  function toggleListPreference(key: 'emphases' | 'sources', value: string) {
+    updatePreferences((current) => {
+      const values = current[key] as string[];
+      const nextValues = values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
+      return { ...current, [key]: nextValues.length ? nextValues : values };
+    });
+  }
+
+  function toggleSectionChecklist(item: string) {
+    if (!activeSectionId) return;
+    updatePreferences((current) => {
+      const checklist = current.sectionOverrides[activeSectionId]?.checklist || [];
+      const nextChecklist = checklist.includes(item) ? checklist.filter((value) => value !== item) : [...checklist, item];
+      return {
+        ...current,
+        sectionOverrides: {
+          ...current.sectionOverrides,
+          [activeSectionId]: { checklist: nextChecklist },
+        },
+      };
+    });
+  }
 
   function requestWholeSnapshot() {
     setError(null);
     setStage('loading');
     setStatus('Lendo as seções textuais do ETP...');
     postRequest({ action: 'snapshot', mode: 'whole' });
+  }
+
+  function requestCurrentSnapshot() {
+    setError(null);
+    setStage('loading');
+    setStatus('Atualizando a seção aberta no Comprasnet...');
+    postRequest({ action: 'snapshot', mode: 'current' });
   }
 
   async function handleFiles(files: FileList | null) {
@@ -242,6 +321,10 @@ export default function ComprasnetEtpExtension() {
       setError('A seção atual não é um campo textual compatível. Escolha ETP completo para continuar.');
       return;
     }
+    if (mode === 'current' && (context.fields.length !== 1 || context.fields[0]?.id !== context.currentSectionId)) {
+      requestCurrentSnapshot();
+      return;
+    }
     if (mode === 'whole' && !context.fields.some((field) => field.id === 'necessidade')) {
       requestWholeSnapshot();
       return;
@@ -257,6 +340,7 @@ export default function ComprasnetEtpExtension() {
         analysis,
         questionnaireAnswers: buildAnswers(context.fields),
         supplementalSnippets: attachments.flatMap((attachment) => attachment.snippets),
+        generationPreferences: preferences,
       });
       const scopedResult = mode === 'current' && context.fields[0]
         ? { ...result, sections: result.sections?.filter((section) => section.id === context.fields[0].id) }
@@ -280,23 +364,20 @@ export default function ComprasnetEtpExtension() {
   }
 
   function handleApply() {
-    if (!draft || selectedFields.length === 0) {
-      setError('Selecione ao menos uma seção para aplicar.');
+    const generated = draft?.sections?.find((section) => section.id === activeSectionId);
+    if (!activeSectionId || !generated || !activeSelection.selected) {
+      setError('Selecione a seção atualmente aberta no Comprasnet para aplicá-la.');
       return;
     }
-    const fields = selectedFields
-      .map((field) => {
-        const generated = draft.sections?.find((section) => section.id === field.id);
-        if (!generated) return null;
-        const selection = selections[field.id];
-        return { id: field.id, html: generated.html, replaceExisting: selection.replaceExisting };
-      })
-      .filter((value): value is { id: string; html: string; replaceExisting: boolean } => Boolean(value));
+    if (!isFieldEmpty(activeField) && preferences.existingTextMode === 'reescrever' && !activeSelection.replaceExisting) {
+      setError('Para reescrever o conteúdo atual, confirme a substituição desta seção.');
+      return;
+    }
 
     setError(null);
     setStage('applying');
-    setStatus('Aplicando as seções selecionadas e aguardando o salvamento automático...');
-    postRequest({ action: 'apply', fields });
+    setStatus('Aplicando a seção aberta e aguardando o salvamento automático...');
+    postRequest({ action: 'apply', fields: [{ id: generated.id, html: generated.html, replaceExisting: activeSelection.replaceExisting }] });
   }
 
   function toggleSelection(id: string, key: keyof FieldSelection) {
@@ -322,8 +403,24 @@ export default function ComprasnetEtpExtension() {
           </div>
 
           <div className="comprasnet-etp-alert" role="note">
-            <strong>Revisão obrigatória.</strong> O Comprasnet continuará com o conteúdo existente até você selecionar as seções na prévia.
+            <strong>Revisão obrigatória.</strong> A prévia geral é apenas referência. A extensão grava somente a seção que estiver aberta no Comprasnet e nunca conclui o ETP.
           </div>
+
+          <details className="comprasnet-etp-preferences br-card">
+            <summary><strong>Configurar minuta</strong><small>Preferências não sensíveis, lembradas neste navegador.</small></summary>
+            <div className="comprasnet-etp-preferences-content">
+              <div className="comprasnet-etp-grid comprasnet-etp-preferences-grid">
+                <label className="br-input"><span className="label">Extensão</span><select value={preferences.length} onChange={(event) => updatePreferences((current) => ({ ...current, length: event.target.value as ComprasnetEtpGenerationPreferences['length'] }))}>{comprasnetEtpLengthOptions.map((option) => <option key={option} value={option}>{preferenceLabels[option]}</option>)}</select></label>
+                <label className="br-input"><span className="label">Parágrafos alvo</span><input type="number" min="1" max="8" value={preferences.paragraphCount} onChange={(event) => updatePreferences((current) => ({ ...current, paragraphCount: Number(event.target.value) }))} /></label>
+                <label className="br-input"><span className="label">Itens alvo</span><input type="number" min="3" max="12" value={preferences.itemCount} onChange={(event) => updatePreferences((current) => ({ ...current, itemCount: Number(event.target.value) }))} /></label>
+                <label className="br-input"><span className="label">Formato</span><select value={preferences.format} onChange={(event) => updatePreferences((current) => ({ ...current, format: event.target.value as ComprasnetEtpGenerationPreferences['format'] }))}>{comprasnetEtpFormatOptions.map((option) => <option key={option} value={option}>{preferenceLabels[option]}</option>)}</select></label>
+                <label className="br-input"><span className="label">Texto existente</span><select value={preferences.existingTextMode} onChange={(event) => updatePreferences((current) => ({ ...current, existingTextMode: event.target.value as ComprasnetEtpGenerationPreferences['existingTextMode'] }))}>{comprasnetEtpExistingTextOptions.map((option) => <option key={option} value={option}>{preferenceLabels[option]}</option>)}</select></label>
+              </div>
+              <fieldset className="comprasnet-etp-fieldset"><legend>Ênfases</legend><div className="comprasnet-etp-check-grid">{comprasnetEtpEmphasisOptions.map((option) => <label key={option}><input type="checkbox" checked={preferences.emphases.includes(option)} onChange={() => toggleListPreference('emphases', option)} /> {preferenceLabels[option]}</label>)}</div></fieldset>
+              <fieldset className="comprasnet-etp-fieldset"><legend>Fontes permitidas</legend><div className="comprasnet-etp-check-grid">{comprasnetEtpSourceOptions.map((option) => <label key={option}><input type="checkbox" checked={preferences.sources.includes(option)} onChange={() => toggleListPreference('sources', option)} /> {preferenceLabels[option]}</label>)}</div></fieldset>
+              {activeSectionId ? <fieldset className="comprasnet-etp-fieldset"><legend>Ajustes da seção aberta: {activeField?.title || activeSectionId}</legend><div className="comprasnet-etp-check-grid">{(comprasnetEtpSectionChecklists[activeSectionId] || []).map((item) => <label key={item}><input type="checkbox" checked={(preferences.sectionOverrides[activeSectionId]?.checklist || []).includes(item)} onChange={() => toggleSectionChecklist(item)} /> {preferenceLabels[item] || item}</label>)}</div></fieldset> : null}
+            </div>
+          </details>
 
           <fieldset className="comprasnet-etp-fieldset">
             <legend>Escopo da geração</legend>
@@ -409,20 +506,25 @@ export default function ComprasnetEtpExtension() {
           {sections.map((section) => {
             const field = context?.fields.find((item) => item.id === section.id);
             const selection = selections[section.id] || { selected: false, replaceExisting: false };
-            return <article className="comprasnet-etp-preview-item" key={section.id}>
+            const isActiveSection = section.id === activeSectionId;
+            return <article className={`comprasnet-etp-preview-item ${isActiveSection ? 'is-active' : 'is-reference'}`} key={section.id}>
               <div className="comprasnet-etp-preview-heading">
-                <label><input type="checkbox" checked={selection.selected} onChange={() => toggleSelection(section.id, 'selected')} /><strong>{section.title}</strong></label>
-                <span className={isFieldEmpty(field) ? 'comprasnet-etp-tag empty' : 'comprasnet-etp-tag'}>{isFieldEmpty(field) ? 'Campo vazio' : 'Já preenchido'}</span>
+                {isActiveSection
+                  ? <label><input type="checkbox" checked={selection.selected} onChange={() => toggleSelection(section.id, 'selected')} /><strong>{section.title}</strong></label>
+                  : <strong>{section.title}</strong>}
+                <span className={isActiveSection ? 'comprasnet-etp-tag active' : 'comprasnet-etp-tag'}>{isActiveSection ? 'Seção aberta' : 'Somente referência'}</span>
               </div>
-              {!isFieldEmpty(field) ? <label className="comprasnet-etp-replace"><input type="checkbox" checked={selection.replaceExisting} onChange={() => toggleSelection(section.id, 'replaceExisting')} /> Substituir o conteúdo atual nesta seção</label> : null}
+              {!isActiveSection ? <p className="comprasnet-etp-reference-note">Avance manualmente no Comprasnet até esta seção para aplicá-la.</p> : null}
+              {isActiveSection && !isFieldEmpty(field) ? <label className="comprasnet-etp-replace"><input type="checkbox" checked={selection.replaceExisting} onChange={() => toggleSelection(section.id, 'replaceExisting')} /> {preferences.existingTextMode === 'reescrever' ? 'Confirmo que desejo reescrever o conteúdo atual nesta seção' : 'Substituir o conteúdo atual nesta seção'}</label> : null}
               <div className="comprasnet-etp-preview-content" dangerouslySetInnerHTML={{ __html: section.html }} />
             </article>;
           })}
         </div>
         <div className="comprasnet-etp-actions">
+          <button className="br-button secondary" type="button" onClick={() => { setMode('current'); setDraft(null); requestCurrentSnapshot(); }}>Ajustar e regenerar seção aberta</button>
           <button className="br-button secondary" type="button" onClick={() => { setStage('setup'); setDraft(null); }}>Voltar</button>
-          <button className="br-button primary" type="button" onClick={handleApply} disabled={stage === 'applying' || selectedFields.length === 0}>
-            {stage === 'applying' ? <><Loader2 className="spin" size={16} aria-hidden="true" /> Salvando...</> : `Aplicar ${selectedFields.length || ''} seção(ões)`}
+          <button className="br-button primary" type="button" onClick={handleApply} disabled={stage === 'applying' || !activeSelection.selected}>
+            {stage === 'applying' ? <><Loader2 className="spin" size={16} aria-hidden="true" /> Salvando...</> : 'Aplicar esta seção'}
           </button>
         </div>
       </section>
