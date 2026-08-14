@@ -17,6 +17,14 @@
 
 .comprasnet-etp-card { max-width: 56rem; margin: 0 auto; padding: 1.25rem; background: var(--comprasnet-surface, #fff); border: 1px solid var(--comprasnet-border, #ccc); border-radius: var(--comprasnet-radius, .25rem); box-shadow: 0 2px 8px rgba(0,0,0,.08); }
 .comprasnet-etp-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--comprasnet-border, #ccc); }
+.comprasnet-etp-card-header-actions { display: flex; align-items: flex-start; gap: .5rem; }
+.comprasnet-etp-notice-control { position: relative; }
+.comprasnet-etp-notice-trigger { position: relative; }
+.comprasnet-etp-notice-count { position: absolute; top: -.25rem; right: -.25rem; display: grid; min-width: 1rem; height: 1rem; place-items: center; padding: 0 .2rem; color: #fff; background: #b36b00; border-radius: 999px; font-size: .65rem; line-height: 1; }
+.comprasnet-etp-notice-panel { position: absolute; z-index: 2; top: calc(100% + .5rem); right: 0; width: min(30rem, calc(100vw - 2rem)); max-height: 20rem; overflow: auto; padding: .85rem; color: var(--comprasnet-text, #333); background: #fff8e6; border: 1px solid #b36b00; border-left-width: 4px; border-radius: var(--comprasnet-radius, .25rem); box-shadow: 0 8px 24px rgba(0,0,0,.16); line-height: 1.45; }
+.comprasnet-etp-notice-panel strong { display: block; margin-bottom: .35rem; }
+.comprasnet-etp-notice-panel p { margin: 0; }
+.comprasnet-etp-notice-panel ul { margin: .35rem 0 .75rem 1.1rem; padding: 0; }
 .comprasnet-etp-card-header p { margin-top: .35rem; color: var(--comprasnet-muted, #666); line-height: 1.5; }
 .comprasnet-etp-eyebrow { display: block; margin-bottom: .3rem; color: var(--comprasnet-primary, #1351b4); font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
 .comprasnet-etp-fieldset { margin: 1rem 0; padding: 0; border: 0; }
@@ -62,4 +70,4 @@
 .comprasnet-etp-preview-content ul, .comprasnet-etp-preview-content ol { margin: .35rem 0 .35rem 1.25rem; }
 .spin { animation: comprasnet-etp-spin .9s linear infinite; }
 @keyframes comprasnet-etp-spin { to { transform: rotate(360deg); } }
-@media (max-width: 560px) { .comprasnet-etp-app { padding: .5rem; } .comprasnet-etp-card-header, .comprasnet-etp-grid, .comprasnet-etp-upload-heading { display: grid; grid-template-columns: 1fr; } .comprasnet-etp-grid .comprasnet-etp-search { width: 100%; } .comprasnet-etp-actions { flex-direction: column-reverse; } .comprasnet-etp-actions .br-button { width: 100%; } }
+@media (max-width: 560px) { .comprasnet-etp-app { padding: .5rem; } .comprasnet-etp-card-header, .comprasnet-etp-grid, .comprasnet-etp-upload-heading { display: grid; grid-template-columns: 1fr; } .comprasnet-etp-card-header-actions { justify-content: flex-end; } .comprasnet-etp-notice-panel { position: fixed; top: 4.5rem; right: .75rem; left: .75rem; width: auto; } .comprasnet-etp-grid .comprasnet-etp-search { width: 100%; } .comprasnet-etp-actions { flex-direction: column-reverse; } .comprasnet-etp-actions .br-button { width: 100%; } }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { Loader2, Paperclip, X } from 'lucide-react';
+import { CircleAlert, Loader2, Paperclip, X } from 'lucide-react';
 
 import {
   COMPRASNET_ETP_CLOSE_MESSAGE,
@@ -80,6 +80,7 @@ export default function ComprasnetEtpExtension() {
   const [attachments, setAttachments] = useState<PreliminaryStudySupplementalAttachmentAnalysis[]>([]);
   const [draft, setDraft] = useState<ComprasnetEtpDraftResult | null>(null);
   const [selections, setSelections] = useState<Record<string, FieldSelection>>({});
+  const [showReviewNotices, setShowReviewNotices] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const autoLookupDoneRef = useRef(false);
 
@@ -117,6 +118,9 @@ export default function ComprasnetEtpExtension() {
         setStage('done');
         setStatus(result.message);
         setError(null);
+        window.setTimeout(() => {
+          postComprasnetMessage({ source: 'siages', type: COMPRASNET_ETP_CLOSE_MESSAGE, version: 1 });
+        }, 0);
       }
     };
 
@@ -258,6 +262,7 @@ export default function ComprasnetEtpExtension() {
         ? { ...result, sections: result.sections?.filter((section) => section.id === context.fields[0].id) }
         : result;
       setDraft(scopedResult);
+      setShowReviewNotices(false);
       const nextSelections = Object.fromEntries((scopedResult.sections || []).map((section) => {
         const existing = context.fields.find((field) => field.id === section.id);
         return [section.id, {
@@ -370,14 +375,36 @@ export default function ComprasnetEtpExtension() {
 
   function renderPreview() {
     const sections = draft?.sections || [];
+    const reviewWarnings = draft?.warnings || [];
+    const reviewPendencies = draft?.missingRequiredFields || [];
+    const reviewNoticeCount = reviewWarnings.length + reviewPendencies.length;
+    const hasReviewNotices = reviewNoticeCount > 0;
     return (
       <section className="comprasnet-etp-card br-card">
         <div className="comprasnet-etp-card-header">
           <div><span className="comprasnet-etp-eyebrow">Prévia com seleção</span><h1>Revise antes de aplicar</h1><p>{draft?.subtitle || 'Confira cada seção gerada e decida o que será enviado ao Comprasnet.'}</p></div>
-          <button className="br-button circle secondary" type="button" aria-label="Fechar" onClick={() => postComprasnetMessage({ source: 'siages', type: COMPRASNET_ETP_CLOSE_MESSAGE, version: 1 })}><X size={18} aria-hidden="true" /></button>
+          <div className="comprasnet-etp-card-header-actions">
+            {hasReviewNotices ? <div className="comprasnet-etp-notice-control">
+              <button
+                className="br-button circle secondary comprasnet-etp-notice-trigger"
+                type="button"
+                aria-label={`Ver ${reviewNoticeCount} aviso(s) e pendência(s)`}
+                aria-expanded={showReviewNotices}
+                aria-controls="comprasnet-etp-review-notices"
+                title="Ver avisos e pendências"
+                onClick={() => setShowReviewNotices((current) => !current)}
+              >
+                <CircleAlert size={18} aria-hidden="true" />
+                <span className="comprasnet-etp-notice-count" aria-hidden="true">{reviewNoticeCount}</span>
+              </button>
+              {showReviewNotices ? <div id="comprasnet-etp-review-notices" className="comprasnet-etp-notice-panel" role="region" aria-label="Avisos e pendências">
+                {reviewWarnings.length ? <div><strong>Atenção</strong><ul>{reviewWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div> : null}
+                {reviewPendencies.length ? <div><strong>Pendências</strong><p>{reviewPendencies.join('; ')}.</p></div> : null}
+              </div> : null}
+            </div> : null}
+            <button className="br-button circle secondary" type="button" aria-label="Fechar" onClick={() => postComprasnetMessage({ source: 'siages', type: COMPRASNET_ETP_CLOSE_MESSAGE, version: 1 })}><X size={18} aria-hidden="true" /></button>
+          </div>
         </div>
-        {draft?.warnings?.length ? <div className="comprasnet-etp-alert warning" role="alert"><strong>Atenção:</strong><ul>{draft.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div> : null}
-        {draft?.missingRequiredFields?.length ? <div className="comprasnet-etp-alert warning" role="alert"><strong>Pendências:</strong> {draft.missingRequiredFields.join('; ')}.</div> : null}
         <div className="comprasnet-etp-preview-list">
           {sections.map((section) => {
             const field = context?.fields.find((item) => item.id === section.id);

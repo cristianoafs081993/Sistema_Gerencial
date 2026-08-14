@@ -32,6 +32,7 @@
   let overlay = null;
   let root = null;
   let openButton = null;
+  let returnFocusElement = null;
   let routeWatcherStarted = false;
 
   function normalize(value) {
@@ -317,7 +318,11 @@
   }
 
   function closeModal() {
-    if (overlay) overlay.hidden = true;
+    if (!overlay || overlay.hidden) return;
+    overlay.hidden = true;
+    const focusTarget = returnFocusElement?.isConnected ? returnFocusElement : openButton;
+    if (focusTarget && typeof focusTarget.focus === 'function') focusTarget.focus();
+    returnFocusElement = null;
   }
 
   function removeAssistant() {
@@ -375,6 +380,7 @@
 
   function openModal() {
     if (!overlay) return;
+    returnFocusElement = document.activeElement instanceof HTMLElement ? document.activeElement : openButton;
     overlay.hidden = false;
     iframe?.focus();
     void sendInitialContext();

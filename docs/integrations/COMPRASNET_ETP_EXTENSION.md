@@ -18,6 +18,7 @@ O certificado digital e a sessão do Comprasnet permanecem exclusivamente no nav
 6. `gerar-etp-comprasnet` gera a prévia geral do ETP.
 7. O usuário seleciona os campos e, explicitamente, autoriza a substituição de campos já preenchidos.
 8. O content script escreve no CKEditor, dispara os eventos necessários e aguarda a confirmação de salvamento automático.
+9. Avisos e pendências ficam recolhidos no ícone de alerta da prévia; após a aplicação bem-sucedida, o modal fecha e o foco retorna à página do Comprasnet.
 
 O fluxo nunca acessa nem aciona `Concluir ETP`.
 
@@ -49,4 +50,3 @@ O botão e o modal usam a nomenclatura visual do Design System Brasil/Comprasnet
 5. Gere uma prévia com processo e anexos auxiliares.
 6. Aplique somente uma seção e confirme o autosave no Comprasnet.
 7. Verifique manualmente que `Concluir ETP` não foi acionado.
-

@@ -54,4 +54,16 @@ describe('content script do ETP Comprasnet', () => {
     expect(document.querySelector('#visible-actions #siages-comprasnet-etp-open')).toBeTruthy();
     expect(document.querySelector('div[style="display:none"] #siages-comprasnet-etp-open')).toBeNull();
   });
+
+  it('devolve o foco para a página ao fechar o modal', () => {
+    window.eval(readFileSync(extensionFixturePath('comprasnet-etp.js'), 'utf8'));
+    const testWindow = window as typeof window & { __siagesComprasnetEtp?: { install: () => void; closeModal: () => void } };
+    testWindow.__siagesComprasnetEtp?.install();
+    const openButton = document.querySelector('#siages-comprasnet-etp-open') as HTMLButtonElement;
+    openButton.focus();
+    openButton.click();
+    testWindow.__siagesComprasnetEtp?.closeModal();
+
+    expect(document.activeElement).toBe(openButton);
+  });
 });
