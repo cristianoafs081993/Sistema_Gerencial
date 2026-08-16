@@ -40,6 +40,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SuapSyncPanel } from '@/components/suap/SuapSyncPanel';
+import { SuapThemeSwitcher } from '@/components/suap/SuapThemeSwitcher';
 import { LogoIcon } from './Logo';
 
 interface LayoutProps {
@@ -325,20 +326,20 @@ export function Layout({ children }: LayoutProps) {
           <Link to="/" className="flex items-center gap-3 no-underline" onClick={() => setSidebarOpen(false)}>
              <LogoIcon size={32} />
             <div>
-              <h1 className="font-bold text-lg tracking-tight leading-none text-sebrae-navy flex items-center gap-1.5 m-0">
-                SIAGES <span className="text-[10px] bg-sebrae-gold text-sebrae-navy px-1.5 py-0.5 rounded font-black">Beta</span>
+              <h1 className="font-bold text-lg tracking-tight leading-none text-foreground flex items-center gap-1.5 m-0">
+                SUAP <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full font-bold">IFRN</span>
               </h1>
-              <p className="text-[10px] text-slate-500 tracking-wider m-0 mt-0.5">Gestão Estratégica & Integrada</p>
+              <p className="text-[10px] text-muted-foreground tracking-wider m-0 mt-0.5">Sistema Unificado de Administração Pública</p>
             </div>
           </Link>
 
-          <div className="mt-3 py-1.5 px-3 bg-white rounded-md border border-slate-200/80 text-[11px] text-slate-700 flex items-center gap-1.5 shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-ifrn-green animate-pulse"></span>
+          <div className="mt-3 py-1.5 px-3 bg-muted/60 rounded-md border border-border text-[11px] text-foreground flex items-center gap-1.5 shadow-xs">
+            <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
             <span className="min-w-0 truncate" title={orgLabel}>{orgLabel}</span>
           </div>
         </div>
 
-        <nav className="min-h-0 flex-1 overflow-y-auto px-4 pb-3 pt-4 scrollbar-thin space-y-5 bg-white">
+        <nav className="min-h-0 flex-1 overflow-y-auto px-4 pb-3 pt-4 scrollbar-thin space-y-5 bg-card">
           {navigationSections.map((section) => {
             const sectionExpanded = expandedSections[section.title] ?? true;
             const SectionIcon = section.icon;
@@ -348,18 +349,18 @@ export function Layout({ children }: LayoutProps) {
                 <button
                   type="button"
                   className={cn(
-                    'mb-1 flex w-full cursor-pointer select-none items-center justify-between rounded-[7px] px-3 py-[6px] text-left text-[10px] font-bold tracking-widest text-slate-500 uppercase transition-all duration-200 hover:bg-slate-50 hover:text-slate-950',
-                    sectionExpanded && 'text-slate-900',
+                    'mb-1 flex w-full cursor-pointer select-none items-center justify-between rounded-md px-3 py-1.5 text-left text-[10px] font-bold tracking-widest text-muted-foreground uppercase transition-all duration-150 hover:bg-muted hover:text-foreground',
+                    sectionExpanded && 'text-foreground font-extrabold',
                   )}
                   onClick={() => toggleSection(section.title)}
                 >
                   <span className="flex min-w-0 items-center gap-2">
-                    <SectionIcon className={cn('h-3.5 w-3.5 shrink-0 text-slate-500 transition-all duration-200', sectionExpanded && 'text-sebrae-blue scale-110')} />
+                    <SectionIcon className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-all duration-150', sectionExpanded && 'text-primary scale-110')} />
                     <span className="truncate">{section.title}</span>
                   </span>
                   <ChevronRight
                     className={cn(
-                      'h-3 w-3 shrink-0 text-slate-300 transition-transform duration-200 ease-out',
+                      'h-3 w-3 shrink-0 text-muted-foreground/60 transition-transform duration-150 ease-out',
                       sectionExpanded ? 'rotate-90' : 'rotate-0',
                     )}
                   />
@@ -367,7 +368,7 @@ export function Layout({ children }: LayoutProps) {
 
                 <div
                   className={cn(
-                    'overflow-hidden pl-0.5 space-y-1 transition-[max-height,opacity] duration-300 ease-out',
+                    'overflow-hidden pl-0.5 space-y-1 transition-[max-height,opacity] duration-200 ease-out',
                     sectionExpanded ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0',
                   )}
                 >
@@ -385,28 +386,28 @@ export function Layout({ children }: LayoutProps) {
                           <button
                             type="button"
                             className={cn(
-                              'relative flex w-full cursor-pointer items-center gap-[9px] rounded-lg px-3.5 py-2.5 text-left text-sm font-medium text-slate-700 transition-all duration-200 hover:bg-slate-50 hover:text-slate-950 group',
-                              parentDirectlyActive && 'bg-sebrae-blue/10 text-sebrae-navy font-bold pl-5',
+                              'relative flex w-full cursor-pointer items-center gap-[9px] rounded-full px-3.5 py-2 text-left text-sm font-medium text-foreground transition-all duration-150 hover:bg-muted group',
+                              parentDirectlyActive && 'bg-primary/10 text-primary font-bold pl-5',
                             )}
                             onClick={() => toggleSubmenu(item.screenId)}
                           >
                             {parentDirectlyActive && (
-                              <span className="absolute left-0 top-2 bottom-2 w-[3px] bg-sebrae-blue rounded-r" />
+                              <span className="absolute left-0 top-2 bottom-2 w-[3px] bg-primary rounded-r" />
                             )}
                             {ItemIcon && (
                               <ItemIcon
                                 className={cn(
-                                  'h-4 w-4 shrink-0 transition-transform duration-200',
+                                  'h-4 w-4 shrink-0 transition-transform duration-150',
                                   parentDirectlyActive
-                                    ? 'text-sebrae-blue scale-110'
-                                    : 'text-slate-500 group-hover:text-slate-700 group-hover:scale-105'
+                                    ? 'text-primary scale-110'
+                                    : 'text-muted-foreground group-hover:text-foreground group-hover:scale-105'
                                 )}
                               />
                             )}
                             <span className="min-w-0 flex-1 truncate">{item.name}</span>
                             <ChevronRight
                               className={cn(
-                                'h-3 w-3 shrink-0 text-slate-300 transition-transform duration-200 ease-out',
+                                'h-3 w-3 shrink-0 text-muted-foreground/60 transition-transform duration-150 ease-out',
                                 submenuExpanded && 'rotate-90',
                               )}
                             />
@@ -414,7 +415,7 @@ export function Layout({ children }: LayoutProps) {
 
                           <div
                             className={cn(
-                              'overflow-hidden border-l border-slate-200 ml-[26px] pl-1.5 space-y-0.5 transition-[max-height,opacity] duration-300 ease-out',
+                              'overflow-hidden border-l border-border ml-[24px] pl-1.5 space-y-0.5 transition-[max-height,opacity] duration-200 ease-out',
                               submenuExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0',
                             )}
                           >
@@ -427,14 +428,14 @@ export function Layout({ children }: LayoutProps) {
                                   to={child.href}
                                   onClick={() => setSidebarOpen(false)}
                                   className={cn(
-                                    'relative flex items-center gap-2 rounded-[7px] py-1.5 pl-[12px] pr-2.5 text-xs font-medium text-slate-600 transition-all duration-200 hover:bg-slate-50 hover:text-slate-955',
-                                    childActive && 'bg-sebrae-blue/5 font-semibold text-sebrae-navy pl-5',
+                                    'relative flex items-center gap-2 rounded-full py-1 pl-[12px] pr-2.5 text-xs font-medium text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground',
+                                    childActive && 'bg-primary/10 font-bold text-primary pl-4',
                                   )}
                                 >
                                   {childActive && (
-                                    <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] bg-sebrae-blue rounded-r" />
+                                    <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] bg-primary rounded-r" />
                                   )}
-                                  <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full bg-slate-300 transition-colors duration-200', childActive && 'bg-sebrae-blue')} />
+                                  <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full bg-border transition-colors duration-150', childActive && 'bg-primary')} />
                                   <span className="truncate">{child.name}</span>
                                 </Link>
                               );
@@ -450,20 +451,20 @@ export function Layout({ children }: LayoutProps) {
                         to={item.href}
                         onClick={() => setSidebarOpen(false)}
                         className={cn(
-                          'relative flex items-center gap-[9px] rounded-lg px-3.5 py-2.5 text-sm font-medium text-slate-700 no-underline transition-all duration-200 hover:bg-slate-50 hover:text-slate-955 group',
-                          active && 'bg-sebrae-blue/10 text-sebrae-navy font-bold pl-5',
+                          'relative flex items-center gap-[9px] rounded-full px-3.5 py-2 text-sm font-medium text-foreground no-underline transition-all duration-150 hover:bg-muted group',
+                          active && 'bg-primary/10 text-primary font-bold pl-5',
                         )}
                       >
                         {active && (
-                          <span className="absolute left-0 top-2 bottom-2 w-[3px] bg-sebrae-blue rounded-r" />
+                          <span className="absolute left-0 top-2 bottom-2 w-[3px] bg-primary rounded-r" />
                         )}
                         {ItemIcon && (
                           <ItemIcon
                             className={cn(
-                              'h-4 w-4 shrink-0 transition-transform duration-200',
+                              'h-4 w-4 shrink-0 transition-transform duration-150',
                               active
-                                ? 'text-sebrae-blue scale-110'
-                                : 'text-slate-500 group-hover:text-slate-700 group-hover:scale-105'
+                                ? 'text-primary scale-110'
+                                : 'text-muted-foreground group-hover:text-foreground group-hover:scale-105'
                             )}
                           />
                         )}
@@ -477,66 +478,63 @@ export function Layout({ children }: LayoutProps) {
           })}
         </nav>
 
-        <div className="shrink-0 border-t border-slate-100 bg-slate-50/50 p-4 text-xs text-slate-500 flex flex-col gap-2.5">
+        <div className="shrink-0 border-t border-border bg-muted/40 p-4 text-xs text-muted-foreground flex flex-col gap-2">
           <div className="flex items-center justify-between text-[10px]">
-            <span>Versão do Beta</span>
-            <span className="font-mono text-[10px] text-slate-600">v2.1.4</span>
+            <span>SUAP Design System</span>
+            <span className="font-mono text-[10px] text-foreground font-semibold">IFRN v3.0</span>
           </div>
-          <div className="text-[10px] leading-tight text-slate-400">
-            Desenvolvido para conformidade WCAG 2.1 com alto contraste.
+          <div className="text-[10px] leading-tight text-muted-foreground">
+            Conformidade com os padrões e temas visuais do SUAP.
           </div>
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-border-light bg-white/85 px-4 backdrop-blur-md lg:px-6">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-border bg-card/90 px-4 backdrop-blur-md lg:px-6">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="h-10 w-10 rounded-xl lg:hidden text-sebrae-navy"
+              className="h-9 w-9 rounded-full lg:hidden text-foreground"
               onClick={() => setSidebarOpen(true)}
               aria-label="Abrir menu"
             >
               <Menu className="h-5 w-5" />
             </Button>
 
-            <label className="hidden min-w-[220px] max-w-[360px] flex-1 items-center gap-[7px] rounded-full border border-transparent bg-slate-100 px-4 py-1.5 sm:flex transition-all focus-within:bg-white focus-within:border-sebrae-blue focus-within:ring-4 focus-within:ring-sebrae-blue/10">
-              <Search className="h-[13px] w-[13px] shrink-0 text-muted-gray" />
+            <label className="hidden min-w-[220px] max-w-[340px] flex-1 items-center gap-[7px] rounded-full border border-border/80 bg-muted/60 px-3.5 py-1.5 sm:flex transition-all focus-within:bg-card focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
+              <Search className="h-[13px] w-[13px] shrink-0 text-muted-foreground" />
               <input
                 aria-label="Buscar módulo"
                 type="search"
                 value={navigationSearch}
                 onChange={(event) => setNavigationSearch(event.target.value)}
-                placeholder="Pesquisar módulo..."
-                className="min-w-0 flex-1 border-0 bg-transparent p-0 text-xs font-medium text-ink-legacy outline-none placeholder:text-muted-gray focus-visible:ring-0 focus-visible:ring-offset-0"
+                placeholder="Pesquisar no SUAP..."
+                className="min-w-0 flex-1 border-0 bg-transparent p-0 text-xs font-medium text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0"
               />
             </label>
 
             <div className="min-w-0">
-              <div id="header-subtitle" className="truncate text-[10px] md:text-[11px] text-muted-gray font-semibold uppercase tracking-[0.14em] empty:hidden" />
+              <div id="header-subtitle" className="truncate text-[10px] md:text-[11px] text-muted-foreground font-bold uppercase tracking-wider empty:hidden" />
             </div>
           </div>
 
-          <div className="flex items-center gap-2 md:gap-4">
+          <div className="flex items-center gap-2 md:gap-3">
             {/* dynamic page action buttons (eg sync) */}
             <div id="header-actions" className="flex items-center gap-2" />
 
-            {/* Help/WCAG Badge */}
-            <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-full text-[10px] font-semibold text-emerald-700 select-none">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>WCAG 2.1 AAA</span>
-            </div>
+            {/* SUAP Theme Switcher */}
+            <SuapThemeSwitcher />
 
             {/* Notifications button */}
             <button 
               type="button" 
-              className="p-1.5 hover:bg-slate-100 rounded-full text-muted-gray hover:text-ink-legacy transition-colors relative"
+              className="p-1.5 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors relative"
               title="Notificações"
             >
               <Bell className="w-4 h-4 md:w-4.5 md:h-4.5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-sebrae-gold rounded-full border border-white" />
+              <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full border border-card" />
             </button>
 
             {/* User settings */}
@@ -548,16 +546,16 @@ export function Layout({ children }: LayoutProps) {
                     className="flex items-center gap-2 rounded-lg border-l border-slate-200 py-1 pl-2 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:gap-2.5 md:pl-3"
                     aria-label="Abrir configurações do usuário"
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-sebrae-blue to-ifrn-green text-xs font-bold text-white shadow select-none">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-sm select-none">
                       {userEmail ? userEmail.substring(0, 1).toUpperCase() : 'U'}
                     </div>
                     <div className="hidden flex-col text-right sm:flex">
-                      <span className="text-xs font-semibold leading-none text-ink-legacy">
+                      <span className="text-xs font-semibold leading-none text-foreground">
                         {userEmail ? userEmail.split('@')[0] : 'Usuário'}
                       </span>
-                      <span className="text-[10px] text-muted-gray">{userEmail || ''}</span>
+                      <span className="text-[10px] text-muted-foreground">{userEmail || ''}</span>
                     </div>
-                    <ChevronDown className="hidden h-3.5 w-3.5 text-muted-gray sm:block" />
+                    <ChevronDown className="hidden h-3.5 w-3.5 text-muted-foreground sm:block" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-64">

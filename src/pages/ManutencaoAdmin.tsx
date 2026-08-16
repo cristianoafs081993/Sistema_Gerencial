@@ -1,24 +1,35 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import {
   AlertCircle,
+  AlertTriangle,
+  Boxes,
   Building2,
   Calendar,
   Check,
+  CheckCircle2,
   ClipboardList,
+  Clock,
   ExternalLink,
+  Eye,
+  Filter,
+  Layers,
+  Maximize2,
   Plus,
   Printer,
   QrCode,
   Search,
+  Sparkles,
+  Star,
   Trash2,
+  TrendingUp,
   User,
+  ZoomIn,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { HeaderActions, HeaderSubtitle } from '@/components/HeaderParts';
-import { StatCard } from '@/components/StatCard';
+import { ChartPanel } from '@/components/design-system/ChartPanel';
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
-import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { SectionPanel } from '@/components/design-system/SectionPanel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,7 +45,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import {
@@ -46,9 +57,13 @@ import {
 } from '@/services/manutencao';
 import { countOpenOccurrencesByBloco, filterAmbientesByBloco } from '@/utils/manutencaoMap';
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
+  CartesianGrid,
   Cell,
+  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -56,6 +71,27 @@ import {
   YAxis,
   Tooltip as RechartsTooltip,
 } from 'recharts';
+
+const problemLabels: Record<string, string> = {
+  falta_papel_higienico: 'Falta Papel Higiênico',
+  falta_papel_toalha: 'Falta Papel Toalha',
+  falta_sabonete: 'Falta Sabonete',
+  lixeira_cheia: 'Lixeira Cheia',
+  vazamento: 'Vazamento Hidráulico',
+  mau_cheiro: 'Mau Cheiro / Odor',
+  ar_condicionado: 'Falha no Ar Condicionado',
+  lampada_queimada: 'Lâmpada / Elétrica',
+  limpeza_geral: 'Limpeza Pesada',
+  sujeira_piso: 'Piso Sujo',
+};
+
+const tipoLabels: Record<string, string> = {
+  banheiro: 'Banheiro',
+  sala: 'Sala de Aula',
+  laboratorio: 'Laboratório',
+  corredor: 'Convivência / Foyer',
+  outros: 'Outros Espaços',
+};
 
 const formatDateTime = (isoString?: string | null) => {
   if (!isoString) return '-';
@@ -71,7 +107,7 @@ const mapAcaoLabel: Record<string, string> = {
 };
 
 const mapAcaoBadge: Record<string, string> = {
-  limpeza_padrao: 'border-sebrae-blue/20 bg-sebrae-blue/10 text-sebrae-blue',
+  limpeza_padrao: 'border-info/20 bg-info/10 text-info',
   reposicao_insumos: 'border-purple-200 bg-purple-50 text-purple-700',
   inspecao: 'border-amber-200 bg-amber-50 text-amber-700',
   manutencao_corretiva: 'border-red-200 bg-red-50 text-red-700',
@@ -116,10 +152,23 @@ export default function ManutencaoAdmin() {
   const [blocosMapa, setBlocosMapa] = useState<BlocoMapa[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Filters
+  // Global Table Filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('todos');
+  const [statusFilter, setStatusFilter] = useState('pendente');
+  const [chFilterAcao, setChFilterAcao] = useState('todos');
+  const [ocFilterNota, setOcFilterNota] = useState('todos');
   const [consumoGrouping, setConsumoGrouping] = useState<'ambiente' | 'dia' | 'amb_dia'>('amb_dia');
+
+  // Mapa Table Filters
+  const [mapaSearchQuery, setMapaSearchQuery] = useState('');
+  const [mapaStatusFilter, setMapaStatusFilter] = useState<string>('todos');
+  const [mapaTipoFilter, setMapaTipoFilter] = useState<string>('todos');
+
+  // Dashboard Filters
+  const [dashViewMode, setDashViewMode] = useState<'avaliacoes' | 'insumos'>('avaliacoes');
+  const [dashPeriodFilter, setDashPeriodFilter] = useState<'mes_atual' | '7d' | '30d' | 'hoje' | 'todos'>('mes_atual');
+  const [dashBlocoFilter, setDashBlocoFilter] = useState<string>('todos');
+  const [dashTipoFilter, setDashTipoFilter] = useState<string>('todos');
 
   // Modals
   const [isAddRoomOpen, setIsAddRoomOpen] = useState(false);
@@ -131,9 +180,22 @@ export default function ManutencaoAdmin() {
   });
 
   const [qrCodeData, setQrCodeData] = useState<{ codigo: string; nome: string } | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<{ url: string; title: string; desc?: string } | null>(null);
   const [qrBaseUrl, setQrBaseUrl] = useState(() => {
     return localStorage.getItem('manutencao:qr_base_url') || window.location.origin;
   });
+
+  // Consumo Drilldown States
+  const [isConsumoDrilldownOpen, setIsConsumoDrilldownOpen] = useState(false);
+  const [consumoDrilldownSearch, setConsumoDrilldownSearch] = useState('');
+  const [consumoDrilldownFilterDate, setConsumoDrilldownFilterDate] = useState<string | null>(null);
+  const [consumoDrilldownFilterMaterial, setConsumoDrilldownFilterMaterial] = useState<string | null>(null);
+
+  // Limpezas Drilldown States
+  const [isLimpezasDrilldownOpen, setIsLimpezasDrilldownOpen] = useState(false);
+  const [limpezasDrilldownSearch, setLimpezasDrilldownSearch] = useState('');
+  const [limpezasDrilldownFilterDate, setLimpezasDrilldownFilterDate] = useState<string | null>(null);
+  const [limpezasDrilldownFilterAcao, setLimpezasDrilldownFilterAcao] = useState<string>('todos');
 
   const loadData = async () => {
     setIsLoading(true);
@@ -481,39 +543,55 @@ export default function ManutencaoAdmin() {
     printWindow.document.close();
   };
 
-  // Filter calculations
-  const filteredOcorrencias = ocorrencias.filter((oc) => {
-    const matchesSearch =
-      !searchQuery ||
-      oc.ambiente?.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      oc.ambiente?.codigo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      oc.observacao?.toLowerCase().includes(searchQuery.toLowerCase());
+  // Table Filter calculations
+  const filteredOcorrencias = useMemo(() => {
+    return ocorrencias.filter((oc) => {
+      const matchesSearch =
+        !searchQuery ||
+        oc.ambiente?.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        oc.ambiente?.codigo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        oc.observacao?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        oc.problemas.some((p) => (problemLabels[p] || p).toLowerCase().includes(searchQuery.toLowerCase()));
 
-    const matchesStatus =
-      statusFilter === 'todos' ||
-      (statusFilter === 'pendente' && oc.status === 'pendente') ||
-      (statusFilter === 'resolvido' && oc.status === 'resolvido');
+      const matchesStatus =
+        statusFilter === 'todos' ||
+        (statusFilter === 'pendente' && oc.status === 'pendente') ||
+        (statusFilter === 'resolvido' && oc.status === 'resolvido');
 
-    return matchesSearch && matchesStatus;
-  });
+      const matchesNota =
+        ocFilterNota === 'todos' || String(oc.avaliacao) === ocFilterNota;
 
-  const filteredCheckins = checkins.filter((ch) => {
-    return (
-      !searchQuery ||
-      ch.ambiente?.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ch.ambiente?.codigo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ch.responsavel_nome.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  });
+      return matchesSearch && matchesStatus && matchesNota;
+    });
+  }, [ocorrencias, searchQuery, statusFilter, ocFilterNota]);
 
-  const filteredAmbientes = ambientes.filter((amb) => {
-    return (
-      !searchQuery ||
-      amb.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      amb.codigo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      amb.bloco?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  });
+  const filteredCheckins = useMemo(() => {
+    return checkins.filter((ch) => {
+      const matchesSearch =
+        !searchQuery ||
+        ch.ambiente?.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ch.ambiente?.codigo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ch.responsavel_nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ch.observacao?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ch.materiais?.some((m) => (materialLabels[m.material] || m.material).toLowerCase().includes(searchQuery.toLowerCase()));
+
+      const matchesAcao =
+        chFilterAcao === 'todos' || (ch.acoes_realizadas && ch.acoes_realizadas.includes(chFilterAcao));
+
+      return matchesSearch && matchesAcao;
+    });
+  }, [checkins, searchQuery, chFilterAcao]);
+
+  const filteredAmbientes = useMemo(() => {
+    return ambientes.filter((amb) => {
+      return (
+        !searchQuery ||
+        amb.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        amb.codigo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        amb.bloco?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    });
+  }, [ambientes, searchQuery]);
 
   const [selectedBlocoId, setSelectedBlocoId] = useState<string | null>(null);
   const [hoveredBuilding, setHoveredBuilding] = useState<string | null>(null);
@@ -815,10 +893,34 @@ export default function ManutencaoAdmin() {
     setSelectedBlocoId((prev) => (prev === blocoId ? null : blocoId));
   };
 
-  const filteredAmbientesByBloco = filterAmbientesByBloco(
-    filteredAmbientes,
-    selectedBloco?.nome,
-  );
+  const mapaFilteredAmbientes = useMemo(() => {
+    const baseList = filterAmbientesByBloco(ambientes, selectedBloco?.nome);
+
+    return baseList.filter((amb) => {
+      if (mapaSearchQuery) {
+        const q = mapaSearchQuery.toLowerCase();
+        const matchNome = amb.nome.toLowerCase().includes(q);
+        const matchCodigo = amb.codigo.toLowerCase().includes(q);
+        const matchBloco = amb.bloco?.toLowerCase().includes(q) || false;
+        if (!matchNome && !matchCodigo && !matchBloco) return false;
+      }
+
+      if (mapaTipoFilter !== 'todos' && amb.tipo !== mapaTipoFilter) {
+        return false;
+      }
+
+      if (mapaStatusFilter !== 'todos') {
+        const pendentesCount = ocorrencias.filter((o) => o.ambiente_id === amb.id && o.status === 'pendente').length;
+        const hasCheckins = checkins.some((ch) => ch.ambiente_id === amb.id);
+
+        if (mapaStatusFilter === 'com_alerta' && pendentesCount === 0) return false;
+        if (mapaStatusFilter === 'limpos' && (pendentesCount > 0 || !hasCheckins)) return false;
+        if (mapaStatusFilter === 'sem_limpeza' && hasCheckins) return false;
+      }
+
+      return true;
+    });
+  }, [ambientes, selectedBloco, mapaSearchQuery, mapaTipoFilter, mapaStatusFilter, ocorrencias, checkins]);
 
   const getBuildingStats = (blocoNome: string) => {
     const rooms = filterAmbientesByBloco(ambientes, blocoNome);
@@ -835,48 +937,250 @@ export default function ManutencaoAdmin() {
     return selectedBlocoId !== null && selectedBlocoId !== blocoId;
   };
 
-  // Material consumption aggregation
-  const materialsDataMap: Record<string, number> = {
-    papel_higienico: 0,
-    sabonete_liquido: 0,
-    papel_toalha: 0,
-    saco_lixo: 0,
-    outros: 0,
+  // Ambientes Map & Blocos Únicos
+  const ambienteMap = useMemo(() => {
+    const map = new Map<string, Ambiente>();
+    ambientes.forEach((a) => map.set(a.id, a));
+    return map;
+  }, [ambientes]);
+
+  const uniqueBlocos = useMemo(() => {
+    const set = new Set<string>();
+    ambientes.forEach((a) => {
+      if (a.bloco) set.add(a.bloco);
+    });
+    blocosMapa.forEach((b) => {
+      if (b.nome) set.add(b.nome);
+    });
+    return Array.from(set).sort();
+  }, [ambientes, blocosMapa]);
+
+  const isWithinPeriod = (dateIso?: string | null, period: string = 'mes_atual') => {
+    if (!dateIso) return false;
+    if (period === 'todos') return true;
+    const date = new Date(dateIso);
+    const now = new Date();
+    if (period === 'hoje') {
+      return date.toDateString() === now.toDateString();
+    }
+    if (period === '7d') {
+      const past7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      return date >= past7;
+    }
+    if (period === '30d') {
+      const past30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      return date >= past30;
+    }
+    if (period === 'mes_atual') {
+      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+    }
+    return true;
   };
 
-  checkins.forEach((ch) => {
-    ch.materiais?.forEach((mat) => {
-      if (materialsDataMap[mat.material] !== undefined) {
-        materialsDataMap[mat.material] += mat.quantidade;
-      }
+  // Dashboard filtered data
+  const dashFilteredCheckins = useMemo(() => {
+    return checkins.filter((ch) => {
+      if (!isWithinPeriod(ch.created_at, dashPeriodFilter)) return false;
+      const amb = ambienteMap.get(ch.ambiente_id) || ch.ambiente;
+      if (dashBlocoFilter !== 'todos' && amb?.bloco !== dashBlocoFilter) return false;
+      if (dashTipoFilter !== 'todos' && amb?.tipo !== dashTipoFilter) return false;
+      return true;
     });
-  });
+  }, [checkins, dashPeriodFilter, dashBlocoFilter, dashTipoFilter, ambienteMap]);
 
-  const materialsChartData = Object.entries(materialsDataMap).map(([key, val]) => ({
-    name: materialLabels[key] || key,
-    quantidade: val,
-  }));
+  const dashFilteredOcorrencias = useMemo(() => {
+    return ocorrencias.filter((oc) => {
+      if (!isWithinPeriod(oc.created_at, dashPeriodFilter)) return false;
+      const amb = ambienteMap.get(oc.ambiente_id) || oc.ambiente;
+      if (dashBlocoFilter !== 'todos' && amb?.bloco !== dashBlocoFilter) return false;
+      if (dashTipoFilter !== 'todos' && amb?.tipo !== dashTipoFilter) return false;
+      return true;
+    });
+  }, [ocorrencias, dashPeriodFilter, dashBlocoFilter, dashTipoFilter, ambienteMap]);
+
+  // Material consumption aggregation
+  const dashMaterialsMap = useMemo(() => {
+    const map: Record<string, number> = {
+      papel_higienico: 0,
+      sabonete_liquido: 0,
+      papel_toalha: 0,
+      saco_lixo: 0,
+      outros: 0,
+    };
+    dashFilteredCheckins.forEach((ch) => {
+      ch.materiais?.forEach((mat) => {
+        if (map[mat.material] !== undefined) {
+          map[mat.material] += mat.quantidade;
+        }
+      });
+    });
+    return map;
+  }, [dashFilteredCheckins]);
+
+  const dashMaterialsChartData = useMemo(() => {
+    return Object.entries(dashMaterialsMap).map(([key, val]) => ({
+      key,
+      name: materialLabels[key] || key,
+      quantidade: val,
+    }));
+  }, [dashMaterialsMap]);
+
+  const dashTotalMateriais = useMemo(() => {
+    return Object.values(dashMaterialsMap).reduce((a, b) => a + b, 0);
+  }, [dashMaterialsMap]);
 
   // Ratings aggregation
-  const ratingCounts = {
-    Excelente: ocorrencias.filter((o) => o.avaliacao === 5).length,
-    Bom: ocorrencias.filter((o) => o.avaliacao === 4).length,
-    Regular: ocorrencias.filter((o) => o.avaliacao === 3).length,
-    Ruim: ocorrencias.filter((o) => o.avaliacao <= 2).length,
-  };
+  const dashValidRatings = useMemo(() => {
+    return dashFilteredOcorrencias.filter((o) => typeof o.avaliacao === 'number' && o.avaliacao > 0);
+  }, [dashFilteredOcorrencias]);
 
-  const ratingChartData = Object.entries(ratingCounts).map(([key, val]) => ({
-    name: key,
-    value: val,
-  }));
+  const dashRatingCounts = useMemo(() => ({
+    '5 Estrelas': dashValidRatings.filter((o) => o.avaliacao === 5).length,
+    '4 Estrelas': dashValidRatings.filter((o) => o.avaliacao === 4).length,
+    '3 Estrelas': dashValidRatings.filter((o) => o.avaliacao === 3).length,
+    '1-2 Estrelas': dashValidRatings.filter((o) => o.avaliacao <= 2).length,
+  }), [dashValidRatings]);
+
+  const dashRatingChartData = useMemo(() => {
+    return Object.entries(dashRatingCounts).map(([key, val]) => ({
+      name: key,
+      value: val,
+    }));
+  }, [dashRatingCounts]);
 
   const ratingColors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'];
 
+  const dashMediaAvaliacoes = useMemo(() => {
+    if (dashValidRatings.length === 0) return null;
+    const sum = dashValidRatings.reduce((acc, o) => acc + (o.avaliacao || 0), 0);
+    return (sum / dashValidRatings.length).toFixed(1);
+  }, [dashValidRatings]);
+
+  const dashTaxaResolucao = useMemo(() => {
+    if (dashFilteredOcorrencias.length === 0) return 100;
+    const resolvidos = dashFilteredOcorrencias.filter((o) => o.status === 'resolvido').length;
+    return Math.round((resolvidos / dashFilteredOcorrencias.length) * 100);
+  }, [dashFilteredOcorrencias]);
+
+  const dashPendentesCount = useMemo(() => {
+    return dashFilteredOcorrencias.filter((o) => o.status === 'pendente').length;
+  }, [dashFilteredOcorrencias]);
+
+  const dashMttrText = useMemo(() => {
+    const resolvidosComTempo = dashFilteredOcorrencias.filter(
+      (o) => o.status === 'resolvido' && o.resolvido_em && o.created_at
+    );
+    if (resolvidosComTempo.length === 0) return '—';
+    const totalMs = resolvidosComTempo.reduce((acc, o) => {
+      return acc + (new Date(o.resolvido_em!).getTime() - new Date(o.created_at).getTime());
+    }, 0);
+    const avgHours = totalMs / resolvidosComTempo.length / (1000 * 60 * 60);
+    if (avgHours < 24) return `${Math.round(avgHours)}h`;
+    return `${(avgHours / 24).toFixed(1)} dias`;
+  }, [dashFilteredOcorrencias]);
+
+  // Timeline series (Limpezas e Insumos dia a dia)
+  const dashTimelineData = useMemo(() => {
+    const dayMap = new Map<string, { dateStr: string; timestamp: number; limpezas: number; insumos: number }>();
+    dashFilteredCheckins.forEach((ch) => {
+      const d = new Date(ch.created_at);
+      const key = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      if (!dayMap.has(key)) {
+        dayMap.set(key, { dateStr: key, timestamp: dayStart, limpezas: 0, insumos: 0 });
+      }
+      const item = dayMap.get(key)!;
+      item.limpezas += 1;
+      ch.materiais?.forEach((m) => {
+        item.insumos += m.quantidade;
+      });
+    });
+    return Array.from(dayMap.values()).sort((a, b) => a.timestamp - b.timestamp);
+  }, [dashFilteredCheckins]);
+
+  // Top Problems reported
+  const dashProblemsData = useMemo(() => {
+    const map: Record<string, number> = {};
+    dashFilteredOcorrencias.forEach((oc) => {
+      oc.problemas?.forEach((prob) => {
+        map[prob] = (map[prob] || 0) + 1;
+      });
+    });
+    return Object.entries(map)
+      .map(([prob, count]) => ({
+        problema: problemLabels[prob] || prob.replace(/_/g, ' '),
+        quantidade: count,
+      }))
+      .sort((a, b) => b.quantidade - a.quantidade)
+      .slice(0, 6);
+  }, [dashFilteredOcorrencias]);
+
+  // Top 5 consuming rooms
+  const dashTopConsumoAmbientes = useMemo(() => {
+    const map = new Map<string, { nome: string; bloco: string; codigo: string; total: number }>();
+    dashFilteredCheckins.forEach((ch) => {
+      const amb = ambienteMap.get(ch.ambiente_id) || ch.ambiente;
+      const ambNome = amb?.nome || 'Ambiente';
+      const ambBloco = amb?.bloco || 'Geral';
+      const ambCodigo = amb?.codigo || '—';
+      const key = ch.ambiente_id;
+      if (!map.has(key)) {
+        map.set(key, { nome: ambNome, bloco: ambBloco, codigo: ambCodigo, total: 0 });
+      }
+      const item = map.get(key)!;
+      ch.materiais?.forEach((m) => {
+        item.total += m.quantidade;
+      });
+    });
+    return Array.from(map.values())
+      .filter((a) => a.total > 0)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5);
+  }, [dashFilteredCheckins, ambienteMap]);
+
+  const maxConsumo = dashTopConsumoAmbientes.length > 0 ? dashTopConsumoAmbientes[0].total : 1;
+
+  // Critical environments list
+  const dashAmbientesCriticos = useMemo(() => {
+    const list: Array<{
+      id: string;
+      nome: string;
+      bloco: string;
+      codigo: string;
+      pendentes: number;
+      media: string | null;
+    }> = [];
+
+    ambientes.forEach((amb) => {
+      const ambOcorrencias = dashFilteredOcorrencias.filter((o) => o.ambiente_id === amb.id);
+      const pendentes = ambOcorrencias.filter((o) => o.status === 'pendente').length;
+      const ratings = ambOcorrencias.filter((o) => typeof o.avaliacao === 'number' && o.avaliacao > 0);
+      const media = ratings.length > 0
+        ? (ratings.reduce((acc, o) => acc + (o.avaliacao || 0), 0) / ratings.length).toFixed(1)
+        : null;
+
+      if (pendentes > 0 || (media !== null && Number(media) <= 3.0)) {
+        list.push({
+          id: amb.id,
+          nome: amb.nome,
+          bloco: amb.bloco || 'Geral',
+          codigo: amb.codigo,
+          pendentes,
+          media,
+        });
+      }
+    });
+
+    return list.sort((a, b) => b.pendentes - a.pendentes || (Number(a.media || 5) - Number(b.media || 5))).slice(0, 5);
+  }, [ambientes, dashFilteredOcorrencias]);
+
   // Aggregated consumption data calculations
+  // Consumo Drilldown Aggregations
   const consumoData = useMemo(() => {
     const map = new Map<string, {
       ambienteNome?: string;
       ambienteCodigo?: string;
+      ambienteBloco?: string;
       data?: string;
       papel_higienico: number;
       sabonete_liquido: number;
@@ -885,11 +1189,12 @@ export default function ManutencaoAdmin() {
       outros: number;
     }>();
 
-    checkins.forEach((ch) => {
+    dashFilteredCheckins.forEach((ch) => {
       const dateKey = ch.created_at ? new Date(ch.created_at).toLocaleDateString('pt-BR') : 'Sem data';
       const ambId = ch.ambiente_id;
       const ambNome = ch.ambiente?.nome || 'Ambiente Desconhecido';
       const ambCodigo = ch.ambiente?.codigo || 'S/C';
+      const ambBloco = ch.ambiente?.bloco || '-';
 
       let groupKey = '';
       if (consumoGrouping === 'ambiente') {
@@ -904,6 +1209,7 @@ export default function ManutencaoAdmin() {
         map.set(groupKey, {
           ambienteNome: consumoGrouping !== 'dia' ? ambNome : undefined,
           ambienteCodigo: consumoGrouping !== 'dia' ? ambCodigo : undefined,
+          ambienteBloco: consumoGrouping !== 'dia' ? ambBloco : undefined,
           data: consumoGrouping !== 'ambiente' ? dateKey : undefined,
           papel_higienico: 0,
           sabonete_liquido: 0,
@@ -927,26 +1233,34 @@ export default function ManutencaoAdmin() {
       const total = item.papel_higienico + item.sabonete_liquido + item.papel_toalha + item.saco_lixo + item.outros;
       return { ...item, total };
     }).filter(item => item.total > 0);
-  }, [checkins, consumoGrouping]);
+  }, [dashFilteredCheckins, consumoGrouping]);
 
   const filteredConsumoData = useMemo(() => {
     return consumoData.filter((item) => {
-      if (!searchQuery) return true;
-      const q = searchQuery.toLowerCase();
+      if (consumoDrilldownFilterDate) {
+        if (item.data && !item.data.includes(consumoDrilldownFilterDate)) return false;
+      }
+      if (consumoDrilldownFilterMaterial) {
+        const matKey = consumoDrilldownFilterMaterial as 'papel_higienico' | 'sabonete_liquido' | 'papel_toalha' | 'saco_lixo' | 'outros';
+        if ((item[matKey] || 0) === 0) return false;
+      }
+      if (!consumoDrilldownSearch) return true;
+      const q = consumoDrilldownSearch.toLowerCase();
       const matchNome = item.ambienteNome?.toLowerCase().includes(q) || false;
       const matchCodigo = item.ambienteCodigo?.toLowerCase().includes(q) || false;
+      const matchBloco = item.ambienteBloco?.toLowerCase().includes(q) || false;
       const matchData = item.data?.includes(q) || false;
-      return matchNome || matchCodigo || matchData;
+      return matchNome || matchCodigo || matchBloco || matchData;
     });
-  }, [consumoData, searchQuery]);
+  }, [consumoData, consumoDrilldownSearch, consumoDrilldownFilterDate, consumoDrilldownFilterMaterial]);
 
   const sortedConsumoData = useMemo(() => {
     return [...filteredConsumoData].sort((left, right) => {
       if (consumoGrouping === 'dia') {
         const [dL, mL, yL] = (left.data || '').split('/').map(Number);
         const [dR, mR, yR] = (right.data || '').split('/').map(Number);
-        const dateL = new Date(yL, mL - 1, dL).getTime();
-        const dateR = new Date(yR, mR - 1, dR).getTime();
+        const dateL = new Date(yL || 2026, (mL || 1) - 1, dL || 1).getTime();
+        const dateR = new Date(yR || 2026, (mR || 1) - 1, dR || 1).getTime();
         return dateR - dateL;
       }
       if (consumoGrouping === 'ambiente') {
@@ -954,28 +1268,44 @@ export default function ManutencaoAdmin() {
       }
       const [dL, mL, yL] = (left.data || '').split('/').map(Number);
       const [dR, mR, yR] = (right.data || '').split('/').map(Number);
-      const dateL = new Date(yL, mL - 1, dL).getTime();
-      const dateR = new Date(yR, mR - 1, dR).getTime();
+      const dateL = new Date(yL || 2026, (mL || 1) - 1, dL || 1).getTime();
+      const dateR = new Date(yR || 2026, (mR || 1) - 1, dR || 1).getTime();
       if (dateR !== dateL) return dateR - dateL;
       return right.total - left.total;
     });
   }, [filteredConsumoData, consumoGrouping]);
 
-  const kpis = {
-    totalPendentes: ocorrencias.filter((oc) => oc.status === 'pendente').length,
-    limpezasHoje: checkins.filter((ch) => {
-      const today = new Date().toDateString();
-      return new Date(ch.created_at).toDateString() === today;
-    }).length,
-    totalSalas: ambientes.length,
-  };
+  // Limpezas Drilldown Aggregation
+  const filteredLimpezasDrilldown = useMemo(() => {
+    return dashFilteredCheckins.filter((ch) => {
+      if (limpezasDrilldownFilterDate) {
+        const d = new Date(ch.created_at);
+        const dateKey = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        if (dateKey !== limpezasDrilldownFilterDate) return false;
+      }
+
+      if (limpezasDrilldownFilterAcao !== 'todos') {
+        if (!ch.acoes_realizadas || !ch.acoes_realizadas.includes(limpezasDrilldownFilterAcao)) {
+          return false;
+        }
+      }
+
+      if (!limpezasDrilldownSearch) return true;
+      const q = limpezasDrilldownSearch.toLowerCase();
+      const matchAmb = ch.ambiente?.nome?.toLowerCase().includes(q) || ch.ambiente?.codigo?.toLowerCase().includes(q) || ch.ambiente?.bloco?.toLowerCase().includes(q);
+      const matchResp = ch.responsavel_nome?.toLowerCase().includes(q);
+      const matchObs = ch.observacao?.toLowerCase().includes(q);
+      const matchMats = ch.materiais?.some((m) => (materialLabels[m.material] || m.material).toLowerCase().includes(q));
+
+      return matchAmb || matchResp || matchObs || matchMats;
+    });
+  }, [dashFilteredCheckins, limpezasDrilldownSearch, limpezasDrilldownFilterDate, limpezasDrilldownFilterAcao]);
+
+  const isDashFilterActive = dashPeriodFilter !== 'mes_atual' || dashBlocoFilter !== 'todos' || dashTipoFilter !== 'todos';
 
   return (
     <div className="space-y-6 pb-10">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black tracking-tight text-gradient-dark">Limpeza e Manutenção</h1>
-        <HeaderSubtitle>Painel administrativo para controle e inspeção de ambientes via QR Code.</HeaderSubtitle>
-      </div>
+      <HeaderSubtitle>Painel administrativo para controle e inspeção de ambientes via QR Code.</HeaderSubtitle>
 
       <HeaderActions>
         <div className="flex items-center gap-2">
@@ -986,72 +1316,713 @@ export default function ManutencaoAdmin() {
         </div>
       </HeaderActions>
 
-      {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <StatCard title="Ocorrências Pendentes" value={kpis.totalPendentes} subtitle="Relatadas por usuários aguardando resolução" icon={AlertCircle} stitchColor={kpis.totalPendentes > 0 ? 'red-500' : 'emerald-green'} isLoading={isLoading} />
-        <StatCard title="Limpezas Hoje" value={kpis.limpezasHoje} subtitle="Registradas pela equipe de conservação" icon={Check} stitchColor="vibrant-blue" isLoading={isLoading} />
-        <StatCard title="Ambientes Monitorados" value={kpis.totalSalas} subtitle="Salas e banheiros com QR Code ativo" icon={Building2} stitchColor="purple" isLoading={isLoading} />
-      </div>
-
-      {/* Search and filter header */}
-      <FilterPanel title="Filtros e Busca" actions={<Button type="button" variant="ghost" size="sm" onClick={() => { setSearchQuery(''); setStatusFilter('todos'); }}>Limpar</Button>}>
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Pesquisar por ambiente, código, bloco..." className="h-10 pl-9 input-system" />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="relative">
+        {/* Tabs de Navegação - Layout Folder Tab */}
+        <div className="flex items-end justify-between px-0 relative -mb-[1px] z-10 w-full gap-4 flex-wrap sm:flex-nowrap">
+          <div className="flex space-x-1 overflow-x-auto">
+            <button
+              type="button"
+              className={`px-5 py-2.5 text-xs font-bold font-ui transition-all duration-200 border rounded-t-radius-lg whitespace-nowrap ${
+                activeTab === 'dashboard'
+                  ? 'bg-surface-card border-border-default/80 border-b-surface-card text-emerald-700 shadow-sm relative z-20 pb-[11px]'
+                  : 'bg-surface-subtle/30 text-text-muted hover:text-text-primary hover:bg-surface-subtle/60 border-transparent border-b-border-default/80 cursor-pointer relative z-10 pb-2.5'
+              }`}
+              onClick={() => setActiveTab('dashboard')}
+            >
+              Dashboard
+            </button>
+            <button
+              type="button"
+              className={`px-5 py-2.5 text-xs font-bold font-ui transition-all duration-200 border rounded-t-radius-lg whitespace-nowrap ${
+                activeTab === 'mapa'
+                  ? 'bg-surface-card border-border-default/80 border-b-surface-card text-emerald-700 shadow-sm relative z-20 pb-[11px]'
+                  : 'bg-surface-subtle/30 text-text-muted hover:text-text-primary hover:bg-surface-subtle/60 border-transparent border-b-border-default/80 cursor-pointer relative z-10 pb-2.5'
+              }`}
+              onClick={() => setActiveTab('mapa')}
+            >
+              Visão Geral / Mapa
+            </button>
+            <button
+              type="button"
+              className={`px-5 py-2.5 text-xs font-bold font-ui transition-all duration-200 border rounded-t-radius-lg whitespace-nowrap ${
+                activeTab === 'ocorrencias'
+                  ? 'bg-surface-card border-border-default/80 border-b-surface-card text-emerald-700 shadow-sm relative z-20 pb-[11px]'
+                  : 'bg-surface-subtle/30 text-text-muted hover:text-text-primary hover:bg-surface-subtle/60 border-transparent border-b-border-default/80 cursor-pointer relative z-10 pb-2.5'
+              }`}
+              onClick={() => setActiveTab('ocorrencias')}
+            >
+              Ocorrências ({filteredOcorrencias.length})
+            </button>
+            <button
+              type="button"
+              className={`px-5 py-2.5 text-xs font-bold font-ui transition-all duration-200 border rounded-t-radius-lg whitespace-nowrap ${
+                activeTab === 'ambientes'
+                  ? 'bg-surface-card border-border-default/80 border-b-surface-card text-emerald-700 shadow-sm relative z-20 pb-[11px]'
+                  : 'bg-surface-subtle/30 text-text-muted hover:text-text-primary hover:bg-surface-subtle/60 border-transparent border-b-border-default/80 cursor-pointer relative z-10 pb-2.5'
+              }`}
+              onClick={() => setActiveTab('ambientes')}
+            >
+              Salas e Ambientes ({filteredAmbientes.length})
+            </button>
           </div>
-          {activeTab === 'ocorrencias' && (
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-10 input-system">
-                <SelectValue placeholder="Filtrar por Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os status</SelectItem>
-                <SelectItem value="pendente">Pendentes</SelectItem>
-                <SelectItem value="resolvido">Resolvidos</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
-          {activeTab === 'consumo' && (
-            <Select value={consumoGrouping} onValueChange={(val: any) => setConsumoGrouping(val)}>
-              <SelectTrigger className="h-10 input-system">
-                <SelectValue placeholder="Agrupamento do Consumo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="amb_dia">Por Ambiente e Dia</SelectItem>
-                <SelectItem value="ambiente">Por Ambiente</SelectItem>
-                <SelectItem value="dia">Por Dia</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
         </div>
-      </FilterPanel>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="bg-slate-100/80 p-1 border rounded-lg">
-          <TabsTrigger value="dashboard" className="px-4 py-2 font-medium transition-all rounded-md data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">
-            Visão Geral / Mapa
-          </TabsTrigger>
-          <TabsTrigger value="ocorrencias" className="px-4 py-2 font-medium transition-all rounded-md data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">
-            Ocorrências ({filteredOcorrencias.length})
-          </TabsTrigger>
-          <TabsTrigger value="checkins" className="px-4 py-2 font-medium transition-all rounded-md data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">
-            Histórico de Limpezas ({filteredCheckins.length})
-          </TabsTrigger>
-          <TabsTrigger value="consumo" className="px-4 py-2 font-medium transition-all rounded-md data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">
-            Consumo por Ambiente/Dia
-          </TabsTrigger>
-          <TabsTrigger value="ambientes" className="px-4 py-2 font-medium transition-all rounded-md data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm">
-            Salas e Ambientes ({filteredAmbientes.length})
-          </TabsTrigger>
-        </TabsList>
 
         {/* Tab: Dashboard */}
-        <TabsContent value="dashboard" className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-12">
-            {/* Campus map */}
-            <div className="lg:col-span-8 space-y-3">
-              <div className="bg-white p-4 border rounded-2xl shadow-sm space-y-3">
+        <TabsContent value="dashboard" className="mt-0">
+          <SectionPanel contentClassName="space-y-6">
+            {/* Dashboard Filters Toolbar */}
+            <div className="bg-surface-subtle/40 border border-border-default/60 rounded-xl p-3.5 mb-6 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-text-secondary pr-1">
+                  <Filter className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>Filtros do Painel:</span>
+                </div>
+
+                {/* Seletor Radio: Avaliações vs Insumos */}
+                <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-300 shadow-2xs">
+                  <label
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md cursor-pointer transition-all select-none',
+                      dashViewMode === 'avaliacoes'
+                        ? 'bg-emerald-700 text-white shadow-xs'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="dashViewMode"
+                      value="avaliacoes"
+                      checked={dashViewMode === 'avaliacoes'}
+                      onChange={() => setDashViewMode('avaliacoes')}
+                      className="sr-only"
+                    />
+                    <Star className={cn('h-3.5 w-3.5 shrink-0', dashViewMode === 'avaliacoes' ? 'fill-white text-white' : 'text-slate-600')} />
+                    <span className={dashViewMode === 'avaliacoes' ? 'text-white font-bold' : 'text-slate-700 font-semibold'}>Avaliações</span>
+                  </label>
+
+                  <label
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md cursor-pointer transition-all select-none',
+                      dashViewMode === 'insumos'
+                        ? 'bg-emerald-700 text-white shadow-xs'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="dashViewMode"
+                      value="insumos"
+                      checked={dashViewMode === 'insumos'}
+                      onChange={() => setDashViewMode('insumos')}
+                      className="sr-only"
+                    />
+                    <Boxes className={cn('h-3.5 w-3.5 shrink-0', dashViewMode === 'insumos' ? 'text-white' : 'text-slate-600')} />
+                    <span className={dashViewMode === 'insumos' ? 'text-white font-bold' : 'text-slate-700 font-semibold'}>Insumos</span>
+                  </label>
+                </div>
+
+                {/* Período */}
+                <div className="w-40">
+                  <Select value={dashPeriodFilter} onValueChange={(val: any) => setDashPeriodFilter(val)}>
+                    <SelectTrigger className="h-8 text-xs bg-white input-system">
+                      <SelectValue placeholder="Período" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="mes_atual">Mês Atual</SelectItem>
+                      <SelectItem value="7d">Últimos 7 dias</SelectItem>
+                      <SelectItem value="30d">Últimos 30 dias</SelectItem>
+                      <SelectItem value="hoje">Hoje</SelectItem>
+                      <SelectItem value="todos">Todo o Histórico</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Bloco */}
+                <div className="w-44">
+                  <Select value={dashBlocoFilter} onValueChange={setDashBlocoFilter}>
+                    <SelectTrigger className="h-8 text-xs bg-white input-system">
+                      <SelectValue placeholder="Bloco / Setor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os Blocos</SelectItem>
+                      {uniqueBlocos.map((bloco) => (
+                        <SelectItem key={bloco} value={bloco}>
+                          {bloco}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Tipo de Ambiente */}
+                <div className="w-36">
+                  <Select value={dashTipoFilter} onValueChange={setDashTipoFilter}>
+                    <SelectTrigger className="h-8 text-xs bg-white input-system">
+                      <SelectValue placeholder="Tipo de Espaço" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os Tipos</SelectItem>
+                      <SelectItem value="banheiro">Banheiros</SelectItem>
+                      <SelectItem value="sala">Salas de Aula</SelectItem>
+                      <SelectItem value="laboratorio">Laboratórios</SelectItem>
+                      <SelectItem value="corredor">Convivência / Foyer</SelectItem>
+                      <SelectItem value="outros">Outros Espaços</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {isDashFilterActive && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => {
+                    setDashPeriodFilter('mes_atual');
+                    setDashBlocoFilter('todos');
+                    setDashTipoFilter('todos');
+                  }}
+                  className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 h-8"
+                >
+                  Restaurar Padrão
+                </Button>
+              )}
+            </div>
+
+            {/* SEÇÃO 1: MODO AVALIAÇÕES & OCORRÊNCIAS */}
+            {dashViewMode === 'avaliacoes' && (
+              <div className="space-y-6">
+                {/* Executive KPIs: Avaliações e Chamados */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="p-3.5 bg-surface-card rounded-xl border border-border-default/70 shadow-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-text-muted">Satisfação Média</span>
+                      <Star className="h-4 w-4 text-amber-500 fill-amber-500 opacity-70" />
+                    </div>
+                    <div className="text-2xl font-black text-amber-600">
+                      {dashMediaAvaliacoes !== null ? `${dashMediaAvaliacoes}` : '—'}
+                      <span className="text-xs font-normal text-text-muted"> ★</span>
+                    </div>
+                    <div className="text-[10px] text-text-muted truncate">
+                      {dashValidRatings.length} avaliações recebidas
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 bg-surface-card rounded-xl border border-border-default/70 shadow-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-text-muted">Total de Ocorrências</span>
+                      <AlertTriangle className="h-4 w-4 text-rose-600 opacity-70" />
+                    </div>
+                    <div className="text-2xl font-black text-rose-700">
+                      {dashFilteredOcorrencias.length}
+                    </div>
+                    <div className="text-[10px] text-text-muted truncate">
+                      {dashPendentesCount} pendência{dashPendentesCount !== 1 && 's'} aberta{dashPendentesCount !== 1 && 's'}
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 bg-surface-card rounded-xl border border-border-default/70 shadow-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-text-muted">Taxa de Resolução</span>
+                      <ClipboardList className="h-4 w-4 text-purple-600 opacity-70" />
+                    </div>
+                    <div className="text-2xl font-black text-purple-700">
+                      {dashTaxaResolucao}%
+                    </div>
+                    <div className="text-[10px] text-text-muted truncate">
+                      {dashFilteredOcorrencias.filter(o => o.status === 'resolvido').length} chamados resolvidos
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 bg-surface-card rounded-xl border border-border-default/70 shadow-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-text-muted">Tempo Médio Resolução</span>
+                      <Clock className="h-4 w-4 text-slate-600 opacity-70" />
+                    </div>
+                    <div className="text-2xl font-black text-slate-800">
+                      {dashMttrText}
+                    </div>
+                    <div className="text-[10px] text-text-muted truncate">
+                      SLA médio de atendimento
+                    </div>
+                  </div>
+                </div>
+
+                {/* Gráficos de Avaliações */}
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* Chart: Ratings Distribution */}
+                  <div className="bg-surface-card rounded-xl p-4 border border-border-default/70 shadow-sm space-y-3">
+                    <div className="space-y-0.5">
+                      <h4 className="font-extrabold text-text-primary text-sm uppercase tracking-wide flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                        Distribuição de Avaliações
+                      </h4>
+                      <p className="text-xs text-text-muted">Nível de satisfação registrado pelos usuários nos ambientes.</p>
+                    </div>
+                    <div className="h-72 w-full flex items-center justify-center pt-2">
+                      {dashValidRatings.length === 0 ? (
+                        <div className="text-text-muted italic text-xs">
+                          Nenhuma avaliação registrada com os filtros selecionados.
+                        </div>
+                      ) : (
+                        <div className="w-full h-full flex flex-col sm:flex-row items-center justify-around gap-4">
+                          <div className="h-52 w-52 shrink-0">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie
+                                  data={dashRatingChartData}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={55}
+                                  outerRadius={78}
+                                  paddingAngle={3}
+                                  dataKey="value"
+                                >
+                                  {dashRatingChartData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={ratingColors[index % ratingColors.length]} />
+                                  ))}
+                                </Pie>
+                                <RechartsTooltip
+                                  formatter={(val: number, name: string) => {
+                                    const pct = dashValidRatings.length > 0 ? Math.round((val / dashValidRatings.length) * 100) : 0;
+                                    return [`${val} avaliação(ões) (${pct}%)`, name];
+                                  }}
+                                  contentStyle={{ borderRadius: '8px', fontSize: '12px', border: '1px solid #e2e8f0' }}
+                                />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </div>
+                          <div className="space-y-2.5 min-w-[170px]">
+                            {dashRatingChartData.map((item, index) => {
+                              const pct = dashValidRatings.length > 0 ? Math.round((item.value / dashValidRatings.length) * 100) : 0;
+                              return (
+                                <div key={item.name} className="flex items-center justify-between gap-3 text-xs bg-surface-subtle/40 px-3 py-1.5 rounded-lg border border-border-default/40">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ratingColors[index] }} />
+                                    <span className="font-medium text-text-secondary">{item.name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <span className="font-bold text-text-primary">{item.value}</span>
+                                    <span className="text-[11px] font-semibold text-text-muted">({pct}%)</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Chart: Top Problems Pareto */}
+                  <div className="bg-surface-card rounded-xl p-4 border border-border-default/70 shadow-sm space-y-3">
+                    <div className="space-y-0.5">
+                      <h4 className="font-extrabold text-text-primary text-sm uppercase tracking-wide flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                        Principais Problemas Relatados
+                      </h4>
+                      <p className="text-xs text-text-muted">Ranking de queixas e falhas mais frequentes reportadas pelos usuários.</p>
+                    </div>
+                    <div className="h-72 w-full pt-2">
+                      {dashProblemsData.length === 0 ? (
+                        <div className="h-full flex items-center justify-center text-text-muted italic text-xs">
+                          Nenhum problema relatado no período selecionado.
+                        </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart layout="vertical" data={dashProblemsData} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
+                            <XAxis type="number" tick={{ fontSize: 10, fill: '#64748b' }} allowDecimals={false} />
+                            <YAxis dataKey="problema" type="category" width={140} tick={{ fontSize: 10, fill: '#64748b' }} />
+                            <RechartsTooltip
+                              formatter={(val: number) => [`${val} chamado(s)`, 'Ocorrências']}
+                              contentStyle={{ borderRadius: '8px', fontSize: '12px', border: '1px solid #e2e8f0' }}
+                            />
+                            <Bar dataKey="quantidade" fill="#f43f5e" radius={[0, 4, 4, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Critical Environments / Attention Needed */}
+                <div className="bg-surface-card rounded-xl p-4 border border-border-default/70 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-extrabold text-text-primary text-sm uppercase tracking-wide flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-500" />
+                      Ambientes com Atenção Prioritária
+                    </h4>
+                    <span className="text-[10px] text-text-muted font-mono">alertas & notas</span>
+                  </div>
+                  {dashAmbientesCriticos.length === 0 ? (
+                    <div className="py-8 text-center text-emerald-600 font-medium text-xs flex flex-col items-center gap-1">
+                      <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                      Todos os ambientes estão operando em conformidade e sem pendências críticas.
+                    </div>
+                  ) : (
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
+                      {dashAmbientesCriticos.map((amb) => (
+                        <div
+                          key={amb.id}
+                          className="flex items-center justify-between p-2.5 rounded-lg bg-surface-subtle/40 border border-border-default/50 hover:bg-surface-subtle transition-colors"
+                        >
+                          <div className="space-y-0.5 min-w-0">
+                            <div className="text-xs font-bold text-text-primary truncate">{amb.nome}</div>
+                            <div className="text-[10px] text-text-muted flex items-center gap-1.5">
+                              <span className="font-mono bg-white px-1 rounded border border-border-default/50">{amb.codigo}</span>
+                              <span>• {amb.bloco}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {amb.media !== null && (
+                              <span className={cn(
+                                "text-[10px] font-bold px-1.5 py-0.5 rounded border",
+                                Number(amb.media) <= 2.5 ? "bg-red-50 text-red-700 border-red-200" : "bg-amber-50 text-amber-700 border-amber-200"
+                              )}>
+                                {amb.media} ★
+                              </span>
+                            )}
+                            {amb.pendentes > 0 ? (
+                              <Badge className="bg-red-100 hover:bg-red-100 text-red-700 text-[10px] border-none font-bold py-0.5 px-2">
+                                {amb.pendentes} pendente{amb.pendentes > 1 && 's'}
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-emerald-100 hover:bg-emerald-100 text-emerald-700 text-[10px] border-none font-bold py-0.5 px-2">
+                                OK
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* SEÇÃO 2: MODO INSUMOS & LIMPEZA */}
+            {dashViewMode === 'insumos' && (
+              <div className="space-y-6">
+                {/* Executive KPIs: Limpezas e Insumos */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="p-3.5 bg-surface-card rounded-xl border border-border-default/70 shadow-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-text-muted">Limpezas Registradas</span>
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 opacity-70" />
+                    </div>
+                    <div className="text-2xl font-black text-emerald-700">
+                      {dashFilteredCheckins.length}
+                    </div>
+                    <div className="text-[10px] text-text-muted truncate">
+                      intervenções de conservação
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 bg-surface-card rounded-xl border border-border-default/70 shadow-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-text-muted">Consumo Total de Insumos</span>
+                      <TrendingUp className="h-4 w-4 text-teal-600 opacity-70" />
+                    </div>
+                    <div className="text-2xl font-black text-teal-700">
+                      {dashTotalMateriais}
+                    </div>
+                    <div className="text-[10px] text-text-muted truncate">
+                      unidades / rolos repostos
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 bg-surface-card rounded-xl border border-border-default/70 shadow-xs space-y-1 col-span-2 md:col-span-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-text-muted">Média por Intervenção</span>
+                      <Boxes className="h-4 w-4 text-blue-600 opacity-70" />
+                    </div>
+                    <div className="text-2xl font-black text-blue-700">
+                      {(dashTotalMateriais / (dashFilteredCheckins.length || 1)).toFixed(1)}
+                      <span className="text-xs font-normal text-text-muted"> un</span>
+                    </div>
+                    <div className="text-[10px] text-text-muted truncate">
+                      insumos por passagem de limpeza
+                    </div>
+                  </div>
+                </div>
+
+                {/* Charts Section: 3 Insumos & Limpezas Visualizations */}
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* Chart 1: Temporal Evolution of Cleanings */}
+                  <div className="bg-surface-card rounded-xl p-4 border border-border-default/70 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="space-y-0.5">
+                        <h4 className="font-extrabold text-text-primary text-sm uppercase tracking-wide flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                          Evolução Temporal de Limpezas
+                        </h4>
+                        <p className="text-xs text-text-muted">Volume diário de passagens e intervenções de conservação.</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="xs"
+                        onClick={() => {
+                          setLimpezasDrilldownFilterDate(null);
+                          setLimpezasDrilldownFilterAcao('todos');
+                          setLimpezasDrilldownSearch('');
+                          setIsLimpezasDrilldownOpen(true);
+                        }}
+                        className="h-7 text-xs gap-1.5 text-blue-700 border-blue-200 hover:bg-blue-50 shrink-0 font-semibold"
+                        title="Abrir detalhamento de limpezas"
+                      >
+                        <Maximize2 className="h-3.5 w-3.5" />
+                        Detalhar
+                      </Button>
+                    </div>
+                    <div className="h-72 w-full pt-2">
+                      {dashTimelineData.length === 0 ? (
+                        <div className="h-full flex items-center justify-center text-text-muted italic text-xs">
+                          Sem registros de limpezas para o período selecionado.
+                        </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart
+                            data={dashTimelineData}
+                            margin={{ top: 10, right: 15, left: -10, bottom: 20 }}
+                            onClick={(data: any) => {
+                              if (data && data.activePayload && data.activePayload.length > 0) {
+                                const clickedItem = data.activePayload[0].payload;
+                                if (clickedItem && clickedItem.dateStr) {
+                                  setLimpezasDrilldownFilterDate(clickedItem.dateStr);
+                                  setLimpezasDrilldownFilterAcao('todos');
+                                  setIsLimpezasDrilldownOpen(true);
+                                }
+                              }
+                            }}
+                            className="cursor-pointer"
+                          >
+                            <defs>
+                              <linearGradient id="colorLimpezas" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
+                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0}/>
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                            <XAxis dataKey="dateStr" tick={{ fontSize: 10, fill: '#64748b' }} />
+                            <YAxis tick={{ fontSize: 10, fill: '#64748b' }} allowDecimals={false} />
+                            <RechartsTooltip
+                              formatter={(val: number) => [`${val} passagem(ns) (clique para detalhar)`, 'Limpezas Realizadas']}
+                              contentStyle={{ borderRadius: '8px', fontSize: '12px', border: '1px solid #e2e8f0' }}
+                            />
+                            <Area type="monotone" dataKey="limpezas" name="Limpezas" stroke="#3b82f6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorLimpezas)" />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Chart 2: Temporal Evolution of Material Inputs */}
+                  <div className="bg-surface-card rounded-xl p-4 border border-border-default/70 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="space-y-0.5">
+                        <h4 className="font-extrabold text-text-primary text-sm uppercase tracking-wide flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                          Evolução Temporal de Insumos
+                        </h4>
+                        <p className="text-xs text-text-muted">Quantidade diária de materiais e insumos repostos.</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="xs"
+                        onClick={() => {
+                          setConsumoDrilldownFilterDate(null);
+                          setConsumoDrilldownFilterMaterial(null);
+                          setConsumoDrilldownSearch('');
+                          setIsConsumoDrilldownOpen(true);
+                        }}
+                        className="h-7 text-xs gap-1.5 text-emerald-700 border-emerald-200 hover:bg-emerald-50 shrink-0 font-semibold"
+                        title="Abrir detalhamento de consumo"
+                      >
+                        <Maximize2 className="h-3.5 w-3.5" />
+                        Detalhar
+                      </Button>
+                    </div>
+                    <div className="h-72 w-full pt-2">
+                      {dashTimelineData.length === 0 ? (
+                        <div className="h-full flex items-center justify-center text-text-muted italic text-xs">
+                          Sem registros de reposição para o período selecionado.
+                        </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart
+                            data={dashTimelineData}
+                            margin={{ top: 10, right: 15, left: -10, bottom: 20 }}
+                            onClick={(data: any) => {
+                              if (data && data.activePayload && data.activePayload.length > 0) {
+                                const clickedItem = data.activePayload[0].payload;
+                                if (clickedItem && clickedItem.dateStr) {
+                                  setConsumoDrilldownFilterDate(clickedItem.dateStr);
+                                  setConsumoDrilldownFilterMaterial(null);
+                                  setIsConsumoDrilldownOpen(true);
+                                }
+                              }
+                            }}
+                            className="cursor-pointer"
+                          >
+                            <defs>
+                              <linearGradient id="colorInsumos" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
+                                <stop offset="95%" stopColor="#10b981" stopOpacity={0.0}/>
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                            <XAxis dataKey="dateStr" tick={{ fontSize: 10, fill: '#64748b' }} />
+                            <YAxis tick={{ fontSize: 10, fill: '#64748b' }} allowDecimals={false} />
+                            <RechartsTooltip
+                              formatter={(val: number) => [`${val} un (clique para detalhar)`, 'Insumos Repostos']}
+                              contentStyle={{ borderRadius: '8px', fontSize: '12px', border: '1px solid #e2e8f0' }}
+                            />
+                            <Area type="monotone" dataKey="insumos" name="Insumos Repostos" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorInsumos)" />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Chart 3: Material Consumption by Category */}
+                  <div className="bg-surface-card rounded-xl p-4 border border-border-default/70 shadow-sm space-y-3 md:col-span-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="space-y-0.5">
+                        <h4 className="font-extrabold text-text-primary text-sm uppercase tracking-wide flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-teal-500"></span>
+                          Consumo Geral de Insumos
+                        </h4>
+                        <p className="text-xs text-text-muted">Distribuição acumulada de reposição por tipo de material no período.</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="xs"
+                        onClick={() => {
+                          setConsumoDrilldownFilterDate(null);
+                          setConsumoDrilldownFilterMaterial(null);
+                          setConsumoDrilldownSearch('');
+                          setIsConsumoDrilldownOpen(true);
+                        }}
+                        className="h-7 text-xs gap-1.5 text-teal-700 border-teal-200 hover:bg-teal-50 shrink-0 font-semibold"
+                        title="Abrir detalhamento de consumo"
+                      >
+                        <Maximize2 className="h-3.5 w-3.5" />
+                        Detalhar
+                      </Button>
+                    </div>
+                    <div className="h-72 w-full pt-2">
+                      {dashMaterialsChartData.every((d) => d.quantidade === 0) ? (
+                        <div className="h-full flex items-center justify-center text-text-muted italic text-xs">
+                          Nenhum consumo de material registrado com os filtros selecionados.
+                        </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={dashMaterialsChartData}
+                            margin={{ top: 10, right: 20, left: 15, bottom: 40 }}
+                            onClick={(data: any) => {
+                              if (data && data.activePayload && data.activePayload.length > 0) {
+                                const clickedItem = data.activePayload[0].payload;
+                                if (clickedItem && clickedItem.key) {
+                                  setConsumoDrilldownFilterMaterial(clickedItem.key);
+                                  setConsumoDrilldownFilterDate(null);
+                                  setIsConsumoDrilldownOpen(true);
+                                }
+                              }
+                            }}
+                            className="cursor-pointer"
+                          >
+                            <XAxis
+                              dataKey="name"
+                              tick={{ fontSize: 10, fill: '#64748b' }}
+                              interval={0}
+                              height={45}
+                            />
+                            <YAxis tick={{ fontSize: 10, fill: '#64748b' }} allowDecimals={false} />
+                            <RechartsTooltip
+                              formatter={(val: number) => [`${val} un (clique para detalhar)`, 'Quantidade']}
+                              contentStyle={{ borderRadius: '8px', fontSize: '12px', border: '1px solid #e2e8f0' }}
+                            />
+                            <Bar dataKey="quantidade" fill="#0d9488" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Top Consuming Environments */}
+                <div className="bg-surface-card rounded-xl p-4 border border-border-default/70 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-extrabold text-text-primary text-sm uppercase tracking-wide flex items-center gap-2">
+                      <Boxes className="h-4 w-4 text-emerald-600" />
+                      Top 5 Ambientes em Consumo de Insumos
+                    </h4>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => {
+                        setConsumoDrilldownFilterDate(null);
+                        setConsumoDrilldownFilterMaterial(null);
+                        setConsumoDrilldownSearch('');
+                        setIsConsumoDrilldownOpen(true);
+                      }}
+                      className="h-6 text-[11px] text-emerald-700 hover:bg-emerald-50 px-2 font-semibold"
+                    >
+                      Ver detalhamento
+                    </Button>
+                  </div>
+                  {dashTopConsumoAmbientes.length === 0 ? (
+                    <div className="py-8 text-center text-text-muted italic text-xs">
+                      Nenhum consumo registrado no período.
+                    </div>
+                  ) : (
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+                      {dashTopConsumoAmbientes.map((amb, idx) => {
+                        const percentage = Math.round((amb.total / maxConsumo) * 100);
+                        return (
+                          <div
+                            key={idx}
+                            onClick={() => {
+                              setConsumoDrilldownSearch(amb.codigo);
+                              setConsumoDrilldownFilterDate(null);
+                              setConsumoDrilldownFilterMaterial(null);
+                              setIsConsumoDrilldownOpen(true);
+                            }}
+                            className="space-y-1.5 p-2.5 rounded-lg border border-border-default/50 bg-surface-subtle/30 hover:bg-emerald-50/60 transition-colors cursor-pointer"
+                            title="Clique para ver o detalhamento deste ambiente"
+                          >
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="font-semibold text-text-primary truncate max-w-[180px]">
+                                {amb.nome}
+                                <span className="text-text-muted font-normal text-[10px] ml-1.5">({amb.bloco})</span>
+                              </div>
+                              <span className="font-mono font-bold text-emerald-700">{amb.total} un</span>
+                            </div>
+                            <div className="w-full h-2 bg-surface-subtle rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </SectionPanel>
+        </TabsContent>
+
+        {/* Tab: Visão Geral / Mapa */}
+        <TabsContent value="mapa" className="mt-0 space-y-6">
+          {/* Campus map */}
+          <div className={cn(
+            "bg-white p-4 border border-border-default/80 shadow-soft space-y-3 relative z-0 rounded-b-2xl rounded-tr-2xl",
+            activeTab === 'mapa' ? 'rounded-tl-none' : 'rounded-tl-2xl'
+          )}>
                 <div className="flex items-center justify-between">
                   <h3 className="font-extrabold text-slate-800 text-sm uppercase tracking-wide">
                     Mapa do Campus - Currais Novos
@@ -1300,12 +2271,10 @@ export default function ManutencaoAdmin() {
                   })()}
                 </div>
               </div>
-            </div>
 
-            {/* Side Panel: Selected Zone Info OR Block Editor */}
-            <div className="lg:col-span-4">
+              {/* Side Panel / Bottom Card: Selected Zone Info OR Block Editor */}
               {isEditMapMode ? (
-                <Card className="border shadow-sm bg-white rounded-2xl h-full flex flex-col">
+                <Card className="border shadow-sm bg-white rounded-2xl">
                   <CardHeader className="pb-3 border-b">
                     <CardTitle className="text-sm font-extrabold uppercase text-slate-800 flex items-center gap-2">
                       <Building2 className="h-5 w-5 text-emerald-600" />
@@ -1317,7 +2286,7 @@ export default function ManutencaoAdmin() {
                         : 'Preencha os dados do bloco e utilize as ferramentas de desenho no mapa.'}
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="flex-1 overflow-y-auto pt-4 space-y-4">
+                  <CardContent className="pt-4 space-y-4">
                     {!editingBloco ? (
                       <div className="space-y-4">
                         <div className="flex gap-2">
@@ -1327,7 +2296,7 @@ export default function ManutencaoAdmin() {
                               geometria_tipo: 'polygon',
                               geometria_data: {}
                             })}
-                            className="flex-1 h-9 gap-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
+                            className="h-9 gap-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
                           >
                             <Plus className="h-3.5 w-3.5" />
                             Novo Bloco
@@ -1340,9 +2309,9 @@ export default function ManutencaoAdmin() {
                             Restaurar Padrão
                           </Button>
                         </div>
-                        <div className="divide-y divide-slate-100 max-h-[350px] overflow-y-auto pr-1">
+                        <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-[350px] overflow-y-auto pr-1">
                           {activeBlocos.map(bloco => (
-                            <div key={bloco.id} className="py-2.5 flex items-center justify-between gap-2 text-xs">
+                            <div key={bloco.id} className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 flex items-center justify-between gap-2 text-xs">
                               <div className="min-w-0">
                                 <div className="font-bold text-slate-700 truncate">{bloco.nome}</div>
                                 <div className="text-[10px] text-slate-400 capitalize">{bloco.geometria_tipo}</div>
@@ -1370,7 +2339,7 @@ export default function ManutencaoAdmin() {
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-4">
+                      <div className="space-y-4 max-w-2xl">
                         <div className="space-y-1">
                           <label className="text-xs font-semibold text-slate-600">Nome do Bloco</label>
                           <Input
@@ -1493,148 +2462,211 @@ export default function ManutencaoAdmin() {
                   </CardContent>
                 </Card>
               ) : (
-                <Card className="border shadow-sm bg-white rounded-2xl h-full flex flex-col">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base font-extrabold text-slate-800 flex items-center gap-2">
-                      <Building2 className="h-5 w-5 text-emerald-600" />
-                      {selectedBloco ? selectedBloco.nome : 'Todos os Ambientes'}
-                    </CardTitle>
-                    <CardDescription className="text-xs">
-                      {selectedBloco
-                        ? 'Ambientes cadastrados neste bloco.'
-                        : 'Selecione um bloco no mapa para filtrar.'}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex-1 overflow-y-auto max-h-[350px] space-y-2">
-                    {filteredAmbientesByBloco.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-10 text-center text-slate-400 italic text-xs">
-                        Nenhum ambiente cadastrado neste bloco.
+                <DataTablePanel
+                  actions={
+                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                      <div className="relative w-52">
+                        <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          value={mapaSearchQuery}
+                          onChange={(e) => setMapaSearchQuery(e.target.value)}
+                          placeholder="Buscar no mapa..."
+                          className="h-8 pl-8 text-xs input-system"
+                        />
                       </div>
-                    ) : (
-                      filteredAmbientesByBloco.map((amb) => {
-                        const roomOcorrencias = ocorrencias.filter((o) => o.ambiente_id === amb.id && o.status === 'pendente');
-                        const roomCheckins = checkins.filter((ch) => ch.ambiente_id === amb.id);
-                        const lastCheckin = roomCheckins[0];
 
-                        return (
-                          <div key={amb.id} className="p-3 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors flex items-start justify-between gap-3">
-                            <div className="space-y-1 min-w-0">
-                              <div className="text-xs font-bold text-slate-800 truncate">{amb.nome}</div>
-                              <div className="text-[10px] font-mono text-slate-400 flex items-center gap-1.5">
-                                <span className="uppercase bg-slate-100 px-1 rounded font-bold">{amb.codigo}</span>
-                                {amb.bloco && <span>• {amb.bloco}</span>}
-                              </div>
-                              <div className="text-[10px] text-slate-500">
-                                {lastCheckin 
-                                  ? `Última limpeza: ${new Date(lastCheckin.created_at).toLocaleDateString()} ${new Date(lastCheckin.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`
-                                  : 'Sem registro de limpeza'}
-                              </div>
-                            </div>
-                            <div className="shrink-0 flex flex-col items-end gap-1.5">
-                              {roomOcorrencias.length > 0 ? (
-                                <Badge className="bg-red-100 hover:bg-red-100 text-red-700 text-[9px] border-none font-bold py-0.5 px-1.5">
-                                  {roomOcorrencias.length} alerta{roomOcorrencias.length > 1 && 's'}
-                                </Badge>
-                              ) : (
-                                <Badge className="bg-emerald-100 hover:bg-emerald-100 text-emerald-700 text-[9px] border-none font-bold py-0.5 px-1.5">
-                                  OK / Limpo
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </CardContent>
-                </Card>
+                      <Select value={mapaStatusFilter} onValueChange={setMapaStatusFilter}>
+                        <SelectTrigger className="h-8 text-xs w-36 input-system">
+                          <SelectValue placeholder="Situação" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todos">Todas situações</SelectItem>
+                          <SelectItem value="com_alerta">Com alertas</SelectItem>
+                          <SelectItem value="limpos">OK / Limpos</SelectItem>
+                          <SelectItem value="sem_limpeza">Sem limpeza</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={mapaTipoFilter} onValueChange={setMapaTipoFilter}>
+                        <SelectTrigger className="h-8 text-xs w-36 input-system">
+                          <SelectValue placeholder="Tipo de Espaço" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todos">Todos os tipos</SelectItem>
+                          <SelectItem value="banheiro">Banheiro</SelectItem>
+                          <SelectItem value="sala">Sala de Aula</SelectItem>
+                          <SelectItem value="laboratorio">Laboratório</SelectItem>
+                          <SelectItem value="corredor">Convivência</SelectItem>
+                          <SelectItem value="outros">Outros</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      {selectedBlocoId && (
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          onClick={() => setSelectedBlocoId(null)}
+                          className="h-8 text-xs text-slate-600 hover:text-slate-900 border-slate-200 shrink-0"
+                        >
+                          Ver Todos os Blocos
+                        </Button>
+                      )}
+                    </div>
+                  }
+                >
+                  <div className="overflow-x-auto">
+                    <Table className="table-system">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[120px]">Código</TableHead>
+                          <TableHead>Ambiente</TableHead>
+                          <TableHead className="w-[150px]">Bloco / Setor</TableHead>
+                          <TableHead className="w-[130px]">Tipo</TableHead>
+                          <TableHead className="w-[190px]">Última Limpeza</TableHead>
+                          <TableHead className="w-[130px]">Situação</TableHead>
+                          <TableHead className="text-right w-[80px]">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {mapaFilteredAmbientes.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center py-8 text-slate-400 italic text-xs">
+                              Nenhum ambiente encontrado com os filtros aplicados.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          mapaFilteredAmbientes.map((amb) => {
+                            const roomOcorrencias = ocorrencias.filter((o) => o.ambiente_id === amb.id && o.status === 'pendente');
+                            const roomCheckins = checkins.filter((ch) => ch.ambiente_id === amb.id);
+                            const lastCheckin = roomCheckins[0];
+
+                            return (
+                              <TableRow key={amb.id}>
+                                <TableCell className="font-mono text-xs font-bold text-slate-700">
+                                  <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 uppercase">
+                                    {amb.codigo}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="font-bold text-slate-800 text-xs">
+                                  {amb.nome}
+                                </TableCell>
+                                <TableCell className="text-xs text-slate-600">
+                                  {amb.bloco || '—'}
+                                </TableCell>
+                                <TableCell className="text-xs text-slate-500 capitalize">
+                                  {tipoLabels[amb.tipo] || amb.tipo}
+                                </TableCell>
+                                <TableCell className="text-xs text-slate-600">
+                                  {lastCheckin ? (
+                                    <div>
+                                      <div className="font-medium text-slate-800">
+                                        {new Date(lastCheckin.created_at).toLocaleDateString('pt-BR')} às {new Date(lastCheckin.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      </div>
+                                      <div className="text-[10px] text-slate-400">{lastCheckin.responsavel_nome}</div>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-400 italic text-[11px]">Sem registro</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {roomOcorrencias.length > 0 ? (
+                                    <Badge className="bg-red-100 hover:bg-red-100 text-red-700 text-[10px] border-none font-bold py-0.5 px-2">
+                                      {roomOcorrencias.length} alerta{roomOcorrencias.length > 1 && 's'}
+                                    </Badge>
+                                  ) : lastCheckin ? (
+                                    <Badge className="bg-emerald-100 hover:bg-emerald-100 text-emerald-700 text-[10px] border-none font-bold py-0.5 px-2">
+                                      OK / Limpo
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="bg-slate-100 hover:bg-slate-100 text-slate-600 text-[10px] border-none font-medium py-0.5 px-2">
+                                      Pendente
+                                    </Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button
+                                    variant="ghost"
+                                    size="xs"
+                                    onClick={() => setQrCodeData({ codigo: amb.codigo, nome: amb.nome })}
+                                    title="Imprimir / Ver QR Code"
+                                    className="h-7 w-7 p-0 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50"
+                                  >
+                                    <QrCode className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </DataTablePanel>
               )}
-            </div>
-          </div>
-
-          {/* Charts Section */}
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* Chart 1: Material Consumption */}
-            <div className="bg-white p-4 border rounded-2xl shadow-sm space-y-4">
-              <h4 className="font-extrabold text-slate-800 text-sm uppercase tracking-wide">
-                Consumo Geral de Insumos
-              </h4>
-              <div className="h-64 w-full">
-                {materialsChartData.every(d => d.quantidade === 0) ? (
-                  <div className="h-full flex items-center justify-center text-slate-400 italic text-xs">
-                    Nenhum consumo de material registrado ainda.
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={materialsChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                      <XAxis dataKey="name" tick={{ fontSize: 9 }} />
-                      <YAxis tick={{ fontSize: 9 }} />
-                      <RechartsTooltip />
-                      <Bar dataKey="quantidade" fill="#10b981" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </div>
-
-            {/* Chart 2: Ratings */}
-            <div className="bg-white p-4 border rounded-2xl shadow-sm space-y-4">
-              <h4 className="font-extrabold text-slate-800 text-sm uppercase tracking-wide">
-                Distribuição de Avaliações
-              </h4>
-              <div className="h-64 w-full flex items-center justify-center">
-                {ocorrencias.length === 0 ? (
-                  <div className="text-slate-400 italic text-xs">
-                    Nenhuma avaliação registrada ainda.
-                  </div>
-                ) : (
-                  <div className="w-full h-full flex flex-col md:flex-row items-center justify-around">
-                    <div className="h-44 w-44">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={ratingChartData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={50}
-                            outerRadius={70}
-                            paddingAngle={3}
-                            dataKey="value"
-                          >
-                            {ratingChartData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={ratingColors[index % ratingColors.length]} />
-                            ))}
-                          </Pie>
-                          <RechartsTooltip />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="space-y-1.5">
-                      {ratingChartData.map((item, index) => (
-                        <div key={item.name} className="flex items-center gap-2 text-xs">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: ratingColors[index] }} />
-                          <span className="font-semibold text-slate-700">{item.name}:</span>
-                          <span className="font-black text-slate-900">{item.value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
         </TabsContent>
 
         {/* Tab 1: Ocorrencias */}
-        <TabsContent value="ocorrencias">
-          <DataTablePanel title="Relatos de Problemas" description="Feed de feedbacks recebidos dos usuários em tempo real.">
-            <Table>
+        <TabsContent value="ocorrencias" className="mt-0">
+          <DataTablePanel
+            actions={
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                <div className="relative w-64">
+                  <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Buscar ocorrência..."
+                    className="h-8 pl-8 text-xs input-system"
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="h-8 text-xs w-36 input-system">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os status</SelectItem>
+                    <SelectItem value="pendente">Pendentes</SelectItem>
+                    <SelectItem value="resolvido">Resolvidos</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={ocFilterNota} onValueChange={setOcFilterNota}>
+                  <SelectTrigger className="h-8 text-xs w-32 input-system">
+                    <SelectValue placeholder="Avaliação" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todas notas</SelectItem>
+                    <SelectItem value="5">5 ★</SelectItem>
+                    <SelectItem value="4">4 ★</SelectItem>
+                    <SelectItem value="3">3 ★</SelectItem>
+                    <SelectItem value="2">2 ★</SelectItem>
+                    <SelectItem value="1">1 ★</SelectItem>
+                  </SelectContent>
+                </Select>
+                {(searchQuery || statusFilter !== 'pendente' || ocFilterNota !== 'todos') && (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setStatusFilter('pendente');
+                      setOcFilterNota('todos');
+                    }}
+                    className="h-8 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                  >
+                    Restaurar Padrão
+                  </Button>
+                )}
+              </div>
+            }
+          >
+            <Table className="table-system">
               <TableHeader className="bg-slate-50/80">
                 <TableRow>
                   <TableHead className="w-1/4">Ambiente</TableHead>
-                  <TableHead className="w-12">Avaliação</TableHead>
+                  <TableHead className="w-12 text-center">Avaliação</TableHead>
                   <TableHead className="w-1/4">Problemas Relatados</TableHead>
                   <TableHead>Detalhes</TableHead>
-                  <TableHead className="w-24">Foto</TableHead>
+                  <TableHead className="w-20">Foto</TableHead>
                   <TableHead className="w-40">Data de Envio</TableHead>
                   <TableHead className="w-24">Status</TableHead>
                   <TableHead className="w-24 text-right">Ação</TableHead>
@@ -1678,19 +2710,25 @@ export default function ManutencaoAdmin() {
                       </TableCell>
                       <TableCell className="align-top">
                         {oc.foto_url ? (
-                          <a
-                            href={oc.foto_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex overflow-hidden rounded-lg border border-slate-200 bg-slate-50 transition hover:border-emerald-300"
-                            title="Abrir foto da ocorrência"
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPhoto({
+                              url: oc.foto_url!,
+                              title: `Foto da ocorrência - ${oc.ambiente?.nome || 'Ambiente'}`,
+                              desc: oc.observacao || (oc.problemas.length > 0 ? `Problemas: ${oc.problemas.map(p => problemLabels[p] || p).join(', ')}` : undefined),
+                            })}
+                            className="group relative inline-flex overflow-hidden rounded-lg border border-slate-200 bg-slate-50 transition hover:border-emerald-500 shadow-xs cursor-pointer"
+                            title="Clique para ampliar a foto"
                           >
                             <img
                               src={oc.foto_url}
                               alt={`Foto da ocorrência em ${oc.ambiente?.nome || 'ambiente'}`}
-                              className="h-14 w-16 object-cover"
+                              className="h-14 w-16 object-cover transition-transform duration-200 group-hover:scale-105"
                             />
-                          </a>
+                            <div className="absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <ZoomIn className="h-4 w-4 text-white drop-shadow" />
+                            </div>
+                          </button>
                         ) : (
                           <span className="text-xs italic text-slate-400">Sem foto</span>
                         )}
@@ -1729,165 +2767,39 @@ export default function ManutencaoAdmin() {
           </DataTablePanel>
         </TabsContent>
 
-        {/* Tab 2: Checkins */}
-        <TabsContent value="checkins">
-          <DataTablePanel title="Diário de Conservação" description="Logs de passagens registrados pelas equipes de limpeza do campus.">
-            <Table>
-              <TableHeader className="bg-slate-50/80">
-                <TableRow>
-                  <TableHead className="w-1/4">Ambiente</TableHead>
-                  <TableHead className="w-1/4">Responsável</TableHead>
-                  <TableHead className="w-1/4">Ações Realizadas</TableHead>
-                  <TableHead>Observações / Consumos</TableHead>
-                  <TableHead className="w-40 text-right">Data/Hora</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow><TableCell colSpan={5} className="h-28 text-center italic text-muted-foreground">Carregando dados...</TableCell></TableRow>
-                ) : filteredCheckins.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="h-28 text-center italic text-muted-foreground">Nenhum check-in registrado.</TableCell></TableRow>
-                ) : (
-                  filteredCheckins.map((ch) => (
-                    <TableRow key={ch.id} className="hover:bg-slate-50/50">
-                      <TableCell>
-                        <div className="font-semibold text-slate-900">{ch.ambiente?.nome}</div>
-                        <div className="text-xs font-mono text-slate-500">{ch.ambiente?.codigo}</div>
-                      </TableCell>
-                      <TableCell className="font-medium text-slate-800 flex items-center gap-2">
-                        <User className="h-3.5 w-3.5 text-slate-400" />
-                        {ch.responsavel_nome}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {ch.acoes_realizadas && ch.acoes_realizadas.length > 0 ? (
-                            ch.acoes_realizadas.map((acao) => (
-                              <Badge key={acao} variant="secondary" className={cn('text-[10px] border font-medium px-2 py-0.5', mapAcaoBadge[acao])}>
-                                {mapAcaoLabel[acao] || acao}
-                              </Badge>
-                            ))
-                          ) : (
-                            <span className="text-xs text-muted-foreground italic">Nenhuma ação</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs text-slate-600 max-w-xs align-top">
-                        <div className="space-y-1">
-                          {ch.observacao && <div>{ch.observacao}</div>}
-                          {ch.materiais && ch.materiais.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {ch.materiais.map((mat) => (
-                                <span key={mat.material} className="inline-flex items-center text-[10px] bg-slate-100 text-slate-600 rounded px-1.5 py-0.5 font-bold font-mono">
-                                  {materialEmojis[mat.material] || '📦'} {mat.quantidade}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs text-slate-500 text-right">
-                        {formatDateTime(ch.created_at)}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </DataTablePanel>
-        </TabsContent>
 
-        {/* Tab: Consumo */}
-        <TabsContent value="consumo">
-          <DataTablePanel
-            title="Consumo de Insumos"
-            description="Detalhamento do consumo de materiais de limpeza/higienização reportados pelas equipes nos check-ins."
-          >
-            <Table>
-              <TableHeader className="bg-slate-50/80">
-                <TableRow>
-                  {consumoGrouping !== 'dia' && <TableHead className="w-1/3">Ambiente</TableHead>}
-                  {consumoGrouping !== 'ambiente' && <TableHead className="w-40">Data</TableHead>}
-                  <TableHead className="text-right">🧻 Papel Higiênico</TableHead>
-                  <TableHead className="text-right">🧴 Sabonete Líquido</TableHead>
-                  <TableHead className="text-right">🧻 Papel Toalha</TableHead>
-                  <TableHead className="text-right">🗑️ Saco de Lixo</TableHead>
-                  <TableHead className="text-right">📦 Outros</TableHead>
-                  <TableHead className="text-right font-bold">Total Geral</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={consumoGrouping === 'amb_dia' ? 8 : 7} className="h-28 text-center italic text-muted-foreground">
-                      Carregando dados...
-                    </TableCell>
-                  </TableRow>
-                ) : sortedConsumoData.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={consumoGrouping === 'amb_dia' ? 8 : 7} className="h-28 text-center italic text-muted-foreground">
-                      Nenhum consumo registrado com os filtros selecionados.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  sortedConsumoData.map((row, idx) => (
-                    <TableRow key={idx} className="hover:bg-slate-50/50">
-                      {consumoGrouping !== 'dia' && (
-                        <TableCell>
-                          <div className="font-semibold text-slate-900">{row.ambienteNome}</div>
-                          {row.ambienteCodigo && <div className="text-xs font-mono text-slate-500">{row.ambienteCodigo}</div>}
-                        </TableCell>
-                      )}
-                      {consumoGrouping !== 'ambiente' && (
-                        <TableCell className="font-medium text-slate-700">
-                          {row.data}
-                        </TableCell>
-                      )}
-                      <TableCell className="text-right text-slate-700 font-mono">
-                        {row.papel_higienico || '-'}
-                      </TableCell>
-                      <TableCell className="text-right text-slate-700 font-mono">
-                        {row.sabonete_liquido || '-'}
-                      </TableCell>
-                      <TableCell className="text-right text-slate-700 font-mono">
-                        {row.papel_toalha || '-'}
-                      </TableCell>
-                      <TableCell className="text-right text-slate-700 font-mono">
-                        {row.saco_lixo || '-'}
-                      </TableCell>
-                      <TableCell className="text-right text-slate-700 font-mono">
-                        {row.outros || '-'}
-                      </TableCell>
-                      <TableCell className="text-right font-extrabold text-slate-900 font-mono">
-                        {row.total}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </DataTablePanel>
-        </TabsContent>
+
+
 
         {/* Tab 3: Ambientes */}
-        <TabsContent value="ambientes">
+        <TabsContent value="ambientes" className="mt-0">
           <DataTablePanel
-            title="Ambientes Monitorados"
-            description="Lista de todos os espaços físicos que possuem QR Code de identificação."
             actions={
-              filteredAmbientes.length > 0 && (
-                <Button
-                  onClick={printAllQrCodes}
-                  size="sm"
-                  variant="outline"
-                  className="h-8 gap-1.5 text-emerald-700 border-emerald-200 hover:bg-emerald-50"
-                >
-                  <Printer className="h-3.5 w-3.5" />
-                  Imprimir Todos ({filteredAmbientes.length})
-                </Button>
-              )
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                <div className="relative w-64">
+                  <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Buscar ambiente..."
+                    className="h-8 pl-8 text-xs input-system"
+                  />
+                </div>
+                {filteredAmbientes.length > 0 && (
+                  <Button
+                    onClick={printAllQrCodes}
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1.5 text-emerald-700 border-emerald-200 hover:bg-emerald-50 text-xs"
+                  >
+                    <Printer className="h-3.5 w-3.5" />
+                    Imprimir Todos ({filteredAmbientes.length})
+                  </Button>
+                )}
+              </div>
             }
           >
-            <Table>
+            <Table className="table-system">
               <TableHeader className="bg-slate-50/80">
                 <TableRow>
                   <TableHead className="w-1/4">Código</TableHead>
@@ -2055,6 +2967,395 @@ export default function ManutencaoAdmin() {
             <Button onClick={printQrCode} className="bg-emerald-600 hover:bg-emerald-700 text-white h-10 px-5 gap-2 shadow-sm">
               <Printer className="h-4 w-4" />
               Imprimir Etiqueta
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Visualizador de Foto da Ocorrência */}
+      <Dialog open={selectedPhoto !== null} onOpenChange={(open) => { if (!open) setSelectedPhoto(null); }}>
+        <DialogContent className="sm:max-w-[580px] bg-white rounded-2xl shadow-lifted p-5">
+          <DialogHeader>
+            <DialogTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+              <Eye className="h-4 w-4 text-emerald-600" />
+              {selectedPhoto?.title}
+            </DialogTitle>
+            {selectedPhoto?.desc && (
+              <DialogDescription className="text-xs text-slate-600">
+                {selectedPhoto.desc}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+
+          {selectedPhoto && (
+            <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-900 flex items-center justify-center my-2 max-h-[420px]">
+              <img
+                src={selectedPhoto.url}
+                alt={selectedPhoto.title}
+                className="max-h-[400px] w-auto object-contain rounded-lg shadow-sm"
+              />
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 pt-2">
+            {selectedPhoto && (
+              <a
+                href={selectedPhoto.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-emerald-700 hover:underline font-semibold mr-auto pl-1"
+              >
+                Abrir imagem original
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            )}
+            <Button type="button" variant="outline" onClick={() => setSelectedPhoto(null)} className="h-9 text-xs">
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Drilldown: Detalhamento de Consumo de Insumos */}
+      <Dialog open={isConsumoDrilldownOpen} onOpenChange={setIsConsumoDrilldownOpen}>
+        <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col p-6 overflow-hidden bg-white rounded-2xl shadow-lifted">
+          <DialogHeader className="pb-3 border-b border-border-default/60">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-emerald-100 text-emerald-800">
+                  <Boxes className="h-5 w-5" />
+                </div>
+                <div>
+                  <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    Detalhamento de Consumo de Insumos
+                    <Badge variant="outline" className="text-[11px] font-normal border-emerald-300 text-emerald-800 bg-emerald-50">
+                      Detalhamento
+                    </Badge>
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-slate-500">
+                    Registro analítico detalhado das reposições realizadas no período ({sortedConsumoData.length} registros).
+                  </DialogDescription>
+                </div>
+              </div>
+              {/* Badges de filtros de drilldown ativos */}
+              {(consumoDrilldownFilterDate || consumoDrilldownFilterMaterial) && (
+                <div className="flex items-center gap-1.5">
+                  {consumoDrilldownFilterDate && (
+                    <Badge variant="secondary" className="text-xs gap-1 bg-blue-100 text-blue-800">
+                      Data: {consumoDrilldownFilterDate}
+                      <button onClick={() => setConsumoDrilldownFilterDate(null)} className="ml-1 hover:text-blue-950 font-bold">×</button>
+                    </Badge>
+                  )}
+                  {consumoDrilldownFilterMaterial && (
+                    <Badge variant="secondary" className="text-xs gap-1 bg-emerald-100 text-emerald-800">
+                      Material: {materialLabels[consumoDrilldownFilterMaterial] || consumoDrilldownFilterMaterial}
+                      <button onClick={() => setConsumoDrilldownFilterMaterial(null)} className="ml-1 hover:text-emerald-950 font-bold">×</button>
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </div>
+          </DialogHeader>
+
+          {/* Drilldown Toolbar */}
+          <div className="py-3 flex items-center justify-between gap-3 flex-wrap bg-slate-50/70 px-4 -mx-6 border-b border-slate-200/80">
+            <div className="flex items-center gap-2 flex-1 min-w-[240px]">
+              <div className="relative w-full max-w-xs">
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={consumoDrilldownSearch}
+                  onChange={(e) => setConsumoDrilldownSearch(e.target.value)}
+                  placeholder="Buscar por ambiente, código, bloco..."
+                  className="h-8 pl-8 text-xs bg-white input-system"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500">Agrupar por:</span>
+              <Select value={consumoGrouping} onValueChange={(val: any) => setConsumoGrouping(val)}>
+                <SelectTrigger className="h-8 text-xs w-48 bg-white input-system">
+                  <SelectValue placeholder="Agrupamento" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="amb_dia">Por Ambiente e Dia</SelectItem>
+                  <SelectItem value="ambiente">Por Ambiente</SelectItem>
+                  <SelectItem value="dia">Por Dia</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {(consumoDrilldownSearch || consumoDrilldownFilterDate || consumoDrilldownFilterMaterial) && (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => {
+                    setConsumoDrilldownSearch('');
+                    setConsumoDrilldownFilterDate(null);
+                    setConsumoDrilldownFilterMaterial(null);
+                  }}
+                  className="h-8 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                >
+                  Limpar Filtros
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Drilldown Table Content */}
+          <div className="flex-1 overflow-y-auto -mx-6 px-6 pt-2">
+            <Table className="table-system">
+              <TableHeader className="sticky top-0 bg-slate-50/95 backdrop-blur z-10 shadow-xs">
+                <TableRow>
+                  {consumoGrouping !== 'dia' && <TableHead className="w-1/3">Ambiente</TableHead>}
+                  {consumoGrouping !== 'ambiente' && <TableHead className="w-32">Data</TableHead>}
+                  <TableHead className="text-right">🧻 Papel Higiênico</TableHead>
+                  <TableHead className="text-right">🧴 Sabonete Líquido</TableHead>
+                  <TableHead className="text-right">🧻 Papel Toalha</TableHead>
+                  <TableHead className="text-right">🗑️ Saco de Lixo</TableHead>
+                  <TableHead className="text-right">📦 Outros</TableHead>
+                  <TableHead className="text-right font-bold">Total Geral</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedConsumoData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={consumoGrouping === 'amb_dia' ? 8 : 7} className="h-36 text-center italic text-muted-foreground">
+                      Nenhum registro de consumo localizado com os filtros aplicados.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  sortedConsumoData.map((row, idx) => (
+                    <TableRow key={idx} className="hover:bg-slate-50/60">
+                      {consumoGrouping !== 'dia' && (
+                        <TableCell>
+                          <div className="font-semibold text-slate-900">{row.ambienteNome}</div>
+                          <div className="text-xs font-mono text-slate-500 flex items-center gap-1.5">
+                            {row.ambienteCodigo && <span>{row.ambienteCodigo}</span>}
+                            {row.ambienteBloco && <span>• {row.ambienteBloco}</span>}
+                          </div>
+                        </TableCell>
+                      )}
+                      {consumoGrouping !== 'ambiente' && (
+                        <TableCell className="font-medium text-slate-700">
+                          {row.data}
+                        </TableCell>
+                      )}
+                      <TableCell className="text-right text-slate-700 font-mono">
+                        {row.papel_higienico || '-'}
+                      </TableCell>
+                      <TableCell className="text-right text-slate-700 font-mono">
+                        {row.sabonete_liquido || '-'}
+                      </TableCell>
+                      <TableCell className="text-right text-slate-700 font-mono">
+                        {row.papel_toalha || '-'}
+                      </TableCell>
+                      <TableCell className="text-right text-slate-700 font-mono">
+                        {row.saco_lixo || '-'}
+                      </TableCell>
+                      <TableCell className="text-right text-slate-700 font-mono">
+                        {row.outros || '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-extrabold text-emerald-800 font-mono bg-emerald-50/40">
+                        {row.total}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <DialogFooter className="pt-3 border-t border-border-default/60 flex items-center justify-between w-full">
+            <div className="text-xs text-slate-500">
+              Total consolidado:{' '}
+              <strong className="text-slate-800">
+                {sortedConsumoData.reduce((acc, r) => acc + r.total, 0)} unidades
+              </strong>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsConsumoDrilldownOpen(false)}
+              className="text-xs"
+            >
+              Fechar Detalhamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Drilldown: Detalhamento de Limpezas Realizadas */}
+      <Dialog open={isLimpezasDrilldownOpen} onOpenChange={setIsLimpezasDrilldownOpen}>
+        <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col p-6 overflow-hidden bg-white rounded-2xl shadow-lifted">
+          <DialogHeader className="pb-3 border-b border-border-default/60">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-blue-100 text-blue-800">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    Detalhamento de Limpezas Realizadas
+                    <Badge variant="outline" className="text-[11px] font-normal border-blue-300 text-blue-800 bg-blue-50">
+                      Detalhamento
+                    </Badge>
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-slate-500">
+                    Registro analítico de passagens e intervenções de limpeza no período ({filteredLimpezasDrilldown.length} registros).
+                  </DialogDescription>
+                </div>
+              </div>
+              {/* Badges de filtros de drilldown ativos */}
+              {(limpezasDrilldownFilterDate || limpezasDrilldownFilterAcao !== 'todos') && (
+                <div className="flex items-center gap-1.5">
+                  {limpezasDrilldownFilterDate && (
+                    <Badge variant="secondary" className="text-xs gap-1 bg-blue-100 text-blue-800">
+                      Data: {limpezasDrilldownFilterDate}
+                      <button onClick={() => setLimpezasDrilldownFilterDate(null)} className="ml-1 hover:text-blue-950 font-bold">×</button>
+                    </Badge>
+                  )}
+                  {limpezasDrilldownFilterAcao !== 'todos' && (
+                    <Badge variant="secondary" className="text-xs gap-1 bg-purple-100 text-purple-800">
+                      Ação: {mapAcaoLabel[limpezasDrilldownFilterAcao] || limpezasDrilldownFilterAcao}
+                      <button onClick={() => setLimpezasDrilldownFilterAcao('todos')} className="ml-1 hover:text-purple-950 font-bold">×</button>
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </div>
+          </DialogHeader>
+
+          {/* Drilldown Toolbar */}
+          <div className="py-3 flex items-center justify-between gap-3 flex-wrap bg-slate-50/70 px-4 -mx-6 border-b border-slate-200/80">
+            <div className="flex items-center gap-2 flex-1 min-w-[240px]">
+              <div className="relative w-full max-w-xs">
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={limpezasDrilldownSearch}
+                  onChange={(e) => setLimpezasDrilldownSearch(e.target.value)}
+                  placeholder="Buscar por ambiente, responsável, material..."
+                  className="h-8 pl-8 text-xs bg-white input-system"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500">Filtrar por ação:</span>
+              <Select value={limpezasDrilldownFilterAcao} onValueChange={setLimpezasDrilldownFilterAcao}>
+                <SelectTrigger className="h-8 text-xs w-48 bg-white input-system">
+                  <SelectValue placeholder="Todas ações" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todas ações</SelectItem>
+                  <SelectItem value="limpeza_padrao">Limpeza Padrão</SelectItem>
+                  <SelectItem value="reposicao_insumos">Reposição Insumos</SelectItem>
+                  <SelectItem value="varricao">Varrição</SelectItem>
+                  <SelectItem value="recolhimento_lixo">Recolhimento Lixo</SelectItem>
+                  <SelectItem value="limpeza_pesada">Limpeza Pesada</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {(limpezasDrilldownSearch || limpezasDrilldownFilterDate || limpezasDrilldownFilterAcao !== 'todos') && (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => {
+                    setLimpezasDrilldownSearch('');
+                    setLimpezasDrilldownFilterDate(null);
+                    setLimpezasDrilldownFilterAcao('todos');
+                  }}
+                  className="h-8 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                >
+                  Limpar Filtros
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Drilldown Table Content */}
+          <div className="flex-1 overflow-y-auto -mx-6 px-6 pt-2">
+            <Table className="table-system">
+              <TableHeader className="sticky top-0 bg-slate-50/95 backdrop-blur z-10 shadow-xs">
+                <TableRow>
+                  <TableHead className="w-1/4">Ambiente</TableHead>
+                  <TableHead className="w-1/4">Responsável</TableHead>
+                  <TableHead className="w-1/4">Ações Realizadas</TableHead>
+                  <TableHead>Observações / Consumos</TableHead>
+                  <TableHead className="w-36 text-right">Data/Hora</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredLimpezasDrilldown.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-36 text-center italic text-muted-foreground">
+                      Nenhum registro de limpeza localizado com os filtros aplicados.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredLimpezasDrilldown.map((ch) => (
+                    <TableRow key={ch.id} className="hover:bg-slate-50/60">
+                      <TableCell>
+                        <div className="font-semibold text-slate-900">{ch.ambiente?.nome}</div>
+                        <div className="text-xs font-mono text-slate-500 flex items-center gap-1.5">
+                          {ch.ambiente?.codigo && <span>{ch.ambiente?.codigo}</span>}
+                          {ch.ambiente?.bloco && <span>• {ch.ambiente?.bloco}</span>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-medium text-slate-800 flex items-center gap-2">
+                        <User className="h-3.5 w-3.5 text-slate-400" />
+                        {ch.responsavel_nome}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {ch.acoes_realizadas && ch.acoes_realizadas.length > 0 ? (
+                            ch.acoes_realizadas.map((acao) => (
+                              <Badge key={acao} variant="secondary" className={cn('text-[10px] border font-medium px-2 py-0.5', mapAcaoBadge[acao])}>
+                                {mapAcaoLabel[acao] || acao}
+                              </Badge>
+                            ))
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">Nenhuma ação</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs text-slate-600 max-w-xs align-top">
+                        <div className="space-y-1">
+                          {ch.observacao && <div>{ch.observacao}</div>}
+                          {ch.materiais && ch.materiais.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {ch.materiais.map((mat) => (
+                                <span key={mat.material} className="inline-flex items-center text-[10px] bg-slate-100 text-slate-600 rounded px-1.5 py-0.5 font-bold font-mono">
+                                  {materialEmojis[mat.material] || '📦'} {mat.quantidade}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs text-slate-500 text-right">
+                        {formatDateTime(ch.created_at)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <DialogFooter className="pt-3 border-t border-border-default/60 flex items-center justify-between w-full">
+            <div className="text-xs text-slate-500">
+              Total consolidado:{' '}
+              <strong className="text-slate-800">
+                {filteredLimpezasDrilldown.length} passagem(ns)
+              </strong>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsLimpezasDrilldownOpen(false)}
+              className="text-xs"
+            >
+              Fechar Detalhamento
             </Button>
           </DialogFooter>
         </DialogContent>

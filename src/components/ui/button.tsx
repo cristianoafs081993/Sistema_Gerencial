@@ -13,60 +13,62 @@ import { cn } from "@/lib/utils";
  * 10. Micro-interações: transition suave, active:scale-[0.97]
  */
 const buttonVariants = cva(
-  // Base — affordance: parece clicável, responde ao toque
+  // Base SUAP button styling — estilo pill arredondado e toque acessível
   [
     "inline-flex items-center justify-center gap-2 whitespace-nowrap",
-    "font-ui rounded-lg text-sm font-semibold",
+    "font-ui rounded-full text-sm font-semibold",
     "ring-offset-background transition-all duration-150",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
     "disabled:pointer-events-none disabled:opacity-40",
     "[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
-    // Micro-interação no clique (conceito 10)
     "active:scale-95",
     "select-none cursor-pointer",
   ].join(" "),
   {
     variants: {
       variant: {
-        // Primary — destaque máximo com sombra colorida
+        // Primary SUAP — sólido na cor primária institucional com hover contrastado
         default:
-          "bg-primary text-primary-foreground shadow-soft hover:bg-primary/90 hover:shadow-primary",
+          "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-primary",
 
-        // Destructive — vermelho semântico
+        // Destructive SUAP — vermelho semântico
         destructive:
-          "bg-destructive text-destructive-foreground shadow-soft hover:bg-destructive/90",
+          "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
 
-        // Outline — borda sutil, fundo branco (affordance clara de "botão secundário")
+        // Outline — borda de 1px, fundo branco/card, texto primário ou preto
         outline:
-          "border border-border bg-card text-foreground shadow-xs hover:bg-muted hover:border-border/80",
+          "border border-border bg-card text-foreground shadow-xs hover:bg-muted hover:border-primary/40",
 
-        // Secondary — superfície muted
+        // Secondary — superfície suave
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/70",
 
-        // Ghost — transparente, mas com hover visível
+        // Ghost — fundo transparente com hover suave
         ghost:
           "text-muted-foreground hover:bg-muted hover:text-foreground",
 
-        // Link — affordance de texto clicável
+        // Link — texto clicável no tom primário do SUAP
         link:
           "text-primary underline-offset-4 hover:underline p-0 h-auto shadow-none",
 
-        // Brand — Sebrae Navy oficial
-        brand:
-          "bg-sebrae-navy text-white hover:bg-[#13204d] shadow-soft",
+        // SUAP Pill oficial
+        suap:
+          "bg-primary text-primary-foreground rounded-full hover:bg-primary/90 shadow-sm",
 
-        // Gold — Sebrae Gold oficial
+        // Brand — cor de destaque
+        brand:
+          "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm",
+
+        // Gold / Alerta
         gold:
-          "bg-sebrae-gold text-sebrae-navy hover:bg-[#e6be02] shadow-soft",
+          "bg-warning text-foreground hover:opacity-90 shadow-sm",
       },
       size: {
-        // Padding baseado em múltiplos de 8pt (conceito 8 e 3)
-        default: "h-10 px-5 py-2",   // 40px h, 20px lateral
-        sm:      "h-9 px-4 py-1.5 text-xs rounded-md",  // 36px
-        lg:      "h-11 px-8 py-2.5 text-base rounded-xl", // 44px
-        icon:    "h-10 w-10 p-0",
-        "icon-sm":"h-8 w-8 p-0 rounded-md",
+        default: "h-9 px-4 py-2 text-sm",        // 36px altura padrão SUAP
+        sm:      "h-8 px-3 py-1 text-xs",        // 32px altura compacta SUAP
+        lg:      "h-10 px-6 py-2.5 text-base",   // 40px altura ampla
+        icon:    "h-9 w-9 p-0 rounded-full",
+        "icon-sm":"h-7 w-7 p-0 rounded-full text-xs",
       },
     },
     defaultVariants: {

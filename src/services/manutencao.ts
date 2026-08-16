@@ -142,6 +142,14 @@ export const manutencaoService = {
       ocorrencias.map(async (ocorrencia) => {
         if (!ocorrencia.foto_path) return ocorrencia;
 
+        if (
+          ocorrencia.foto_path.startsWith('http://') ||
+          ocorrencia.foto_path.startsWith('https://') ||
+          ocorrencia.foto_path.startsWith('data:')
+        ) {
+          return { ...ocorrencia, foto_url: ocorrencia.foto_path };
+        }
+
         const { data: signedData, error: signedError } = await supabase.storage
           .from(OCORRENCIA_FOTOS_BUCKET)
           .createSignedUrl(ocorrencia.foto_path, 60 * 60);

@@ -198,6 +198,7 @@ Observacoes:
 Observacao para a aba RAP do dashboard:
 
 - os cards de topo devem usar os campos proprios de RAP do empenho
+- a tabela "Resumo de RAPs por Origem" permite drill-down via clique em cada linha de origem de recurso / PTRES, abrindo o modal `DashboardRapOrigemEmpenhosModal` com os empenhos daquela origem filtrados com saldo > 0 por padrão, busca e visualização detalhada via `EmpenhoDialog`
 - separar `…6485 tokens truncated…peracionais, mostrando uma orientacao curta e o campo original do modelo em uma caixa fixa compacta
 - no modal do Termo de Referencia, a tela mostra apenas copy resumida e operacional; o texto original do modelo AGU, com artigos e redacao integral, fica disponivel na dica nativa do navegador ao passar o mouse ou focar perguntas e opcoes, evitando duplicacao visual
 - quando uma clausula exclusiva ou opcional traz lacunas no proprio texto, o modal permite escolher a alternativa e preencher esses placeholders na mesma etapa, antes de avancar para a proxima pergunta; quando a alternativa exige complemento operacional mas nao traz placeholder explicito, como `As parcelas serao entregues nos seguintes prazos e condicoes`, o modal abre um campo suplementar e a Edge Function anexa esse complemento ao texto final; se a propria clausula trouxer alternativas inline separadas por `OU`, como `Estudo Tecnico Preliminar` ou `Nota Tecnica`, o modal troca os campos livres por uma escolha direta; ao escolher `Nota Tecnica`, abre campo para informar o numero da nota e a resposta final segue para a Edge Function com `selectedOptionId` e os valores inline da clausula
@@ -282,11 +283,35 @@ Observações:
 
 Observações:
 
+- A interface é estruturada em 4 abas principais: `Dashboard` (painel analítico com seletor Radio entre **Avaliações** e **Insumos**, filtros por período, bloco e tipo de espaço, KPIs executivos dedicados, gráficos analíticos e rankings executivos), `Visão Geral / Mapa` (mapa interativo do campus com editor de blocos e listagem de ambientes), `Ocorrências` e `Salas e Ambientes`.
+- O Dashboard conta com um seletor Radio com opções **"Avaliações"** (apresentando Satisfação Média, Total de Ocorrências, Taxa e Tempo Médio de Resolução, Gráfico de Avaliações, Pareto de Falhas e Salas com Atenção Prioritária) e **"Insumos"** (apresentando Limpezas Registradas, Consumo de Insumos, Média por Intervenção, Evolução Temporal de Limpezas e Insumos, Consumo por Material e Top 5 Ambientes).
+- O detalhamento analítico de **Limpezas Realizadas** foi transformado em um recurso de **Detalhamento interativo**, acionado pelo botão **Detalhar** ou por clique na curva do gráfico `Evolução Temporal de Limpezas`, abrindo um modal analítico com busca instantânea, filtragem por tipo de ação de limpeza e filtro por data.
+- O detalhamento analítico de **Consumo de Insumos** foi transformado em um recurso de **Detalhamento interativo**, acionado por clique nos gráficos de insumos do Dashboard (`Evolução Temporal de Insumos`, `Consumo Geral de Insumos` e `Top 5 Ambientes`), abrindo um modal completo com agrupamentos por ambiente/dia, busca instantânea e filtros por data/material.
+- Todas as tabelas de listagem (`Ocorrências`, `Ambientes` e `Mapa`) contam com barra de busca e filtros rápidos na toolbar (`actions`), sem poluição de títulos redundantes ou inputs no cabeçalho das colunas. Na aba `Ocorrências`, o filtro de status é inicializado por padrão como **Pendentes**, permitindo focar imediatamente nos chamados que requerem atendimento.
 - O mapa seleciona cada bloco pelo próprio `id` e relaciona ambientes pelo nome de `bloco`.
 - O cadastro, os filtros, as estatísticas e a geometria do mapa não usam zona funcional.
 - A rota pública `feedback-ambiente/:codigo` permite anexar uma foto opcional JPEG, PNG ou WebP de até 5 MB; o arquivo vai para o bucket privado `manutencao-ocorrencias` e a ocorrência guarda apenas `foto_path`.
-- A tela administrativa cria uma URL assinada temporária para exibir a miniatura e abrir a foto.
-- Cada ocorrência pendente incrementa o alerta do bloco cujo nome coincide com `manutencao_ambientes.bloco` do ambiente indicado.
+- A tela administrativa cria uma URL assinada temporária ou consome URL de demonstração para exibir a miniatura e abrir a foto em modal interativo.
+
+### Execução e Projeção Orçamentária de Contratos (Dashboard)
+
+`Dashboard.tsx` -> `DashboardContractExecutionTab.tsx` -> `contractProjection.ts` -> `contratosApiService` (`contratos_api`, `contratos_api_faturas`, `contratos_api_historico`, `contratos_api_empenhos`)
+
+- **Modelo de Parcelas e Vigência**:
+  - O total de parcelas previsto no ciclo de vida é derivado do histórico (`contratos_api_historico.novo_num_parcelas` ou `num_parcelas` do termo mais recente) ou da contagem de meses de vigência (`vigencia_inicio` a `vigencia_fim`).
+  - As faturas são segregadas por situação oficial do Comprasnet / SIAFI:
+    - **Executadas / Apropriadas**: (`Pago`, `Siafi Apropriado`, `Pagamento Parcial`) — já consumiram saldo dos empenhos e compõem o `liquidado`.
+    - **Pendentes de Apropriação**: (`Pendente`, `Em análise`, `Em ateste`) — registradas no Comprasnet mas ainda não apropriadas no SIAFI; **não consumiram saldo** e compõem o passivo futuro a liquidar.
+    - **A Emitir / Futuras**: $\max(0, \text{Parcelas Restantes} - \text{Faturas Pendentes})$.
+  - $\text{Parcelas Restantes Contrato} = \max(0, \text{Total Parcelas Previstas} - \text{Faturas Apropriadas})$.
+- **Cálculo da Projeção e Cobertura**:
+  - `mesAtualTemNota`: só é considerado `true` se houver fatura no mês atual com status **liquidado/apropriado**. Se a fatura estiver `Pendente`, o mês atual continua aberto para pagamento e consome saldo.
+  - $\text{Custo Futuro} = \text{Valor das Faturas Pendentes} + (\text{Parcelas a Emitir no Horizonte} \times \text{mediaNota})$.
+  - $\text{Projetado} = \text{Liquidado} + \text{Custo Futuro}$.
+  - $\text{Capacidade Vigente} = \text{Liquidado} + \text{Saldo Empenhos}$.
+  - $\text{Cobertura Ratio} = \frac{\text{Capacidade Vigente}}{\text{Projetado}} \times 100$.
+- **Interface e Rastreamento**:
+  - O HoverCard e o Drawer exibem o ciclo de vida completo: Total Previsto, Liquidadas, Pendentes de apropriação, A emitir e Total restante a pagar/liquidar.
 
 ## Regras de cautela
 

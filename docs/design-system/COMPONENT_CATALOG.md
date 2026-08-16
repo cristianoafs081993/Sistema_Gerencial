@@ -50,13 +50,14 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 
 ## Componentes base
 
-- `Button`: verde institucional para acao primaria; branco com borda para acoes secundarias.
-- `Card`: superficie branca com borda clara.
-- `Input`, `Textarea`, `Select`: branco, borda clara, foco verde.
-- `Badge`: pill neutro; variantes usam status semanticos e baixa opacidade.
-- `Tabs`: segmentado com ativo verde quando usado em paginas operacionais.
-- `Dialog`, `Sheet`, `Popover`, `DropdownMenu`: superficies brancas com elevacao suave.
-- `RichTextEditor`: editor TipTap do fluxo de documentos; oferece negrito, italico, sublinhado, listas, alinhamento, desfazer e refazer. Pode destacar marcadores `[CAMPO PENDENTE]` e, quando a pagina solicitar, placeholders entre colchetes com o token destrutivo.
+- `Button`: estilo *pill* arredondado (`rounded-full`), 36px de altura padrão, com variantes `default` (primária do tema SUAP), `secondary`, `destructive`, `outline`, `ghost`, `link` e `suap`.
+- `Card`: superfície limpa (`bg-card`) com bordas sutis (`border-border`), raio de 12px e sombra suave.
+- `Input`, `Textarea`, `Select`: superfícies neutras, borda suave, foco na cor primária do tema ativo do SUAP (`ring-primary/20`).
+- `Badge`: padrão `span.status` do SUAP, formato pílula com borda de 1px, fundo translúcido e texto contrastado (`success`, `warning`, `danger`, `info`, `brand`).
+- `Tabs`: abas segmentadas com realce ativo na cor primária do tema SUAP.
+- `Dialog`, `Sheet`, `Popover`, `DropdownMenu`: superfícies de alta legibilidade com elevação suave.
+- `SuapThemeSwitcher`: componente seletor no Header que permite alternar instantaneamente entre os 8 temas oficiais do SUAP (Padrão, IFs, Aurora, Dunas, Gov.br, Luna Dark, Alto Contraste, Modo Daltonismo).
+- `RichTextEditor`: editor TipTap do fluxo de documentos; oferece negrito, itálico, sublinhado, listas, alinhamento, desfazer e refazer. Pode destacar marcadores `[CAMPO PENDENTE]` e, quando a página solicitar, placeholders entre colchetes com o token destrutivo.
 - `ArtefatosLicitacao`: pagina operacional que combina `SectionPanel`, `FilterPanel`, `DataTablePanel`, badges de tipo e botoes iconicos para abrir, copiar, baixar DOCX e excluir artefatos.
 - `LicitacoesPregoes`: pagina operacional que combina `FilterPanel` rotulado em grade responsiva com campos de UASG, objeto, item e busca geral, `DataTablePanel`, `TablePagination`, badges de prazo/status e drawer lateral de detalhe para compras PNCP; a UASG e opcional na consulta institucional e nao ha card de resumo acima dos filtros.
 - `AtasRegistroPrecos`: pagina operacional que combina `FilterPanel`, `DataTablePanel`, `TablePagination`, badges de vinculo/cobertura de itens com hover de participantes, drawer lateral de detalhe e destaque inline do item que corresponde a busca.
@@ -64,6 +65,7 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 - `ContratoApiDetailsSheet`: drawer lateral de detalhes de contratos API com resumo visual no topo e secoes em `Accordion`, fechadas inicialmente; faturas permitem alternar o agrupamento por item ou por fatura.
 - `DashboardContractExecutionTab`: aba analitica dedicada a contratos no dashboard, com Heatmap inicialmente filtrado por `Servicos Continuados (Mao de Obra Exclusiva)`, seletor global por bolhas clicaveis, grafico mensal de faturas e bullet chart de projecao anual frente ao empenhado com hover de rastreabilidade.
 - `DashboardRapAnnualEvolutionPanel`: painel da aba RAP com `ChartPanel`, seletor de UG, upload CSV restrito a superadmin, grafico anual combinado e tabela resumida do historico agregado.
+- `DashboardRapOrigemEmpenhosModal`: modal de drill-down da tabela "Resumo de RAPs por Origem" da aba RAP do Dashboard. Ao clicar em qualquer linha de origem/PTRES, abre modal com KPI cards resumidos da origem e tabela direta com os empenhos que possuem saldo remanescente (NE, favorecido, processo/PI, descrição, inscrito/reinscrito, liquidado no ano, saldo atual em destaque e ação para inspecionar o empenho completo via `EmpenhoDialog`).
 - `EnergiaCampus`: pagina analitica-operacional que combina `StatCard`, `ChartPanel`, `SectionPanel`, `DataTablePanel`, filtros no `HeaderActions` e upload XLSX restrito a superadmin.
 - `PesquisaPrecos`: fluxo operacional em etapas que combina breadcrumb contextual clicavel com wizard, menu de exportacao, `SectionPanel`, painel de personalizacao institucional do relatorio, painel compacto de metodos de calculo, seletor horizontal de itens, sugestoes CATMAT/CATSER confirmaveis, barra compacta com icone sanduiche para abrir/retrair o painel de filtros avancados da cesta oficial e aplicar filtros a selecao mediante justificativa obrigatoria, `DataTablePanel` para revisar ate 100 referencias e previa integral do documento PDF/HTML em `iframe` isolado; `Observacoes` e editado na identificacao, enquanto `Alertas e conformidade` permanece como painel operacional externo e ausente de todas as exportacoes. Quando um item esta aberto, o topo exibe `Itens > Nome do item`, o link `Itens` retorna a lista, a entrada normal na etapa Itens sempre abre a lista antes das cotacoes, a busca oficial pendente preserva a estrutura com skeletons e bloqueia acoes dependentes, falhas oferecem nova tentativa, motivos positivos da IA ou estados sem alerta nao geram cards ou avisos visuais, e a atualizacao monetaria global fica no rodape discreto do painel de metodos com aviso transitorio sobre o mes atual.
 - `SupplierEmailDialog`: modal de solicitacao de cotacao de `PesquisaPrecos`, com cabecalho, corpo e rodape no mesmo padrao dos modais operacionais; o rodape oferece a acao secundaria `Historico de e-mails`, que abre um modal dedicado com os disparos registrados da pesquisa.

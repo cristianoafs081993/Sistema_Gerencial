@@ -1089,7 +1089,7 @@ export default function RequisicaoCompraPage() {
                             )}
                             {requisicao.processNumber && (
                               <div className="flex gap-1.5 items-center">
-                                <FileText className="h-3.5 w-3.5 text-sebrae-blue shrink-0" />
+                                <FileText className="h-3.5 w-3.5 text-primary shrink-0" />
                                 <span>Processo: <span className="font-bold text-text-primary">{requisicao.processNumber}</span></span>
                               </div>
                             )}

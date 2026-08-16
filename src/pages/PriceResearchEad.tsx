@@ -146,7 +146,7 @@ export default function PriceResearchEad() {
         <div className="min-w-0 space-y-1">
           <div className="flex items-center gap-2">
             <GraduationCap className="h-5 w-5 text-primary" />
-            <h3 className="text-xl font-bold text-sebrae-navy">Capacitação EAD</h3>
+            <h3 className="text-xl font-bold text-foreground">Capacitação EAD</h3>
           </div>
           <p className="max-w-3xl text-sm text-text-muted">
             Aulas em vídeo para orientar a equipe no uso do módulo de pesquisa de preços e na condução da cotação.

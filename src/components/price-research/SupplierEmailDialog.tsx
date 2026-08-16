@@ -848,7 +848,7 @@ export function SupplierEmailDialog({
             </p>
             <div className="border rounded-lg overflow-hidden bg-slate-50 text-[13px] max-h-72 overflow-y-auto font-sans shadow-inner border-border-default/80">
               {/* Header */}
-              <div className={`p-4 text-white ${modality === 'express' ? 'bg-red-700' : 'bg-sebrae-navy'}`}>
+              <div className={`p-4 text-white ${modality === 'express' ? 'bg-red-700' : 'bg-primary'}`}>
                 <p className="text-[9px] uppercase tracking-wider opacity-70">{agencyName}</p>
                 <p className="font-bold text-sm">Solicitação de Cotação de Preços</p>
                 <p className="text-[10px] opacity-80">{MODALITY_LABELS[modality]} · {new Date().toLocaleDateString('pt-BR')}</p>

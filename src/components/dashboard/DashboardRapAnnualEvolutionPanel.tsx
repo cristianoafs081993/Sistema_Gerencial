@@ -26,9 +26,6 @@ const RAP_ANNUAL_COLORS = {
   total: '#7c3aed',
 };
 
-function formatDateTime(value: string) {
-  return value ? new Date(value).toLocaleString('pt-BR') : '-';
-}
 
 export function DashboardRapAnnualEvolutionPanel() {
   const queryClient = useQueryClient();
@@ -80,12 +77,6 @@ export function DashboardRapAnnualEvolutionPanel() {
       .sort((left, right) => left.codigo.localeCompare(right.codigo));
   }, [report.rows]);
 
-  const selectedUgLabel = useMemo(() => {
-    const option = ugOptions.find((item) => item.codigo === selectedUg);
-    if (!option) return '';
-    return option.nome && option.nome !== option.codigo ? `${option.codigo} - ${option.nome}` : option.codigo;
-  }, [selectedUg, ugOptions]);
-
   useEffect(() => {
     if (!selectedUg && ugOptions.some((option) => option.codigo === '158366')) {
       setSelectedUg('158366');
@@ -123,32 +114,22 @@ export function DashboardRapAnnualEvolutionPanel() {
   return (
     <ChartPanel
       title="Evolução anual dos restos a pagar"
-      description={
-        report.importedAt
-          ? `Último histórico importado em ${formatDateTime(report.importedAt)}`
-          : 'Histórico agregado por UG e ano'
-      }
-      loading={isLoading}
-      heightClassName="h-[380px]"
-    >
-      <div className="space-y-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="grid gap-2 sm:grid-cols-[minmax(220px,360px)_auto] sm:items-center">
+      titleClassName="text-lg sm:text-xl font-bold text-text-primary"
+      actions={
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="w-[280px] sm:w-[360px]">
             <Select value={selectedUg} onValueChange={setSelectedUg} disabled={!hasRows}>
-              <SelectTrigger aria-label="Selecionar UG do histórico RAP">
+              <SelectTrigger aria-label="Selecionar UG do histórico RAP" className="h-9 text-xs">
                 <SelectValue placeholder={hasRows ? 'Selecionar UG' : 'Nenhum histórico importado'} />
               </SelectTrigger>
               <SelectContent>
                 {ugOptions.map((option) => (
-                  <SelectItem key={option.codigo} value={option.codigo}>
+                  <SelectItem key={option.codigo} value={option.codigo} className="text-xs">
                     {option.codigo} - {option.nome}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {selectedUgLabel ? (
-              <span className="font-ui text-xs font-semibold text-text-muted">{selectedUgLabel}</span>
-            ) : null}
           </div>
 
           {isSuperAdmin ? (
@@ -162,17 +143,22 @@ export function DashboardRapAnnualEvolutionPanel() {
               />
               <Button
                 type="button"
-                className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-colors"
+                size="sm"
+                className="h-9 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors"
                 onClick={() => inputRef.current?.click()}
                 disabled={isUploading}
               >
-                {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
                 Importar histórico RAP
               </Button>
             </HeaderActions>
           ) : null}
         </div>
-
+      }
+      loading={isLoading}
+      heightClassName="h-[380px]"
+    >
+      <div className="space-y-4">
         {!hasRows ? (
           <div className="flex h-[260px] items-center justify-center rounded-[22px] border border-dashed border-border-default/80 bg-surface-subtle/40 px-6 text-center">
             <div>

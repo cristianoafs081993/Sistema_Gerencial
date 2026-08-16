@@ -537,7 +537,7 @@ export default function ConsultorSessions() {
 
                 <div className={cn('relative top-1 flex flex-col gap-2', message.role === 'user' ? 'items-end' : 'min-w-0 flex-1')}>
                   {message.attachedFile && (
-                    <div className="flex w-fit items-center gap-2 rounded-lg border border-sebrae-blue/20 bg-sebrae-blue/10 px-3 py-2 text-xs font-semibold text-sebrae-blue">
+                    <div className="flex w-fit items-center gap-2 rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary">
                       <FileText className="h-4 w-4 shrink-0" />
                       <span className="truncate">{message.attachedFile.name}</span>
                     </div>
@@ -620,9 +620,9 @@ export default function ConsultorSessions() {
         <div className="shrink-0 border-t bg-white shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.05)]">
           <div className="w-full px-4 pb-4 pt-3 md:px-10 md:pb-5">
             {attachedFile && (
-              <div className="mb-3 flex max-w-full items-center justify-between rounded-xl border border-sebrae-blue/20 bg-white p-3 shadow-sm">
+              <div className="mb-3 flex max-w-full items-center justify-between rounded-xl border border-border bg-card p-3 shadow-xs">
                 <div className="flex items-center gap-3 overflow-hidden">
-                  <div className="rounded-lg bg-sebrae-blue/10 p-2 text-sebrae-blue">
+                  <div className="rounded-lg bg-primary/10 p-2 text-primary">
                     <FileText className="h-5 w-5" />
                   </div>
                   <div className="shrink truncate">

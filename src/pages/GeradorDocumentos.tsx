@@ -554,9 +554,9 @@ export default function GeradorDocumentos() {
                     <Plus className="w-4 h-4 mr-2" /> ADICIONAR NATUREZA DE DESPESA
                   </Button>
 
-                  <div className="flex justify-between items-center px-4 py-3 bg-sebrae-blue/5 border-2 border-sebrae-blue/20 rounded-lg text-sebrae-navy">
+                  <div className="flex justify-between items-center px-4 py-3 bg-primary/5 border border-primary/20 rounded-lg text-foreground">
                     <span className="text-sm font-semibold">TOTAL PREVISTO:</span>
-                    <span className="text-lg font-black font-mono tabular-nums">R$ {formatCurrency(totalCDO())}</span>
+                    <span className="text-lg font-black font-mono tabular-nums text-primary">R$ {formatCurrency(totalCDO())}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -567,7 +567,7 @@ export default function GeradorDocumentos() {
             <div className="flex gap-4">
               {activeTab === 'despacho' ? (
                 <Button 
-                  className="flex-1 h-12 text-lg font-bold shadow-lg transition-all active:scale-[0.98] text-white bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20"
+                  className="flex-1 h-12 text-lg font-bold shadow-md transition-all active:scale-[0.98]"
                   onClick={handleGenerate}
                 >
                   <RefreshCw className={cn("w-5 h-5 mr-2", hasGenerated && "animate-spin")} />
@@ -575,14 +575,14 @@ export default function GeradorDocumentos() {
                 </Button>
               ) : (
                 <Button 
-                  className="flex-1 h-12 text-lg font-bold shadow-lg transition-all active:scale-[0.98] text-white bg-purple hover:bg-purple/80 shadow-purple/20"
+                  className="flex-1 h-12 text-lg font-bold shadow-md transition-all active:scale-[0.98]"
                   onClick={handleGenerate}
                 >
                   <RefreshCw className={cn("w-5 h-5 mr-2", hasGenerated && "animate-spin")} />
                   {hasGenerated ? 'REGERAR CDO' : 'GERAR CDO'}
                 </Button>
               )}
-              <Button variant="outline" className="h-12 w-32 border-2 hover:bg-destructive hover:text-white" onClick={handleReset}>
+              <Button variant="outline" className="h-12 w-32 border hover:bg-destructive hover:text-destructive-foreground" onClick={handleReset}>
                 LIMPAR
               </Button>
             </div>
@@ -604,7 +604,7 @@ export default function GeradorDocumentos() {
                     <ExternalLink className="w-5 h-5 mr-2" /> CLONAR
                   </Button>
                   <Button
-                    className="h-14 bg-sebrae-blue hover:bg-sebrae-navy text-white font-black transition-all border-none active:scale-[0.98]"
+                    className="h-14 font-black transition-all active:scale-[0.98]"
                     onClick={handleCloneAndFillInSuap}
                   >
                     <ExternalLink className="w-5 h-5 mr-2" /> CLONAR E PREENCHER NO SUAP
@@ -722,7 +722,7 @@ export default function GeradorDocumentos() {
                   <ExternalLink className="w-4 h-4 mr-2" /> CLONAR
                 </Button>
                 <Button
-                  className="bg-sebrae-blue hover:bg-sebrae-navy text-white font-bold h-12 shadow-sm px-6"
+                  className="font-bold h-12 shadow-sm px-6"
                   onClick={handleCloneAndFillInSuap}
                 >
                   <ExternalLink className="w-4 h-4 mr-2" /> CLONAR E PREENCHER NO SUAP

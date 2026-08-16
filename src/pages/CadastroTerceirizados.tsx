@@ -629,7 +629,7 @@ export default function CadastroTerceirizadosPage() {
                         {groupedActivePermissions.map((group) => (
                           <TableRow key={group.key}>
                             <TableCell className="whitespace-nowrap py-3 align-middle">
-                              <Badge variant="secondary" className={group.type === 'contrato' ? 'bg-sebrae-blue/10 text-sebrae-blue border border-sebrae-blue/20' : 'bg-amber-50 text-amber-800'}>
+                              <Badge variant={group.type === 'contrato' ? 'info' : 'warning'}>
                                 {group.type === 'contrato' ? 'Contrato' : 'Empenho'}
                               </Badge>
                             </TableCell>

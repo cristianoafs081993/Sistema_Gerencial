@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
-
 import {
+  calculateContractInstallmentMetrics,
   calculateRobustInvoiceBaseline,
+  getContractTotalExpectedInstallments,
   getProjectionHistoryPeriod,
+  isExecutedFatura,
   resolveFaturaCompetencia,
 } from '@/utils/contractProjection';
 
@@ -58,5 +60,77 @@ describe('contractProjection', () => {
     expect(baseline.notasUtilizadas).toBe(2);
     expect(baseline.notasDesconsideradas).toBe(0);
     expect(baseline.usouFallbackMediana).toBe(true);
+  });
+
+  it('identifica faturas apropriadas / executadas vs pendentes', () => {
+    expect(isExecutedFatura('Siafi Apropriado')).toBe(true);
+    expect(isExecutedFatura('Pago')).toBe(true);
+    expect(isExecutedFatura('Pagamento Parcial')).toBe(true);
+    expect(isExecutedFatura('Pendente')).toBe(false);
+    expect(isExecutedFatura('Em análise')).toBe(false);
+    expect(isExecutedFatura('Em Ateste')).toBe(false);
+    expect(isExecutedFatura(null)).toBe(false);
+  });
+
+  it('calcula métricas de parcelas para contrato com faturas apropriadas e pendentes (caso real 00153/2024)', () => {
+
+    const contrato = {
+      vigencia_inicio: '2024-09-03',
+      vigencia_fim: '2026-09-03',
+      vigencia_inicio_derivada: '2024-09-03',
+      vigencia_fim_derivada: '2026-09-03',
+      categoria: 'Mão de Obra',
+    };
+
+    const historico = [
+      {
+        tipo: 'Contrato',
+        num_parcelas: 24,
+        novo_num_parcelas: null,
+        data_assinatura: '2024-08-26',
+        vigencia_inicio: '2024-09-03',
+        vigencia_fim: '2026-09-03',
+      },
+    ];
+
+    expect(getContractTotalExpectedInstallments(contrato, historico)).toBe(24);
+
+    // 22 faturas liquidadas + 1 fatura pendente
+    const faturas = [
+      ...Array.from({ length: 22 }, (_, index) => ({
+        id: `f-${index + 1}`,
+        contrato_api_id: 'c1',
+        api_fatura_id: index + 1,
+        numero_instrumento_cobranca: `NF-${index + 1}`,
+        situacao: 'Siafi Apropriado',
+        valor_liquido: 57000,
+        valor_bruto: 57000,
+        data_emissao: `2025-${String((index % 12) + 1).padStart(2, '0')}-10`,
+        data_pagamento: null,
+      })),
+      {
+        id: 'f-23',
+        contrato_api_id: 'c1',
+        api_fatura_id: 23,
+        numero_instrumento_cobranca: 'NF-370',
+        situacao: 'Pendente',
+        valor_liquido: 57094.72,
+        valor_bruto: 57094.72,
+        data_emissao: '2026-08-12',
+        data_pagamento: null,
+      },
+    ];
+
+    const metrics = calculateContractInstallmentMetrics(contrato, faturas as never, historico as never);
+
+    expect(metrics.totalParcelasPrevistas).toBe(24);
+    expect(metrics.qtdApropriadas).toBe(22);
+    expect(metrics.qtdPendentes).toBe(1);
+    expect(metrics.parcelasNaoEmitidas).toBe(1);
+    expect(metrics.parcelasRestantesContrato).toBe(2);
+    expect(metrics.faturasApropriadas).toHaveLength(22);
+    expect(metrics.faturasPendentes).toHaveLength(1);
+    expect(metrics.valorLiquidadoTotal).toBe(22 * 57000);
+    expect(metrics.valorPendenteTotal).toBe(57094.72);
   });
 });

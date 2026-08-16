@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Flag, Lock, Receipt, Wallet } from 'lucide-react';
 import { StatCard } from '@/components/StatCard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -5,6 +6,8 @@ import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCurrency } from '@/lib/utils';
 import { DashboardRapAnnualEvolutionPanel } from './DashboardRapAnnualEvolutionPanel';
+import { DashboardRapOrigemEmpenhosModal } from './DashboardRapOrigemEmpenhosModal';
+import type { Atividade, Empenho } from '@/types';
 
 type RapResumo = {
   origem: string;
@@ -22,6 +25,10 @@ type DashboardRapTabProps = {
   rapTotalSaldoAtual: number;
   filteredRapCount: number;
   dadosRapPorOrigem: RapResumo[];
+  empenhosRap?: Empenho[];
+  rapReferenceYear?: number;
+  atividades?: Atividade[];
+  onSaveEmpenho?: (updated: Empenho) => Promise<void> | void;
 };
 
 export function DashboardRapTab({
@@ -32,8 +39,20 @@ export function DashboardRapTab({
   rapTotalSaldoAtual,
   filteredRapCount,
   dadosRapPorOrigem,
+  empenhosRap = [],
+  rapReferenceYear = new Date().getFullYear(),
+  atividades = [],
+  onSaveEmpenho,
 }: DashboardRapTabProps) {
+  const [selectedOrigem, setSelectedOrigem] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   const rapTotalBaseVigente = rapTotalInscrito + rapTotalReinscrito;
+
+  const handleRowClick = (origem: string) => {
+    setSelectedOrigem(origem);
+    setIsModalOpen(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -78,8 +97,10 @@ export function DashboardRapTab({
 
       <Card className="card-system overflow-hidden">
         <CardHeader className="border-b border-border-default/50 px-6 py-4">
-          <CardTitle className="table-title">Resumo de RAPs por Origem</CardTitle>
-          <CardDescription>Base vigente do ano, liquidado no exercício e saldo remanescente</CardDescription>
+          <CardTitle className="text-lg sm:text-xl font-bold text-text-primary">RAP por origem de recurso</CardTitle>
+          <CardDescription>
+            Liquidado no exercício e saldo remanescente (clique na linha para ver os empenhos com saldo)
+          </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -102,8 +123,30 @@ export function DashboardRapTab({
                   </TableRow>
                 ) : (
                   dadosRapPorOrigem.map((item, index) => (
-                    <TableRow key={index} className="border-b transition-colors last:border-0 hover:bg-slate-50/80">
-                      <TableCell className="px-6 py-4 text-sm font-medium">{item.origem}</TableCell>
+                    <TableRow
+                      key={index}
+                      className="border-b transition-colors last:border-0 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 cursor-pointer group"
+                      onClick={() => handleRowClick(item.origem)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleRowClick(item.origem);
+                        }
+                      }}
+                      title={`Clique para ver os empenhos com saldo da origem ${item.origem}`}
+                    >
+                      <TableCell className="px-6 py-4 text-sm font-medium">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-text-primary group-hover:text-primary transition-colors">
+                            {item.origem}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 font-normal">
+                            (ver empenhos)
+                          </span>
+                        </div>
+                      </TableCell>
                       <TableCell className="px-4 py-4 text-right text-sm">{formatCurrency(item.baseVigente)}</TableCell>
                       <TableCell className="px-4 py-4 text-right text-sm">{formatCurrency(item.liquidadoNoAno)}</TableCell>
                       <TableCell className="px-4 py-4 text-right text-sm font-medium text-status-error">
@@ -123,6 +166,16 @@ export function DashboardRapTab({
           </div>
         </CardContent>
       </Card>
+
+      <DashboardRapOrigemEmpenhosModal
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        origem={selectedOrigem}
+        empenhos={empenhosRap}
+        rapReferenceYear={rapReferenceYear}
+        atividades={atividades}
+        onSaveEmpenho={onSaveEmpenho}
+      />
     </div>
   );
 }
