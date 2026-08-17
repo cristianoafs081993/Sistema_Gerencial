@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 
 import {
   DEFAULT_PNCP_UASG,
+  DEFAULT_PNCP_UASGS,
   IFRN_UASG_CATALOG,
   IFRN_CNPJ,
   PREGAO_ELETRONICO_MODALIDADE_ID,
@@ -41,6 +42,10 @@ type SyncRequest = {
   objetoBusca?: string;
   itemBusca?: string;
   enrichUasgs?: boolean;
+  fetchItens?: boolean;
+  enrichExistingItems?: boolean;
+  resolveIndividual?: boolean;
+  query?: string;
 };
 
 type PncpPage = {
@@ -148,7 +153,12 @@ function normalizeUnidadeCodigos(body: SyncRequest) {
       ? [body.unidadeCodigo]
       : [];
 
-  return Array.from(new Set(requested.map((value) => String(value ?? '').trim()).filter(Boolean)));
+  const list = Array.from(new Set(requested.map((value) => String(value ?? '').trim()).filter(Boolean)));
+  if (list.length > 0) return list;
+  if (!body.cnpjOrgao || onlyDigits(body.cnpjOrgao) === IFRN_CNPJ) {
+    return DEFAULT_PNCP_UASGS;
+  }
+  return [];
 }
 
 function onlyDigits(value: unknown) {
@@ -596,7 +606,8 @@ async function runSync(supabase: SupabaseClient, body: SyncRequest) {
       Array.from(uniqueByNumeroControle.values()),
       async (item) => {
         const detail = await fetchPncpDetail(item.cnpj, item.row);
-        if (!itemBusca) return { cnpj: item.cnpj, row: detail };
+        const shouldFetchItens = body.fetchItens !== false;
+        if (!shouldFetchItens && !itemBusca) return { cnpj: item.cnpj, row: detail };
 
         const itens = await fetchPncpItems(item.cnpj, detail).catch(() => []);
         return {
@@ -607,7 +618,7 @@ async function runSync(supabase: SupabaseClient, body: SyncRequest) {
           },
         };
       },
-      4,
+      5,
     );
     const matchedRows = detailedRows.filter((item) => (
       matchesObjetoBusca(item.row, objetoBusca)
@@ -719,6 +730,68 @@ Deno.serve(async (request) => {
         },
       },
     );
+
+    if (body.enrichExistingItems === true) {
+      console.log('[enrichExistingItems] Verificando licitacoes sem itens no banco...');
+      const { data: licitacoes, error: licErr } = await supabase
+        .from('licitacoes_pncp')
+        .select('id, numero_controle_pncp, cnpj_orgao, ano_compra, sequencial_compra, raw_data')
+        .order('data_publicacao_pncp', { ascending: false, nullsFirst: false });
+
+      if (licErr) throw licErr;
+
+      const toEnrich = (licitacoes ?? []).filter((lic: any) => {
+        const raw = lic.raw_data as Record<string, unknown> | null;
+        return !Array.isArray(raw?.itens) || (raw?.itens as unknown[]).length === 0;
+      });
+
+      console.log(`[enrichExistingItems] Total para enriquecer: ${toEnrich.length} de ${licitacoes?.length ?? 0}`);
+
+      let enrichedCount = 0;
+      const errors: Array<{ numeroControle: string; message: string }> = [];
+
+      await mapWithConcurrency(
+        toEnrich,
+        async (lic: any) => {
+          const cnpj = onlyDigits(lic.cnpj_orgao) || IFRN_CNPJ;
+          const ano = Number(lic.ano_compra);
+          const seq = Number(lic.sequencial_compra);
+          if (!ano || !seq) return;
+
+          try {
+            const itens = await fetchPncpItems(cnpj, { anoCompra: ano, sequencialCompra: seq });
+            if (Array.isArray(itens) && itens.length > 0) {
+              const updatedRawData = {
+                ...(typeof lic.raw_data === 'object' && lic.raw_data ? lic.raw_data : {}),
+                itens,
+              };
+
+              const { error: updateErr } = await supabase
+                .from('licitacoes_pncp')
+                .update({ raw_data: updatedRawData, updated_at: new Date().toISOString() })
+                .eq('id', lic.id);
+
+              if (updateErr) {
+                errors.push({ numeroControle: lic.numero_controle_pncp, message: updateErr.message });
+              } else {
+                enrichedCount += 1;
+              }
+            }
+          } catch (err) {
+            errors.push({ numeroControle: lic.numero_controle_pncp, message: errorToMessage(err) });
+          }
+        },
+        5,
+      );
+
+      return jsonResponse({
+        status: 'success',
+        totalChecked: licitacoes?.length ?? 0,
+        totalEligible: toEnrich.length,
+        enrichedCount,
+        errors,
+      });
+    }
 
     if (body.resolveIndividual === true && body.query) {
       console.log(`[resolveIndividual] Buscando no Elasticsearch do PNCP: ${body.query}`);

@@ -271,30 +271,29 @@ Uso:
 
 Fonte primaria:
 
-- `https://pncp.gov.br/api/consulta`
+- `https://pncp.gov.br/api/consulta` (editais e publicacoes)
+- `https://pncp.gov.br/api/pncp` (itens e detalhes de compras)
 - `https://api.portaldatransparencia.gov.br` (consulta de empenhos e itens de empenho)
 
 Endpoints PNCP e CGU usados:
 
-- `/v1/contratacoes/publicacao`
-- `/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}`
-- `/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}/itens`
+- `/api/consulta/v1/contratacoes/publicacao`
+- `/api/consulta/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}`
+- `/api/pncp/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}/itens`
 - `/api-de-dados/licitacoes/empenhos` (Portal da Transparência)
 - `/api-de-dados/despesas/itens-de-empenho` (Portal da Transparência)
 
 Parametros operacionais:
 
-- UASG inicial da tela: vazia; a lista e a busca padrao usam o CNPJ institucional para cobrir todas as UASGs IFRN publicadas
-- CNPJ da consulta PNCP: resolvido primeiro pelo catalogo interno IFRN em `IFRN_UASG_CATALOG`; para UASGs fora do catalogo, a function usa Dados Abertos Compras.gov.br; `LICITACOES_PNCP_CNPJ=10877412000168` fica apenas como default operacional
+- UASG inicial da tela: vazia; a lista e a busca padrao consultam o banco local e sincronizam todas as 19 UASGs do catalogo do IFRN
+- CNPJ da consulta PNCP: resolvido primeiro pelo catalogo interno IFRN em `IFRN_UASG_CATALOG`; para UASGs fora do catalogo, a function usa Dados Abertos Compras.gov.br; `LICITACOES_PNCP_CNPJ=10877412000168` fica como default operacional
 - UASGs IFRN em cache interno: `152711`, `152756`, `152757`, `154582`, `154838`, `154839`, `154840`, `158155`, `158365`, `158366`, `158367`, `158368`, `158369`, `158370`, `158371`, `158372`, `158373`, `158374`, `158375`
 - pregao eletronico: `codigoModalidadeContratacao = 6`
 - datas PNCP em `yyyyMMdd`
 - janela maxima de consulta: 365 dias
-- a consulta institucional sem `codigoUnidadeAdministrativa` envia apenas o CNPJ IFRN e descobre todas as UASGs publicadas no periodo
-- quando `codigoUnidadeAdministrativa` e enviado, o PNCP tambem exige `cnpj`; por isso a function usa o catalogo interno ou chama `/modulo-uasg/1_consultarUasg` para descobrir o CNPJ da UASG antes da consulta PNCP
 - o endpoint de publicacao nao recebe `tamanhoPagina`; enviar esse parametro produz `HTTP 400`
 - o endpoint PNCP de publicacao e usado para UASG/data/modalidade; busca textual por objeto fica como filtro local sobre os dados retornados/materializados
-- o endpoint PNCP de itens e chamado sob demanda quando `itemBusca` e enviado; os itens retornados sao gravados em `licitacoes_pncp.raw_data.itens` para permitir pesquisa local posterior sem obrigar clique no drawer
+- o endpoint PNCP de itens (`/api/pncp/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}/itens`) e chamado por padrao durante as sincronizacoes; os itens retornados sao gravados em `licitacoes_pncp.raw_data.itens` para permitir pesquisa local instantanea e alimentacao do drawer de detalhes com saldo de empenho
 
 Fonte secundaria best-effort:
 

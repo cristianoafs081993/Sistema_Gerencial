@@ -27,13 +27,14 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { HeaderActions, HeaderSubtitle } from '@/components/HeaderParts';
+import { HeaderSubtitle } from '@/components/HeaderParts';
 import { ChartPanel } from '@/components/design-system/ChartPanel';
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
 import { SectionPanel } from '@/components/design-system/SectionPanel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -169,6 +170,7 @@ export default function ManutencaoAdmin() {
   const [dashPeriodFilter, setDashPeriodFilter] = useState<'mes_atual' | '7d' | '30d' | 'hoje' | 'todos'>('mes_atual');
   const [dashBlocoFilter, setDashBlocoFilter] = useState<string>('todos');
   const [dashTipoFilter, setDashTipoFilter] = useState<string>('todos');
+  const [dashMaterialFilter, setDashMaterialFilter] = useState<string>('todos');
 
   // Modals
   const [isAddRoomOpen, setIsAddRoomOpen] = useState(false);
@@ -182,8 +184,15 @@ export default function ManutencaoAdmin() {
   const [qrCodeData, setQrCodeData] = useState<{ codigo: string; nome: string } | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<{ url: string; title: string; desc?: string } | null>(null);
   const [qrBaseUrl, setQrBaseUrl] = useState(() => {
-    return localStorage.getItem('manutencao:qr_base_url') || window.location.origin;
+    const saved = localStorage.getItem('manutencao:qr_base_url');
+    if (!saved || saved.includes('localhost') || saved.includes('127.0.0.1')) {
+      return 'https://www.siages.com.br';
+    }
+    return saved;
   });
+
+  // Multi-selection for QR Code printing
+  const [selectedAmbienteIds, setSelectedAmbienteIds] = useState<Set<string>>(new Set());
 
   // Consumo Drilldown States
   const [isConsumoDrilldownOpen, setIsConsumoDrilldownOpen] = useState(false);
@@ -284,117 +293,165 @@ export default function ManutencaoAdmin() {
   };
 
   const printQrCode = () => {
-    const printContent = document.getElementById('printable-qr-card');
-    if (!printContent) return;
+    if (!qrCodeData) return;
 
     const windowUrl = 'about:blank';
     const uniqueName = new Date().getTime();
     const windowName = `PrintWindow_${uniqueName}`;
-    const printWindow = window.open(windowUrl, windowName, 'left=50,top=50,width=800,height=600');
+    const printWindow = window.open(windowUrl, windowName, 'left=50,top=50,width=850,height=700');
 
     if (!printWindow) {
       toast.error('Bloqueador de popup ativo. Permita popups para imprimir.');
       return;
     }
 
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(
       qrBaseUrl + '/feedback-ambiente/' + qrCodeData?.codigo
     )}`;
 
     printWindow.document.write(`
+      <!DOCTYPE html>
       <html>
         <head>
-          <title>Imprimir QR Code - ${qrCodeData?.nome}</title>
+          <meta charset="utf-8">
+          <title>Cartaz QR Code - ${qrCodeData?.nome}</title>
           <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
             body {
               font-family: system-ui, -apple-system, sans-serif;
               display: flex;
               justify-content: center;
               align-items: center;
-              height: 100vh;
-              margin: 0;
-              background-color: #ffffff;
+              min-height: 100vh;
+              background-color: #f8fafc;
+              padding: 20px;
             }
-            .qr-card {
-              border: 3px solid #0f172a;
+            .cartaz-wrapper {
+              position: relative;
+              width: 100%;
+              max-width: 800px;
+              aspect-ratio: 1024 / 819;
               border-radius: 16px;
-              padding: 40px;
-              text-align: center;
-              max-width: 400px;
-              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+              overflow: hidden;
+              box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+              background: #ffffff;
             }
-            .logo-img {
-              height: 70px;
-              object-fit: contain;
-              margin-bottom: 15px;
+            .cartaz-bg {
+              width: 100%;
+              height: 100%;
+              display: block;
+              object-fit: cover;
             }
-            .title {
-              font-size: 18px;
-              font-weight: 700;
-              color: #1e293b;
-              margin-top: 0;
-              margin-bottom: 8px;
-            }
-            .subtitle {
-              font-size: 13px;
-              color: #64748b;
-              margin-bottom: 25px;
-              line-height: 1.4;
+            .qr-overlay {
+              position: absolute;
+              left: 57.2%;
+              top: 38.2%;
+              width: 33.8%;
+              height: 44.5%;
+              background: #ffffff;
+              border-radius: 12%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              padding: 2.5%;
+              box-sizing: border-box;
             }
             .qr-image {
-              margin: 15px auto;
+              width: 100%;
+              height: 100%;
+              object-fit: contain;
               display: block;
-              border: 1px solid #e2e8f0;
-              padding: 10px;
-              border-radius: 8px;
             }
-            .room-info {
-              margin-top: 20px;
-              background: #f1f5f9;
-              padding: 12px;
+            .room-tag {
+              position: absolute;
+              left: 6.5%;
+              bottom: 13.5%;
+              max-width: 48%;
+              background: rgba(255, 255, 255, 0.96);
+              border: 1.5px solid #059669;
               border-radius: 8px;
-              font-family: monospace;
-              font-size: 14px;
-              font-weight: bold;
-              color: #0f172a;
+              padding: 6px 12px;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.06);
             }
-            .footer {
-              margin-top: 25px;
+            .room-name {
+              font-size: 13px;
+              font-weight: 800;
+              color: #064e3b;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+            .room-code {
               font-size: 11px;
-              color: #94a3b8;
+              font-family: monospace;
+              font-weight: 700;
+              color: #047857;
+              background: #ecfdf5;
+              padding: 2px 6px;
+              border-radius: 4px;
+              border: 1px solid #a7f3d0;
+              white-space: nowrap;
             }
             @media print {
-              body { background: none; }
-              .qr-card { border-width: 3px; box-shadow: none; }
+              body { background: none; padding: 0; min-height: auto; }
+              .cartaz-wrapper {
+                max-width: 100%;
+                border-radius: 0;
+                box-shadow: none;
+                page-break-inside: avoid;
+                break-inside: avoid;
+              }
             }
           </style>
         </head>
         <body>
-          <div class="qr-card">
-            <img class="logo-img" src="/logo-ifrn-cn.png" alt="Logo IFRN" />
-            <div class="title">Ajude-nos a melhorar este ambiente!</div>
-            <div class="subtitle">Escaneie o QR Code para avaliar este espaço ou informar qualquer problema encontrado.</div>
-            <img class="qr-image" src="${qrCodeUrl}" width="230" height="230" alt="QR Code" />
-            <div class="room-info">${qrCodeData?.nome}</div>
+          <div class="cartaz-wrapper">
+            <img class="cartaz-bg" src="/cartaz-qr-template.png" alt="Cartaz Institucional IFRN" />
+            <div class="qr-overlay">
+              <img class="qr-image" src="${qrCodeUrl}" alt="QR Code" />
+            </div>
+            <div class="room-tag">
+              <span class="room-name">${qrCodeData?.nome}</span>
+              <span class="room-code">${qrCodeData?.codigo}</span>
+            </div>
           </div>
           <script>
             window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
+              const images = document.querySelectorAll('img');
+              let loadedCount = 0;
+              const totalImages = images.length;
+              function checkAllLoaded() {
+                loadedCount++;
+                if (loadedCount >= totalImages) {
+                  setTimeout(function() {
+                    window.print();
+                    setTimeout(function() { window.close(); }, 500);
+                  }, 300);
+                }
+              }
+              if (totalImages === 0) {
+                window.print();
+              } else {
+                images.forEach(img => {
+                  if (img.complete) {
+                    checkAllLoaded();
+                  } else {
+                    img.onload = checkAllLoaded;
+                    img.onerror = checkAllLoaded;
+                  }
+                });
+              }
             }
           </script>
         </body>
       </html>
     `);
-    printWindow.document.close();
   };
 
-  const printAllQrCodes = () => {
-    if (filteredAmbientes.length === 0) {
-      toast.error('Nenhum ambiente filtrado para imprimir.');
-      return;
-    }
-
+  const printQrCodesList = (ambientesToPrint: Ambiente[], pageTitle: string) => {
     const windowUrl = 'about:blank';
     const uniqueName = new Date().getTime();
     const windowName = `PrintWindow_${uniqueName}`;
@@ -405,101 +462,124 @@ export default function ManutencaoAdmin() {
       return;
     }
 
-    const qrCardsHtml = filteredAmbientes.map((amb) => {
-      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
+    const qrCardsHtml = ambientesToPrint.map((amb) => {
+      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(
         qrBaseUrl + '/feedback-ambiente/' + amb.codigo
       )}`;
       return `
-        <div class="qr-card">
-          <img class="logo-img" src="/logo-ifrn-cn.png" alt="Logo IFRN" />
-          <div class="title">Ajude-nos a melhorar este ambiente!</div>
-          <div class="subtitle">Escaneie o QR Code para avaliar este espaço ou informar qualquer problema encontrado.</div>
-          <img class="qr-image" src="${qrCodeUrl}" width="200" height="200" alt="QR Code" />
-          <div class="room-info">${amb.nome}</div>
+        <div class="cartaz-wrapper">
+          <img class="cartaz-bg" src="/cartaz-qr-template.png" alt="Cartaz Institucional IFRN" />
+          <div class="qr-overlay">
+            <img class="qr-image" src="${qrCodeUrl}" alt="QR Code" />
+          </div>
+          <div class="room-tag">
+            <span class="room-name">${amb.nome}</span>
+            <span class="room-code">${amb.codigo}</span>
+          </div>
         </div>
       `;
     }).join('\n');
 
     printWindow.document.write(`
+      <!DOCTYPE html>
       <html>
         <head>
-          <title>Imprimir QR Codes</title>
+          <meta charset="utf-8">
+          <title>${pageTitle}</title>
           <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
             body {
               font-family: system-ui, -apple-system, sans-serif;
               margin: 0;
               padding: 20px;
-              background-color: #ffffff;
+              background-color: #f8fafc;
             }
             .grid-container {
-              display: grid;
-              grid-template-columns: repeat(2, 1fr);
-              gap: 20px;
-            }
-            .qr-card {
-              border: 3px solid #0f172a;
-              border-radius: 16px;
-              padding: 25px 20px;
-              text-align: center;
-              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-              background: white;
-              break-inside: avoid;
-              page-break-inside: avoid;
               display: flex;
               flex-direction: column;
-              justify-content: space-between;
+              gap: 30px;
+              align-items: center;
+            }
+            .cartaz-wrapper {
+              position: relative;
+              width: 100%;
+              max-width: 800px;
+              aspect-ratio: 1024 / 819;
+              border-radius: 16px;
+              overflow: hidden;
+              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+              background: #ffffff;
+              page-break-after: always;
+              break-after: page;
+            }
+            .cartaz-bg {
+              width: 100%;
+              height: 100%;
+              display: block;
+              object-fit: cover;
+            }
+            .qr-overlay {
+              position: absolute;
+              left: 57.2%;
+              top: 38.2%;
+              width: 33.8%;
+              height: 44.5%;
+              background: #ffffff;
+              border-radius: 12%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              padding: 2.5%;
               box-sizing: border-box;
             }
-            .logo-img {
-              height: 55px;
-              object-fit: contain;
-              margin-bottom: 10px;
-            }
-            .title {
-              font-size: 15px;
-              font-weight: 700;
-              color: #1e293b;
-              margin-top: 0;
-              margin-bottom: 6px;
-            }
-            .subtitle {
-              font-size: 11px;
-              color: #64748b;
-              margin-bottom: 15px;
-              line-height: 1.4;
-            }
             .qr-image {
-              margin: 10px auto;
+              width: 100%;
+              height: 100%;
+              object-fit: contain;
               display: block;
-              border: 1px solid #e2e8f0;
-              padding: 8px;
-              border-radius: 8px;
             }
-            .room-info {
-              margin-top: 15px;
-              background: #f1f5f9;
-              padding: 10px;
+            .room-tag {
+              position: absolute;
+              left: 6.5%;
+              bottom: 13.5%;
+              max-width: 48%;
+              background: rgba(255, 255, 255, 0.96);
+              border: 1.5px solid #059669;
               border-radius: 8px;
-              font-family: monospace;
+              padding: 6px 12px;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+            }
+            .room-name {
               font-size: 13px;
-              font-weight: bold;
-              color: #0f172a;
+              font-weight: 800;
+              color: #064e3b;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
             }
-            .footer {
-              margin-top: 15px;
-              font-size: 10px;
-              color: #94a3b8;
+            .room-code {
+              font-size: 11px;
+              font-family: monospace;
+              font-weight: 700;
+              color: #047857;
+              background: #ecfdf5;
+              padding: 2px 6px;
+              border-radius: 4px;
+              border: 1px solid #a7f3d0;
+              white-space: nowrap;
             }
             @media print {
               body { background: none; padding: 0; }
-              .grid-container {
-                gap: 15px;
-              }
-              .qr-card {
-                border-width: 3px;
+              .grid-container { gap: 0; }
+              .cartaz-wrapper {
+                max-width: 100%;
                 box-shadow: none;
-                page-break-inside: avoid;
-                break-inside: avoid;
+                border-radius: 0;
+                page-break-after: always;
+                break-after: page;
               }
             }
           </style>
@@ -510,23 +590,22 @@ export default function ManutencaoAdmin() {
           </div>
           <script>
             window.onload = function() {
-              const images = document.querySelectorAll('.qr-image');
+              const images = document.querySelectorAll('img');
               let loadedCount = 0;
               const totalImages = images.length;
-              
               function checkAllLoaded() {
                 loadedCount++;
-                if (loadedCount === totalImages) {
-                  window.print();
-                  setTimeout(function() { window.close(); }, 500);
+                if (loadedCount >= totalImages) {
+                  setTimeout(function() {
+                    window.print();
+                    setTimeout(function() { window.close(); }, 500);
+                  }, 400);
                 }
               }
-
               if (totalImages === 0) {
                 window.print();
-                window.close();
               } else {
-                images.forEach(function(img) {
+                images.forEach(img => {
                   if (img.complete) {
                     checkAllLoaded();
                   } else {
@@ -535,7 +614,7 @@ export default function ManutencaoAdmin() {
                   }
                 });
               }
-            };
+            }
           </script>
         </body>
       </html>
@@ -543,7 +622,7 @@ export default function ManutencaoAdmin() {
     printWindow.document.close();
   };
 
-  // Table Filter calculations
+
   const filteredOcorrencias = useMemo(() => {
     return ocorrencias.filter((oc) => {
       const matchesSearch =
@@ -582,16 +661,7 @@ export default function ManutencaoAdmin() {
     });
   }, [checkins, searchQuery, chFilterAcao]);
 
-  const filteredAmbientes = useMemo(() => {
-    return ambientes.filter((amb) => {
-      return (
-        !searchQuery ||
-        amb.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        amb.codigo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        amb.bloco?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    });
-  }, [ambientes, searchQuery]);
+
 
   const [selectedBlocoId, setSelectedBlocoId] = useState<string | null>(null);
   const [hoveredBuilding, setHoveredBuilding] = useState<string | null>(null);
@@ -922,6 +992,60 @@ export default function ManutencaoAdmin() {
     });
   }, [ambientes, selectedBloco, mapaSearchQuery, mapaTipoFilter, mapaStatusFilter, ocorrencias, checkins]);
 
+  // Selection calculations
+  const isAllVisibleSelected = useMemo(() => {
+    return mapaFilteredAmbientes.length > 0 && mapaFilteredAmbientes.every((amb) => selectedAmbienteIds.has(amb.id));
+  }, [mapaFilteredAmbientes, selectedAmbienteIds]);
+
+  const isSomeVisibleSelected = useMemo(() => {
+    return mapaFilteredAmbientes.some((amb) => selectedAmbienteIds.has(amb.id)) && !isAllVisibleSelected;
+  }, [mapaFilteredAmbientes, selectedAmbienteIds, isAllVisibleSelected]);
+
+  const handleToggleSelectAll = () => {
+    if (isAllVisibleSelected) {
+      setSelectedAmbienteIds((prev) => {
+        const next = new Set(prev);
+        mapaFilteredAmbientes.forEach((amb) => next.delete(amb.id));
+        return next;
+      });
+    } else {
+      setSelectedAmbienteIds((prev) => {
+        const next = new Set(prev);
+        mapaFilteredAmbientes.forEach((amb) => next.add(amb.id));
+        return next;
+      });
+    }
+  };
+
+  const handleToggleSelectAmbiente = (id: string) => {
+    setSelectedAmbienteIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const printSelectedQrCodes = () => {
+    const selectedRooms = ambientes.filter((a) => selectedAmbienteIds.has(a.id));
+    if (selectedRooms.length === 0) {
+      toast.error('Nenhum ambiente selecionado para imprimir.');
+      return;
+    }
+    printQrCodesList(selectedRooms, `Imprimir Cartazes Selecionados (${selectedRooms.length})`);
+  };
+
+  const printAllQrCodes = () => {
+    if (mapaFilteredAmbientes.length === 0) {
+      toast.error('Nenhum ambiente filtrado para imprimir.');
+      return;
+    }
+    printQrCodesList(mapaFilteredAmbientes, `Imprimir Cartazes de QR Code (${mapaFilteredAmbientes.length} ambientes)`);
+  };
+
   const getBuildingStats = (blocoNome: string) => {
     const rooms = filterAmbientesByBloco(ambientes, blocoNome);
     const roomIds = new Set(rooms.map((room) => room.id));
@@ -984,9 +1108,13 @@ export default function ManutencaoAdmin() {
       const amb = ambienteMap.get(ch.ambiente_id) || ch.ambiente;
       if (dashBlocoFilter !== 'todos' && amb?.bloco !== dashBlocoFilter) return false;
       if (dashTipoFilter !== 'todos' && amb?.tipo !== dashTipoFilter) return false;
+      if (dashMaterialFilter !== 'todos') {
+        const hasMat = ch.materiais?.some((m) => m.material === dashMaterialFilter && m.quantidade > 0);
+        if (!hasMat) return false;
+      }
       return true;
     });
-  }, [checkins, dashPeriodFilter, dashBlocoFilter, dashTipoFilter, ambienteMap]);
+  }, [checkins, dashPeriodFilter, dashBlocoFilter, dashTipoFilter, dashMaterialFilter, ambienteMap]);
 
   const dashFilteredOcorrencias = useMemo(() => {
     return ocorrencias.filter((oc) => {
@@ -1009,13 +1137,15 @@ export default function ManutencaoAdmin() {
     };
     dashFilteredCheckins.forEach((ch) => {
       ch.materiais?.forEach((mat) => {
-        if (map[mat.material] !== undefined) {
-          map[mat.material] += mat.quantidade;
+        if (dashMaterialFilter === 'todos' || mat.material === dashMaterialFilter) {
+          if (map[mat.material] !== undefined) {
+            map[mat.material] += mat.quantidade;
+          }
         }
       });
     });
     return map;
-  }, [dashFilteredCheckins]);
+  }, [dashFilteredCheckins, dashMaterialFilter]);
 
   const dashMaterialsChartData = useMemo(() => {
     return Object.entries(dashMaterialsMap).map(([key, val]) => ({
@@ -1092,11 +1222,13 @@ export default function ManutencaoAdmin() {
       const item = dayMap.get(key)!;
       item.limpezas += 1;
       ch.materiais?.forEach((m) => {
-        item.insumos += m.quantidade;
+        if (dashMaterialFilter === 'todos' || m.material === dashMaterialFilter) {
+          item.insumos += m.quantidade;
+        }
       });
     });
     return Array.from(dayMap.values()).sort((a, b) => a.timestamp - b.timestamp);
-  }, [dashFilteredCheckins]);
+  }, [dashFilteredCheckins, dashMaterialFilter]);
 
   // Top Problems reported
   const dashProblemsData = useMemo(() => {
@@ -1129,14 +1261,16 @@ export default function ManutencaoAdmin() {
       }
       const item = map.get(key)!;
       ch.materiais?.forEach((m) => {
-        item.total += m.quantidade;
+        if (dashMaterialFilter === 'todos' || m.material === dashMaterialFilter) {
+          item.total += m.quantidade;
+        }
       });
     });
     return Array.from(map.values())
       .filter((a) => a.total > 0)
       .sort((a, b) => b.total - a.total)
       .slice(0, 5);
-  }, [dashFilteredCheckins, ambienteMap]);
+  }, [dashFilteredCheckins, dashMaterialFilter, ambienteMap]);
 
   const maxConsumo = dashTopConsumoAmbientes.length > 0 ? dashTopConsumoAmbientes[0].total : 1;
 
@@ -1301,20 +1435,17 @@ export default function ManutencaoAdmin() {
     });
   }, [dashFilteredCheckins, limpezasDrilldownSearch, limpezasDrilldownFilterDate, limpezasDrilldownFilterAcao]);
 
-  const isDashFilterActive = dashPeriodFilter !== 'mes_atual' || dashBlocoFilter !== 'todos' || dashTipoFilter !== 'todos';
+  const isDashFilterActive =
+    dashPeriodFilter !== 'mes_atual' ||
+    dashBlocoFilter !== 'todos' ||
+    dashTipoFilter !== 'todos' ||
+    (dashViewMode === 'insumos' && dashMaterialFilter !== 'todos');
 
   return (
     <div className="space-y-6 pb-10">
       <HeaderSubtitle>Painel administrativo para controle e inspeção de ambientes via QR Code.</HeaderSubtitle>
 
-      <HeaderActions>
-        <div className="flex items-center gap-2">
-          <Button onClick={() => setIsAddRoomOpen(true)} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shadow-sm">
-            <Plus className="h-4 w-4" />
-            Cadastrar Ambiente
-          </Button>
-        </div>
-      </HeaderActions>
+
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="relative">
         {/* Tabs de Navegação - Layout Folder Tab */}
@@ -1353,17 +1484,7 @@ export default function ManutencaoAdmin() {
             >
               Ocorrências ({filteredOcorrencias.length})
             </button>
-            <button
-              type="button"
-              className={`px-5 py-2.5 text-xs font-bold font-ui transition-all duration-200 border rounded-t-radius-lg whitespace-nowrap ${
-                activeTab === 'ambientes'
-                  ? 'bg-surface-card border-border-default/80 border-b-surface-card text-emerald-700 shadow-sm relative z-20 pb-[11px]'
-                  : 'bg-surface-subtle/30 text-text-muted hover:text-text-primary hover:bg-surface-subtle/60 border-transparent border-b-border-default/80 cursor-pointer relative z-10 pb-2.5'
-              }`}
-              onClick={() => setActiveTab('ambientes')}
-            >
-              Salas e Ambientes ({filteredAmbientes.length})
-            </button>
+
           </div>
         </div>
 
@@ -1381,6 +1502,7 @@ export default function ManutencaoAdmin() {
                 {/* Seletor Radio: Avaliações vs Insumos */}
                 <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-300 shadow-2xs">
                   <label
+                    onClick={() => setDashViewMode('avaliacoes')}
                     className={cn(
                       'flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md cursor-pointer transition-all select-none',
                       dashViewMode === 'avaliacoes'
@@ -1401,6 +1523,7 @@ export default function ManutencaoAdmin() {
                   </label>
 
                   <label
+                    onClick={() => setDashViewMode('insumos')}
                     className={cn(
                       'flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md cursor-pointer transition-all select-none',
                       dashViewMode === 'insumos'
@@ -1470,6 +1593,25 @@ export default function ManutencaoAdmin() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Tipo de Insumo (visível no modo Insumos) */}
+                {dashViewMode === 'insumos' && (
+                  <div className="w-48">
+                    <Select value={dashMaterialFilter} onValueChange={setDashMaterialFilter}>
+                      <SelectTrigger className="h-8 text-xs bg-white input-system">
+                        <SelectValue placeholder="Tipo de Insumo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos os Insumos</SelectItem>
+                        <SelectItem value="papel_higienico">🧻 Papel Higiênico</SelectItem>
+                        <SelectItem value="sabonete_liquido">🧼 Sabonete Líquido</SelectItem>
+                        <SelectItem value="papel_toalha">🧻 Papel Toalha</SelectItem>
+                        <SelectItem value="saco_lixo">🗑️ Saco de Lixo</SelectItem>
+                        <SelectItem value="outros">📦 Outros</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
               {isDashFilterActive && (
@@ -1481,6 +1623,7 @@ export default function ManutencaoAdmin() {
                     setDashPeriodFilter('mes_atual');
                     setDashBlocoFilter('todos');
                     setDashTipoFilter('todos');
+                    setDashMaterialFilter('todos');
                   }}
                   className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 h-8"
                 >
@@ -1831,7 +1974,7 @@ export default function ManutencaoAdmin() {
                         size="xs"
                         onClick={() => {
                           setConsumoDrilldownFilterDate(null);
-                          setConsumoDrilldownFilterMaterial(null);
+                          setConsumoDrilldownFilterMaterial(dashMaterialFilter !== 'todos' ? dashMaterialFilter : null);
                           setConsumoDrilldownSearch('');
                           setIsConsumoDrilldownOpen(true);
                         }}
@@ -1899,7 +2042,7 @@ export default function ManutencaoAdmin() {
                         size="xs"
                         onClick={() => {
                           setConsumoDrilldownFilterDate(null);
-                          setConsumoDrilldownFilterMaterial(null);
+                          setConsumoDrilldownFilterMaterial(dashMaterialFilter !== 'todos' ? dashMaterialFilter : null);
                           setConsumoDrilldownSearch('');
                           setIsConsumoDrilldownOpen(true);
                         }}
@@ -1963,7 +2106,7 @@ export default function ManutencaoAdmin() {
                       size="xs"
                       onClick={() => {
                         setConsumoDrilldownFilterDate(null);
-                        setConsumoDrilldownFilterMaterial(null);
+                        setConsumoDrilldownFilterMaterial(dashMaterialFilter !== 'todos' ? dashMaterialFilter : null);
                         setConsumoDrilldownSearch('');
                         setIsConsumoDrilldownOpen(true);
                       }}
@@ -2465,12 +2608,12 @@ export default function ManutencaoAdmin() {
                 <DataTablePanel
                   actions={
                     <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                      <div className="relative w-52">
+                      <div className="relative w-56">
                         <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                         <Input
                           value={mapaSearchQuery}
                           onChange={(e) => setMapaSearchQuery(e.target.value)}
-                          placeholder="Buscar no mapa..."
+                          placeholder="Buscar ambiente..."
                           className="h-8 pl-8 text-xs input-system"
                         />
                       </div>
@@ -2511,26 +2654,82 @@ export default function ManutencaoAdmin() {
                           Ver Todos os Blocos
                         </Button>
                       )}
+
+                      {selectedAmbienteIds.size > 0 ? (
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <Button
+                            onClick={printSelectedQrCodes}
+                            size="sm"
+                            className="h-8 gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs shrink-0 font-bold shadow-xs"
+                          >
+                            <Printer className="h-3.5 w-3.5" />
+                            Imprimir Selecionados ({selectedAmbienteIds.size})
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            onClick={() => setSelectedAmbienteIds(new Set())}
+                            className="h-8 text-xs text-slate-500 hover:text-slate-800"
+                          >
+                            Limpar
+                          </Button>
+                        </div>
+                      ) : (
+                        mapaFilteredAmbientes.length > 0 && (
+                          <Button
+                            onClick={printAllQrCodes}
+                            size="sm"
+                            variant="outline"
+                            className="h-8 gap-1.5 text-emerald-700 border-emerald-200 hover:bg-emerald-50 text-xs shrink-0"
+                          >
+                            <Printer className="h-3.5 w-3.5" />
+                            Imprimir Todos ({mapaFilteredAmbientes.length})
+                          </Button>
+                        )
+                      )}
+
+                      <Button
+                        onClick={() => setIsAddRoomOpen(true)}
+                        size="sm"
+                        className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs shrink-0 shadow-xs"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Cadastrar Ambiente
+                      </Button>
                     </div>
                   }
                 >
                   <div className="overflow-x-auto">
                     <Table className="table-system">
-                      <TableHeader>
+                      <TableHeader className="bg-slate-50/80">
                         <TableRow>
-                          <TableHead className="w-[120px]">Código</TableHead>
-                          <TableHead>Ambiente</TableHead>
-                          <TableHead className="w-[150px]">Bloco / Setor</TableHead>
-                          <TableHead className="w-[130px]">Tipo</TableHead>
-                          <TableHead className="w-[190px]">Última Limpeza</TableHead>
-                          <TableHead className="w-[130px]">Situação</TableHead>
-                          <TableHead className="text-right w-[80px]">Ações</TableHead>
+                          <TableHead className="w-[40px] text-center">
+                            <Checkbox
+                              checked={isAllVisibleSelected ? true : isSomeVisibleSelected ? 'indeterminate' : false}
+                              onCheckedChange={handleToggleSelectAll}
+                              aria-label="Selecionar todas as salas visíveis"
+                            />
+                          </TableHead>
+                          <TableHead className="w-[110px]">CÓDIGO</TableHead>
+                          <TableHead>NOME DO ESPAÇO</TableHead>
+                          <TableHead className="w-[140px]">BLOCO</TableHead>
+                          <TableHead className="w-[130px]">TIPO DE ESPAÇO</TableHead>
+                          <TableHead className="w-[90px]">STATUS</TableHead>
+                          <TableHead className="w-[180px]">ÚLTIMA LIMPEZA</TableHead>
+                          <TableHead className="w-[120px]">SITUAÇÃO</TableHead>
+                          <TableHead className="text-right w-[160px]">AÇÕES</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {mapaFilteredAmbientes.length === 0 ? (
+                        {isLoading ? (
                           <TableRow>
-                            <TableCell colSpan={7} className="text-center py-8 text-slate-400 italic text-xs">
+                            <TableCell colSpan={9} className="h-28 text-center italic text-muted-foreground">
+                              Carregando dados...
+                            </TableCell>
+                          </TableRow>
+                        ) : mapaFilteredAmbientes.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={9} className="h-28 text-center italic text-muted-foreground text-xs">
                               Nenhum ambiente encontrado com os filtros aplicados.
                             </TableCell>
                           </TableRow>
@@ -2539,22 +2738,40 @@ export default function ManutencaoAdmin() {
                             const roomOcorrencias = ocorrencias.filter((o) => o.ambiente_id === amb.id && o.status === 'pendente');
                             const roomCheckins = checkins.filter((ch) => ch.ambiente_id === amb.id);
                             const lastCheckin = roomCheckins[0];
+                            const isSelected = selectedAmbienteIds.has(amb.id);
 
                             return (
-                              <TableRow key={amb.id}>
-                                <TableCell className="font-mono text-xs font-bold text-slate-700">
-                                  <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 uppercase">
-                                    {amb.codigo}
-                                  </span>
+                              <TableRow
+                                key={amb.id}
+                                className={cn(
+                                  'hover:bg-slate-50/50 transition-colors cursor-pointer',
+                                  isSelected && 'bg-emerald-50/50'
+                                )}
+                                onClick={() => handleToggleSelectAmbiente(amb.id)}
+                              >
+                                <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                                  <Checkbox
+                                    checked={isSelected}
+                                    onCheckedChange={() => handleToggleSelectAmbiente(amb.id)}
+                                    aria-label={`Selecionar ${amb.nome}`}
+                                  />
                                 </TableCell>
-                                <TableCell className="font-bold text-slate-800 text-xs">
+                                <TableCell className="font-mono font-semibold text-slate-700 text-xs">
+                                  {amb.codigo}
+                                </TableCell>
+                                <TableCell className="font-medium text-slate-900 text-xs">
                                   {amb.nome}
                                 </TableCell>
                                 <TableCell className="text-xs text-slate-600">
-                                  {amb.bloco || '—'}
+                                  {amb.bloco || '-'}
                                 </TableCell>
-                                <TableCell className="text-xs text-slate-500 capitalize">
+                                <TableCell className="capitalize text-slate-600 text-xs">
                                   {tipoLabels[amb.tipo] || amb.tipo}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] px-2 py-0.5">
+                                    Ativo
+                                  </Badge>
                                 </TableCell>
                                 <TableCell className="text-xs text-slate-600">
                                   {lastCheckin ? (
@@ -2584,15 +2801,27 @@ export default function ManutencaoAdmin() {
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  <Button
-                                    variant="ghost"
-                                    size="xs"
-                                    onClick={() => setQrCodeData({ codigo: amb.codigo, nome: amb.nome })}
-                                    title="Imprimir / Ver QR Code"
-                                    className="h-7 w-7 p-0 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50"
-                                  >
-                                    <QrCode className="h-3.5 w-3.5" />
-                                  </Button>
+                                  <div className="flex items-center justify-end gap-2">
+                                    <Button
+                                      onClick={() => setQrCodeData({ codigo: amb.codigo, nome: amb.nome })}
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8 gap-1.5 text-slate-700 text-xs"
+                                      title="Imprimir / Ver QR Code"
+                                    >
+                                      <QrCode className="h-3.5 w-3.5" />
+                                      QR Code
+                                    </Button>
+                                    <Button
+                                      onClick={() => void handleDeleteRoom(amb.id)}
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-8 text-red-500 hover:text-red-700 hover:bg-red-50 p-2"
+                                      title="Excluir Ambiente"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
                                 </TableCell>
                               </TableRow>
                             );
@@ -2605,7 +2834,7 @@ export default function ManutencaoAdmin() {
               )}
         </TabsContent>
 
-        {/* Tab 1: Ocorrencias */}
+        {/* Tab: Ocorrências */}
         <TabsContent value="ocorrencias" className="mt-0">
           <DataTablePanel
             actions={
@@ -2696,8 +2925,8 @@ export default function ManutencaoAdmin() {
                         <div className="flex flex-wrap gap-1">
                           {oc.problemas.length > 0 ? (
                             oc.problemas.map((prob) => (
-                              <Badge key={prob} variant="secondary" className="bg-slate-100 text-slate-700 capitalize border-none text-[10px]">
-                                {prob.replace('_', ' ')}
+                              <Badge key={prob} variant="secondary" className="bg-slate-100 text-slate-700 border-none text-[10px]">
+                                {problemLabels[prob] || prob.replace(/_/g, ' ')}
                               </Badge>
                             ))
                           ) : (
@@ -2705,8 +2934,12 @@ export default function ManutencaoAdmin() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="align-top text-xs text-slate-600 max-w-xs truncate">
-                        {oc.observacao || <span className="italic text-slate-400">Sem observações</span>}
+                      <TableCell className="align-top text-xs text-slate-700 min-w-[200px] max-w-md whitespace-normal break-words leading-relaxed">
+                        {oc.observacao ? (
+                          <span className="select-text whitespace-pre-wrap">{oc.observacao}</span>
+                        ) : (
+                          <span className="italic text-slate-400">Sem observações</span>
+                        )}
                       </TableCell>
                       <TableCell className="align-top">
                         {oc.foto_url ? (
@@ -2766,85 +2999,6 @@ export default function ManutencaoAdmin() {
             </Table>
           </DataTablePanel>
         </TabsContent>
-
-
-
-
-
-        {/* Tab 3: Ambientes */}
-        <TabsContent value="ambientes" className="mt-0">
-          <DataTablePanel
-            actions={
-              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                <div className="relative w-64">
-                  <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Buscar ambiente..."
-                    className="h-8 pl-8 text-xs input-system"
-                  />
-                </div>
-                {filteredAmbientes.length > 0 && (
-                  <Button
-                    onClick={printAllQrCodes}
-                    size="sm"
-                    variant="outline"
-                    className="h-8 gap-1.5 text-emerald-700 border-emerald-200 hover:bg-emerald-50 text-xs"
-                  >
-                    <Printer className="h-3.5 w-3.5" />
-                    Imprimir Todos ({filteredAmbientes.length})
-                  </Button>
-                )}
-              </div>
-            }
-          >
-            <Table className="table-system">
-              <TableHeader className="bg-slate-50/80">
-                <TableRow>
-                  <TableHead className="w-1/4">Código</TableHead>
-                  <TableHead className="w-1/4">Nome do Espaço</TableHead>
-                  <TableHead className="w-1/6">Bloco</TableHead>
-                  <TableHead className="w-1/6">Tipo de Espaço</TableHead>
-                  <TableHead className="w-1/6">Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow><TableCell colSpan={6} className="h-28 text-center italic text-muted-foreground">Carregando dados...</TableCell></TableRow>
-                ) : filteredAmbientes.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="h-28 text-center italic text-muted-foreground">Nenhum ambiente encontrado.</TableCell></TableRow>
-                ) : (
-                  filteredAmbientes.map((amb) => (
-                    <TableRow key={amb.id} className="hover:bg-slate-50/50">
-                      <TableCell className="font-mono font-semibold text-slate-700">{amb.codigo}</TableCell>
-                      <TableCell className="font-medium text-slate-900">{amb.nome}</TableCell>
-                      <TableCell>{amb.bloco || '-'}</TableCell>
-                      <TableCell className="capitalize text-slate-600">{amb.tipo}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] px-2 py-0.5">
-                          Ativo
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button onClick={() => setQrCodeData({ codigo: amb.codigo, nome: amb.nome })} size="sm" variant="outline" className="h-8 gap-1.5 text-slate-700">
-                            <QrCode className="h-3.5 w-3.5" />
-                            QR Code
-                          </Button>
-                          <Button onClick={() => void handleDeleteRoom(amb.id)} size="sm" variant="ghost" className="h-8 text-red-500 hover:text-red-700 hover:bg-red-50 p-2">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </DataTablePanel>
-        </TabsContent>
       </Tabs>
 
       {/* Modal: Add Room */}
@@ -2896,77 +3050,68 @@ export default function ManutencaoAdmin() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal: QR Code Preview & Print */}
+      {/* Modal: Visualizador e Impressão de Cartaz com QR Code do Ambiente */}
       <Dialog open={qrCodeData !== null} onOpenChange={(open) => { if (!open) setQrCodeData(null); }}>
-        <DialogContent className="sm:max-w-[450px] bg-white rounded-2xl shadow-lifted">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-lifted p-6">
           <DialogHeader>
-            <DialogTitle className="text-xl font-black text-slate-900">QR Code do Ambiente</DialogTitle>
-            <DialogDescription>Imprima a etiqueta e cole na entrada do ambiente correspondente.</DialogDescription>
+            <DialogTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <QrCode className="h-5 w-5 text-emerald-600" />
+              Cartaz com QR Code do Ambiente
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Cartaz oficial institucional com o QR Code inserido no espaço reservado para afixação e feedback da comunidade acadêmica.
+            </DialogDescription>
           </DialogHeader>
 
-          {/* Configuration for phone testing */}
-          <div className="space-y-1 my-2">
-            <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">URL Base do QR Code (para celular)</label>
-            <Input
-              value={qrBaseUrl}
-              onChange={(e) => {
-                const val = e.target.value;
-                setQrBaseUrl(val);
-                localStorage.setItem('manutencao:qr_base_url', val);
-              }}
-              placeholder="Ex: http://192.168.1.15:5180"
-              className="h-9 text-xs input-system"
-            />
-            <p className="text-[10px] text-muted-foreground leading-normal mt-1">
-              Se for ler com o celular, substitua <strong>localhost</strong> pelo IP da rede do seu computador (ex: <strong>http://10.50.6.5:5180</strong>). Dispositivos na mesma rede Wi-Fi conseguirão carregar a página.
-            </p>
-          </div>
 
-          {/* QR Card Container */}
-          <div className="flex flex-col items-center justify-center p-6 bg-slate-50 border rounded-2xl my-2" id="printable-qr-card">
-            <img src="/logo-ifrn-cn.png" alt="Logo IFRN" className="h-16 object-contain mb-3" />
-            <div className="text-slate-800 font-extrabold text-sm text-center mb-1">Ajude-nos a melhorar este ambiente!</div>
-            <div className="text-slate-500 text-[10px] text-center max-w-xs leading-normal mb-4">
-              Escaneie o QR Code para avaliar este espaço ou informar qualquer problema encontrado.
-            </div>
+          {/* Poster Preview Container */}
+          {qrCodeData && (
+            <div className="relative w-full aspect-[1024/819] rounded-xl overflow-hidden border border-slate-300 shadow-md bg-white my-2">
+              <img
+                src="/cartaz-qr-template.png"
+                alt="Cartaz Institucional IFRN"
+                className="w-full h-full object-cover select-none pointer-events-none"
+              />
 
-            {qrCodeData && (
-              <div className="bg-white p-3 border rounded-xl shadow-sm mb-4">
+              {/* Overlay QR Code no espaço reservado */}
+              <div className="absolute left-[57.2%] top-[38.2%] w-[33.8%] h-[44.5%] bg-white rounded-[12%] flex items-center justify-center p-[2.5%] shadow-2xs">
                 <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(
                     qrBaseUrl + '/feedback-ambiente/' + qrCodeData.codigo
                   )}`}
-                  width="200"
-                  height="200"
-                  alt="QR Code"
-                  className="rounded-lg"
+                  alt={`QR Code ${qrCodeData.nome}`}
+                  className="w-full h-full object-contain"
                 />
               </div>
-            )}
 
-            <div className="w-full bg-slate-200/60 p-3 rounded-xl text-center">
-              <div className="text-slate-900 font-extrabold text-sm">{qrCodeData?.nome}</div>
+              {/* Tag de identificação do ambiente */}
+              <div className="absolute left-[6.5%] bottom-[13.5%] max-w-[48%] bg-white/95 backdrop-blur-xs border border-emerald-600/60 rounded-lg px-2.5 py-1.5 flex items-center gap-2 shadow-xs">
+                <span className="text-xs font-black text-emerald-950 truncate">{qrCodeData.nome}</span>
+                <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 shrink-0">
+                  {qrCodeData.codigo}
+                </span>
+              </div>
             </div>
-          </div>
+          )}
 
-          <DialogFooter className="gap-2 sm:gap-0 pt-2">
+          <DialogFooter className="gap-2 pt-2 flex-wrap sm:flex-nowrap">
             {qrCodeData && (
               <a
                 href={`${qrBaseUrl}/feedback-ambiente/${qrCodeData.codigo}`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-[#10b981] hover:underline font-semibold mr-auto pl-2"
+                className="inline-flex items-center gap-1 text-xs text-emerald-700 hover:underline font-semibold mr-auto pl-1"
               >
                 Testar link público
                 <ExternalLink className="h-3.5 w-3.5" />
               </a>
             )}
-            <Button type="button" variant="ghost" onClick={() => setQrCodeData(null)} className="h-10">
+            <Button type="button" variant="ghost" onClick={() => setQrCodeData(null)} className="h-9 text-xs">
               Fechar
             </Button>
-            <Button onClick={printQrCode} className="bg-emerald-600 hover:bg-emerald-700 text-white h-10 px-5 gap-2 shadow-sm">
+            <Button onClick={printQrCode} className="bg-emerald-700 hover:bg-emerald-800 text-white h-9 px-4 gap-2 text-xs shadow-xs font-bold">
               <Printer className="h-4 w-4" />
-              Imprimir Etiqueta
+              Imprimir Cartaz
             </Button>
           </DialogFooter>
         </DialogContent>

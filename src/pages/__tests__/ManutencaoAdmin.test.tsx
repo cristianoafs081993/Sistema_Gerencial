@@ -178,7 +178,8 @@ describe('ManutencaoAdmin', () => {
     expect(screen.getByText('Ambientes com Atenção Prioritária')).toBeInTheDocument();
 
     // Alterna para o modo Insumos
-    const insumosRadio = screen.getByText('Insumos');
+    const insumosRadio = screen.getByDisplayValue('insumos');
+    fireEvent.change(insumosRadio, { target: { checked: true } });
     fireEvent.click(insumosRadio);
 
     // KPIs do modo Insumos
@@ -191,9 +192,12 @@ describe('ManutencaoAdmin', () => {
     expect(screen.getByText('Evolução Temporal de Insumos')).toBeInTheDocument();
     expect(screen.getByText('Consumo Geral de Insumos')).toBeInTheDocument();
     expect(screen.getByText('Top 5 Ambientes em Consumo de Insumos')).toBeInTheDocument();
+
+    // Valida que o filtro de Tipo de Insumo está visível no modo Insumos
+    expect(screen.getByText('Todos os Insumos')).toBeInTheDocument();
   });
 
-  it('permite alternar para a aba Visão Geral / Mapa e exibe o mapa do campus com a tabela filtrável', async () => {
+  it('permite alternar para a aba Visão Geral / Mapa e exibe o mapa do campus com a tabela consolidada filtrável', async () => {
     render(
       <MemoryRouter>
         <ManutencaoAdmin />
@@ -209,9 +213,41 @@ describe('ManutencaoAdmin', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Mapa do Campus - Currais Novos')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('Buscar no mapa...')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Buscar ambiente...')).toBeInTheDocument();
+      expect(screen.getByText('CÓDIGO')).toBeInTheDocument();
+      expect(screen.getByText('NOME DO ESPAÇO')).toBeInTheDocument();
+      expect(screen.getByText('BLOCO')).toBeInTheDocument();
+      expect(screen.getByText('TIPO DE ESPAÇO')).toBeInTheDocument();
+      expect(screen.getByText('STATUS')).toBeInTheDocument();
+      expect(screen.getByText('ÚLTIMA LIMPEZA')).toBeInTheDocument();
+      expect(screen.getByText('SITUAÇÃO')).toBeInTheDocument();
+      expect(screen.getByText('AÇÕES')).toBeInTheDocument();
       expect(screen.getByText('Sala 101 - Informática')).toBeInTheDocument();
       expect(screen.getByText('Banheiro Masculino Adm')).toBeInTheDocument();
+      expect(screen.getAllByText('Ativo').length).toBeGreaterThan(0);
+      expect(screen.getAllByRole('button', { name: /QR Code/i }).length).toBeGreaterThan(0);
+      expect(screen.getByRole('button', { name: /Imprimir Todos/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Cadastrar Ambiente/i })).toBeInTheDocument();
+    });
+
+    // Seleciona um ambiente específico pelo checkbox
+    const checkboxes = screen.getAllByRole('checkbox');
+    expect(checkboxes.length).toBeGreaterThan(1);
+    fireEvent.click(checkboxes[1]);
+
+    // Valida que o botão de Imprimir Selecionados aparece com contagem
+    expect(screen.getByRole('button', { name: /Imprimir Selecionados \(1\)/i })).toBeInTheDocument();
+
+    // Clica no botão QR Code do primeiro ambiente para validar modal e URL base
+    const qrCodeBtns = screen.getAllByRole('button', { name: /QR Code/i });
+    fireEvent.click(qrCodeBtns[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText('Cartaz com QR Code do Ambiente')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /Testar link público/i })).toHaveAttribute(
+        'href',
+        expect.stringContaining('https://www.siages.com.br/feedback-ambiente/')
+      );
     });
   });
 
