@@ -150,4 +150,14 @@ describe('Empenhos', () => {
     expect(screen.getAllByText('Empenho teste')[0]).toBeInTheDocument();
     expect(screen.getAllByText('Tesouro • PI: PI-AD')[0]).toBeInTheDocument();
   });
+
+  it('alterna entre as abas de execucao e restos a pagar usando o layout folder tab', () => {
+    renderEmpenhos();
+
+    const restosTab = screen.getByRole('button', { name: /^Restos a Pagar/i });
+    expect(restosTab).toBeInTheDocument();
+
+    fireEvent.click(restosTab);
+    expect(screen.getByText('Nenhum empenho encontrado.')).toBeInTheDocument();
+  });
 });

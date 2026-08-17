@@ -13,6 +13,7 @@ import {
 } from '@/lib/comprasnetEtpPreferences';
 import type { SuapProcesso } from '@/types';
 import { COMPRASNET_ETP_INSTITUTIONAL_CONTEXT } from '@/lib/comprasnetEtpInstitutionalContext';
+import { enforceComprasnetEtpFormat } from '@/lib/comprasnetEtpFormatting';
 
 export type ComprasnetEtpDraftField = {
   key: string;
@@ -97,6 +98,7 @@ function escapeHtml(value: string) {
 }
 
 function buildLocalDraft(params: GenerateComprasnetEtpParams, warning?: string): ComprasnetEtpDraftResult {
+  const preferences = normalizeComprasnetEtpGenerationPreferences(params.generationPreferences);
   const answers = new Map((params.questionnaireAnswers || []).map((answer) => [answer.questionId, answer]));
   const sections = comprasnetEtpQuestions.map((question) => {
     const value = normalizeComprasnetEtpText(answers.get(question.id)?.value);
@@ -104,7 +106,7 @@ function buildLocalDraft(params: GenerateComprasnetEtpParams, warning?: string):
     return {
       id: question.id,
       title: question.title,
-      html: `<p>${escapeHtml(content)}</p>`,
+      html: enforceComprasnetEtpFormat(`<p>${escapeHtml(content)}</p>`, preferences),
     };
   });
   const missingRequiredFields = comprasnetEtpQuestions
@@ -137,7 +139,14 @@ export const comprasnetEtpService = {
         body: buildPayload(params),
       });
       if (error) throw new Error(await getSupabaseFunctionErrorMessage(error));
-      return data as ComprasnetEtpDraftResult;
+      const result = data as ComprasnetEtpDraftResult;
+      return {
+        ...result,
+        sections: result.sections?.map((section) => ({
+          ...section,
+          html: enforceComprasnetEtpFormat(section.html, normalizeComprasnetEtpGenerationPreferences(params.generationPreferences)),
+        })),
+      };
     } catch (error) {
       console.warn('Falha ao chamar gerar-etp-comprasnet; usando fallback local.', error);
       return buildLocalDraft(

@@ -199,15 +199,19 @@ function normalizeSections(raw: unknown, questions: EtpQuestion[]) {
 }
 
 function normalizeAiResult(raw: Record<string, unknown>, request: EtpRequest, questions: EtpQuestion[], model?: string) {
+  const preferences = normalizePreferences(request.generationPreferences);
   const fallback = fallbackSections(request, questions);
-  const sections = normalizeSections(raw.sections, questions);
+  const sections = normalizeSections(raw.sections, questions).map((section) => ({
+    ...section,
+    html: enforceOutputFormat(section.html, preferences),
+  }));
   const warnings = Array.isArray(raw.warnings) ? raw.warnings.filter((item): item is string => typeof item === 'string' && Boolean(item.trim())).map((item) => item.trim()) : [];
   const answers = answerMap(request);
   return {
     status: 'generated',
     title: 'Estudo Técnico Preliminar',
     subtitle: request.processo?.numProcesso ? `Processo ${request.processo.numProcesso}` : 'Rascunho para revisão',
-    sections: sections.length ? sections : fallback,
+    sections: sections.length ? sections : fallback.map((section) => ({ ...section, html: enforceOutputFormat(section.html, preferences) })),
     warnings: [...new Set([...(request.analysisWarnings || []), ...warnings])],
     missingRequiredFields: missingRequiredFields(request, questions),
     fields: questions.map((question) => {
@@ -216,6 +220,30 @@ function normalizeAiResult(raw: Record<string, unknown>, request: EtpRequest, qu
     }),
     model,
   };
+}
+
+function stripMarkup(value: string) {
+  return value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function splitText(value: string, count: number) {
+  const sentences = value.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((item) => item.trim()).filter(Boolean) || [];
+  if (sentences.length >= count) return Array.from({ length: count }, (_, index) => sentences.slice(Math.floor(index * sentences.length / count), Math.floor((index + 1) * sentences.length / count)).join(' ')).filter(Boolean);
+  const words = value.split(/\s+/).filter(Boolean);
+  return Array.from({ length: count }, (_, index) => words.slice(Math.floor(index * words.length / count), Math.max(Math.floor((index + 1) * words.length / count), Math.floor(index * words.length / count) + 1)).join(' ')).filter(Boolean);
+}
+
+function enforceOutputFormat(html: string, preferences: GenerationPreferences) {
+  const paragraphMatches = [...html.matchAll(/<p(?:\s[^>]*)?>([\s\S]*?)<\/p>/gi)].map((match) => stripMarkup(match[1])).filter(Boolean);
+  const itemMatches = [...html.matchAll(/<li(?:\s[^>]*)?>([\s\S]*?)<\/li>/gi)].map((match) => stripMarkup(match[1])).filter(Boolean);
+  if (preferences.format === 'topicos') {
+    const source = itemMatches.length ? itemMatches : paragraphMatches;
+    const items = source.length === preferences.itemCount ? source : splitText(source.join(' '), preferences.itemCount);
+    return items.length ? `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : html;
+  }
+  const source = paragraphMatches.length ? paragraphMatches : [stripMarkup(html)];
+  const paragraphs = source.length === preferences.paragraphCount ? source : splitText(source.join(' '), preferences.paragraphCount);
+  return paragraphs.length ? paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join('') : html;
 }
 
 function buildPrompt(request: EtpRequest, questions: EtpQuestion[]) {
@@ -239,7 +267,7 @@ function buildPrompt(request: EtpRequest, questions: EtpQuestion[]) {
     'Use apenas as fontes permitidas nas preferências. Não transforme anexos em resumo; use-os somente para confirmar dados pontuais.',
     'Quando houver conflito entre fontes, preserve o dado explicitamente informado pelo usuário/processo e registre a necessidade de validação.',
     `Preferências de redação validadas: ${JSON.stringify(preferences)}.`,
-    `Respeite o formato ${preferences.format}; use aproximadamente ${preferences.paragraphCount} parágrafo(s) em texto corrido ou ${preferences.itemCount} item(ns) em tópicos, sem alongar texto sem evidência.`,
+    `Respeite exatamente o formato ${preferences.format}; gere exatamente ${preferences.paragraphCount} parágrafo(s) nos formatos corridos ou exatamente ${preferences.itemCount} item(ns) no formato de tópicos. Não alongue o texto nem invente conteúdo para atingir a quantidade.`,
     `Tratamento do conteúdo existente: ${preferences.existingTextMode}. Se faltar base para melhorar ou reescrever, mantenha a lacuna como [CAMPO PENDENTE: ...].`,
     'Responda apenas JSON válido no formato: {"status":"generated","warnings":["..."],"sections":[{"id":"...","title":"...","html":"<p>...</p>"}]}',
     `Processo: ${JSON.stringify(request.processo || {})}`,

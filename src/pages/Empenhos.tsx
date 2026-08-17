@@ -4,8 +4,6 @@ import { useData } from '@/contexts/DataContext';
 import { Empenho, DIMENSOES, COMPONENTES_POR_DIMENSAO } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -572,13 +570,38 @@ export default function Empenhos() {
           )}
         </CardContent>
       </FilterPanel>
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6 mt-6">
-          <TabsList className="bg-slate-100 p-1 rounded-lg h-auto">
-            <TabsTrigger value="execucao" className="px-6 py-2 text-sm font-semibold text-slate-600 data-[state=active]:bg-[#2f9e41] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md">Execução {new Date().getFullYear()}</TabsTrigger>
-            <TabsTrigger value="restos" className="px-6 py-2 text-sm font-semibold text-slate-600 data-[state=active]:bg-[#2f9e41] data-[state=active]:text-white data-[state=active]:shadow-sm rounded-md">Restos a Pagar</TabsTrigger>
-          </TabsList>
+      {/* Container de Card Tab Integrado */}
+      <div className="relative mt-6">
+        {/* Tabs de Navegação - Layout Folder Tab */}
+        <div className="flex items-end justify-between px-0 relative -mb-[1px] z-10 w-full gap-4 flex-wrap sm:flex-nowrap">
+          <div className="flex space-x-1 overflow-x-auto">
+            <button
+              type="button"
+              className={`px-6 py-3 text-sm font-bold font-ui transition-all duration-200 border rounded-t-radius-lg whitespace-nowrap ${
+                activeTab === 'execucao'
+                  ? 'bg-surface-card border-border-default/80 border-b-surface-card text-sebrae-blue shadow-sm relative z-20 pb-[13px]'
+                  : 'bg-surface-subtle/30 text-text-muted hover:text-text-primary hover:bg-surface-subtle/60 border-transparent border-b-border-default/80 cursor-pointer relative z-10 pb-3'
+              }`}
+              onClick={() => setActiveTab('execucao')}
+            >
+              Execução {new Date().getFullYear()}
+            </button>
+            <button
+              type="button"
+              className={`px-6 py-3 text-sm font-bold font-ui transition-all duration-200 border rounded-t-radius-lg whitespace-nowrap ${
+                activeTab === 'restos'
+                  ? 'bg-surface-card border-border-default/80 border-b-surface-card text-sebrae-blue shadow-sm relative z-20 pb-[13px]'
+                  : 'bg-surface-subtle/30 text-text-muted hover:text-text-primary hover:bg-surface-subtle/60 border-transparent border-b-border-default/80 cursor-pointer relative z-10 pb-3'
+              }`}
+              onClick={() => setActiveTab('restos')}
+            >
+              Restos a Pagar
+            </button>
+          </div>
+        </div>
 
-        <TabsContent value="execucao">
+        {/* Card Principal de Conteúdo */}
+        {activeTab === 'execucao' ? (
           <EmpenhosTable
             empenhos={filteredEmpenhos.filter(e => e.tipo === 'exercicio' || (!e.tipo && e.numero.includes(String(new Date().getFullYear()))))}
             type="execucao"
@@ -587,10 +610,9 @@ export default function Empenhos() {
             toggleFavorite={toggleFavorite}
             isFavoritePending={isFavoritePending}
             isLoading={isLoading}
+            isFirstTabActive={true}
           />
-        </TabsContent>
-
-        <TabsContent value="restos">
+        ) : (
           <EmpenhosTable
             empenhos={filteredEmpenhos.filter(e => e.tipo === 'rap' || (!e.tipo && !e.numero.includes(String(new Date().getFullYear()))))}
             type="restos"
@@ -599,9 +621,10 @@ export default function Empenhos() {
             toggleFavorite={toggleFavorite}
             isFavoritePending={isFavoritePending}
             isLoading={isLoading}
+            isFirstTabActive={false}
           />
-        </TabsContent>
-      </Tabs>
+        )}
+      </div>
 
       <EmpenhoDialog
         open={isDialogOpen}
@@ -641,7 +664,7 @@ function EmpenhoRow({
 
   return (
     <TableRow className={`hover:bg-slate-50/80 transition-colors border-b border-border-default/50 ${isChild ? 'bg-slate-50/30' : ''}`}>
-      <TableCell className={`py-4 px-6 align-top ${isChild ? 'pl-10' : ''} w-[13%] min-w-[130px]`}>
+      <TableCell className={`py-4 px-4 sm:px-6 align-top ${isChild ? 'pl-10' : ''} w-[14%]`}>
         <div className="flex flex-col gap-1">
           <span className="font-mono text-sm font-semibold whitespace-nowrap">{empenho.numero}</span>
           {empenho.processo && (
@@ -657,15 +680,15 @@ function EmpenhoRow({
           )}
         </div>
       </TableCell>
-      <TableCell className="py-4 px-4 align-top w-[30%] min-w-[250px]">
+      <TableCell className="py-4 px-4 align-top w-[28%]">
         <div className="flex flex-col">
-          <span className="text-sm font-medium truncate max-w-[280px] sm:max-w-[360px] md:max-w-[420px] lg:max-w-[500px]" title={empenho.favorecidoNome}>{empenho.favorecidoNome || '-'}</span>
+          <span className="text-sm font-medium line-clamp-2" title={empenho.favorecidoNome}>{empenho.favorecidoNome || '-'}</span>
           <span className="text-xs text-muted-foreground">
             {formatarDocumento(empenho.favorecidoDocumento || '')}
           </span>
         </div>
       </TableCell>
-      <TableCell className="py-4 px-4 align-top w-[20%] min-w-[180px]">
+      <TableCell className="py-4 px-4 align-top w-[22%]">
         <div className="flex flex-col gap-1">
           <span className="text-sm line-clamp-2" title={empenho.descricao}>{empenho.descricao || '-'}</span>
           {type === 'execucao' && (empenho.origemRecurso || empenho.planoInterno) && (
@@ -678,7 +701,7 @@ function EmpenhoRow({
           )}
         </div>
       </TableCell>
-      <TableCell className="py-4 px-4 text-right align-top whitespace-nowrap w-[18%] min-w-[150px]">
+      <TableCell className="py-4 px-4 text-right align-top whitespace-nowrap w-[18%]">
         <div className="flex flex-col gap-1 items-end">
           {type === 'restos' && empenho.rapInscrito != null ? (
             <>
@@ -714,7 +737,7 @@ function EmpenhoRow({
           )}
         </div>
       </TableCell>
-      <TableCell className="py-4 px-4 text-right align-top whitespace-nowrap w-[14%] min-w-[120px]">
+      <TableCell className="py-4 px-4 text-right align-top whitespace-nowrap w-[12%]">
         {(() => {
           if (type === 'restos') {
             return (
@@ -732,8 +755,8 @@ function EmpenhoRow({
         })()}
       </TableCell>
 
-      <TableCell className="py-4 px-6 align-top whitespace-nowrap w-[10%] min-w-[90px]">
-        <div className="flex items-center justify-center gap-2">
+      <TableCell className="py-4 px-4 pr-6 align-top whitespace-nowrap w-[6%] min-w-[80px]">
+        <div className="flex items-center justify-center gap-1.5">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -766,15 +789,24 @@ function EmpenhoRow({
   );
 }
 
-// Extracted Component for Table Reuse inside Tabs
-function EmpenhosTable({ empenhos, type, handleOpenDialog, isFavorite, toggleFavorite, isFavoritePending, isLoading }: {
-  empenhos: Empenho[],
-  type: 'execucao' | 'restos',
-  handleOpenDialog: (e: Empenho) => void,
-  isFavorite: (entityType: 'empenho', entityId: string) => boolean,
-  toggleFavorite: (entityType: 'empenho', entityId: string) => Promise<unknown>,
-  isFavoritePending?: boolean,
-  isLoading?: boolean
+function EmpenhosTable({
+  empenhos,
+  type,
+  handleOpenDialog,
+  isFavorite,
+  toggleFavorite,
+  isFavoritePending,
+  isLoading,
+  isFirstTabActive = true,
+}: {
+  empenhos: Empenho[];
+  type: 'execucao' | 'restos';
+  handleOpenDialog: (e: Empenho) => void;
+  isFavorite: (entityType: 'empenho', entityId: string) => boolean;
+  toggleFavorite: (entityType: 'empenho', entityId: string) => Promise<unknown>;
+  isFavoritePending?: boolean;
+  isLoading?: boolean;
+  isFirstTabActive?: boolean;
 }) {
   const [sortKey, setSortKey] = useState<string>('numero');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -889,11 +921,10 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isFavorite, toggleFav
   );
 
   return (
-    <Card className="card-system overflow-hidden">
-      <CardHeader className="px-6 py-4 border-b border-border-default/50 flex flex-row items-center justify-between">
-        <CardTitle className="table-title">
-          {empenhos.length} empenho{empenhos.length !== 1 ? 's' : ''} encontrado{empenhos.length !== 1 ? 's' : ''}
-        </CardTitle>
+    <Card className={`border border-border-default/80 bg-surface-card rounded-b-radius-xl rounded-tr-radius-xl shadow-soft relative z-0 p-0 overflow-hidden ${
+      isFirstTabActive ? 'rounded-tl-none' : 'rounded-tl-radius-xl'
+    }`}>
+      <CardHeader className="px-6 py-3 border-b border-border-default/50 flex flex-row items-center justify-end">
         <Button
           variant={groupBy === 'favorecido' ? 'default' : 'outline'}
           size="sm"
@@ -905,95 +936,94 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isFavorite, toggleFav
         </Button>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-slate-50/50">
-              <TableRow className="hover:bg-transparent border-b border-border-default/50">
-                <SortHeader label="Número" colKey="numero" className="w-[13%] min-w-[130px]" />
-                <SortHeader label="Favorecido" colKey="favorecido" className="w-[30%] min-w-[250px]" />
-                <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider w-[20%] min-w-[180px]">Descrição</TableHead>
-                <SortHeader label={type === 'execucao' ? 'Empenhado / Liquidado' : 'Inscrito / Reinscrito / Liq Ano'} colKey="valor" align="right" className="w-[18%] min-w-[150px]" />
-                <SortHeader label={type === 'execucao' ? 'Saldo' : 'Saldo Atual'} colKey="saldo" align="right" className="w-[14%] min-w-[120px]" />
-                <TableHead className="h-11 px-6 text-center text-xs font-semibold uppercase tracking-wider w-[10%] min-w-[90px]">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="px-4"><Skeleton className="h-8 w-24" /></TableCell>
-                    <TableCell className="px-4"><Skeleton className="h-8 w-32" /></TableCell>
-                    <TableCell className="px-4"><Skeleton className="h-8 w-24" /></TableCell>
-                    <TableCell className="px-4"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
-                    <TableCell className="px-4"><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
-                    <TableCell className="px-6"><Skeleton className="h-8 w-16 mx-auto" /></TableCell>
-                  </TableRow>
-                ))
-              ) : paginatedData.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">Nenhum empenho encontrado.</TableCell>
+        <Table>
+          <TableHeader className="bg-slate-50/50">
+            <TableRow className="hover:bg-transparent border-b border-border-default/50">
+              <SortHeader label="Número" colKey="numero" className="w-[14%] px-4 sm:px-6" />
+              <SortHeader label="Favorecido" colKey="favorecido" className="w-[28%] px-4" />
+              <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider w-[22%]">Descrição</TableHead>
+              <SortHeader label={type === 'execucao' ? 'Empenhado / Liquidado' : 'Inscrito / Reinscrito / Liq Ano'} colKey="valor" align="right" className="w-[18%] px-4" />
+              <SortHeader label={type === 'execucao' ? 'Saldo' : 'Saldo Atual'} colKey="saldo" align="right" className="w-[12%] px-4" />
+              <TableHead className="h-11 px-4 pr-6 text-center text-xs font-semibold uppercase tracking-wider w-[6%] min-w-[80px]">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell className="px-4 sm:px-6"><Skeleton className="h-8 w-24" /></TableCell>
+                  <TableCell className="px-4"><Skeleton className="h-8 w-32" /></TableCell>
+                  <TableCell className="px-4"><Skeleton className="h-8 w-24" /></TableCell>
+                  <TableCell className="px-4"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                  <TableCell className="px-4"><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
+                  <TableCell className="px-4 pr-6"><Skeleton className="h-8 w-16 mx-auto" /></TableCell>
                 </TableRow>
-              ) : (
-                paginatedData.map((row, idx) => {
-                  if (row.isGroup) {
-                    const isExpanded = expandedGroups[row.name];
-                    return (
-                      <Fragment key={`group-${idx}`}>
-                        <TableRow
-                          className="bg-slate-50/50 hover:bg-slate-100/80 transition-colors cursor-pointer border-b border-border-default/50"
-                          onClick={() => toggleGroup(row.name)}
-                        >
-                          <TableCell className="py-4 px-6 font-medium w-[43%] min-w-[380px]" colSpan={2}>
-                            <div className="flex items-center gap-2">
-                              <ChevronRight className={`h-4 w-4 text-slate-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                              <span>{row.name}</span>
-                              <Badge variant="secondary" className="ml-2 bg-white text-xs">{row.items.length}</Badge>
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-4 px-4 text-sm text-muted-foreground w-[20%] min-w-[180px]">
-                            -
-                          </TableCell>
-                          <TableCell className="py-4 px-4 text-right w-[18%] min-w-[150px]">
-                            <div className="flex flex-col gap-1 items-end">
-                              <span className="font-bold text-sm">{formatCurrency(row.valorTotal)}</span>
-                              {type === 'execucao' ? (
-                                <>
-                                  <span className={`text-[11px] ${(row.liquidadoTotal || 0) > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado">
-                                    Liq: {formatCurrency(row.liquidadoTotal)}
+              ))
+            ) : paginatedData.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">Nenhum empenho encontrado.</TableCell>
+              </TableRow>
+            ) : (
+              paginatedData.map((row, idx) => {
+                if (row.isGroup) {
+                  const isExpanded = expandedGroups[row.name];
+                  return (
+                    <Fragment key={`group-${idx}`}>
+                      <TableRow
+                        className="bg-slate-50/50 hover:bg-slate-100/80 transition-colors cursor-pointer border-b border-border-default/50"
+                        onClick={() => toggleGroup(row.name)}
+                      >
+                        <TableCell className="py-4 px-4 sm:px-6 font-medium w-[42%]" colSpan={2}>
+                          <div className="flex items-center gap-2">
+                            <ChevronRight className={`h-4 w-4 text-slate-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                            <span>{row.name}</span>
+                            <Badge variant="secondary" className="ml-2 bg-white text-xs">{row.items.length}</Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-4 text-sm text-muted-foreground w-[22%]">
+                          -
+                        </TableCell>
+                        <TableCell className="py-4 px-4 text-right w-[18%]">
+                          <div className="flex flex-col gap-1 items-end">
+                            <span className="font-bold text-sm">{formatCurrency(row.valorTotal)}</span>
+                            {type === 'execucao' ? (
+                              <>
+                                <span className={`text-[11px] ${(row.liquidadoTotal || 0) > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado">
+                                  Liq: {formatCurrency(row.liquidadoTotal)}
+                                </span>
+                                {(row.pagoTotal || 0) > 0 && (
+                                  <span className="text-[11px] text-status-success" title="Pago">
+                                    Pg: {formatCurrency(row.pagoTotal)}
                                   </span>
-                                  {(row.pagoTotal || 0) > 0 && (
-                                    <span className="text-[11px] text-status-success" title="Pago">
-                                      Pg: {formatCurrency(row.pagoTotal)}
-                                    </span>
-                                  )}
-                                </>
-                              ) : (
-                                <>
-                                  <span className={`text-[11px] ${(row.liquidadoTotal || 0) > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado no Ano">
-                                    Liq Ano: {formatCurrency(row.liquidadoTotal)}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-4 px-4 text-right w-[14%] min-w-[120px]">
-                            {(() => {
-                              if (type === 'restos') {
-                                return (
-                                  <span className={`font-bold text-sm ${row.saldoTotal > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}>
-                                    {formatCurrency(row.saldoTotal)}
-                                  </span>
-                                );
-                              }
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <span className={`text-[11px] ${(row.liquidadoTotal || 0) > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado no Ano">
+                                  Liq Ano: {formatCurrency(row.liquidadoTotal)}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-4 text-right w-[12%]">
+                          {(() => {
+                            if (type === 'restos') {
                               return (
-                                <span className={`font-bold text-sm ${row.saldoTotal > 0 ? 'text-status-success' : row.saldoTotal < 0 ? 'text-status-error' : 'text-muted-foreground'}`}>
+                                <span className={`font-bold text-sm ${row.saldoTotal > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}>
                                   {formatCurrency(row.saldoTotal)}
                                 </span>
                               );
-                            })()}
-                          </TableCell>
-                          <TableCell className="py-4 px-6 text-center w-[10%] min-w-[90px]"></TableCell>
-                        </TableRow>
+                            }
+                            return (
+                              <span className={`font-bold text-sm ${row.saldoTotal > 0 ? 'text-status-success' : row.saldoTotal < 0 ? 'text-status-error' : 'text-muted-foreground'}`}>
+                                {formatCurrency(row.saldoTotal)}
+                              </span>
+                            );
+                          })()}
+                        </TableCell>
+                        <TableCell className="py-4 px-4 pr-6 text-center w-[6%] min-w-[80px]"></TableCell>
+                      </TableRow>
                         {isExpanded && row.items.map(empenho => (
                           <EmpenhoRow
                             key={empenho.id}
@@ -1028,7 +1058,6 @@ function EmpenhosTable({ empenhos, type, handleOpenDialog, isFavorite, toggleFav
               )}
             </TableBody>
           </Table>
-        </div>
         <TablePagination
           page={safePage}
           totalPages={totalPages}
