@@ -327,9 +327,9 @@ export function Layout({ children }: LayoutProps) {
              <LogoIcon size={32} />
             <div>
               <h1 className="font-bold text-lg tracking-tight leading-none text-foreground flex items-center gap-1.5 m-0">
-                SUAP <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full font-bold">IFRN</span>
+                SIAGES <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full font-bold">Beta</span>
               </h1>
-              <p className="text-[10px] text-muted-foreground tracking-wider m-0 mt-0.5">Sistema Unificado de Administração Pública</p>
+              <p className="text-[10px] text-muted-foreground tracking-wider m-0 mt-0.5">Sistema Integrado de Administração e Gestão Estratégica</p>
             </div>
           </Link>
 
@@ -480,11 +480,11 @@ export function Layout({ children }: LayoutProps) {
 
         <div className="shrink-0 border-t border-border bg-muted/40 p-4 text-xs text-muted-foreground flex flex-col gap-2">
           <div className="flex items-center justify-between text-[10px]">
-            <span>SUAP Design System</span>
-            <span className="font-mono text-[10px] text-foreground font-semibold">IFRN v3.0</span>
+            <span>SIAGES</span>
+            <span className="font-mono text-[10px] text-foreground font-semibold">Versão v3.0</span>
           </div>
           <div className="text-[10px] leading-tight text-muted-foreground">
-            Conformidade com os padrões e temas visuais do SUAP.
+            Sistema Integrado de Administração e Gestão Estratégica.
           </div>
         </div>
       </aside>
@@ -510,7 +510,7 @@ export function Layout({ children }: LayoutProps) {
                 type="search"
                 value={navigationSearch}
                 onChange={(event) => setNavigationSearch(event.target.value)}
-                placeholder="Pesquisar no SUAP..."
+                placeholder="Pesquisar no SIAGES..."
                 className="min-w-0 flex-1 border-0 bg-transparent p-0 text-xs font-medium text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0"
               />
             </label>

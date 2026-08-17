@@ -29,7 +29,10 @@ const getItemUnitPrice = (item: PortalTransparenciaItemEmpenho) => {
   return Number(historyUnitPrice || item.valorAtual || 0);
 };
 
-const getItemQuantity = (_item: PortalTransparenciaItemEmpenho) => 0;
+const getItemQuantity = (item: PortalTransparenciaItemEmpenho) => {
+  const historyQuantity = item.historico?.find((row) => Number(row.quantidade) > 0)?.quantidade;
+  return Number(historyQuantity || 0);
+};
 
 export const buildEmpenhoItemSourceKey = (numeroEmpenho: string, item: PortalTransparenciaItemEmpenho) =>
   [

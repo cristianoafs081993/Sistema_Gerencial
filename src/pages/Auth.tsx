@@ -87,9 +87,9 @@ export default function Auth() {
           <LogoIcon size={34} />
           <div>
             <h1 className="font-bold text-lg tracking-tight leading-none text-white flex items-center gap-1.5 m-0">
-              SUAP <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full font-bold">IFRN</span>
+              SIAGES <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full font-bold">Beta</span>
             </h1>
-            <p className="text-[10px] text-slate-300 tracking-wider m-0 mt-0.5">Sistema Unificado de Administração Pública</p>
+            <p className="text-[10px] text-slate-300 tracking-wider m-0 mt-0.5">Sistema Integrado de Administração e Gestão Estratégica</p>
           </div>
         </div>
 
@@ -134,7 +134,7 @@ export default function Auth() {
 
         {/* Footer brand info */}
         <div className="text-xs text-slate-400 font-medium z-10">
-          SUAP Design System • IFRN Campus Currais Novos
+          SIAGES • IFRN Campus Currais Novos
         </div>
       </div>
 
@@ -147,9 +147,9 @@ export default function Auth() {
             <LogoIcon size={38} />
             <div>
               <h1 className="font-bold text-xl tracking-tight leading-none text-foreground flex items-center gap-1.5 m-0">
-                SUAP <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full font-bold">IFRN</span>
+                SIAGES <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full font-bold">Beta</span>
               </h1>
-              <p className="text-[10px] text-muted-foreground tracking-wider m-0 mt-0.5">Sistema Unificado de Administração Pública</p>
+              <p className="text-[10px] text-muted-foreground tracking-wider m-0 mt-0.5">Sistema Integrado de Administração e Gestão Estratégica</p>
             </div>
           </div>
 

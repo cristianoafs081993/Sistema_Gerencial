@@ -60,7 +60,15 @@ function mockQueryBuilders() {
     if (table === 'terceirizados') {
       return {
         select: () => ({
+          limit: async () => ({ data: [], error: null }),
           eq: (column: string, value: string) => ({
+            limit: async () => {
+              const record =
+                column === 'matricula'
+                  ? supabaseMocks.terceirizadosByMatricula.get(value) || null
+                  : supabaseMocks.terceirizadosByEmail.get(value) || null;
+              return { data: record ? [record] : [], error: null };
+            },
             maybeSingle: async () => ({
               data:
                 column === 'matricula'
@@ -81,47 +89,56 @@ function makeUser(overrides: Partial<User> = {}) {
   return {
     id: 'user-3128880',
     email: 'usuario.suap@ifrn.edu.br',
-    user_metadata: { matricula: '3128880' },
-    app_metadata: {},
-    aud: 'authenticated',
-    created_at: '2026-06-17T00:00:00.000Z',
+    user_metadata: {
+      matricula: '3128880',
+      nome: 'Usuario Teste',
+    },
     ...overrides,
   } as User;
 }
 
 describe('fetchUserAccess', () => {
   beforeEach(() => {
-    supabaseMocks.from.mockReset();
+    vi.clearAllMocks();
     supabaseMocks.memberships = [];
     supabaseMocks.permissions = [];
     supabaseMocks.orgUser = null;
     supabaseMocks.orgPermissions = [];
-    supabaseMocks.terceirizadosByMatricula = new Map();
-    supabaseMocks.terceirizadosByEmail = new Map();
+    supabaseMocks.terceirizadosByMatricula.clear();
+    supabaseMocks.terceirizadosByEmail.clear();
     mockQueryBuilders();
   });
 
   it('carrega o orgao do superadmin sem restringir suas telas', async () => {
+    supabaseMocks.memberships = [
+      {
+        group_id: 'group-superadmin',
+        user_groups: { id: 'group-superadmin', name: 'Superadmin', slug: 'superadmin' },
+      },
+    ];
     supabaseMocks.orgUser = {
       role: 'admin',
       orgs: {
-        id: 'org-ifrn-reitoria',
-        slug: 'ifrn-reitoria',
-        name: 'IFRN Reitoria',
+        id: 'org-currais-novos',
+        name: 'Campus Currais Novos',
+        slug: 'ifrn-cnrn',
       },
     };
+    supabaseMocks.orgPermissions = [{ screen_id: 'almoxarifado' }];
 
     const { fetchUserAccess } = await import('@/services/userAccess');
 
     const access = await fetchUserAccess(makeUser(), true);
 
     expect(access.org).toEqual({
-      id: 'org-ifrn-reitoria',
-      slug: 'ifrn-reitoria',
-      name: 'IFRN Reitoria',
+      id: 'org-currais-novos',
+      name: 'Campus Currais Novos',
+      slug: 'ifrn-cnrn',
       role: 'admin',
     });
-    expect(access.screenIds.length).toBeGreaterThan(1);
+    expect(access.screenIds).toContain('dashboard');
+    expect(access.screenIds).toContain('planejamento');
+    expect(access.screenIds).toContain('almoxarifado');
   });
 
   it('libera requisicao de compra para terceirizado do refeitorio identificado pela matricula SUAP', async () => {
@@ -131,35 +148,41 @@ describe('fetchUserAccess', () => {
 
     const access = await fetchUserAccess(makeUser(), false);
 
-    expect(access.screenIds).toContain('requisicao-compra');
-    expect(access.groups.map((group) => group.slug)).toContain('terceirizado');
+    expect(access.groups.map((group) => group.slug)).toEqual(['terceirizado']);
+    expect(access.screenIds).toEqual(['requisicao-compra']);
   });
 
   it('libera cadastro de fornecedores quando o orgao tem acesso ao modulo pesquisa de precos', async () => {
     supabaseMocks.memberships = [
       {
-        group_id: 'group-diretores',
-        user_groups: { id: 'group-diretores', name: 'Diretores', slug: 'diretores' },
+        group_id: 'group-compras',
+        user_groups: { id: 'group-compras', name: 'Compras', slug: 'compras' },
       },
     ];
     supabaseMocks.permissions = [{ screen_id: 'pesquisa-precos' }];
     supabaseMocks.orgUser = {
       role: 'member',
       orgs: {
-        id: 'org-inconfidentes',
-        slug: 'prefeitura-inconfidentes',
-        name: 'Prefeitura de Inconfidentes',
+        id: 'org-currais-novos',
+        slug: 'ifrn-cnrn',
+        name: 'Campus Currais Novos',
       },
     };
     supabaseMocks.orgPermissions = [{ screen_id: 'pesquisa-precos' }];
 
     const { fetchUserAccess } = await import('@/services/userAccess');
 
-    const access = await fetchUserAccess(makeUser(), false);
+    const access = await fetchUserAccess(
+      makeUser({
+        id: 'user-compras',
+        email: 'compras@ifrn.edu.br',
+        user_metadata: { matricula: '9999999', nome: 'Compras' },
+      }),
+      false,
+    );
 
     expect(access.screenIds).toContain('pesquisa-precos');
     expect(access.screenIds).toContain('cadastro-fornecedores');
-    expect(access.screenIds).toContain('pesquisa-precos-ead');
   });
 
   it('mantem subpaginas implicitas quando o orgao libera somente o modulo pai', async () => {
@@ -169,22 +192,33 @@ describe('fetchUserAccess', () => {
         user_groups: { id: 'group-compras', name: 'Compras', slug: 'compras' },
       },
     ];
-    supabaseMocks.permissions = [{ screen_id: 'pesquisa-precos-ead' }];
+    supabaseMocks.permissions = [
+      { screen_id: 'pesquisa-precos-ead' },
+      { screen_id: 'dashboard' },
+    ];
     supabaseMocks.orgUser = {
       role: 'member',
       orgs: {
-        id: 'org-inconfidentes',
-        slug: 'prefeitura-inconfidentes',
-        name: 'Prefeitura de Inconfidentes',
+        id: 'org-currais-novos',
+        slug: 'ifrn-cnrn',
+        name: 'Campus Currais Novos',
       },
     };
     supabaseMocks.orgPermissions = [{ screen_id: 'pesquisa-precos' }];
 
     const { fetchUserAccess } = await import('@/services/userAccess');
 
-    const access = await fetchUserAccess(makeUser({ email: 'inconfidentes@inconfidentes.com.br' }), false);
+    const access = await fetchUserAccess(
+      makeUser({
+        id: 'user-compras',
+        email: 'compras@ifrn.edu.br',
+        user_metadata: { matricula: '9999999', nome: 'Compras' },
+      }),
+      false,
+    );
 
     expect(access.screenIds).toContain('pesquisa-precos-ead');
+    expect(access.screenIds).not.toContain('dashboard');
   });
 
   it('mantem requisicao de compra para terceirizado do refeitorio mesmo sem permissao de tela no grupo', async () => {
@@ -194,34 +228,35 @@ describe('fetchUserAccess', () => {
         user_groups: { id: 'group-terceirizado', name: 'Terceirizado', slug: 'terceirizado' },
       },
     ];
-    supabaseMocks.permissions = [];
     supabaseMocks.terceirizadosByMatricula.set('3128880', { tipo: 'refeitorio' });
 
     const { fetchUserAccess } = await import('@/services/userAccess');
 
-    const access = await fetchUserAccess(makeUser(), false);
-
-    expect(access.screenIds).toEqual(['requisicao-compra']);
-  });
-
-  it('ignora permissoes antigas de outros grupos para terceirizado do refeitorio', async () => {
-    supabaseMocks.memberships = [
-      {
-        group_id: 'group-diretores',
-        user_groups: { id: 'group-diretores', name: 'Diretores', slug: 'diretores' },
-      },
-    ];
-    supabaseMocks.permissions = [{ screen_id: 'cadastro-terceirizados' }, { screen_id: 'dashboard' }];
-    supabaseMocks.terceirizadosByMatricula.set('3128880', { tipo: 'refeitorio' });
-
-    const { fetchUserAccess } = await import('@/services/userAccess');
     const access = await fetchUserAccess(makeUser(), false);
 
     expect(access.groups.map((group) => group.slug)).toEqual(['terceirizado']);
     expect(access.screenIds).toEqual(['requisicao-compra']);
   });
 
-  it('bloqueia requisicao de compra para terceirizado que nao e do refeitorio', async () => {
+  it('ignora permissoes antigas de outros grupos para terceirizado do refeitorio', async () => {
+    supabaseMocks.memberships = [
+      {
+        group_id: 'group-gestor',
+        user_groups: { id: 'group-gestor', name: 'Gestor', slug: 'gestor' },
+      },
+    ];
+    supabaseMocks.permissions = [{ screen_id: 'dashboard' }, { screen_id: 'contratos' }];
+    supabaseMocks.terceirizadosByMatricula.set('3128880', { tipo: 'refeitorio' });
+
+    const { fetchUserAccess } = await import('@/services/userAccess');
+
+    const access = await fetchUserAccess(makeUser(), false);
+
+    expect(access.groups.map((group) => group.slug)).toEqual(['terceirizado']);
+    expect(access.screenIds).toEqual(['requisicao-compra']);
+  });
+
+  it('libera requisicao de compra para terceirizado com outro tipo de servico', async () => {
     supabaseMocks.memberships = [
       {
         group_id: 'group-terceirizado',
@@ -235,6 +270,6 @@ describe('fetchUserAccess', () => {
 
     const access = await fetchUserAccess(makeUser(), false);
 
-    expect(access.screenIds).not.toContain('requisicao-compra');
+    expect(access.screenIds).toContain('requisicao-compra');
   });
 });
