@@ -146,7 +146,7 @@ describe('LicitacoesPregoes', () => {
     });
   });
 
-  it('lista pregoes de todas as UASGs por padrao e abre drawer de detalhes', async () => {
+  it('lista pregoes de todas as UASGs por padrao e abre modal de detalhes', async () => {
     renderPage();
 
     expect(await screen.findByText('Servicos de combustiveis para o campus')).toBeInTheDocument();

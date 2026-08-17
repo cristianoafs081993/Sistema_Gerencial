@@ -25,7 +25,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/lib/supabase';
@@ -231,7 +238,7 @@ function isInternalUasg(uasgCodigo: string) {
   return DEFAULT_PNCP_UASGS.includes(normalized);
 }
 
-function AtasDetailsSheet({
+function AtasDetailsDialog({
   ata,
   onOpenChange,
 }: {
@@ -348,211 +355,220 @@ function AtasDetailsSheet({
   const linkAtaPncp = ata ? rawString(ata, ['linkAtaPNCP', 'linkCompraPNCP']) : null;
 
   return (
-    <Sheet open={Boolean(ata)} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-3xl">
+    <Dialog open={Boolean(ata)} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-4xl flex-col gap-0 overflow-hidden border border-border-default bg-surface-card p-0 shadow-2xl">
         {ata ? (
-          <div className="space-y-6">
-            <SheetHeader className="pr-8">
+          <>
+            <DialogHeader className="border-b border-border-default/60 px-6 py-4 pr-12">
               <div className="flex flex-wrap items-center gap-2">
-                <SheetTitle className="text-xl">Ata {ata.numeroAta}</SheetTitle>
+                <DialogTitle className="text-xl font-semibold text-text-primary">Ata {ata.numeroAta}</DialogTitle>
                 <Badge variant="outline" className={vigenciaInfo.badgeClass}>
                   {vigenciaInfo.label}
                 </Badge>
               </div>
-              <SheetDescription className="text-sm">{formatUasg(ata.unidadeGerenciadoraCodigo, ata.unidadeGerenciadoraNome)}</SheetDescription>
-            </SheetHeader>
+              <DialogDescription className="text-sm text-text-secondary">
+                {formatUasg(ata.unidadeGerenciadoraCodigo, ata.unidadeGerenciadoraNome)}
+              </DialogDescription>
+            </DialogHeader>
 
-            <div className="rounded-radius-md border border-border-default bg-surface-subtle/40 p-3.5 space-y-1.5">
-              <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Objeto da Ata</p>
-              <p className="font-ui text-sm leading-relaxed text-text-primary">{ata.objeto || '-'}</p>
-            </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div className="rounded-radius-md border border-border-default bg-surface-subtle/40 p-3.5 space-y-1.5">
+                <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Objeto da Ata</p>
+                <p className="font-ui text-sm leading-relaxed text-text-primary">{ata.objeto || '-'}</p>
+              </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-radius-md border border-border-default bg-surface-subtle/60 p-3">
-                <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Valor Homologado</p>
-                <p className="mt-1 font-mono text-base font-bold text-text-primary">{formatCurrency(valorTotalAta)}</p>
-                <p className="text-[11px] text-text-secondary">Total registrado na ata</p>
-              </div>
-              <div className="rounded-radius-md border border-border-default bg-surface-subtle/60 p-3">
-                <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Já Empenhado</p>
-                <p className="mt-1 font-mono text-base font-bold text-text-primary">
-                  {formatCurrency(executionData.totalEmpenhado)}
-                </p>
-                <p className="text-[11px] text-text-secondary">{percentualConsumidoGeral}% consumido</p>
-              </div>
-              <div className="rounded-radius-md border border-border-default bg-surface-subtle/60 p-3">
-                <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Saldo Disponível</p>
-                <p className="mt-1 font-mono text-base font-bold text-emerald-600 dark:text-emerald-400">
-                  {formatCurrency(saldoGeralAta)}
-                </p>
-                <p className="text-[11px] text-text-secondary">Disponível para pedidos</p>
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-radius-md border border-border-default bg-surface-subtle/60 p-3">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-text-muted" />
-                  <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Vigência da Ata</p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-radius-md border border-border-default bg-surface-subtle/60 p-3">
+                  <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Valor Homologado</p>
+                  <p className="mt-1 font-mono text-base font-bold text-text-primary">{formatCurrency(valorTotalAta)}</p>
+                  <p className="text-[11px] text-text-secondary">Total registrado na ata</p>
                 </div>
-                <p className="mt-1 font-ui text-sm font-semibold text-text-primary">
-                  {formatDate(ata.dataVigenciaInicial)} até {formatDate(ata.dataVigenciaFinal)}
-                </p>
-                <p className="mt-0.5 text-xs text-text-secondary">{vigenciaInfo.detail}</p>
-              </div>
-              <div className="rounded-radius-md border border-border-default bg-surface-subtle/60 p-3">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-text-muted" />
-                  <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Compra / Pregão de Origem</p>
+                <div className="rounded-radius-md border border-border-default bg-surface-subtle/60 p-3">
+                  <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Já Empenhado</p>
+                  <p className="mt-1 font-mono text-base font-bold text-text-primary">
+                    {formatCurrency(executionData.totalEmpenhado)}
+                  </p>
+                  <p className="text-[11px] text-text-secondary">{percentualConsumidoGeral}% consumido</p>
                 </div>
-                <p className="mt-1 font-ui text-sm font-semibold text-text-primary">
-                  {ata.numeroCompra || '-'}{ata.anoCompra ? `/${ata.anoCompra}` : ''}
-                </p>
-                <p className="mt-0.5 text-xs text-text-secondary">{ata.modalidadeNome || 'Pregão Eletrônico'}</p>
-              </div>
-            </div>
-
-            <div className="rounded-radius-md border border-border-default bg-surface-subtle/30 p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-primary" />
-                  <h4 className="font-ui text-xs font-semibold uppercase tracking-[0.12em] text-text-primary">
-                    Participantes e Adesões (Lei 14.133/2021)
-                  </h4>
-                </div>
-                <div className="flex gap-2">
-                  <Badge variant="outline">{ata.totalUnidadesParticipantes} participante(s)</Badge>
-                  <Badge variant="outline">{ata.totalAdesoes} carona(s)</Badge>
+                <div className="rounded-radius-md border border-border-default bg-surface-subtle/60 p-3">
+                  <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Saldo Disponível</p>
+                  <p className="mt-1 font-mono text-base font-bold text-emerald-600 dark:text-emerald-400">
+                    {formatCurrency(saldoGeralAta)}
+                  </p>
+                  <p className="text-[11px] text-text-secondary">Disponível para pedidos</p>
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 text-xs">
-                <div>
-                  <p className="font-semibold text-text-muted mb-1">Órgãos / Campi Participantes:</p>
-                  {ata.unidadesParticipantes.length > 0 ? (
-                    <ul className="space-y-1">
-                      {ata.unidadesParticipantes.map((u) => {
-                        const cat = IFRN_UASG_CATALOG.find((c) => c.codigo === u);
-                        return (
-                          <li key={u} className="flex items-center gap-1.5 text-text-primary">
-                            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                            UASG {u} — {cat?.nome || 'Órgão Participante'}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : (
-                    <p className="text-text-secondary">Nenhum participante registrado além da gerenciadora.</p>
-                  )}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-radius-md border border-border-default bg-surface-subtle/60 p-3">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-text-muted" />
+                    <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Vigência da Ata</p>
+                  </div>
+                  <p className="mt-1 font-ui text-sm font-semibold text-text-primary">
+                    {formatDate(ata.dataVigenciaInicial)} até {formatDate(ata.dataVigenciaFinal)}
+                  </p>
+                  <p className="mt-0.5 text-xs text-text-secondary">{vigenciaInfo.detail}</p>
                 </div>
-                <div>
-                  <p className="font-semibold text-text-muted mb-1">Órgãos Aderentes (Caronas):</p>
-                  {ata.unidadesAderentes.length > 0 ? (
-                    <ul className="space-y-1">
-                      {ata.unidadesAderentes.map((u) => {
-                        const cat = IFRN_UASG_CATALOG.find((c) => c.codigo === u);
-                        return (
-                          <li key={u} className="flex items-center gap-1.5 text-text-primary">
-                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                            UASG {u} — {cat?.nome || 'Órgão Aderente'}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : (
-                    <p className="text-text-secondary">Nenhuma adesão registrada até o momento.</p>
-                  )}
+                <div className="rounded-radius-md border border-border-default bg-surface-subtle/60 p-3">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-text-muted" />
+                    <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Compra / Pregão de Origem</p>
+                  </div>
+                  <p className="mt-1 font-ui text-sm font-semibold text-text-primary">
+                    {ata.numeroCompra || '-'}{ata.anoCompra ? `/${ata.anoCompra}` : ''}
+                  </p>
+                  <p className="mt-0.5 text-xs text-text-secondary">{ata.modalidadeNome || 'Pregão Eletrônico'}</p>
                 </div>
               </div>
-            </div>
 
-            <DataTablePanel title="Itens e Saldos da Ata" description={`${items.length} item(ns) materializado(s)`}>
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs text-text-secondary">
-                  {items.length === 0 ? 'Os itens podem ser carregados sob demanda para evitar timeout na busca geral.' : 'Saldos cruzados com o Comprasnet Contratos e SIAFI.'}
-                </p>
-                <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => void handleSyncDetails()} disabled={isSyncingDetails}>
-                  {isSyncingDetails ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
-                  Atualizar detalhes
-                </Button>
+              <div className="rounded-radius-md border border-border-default bg-surface-subtle/30 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-primary" />
+                    <h4 className="font-ui text-xs font-semibold uppercase tracking-[0.12em] text-text-primary">
+                      Participantes e Adesões (Lei 14.133/2021)
+                    </h4>
+                  </div>
+                  <div className="flex gap-2">
+                    <Badge variant="outline">{ata.totalUnidadesParticipantes} participante(s)</Badge>
+                    <Badge variant="outline">{ata.totalAdesoes} carona(s)</Badge>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 text-xs">
+                  <div>
+                    <p className="font-semibold text-text-muted mb-1">Órgãos / Campi Participantes:</p>
+                    {ata.unidadesParticipantes.length > 0 ? (
+                      <ul className="space-y-1">
+                        {ata.unidadesParticipantes.map((u) => {
+                          const cat = IFRN_UASG_CATALOG.find((c) => c.codigo === u);
+                          return (
+                            <li key={u} className="flex items-center gap-1.5 text-text-primary">
+                              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                              UASG {u} — {cat?.nome || 'Órgão Participante'}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <p className="text-text-secondary">Nenhum participante registrado além da gerenciadora.</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-text-muted mb-1">Órgãos Aderentes (Caronas):</p>
+                    {ata.unidadesAderentes.length > 0 ? (
+                      <ul className="space-y-1">
+                        {ata.unidadesAderentes.map((u) => {
+                          const cat = IFRN_UASG_CATALOG.find((c) => c.codigo === u);
+                          return (
+                            <li key={u} className="flex items-center gap-1.5 text-text-primary">
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                              UASG {u} — {cat?.nome || 'Órgão Aderente'}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <p className="text-text-secondary">Nenhuma adesão registrada até o momento.</p>
+                    )}
+                  </div>
+                </div>
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">Item</TableHead>
-                    <TableHead>Descrição & Fornecedor</TableHead>
-                    <TableHead className="text-right">Qtd.</TableHead>
-                    <TableHead className="text-right">Valor Homologado</TableHead>
-                    <TableHead className="text-right">Já Empenhado</TableHead>
-                    <TableHead className="text-right">Saldo Restante</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {items.length === 0 ? (
+
+              <DataTablePanel title="Itens e Saldos da Ata" description={`${items.length} item(ns) materializado(s)`}>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-text-secondary">
+                    {items.length === 0 ? 'Os itens podem ser carregados sob demanda para evitar timeout na busca geral.' : 'Saldos cruzados com o Comprasnet Contratos e SIAFI.'}
+                  </p>
+                  <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => void handleSyncDetails()} disabled={isSyncingDetails}>
+                    {isSyncingDetails ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
+                    Atualizar detalhes
+                  </Button>
+                </div>
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={6}>
-                        <div className="py-8 text-center text-sm text-text-secondary">Nenhum item materializado.</div>
-                      </TableCell>
+                      <TableHead className="w-12">Item</TableHead>
+                      <TableHead>Descrição & Fornecedor</TableHead>
+                      <TableHead className="text-right">Qtd.</TableHead>
+                      <TableHead className="text-right">Valor Homologado</TableHead>
+                      <TableHead className="text-right">Já Empenhado</TableHead>
+                      <TableHead className="text-right">Saldo Restante</TableHead>
                     </TableRow>
-                  ) : items.map((item) => {
-                    const itemNum = String(Number(item.numeroItem || '0'));
-                    const itemHomologado = item.valorTotal || ((item.quantidadeHomologada || 0) * (item.valorUnitario || 0)) || 0;
-                    const itemEmpenhado = executionData.itemCommittedMap.get(itemNum) || 0;
-                    const itemSaldo = Math.max(0, itemHomologado - itemEmpenhado);
-                    const itemPercent = itemHomologado > 0 ? Math.min(100, Math.round((itemEmpenhado / itemHomologado) * 100)) : 0;
-
-                    let progressColor = 'bg-emerald-500';
-                    if (itemPercent >= 90) progressColor = 'bg-destructive';
-                    else if (itemPercent >= 70) progressColor = 'bg-amber-500';
-
-                    return (
-                      <TableRow key={item.itemKey}>
-                        <TableCell className="font-mono text-xs font-bold">{item.numeroItem}</TableCell>
-                        <TableCell className="max-w-xs">
-                          <p className="text-xs font-medium text-text-primary line-clamp-2">{item.descricaoItem || '-'}</p>
-                          <p className="mt-0.5 text-[11px] text-text-secondary truncate">
-                            {item.fornecedorNome || item.fornecedorNi || '-'}
-                          </p>
-                        </TableCell>
-                        <TableCell className="text-right text-xs font-mono">{item.quantidadeHomologada ?? '-'}</TableCell>
-                        <TableCell className="text-right text-xs font-mono font-semibold">{formatCurrency(itemHomologado)}</TableCell>
-                        <TableCell className="text-right text-xs font-mono">
-                          <span className="font-semibold text-text-primary">{formatCurrency(itemEmpenhado)}</span>
-                          <div className="mt-1 w-full bg-surface-subtle rounded-full h-1.5 overflow-hidden">
-                            <div className={`h-full ${progressColor}`} style={{ width: `${itemPercent}%` }} />
-                          </div>
-                          <span className="text-[10px] text-text-secondary">{itemPercent}%</span>
-                        </TableCell>
-                        <TableCell className="text-right text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                          {formatCurrency(itemSaldo)}
+                  </TableHeader>
+                  <TableBody>
+                    {items.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6}>
+                          <div className="py-8 text-center text-sm text-text-secondary">Nenhum item materializado.</div>
                         </TableCell>
                       </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </DataTablePanel>
+                    ) : items.map((item) => {
+                      const itemNum = String(Number(item.numeroItem || '0'));
+                      const itemHomologado = item.valorTotal || ((item.quantidadeHomologada || 0) * (item.valorUnitario || 0)) || 0;
+                      const itemEmpenhado = executionData.itemCommittedMap.get(itemNum) || 0;
+                      const itemSaldo = Math.max(0, itemHomologado - itemEmpenhado);
+                      const itemPercent = itemHomologado > 0 ? Math.min(100, Math.round((itemEmpenhado / itemHomologado) * 100)) : 0;
 
-            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border-default">
-              {linkAtaPncp ? (
-                <Button type="button" variant="default" className="gap-2" asChild>
-                  <a href={linkAtaPncp} target="_blank" rel="noreferrer">
+                      let progressColor = 'bg-emerald-500';
+                      if (itemPercent >= 90) progressColor = 'bg-destructive';
+                      else if (itemPercent >= 70) progressColor = 'bg-amber-500';
+
+                      return (
+                        <TableRow key={item.itemKey}>
+                          <TableCell className="font-mono text-xs font-bold">{item.numeroItem}</TableCell>
+                          <TableCell className="max-w-xs">
+                            <p className="text-xs font-medium text-text-primary line-clamp-2">{item.descricaoItem || '-'}</p>
+                            <p className="mt-0.5 text-[11px] text-text-secondary truncate">
+                              {item.fornecedorNome || item.fornecedorNi || '-'}
+                            </p>
+                          </TableCell>
+                          <TableCell className="text-right text-xs font-mono">{item.quantidadeHomologada ?? '-'}</TableCell>
+                          <TableCell className="text-right text-xs font-mono font-semibold">{formatCurrency(itemHomologado)}</TableCell>
+                          <TableCell className="text-right text-xs font-mono">
+                            <span className="font-semibold text-text-primary">{formatCurrency(itemEmpenhado)}</span>
+                            <div className="mt-1 w-full bg-surface-subtle rounded-full h-1.5 overflow-hidden">
+                              <div className={`h-full ${progressColor}`} style={{ width: `${itemPercent}%` }} />
+                            </div>
+                            <span className="text-[10px] text-text-secondary">{itemPercent}%</span>
+                          </TableCell>
+                          <TableCell className="text-right text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                            {formatCurrency(itemSaldo)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </DataTablePanel>
+            </div>
+
+            <DialogFooter className="flex flex-wrap items-center justify-between gap-2 border-t border-border-default/60 bg-surface-subtle/30 px-6 py-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {linkAtaPncp ? (
+                  <Button type="button" variant="default" size="sm" className="gap-2" asChild>
+                    <a href={linkAtaPncp} target="_blank" rel="noreferrer">
+                      <ExternalLink className="h-4 w-4" />
+                      Abrir Ata Oficial no PNCP
+                    </a>
+                  </Button>
+                ) : null}
+                <Button type="button" variant="outline" size="sm" className="gap-2" asChild>
+                  <a href={rawString(ata, ['linkCompraPNCP']) ?? 'https://dadosabertos.compras.gov.br/swagger-ui/index.html'} target="_blank" rel="noreferrer">
                     <ExternalLink className="h-4 w-4" />
-                    Abrir Ata Oficial no PNCP
+                    Ver Processo de Compra
                   </a>
                 </Button>
-              ) : null}
-              <Button type="button" variant="outline" className="gap-2" asChild>
-                <a href={rawString(ata, ['linkCompraPNCP']) ?? 'https://dadosabertos.compras.gov.br/swagger-ui/index.html'} target="_blank" rel="noreferrer">
-                  <ExternalLink className="h-4 w-4" />
-                  Ver Processo de Compra
-                </a>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+                Fechar
               </Button>
-            </div>
-          </div>
+            </DialogFooter>
+          </>
         ) : null}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -832,7 +848,7 @@ export default function AtasRegistroPrecos() {
         />
       </DataTablePanel>
 
-      <AtasDetailsSheet ata={selectedAta} onOpenChange={(open) => !open && setSelectedAta(null)} />
+      <AtasDetailsDialog ata={selectedAta} onOpenChange={(open) => !open && setSelectedAta(null)} />
     </div>
   );
 }

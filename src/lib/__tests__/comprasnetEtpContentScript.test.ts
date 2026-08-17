@@ -21,7 +21,11 @@ describe('content script do ETP Comprasnet', () => {
     testWindow.__siagesComprasnetEtp?.install();
     testWindow.__siagesComprasnetEtp?.install();
 
-    expect(document.querySelectorAll('#siages-comprasnet-etp-open')).toHaveLength(1);
+    const openButtons = document.querySelectorAll('#siages-comprasnet-etp-open');
+    expect(openButtons).toHaveLength(1);
+    expect(openButtons[0].classList.contains('br-button')).toBe(true);
+    expect(openButtons[0].classList.contains('secondary')).toBe(true);
+    expect(openButtons[0].classList.contains('small')).toBe(true);
     expect(document.querySelectorAll('#siages-comprasnet-etp-overlay')).toHaveLength(1);
     expect(document.body.className).toBe(originalClass);
     expect(document.querySelector('button.br-button.primary')).toHaveTextContent('Concluir ETP');

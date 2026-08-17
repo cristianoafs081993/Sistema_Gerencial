@@ -12,7 +12,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/lib/supabase';
 import {
@@ -159,7 +166,7 @@ function parseNumeric(val: any): number {
   return Number(clean) || 0;
 }
 
-function LicitacaoDetailsSheet({
+function LicitacaoDetailsDialog({
   licitacao,
   onOpenChange,
 }: {
@@ -539,184 +546,195 @@ function LicitacaoDetailsSheet({
     : fetchedPncpItens;
 
   return (
-    <Sheet open={Boolean(licitacao)} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+    <Dialog open={Boolean(licitacao)} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-3xl flex-col gap-0 overflow-hidden border border-border-default bg-surface-card p-0 shadow-2xl">
         {licitacao ? (
-          <div className="space-y-5">
-            <SheetHeader className="pr-8">
-              <SheetTitle>{licitacao.modalidadeNome || 'Pregão'} {licitacao.numeroCompra}/{licitacao.anoCompra}</SheetTitle>
-              <SheetDescription>{licitacao.numeroControlePncp}</SheetDescription>
-            </SheetHeader>
+          <>
+            <DialogHeader className="border-b border-border-default/60 px-6 py-4 pr-12">
+              <DialogTitle className="text-lg font-semibold text-text-primary">
+                {licitacao.modalidadeNome || 'Pregão'} {licitacao.numeroCompra}/{licitacao.anoCompra}
+              </DialogTitle>
+              <DialogDescription className="text-xs font-mono text-text-secondary">
+                {licitacao.numeroControlePncp}
+              </DialogDescription>
+            </DialogHeader>
 
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="outline" className={proposalBadgeClass(getProposalStatus(licitacao))}>
-                {getProposalStatus(licitacao)}
-              </Badge>
-              {licitacao.srp ? <Badge variant="outline">SRP</Badge> : null}
-              {licitacao.situacaoCompraNome ? <Badge variant="secondary">{licitacao.situacaoCompraNome}</Badge> : null}
-            </div>
-
-            <div className="space-y-2">
-              <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Objeto</p>
-              <p className="font-ui text-sm leading-6 text-text-primary">{licitacao.objetoCompra || '-'}</p>
-            </div>
-
-            {loadingPncpItens ? (
-              <div className="rounded-radius-lg border border-border-default p-4 flex items-center justify-center gap-2 text-xs text-text-secondary">
-                <Loader2 className="h-4 w-4 animate-spin text-action-primary" />
-                Carregando itens do pregão no PNCP...
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className={proposalBadgeClass(getProposalStatus(licitacao))}>
+                  {getProposalStatus(licitacao)}
+                </Badge>
+                {licitacao.srp ? <Badge variant="outline">SRP</Badge> : null}
+                {licitacao.situacaoCompraNome ? <Badge variant="secondary">{licitacao.situacaoCompraNome}</Badge> : null}
               </div>
-            ) : displayItens.length > 0 ? (
+
+              <div className="space-y-2">
+                <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Objeto</p>
+                <p className="font-ui text-sm leading-6 text-text-primary">{licitacao.objetoCompra || '-'}</p>
+              </div>
+
+              {loadingPncpItens ? (
+                <div className="rounded-radius-lg border border-border-default p-4 flex items-center justify-center gap-2 text-xs text-text-secondary">
+                  <Loader2 className="h-4 w-4 animate-spin text-action-primary" />
+                  Carregando itens do pregão no PNCP...
+                </div>
+              ) : displayItens.length > 0 ? (
+                <div className="rounded-radius-lg border border-border-default p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Itens PNCP</p>
+                    <Badge variant="outline" className="text-xs">{displayItens.length} item(ns)</Badge>
+                  </div>
+                  <div className="mt-3 space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                    {displayItens.map((item, index) => {
+                      const unitValue = rawNumber(item.valorUnitarioEstimado ?? item.valorUnitario);
+                      const itemNum = getPncpItemNumber(item);
+                      const origValue = rawNumber(item.valorTotal ?? item.valorTotalEstimado) || 0;
+                      const committedVal = committedValues.get(itemNum) || 0;
+                      const balance = origValue - committedVal;
+
+                      return (
+                        <div key={`${itemNum}-${index}`} className="rounded-radius-md border border-border-default/70 bg-surface-subtle/60 p-3">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <p className="font-ui text-sm font-semibold text-text-primary">Item {itemNum}</p>
+                            <p className="font-mono text-xs font-semibold text-text-primary">
+                              Valor Estimado: {formatCurrency(origValue)}
+                            </p>
+                          </div>
+                          <p className="mt-1 font-ui text-sm text-text-secondary">{getPncpItemDescription(item)}</p>
+                          <p className="mt-1 font-ui text-xs text-text-muted">
+                            Qtd. {rawText(item.quantidade) ?? '-'} {rawText(item.unidadeMedida) ?? ''}
+                            {unitValue !== null ? ` | Unit. ${formatCurrency(unitValue)}` : ''}
+                          </p>
+                          <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border-default/50 pt-2 text-xs">
+                            <div>
+                              <span className="text-text-muted block">Já Empenhado</span>
+                              <span className="font-semibold text-action-primary block mt-0.5">
+                                {loadingEmpenhos ? 'Carregando...' : formatCurrency(committedVal)}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-text-muted block">Saldo Restante</span>
+                              <span className={`font-semibold block mt-0.5 ${balance <= 0 ? 'text-status-error' : 'text-status-success'}`}>
+                                {loadingEmpenhos ? 'Carregando...' : formatCurrency(balance)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
               <div className="rounded-radius-lg border border-border-default p-4">
                 <div className="flex items-center justify-between">
-                  <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Itens PNCP</p>
-                  <Badge variant="outline" className="text-xs">{displayItens.length} item(ns)</Badge>
+                  <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">
+                    Empenhos da Licitação (Portal da Transparência)
+                  </p>
+                  {empenhos.length > 0 && !loadingEmpenhos ? (
+                    <Badge variant="outline" className="text-xs bg-action-primary/5 text-action-primary border-action-primary/20">
+                      {empenhos.length} empenho(s)
+                    </Badge>
+                  ) : null}
                 </div>
-                <div className="mt-3 space-y-2 max-h-[360px] overflow-y-auto pr-1">
-                  {displayItens.map((item, index) => {
-                    const unitValue = rawNumber(item.valorUnitarioEstimado ?? item.valorUnitario);
-                    const itemNum = getPncpItemNumber(item);
-                    const origValue = rawNumber(item.valorTotal ?? item.valorTotalEstimado) || 0;
-                    const committedVal = committedValues.get(itemNum) || 0;
-                    const balance = origValue - committedVal;
 
-                    return (
-                      <div key={`${itemNum}-${index}`} className="rounded-radius-md border border-border-default/70 bg-surface-subtle/60 p-3">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <p className="font-ui text-sm font-semibold text-text-primary">Item {itemNum}</p>
-                          <p className="font-mono text-xs font-semibold text-text-primary">
-                            Valor Estimado: {formatCurrency(origValue)}
-                          </p>
+                {loadingEmpenhos ? (
+                  <div className="flex items-center justify-center gap-2 py-8 text-sm text-text-secondary">
+                    <Loader2 className="h-4 w-4 animate-spin text-action-primary" />
+                    Buscando empenhos no Portal da Transparência...
+                  </div>
+                ) : empenhosError ? (
+                  <div className="mt-3 rounded-radius-md border border-status-error/20 bg-status-error/5 p-3 text-xs text-status-error">
+                    Aviso: Não foi possível obter dados em tempo real do Portal da Transparência.
+                    <p className="mt-1 font-mono text-[10px] opacity-80">{empenhosError}</p>
+                  </div>
+                ) : empenhos.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-text-secondary border border-dashed border-border-default/60 rounded-radius-md mt-3">
+                    Nenhum empenho registrado para esta licitação no Portal da Transparência.
+                  </div>
+                ) : (
+                  <div className="mt-3 space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                    {empenhos.map((emp, index) => (
+                      <div key={`${emp.numeroEmpenho}-${index}`} className="rounded-radius-md border border-border-default/50 bg-surface-subtle/40 p-2.5 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono font-semibold text-text-primary">{emp.numeroEmpenho}</span>
+                          <span className="font-semibold text-text-primary">{formatCurrency(parseNumeric(emp.valor))}</span>
                         </div>
-                        <p className="mt-1 font-ui text-sm text-text-secondary">{getPncpItemDescription(item)}</p>
-                        <p className="mt-1 font-ui text-xs text-text-muted">
-                          Qtd. {rawText(item.quantidade) ?? '-'} {rawText(item.unidadeMedida) ?? ''}
-                          {unitValue !== null ? ` | Unit. ${formatCurrency(unitValue)}` : ''}
-                        </p>
-                        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border-default/50 pt-2 text-xs">
-                          <div>
-                            <span className="text-text-muted block">Já Empenhado</span>
-                            <span className="font-semibold text-action-primary block mt-0.5">
-                              {loadingEmpenhos ? 'Carregando...' : formatCurrency(committedVal)}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-text-muted block">Saldo Restante</span>
-                            <span className={`font-semibold block mt-0.5 ${balance <= 0 ? 'text-status-error' : 'text-status-success'}`}>
-                              {loadingEmpenhos ? 'Carregando...' : formatCurrency(balance)}
-                            </span>
-                          </div>
+                        <div className="mt-1 text-text-muted flex flex-wrap gap-x-2 gap-y-0.5">
+                          <span>Emissão: {formatDate(emp.dataEmissao)}</span>
+                          <span>|</span>
+                          <span>Emitente: UG {emp.unidadeGestora?.codigo} {emp.unidadeGestora?.nome ? `(${emp.unidadeGestora.nome})` : ''}</span>
                         </div>
+                        {emp.credor?.nome ? (
+                          <div className="mt-1 text-text-secondary truncate">
+                            Favorecido: <span className="font-medium">{emp.credor.nome}</span>
+                            {emp.credor.cpfCnpjFormatado ? ` (${emp.credor.cpfCnpjFormatado})` : ''}
+                          </div>
+                        ) : null}
                       </div>
-                    );
-                  })}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            ) : null}
 
-            <div className="rounded-radius-lg border border-border-default p-4">
-              <div className="flex items-center justify-between">
-                <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">
-                  Empenhos da Licitação (Portal da Transparência)
-                </p>
-                {empenhos.length > 0 && !loadingEmpenhos ? (
-                  <Badge variant="outline" className="text-xs bg-action-primary/5 text-action-primary border-action-primary/20">
-                    {empenhos.length} empenho(s)
-                  </Badge>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <DetailItem label="Processo" value={licitacao.processo} />
+                <DetailItem label="UASG" value={formatUasg(licitacao)} />
+                <DetailItem label="Publicação PNCP" value={formatDateTime(licitacao.dataPublicacaoPncp)} />
+                <DetailItem label="Abertura" value={formatDateTime(licitacao.dataAberturaProposta)} />
+                <DetailItem label="Encerramento" value={formatDateTime(licitacao.dataEncerramentoProposta)} />
+                <DetailItem label="Atualização global" value={formatDateTime(licitacao.dataAtualizacaoGlobal)} />
+                <DetailItem label="Valor estimado" value={formatCurrency(licitacao.valorTotalEstimado)} />
+                <DetailItem label="Valor homologado" value={formatCurrency(licitacao.valorTotalHomologado)} />
+                <DetailItem label="Modo de disputa" value={licitacao.modoDisputaNome} />
+                <DetailItem label="Amparo legal" value={licitacao.amparoLegalNome} />
+              </div>
+
+              {licitacao.informacaoComplementar ? (
+                <div className="rounded-radius-lg border border-border-default p-4">
+                  <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Informação complementar</p>
+                  <p className="mt-2 whitespace-pre-wrap font-ui text-sm leading-6 text-text-secondary">
+                    {licitacao.informacaoComplementar}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+
+            <DialogFooter className="flex flex-wrap items-center justify-between gap-2 border-t border-border-default/60 bg-surface-subtle/30 px-6 py-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {links?.pncpUrl ? (
+                  <Button type="button" variant="outline" size="sm" className="gap-2" asChild>
+                    <a href={links.pncpUrl} target="_blank" rel="noreferrer">
+                      <ExternalLink className="h-4 w-4" />
+                      PNCP
+                    </a>
+                  </Button>
+                ) : null}
+                {links?.comprasGovUrl ? (
+                  <Button type="button" variant="outline" size="sm" className="gap-2" asChild>
+                    <a href={links.comprasGovUrl} target="_blank" rel="noreferrer">
+                      <ExternalLink className="h-4 w-4" />
+                      Compras.gov.br
+                    </a>
+                  </Button>
+                ) : null}
+                {licitacao.linkProcessoEletronico ? (
+                  <Button type="button" variant="outline" size="sm" className="gap-2" asChild>
+                    <a href={licitacao.linkProcessoEletronico} target="_blank" rel="noreferrer">
+                      <ExternalLink className="h-4 w-4" />
+                      Processo
+                    </a>
+                  </Button>
                 ) : null}
               </div>
-
-              {loadingEmpenhos ? (
-                <div className="flex items-center justify-center gap-2 py-8 text-sm text-text-secondary">
-                  <Loader2 className="h-4 w-4 animate-spin text-action-primary" />
-                  Buscando empenhos no Portal da Transparência...
-                </div>
-              ) : empenhosError ? (
-                <div className="mt-3 rounded-radius-md border border-status-error/20 bg-status-error/5 p-3 text-xs text-status-error">
-                  Aviso: Não foi possível obter dados em tempo real do Portal da Transparência.
-                  <p className="mt-1 font-mono text-[10px] opacity-80">{empenhosError}</p>
-                </div>
-              ) : empenhos.length === 0 ? (
-                <div className="py-6 text-center text-xs text-text-secondary border border-dashed border-border-default/60 rounded-radius-md mt-3">
-                  Nenhum empenho registrado para esta licitação no Portal da Transparência.
-                </div>
-              ) : (
-                <div className="mt-3 space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                  {empenhos.map((emp, index) => (
-                    <div key={`${emp.numeroEmpenho}-${index}`} className="rounded-radius-md border border-border-default/50 bg-surface-subtle/40 p-2.5 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono font-semibold text-text-primary">{emp.numeroEmpenho}</span>
-                        <span className="font-semibold text-text-primary">{formatCurrency(parseNumeric(emp.valor))}</span>
-                      </div>
-                      <div className="mt-1 text-text-muted flex flex-wrap gap-x-2 gap-y-0.5">
-                        <span>Emissão: {formatDate(emp.dataEmissao)}</span>
-                        <span>|</span>
-                        <span>Emitente: UG {emp.unidadeGestora?.codigo} {emp.unidadeGestora?.nome ? `(${emp.unidadeGestora.nome})` : ''}</span>
-                      </div>
-                      {emp.credor?.nome ? (
-                        <div className="mt-1 text-text-secondary truncate">
-                          Favorecido: <span className="font-medium">{emp.credor.nome}</span>
-                          {emp.credor.cpfCnpjFormatado ? ` (${emp.credor.cpfCnpjFormatado})` : ''}
-                        </div>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <DetailItem label="Processo" value={licitacao.processo} />
-              <DetailItem label="UASG" value={formatUasg(licitacao)} />
-              <DetailItem label="Publicação PNCP" value={formatDateTime(licitacao.dataPublicacaoPncp)} />
-              <DetailItem label="Abertura" value={formatDateTime(licitacao.dataAberturaProposta)} />
-              <DetailItem label="Encerramento" value={formatDateTime(licitacao.dataEncerramentoProposta)} />
-              <DetailItem label="Atualização global" value={formatDateTime(licitacao.dataAtualizacaoGlobal)} />
-              <DetailItem label="Valor estimado" value={formatCurrency(licitacao.valorTotalEstimado)} />
-              <DetailItem label="Valor homologado" value={formatCurrency(licitacao.valorTotalHomologado)} />
-              <DetailItem label="Modo de disputa" value={licitacao.modoDisputaNome} />
-              <DetailItem label="Amparo legal" value={licitacao.amparoLegalNome} />
-            </div>
-
-            {licitacao.informacaoComplementar ? (
-              <div className="rounded-radius-lg border border-border-default p-4">
-                <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Informação complementar</p>
-                <p className="mt-2 whitespace-pre-wrap font-ui text-sm leading-6 text-text-secondary">
-                  {licitacao.informacaoComplementar}
-                </p>
-              </div>
-            ) : null}
-
-            <div className="flex flex-wrap gap-2">
-              {links?.pncpUrl ? (
-                <Button type="button" variant="outline" className="gap-2" asChild>
-                  <a href={links.pncpUrl} target="_blank" rel="noreferrer">
-                    <ExternalLink className="h-4 w-4" />
-                    PNCP
-                  </a>
-                </Button>
-              ) : null}
-              {links?.comprasGovUrl ? (
-                <Button type="button" variant="outline" className="gap-2" asChild>
-                  <a href={links.comprasGovUrl} target="_blank" rel="noreferrer">
-                    <ExternalLink className="h-4 w-4" />
-                    Compras.gov.br
-                  </a>
-                </Button>
-              ) : null}
-              {licitacao.linkProcessoEletronico ? (
-                <Button type="button" variant="outline" className="gap-2" asChild>
-                  <a href={licitacao.linkProcessoEletronico} target="_blank" rel="noreferrer">
-                    <ExternalLink className="h-4 w-4" />
-                    Processo
-                  </a>
-                </Button>
-              ) : null}
-            </div>
-          </div>
+              <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+                Fechar
+              </Button>
+            </DialogFooter>
+          </>
         ) : null}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1126,7 +1144,7 @@ export default function LicitacoesPregoes() {
         />
       </DataTablePanel>
 
-      <LicitacaoDetailsSheet licitacao={selectedLicitacao} onOpenChange={(open) => !open && setSelectedLicitacao(null)} />
+      <LicitacaoDetailsDialog licitacao={selectedLicitacao} onOpenChange={(open) => !open && setSelectedLicitacao(null)} />
     </div>
   );
 }

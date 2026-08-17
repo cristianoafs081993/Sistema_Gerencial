@@ -42,7 +42,7 @@ Informações básicas, área requisitante, responsáveis, anexos, categoria, co
 
 ## Design visual
 
-O botão e o modal usam a nomenclatura visual do Design System Brasil/Comprasnet (`br-button`, `br-card`, `br-input` e alertas). O content script captura tipografia, cores, bordas, foco e raio computados na página e envia os tokens `--comprasnet-*` ao iframe. A folha de estilos do iframe é isolada e não usa os tokens `suape-*`.
+O botão e o modal usam a nomenclatura visual do Design System Brasil/Comprasnet (`br-button secondary small`, `br-card`, `br-input` e alertas). O launcher herda e sincroniza as classes de tamanho (`small`) das ações originais da tela (`Voltar` e `Concluir ETP`), garantindo altura e padding idênticos aos botões nativos. O content script captura tipografia, cores, bordas, foco e raio computados na página e envia os tokens `--comprasnet-*` ao iframe. A folha de estilos do iframe é isolada e não usa os tokens `suape-*`.
 
 ## Teste manual
 

@@ -122,7 +122,7 @@ describe('AtasRegistroPrecos', () => {
     });
   });
 
-  it('lista atas e abre drawer de detalhes', async () => {
+  it('lista atas e abre modal de detalhes', async () => {
     renderPage();
 
     expect(await screen.findByText('Aquisicao de materiais de consumo')).toBeInTheDocument();

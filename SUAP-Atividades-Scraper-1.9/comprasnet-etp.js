@@ -422,6 +422,11 @@
     const conclude = concludeCandidates.find(isVisible);
     if (conclude?.parentElement) {
       openButton.classList.remove('siages-comprasnet-etp-floating');
+      const siblingButtons = Array.from(conclude.parentElement.querySelectorAll('button, .br-button'));
+      const isSmall = siblingButtons.some((b) => b.classList.contains('small') || b.classList.contains('p-button-sm') || b.classList.contains('btn-sm')) || conclude.classList.contains('small');
+      if (isSmall || siblingButtons.length > 0) {
+        openButton.classList.add('small');
+      }
       conclude.parentElement.insertBefore(openButton, conclude);
       return;
     }
@@ -430,6 +435,7 @@
       .find((element) => isVisible(element) && normalize(element.textContent).toLowerCase().includes('estudo técnico preliminar'));
     if (heading?.parentElement) {
       openButton.classList.remove('siages-comprasnet-etp-floating');
+      openButton.classList.add('small');
       heading.parentElement.appendChild(openButton);
       return;
     }
@@ -472,7 +478,7 @@
     root = createElement('div');
     root.id = ROOT_ID;
 
-    openButton = createElement('button', 'br-button secondary', 'Escrever ETP com IA');
+    openButton = createElement('button', 'br-button secondary small', 'Escrever ETP com IA');
     openButton.id = 'siages-comprasnet-etp-open';
     openButton.type = 'button';
     openButton.setAttribute('aria-haspopup', 'dialog');
