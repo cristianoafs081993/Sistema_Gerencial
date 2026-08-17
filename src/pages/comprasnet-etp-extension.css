@@ -49,13 +49,25 @@
 .comprasnet-etp-app .br-button.secondary { color: var(--comprasnet-secondary-text, var(--comprasnet-text, #333)); background: var(--comprasnet-secondary, #fff); border-color: var(--comprasnet-border, #888); }
 .comprasnet-etp-app .br-button.small { min-height: 2rem; padding: .35rem .65rem; font-size: .8rem; }
 .comprasnet-etp-app .br-button.circle { width: 2.25rem; min-height: 2.25rem; padding: 0; border-radius: 50%; }
+.comprasnet-etp-app .br-button.circle.active, .comprasnet-etp-app .br-button.circle[aria-expanded="true"] { color: var(--comprasnet-primary-text, #fff); background: var(--comprasnet-primary, #1351b4); border-color: var(--comprasnet-primary, #1351b4); }
 .comprasnet-etp-app .br-button:disabled { cursor: wait; opacity: .65; }
 .comprasnet-etp-upload { margin: 1rem 0; padding: .85rem; box-shadow: none; }
 .comprasnet-etp-preferences { margin: 1rem 0; padding: .85rem; box-shadow: none; }
+.comprasnet-etp-preferences-header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding-bottom: .6rem; border-bottom: 1px solid var(--comprasnet-border, #eee); }
+.comprasnet-etp-preferences-header strong { display: block; margin-bottom: .15rem; }
+.comprasnet-etp-preferences-header small { color: var(--comprasnet-muted, #666); font-weight: 400; }
+.comprasnet-etp-preferences summary { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; cursor: pointer; color: var(--comprasnet-text, #333); }
+.comprasnet-etp-preferences summary small { color: var(--comprasnet-muted, #666); font-weight: 400; }
 .comprasnet-etp-preferences-content { display: grid; gap: .85rem; margin-top: .85rem; }
 .comprasnet-etp-preferences-grid { align-items: end; }
 .comprasnet-etp-check-grid { display: flex; flex-wrap: wrap; gap: .5rem 1rem; }
 .comprasnet-etp-check-grid label { display: inline-flex; align-items: center; gap: .35rem; }
+.comprasnet-etp-process-group { display: grid; gap: .35rem; margin: 0 0 1rem; }
+.comprasnet-etp-process-group .label { font-weight: 700; }
+.comprasnet-etp-process-row { display: flex; gap: .75rem; align-items: center; }
+.comprasnet-etp-process-row input { flex: 1; min-width: 0; min-height: 2.5rem; padding: .55rem .7rem; color: var(--comprasnet-text, #333); background: var(--comprasnet-surface, #fff); border: 1px solid var(--comprasnet-border, #888); border-radius: var(--comprasnet-radius, .25rem); }
+.comprasnet-etp-process-row input:focus { outline: 3px solid color-mix(in srgb, var(--comprasnet-focus, #1351b4) 35%, transparent); outline-offset: 1px; border-color: var(--comprasnet-focus, #1351b4); }
+.comprasnet-etp-process-row .comprasnet-etp-search { white-space: nowrap; flex-shrink: 0; }
 .comprasnet-etp-upload-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
 .comprasnet-etp-upload-heading strong { display: block; margin-bottom: .2rem; }
 .comprasnet-etp-file-list { display: grid; gap: .35rem; margin: .75rem 0 0; padding: 0; list-style: none; }
@@ -85,4 +97,8 @@
 .comprasnet-etp-preview-content ul, .comprasnet-etp-preview-content ol { margin: .35rem 0 .35rem 1.25rem; }
 .spin { animation: comprasnet-etp-spin .9s linear infinite; }
 @keyframes comprasnet-etp-spin { to { transform: rotate(360deg); } }
+<<<<<<< HEAD
 @media (max-width: 560px) { .comprasnet-etp-app { padding: .5rem; } .comprasnet-etp-card-header, .comprasnet-etp-grid, .comprasnet-etp-upload-heading { display: grid; grid-template-columns: 1fr; } .comprasnet-etp-card-header-actions { justify-content: flex-end; } .comprasnet-etp-notice-panel { position: fixed; top: 4.5rem; right: .75rem; left: .75rem; width: auto; } .comprasnet-etp-grid .comprasnet-etp-search, .comprasnet-etp-process-grid .comprasnet-etp-search { width: 100%; margin-top: 0; } .comprasnet-etp-actions { flex-direction: column-reverse; } .comprasnet-etp-actions .br-button { width: 100%; } }
+=======
+@media (max-width: 560px) { .comprasnet-etp-app { padding: .5rem; } .comprasnet-etp-card-header, .comprasnet-etp-grid, .comprasnet-etp-upload-heading { display: grid; grid-template-columns: 1fr; } .comprasnet-etp-card-header-actions { justify-content: flex-end; } .comprasnet-etp-notice-panel { position: fixed; top: 4.5rem; right: .75rem; left: .75rem; width: auto; } .comprasnet-etp-process-row { flex-direction: column; align-items: stretch; } .comprasnet-etp-process-row .comprasnet-etp-search { width: 100%; } .comprasnet-etp-actions { flex-direction: column-reverse; } .comprasnet-etp-actions .br-button { width: 100%; } }
+>>>>>>> feat/suap-design-system

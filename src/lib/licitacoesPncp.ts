@@ -3,7 +3,7 @@ export const DEFAULT_PNCP_UASG = '158366';
 export const PREGAO_ELETRONICO_MODALIDADE_ID = 6;
 export const PNCP_MAX_WINDOW_DAYS = 365;
 export const PNCP_PUBLICATION_ENDPOINT = 'https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao';
-export const PNCP_ITEMS_ENDPOINT_BASE = 'https://pncp.gov.br/api/consulta/v1/orgaos';
+export const PNCP_ITEMS_ENDPOINT_BASE = 'https://pncp.gov.br/api/pncp/v1/orgaos';
 
 export type PncpUasgCatalogItem = {
   codigo: string;

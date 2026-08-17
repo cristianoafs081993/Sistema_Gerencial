@@ -239,8 +239,8 @@ describe('Layout', () => {
 
     expect(cotacoes.compareDocumentPosition(cadastro) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(cadastro.compareDocumentPosition(capacitacao) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(cotacoes).not.toHaveClass('font-semibold');
-    expect(capacitacao).toHaveClass('font-semibold');
+    expect(cotacoes).not.toHaveClass('font-bold');
+    expect(capacitacao).toHaveClass('font-bold');
   });
 
   it('exibe credito disponivel no grupo orcamentario', () => {

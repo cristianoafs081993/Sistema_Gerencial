@@ -182,6 +182,11 @@ function ContractProjectionTraceHover({ item, targetMonths = 12 }: { item: Contr
 
         <div className="border-b border-border-default/60 px-4 py-3">
           <div className="grid gap-2 text-[11px] text-text-muted sm:grid-cols-2">
+            {item.totalParcelasContrato ? (
+              <span className="col-span-full font-medium text-text-secondary">
+                Parcelas: {item.totalParcelasContrato} previstas ({item.parcelasApropriadas || 0} liquidadas, {item.parcelasPendentes || 0} pendentes, {item.parcelasNaoEmitidas || 0} a emitir) · Faltam liquidar: {item.parcelasRestantes ?? 0}
+              </span>
+            ) : null}
             <span>Notas historicas: {item.notasUtilizadas || 0} usadas de {item.notasTotais || 0}</span>
             <span>Desconsideradas: {item.notasDesconsideradas || 0}</span>
             <span>Meses historicos: {item.mesesHistorico || item.mesesConsiderados || 0}</span>
@@ -557,6 +562,35 @@ export function DashboardContractExecutionTab({
                                 </div>
                               </div>
 
+                              {item.totalParcelasContrato != null && item.totalParcelasContrato > 0 && (
+                                <div className="space-y-1 rounded-xl bg-slate-50 p-2.5 border border-slate-100 text-[11px]">
+                                  <div className="flex justify-between items-center text-text-muted">
+                                    <span>Parcelas previstas:</span>
+                                    <span className="font-bold text-text-primary">{item.totalParcelasContrato}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center text-text-muted">
+                                    <span>• Liquidadas:</span>
+                                    <span className="font-bold text-emerald-600">{item.parcelasApropriadas ?? 0}</span>
+                                  </div>
+                                  {(item.parcelasPendentes ?? 0) > 0 && (
+                                    <div className="flex justify-between items-center text-amber-700">
+                                      <span>• Pendentes:</span>
+                                      <span className="font-bold">{item.parcelasPendentes} ({formatCurrency(item.valorPendente ?? 0)})</span>
+                                    </div>
+                                  )}
+                                  {(item.parcelasNaoEmitidas ?? 0) > 0 && (
+                                    <div className="flex justify-between items-center text-text-muted">
+                                      <span>• A emitir:</span>
+                                      <span className="font-bold text-text-primary">{item.parcelasNaoEmitidas}</span>
+                                    </div>
+                                  )}
+                                  <div className="flex justify-between items-center pt-1 border-t border-slate-200/60 font-semibold text-text-primary">
+                                    <span>Faltam liquidar:</span>
+                                    <span className="font-bold text-primary">{item.parcelasRestantes ?? 0} parcela(s)</span>
+                                  </div>
+                                </div>
+                              )}
+
                               <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 border border-slate-100 text-xs">
                                 <span className="font-semibold text-text-muted">Cobertura Realizada</span>
                                 <span className={cn(
@@ -680,6 +714,7 @@ export function DashboardContractExecutionTab({
         <>
           <ChartPanel
             title="Gasto Mensal por Contrato"
+            titleClassName="text-lg sm:text-xl font-bold text-text-primary"
             description="Faturas emitidas no periodo (valor total acumulado mensal)"
             loading={isLoading || isContractExpenseLoading}
             heightClassName="h-[380px]"
@@ -749,6 +784,7 @@ export function DashboardContractExecutionTab({
 
           <ChartPanel
             title={`Projeção de Cobertura por Contrato (até ${selectedTargetLabel})`}
+            titleClassName="text-lg sm:text-xl font-bold text-text-primary"
             description={`Liquidações executadas projetadas até ${selectedTargetLabel} frente ao saldo dos empenhos`}
             loading={isLoading || isContractExpenseLoading}
             heightClassName="min-h-[260px]"

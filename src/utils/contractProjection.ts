@@ -156,3 +156,130 @@ export const calculateRobustInvoiceBaseline = (rawValues: number[]): RobustInvoi
     usouFallbackMediana: false,
   };
 };
+
+const EXECUTED_FATURA_STATUSES = new Set(['pago', 'siafi apropriado', 'pagamento parcial']);
+
+export const isExecutedFatura = (situacao?: string | null): boolean => {
+  const normalized = String(situacao ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+  return EXECUTED_FATURA_STATUSES.has(normalized);
+};
+
+export interface ContractInstallmentMetrics {
+  totalParcelasPrevistas: number;
+  qtdApropriadas: number;
+  qtdPendentes: number;
+  parcelasNaoEmitidas: number;
+  parcelasRestantesContrato: number;
+  faturasApropriadas: ContratoApiFaturaRow[];
+  faturasPendentes: ContratoApiFaturaRow[];
+  valorLiquidadoTotal: number;
+  valorPendenteTotal: number;
+}
+
+export const getContractTotalExpectedInstallments = (
+  contrato: {
+    vigencia_inicio?: string | null;
+    vigencia_fim?: string | null;
+    vigencia_inicio_derivada?: string | null;
+    vigencia_fim_derivada?: string | null;
+    categoria?: string | null;
+  },
+  historico?: Array<{
+    tipo?: string | null;
+    num_parcelas?: number | null;
+    novo_num_parcelas?: number | null;
+    data_assinatura?: string | null;
+    vigencia_inicio?: string | null;
+    vigencia_fim?: string | null;
+  }> | null,
+): number => {
+  const inicioStr = contrato.vigencia_inicio_derivada ?? contrato.vigencia_inicio;
+  const fimStr = contrato.vigencia_fim_derivada ?? contrato.vigencia_fim;
+
+  let monthsFromValidity = 0;
+  if (inicioStr && fimStr) {
+    const dInicio = dateFromValue(inicioStr);
+    const dFim = dateFromValue(fimStr);
+    if (dInicio && dFim && dFim.getTime() >= dInicio.getTime()) {
+      const diffMonths = (dFim.getUTCFullYear() - dInicio.getUTCFullYear()) * 12 + dFim.getUTCMonth() - dInicio.getUTCMonth();
+      monthsFromValidity = Math.max(1, diffMonths);
+    }
+  }
+
+  if (historico && historico.length > 0) {
+    const sorted = [...historico].sort((a, b) => {
+      const timeA = a.data_assinatura ? new Date(a.data_assinatura).getTime() : 0;
+      const timeB = b.data_assinatura ? new Date(b.data_assinatura).getTime() : 0;
+      return timeB - timeA;
+    });
+
+    for (const term of sorted) {
+      const termParcelas = term.novo_num_parcelas ?? term.num_parcelas;
+      if (termParcelas && termParcelas > 0) {
+        return Math.max(termParcelas, monthsFromValidity);
+      }
+    }
+  }
+
+  return monthsFromValidity > 0 ? monthsFromValidity : 12;
+};
+
+export const calculateContractInstallmentMetrics = (
+  contrato: {
+    vigencia_inicio?: string | null;
+    vigencia_fim?: string | null;
+    vigencia_inicio_derivada?: string | null;
+    vigencia_fim_derivada?: string | null;
+    categoria?: string | null;
+  },
+  faturas: ContratoApiFaturaRow[],
+  historico?: Array<{
+    tipo?: string | null;
+    num_parcelas?: number | null;
+    novo_num_parcelas?: number | null;
+    data_assinatura?: string | null;
+    vigencia_inicio?: string | null;
+    vigencia_fim?: string | null;
+  }> | null,
+): ContractInstallmentMetrics => {
+  const totalParcelasPrevistas = getContractTotalExpectedInstallments(contrato, historico);
+
+  const faturasApropriadas: ContratoApiFaturaRow[] = [];
+  const faturasPendentes: ContratoApiFaturaRow[] = [];
+  let valorLiquidadoTotal = 0;
+  let valorPendenteTotal = 0;
+
+  faturas.forEach((fatura) => {
+    const val = Number(fatura.valor_liquido ?? fatura.valor_bruto ?? 0) || 0;
+    if (val <= 0) return;
+
+    if (isExecutedFatura(fatura.situacao)) {
+      faturasApropriadas.push(fatura);
+      valorLiquidadoTotal += val;
+    } else {
+      faturasPendentes.push(fatura);
+      valorPendenteTotal += val;
+    }
+  });
+
+  const qtdApropriadas = faturasApropriadas.length;
+  const qtdPendentes = faturasPendentes.length;
+  const parcelasRestantesContrato = Math.max(0, totalParcelasPrevistas - qtdApropriadas);
+  const parcelasNaoEmitidas = Math.max(0, parcelasRestantesContrato - qtdPendentes);
+
+  return {
+    totalParcelasPrevistas,
+    qtdApropriadas,
+    qtdPendentes,
+    parcelasNaoEmitidas,
+    parcelasRestantesContrato,
+    faturasApropriadas,
+    faturasPendentes,
+    valorLiquidadoTotal,
+    valorPendenteTotal,
+  };
+};

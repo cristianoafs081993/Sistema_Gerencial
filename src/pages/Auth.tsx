@@ -79,17 +79,17 @@ export default function Auth() {
         />
         <div className="absolute inset-0 bg-gradient-to-br from-[#0B1538]/95 via-[#1A2B66]/85 to-[#0056C3]/45 pointer-events-none" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.06),transparent_45%)] pointer-events-none" />
-        <div className="absolute -left-16 -top-16 w-96 h-96 rounded-full bg-sebrae-blue/15 blur-3xl pointer-events-none" />
-        <div className="absolute -right-16 -bottom-16 w-96 h-96 rounded-full bg-sebrae-gold/10 blur-3xl pointer-events-none" />
+        <div className="absolute -left-16 -top-16 w-96 h-96 rounded-full bg-primary/20 blur-3xl pointer-events-none" />
+        <div className="absolute -right-16 -bottom-16 w-96 h-96 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
         
         {/* Top Branding Logo */}
         <div className="flex items-center gap-3 z-10 select-none">
           <LogoIcon size={34} />
           <div>
             <h1 className="font-bold text-lg tracking-tight leading-none text-white flex items-center gap-1.5 m-0">
-              SIAGES <span className="text-[10px] bg-sebrae-gold text-sebrae-navy px-1.5 py-0.5 rounded font-black">Beta</span>
+              SIAGES <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full font-bold">Beta</span>
             </h1>
-            <p className="text-[10px] text-slate-300 tracking-wider m-0 mt-0.5">Administração & Gestão Estratégica</p>
+            <p className="text-[10px] text-slate-300 tracking-wider m-0 mt-0.5">Sistema Integrado de Administração e Gestão Estratégica</p>
           </div>
         </div>
 
@@ -107,7 +107,7 @@ export default function Auth() {
           {/* Refined Minimalist Feature Highlight Bullets */}
           <div className="space-y-6">
             <div className="flex items-start gap-4 group">
-              <div className="flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-sebrae-gold transition-all duration-300 group-hover:bg-white/15">
+              <div className="flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-primary-foreground transition-all duration-300 group-hover:bg-white/15">
                 <RefreshCw className="h-5 w-5 animate-[spin_12s_linear_infinite]" />
               </div>
               <div className="space-y-0.5">
@@ -119,7 +119,7 @@ export default function Auth() {
             </div>
 
             <div className="flex items-start gap-4 group">
-              <div className="flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-sebrae-gold transition-all duration-300 group-hover:bg-white/15">
+              <div className="flex-shrink-0 flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-primary-foreground transition-all duration-300 group-hover:bg-white/15">
                 <Sparkles className="h-5 w-5" />
               </div>
               <div className="space-y-0.5">
@@ -134,22 +134,22 @@ export default function Auth() {
 
         {/* Footer brand info */}
         <div className="text-xs text-slate-400 font-medium z-10">
-          SIAGES Beta v3.0 • IFRN Campus Currais Novos
+          SIAGES • IFRN Campus Currais Novos
         </div>
       </div>
 
       {/* Right Column: Authentication Card form */}
-      <div className="md:col-span-7 lg:col-span-6 xl:col-span-5 flex flex-col justify-center px-4 py-12 sm:px-6 lg:px-16 bg-[radial-gradient(120%_120%_at_50%_10%,#ffffff_50%,rgba(42,79,218,0.02)_100%)] relative">
+      <div className="md:col-span-7 lg:col-span-6 xl:col-span-5 flex flex-col justify-center px-4 py-12 sm:px-6 lg:px-16 bg-background relative">
         <div className="mx-auto w-full max-w-md space-y-8">
           
           {/* Mobile-only branding logo */}
           <div className="flex md:hidden items-center justify-center gap-3 mb-6 select-none">
             <LogoIcon size={38} />
             <div>
-              <h1 className="font-bold text-xl tracking-tight leading-none text-sebrae-navy flex items-center gap-1.5 m-0">
-                SIAGES <span className="text-[10px] bg-sebrae-gold text-sebrae-navy px-1.5 py-0.5 rounded font-black">Beta</span>
+              <h1 className="font-bold text-xl tracking-tight leading-none text-foreground flex items-center gap-1.5 m-0">
+                SIAGES <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full font-bold">Beta</span>
               </h1>
-              <p className="text-[10px] text-slate-500 tracking-wider m-0 mt-0.5">Administração & Gestão Estratégica</p>
+              <p className="text-[10px] text-muted-foreground tracking-wider m-0 mt-0.5">Sistema Integrado de Administração e Gestão Estratégica</p>
             </div>
           </div>
 

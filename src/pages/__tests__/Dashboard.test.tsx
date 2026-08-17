@@ -532,14 +532,14 @@ describe('Dashboard', () => {
     expect(bullets[0]).toMatchObject({
       id: 'c1',
       empenhado: 1000,
-      liquidado: 1050,
-      projetado: 1800,
+      liquidado: 150,
+      projetado: 1725,
       saldoEmpenhos: 830,
       mesesConsiderados: 12,
-      percentualLiquidado: expect.closeTo(126.51, 1),
-      percentualProjetado: expect.closeTo(216.87, 1),
+      percentualLiquidado: expect.closeTo(18.07, 1),
+      percentualProjetado: expect.closeTo(207.83, 1),
       coberturaMes: 'Fevereiro/27',
-      necessidadeEmpenho: 0,
+      necessidadeEmpenho: 745,
     });
     expect(bullets[0].liquidacoes).toEqual([
       expect.objectContaining({
@@ -679,6 +679,94 @@ describe('Dashboard', () => {
     expect(bullet.liquidado).toBe(1315);
     expect(bullet.projetado).toBe(1840);
   });
+
+  it('projeta corretamente as 2 parcelas restantes quando há 1 nota pendente e 1 a emitir no fim do contrato (caso 00153/2024)', () => {
+    const faturas = [
+      ...Array.from({ length: 22 }, (_, index) => ({
+        id: `f-${index + 1}`,
+        contrato_api_id: 'c153',
+        situacao: 'Siafi Apropriado',
+        valor_liquido: 57000,
+        valor_bruto: 57000,
+        data_emissao: `2025-${String((index % 12) + 1).padStart(2, '0')}-10`,
+        raw_data: { contratante: '158366' },
+      })),
+      {
+        id: 'f-23',
+        contrato_api_id: 'c153',
+        situacao: 'Pendente',
+        valor_liquido: 57000,
+        valor_bruto: 57000,
+        data_emissao: '2026-08-12',
+        raw_data: { contratante: '158366' },
+      },
+    ];
+
+    const [bullet] = buildContractProjectionBullets(
+      [
+        {
+          id: 'c153',
+          numero: '00153/2024',
+          fornecedor_nome: 'INSTITUTO DE DIGNIDADE E DESENVOLVIMENTO SOCIAL',
+          objeto: 'Servicos de Apoio',
+          categoria: 'Mão de Obra',
+          vigencia_inicio: '2024-09-03',
+          vigencia_fim: '2026-09-03',
+          vigencia_inicio_derivada: '2024-09-03',
+          vigencia_fim_derivada: '2026-09-03',
+          valor_global: 1368000,
+        },
+      ] as never,
+      faturas as never,
+      [
+        {
+          id: 'e1',
+          contrato_api_id: 'c153',
+          numero: '2026NE000153',
+          valor_empenhado: 200000,
+          valor_liquidado: 86000,
+          valor_pago: 86000,
+          valor_a_liquidar: 114000, // Saldo exato para 2 parcelas de 57.000
+        },
+      ] as never,
+      ['c153'],
+      {
+        startDate: new Date('2026-01-01T00:00:00Z'),
+        endDate: new Date('2026-12-31T00:00:00Z'),
+        today: new Date('2026-08-14T00:00:00Z'),
+        projectionTargetMonths: 12,
+        historico: [
+          {
+            id: 'h1',
+            contrato_api_id: 'c153',
+            tipo: 'Contrato',
+            num_parcelas: 24,
+            novo_num_parcelas: null,
+            data_assinatura: '2024-08-26',
+            vigencia_inicio: '2024-09-03',
+            vigencia_fim: '2026-09-03',
+          } as never,
+        ],
+      },
+    );
+
+    expect(bullet.totalParcelasContrato).toBe(24);
+    expect(bullet.parcelasApropriadas).toBe(22);
+    expect(bullet.parcelasPendentes).toBe(1);
+    expect(bullet.parcelasNaoEmitidas).toBe(1);
+    expect(bullet.parcelasRestantes).toBe(2);
+    expect(bullet.mesesRestantes).toBe(2);
+    expect(bullet.mesAtualTemNota).toBe(false); // Porque a nota de agosto é Pendente, não liquidada
+    expect(bullet.valorPendente).toBe(57000);
+    // Projetado deve incluir 2 parcelas (57.000 pendente + 57.000 não emitida)
+    expect(bullet.projetado).toBe(bullet.liquidado + 114000);
+    expect(bullet.coberturaMes).toBe('Setembro/26');
+    // Como saldo é 114.000 e falta exatamente 114.000 para as 2 parcelas, ratio é 100% (e não >100%)
+    const capacidade = bullet.liquidado + bullet.saldoEmpenhos;
+    const ratio = (capacidade / bullet.projetado) * 100;
+    expect(ratio).toBeCloseTo(100, 1);
+  });
+
   it('inicia sem nenhum contrato selecionado por padrao', async () => {
     const currentYear = new Date().getFullYear();
     contratosApiAtivosQueryData = [1, 2, 3, 4, 5, 6].map((index) => ({

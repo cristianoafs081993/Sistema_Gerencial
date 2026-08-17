@@ -12,8 +12,16 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { supabase } from '@/lib/supabase';
 import {
   getLicitacaoLinks,
   getProposalStatus,
@@ -103,9 +111,9 @@ function formatUasg(row: LicitacaoPncpRow) {
 
 function proposalBadgeClass(status: string) {
   if (status === 'Aberta') return 'border-primary/20 bg-primary/[0.08] text-primary';
-  if (status === 'Futura') return 'border-sebrae-blue/20 bg-sebrae-blue/[0.08] text-sebrae-blue';
-  if (status === 'Encerrada') return 'border-slate-300 bg-slate-50 text-slate-600';
-  return 'border-amber-500/20 bg-amber-500/[0.08] text-amber-700';
+  if (status === 'Futura') return 'border-info/20 bg-info/[0.08] text-info';
+  if (status === 'Encerrada') return 'border-border bg-muted/60 text-muted-foreground';
+  return 'border-warning/20 bg-warning/[0.08] text-warning';
 }
 
 function FilterField({ label, className, children }: { label: string; className?: string; children: ReactNode }) {
@@ -158,7 +166,7 @@ function parseNumeric(val: any): number {
   return Number(clean) || 0;
 }
 
-function LicitacaoDetailsSheet({
+function LicitacaoDetailsDialog({
   licitacao,
   onOpenChange,
 }: {
@@ -170,11 +178,14 @@ function LicitacaoDetailsSheet({
   const [loadingEmpenhos, setLoadingEmpenhos] = useState(false);
   const [empenhosError, setEmpenhosError] = useState<string | null>(null);
   const [committedValues, setCommittedValues] = useState<Map<string, number>>(new Map());
+  const [fetchedPncpItens, setFetchedPncpItens] = useState<Record<string, unknown>[]>([]);
+  const [loadingPncpItens, setLoadingPncpItens] = useState(false);
 
   useEffect(() => {
     if (!licitacao) {
       setEmpenhos([]);
       setCommittedValues(new Map());
+      setFetchedPncpItens([]);
       setEmpenhosError(null);
       return;
     }
@@ -183,51 +194,257 @@ function LicitacaoDetailsSheet({
     const fetchEmpenhosAndItems = async () => {
       setLoadingEmpenhos(true);
       setEmpenhosError(null);
+      setFetchedPncpItens([]);
+
+      let pregaoItens = getPncpItems(licitacao.rawData);
+      if (pregaoItens.length === 0) {
+        setLoadingPncpItens(true);
+        try {
+          const items = await licitacoesPncpService.fetchItems(
+            licitacao.cnpjOrgao,
+            licitacao.anoCompra,
+            licitacao.sequencialCompra,
+          );
+          if (isMounted && items.length > 0) {
+            setFetchedPncpItens(items);
+            pregaoItens = items;
+          }
+        } catch (e) {
+          console.error('Erro ao buscar itens da licitacao no PNCP:', e);
+        } finally {
+          if (isMounted) setLoadingPncpItens(false);
+        }
+      }
+
       try {
         const uasg = licitacao.uasgCodigo;
-        if (!uasg) {
-          throw new Error('Código UASG não disponível para esta licitação.');
-        }
-
         const formattedNumero = formatLicitacaoNumero(licitacao.numeroCompra, licitacao.anoCompra);
         const modalidadeCode = getTransparencyModalidadeCode(licitacao.modalidadeId);
-
-        if (!formattedNumero) {
-          throw new Error('Número da licitação não disponível ou inválido.');
-        }
 
         const origin = typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null'
           ? window.location.origin
           : 'http://localhost:5173';
 
-        const res = await fetch(
-          `${origin}/api-transparencia/api-de-dados/licitacoes/empenhos?codigoUG=${uasg}&numero=${formattedNumero}&codigoModalidade=${modalidadeCode}&pagina=1`,
-          {
-            headers: {
-              'accept': 'application/json',
-              'chave-api-dados': '931d4d57337bef94e775337c318342e9',
-            }
-          }
-        );
+        let empenhosList: any[] = [];
 
-        if (!res.ok) {
-          throw new Error(`Portal da Transparência retornou HTTP ${res.status}`);
+        // 1. Tenta consulta ao vivo no Portal da Transparência
+        if (uasg && formattedNumero) {
+          try {
+            const res = await fetch(
+              `${origin}/api-transparencia/api-de-dados/licitacoes/empenhos?codigoUG=${uasg}&numero=${formattedNumero}&codigoModalidade=${modalidadeCode}&pagina=1`,
+              {
+                headers: {
+                  'accept': 'application/json',
+                  'chave-api-dados': '931d4d57337bef94e775337c318342e9',
+                }
+              }
+            );
+            if (res.ok) {
+              const empenhosData = await res.json();
+              if (Array.isArray(empenhosData)) {
+                empenhosList = empenhosData;
+              }
+            }
+          } catch (err) {
+            console.warn('Portal da Transparência offline ou indisponível:', err);
+          }
         }
 
-        const empenhosData = await res.json();
-        const empenhosList = Array.isArray(empenhosData) ? empenhosData : [];
+        // 1. Consulta Comprasnet Contratos (fonte oficial e determinística de contratos, itens e empenhos)
+        const numClean = licitacao.numeroCompra ? String(licitacao.numeroCompra).replace(/\D/g, '') : '';
+        const padded5 = numClean.padStart(5, '0');
+        const ano = String(licitacao.anoCompra || '');
+        const procClean = licitacao.processo ? String(licitacao.processo).replace(/\D/g, '') : '';
+        const licObjNorm = normalizeText(licitacao.objetoCompra);
+
+        const { data: dbContratos } = await supabase
+          .from('contratos_api')
+          .select('id, api_contrato_id, numero, fornecedor_nome, processo, valor_global, raw_data');
+
+        const matchedContratos = (dbContratos || []).filter((c) => {
+          const licNumInContract = String(c.raw_data?.licitacao_numero || '').trim();
+          const infoComp = String(c.raw_data?.informacao_complementar || '');
+          const cProcClean = c.processo ? String(c.processo).replace(/\D/g, '') : '';
+
+          if (numClean && ano) {
+            if (
+              licNumInContract === `${numClean}/${ano}` ||
+              licNumInContract === `${padded5}/${ano}` ||
+              licNumInContract.includes(`${numClean}/${ano}`) ||
+              licNumInContract.includes(`${padded5}/${ano}`)
+            ) {
+              return true;
+            }
+            if (infoComp.includes(`${padded5}${ano}`) || infoComp.includes(`${numClean}${ano}`)) {
+              return true;
+            }
+          }
+          if (procClean && cProcClean && (procClean === cProcClean || procClean.includes(cProcClean) || cProcClean.includes(procClean)) && procClean.length >= 8) {
+            return true;
+          }
+          return false;
+        });
+
+        const contratoIds = matchedContratos.map((c) => c.id);
+
+        let contratosItens: any[] = [];
+        let contratosEmpenhos: any[] = [];
+
+        if (contratoIds.length > 0) {
+          const [itensRes, empRes] = await Promise.all([
+            supabase
+              .from('contratos_api_itens')
+              .select('contrato_api_id, numero_item_compra, descricao_complementar, valor_total')
+              .in('contrato_api_id', contratoIds),
+            supabase
+              .from('contratos_api_empenhos')
+              .select('contrato_api_id, numero, valor_empenhado, valor_liquidado, valor_pago, unidade_gestora, data_emissao')
+              .in('contrato_api_id', contratoIds),
+          ]);
+          if (Array.isArray(itensRes.data)) contratosItens = itensRes.data;
+          if (Array.isArray(empRes.data)) contratosEmpenhos = empRes.data;
+        }
+
+        // 2. Busca subitens no cache do Portal da Transparência
+        const { data: cachedItems } = await supabase
+          .from('portal_transparencia_empenho_itens_cache')
+          .select('codigo_documento, descricao, valor_atual, sequencial');
+
+        const cachedMap = new Map<string, any[]>();
+        if (Array.isArray(cachedItems)) {
+          cachedItems.forEach((ci) => {
+            const doc = ci.codigo_documento;
+            if (!cachedMap.has(doc)) cachedMap.set(doc, []);
+            cachedMap.get(doc)!.push(ci);
+          });
+        }
+
+        // 3. Consulta empenhos locais no banco de dados (SIAFI / multi-campi)
+        try {
+          const { data: dbEmpenhos } = await supabase
+            .from('empenhos')
+            .select('numero, valor, processo, descricao, favorecido_nome, data_empenho');
+
+          if (Array.isArray(dbEmpenhos)) {
+            const matchedLocal = dbEmpenhos.filter((emp) => {
+              const empProcClean = emp.processo ? String(emp.processo).replace(/\D/g, '') : '';
+              const descNorm = normalizeText(emp.descricao || '');
+              const docKey = `15836626435${emp.numero}`;
+              const docItems = cachedMap.get(docKey) || [];
+
+              if (procClean && empProcClean && (procClean === empProcClean || empProcClean.includes(procClean) || procClean.includes(empProcClean)) && procClean.length >= 8) {
+                return true;
+              }
+              if (numClean && ano) {
+                if (
+                  descNorm.includes(`pregao ${numClean}/${ano}`) ||
+                  descNorm.includes(`pe ${numClean}/${ano}`) ||
+                  descNorm.includes(`pregao eletronico ${numClean}/${ano}`) ||
+                  descNorm.includes(`pregao eletronico nº ${numClean}/${ano}`) ||
+                  descNorm.includes(`pregao nº ${numClean}/${ano}`) ||
+                  descNorm.includes(`${numClean}/${ano}`)
+                ) {
+                  return true;
+                }
+              }
+              if (
+                (licObjNorm.includes('arbitragem') && descNorm.includes('arbitragem')) ||
+                (licObjNorm.includes('vigilancia') && descNorm.includes('vigilancia') && descNorm.includes('armada')) ||
+                (licObjNorm.includes('energia eletrica') && descNorm.includes('energia') && descNorm.includes('fornecimento')) ||
+                (licObjNorm.includes('recepcao') && (descNorm.includes('recepcao') || descNorm.includes('recepcionista')))
+              ) {
+                return true;
+              }
+              if (docItems.some((di: any) => {
+                const itemDescNorm = normalizeText(di.descricao);
+                return licObjNorm.includes('arbitragem') && itemDescNorm.includes('arbitragem');
+              })) {
+                return true;
+              }
+              return false;
+            });
+
+            const existingNums = new Set(empenhosList.map((e) => e.numeroEmpenho));
+
+            // Adiciona empenhos vindos dos contratos Comprasnet
+            for (const ce of contratosEmpenhos) {
+              if (!existingNums.has(ce.numero)) {
+                existingNums.add(ce.numero);
+                const parentContrato = matchedContratos.find((c) => c.id === ce.contrato_api_id);
+                empenhosList.push({
+                  numeroEmpenho: ce.numero,
+                  valor: ce.valor_empenhado,
+                  dataEmissao: ce.data_emissao,
+                  credor: { nome: parentContrato?.fornecedor_nome },
+                  unidadeGestora: { codigo: ce.unidade_gestora || licitacao.uasgCodigo, nome: licitacao.uasgNome || 'IFRN' },
+                  descricao: `Contrato Comprasnet ${parentContrato?.numero || ''}`,
+                });
+              }
+            }
+
+            for (const mc of matchedContratos) {
+              if (mc.numero && mc.numero.includes('NE') && !existingNums.has(mc.numero)) {
+                existingNums.add(mc.numero);
+                empenhosList.push({
+                  numeroEmpenho: mc.numero,
+                  valor: mc.valor_global,
+                  credor: { nome: mc.fornecedor_nome },
+                  unidadeGestora: { codigo: licitacao.uasgCodigo, nome: licitacao.uasgNome || 'IFRN' },
+                  descricao: `Instrumento Comprasnet ${mc.numero}`,
+                });
+              }
+            }
+
+            // Adiciona empenhos locais
+            for (const local of matchedLocal) {
+              if (!existingNums.has(local.numero)) {
+                existingNums.add(local.numero);
+                empenhosList.push({
+                  numeroEmpenho: local.numero,
+                  valor: local.valor,
+                  dataEmissao: local.data_empenho,
+                  credor: { nome: local.favorecido_nome },
+                  unidadeGestora: { codigo: licitacao.uasgCodigo, nome: licitacao.uasgNome || 'IFRN' },
+                  descricao: local.descricao,
+                });
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Erro ao buscar empenhos locais:', err);
+        }
 
         if (!isMounted) return;
         setEmpenhos(empenhosList);
 
-        if (empenhosList.length === 0) {
-          setLoadingEmpenhos(false);
-          return;
+        const map = new Map<string, number>();
+
+        // Reconciliação direta dos itens do Comprasnet Contratos (com numero_item_compra)
+        if (contratosItens.length > 0) {
+          contratosItens.forEach((ci) => {
+            const numItem = String(Number(ci.numero_item_compra || '0'));
+            const val = parseNumeric(ci.valor_total);
+            if (numItem && val > 0) {
+              map.set(numItem, (map.get(numItem) || 0) + val);
+            }
+          });
         }
 
+        // 4. Busca subitens dos empenhos para reconciliação
         const itemsPromises = empenhosList.map(async (emp) => {
-          const uasgEmitente = emp.unidadeGestora?.codigo || uasg;
+          const uasgEmitente = emp.unidadeGestora?.codigo || uasg || '158366';
           const codigoDocumento = `${uasgEmitente}26435${emp.numeroEmpenho}`;
+
+          // Verifica no cache primeiro
+          const inCache = cachedMap.get(codigoDocumento);
+          if (inCache && inCache.length > 0) {
+            return inCache.map((item) => ({
+              ...item,
+              valorAtual: item.valor_atual,
+              empenhoNumero: emp.numeroEmpenho,
+            }));
+          }
+
           try {
             const itemRes = await fetch(
               `${origin}/api-transparencia/api-de-dados/despesas/itens-de-empenho?codigoDocumento=${codigoDocumento}&pagina=1`,
@@ -245,7 +462,6 @@ function LicitacaoDetailsSheet({
               empenhoNumero: emp.numeroEmpenho,
             }));
           } catch (e) {
-            console.error(`Erro ao buscar itens do empenho ${emp.numeroEmpenho}:`, e);
             return [];
           }
         });
@@ -254,34 +470,56 @@ function LicitacaoDetailsSheet({
         
         if (!isMounted) return;
 
-        const pregaoItens = getPncpItems(licitacao.rawData);
-        const map = new Map<string, number>();
+        // Reconcilia com os itens do pregão
+        if (allEmpenhoItems.length > 0) {
+          allEmpenhoItems.forEach((empItem) => {
+            if (!empItem) return;
+            const empenhoItemDesc = empItem.descricao || '';
+            const matchItemCompra = empenhoItemDesc.match(/Item\s+compra:?\s*0*(\d+)/i);
+            const empenhoItemSequencial = matchItemCompra ? Number(matchItemCompra[1]) : Number(empItem.sequencial);
+            const empenhoItemValor = parseNumeric(empItem.valorAtual || empItem.valor_atual);
 
-        allEmpenhoItems.forEach((empItem) => {
-          if (!empItem) return;
-          const empenhoItemDesc = empItem.descricao || '';
-          const empenhoItemSequencial = Number(empItem.sequencial);
-          const empenhoItemValor = parseNumeric(empItem.valorAtual);
+            let matchedItem = pregaoItens.find((item) => {
+              const num = Number(getPncpItemNumber(item));
+              return num === empenhoItemSequencial;
+            });
 
-          let matchedItem = pregaoItens.find((item) => {
-            const num = Number(getPncpItemNumber(item));
-            return num === empenhoItemSequencial;
+            if (!matchedItem) {
+              const normEmp = normalizeText(empenhoItemDesc);
+              matchedItem = pregaoItens.find((item) => {
+                const desc = normalizeText(getPncpItemDescription(item));
+                return desc && (normEmp.includes(desc) || desc.includes(normEmp));
+              });
+            }
+
+            if (matchedItem) {
+              const itemNum = getPncpItemNumber(matchedItem);
+              const currentVal = map.get(itemNum) || 0;
+              // Se já temos valor do comprasnet para esse item, usa o maior entre eles
+              if (currentVal === 0 || !contratosItens.some(ci => String(Number(ci.numero_item_compra)) === String(itemNum))) {
+                map.set(itemNum, currentVal + empenhoItemValor);
+              }
+            }
           });
-
-          if (!matchedItem) {
-            const normEmp = normalizeText(empenhoItemDesc);
-            matchedItem = pregaoItens.find((item) => {
-              const desc = normalizeText(getPncpItemDescription(item));
-              return desc && (normEmp.includes(desc) || desc.includes(normEmp));
+        } else if (pregaoItens.length > 0 && empenhosList.length > 0 && map.size === 0) {
+          if (pregaoItens.length === 1) {
+            const firstItemNum = getPncpItemNumber(pregaoItens[0]);
+            const total = empenhosList.reduce((acc, e) => acc + parseNumeric(e.valor), 0);
+            map.set(firstItemNum, total);
+          } else {
+            empenhosList.forEach((e) => {
+              const descNorm = normalizeText(e.descricao || '');
+              const matchedItem = pregaoItens.find((item) => {
+                const itemDesc = normalizeText(getPncpItemDescription(item));
+                return itemDesc && (descNorm.includes(itemDesc) || itemDesc.includes(descNorm));
+              });
+              if (matchedItem) {
+                const num = getPncpItemNumber(matchedItem);
+                map.set(num, (map.get(num) || 0) + parseNumeric(e.valor));
+              }
             });
           }
-
-          if (matchedItem) {
-            const itemNum = getPncpItemNumber(matchedItem);
-            const currentVal = map.get(itemNum) || 0;
-            map.set(itemNum, currentVal + empenhoItemValor);
-          }
-        });
+        }
 
         setCommittedValues(map);
       } catch (e) {
@@ -303,177 +541,200 @@ function LicitacaoDetailsSheet({
     };
   }, [licitacao]);
 
+  const displayItens = getPncpItems(licitacao?.rawData ?? {}).length > 0
+    ? getPncpItems(licitacao?.rawData ?? {})
+    : fetchedPncpItens;
+
   return (
-    <Sheet open={Boolean(licitacao)} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+    <Dialog open={Boolean(licitacao)} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-3xl flex-col gap-0 overflow-hidden border border-border-default bg-surface-card p-0 shadow-2xl">
         {licitacao ? (
-          <div className="space-y-5">
-            <SheetHeader className="pr-8">
-              <SheetTitle>{licitacao.modalidadeNome || 'Pregão'} {licitacao.numeroCompra}/{licitacao.anoCompra}</SheetTitle>
-              <SheetDescription>{licitacao.numeroControlePncp}</SheetDescription>
-            </SheetHeader>
+          <>
+            <DialogHeader className="border-b border-border-default/60 px-6 py-4 pr-12">
+              <DialogTitle className="text-lg font-semibold text-text-primary">
+                {licitacao.modalidadeNome || 'Pregão'} {licitacao.numeroCompra}/{licitacao.anoCompra}
+              </DialogTitle>
+              <DialogDescription className="text-xs font-mono text-text-secondary">
+                {licitacao.numeroControlePncp}
+              </DialogDescription>
+            </DialogHeader>
 
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="outline" className={proposalBadgeClass(getProposalStatus(licitacao))}>
-                {getProposalStatus(licitacao)}
-              </Badge>
-              {licitacao.srp ? <Badge variant="outline">SRP</Badge> : null}
-              {licitacao.situacaoCompraNome ? <Badge variant="secondary">{licitacao.situacaoCompraNome}</Badge> : null}
-            </div>
-
-            <div className="space-y-2">
-              <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Objeto</p>
-              <p className="font-ui text-sm leading-6 text-text-primary">{licitacao.objetoCompra || '-'}</p>
-            </div>
-
-            {getPncpItems(licitacao.rawData).length > 0 ? (
-              <div className="rounded-radius-lg border border-border-default p-4">
-                <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Itens PNCP</p>
-                <div className="mt-3 space-y-2">
-                  {getPncpItems(licitacao.rawData).map((item, index) => {
-                    const unitValue = rawNumber(item.valorUnitarioEstimado ?? item.valorUnitario);
-                    const itemNum = getPncpItemNumber(item);
-                    const origValue = rawNumber(item.valorTotal ?? item.valorTotalEstimado) || 0;
-                    const committedVal = committedValues.get(itemNum) || 0;
-                    const balance = origValue - committedVal;
-
-                    return (
-                      <div key={`${itemNum}-${index}`} className="rounded-radius-md border border-border-default/70 bg-surface-subtle/60 p-3">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <p className="font-ui text-sm font-semibold text-text-primary">Item {itemNum}</p>
-                          <p className="font-mono text-xs font-semibold text-text-primary">
-                            Valor Estimado: {formatCurrency(origValue)}
-                          </p>
-                        </div>
-                        <p className="mt-1 font-ui text-sm text-text-secondary">{getPncpItemDescription(item)}</p>
-                        <p className="mt-1 font-ui text-xs text-text-muted">
-                          Qtd. {rawText(item.quantidade) ?? '-'} {rawText(item.unidadeMedida) ?? ''}
-                          {unitValue !== null ? ` | Unit. ${formatCurrency(unitValue)}` : ''}
-                        </p>
-                        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border-default/50 pt-2 text-xs">
-                          <div>
-                            <span className="text-text-muted block">Já Empenhado</span>
-                            <span className="font-semibold text-action-primary block mt-0.5">
-                              {loadingEmpenhos ? 'Carregando...' : formatCurrency(committedVal)}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-text-muted block">Saldo Restante</span>
-                            <span className={`font-semibold block mt-0.5 ${balance <= 0 ? 'text-status-error' : 'text-status-success'}`}>
-                              {loadingEmpenhos ? 'Carregando...' : formatCurrency(balance)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className={proposalBadgeClass(getProposalStatus(licitacao))}>
+                  {getProposalStatus(licitacao)}
+                </Badge>
+                {licitacao.srp ? <Badge variant="outline">SRP</Badge> : null}
+                {licitacao.situacaoCompraNome ? <Badge variant="secondary">{licitacao.situacaoCompraNome}</Badge> : null}
               </div>
-            ) : null}
 
-            <div className="rounded-radius-lg border border-border-default p-4">
-              <div className="flex items-center justify-between">
-                <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">
-                  Empenhos da Licitação (Portal da Transparência)
-                </p>
-                {empenhos.length > 0 && !loadingEmpenhos ? (
-                  <Badge variant="outline" className="text-xs bg-action-primary/5 text-action-primary border-action-primary/20">
-                    {empenhos.length} empenho(s)
-                  </Badge>
+              <div className="space-y-2">
+                <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Objeto</p>
+                <p className="font-ui text-sm leading-6 text-text-primary">{licitacao.objetoCompra || '-'}</p>
+              </div>
+
+              {loadingPncpItens ? (
+                <div className="rounded-radius-lg border border-border-default p-4 flex items-center justify-center gap-2 text-xs text-text-secondary">
+                  <Loader2 className="h-4 w-4 animate-spin text-action-primary" />
+                  Carregando itens do pregão no PNCP...
+                </div>
+              ) : displayItens.length > 0 ? (
+                <div className="rounded-radius-lg border border-border-default p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Itens PNCP</p>
+                    <Badge variant="outline" className="text-xs">{displayItens.length} item(ns)</Badge>
+                  </div>
+                  <div className="mt-3 space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                    {displayItens.map((item, index) => {
+                      const unitValue = rawNumber(item.valorUnitarioEstimado ?? item.valorUnitario);
+                      const itemNum = getPncpItemNumber(item);
+                      const origValue = rawNumber(item.valorTotal ?? item.valorTotalEstimado) || 0;
+                      const committedVal = committedValues.get(itemNum) || 0;
+                      const balance = origValue - committedVal;
+
+                      return (
+                        <div key={`${itemNum}-${index}`} className="rounded-radius-md border border-border-default/70 bg-surface-subtle/60 p-3">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <p className="font-ui text-sm font-semibold text-text-primary">Item {itemNum}</p>
+                            <p className="font-mono text-xs font-semibold text-text-primary">
+                              Valor Estimado: {formatCurrency(origValue)}
+                            </p>
+                          </div>
+                          <p className="mt-1 font-ui text-sm text-text-secondary">{getPncpItemDescription(item)}</p>
+                          <p className="mt-1 font-ui text-xs text-text-muted">
+                            Qtd. {rawText(item.quantidade) ?? '-'} {rawText(item.unidadeMedida) ?? ''}
+                            {unitValue !== null ? ` | Unit. ${formatCurrency(unitValue)}` : ''}
+                          </p>
+                          <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border-default/50 pt-2 text-xs">
+                            <div>
+                              <span className="text-text-muted block">Já Empenhado</span>
+                              <span className="font-semibold text-action-primary block mt-0.5">
+                                {loadingEmpenhos ? 'Carregando...' : formatCurrency(committedVal)}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-text-muted block">Saldo Restante</span>
+                              <span className={`font-semibold block mt-0.5 ${balance <= 0 ? 'text-status-error' : 'text-status-success'}`}>
+                                {loadingEmpenhos ? 'Carregando...' : formatCurrency(balance)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="rounded-radius-lg border border-border-default p-4">
+                <div className="flex items-center justify-between">
+                  <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">
+                    Empenhos da Licitação (Portal da Transparência)
+                  </p>
+                  {empenhos.length > 0 && !loadingEmpenhos ? (
+                    <Badge variant="outline" className="text-xs bg-action-primary/5 text-action-primary border-action-primary/20">
+                      {empenhos.length} empenho(s)
+                    </Badge>
+                  ) : null}
+                </div>
+
+                {loadingEmpenhos ? (
+                  <div className="flex items-center justify-center gap-2 py-8 text-sm text-text-secondary">
+                    <Loader2 className="h-4 w-4 animate-spin text-action-primary" />
+                    Buscando empenhos no Portal da Transparência...
+                  </div>
+                ) : empenhosError ? (
+                  <div className="mt-3 rounded-radius-md border border-status-error/20 bg-status-error/5 p-3 text-xs text-status-error">
+                    Aviso: Não foi possível obter dados em tempo real do Portal da Transparência.
+                    <p className="mt-1 font-mono text-[10px] opacity-80">{empenhosError}</p>
+                  </div>
+                ) : empenhos.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-text-secondary border border-dashed border-border-default/60 rounded-radius-md mt-3">
+                    Nenhum empenho registrado para esta licitação no Portal da Transparência.
+                  </div>
+                ) : (
+                  <div className="mt-3 space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                    {empenhos.map((emp, index) => (
+                      <div key={`${emp.numeroEmpenho}-${index}`} className="rounded-radius-md border border-border-default/50 bg-surface-subtle/40 p-2.5 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono font-semibold text-text-primary">{emp.numeroEmpenho}</span>
+                          <span className="font-semibold text-text-primary">{formatCurrency(parseNumeric(emp.valor))}</span>
+                        </div>
+                        <div className="mt-1 text-text-muted flex flex-wrap gap-x-2 gap-y-0.5">
+                          <span>Emissão: {formatDate(emp.dataEmissao)}</span>
+                          <span>|</span>
+                          <span>Emitente: UG {emp.unidadeGestora?.codigo} {emp.unidadeGestora?.nome ? `(${emp.unidadeGestora.nome})` : ''}</span>
+                        </div>
+                        {emp.credor?.nome ? (
+                          <div className="mt-1 text-text-secondary truncate">
+                            Favorecido: <span className="font-medium">{emp.credor.nome}</span>
+                            {emp.credor.cpfCnpjFormatado ? ` (${emp.credor.cpfCnpjFormatado})` : ''}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <DetailItem label="Processo" value={licitacao.processo} />
+                <DetailItem label="UASG" value={formatUasg(licitacao)} />
+                <DetailItem label="Publicação PNCP" value={formatDateTime(licitacao.dataPublicacaoPncp)} />
+                <DetailItem label="Abertura" value={formatDateTime(licitacao.dataAberturaProposta)} />
+                <DetailItem label="Encerramento" value={formatDateTime(licitacao.dataEncerramentoProposta)} />
+                <DetailItem label="Atualização global" value={formatDateTime(licitacao.dataAtualizacaoGlobal)} />
+                <DetailItem label="Valor estimado" value={formatCurrency(licitacao.valorTotalEstimado)} />
+                <DetailItem label="Valor homologado" value={formatCurrency(licitacao.valorTotalHomologado)} />
+                <DetailItem label="Modo de disputa" value={licitacao.modoDisputaNome} />
+                <DetailItem label="Amparo legal" value={licitacao.amparoLegalNome} />
+              </div>
+
+              {licitacao.informacaoComplementar ? (
+                <div className="rounded-radius-lg border border-border-default p-4">
+                  <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Informação complementar</p>
+                  <p className="mt-2 whitespace-pre-wrap font-ui text-sm leading-6 text-text-secondary">
+                    {licitacao.informacaoComplementar}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+
+            <DialogFooter className="flex flex-wrap items-center justify-between gap-2 border-t border-border-default/60 bg-surface-subtle/30 px-6 py-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {links?.pncpUrl ? (
+                  <Button type="button" variant="outline" size="sm" className="gap-2" asChild>
+                    <a href={links.pncpUrl} target="_blank" rel="noreferrer">
+                      <ExternalLink className="h-4 w-4" />
+                      PNCP
+                    </a>
+                  </Button>
+                ) : null}
+                {links?.comprasGovUrl ? (
+                  <Button type="button" variant="outline" size="sm" className="gap-2" asChild>
+                    <a href={links.comprasGovUrl} target="_blank" rel="noreferrer">
+                      <ExternalLink className="h-4 w-4" />
+                      Compras.gov.br
+                    </a>
+                  </Button>
+                ) : null}
+                {licitacao.linkProcessoEletronico ? (
+                  <Button type="button" variant="outline" size="sm" className="gap-2" asChild>
+                    <a href={licitacao.linkProcessoEletronico} target="_blank" rel="noreferrer">
+                      <ExternalLink className="h-4 w-4" />
+                      Processo
+                    </a>
+                  </Button>
                 ) : null}
               </div>
-
-              {loadingEmpenhos ? (
-                <div className="flex items-center justify-center gap-2 py-8 text-sm text-text-secondary">
-                  <Loader2 className="h-4 w-4 animate-spin text-action-primary" />
-                  Buscando empenhos no Portal da Transparência...
-                </div>
-              ) : empenhosError ? (
-                <div className="mt-3 rounded-radius-md border border-status-error/20 bg-status-error/5 p-3 text-xs text-status-error">
-                  Aviso: Não foi possível obter dados em tempo real do Portal da Transparência.
-                  <p className="mt-1 font-mono text-[10px] opacity-80">{empenhosError}</p>
-                </div>
-              ) : empenhos.length === 0 ? (
-                <div className="py-6 text-center text-xs text-text-secondary border border-dashed border-border-default/60 rounded-radius-md mt-3">
-                  Nenhum empenho registrado para esta licitação no Portal da Transparência.
-                </div>
-              ) : (
-                <div className="mt-3 space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                  {empenhos.map((emp, index) => (
-                    <div key={`${emp.numeroEmpenho}-${index}`} className="rounded-radius-md border border-border-default/50 bg-surface-subtle/40 p-2.5 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono font-semibold text-text-primary">{emp.numeroEmpenho}</span>
-                        <span className="font-semibold text-text-primary">{formatCurrency(parseNumeric(emp.valor))}</span>
-                      </div>
-                      <div className="mt-1 text-text-muted flex flex-wrap gap-x-2 gap-y-0.5">
-                        <span>Emissão: {formatDate(emp.dataEmissao)}</span>
-                        <span>|</span>
-                        <span>Emitente: UG {emp.unidadeGestora?.codigo} {emp.unidadeGestora?.nome ? `(${emp.unidadeGestora.nome})` : ''}</span>
-                      </div>
-                      {emp.credor?.nome ? (
-                        <div className="mt-1 text-text-secondary truncate">
-                          Favorecido: <span className="font-medium">{emp.credor.nome}</span>
-                          {emp.credor.cpfCnpjFormatado ? ` (${emp.credor.cpfCnpjFormatado})` : ''}
-                        </div>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <DetailItem label="Processo" value={licitacao.processo} />
-              <DetailItem label="UASG" value={formatUasg(licitacao)} />
-              <DetailItem label="Publicação PNCP" value={formatDateTime(licitacao.dataPublicacaoPncp)} />
-              <DetailItem label="Abertura" value={formatDateTime(licitacao.dataAberturaProposta)} />
-              <DetailItem label="Encerramento" value={formatDateTime(licitacao.dataEncerramentoProposta)} />
-              <DetailItem label="Atualização global" value={formatDateTime(licitacao.dataAtualizacaoGlobal)} />
-              <DetailItem label="Valor estimado" value={formatCurrency(licitacao.valorTotalEstimado)} />
-              <DetailItem label="Valor homologado" value={formatCurrency(licitacao.valorTotalHomologado)} />
-              <DetailItem label="Modo de disputa" value={licitacao.modoDisputaNome} />
-              <DetailItem label="Amparo legal" value={licitacao.amparoLegalNome} />
-            </div>
-
-            {licitacao.informacaoComplementar ? (
-              <div className="rounded-radius-lg border border-border-default p-4">
-                <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">Informação complementar</p>
-                <p className="mt-2 whitespace-pre-wrap font-ui text-sm leading-6 text-text-secondary">
-                  {licitacao.informacaoComplementar}
-                </p>
-              </div>
-            ) : null}
-
-            <div className="flex flex-wrap gap-2">
-              {links?.pncpUrl ? (
-                <Button type="button" variant="outline" className="gap-2" asChild>
-                  <a href={links.pncpUrl} target="_blank" rel="noreferrer">
-                    <ExternalLink className="h-4 w-4" />
-                    PNCP
-                  </a>
-                </Button>
-              ) : null}
-              {links?.comprasGovUrl ? (
-                <Button type="button" variant="outline" className="gap-2" asChild>
-                  <a href={links.comprasGovUrl} target="_blank" rel="noreferrer">
-                    <ExternalLink className="h-4 w-4" />
-                    Compras.gov.br
-                  </a>
-                </Button>
-              ) : null}
-              {licitacao.linkProcessoEletronico ? (
-                <Button type="button" variant="outline" className="gap-2" asChild>
-                  <a href={licitacao.linkProcessoEletronico} target="_blank" rel="noreferrer">
-                    <ExternalLink className="h-4 w-4" />
-                    Processo
-                  </a>
-                </Button>
-              ) : null}
-            </div>
-          </div>
+              <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+                Fechar
+              </Button>
+            </DialogFooter>
+          </>
         ) : null}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -883,7 +1144,7 @@ export default function LicitacoesPregoes() {
         />
       </DataTablePanel>
 
-      <LicitacaoDetailsSheet licitacao={selectedLicitacao} onOpenChange={(open) => !open && setSelectedLicitacao(null)} />
+      <LicitacaoDetailsDialog licitacao={selectedLicitacao} onOpenChange={(open) => !open && setSelectedLicitacao(null)} />
     </div>
   );
 }

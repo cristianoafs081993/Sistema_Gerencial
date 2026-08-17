@@ -1,139 +1,268 @@
 /* ============================================================
-   SISTEMA GERENCIAL — Design System v3.0 (Premium)
+   SUAP DESIGN SYSTEM (IFRN) — Sistema Gerencial
+   Fonte de Referência: https://suap.ifrn.edu.br/comum/design_system
    ============================================================ */
 
-/* 1. TYPOGRAPHY - Figtree (Interface) + IBM Plex Mono (Dados) */
-@import url('https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900;1,300..900&family=IBM+Plex+Mono:ital,wght@0,100..700;1,100..700&display=swap');
+/* 1. TYPOGRAPHY - Open Sans (Interface SUAP) + IBM Plex Mono (Dados) */
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,300;1,400;1,500;1,600;1,700;1,800&family=IBM+Plex+Mono:ital,wght@0,100..700;1,100..700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ============================================================
-   2. COLOR SYSTEM — Regra 60-30-10 (Identidade Verde Institucional)
+   2. SUAP THEMES & COLOR SYSTEM
    ============================================================ */
 
 @layer base {
-  :root {
-    /* === PALETA SEBRAE BASE (NEUTROS & BRAND) === */
-    --background: 218 57% 97%;          /* #F4F7FC (App bg) */
-    --foreground: 217 33% 17%;          /* #1E293B (Ink color) */
+  /* TEMA PADRÃO (SUAP TEAL / CIANO ESCURO INSTITUCIONAL) */
+  :root,
+  [data-suap-theme="padrao"] {
+    /* === BASE / SURFACES === */
+    --background: 0 0% 97%;             /* #F8F9FA / F2F2F2 */
+    --foreground: 0 0% 10%;             /* #1A1A1A */
 
-    --card: 0 0% 100%;                /* Branco puro */
-    --card-foreground: 217 33% 17%;
+    --card: 0 0% 100%;                  /* #FFFFFF */
+    --card-foreground: 0 0% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 217 33% 17%;
+    --popover-foreground: 0 0% 10%;
 
-    --border: 210 40% 90%;               /* #E2E8F0 sutil */
-    --input: 210 40% 90%;
-    --ring: 213 100% 38%;              /* Foco Sebrae Blue #0056C3 */
+    --border: 0 0% 88%;                 /* #E0E0E0 */
+    --input: 0 0% 88%;
+    --ring: 172 85% 27%;                /* SUAP Teal #0A7F70 */
 
-    --muted: 218 20% 94%;              /* Cinza/azul claro */
-    --muted-foreground: 215 16% 47%;    /* Texto secundário #64748B */
+    --muted: 172 25% 96%;               /* #F0FAF8 */
+    --muted-foreground: 0 0% 40%;       /* #666666 */
 
-    /* === SECUNDÁRIO (30%) === */
-    --secondary: 218 30% 95%;            /* Cinza suave para fundos */
-    --secondary-foreground: 217 33% 17%;
+    --secondary: 0 0% 95%;              /* #F2F2F2 */
+    --secondary-foreground: 0 0% 10%;
 
-    /* === ACCENT / PRIMARY (10%) === */
-    --primary: 213 100% 38%;           /* Sebrae Blue #0056C3 */
+    /* === ACCENT / PRIMARY (SUAP Teal #0A7F70 / #00BDA4) === */
+    --primary: 172 85% 27%;             /* #0A7F70 */
     --primary-foreground: 0 0% 100%;
 
-    --accent: 213 100% 38%;
+    --accent: 172 85% 27%;
     --accent-foreground: 0 0% 100%;
 
-    /* Estados semânticos */
-    --destructive: 358 78% 45%;       /* Vermelho de erro */
+    /* === FEEDBACK SEMÂNTICO (SUAP Official) === */
+    --destructive: 0 90% 40%;           /* #C20A0A */
     --destructive-foreground: 0 0% 100%;
-    --success: 130 54% 40%;           /* Verde institucional */
+    --success: 130 70% 40%;             /* #1FAD34 */
     --success-foreground: 0 0% 100%;
-    --warning: 42 82% 48%;            /* Âmbar de atenção */
+    --warning: 58 98% 30%;              /* #989301 */
     --warning-foreground: 0 0% 100%;
-    --info: 210 70% 48%;              /* Azul informativo */
+    --info: 199 100% 40%;               /* #008DCC */
     --info-foreground: 0 0% 100%;
 
-    /* Raio padrão — Grid Sebrae */
+    /* Raio padrão SUAP */
     --radius: 0.5rem;
 
-    /* === SIDEBAR (Branding Sebrae Navy & Gold) === */
+    /* === SIDEBAR (SUAP Clean Navigation) === */
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 227 59% 25%;   /* Sebrae Navy #1A2B66 */
-    --sidebar-primary: 213 100% 38%;      /* Sebrae Blue */
+    --sidebar-foreground: 0 0% 15%;
+    --sidebar-primary: 172 85% 27%;     /* #0A7F70 */
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 227 40% 97%;       /* Fundo hover sutil */
-    --sidebar-accent-foreground: 227 59% 25%;
-    --sidebar-border: 210 40% 94%;
-    --sidebar-ring: 213 100% 38%;
+    --sidebar-accent: 172 35% 95%;      /* #E5FFFC */
+    --sidebar-accent-foreground: 172 85% 22%;
+    --sidebar-border: 0 0% 90%;
+    --sidebar-ring: 172 85% 27%;
 
-    /* === SOMBRAS MULTICAMADAS PREMIUM === */
-    --shadow-xs: 0 1px 2px 0 rgba(26, 43, 102, 0.03);
-    --shadow-sm: 0 1px 3px 0 rgba(26, 43, 102, 0.05), 0 1px 2px -1px rgba(26, 43, 102, 0.04);
-    --shadow-md: 0 4px 10px -6px rgba(26, 43, 102, 0.09), 0 2px 4px -2px rgba(26, 43, 102, 0.05);
-    --shadow-lg: 0 12px 24px -18px rgba(26, 43, 102, 0.12), 0 6px 12px -8px rgba(26, 43, 102, 0.06);
-    --shadow-xl: 0 20px 36px -24px rgba(26, 43, 102, 0.14), 0 10px 18px -12px rgba(26, 43, 102, 0.08);
-    --shadow-primary: 0 10px 24px -16px rgba(42, 79, 218, 0.28);
+    /* === SOMBRAS SUAP === */
+    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 10px -4px rgba(10, 127, 112, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+    --shadow-lg: 0 10px 20px -10px rgba(10, 127, 112, 0.12), 0 4px 8px -4px rgba(0, 0, 0, 0.05);
+    --shadow-xl: 0 18px 30px -15px rgba(10, 127, 112, 0.15);
+    --shadow-primary: 0 8px 20px -8px rgba(10, 127, 112, 0.35);
 
-    /* Glassmorphism sutil */
-    --glass-border: rgba(42, 79, 218, 0.08);
-    --glass-bg: rgba(255, 255, 255, 0.88);
-    --glass-highlight: rgba(255, 255, 255, 0.62);
-
-    /* Dot-pattern SVG para fundos */
-    --dot-pattern: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='2' cy='2' r='1' fill='%230056c3' fill-opacity='0.08'/%3E%3C/svg%3E");
+    /* Glassmorphism SUAP */
+    --glass-border: rgba(10, 127, 112, 0.10);
+    --glass-bg: rgba(255, 255, 255, 0.92);
+    --glass-highlight: rgba(255, 255, 255, 0.70);
 
     /* Gradientes */
-    --gradient-primary: linear-gradient(135deg, #0056C3 0%, #1A2B66 100%);
-    --gradient-accent:  linear-gradient(135deg, #1A2B66 0%, #0F1A3E 100%);
-    --gradient-warning: linear-gradient(135deg, #FED303 0%, #DCA702 100%);
-    --gradient-card:    linear-gradient(180deg, #FFFFFF 0%, #F4F7FC 100%);
+    --gradient-primary: linear-gradient(135deg, #0A7F70 0%, #031C18 100%);
+    --gradient-accent:  linear-gradient(135deg, #00BDA4 0%, #0A7F70 100%);
+    --gradient-warning: linear-gradient(135deg, #CAC302 0%, #989301 100%);
+    --gradient-card:    linear-gradient(180deg, #FFFFFF 0%, #F5FFFE 100%);
   }
 
-  /* === DARK MODE — Sebrae Navy com elevação === */
-  .dark {
-    --background: 224 71% 4%;          /* Fundo escuro azulado premium */
-    --foreground: 210 40% 98%;
-
-    --card: 224 71% 7%;                /* Cards um pouco mais claros */
-    --card-foreground: 210 40% 98%;
-
-    --popover: 224 71% 7%;
-    --popover-foreground: 210 40% 98%;
-
-    --secondary: 224 71% 12%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 224 71% 10%;
-    --muted-foreground: 215 16% 65%;
-
-    --border: 224 71% 12%;
-    --input: 224 71% 12%;
-    --ring: 227 72% 51%;
-
-    --primary: 227 72% 51%;
-    --primary-foreground: 210 40% 98%;
-
-    --accent: 227 72% 51%;
+  /* TEMA IFS (INSTITUTOS FEDERAIS / IFRN — VERDE E VERMELHO) */
+  [data-suap-theme="ifs"] {
+    --background: 120 15% 98%;
+    --foreground: 120 20% 10%;
+    --border: 120 12% 88%;
+    --input: 120 12% 88%;
+    --ring: 129 60% 30%;                /* Verde IFRN #1F7A2D */
+    --muted: 129 30% 96%;
+    --muted-foreground: 120 10% 40%;
+    --primary: 129 60% 30%;             /* Verde IFRN #1F7A2D */
+    --primary-foreground: 0 0% 100%;
+    --accent: 129 60% 30%;
     --accent-foreground: 0 0% 100%;
+    --destructive: 359 80% 50%;         /* Vermelho IFs #E41D1B */
+    --sidebar-primary: 129 60% 30%;
+    --sidebar-accent: 129 35% 94%;
+    --sidebar-accent-foreground: 129 60% 24%;
+    --gradient-primary: linear-gradient(135deg, #1F7A2D 0%, #0A290E 100%);
+    --gradient-accent:  linear-gradient(135deg, #33CC49 0%, #1F7A2D 100%);
+  }
 
-    --destructive: 358 70% 54%;
+  /* TEMA AURORA (ROXO / VIOLETA MODERNO) */
+  [data-suap-theme="aurora"] {
+    --background: 230 30% 98%;
+    --foreground: 231 45% 10%;
+    --border: 230 20% 88%;
+    --input: 230 20% 88%;
+    --ring: 231 49% 50%;                /* Aurora Roxo #4456BB */
+    --muted: 231 35% 96%;
+    --muted-foreground: 231 15% 42%;
+    --primary: 231 49% 50%;             /* #4456BB */
+    --primary-foreground: 0 0% 100%;
+    --accent: 231 49% 50%;
+    --accent-foreground: 0 0% 100%;
+    --sidebar-primary: 231 49% 50%;
+    --sidebar-accent: 231 45% 95%;
+    --sidebar-accent-foreground: 231 49% 35%;
+    --gradient-primary: linear-gradient(135deg, #4456BB 0%, #0E1125 100%);
+    --gradient-accent:  linear-gradient(135deg, #6978C9 0%, #4456BB 100%);
+  }
+
+  /* TEMA DUNAS (AREIA DO DESERTO / OCRE DOURADO) */
+  [data-suap-theme="dunas"] {
+    --background: 35 25% 98%;
+    --foreground: 30 25% 10%;
+    --border: 35 20% 88%;
+    --input: 35 20% 88%;
+    --ring: 34 47% 50%;                 /* Dunas Ocre #B98746 */
+    --muted: 35 30% 95%;
+    --muted-foreground: 30 15% 42%;
+    --primary: 34 47% 50%;              /* #B98746 */
+    --primary-foreground: 0 0% 100%;
+    --accent: 34 47% 50%;
+    --accent-foreground: 0 0% 100%;
+    --sidebar-primary: 34 47% 50%;
+    --sidebar-accent: 35 40% 94%;
+    --sidebar-accent-foreground: 34 47% 32%;
+    --gradient-primary: linear-gradient(135deg, #B98746 0%, #251B0E 100%);
+    --gradient-accent:  linear-gradient(135deg, #D5B790 0%, #B98746 100%);
+  }
+
+  /* TEMA GOV.BR (AZUL FEDERAL) */
+  [data-suap-theme="govbr"] {
+    --background: 215 30% 98%;
+    --foreground: 217 33% 12%;
+    --border: 215 25% 88%;
+    --input: 215 25% 88%;
+    --ring: 217 81% 39%;                /* Azul Gov.br #1351B4 */
+    --muted: 215 35% 95%;
+    --muted-foreground: 215 15% 42%;
+    --primary: 217 81% 39%;             /* #1351B4 */
+    --primary-foreground: 0 0% 100%;
+    --accent: 217 81% 39%;
+    --accent-foreground: 0 0% 100%;
+    --sidebar-primary: 217 81% 39%;
+    --sidebar-accent: 215 45% 95%;
+    --sidebar-accent-foreground: 217 81% 30%;
+    --gradient-primary: linear-gradient(135deg, #1351B4 0%, #05152E 100%);
+    --gradient-accent:  linear-gradient(135deg, #2670E8 0%, #1351B4 100%);
+  }
+
+  /* TEMA LUNA (DARK THEME COM CIANO) */
+  .dark,
+  [data-suap-theme="luna"] {
+    --background: 0 0% 10%;             /* #1A1A1A */
+    --foreground: 0 0% 96%;
+
+    --card: 0 0% 14%;                   /* #242424 */
+    --card-foreground: 0 0% 96%;
+
+    --popover: 0 0% 14%;
+    --popover-foreground: 0 0% 96%;
+
+    --secondary: 0 0% 18%;
+    --secondary-foreground: 0 0% 96%;
+
+    --muted: 0 0% 18%;
+    --muted-foreground: 0 0% 65%;
+
+    --border: 0 0% 22%;
+    --input: 0 0% 22%;
+    --ring: 175 80% 40%;                /* Luna Cyan #14B8AA */
+
+    --primary: 175 80% 40%;             /* #14B8AA */
+    --primary-foreground: 0 0% 10%;
+
+    --accent: 175 80% 40%;
+    --accent-foreground: 0 0% 10%;
+
+    --destructive: 0 85% 55%;
     --destructive-foreground: 0 0% 98%;
 
-    --sidebar-background: 224 71% 5%;
-    --sidebar-foreground: 210 40% 90%;
-    --sidebar-primary: 227 72% 51%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 224 71% 10%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 224 71% 10%;
+    --sidebar-background: 0 0% 12%;
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 175 80% 40%;
+    --sidebar-primary-foreground: 0 0% 10%;
+    --sidebar-accent: 175 25% 18%;
+    --sidebar-accent-foreground: 175 80% 55%;
+    --sidebar-border: 0 0% 18%;
 
-    --shadow-primary: 0 8px 18px 0 rgba(42, 79, 218, 0.18);
-    --glass-bg: rgba(15, 23, 42, 0.84);
+    --shadow-primary: 0 8px 18px 0 rgba(20, 184, 170, 0.25);
+    --glass-bg: rgba(26, 26, 26, 0.88);
+    --gradient-primary: linear-gradient(135deg, #14B8AA 0%, #052E2B 100%);
+    --gradient-accent:  linear-gradient(135deg, #1AE5D5 0%, #14B8AA 100%);
+  }
+
+  /* TEMA ALTO CONTRASTE */
+  [data-suap-theme="alto-contraste"] {
+    --background: 0 0% 0%;              /* Preto absoluto */
+    --foreground: 0 0% 100%;            /* Branco absoluto */
+    --card: 0 0% 5%;
+    --card-foreground: 0 0% 100%;
+    --border: 60 100% 50%;              /* Amarelo contrastado */
+    --input: 60 100% 50%;
+    --ring: 60 100% 50%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 60 100% 50%;
+    --primary: 60 100% 50%;             /* #FFFF00 */
+    --primary-foreground: 0 0% 0%;
+    --accent: 60 100% 50%;
+    --accent-foreground: 0 0% 0%;
+    --sidebar-background: 0 0% 0%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 60 100% 50%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 0 0% 20%;
+    --sidebar-accent-foreground: 60 100% 50%;
+    --sidebar-border: 60 100% 50%;
+  }
+
+  /* TEMA MODO DALTONISMO */
+  [data-suap-theme="modo-daltonismo"] {
+    --background: 0 0% 98%;
+    --foreground: 0 0% 12%;
+    --border: 0 0% 85%;
+    --input: 0 0% 85%;
+    --ring: 327 48% 50%;                /* Magenta Acessível #B94686 */
+    --muted: 327 25% 95%;
+    --muted-foreground: 0 0% 38%;
+    --primary: 327 48% 50%;             /* #B94686 */
+    --primary-foreground: 0 0% 100%;
+    --accent: 327 48% 50%;
+    --accent-foreground: 0 0% 100%;
+    --info: 202 78% 50%;                /* Azul #1D9BE2 */
+    --success: 163 80% 45%;             /* Verde Azulado #009E73 */
+    --warning: 56 85% 50%;              /* Amarelo #F0E442 */
+    --destructive: 27 100% 50%;         /* Laranja Escuro #FF7100 */
+    --sidebar-primary: 327 48% 50%;
+    --sidebar-accent: 327 30% 94%;
+    --sidebar-accent-foreground: 327 48% 30%;
   }
 }
 
 /* ============================================================
-   3. BASE STYLES — Tipografia, alinhamento e rolagem
+   3. BASE STYLES — Tipografia Oficial SUAP (Open Sans)
    ============================================================ */
 
 @layer base {
@@ -148,247 +277,229 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Open Sans', 'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     line-height: 1.5;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
     text-rendering: optimizeLegibility;
   }
 
-  /* === HIERARQUIA TIPOGRÁFICA (Editorial Premium) === */
+  /* === HIERARQUIA TIPOGRÁFICA SUAP === */
   h1, .page-title {
-    color: #1A2B66;
-    font-family: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    @apply text-text-3xl font-font-bold tracking-[-0.035em] leading-tight;
-  }
-  .dark h1, .dark .page-title {
     color: hsl(var(--foreground));
+    font-family: 'Open Sans', sans-serif;
+    @apply text-2xl md:text-3xl font-bold tracking-tight leading-tight;
   }
 
   h2 {
-    color: #1A2B66;
-    font-family: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    @apply text-text-2xl font-font-bold tracking-[-0.025em] leading-snug;
-  }
-  .dark h2 {
     color: hsl(var(--foreground));
+    font-family: 'Open Sans', sans-serif;
+    @apply text-xl md:text-2xl font-bold tracking-tight leading-snug;
   }
 
   h3, .panel-title, .table-title {
-    color: #1A2B66;
-    font-family: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    @apply text-text-xl font-font-semibold tracking-[-0.015em] leading-snug;
-  }
-  .dark h3, .dark .panel-title, .dark .table-title {
     color: hsl(var(--foreground));
+    font-family: 'Open Sans', sans-serif;
+    @apply text-lg md:text-xl font-semibold leading-snug;
   }
 
   h4 {
-    @apply text-text-lg font-font-semibold tracking-[-0.01em] text-text-primary;
+    @apply text-base font-semibold text-foreground;
   }
 
   h5 {
-    @apply text-text-base font-font-semibold text-text-primary;
+    @apply text-sm font-semibold text-foreground;
   }
 
   h6 {
-    @apply text-text-xs font-font-semibold uppercase tracking-wider text-text-secondary;
+    @apply text-xs font-semibold uppercase tracking-wider text-muted-foreground;
   }
 
   p, .page-subtitle, .panel-description, .table-description {
-    color: #858481;
-    font-family: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    @apply text-text-sm leading-relaxed;
+    color: hsl(var(--muted-foreground));
+    font-family: 'Open Sans', sans-serif;
+    @apply text-sm leading-relaxed;
   }
 
   code, pre, kbd, samp, .font-mono {
-    font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-family: 'IBM Plex Mono', Monaco, Consolas, monospace;
     font-variant-numeric: tabular-nums;
   }
 
   ::selection {
-    background-color: hsl(var(--primary) / 0.15);
+    background-color: hsl(var(--primary) / 0.20);
     color: hsl(var(--foreground));
   }
 
   :focus-visible {
-    @apply outline-2 outline-border-focus outline-offset-2 rounded-radius-md;
+    @apply outline-2 outline-border-focus outline-offset-2 rounded-md;
   }
 }
 
 /* ============================================================
-   4. COMPONENT LAYER — Estilos refinados e consistentes
+   4. COMPONENT LAYER — Estilos SUAP
    ============================================================ */
 
 @layer components {
 
-  /* === BUTTONS === */
+  /* === SUAP BUTTONS (.btn, .button) === */
   .btn-primary {
-    @apply bg-action-primary text-text-on-brand rounded-radius-md shadow-shadow-button-primary
-           hover:bg-action-primary-hover active:bg-action-primary-active
-           transition-all duration-200 px-space-4 py-space-2 font-font-semibold text-text-sm
-           disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-primary text-primary-foreground rounded-full shadow-sm
+           hover:bg-primary/90 active:scale-[0.98]
+           transition-all duration-150 px-4 py-2 font-semibold text-sm
+           disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2;
   }
 
   .btn-secondary {
-    @apply bg-surface-card text-text-primary border border-border-default rounded-radius-md
-           hover:bg-surface-subtle transition-all duration-200 px-space-4 py-space-2
-           font-font-medium text-text-sm;
+    @apply bg-secondary text-foreground border border-border rounded-full
+           hover:bg-muted active:scale-[0.98] transition-all duration-150 px-4 py-2
+           font-medium text-sm inline-flex items-center justify-center gap-2;
   }
 
   .btn-strong {
-    @apply bg-action-strong text-text-on-dark rounded-radius-md shadow-shadow-lg
-           hover:bg-action-strong-hover transition-all duration-200 px-space-6 py-space-3
-           font-font-bold text-text-base;
+    @apply bg-foreground text-background rounded-full shadow-md
+           hover:opacity-90 active:scale-[0.98] transition-all duration-150 px-6 py-2.5
+           font-bold text-base inline-flex items-center justify-center gap-2;
   }
 
-  /* === CARDS === */
+  /* === CARDS SUAP === */
   .card-system {
-    @apply bg-surface-card rounded-radius-xl p-space-6 shadow-shadow-card
-           hover:shadow-shadow-card-hover hover:-translate-y-[2px]
-           transition-all duration-300 border border-border-subtle/70;
+    @apply bg-card rounded-lg p-5 shadow-sm
+           hover:shadow-md hover:-translate-y-[1px]
+           transition-all duration-200 border border-border;
   }
 
-  /* === STAT CARDS === */
+  /* === STAT CARDS SUAP === */
   .stat-card {
-    @apply bg-surface-card rounded-radius-2xl p-space-6 border border-border-default transition-all duration-300 relative overflow-hidden;
-    box-shadow: var(--shadow-md);
+    @apply bg-card rounded-xl p-5 border border-border transition-all duration-200 relative overflow-hidden;
+    box-shadow: var(--shadow-sm);
   }
   .stat-card:hover {
-    box-shadow: var(--shadow-lg), 0 0 0 1px hsl(var(--primary) / 0.1) inset;
-    transform: translateY(-3px);
+    box-shadow: var(--shadow-md), 0 0 0 1px hsl(var(--primary) / 0.15) inset;
+    transform: translateY(-2px);
   }
 
   .stat-card-primary {
     background: var(--gradient-primary);
-    @apply text-primary-foreground rounded-2xl p-6 relative overflow-hidden;
+    @apply text-primary-foreground rounded-xl p-5 relative overflow-hidden;
     box-shadow: var(--shadow-primary);
   }
   .stat-card-accent {
     background: var(--gradient-accent);
-    @apply text-accent-foreground rounded-2xl p-6 relative overflow-hidden;
-    box-shadow: var(--shadow-lg);
+    @apply text-accent-foreground rounded-xl p-5 relative overflow-hidden;
+    box-shadow: var(--shadow-md);
   }
   .stat-card-warning {
     background: var(--gradient-warning);
-    @apply text-white rounded-2xl p-6 relative overflow-hidden;
-    box-shadow: var(--shadow-lg);
+    @apply text-white rounded-xl p-5 relative overflow-hidden;
+    box-shadow: var(--shadow-md);
   }
 
-  /* === DATA TABLE === */
+  /* === DATA TABLE SUAP (table.listagem) === */
   .data-table-container {
-    @apply w-full bg-surface-card rounded-radius-2xl border border-border-default overflow-hidden;
+    @apply w-full bg-card rounded-xl border border-border overflow-hidden;
     box-shadow: var(--shadow-sm);
   }
 
   /* === PAGE HEADER === */
   .page-header {
-    @apply mb-space-8;
+    @apply mb-6;
   }
 
   .label-eyebrow {
-    color: #1a1a19;
-    font-family: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    @apply text-[11px] font-semibold uppercase tracking-[0.14em];
-  }
-  .dark .label-eyebrow {
-    color: hsl(var(--foreground) / 0.9);
+    color: hsl(var(--muted-foreground));
+    font-family: 'Open Sans', sans-serif;
+    @apply text-[11px] font-bold uppercase tracking-[0.12em];
   }
 
-  /* === BADGES === */
-  .badge-success {
-    @apply inline-flex items-center gap-space-1 px-space-2.5 py-0.5 rounded-radius-full text-text-xs font-font-semibold;
-    background-color: hsl(var(--success) / 0.08);
+  /* === SUAP BADGES (span.status, .legenda li) === */
+  .badge-success,
+  span.status-success {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold;
+    background-color: hsl(var(--success) / 0.12);
     color: hsl(var(--success));
-    border: 1px solid hsl(var(--success) / 0.20);
+    border: 1px solid hsl(var(--success) / 0.35);
   }
-  .badge-warning {
-    @apply inline-flex items-center gap-space-1 px-space-2.5 py-0.5 rounded-radius-full text-text-xs font-font-semibold;
-    background-color: hsl(var(--warning) / 0.08);
-    color: hsl(38 90% 40%);
-    border: 1px solid hsl(var(--warning) / 0.20);
+  .badge-warning,
+  span.status-warning {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold;
+    background-color: hsl(var(--warning) / 0.12);
+    color: hsl(var(--warning));
+    border: 1px solid hsl(var(--warning) / 0.35);
   }
-  .badge-error {
-    @apply inline-flex items-center gap-space-1 px-space-2.5 py-0.5 rounded-radius-full text-text-xs font-font-semibold;
-    background-color: hsl(var(--destructive) / 0.06);
+  .badge-error,
+  span.status-danger {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold;
+    background-color: hsl(var(--destructive) / 0.12);
     color: hsl(var(--destructive));
-    border: 1px solid hsl(var(--destructive) / 0.16);
+    border: 1px solid hsl(var(--destructive) / 0.35);
+  }
+  .badge-info,
+  span.status-info {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold;
+    background-color: hsl(var(--info) / 0.12);
+    color: hsl(var(--info));
+    border: 1px solid hsl(var(--info) / 0.35);
   }
   .pending-field-marker {
     background-color: hsl(var(--destructive) / 0.12);
     border-radius: 4px;
-    box-shadow: 0 0 0 1px hsl(var(--destructive) / 0.16);
+    box-shadow: 0 0 0 1px hsl(var(--destructive) / 0.25);
     color: hsl(var(--destructive));
     font-weight: 700;
     padding: 0 4px;
   }
-  .badge-info {
-    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold;
-    background-color: hsl(var(--primary) / 0.08);
-    color: hsl(var(--primary));
-    border: 1px solid hsl(var(--primary) / 0.16);
-  }
 
   /* === LINKS === */
   .link-primary {
-    @apply text-primary font-medium underline-offset-4 transition-all duration-250;
+    @apply text-primary font-semibold underline-offset-4 transition-colors;
   }
   .link-primary:hover {
     @apply underline opacity-90;
   }
 
   .divider {
-    @apply border-t border-border my-6;
+    @apply border-t border-border my-5;
   }
 
   .input-group {
-    @apply space-y-space-2;
+    @apply space-y-1.5;
   }
   .input-label {
-    @apply text-text-xs font-font-semibold uppercase tracking-wide text-text-secondary;
+    @apply text-xs font-semibold text-muted-foreground uppercase tracking-wider;
   }
 
-  /* === INPUTS === */
+  /* === SUAP INPUTS === */
   .input-system {
-    border-color: rgba(215, 209, 198, 0.82);
-    background: rgba(255, 255, 255, 0.98);
-    color: rgba(52, 49, 43, 0.94);
-    @apply transition-all duration-200 ease-out;
+    border-color: hsl(var(--border));
+    background: hsl(var(--card));
+    color: hsl(var(--foreground));
+    @apply rounded-md text-sm transition-all duration-150;
   }
   .input-system::placeholder {
-    color: rgba(124, 116, 104, 0.7);
+    color: hsl(var(--muted-foreground) / 0.7);
   }
   .input-system:focus,
   .input-system[data-state='open'] {
-    border-color: rgba(47, 158, 65, 0.45);
+    border-color: hsl(var(--primary));
     box-shadow:
-      0 0 0 4px rgba(47, 158, 65, 0.08),
+      0 0 0 3px hsl(var(--primary) / 0.15),
       var(--shadow-xs);
-  }
-  .dark .input-system {
-    background-color: hsl(var(--input));
-    border-color: hsl(var(--border));
-    color: hsl(var(--foreground));
-  }
-  .dark .input-system:focus {
-    border-color: hsl(var(--ring) / 0.6);
-    box-shadow: 0 0 0 4px hsl(var(--ring) / 0.15);
   }
 
   /* === FILTER PANEL === */
   .filter-panel {
-    @apply rounded-radius-xl border border-border-default bg-surface-card shadow-shadow-sm;
+    @apply rounded-xl border border-border bg-card shadow-sm;
   }
   .filter-panel-header {
-    @apply px-space-4 pt-space-4 pb-space-2;
+    @apply px-4 pt-3.5 pb-2;
   }
   .filter-title {
-    @apply inline-flex items-center gap-space-2 text-text-sm font-font-semibold uppercase tracking-[0.12em] text-text-secondary;
+    @apply inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground;
   }
   .filter-title-custom {
-    @apply normal-case tracking-normal text-text-base font-font-semibold text-text-primary;
+    @apply normal-case tracking-normal text-sm font-semibold text-foreground;
   }
   .filter-content {
-    @apply px-space-4 pt-space-3 pb-space-4;
+    @apply px-4 pt-2 pb-3.5;
   }
 
   /* === TABLE PAGINATION === */
@@ -398,60 +509,40 @@
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    border-top: 1px solid rgba(222, 222, 222, 0.92);
-    background: rgba(255, 255, 255, 0.98);
-    padding: 1rem 1.5rem;
-  }
-  .dark .table-pagination {
-    background-color: hsl(var(--card));
-    border-top-color: hsl(var(--border));
+    border-top: 1px solid hsl(var(--border));
+    background: hsl(var(--card));
+    padding: 0.875rem 1.25rem;
   }
   .table-pagination__summary,
   .table-pagination__label {
-    color: rgba(112, 104, 92, 0.84);
-    font-family: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    @apply text-xs font-semibold tracking-wider uppercase;
-  }
-  .dark .table-pagination__summary,
-  .dark .table-pagination__label {
     color: hsl(var(--muted-foreground));
+    font-family: 'Open Sans', sans-serif;
+    @apply text-xs font-semibold tracking-wider uppercase;
   }
   .table-pagination__divider {
     height: 1.25rem;
     width: 1px;
-    background: rgba(220, 220, 220, 0.95);
-  }
-  .dark .table-pagination__divider {
-    background-color: hsl(var(--border));
+    background: hsl(var(--border));
   }
   .table-pagination__select {
     height: 2rem;
     width: 4.5rem;
-    border-color: rgba(224, 224, 224, 0.96);
-    background: #ffffff;
-    box-shadow: var(--shadow-xs);
-  }
-  .dark .table-pagination__select {
-    background-color: hsl(var(--input));
     border-color: hsl(var(--border));
+    background: hsl(var(--card));
+    box-shadow: var(--shadow-xs);
   }
   .table-pagination__nav-button {
-    border-color: rgba(224, 224, 224, 0.96);
-    background: #ffffff;
+    border-color: hsl(var(--border));
+    background: hsl(var(--card));
     box-shadow: var(--shadow-xs);
   }
-  .dark .table-pagination__nav-button {
-    background-color: hsl(var(--input));
-    border-color: hsl(var(--border));
-  }
   .table-pagination__page-chip {
-    color: rgba(58, 58, 58, 0.9);
-    @apply text-xs font-semibold;
-  }
-  .dark .table-pagination__page-chip {
     color: hsl(var(--foreground));
+    @apply text-xs font-semibold rounded-full;
   }
   .table-pagination__page-chip--active {
+    background-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
     box-shadow: var(--shadow-primary);
   }
   .table-pagination__ellipsis {
@@ -460,100 +551,40 @@
     justify-content: center;
     height: 2rem;
     min-width: 1.75rem;
-    color: rgba(124, 116, 104, 0.78);
-  }
-  .dark .table-pagination__ellipsis {
-    color: hsl(var(--muted-foreground));
-  }
-
-  .bg-slate-50\/50 {
-    background-color: rgba(255, 255, 252, 0.92) !important;
-  }
-  .dark .bg-slate-50\/50 {
-    background-color: rgba(255, 255, 252, 0.02) !important;
-  }
-  .hover\:bg-slate-50\/50:hover {
-    background-color: rgba(252, 252, 248, 0.92) !important;
-  }
-  .dark .hover\:bg-slate-50\/50:hover {
-    background-color: rgba(252, 252, 248, 0.04) !important;
-  }
-  .hover\:bg-slate-100\/80:hover {
-    background-color: rgba(249, 250, 245, 0.96) !important;
-  }
-  .dark .hover\:bg-slate-100\/80:hover {
-    background-color: rgba(249, 250, 245, 0.05) !important;
-  }
-  .text-empty-soft {
-    color: rgba(124, 116, 104, 0.82);
-  }
-  .dark .text-empty-soft {
     color: hsl(var(--muted-foreground));
   }
 }
 
 /* ============================================================
-   5. UTILITY LAYER — Animações e micro-interações físicas
+   5. UTILITY LAYER — Micro-interações e Efeitos SUAP
    ============================================================ */
 
 @layer utilities {
 
   .animate-fade-in {
-    animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
   @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
+    from { opacity: 0; transform: translateY(6px); }
     to   { opacity: 1; transform: translateY(0); }
   }
 
   .animate-slide-up {
-    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
   @keyframes slideUp {
-    from { opacity: 0; transform: translateY(16px); }
+    from { opacity: 0; transform: translateY(10px); }
     to   { opacity: 1; transform: translateY(0); }
   }
 
-  .animate-scale-in {
-    animation: scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-  @keyframes scaleIn {
-    from { opacity: 0; transform: scale(0.97); }
-    to   { opacity: 1; transform: scale(1); }
-  }
-
-  .animate-pulse-soft {
-    animation: pulseSoft 2.5s ease-in-out infinite;
-  }
-  @keyframes pulseSoft {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.75; }
-  }
-
-  .animate-shimmer {
-    background: linear-gradient(
-      90deg,
-      hsl(var(--muted)) 25%,
-      hsl(var(--secondary)) 50%,
-      hsl(var(--muted)) 75%
-    );
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-  }
-  @keyframes shimmer {
-    0%   { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-  }
-
-  /* Micro-interações dinâmicas */
   .interactive {
     @apply transition-all cursor-pointer select-none;
     transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-    transition-duration: 250ms;
+    transition-duration: 200ms;
   }
   .interactive:hover  {
-    transform: translateY(-2px) scale(1.01);
-    box-shadow: var(--shadow-lg);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
   }
   .interactive:active {
     transform: translateY(0) scale(0.99);
@@ -563,7 +594,7 @@
     @apply transition-colors duration-150;
   }
   .row-hover:hover {
-    background-color: hsl(var(--primary) / 0.035);
+    background-color: hsl(var(--primary) / 0.04);
   }
 
   .shadow-soft    { box-shadow: var(--shadow-sm); }
@@ -571,114 +602,26 @@
   .shadow-lifted  { box-shadow: var(--shadow-lg); }
   .shadow-primary { box-shadow: var(--shadow-primary); }
 
-  /* Glassmorphism de Alta Performance */
-  .glass {
-    background: var(--glass-bg);
-    backdrop-filter: blur(16px) saturate(140%);
-    -webkit-backdrop-filter: blur(16px) saturate(140%);
-    border: 1px solid var(--glass-border);
-    box-shadow:
-      0 0 0 1px var(--glass-highlight) inset,
-      0 4px 12px -10px rgba(15,23,42,0.12);
-  }
-
-  .glass-heavy {
-    background: var(--glass-bg);
-    backdrop-filter: blur(24px) saturate(160%);
-    -webkit-backdrop-filter: blur(24px) saturate(160%);
-    border: 1px solid var(--glass-border);
-    box-shadow:
-      0 0 0 1px var(--glass-highlight) inset,
-      0 8px 24px -16px rgba(15,23,42,0.18);
-  }
-
-  /* Dot-pattern background */
-  .dot-pattern {
-    background-color: hsl(var(--background));
-    background-image: var(--dot-pattern);
-  }
-  .dark .dot-pattern {
-    --dot-pattern: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='2' cy='2' r='1' fill='%230056c3' fill-opacity='0.16'/%3E%3C/svg%3E");
-  }
-
-  /* Gradiente de fundo dinâmico e polido */
+  /* SUAP App Background */
   .app-bg-soft {
-    background-color: #F4F7FC;
+    background-color: hsl(var(--background));
     background-image:
-      radial-gradient(920px 380px at 12% -18%, rgba(0, 86, 195, 0.03), rgba(0, 86, 195, 0) 58%),
-      linear-gradient(180deg, #F4F7FC 0%, #EBF1FA 100%);
+      radial-gradient(900px 380px at 10% -15%, hsl(var(--primary) / 0.04), transparent 60%),
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--secondary)) 100%);
   }
 
-  .dark .app-bg-soft {
-    background-color: hsl(224 71% 4%);
-    background-image:
-      radial-gradient(1000px 520px at 12% -22%, rgba(42, 79, 218, 0.16), rgba(42, 79, 218, 0) 62%),
-      linear-gradient(180deg, hsl(224 71% 6%) 0%, hsl(224 71% 4%) 100%);
-  }
-
-  /* Bordas Luminosas (Glow Effect) */
-  .border-glow {
-    border: 1px solid var(--glass-border);
-    box-shadow:
-      0 0 0 1px hsl(var(--primary) / 0.05) inset,
-      var(--shadow-sm);
-    @apply transition-all duration-300;
-  }
-  .border-glow:hover {
-    border-color: hsl(var(--primary) / 0.25);
-    box-shadow:
-      0 0 0 1px hsl(var(--primary) / 0.05) inset,
-      0 0 14px hsl(var(--primary) / 0.08),
-      var(--shadow-md);
-  }
-
-  .border-glow-primary {
-    border: 1px solid hsl(var(--primary) / 0.20);
-    box-shadow:
-      0 0 0 1px hsl(var(--primary) / 0.04) inset,
-      0 0 18px hsl(var(--primary) / 0.06),
-      var(--shadow-sm);
-  }
-
-  /* Gradientes de Texto */
-  .text-gradient-primary {
-    background: var(--gradient-primary);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  .text-gradient-dark {
-    background: linear-gradient(180deg, hsl(var(--foreground)) 0%, hsl(var(--muted-foreground)) 120%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  .text-gradient-accent {
-    background: var(--gradient-accent);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  .text-gradient-warning {
-    background: var(--gradient-warning);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  /* Custom Scrollbar superfina e arredondada */
+  /* Custom Scrollbar */
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--border)) transparent;
   }
-  .scrollbar-thin::-webkit-scrollbar       { width: 5px; height: 5px; }
+  .scrollbar-thin::-webkit-scrollbar       { width: 6px; height: 6px; }
   .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background-color: hsl(var(--border));
     border-radius: 99px;
-    border: 1px solid transparent;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background-color: hsl(var(--muted-foreground) / 0.4);
+    background-color: hsl(var(--muted-foreground) / 0.5);
   }
 }

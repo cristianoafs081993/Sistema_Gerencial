@@ -207,7 +207,7 @@ describe('contratosApiService.getLiquidacoesPublicasPorEmpenho', () => {
     expect(functionsInvokeMock).not.toHaveBeenCalled();
   });
 
-  it('aciona refresh pela Edge Function e retorna linhas quando nao ha cache', async () => {
+  it('aciona refresh em background pela Edge Function e retorna vazio sem bloquear quando nao ha cache', async () => {
     const contratosApiService = await loadService();
 
     mockSupabaseCache(null);
@@ -249,19 +249,11 @@ describe('contratosApiService.getLiquidacoesPublicasPorEmpenho', () => {
 
     const result = await contratosApiService.getLiquidacoesPublicasPorEmpenho('2026NE000027');
 
-    expect(result).toEqual([
-      expect.objectContaining({
-        contrato_api_id: 126528,
-        contrato_numero: '00158/2021',
-        numero_instrumento_cobranca: 'Z57375',
-        empenho_numero: '2026NE000027',
-      }),
-    ]);
+    expect(result).toEqual([]);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(functionsInvokeMock).toHaveBeenCalledWith('refresh-comprasnet-liquidacoes-cache', {
       body: {
         empenhoNumero: '2026NE000027',
-        returnRows: true,
         source: 'frontend-cache-miss',
       },
     });

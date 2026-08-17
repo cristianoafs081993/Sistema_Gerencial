@@ -114,7 +114,7 @@ describe('licitacoesPncp helpers', () => {
       sequencialCompra: 198,
       pagina: 1,
       tamanhoPagina: 100,
-    })).toBe('https://pncp.gov.br/api/consulta/v1/orgaos/10877412000168/compras/2025/198/itens?pagina=1&tamanhoPagina=100');
+    })).toBe('https://pncp.gov.br/api/pncp/v1/orgaos/10877412000168/compras/2025/198/itens?pagina=1&tamanhoPagina=100');
 
     expect(pncpCompraMatchesItemSearch({
       itens: [

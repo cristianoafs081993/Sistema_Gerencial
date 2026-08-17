@@ -122,7 +122,7 @@ Mostrar a linhagem operacional dos dados de forma curta:
 
 ### Pregoes PNCP
 
-- API `https://pncp.gov.br/api/consulta`
+- APIs `https://pncp.gov.br/api/consulta` e `https://pncp.gov.br/api/pncp`
   - sincronizacao automatica: [sync-licitacoes-pncp/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-licitacoes-pncp/index.ts)
   - service de leitura no frontend: [licitacoesPncp.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/licitacoesPncp.ts)
   - tabelas:
@@ -130,7 +130,7 @@ Mostrar a linhagem operacional dos dados de forma curta:
     - `licitacoes_pncp_sync_runs`
     - `licitacoes_pncp_uasgs`
   - pagina: [LicitacoesPregoes.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/LicitacoesPregoes.tsx)
-- observacao: o endpoint PNCP `/v1/contratacoes/publicacao` usa datas `yyyyMMdd`, limita cada consulta a ate 365 dias e e consultado por `cnpj=10877412000168` sem UASG na sincronizacao institucional; quando a consulta filtra `codigoUnidadeAdministrativa`, o CNPJ tambem e obrigatorio. A v1 busca pregao eletronico (`codigoModalidadeContratacao = 6`), nao envia `tamanhoPagina` e grava o payload integral em `raw_data`. Quando `itemBusca` e informado, a function tambem consulta `/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}/itens` e salva o resultado em `raw_data.itens` para pesquisa local por item.
+- observacao: o endpoint PNCP `/api/consulta/v1/contratacoes/publicacao` usa datas `yyyyMMdd`, limita cada consulta a ate 365 dias e a sincronizacao automatica diaria particiona as consultas entre todas as 19 UASGs do catalogo do IFRN (`DEFAULT_PNCP_UASGS`). A integracao busca pregao eletronico (`codigoModalidadeContratacao = 6`), grava o payload integral em `raw_data` e busca os itens de compra na API `https://pncp.gov.br/api/pncp/v1/orgaos/{cnpj}/compras/{ano}/{sequencial}/itens` gravando em `raw_data.itens` por padrao para alimentar pesquisas locais instantaneas por item e o drawer de detalhes. O drawer de detalhes reconcilia empenhos e saldos por item de forma deterministica consultando primeiro os contratos, itens (`numero_item_compra`) e empenhos da base do Comprasnet Contratos (`contratos_api`, `contratos_api_itens`, `contratos_api_empenhos`), complementado por `portal_transparencia_empenho_itens_cache` e `empenhos` locais.
 
 ### Pesquisa de preços
 

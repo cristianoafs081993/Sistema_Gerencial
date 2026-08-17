@@ -16,7 +16,7 @@ O certificado digital e a sessão do Comprasnet permanecem exclusivamente no nav
 4. Para o modo ETP completo, navega somente pelas 13 seções textuais permitidas e devolve o conteúdo atual para revisão.
 5. O iframe incorpora automaticamente o contexto institucional fixo do Campus Currais Novos e consulta o processo sincronizado no SIAGES, analisa o PDF disponível e processa anexos auxiliares apenas em memória.
 6. `gerar-etp-comprasnet` gera a prévia geral do ETP.
-7. O usuário configura extensão, formato, ênfases, fontes permitidas, tratamento do texto existente e o checklist da seção aberta. Apenas essas preferências não sensíveis usam `chrome.storage.sync` na chave versionada `siages-comprasnet-etp-generation-preferences-v1`.
+7. O usuário pode abrir o painel de configurações pelo ícone de engrenagem no cabeçalho para configurar extensão, formato, ênfases, fontes permitidas, tratamento do texto existente e o checklist da seção aberta. Apenas essas preferências não sensíveis usam `chrome.storage.sync` na chave versionada `siages-comprasnet-etp-generation-preferences-v1`. O campo de processo possui botão `Buscar processo` alinhado horizontalmente ao input.
 8. A prévia pode conter o ETP completo para referência, mas somente a seção atualmente aberta no Comprasnet pode ser selecionada e aplicada. O usuário avança entre seções manualmente.
 9. O content script escreve no CKEditor, dispara os eventos necessários e aguarda a confirmação de salvamento automático.
 9. Avisos e pendências ficam recolhidos no ícone de alerta da prévia; após a aplicação bem-sucedida, o modal fecha e o foco retorna à página do Comprasnet.
@@ -42,7 +42,7 @@ Informações básicas, área requisitante, responsáveis, anexos, categoria, co
 
 ## Design visual
 
-O botão e o modal usam a nomenclatura visual do Design System Brasil/Comprasnet (`br-button`, `br-card`, `br-input` e alertas). O content script captura tipografia, cores, bordas, foco e raio computados na página e envia os tokens `--comprasnet-*` ao iframe. A folha de estilos do iframe é isolada e não usa os tokens `suape-*`.
+O botão e o modal usam a nomenclatura visual do Design System Brasil/Comprasnet (`br-button secondary small`, `br-card`, `br-input` e alertas). O launcher herda e sincroniza as classes de tamanho (`small`) das ações originais da tela (`Voltar` e `Concluir ETP`), garantindo altura e padding idênticos aos botões nativos. O content script captura tipografia, cores, bordas, foco e raio computados na página e envia os tokens `--comprasnet-*` ao iframe. A folha de estilos do iframe é isolada e não usa os tokens `suape-*`.
 
 ## Teste manual
 

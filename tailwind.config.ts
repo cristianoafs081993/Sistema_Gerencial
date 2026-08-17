@@ -16,20 +16,27 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["Figtree", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
-        ui: ["Figtree", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
-        data: ["IBM Plex Mono", "ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"],
+        sans: ["Open Sans", "Lato", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
+        ui: ["Open Sans", "Lato", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
+        data: ["IBM Plex Mono", "Monaco", "Consolas", "ui-monospace", "monospace"],
       },
       colors: {
-        // --- SEBRAE BASE BRAND COLORS ---
-        "sebrae-blue": "#0056C3",
-        "sebrae-navy": "#1A2B66",
-        "sebrae-gold": "#FED303",
-        "ifrn-green": "#2f9e41",
-        "app-bg": "#F4F7FC",
-        "ink-legacy": "#1E293B",
-        "muted-gray": "#64748B",
-        "border-light": "#E2E8F0",
+        // --- SUAP BRAND COLORS ---
+        "suap-teal": "#0A7F70",
+        "suap-teal-light": "#00BDA4",
+        "suap-green": "#1F7A2D",
+        "suap-aurora": "#4456BB",
+        "suap-dunas": "#B98746",
+        "suap-govbr": "#1351B4",
+        "suap-luna": "#14B8AA",
+        "ifrn-green": "#1F7A2D",
+        "sebrae-blue": "#0A7F70",
+        "sebrae-navy": "#094E45",
+        "sebrae-gold": "#CAC302",
+        "app-bg": "hsl(var(--background))",
+        "ink-legacy": "hsl(var(--foreground))",
+        "muted-gray": "hsl(var(--muted-foreground))",
+        "border-light": "hsl(var(--border))",
 
         // --- TOKENS SEMÂNTICOS (SISTEMA GERENCIAL) ---
         "text-primary":   "hsl(var(--foreground))",

@@ -38,6 +38,7 @@ export type AtasRegistroPrecosListParams = {
   search?: string;
   dataInicial?: string;
   dataFinal?: string;
+  apenasVigentes?: boolean;
 };
 
 export type AtaRegistroPrecoRow = {
@@ -244,6 +245,10 @@ export const atasRegistroPrecosService = {
 
     if (params.dataInicial) query = query.gte('data_vigencia_inicial', `${params.dataInicial}T00:00:00.000Z`);
     if (params.dataFinal) query = query.lte('data_vigencia_inicial', `${params.dataFinal}T23:59:59.999Z`);
+    if (params.apenasVigentes) {
+      const today = new Date().toISOString().slice(0, 10);
+      query = query.gte('data_vigencia_final', `${today}T00:00:00.000Z`);
+    }
 
     const search = params.search?.trim();
     if (search) {

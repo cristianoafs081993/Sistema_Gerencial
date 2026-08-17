@@ -632,7 +632,7 @@ export default function Contratos() {
         </div>
       </FilterPanel>
 
-      <DataTablePanel title="Contratos Ativos" className="mt-6" tableContainerClassName="border-t border-border-default/50">
+      <DataTablePanel className="mt-6">
         <Table>
           <TableHeader className="bg-surface-subtle/70">
             <TableRow className="hover:bg-transparent border-b border-border-default/50">
@@ -652,7 +652,9 @@ export default function Contratos() {
               <TableHead className="h-11 px-4 text-right">Valor Total</TableHead>
               <TableHead className="h-11 px-6">Empenhado</TableHead>
               <TableHead className="h-11 px-4 text-right">Saldo dos empenhos</TableHead>
-              <TableHead className="h-11 px-6 text-right">API</TableHead>
+              <TableHead className="h-11 w-12 px-4 text-center">
+                <span className="sr-only">Ações</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -960,12 +962,25 @@ export default function Contratos() {
                         <span className={cn('font-semibold text-sm', totalALiquidar > 0 ? 'text-status-warning' : 'text-status-success')}>{formatCurrency(totalALiquidar)}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="py-4 px-6 text-right">
+                    <TableCell className="py-4 px-4 text-center">
                       {apiContrato ? (
-                        <Button variant="ghost" size="sm" className="h-8 gap-2 px-2 text-xs" onClick={() => openApiDetails(apiContrato)}>
-                          <Eye className="h-3.5 w-3.5" />
-                          Detalhes
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-text-secondary hover:text-action-primary hover:bg-surface-subtle"
+                              aria-label="Ver detalhes"
+                              onClick={() => openApiDetails(apiContrato)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Ver detalhes
+                          </TooltipContent>
+                        </Tooltip>
                       ) : (
                         <span className="text-xs text-text-secondary">-</span>
                       )}

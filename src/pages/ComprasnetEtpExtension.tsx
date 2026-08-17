@@ -406,7 +406,15 @@ export default function ComprasnetEtpExtension() {
               <p>O texto será preparado para revisão. A extensão não conclui nem envia o ETP.</p>
             </div>
             <div className="comprasnet-etp-card-header-actions">
-              <button className="br-button circle secondary" type="button" aria-label="Configurar minuta" aria-expanded={showPreferences} aria-controls="comprasnet-etp-preferences" title="Configurar minuta" onClick={() => setShowPreferences((current) => !current)}>
+              <button
+                className={`br-button circle secondary ${showPreferences ? 'active' : ''}`}
+                type="button"
+                aria-label="Configurar minuta"
+                aria-expanded={showPreferences}
+                aria-controls="comprasnet-etp-preferences"
+                title="Configurar minuta"
+                onClick={() => setShowPreferences((current) => !current)}
+              >
                 <Settings size={18} aria-hidden="true" />
               </button>
               <button className="br-button circle secondary" type="button" aria-label="Fechar" onClick={() => postComprasnetMessage({ source: 'siages', type: COMPRASNET_ETP_CLOSE_MESSAGE, version: 1 })}>
@@ -415,20 +423,41 @@ export default function ComprasnetEtpExtension() {
             </div>
           </div>
 
-          {showPreferences ? <section id="comprasnet-etp-preferences" className="comprasnet-etp-preferences br-card" aria-label="Configurar minuta">
-            <div className="comprasnet-etp-preferences-content">
-              <div className="comprasnet-etp-grid comprasnet-etp-preferences-grid">
-                <label className="br-input"><span className="label">Extensão</span><select value={preferences.length} onChange={(event) => updatePreferences((current) => ({ ...current, length: event.target.value as ComprasnetEtpGenerationPreferences['length'] }))}>{comprasnetEtpLengthOptions.map((option) => <option key={option} value={option}>{preferenceLabels[option]}</option>)}</select></label>
-                <label className="br-input"><span className="label">Parágrafos alvo</span><input type="number" min="1" max="8" value={preferences.paragraphCount} onChange={(event) => updatePreferences((current) => ({ ...current, paragraphCount: Number(event.target.value) }))} /></label>
-                <label className="br-input"><span className="label">Itens alvo</span><input type="number" min="3" max="12" value={preferences.itemCount} onChange={(event) => updatePreferences((current) => ({ ...current, itemCount: Number(event.target.value) }))} /></label>
-                <label className="br-input"><span className="label">Formato</span><select value={preferences.format} onChange={(event) => updatePreferences((current) => ({ ...current, format: event.target.value as ComprasnetEtpGenerationPreferences['format'] }))}>{comprasnetEtpFormatOptions.map((option) => <option key={option} value={option}>{preferenceLabels[option]}</option>)}</select></label>
-                <label className="br-input"><span className="label">Texto existente</span><select value={preferences.existingTextMode} onChange={(event) => updatePreferences((current) => ({ ...current, existingTextMode: event.target.value as ComprasnetEtpGenerationPreferences['existingTextMode'] }))}>{comprasnetEtpExistingTextOptions.map((option) => <option key={option} value={option}>{preferenceLabels[option]}</option>)}</select></label>
+          <div className="comprasnet-etp-alert" role="note">
+            <strong>Revisão obrigatória.</strong> A prévia geral é apenas referência. A extensão grava somente a seção que estiver aberta no Comprasnet e nunca conclui o ETP.
+          </div>
+
+          {showPreferences ? (
+            <section id="comprasnet-etp-preferences" className="comprasnet-etp-preferences br-card" aria-label="Configurar minuta">
+              <div className="comprasnet-etp-preferences-header">
+                <div>
+                  <strong>Configurar minuta</strong>
+                  <small>Preferências não sensíveis, lembradas neste navegador.</small>
+                </div>
+                <button
+                  className="br-button circle secondary"
+                  type="button"
+                  aria-label="Fechar configurações"
+                  title="Fechar configurações"
+                  onClick={() => setShowPreferences(false)}
+                >
+                  <X size={16} aria-hidden="true" />
+                </button>
               </div>
-              <fieldset className="comprasnet-etp-fieldset"><legend>Ênfases</legend><div className="comprasnet-etp-check-grid">{comprasnetEtpEmphasisOptions.map((option) => <label key={option}><input type="checkbox" checked={preferences.emphases.includes(option)} onChange={() => toggleListPreference('emphases', option)} /> {preferenceLabels[option]}</label>)}</div></fieldset>
-              <fieldset className="comprasnet-etp-fieldset"><legend>Fontes permitidas</legend><div className="comprasnet-etp-check-grid">{comprasnetEtpSourceOptions.map((option) => <label key={option}><input type="checkbox" checked={preferences.sources.includes(option)} onChange={() => toggleListPreference('sources', option)} /> {preferenceLabels[option]}</label>)}</div></fieldset>
-              {activeSectionId ? <fieldset className="comprasnet-etp-fieldset"><legend>Ajustes da seção aberta: {activeField?.title || activeSectionId}</legend><div className="comprasnet-etp-check-grid">{(comprasnetEtpSectionChecklists[activeSectionId] || []).map((item) => <label key={item}><input type="checkbox" checked={(preferences.sectionOverrides[activeSectionId]?.checklist || []).includes(item)} onChange={() => toggleSectionChecklist(item)} /> {preferenceLabels[item] || item}</label>)}</div></fieldset> : null}
-            </div>
-          </section> : null}
+              <div className="comprasnet-etp-preferences-content">
+                <div className="comprasnet-etp-grid comprasnet-etp-preferences-grid">
+                  <label className="br-input"><span className="label">Extensão</span><select value={preferences.length} onChange={(event) => updatePreferences((current) => ({ ...current, length: event.target.value as ComprasnetEtpGenerationPreferences['length'] }))}>{comprasnetEtpLengthOptions.map((option) => <option key={option} value={option}>{preferenceLabels[option]}</option>)}</select></label>
+                  <label className="br-input"><span className="label">Parágrafos alvo</span><input type="number" min="1" max="8" value={preferences.paragraphCount} onChange={(event) => updatePreferences((current) => ({ ...current, paragraphCount: Number(event.target.value) }))} /></label>
+                  <label className="br-input"><span className="label">Itens alvo</span><input type="number" min="3" max="12" value={preferences.itemCount} onChange={(event) => updatePreferences((current) => ({ ...current, itemCount: Number(event.target.value) }))} /></label>
+                  <label className="br-input"><span className="label">Formato</span><select value={preferences.format} onChange={(event) => updatePreferences((current) => ({ ...current, format: event.target.value as ComprasnetEtpGenerationPreferences['format'] }))}>{comprasnetEtpFormatOptions.map((option) => <option key={option} value={option}>{preferenceLabels[option]}</option>)}</select></label>
+                  <label className="br-input"><span className="label">Texto existente</span><select value={preferences.existingTextMode} onChange={(event) => updatePreferences((current) => ({ ...current, existingTextMode: event.target.value as ComprasnetEtpGenerationPreferences['existingTextMode'] }))}>{comprasnetEtpExistingTextOptions.map((option) => <option key={option} value={option}>{preferenceLabels[option]}</option>)}</select></label>
+                </div>
+                <fieldset className="comprasnet-etp-fieldset"><legend>Ênfases</legend><div className="comprasnet-etp-check-grid">{comprasnetEtpEmphasisOptions.map((option) => <label key={option}><input type="checkbox" checked={preferences.emphases.includes(option)} onChange={() => toggleListPreference('emphases', option)} /> {preferenceLabels[option]}</label>)}</div></fieldset>
+                <fieldset className="comprasnet-etp-fieldset"><legend>Fontes permitidas</legend><div className="comprasnet-etp-check-grid">{comprasnetEtpSourceOptions.map((option) => <label key={option}><input type="checkbox" checked={preferences.sources.includes(option)} onChange={() => toggleListPreference('sources', option)} /> {preferenceLabels[option]}</label>)}</div></fieldset>
+                {activeSectionId ? <fieldset className="comprasnet-etp-fieldset"><legend>Ajustes da seção aberta: {activeField?.title || activeSectionId}</legend><div className="comprasnet-etp-check-grid">{(comprasnetEtpSectionChecklists[activeSectionId] || []).map((item) => <label key={item}><input type="checkbox" checked={(preferences.sectionOverrides[activeSectionId]?.checklist || []).includes(item)} onChange={() => toggleSectionChecklist(item)} /> {preferenceLabels[item] || item}</label>)}</div></fieldset> : null}
+              </div>
+            </section>
+          ) : null}
 
           <section className="comprasnet-etp-form-section" aria-labelledby="comprasnet-etp-scope-heading">
             <h2 id="comprasnet-etp-scope-heading" className="comprasnet-etp-section-heading">Escopo da geração</h2>
@@ -445,39 +474,30 @@ export default function ComprasnetEtpExtension() {
             </fieldset>
           </section>
 
-          <section className="comprasnet-etp-form-section" aria-labelledby="comprasnet-etp-process-heading">
-            <h2 id="comprasnet-etp-process-heading" className="comprasnet-etp-section-heading">Processo administrativo</h2>
-            <div className="comprasnet-etp-grid comprasnet-etp-process-grid">
-              <label className="br-input">
-                <span className="label">Número do processo</span>
-                <input value={processNumber} onChange={(event) => setProcessNumber(event.target.value)} placeholder="Ex.: 23035.000001/2026-11" inputMode="numeric" />
-                <small>Usado para buscar dados no SIAGES, sem preencher campos estruturados do Comprasnet.</small>
-              </label>
+          <div className="comprasnet-etp-process-group">
+            <span className="label">Número do processo</span>
+            <div className="comprasnet-etp-process-row">
+              <input value={processNumber} onChange={(event) => setProcessNumber(event.target.value)} placeholder="Ex.: 23035.000001/2026-11" inputMode="numeric" />
               <button className="br-button secondary comprasnet-etp-search" type="button" onClick={() => void lookupProcess()}>
                 Buscar processo
               </button>
             </div>
-          </section>
+            <small>Usado para buscar dados no SIAGES, sem preencher campos estruturados do Comprasnet.</small>
+          </div>
 
-          <section className="comprasnet-etp-form-section" aria-labelledby="comprasnet-etp-context-heading">
-            <h2 id="comprasnet-etp-context-heading" className="comprasnet-etp-section-heading">Objeto e contexto adicional</h2>
-            <label className="br-input">
-              <span className="label">Objeto ou contexto adicional</span>
-              <textarea value={manualObject} onChange={(event) => setManualObject(event.target.value)} placeholder="Descreva o objeto, problema ou informação que deve orientar a redação." rows={4} />
-            </label>
-          </section>
+          <label className="br-input">
+            <span className="label">Objeto ou contexto adicional</span>
+            <textarea value={manualObject} onChange={(event) => setManualObject(event.target.value)} placeholder="Descreva o objeto, problema ou informação que deve orientar a redação." rows={4} />
+          </label>
 
-          <section className="comprasnet-etp-form-section" aria-labelledby="comprasnet-etp-documents-heading">
-            <h2 id="comprasnet-etp-documents-heading" className="comprasnet-etp-section-heading">Documentos de apoio</h2>
-            <div className="comprasnet-etp-upload br-card">
-              <div className="comprasnet-etp-upload-heading">
-                <div><strong>Adicionar documentos</strong><small>PDFs, planilhas, DOCX, CSV e textos. Processamento temporário.</small></div>
-                <button className="br-button secondary small" type="button" onClick={() => fileInputRef.current?.click()}><Paperclip size={16} aria-hidden="true" /> Adicionar</button>
-              </div>
-              <input ref={fileInputRef} hidden type="file" multiple accept={PRELIMINARY_STUDY_SUPPLEMENTAL_ACCEPT} onChange={(event) => void handleFiles(event.target.files)} />
-              {attachments.length > 0 ? <ul className="comprasnet-etp-file-list">{attachments.map((attachment) => <li key={attachment.fileName}><span>{attachment.fileName}</span><small>{attachment.snippets.length} trecho(s)</small></li>)}</ul> : <small>Nenhum arquivo anexado.</small>}
+          <div className="comprasnet-etp-upload br-card">
+            <div className="comprasnet-etp-upload-heading">
+              <div><strong>Documentos de apoio</strong><small>PDFs, planilhas, DOCX, CSV e textos. Processamento temporário.</small></div>
+              <button className="br-button secondary small" type="button" onClick={() => fileInputRef.current?.click()}><Paperclip size={16} aria-hidden="true" /> Adicionar</button>
             </div>
-          </section>
+            <input ref={fileInputRef} hidden type="file" multiple accept={PRELIMINARY_STUDY_SUPPLEMENTAL_ACCEPT} onChange={(event) => void handleFiles(event.target.files)} />
+            {attachments.length > 0 ? <ul className="comprasnet-etp-file-list">{attachments.map((attachment) => <li key={attachment.fileName}><span>{attachment.fileName}</span><small>{attachment.snippets.length} trecho(s)</small></li>)}</ul> : <small>Nenhum arquivo anexado.</small>}
+          </div>
 
           <div className="comprasnet-etp-actions">
             <button className="br-button secondary" type="button" onClick={() => postComprasnetMessage({ source: 'siages', type: COMPRASNET_ETP_CLOSE_MESSAGE, version: 1 })}>Cancelar</button>

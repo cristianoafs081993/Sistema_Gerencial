@@ -4,8 +4,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 interface ChartPanelProps {
-  title: string;
+  title: ReactNode;
+  titleClassName?: string;
   description?: string;
+  actions?: ReactNode;
   loading?: boolean;
   heightClassName?: string;
   className?: string;
@@ -14,7 +16,9 @@ interface ChartPanelProps {
 
 export function ChartPanel({
   title,
+  titleClassName,
   description,
+  actions,
   loading = false,
   heightClassName = 'h-[300px]',
   className,
@@ -23,8 +27,13 @@ export function ChartPanel({
   return (
     <Card className={cn('card-system border border-border-default/80 shadow-soft', className)}>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold">{title}</CardTitle>
-        {description ? <CardDescription>{description}</CardDescription> : null}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <CardTitle className={cn('text-base font-semibold', titleClassName)}>{title}</CardTitle>
+            {description ? <CardDescription>{description}</CardDescription> : null}
+          </div>
+          {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+        </div>
       </CardHeader>
       <CardContent>
         {loading ? (

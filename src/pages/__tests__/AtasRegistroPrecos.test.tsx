@@ -122,7 +122,7 @@ describe('AtasRegistroPrecos', () => {
     });
   });
 
-  it('lista atas e abre drawer de detalhes', async () => {
+  it('lista atas e abre modal de detalhes', async () => {
     renderPage();
 
     expect(await screen.findByText('Aquisicao de materiais de consumo')).toBeInTheDocument();
@@ -130,8 +130,8 @@ describe('AtasRegistroPrecos', () => {
 
     expect(await screen.findByText('Material de consumo')).toBeInTheDocument();
     expect(screen.getByText('Fornecedor SA')).toBeInTheDocument();
-    expect(screen.getByText('R$ 1.500,00')).toBeInTheDocument();
-    expect(screen.getByText('Ata de Registro de Preços')).toBeInTheDocument();
+    expect(screen.getAllByText('R$ 1.500,00').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Participantes e Adesões (Lei 14.133/2021)')).toBeInTheDocument();
   });
 
   it('mostra contagem clara de participantes com hover disponivel', async () => {

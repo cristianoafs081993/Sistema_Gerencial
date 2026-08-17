@@ -13,10 +13,10 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
   <div
     ref={ref}
     className={cn(
-      "rounded-2xl bg-card text-card-foreground",
-      "border border-border/70",
-      "shadow-soft transition-all duration-250 ease-out",
-      "hover:shadow-card hover:-translate-y-[2px]",
+      "rounded-xl bg-card text-card-foreground",
+      "border border-border",
+      "shadow-sm transition-all duration-200 ease-out",
+      "hover:shadow-md hover:-translate-y-[1px]",
       className
     )}
     {...props}
@@ -26,18 +26,17 @@ Card.displayName = "Card";
 
 const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn("flex flex-col space-y-1.5 p-6", className)} {...props} />
+    <div ref={ref} className={cn("flex flex-col space-y-1.5 p-5", className)} {...props} />
   ),
 );
 CardHeader.displayName = "CardHeader";
 
 const CardTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(
   ({ className, ...props }, ref) => (
-    // text-gradient-dark: gradiente linear sutil do preto ao cinza (Linear/Vercel style)
     <h3
       ref={ref}
       className={cn(
-        "text-base font-semibold leading-none tracking-tight text-gradient-dark",
+        "text-base font-semibold leading-none tracking-tight text-foreground",
         className
       )}
       {...props}

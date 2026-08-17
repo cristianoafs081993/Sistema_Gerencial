@@ -14,6 +14,17 @@
   opacity: 1 !important;
   margin-left: .5rem;
   white-space: nowrap;
+  align-items: center;
+  justify-content: center;
+}
+
+#siages-comprasnet-etp-open.small,
+#siages-comprasnet-etp-open:not(.siages-comprasnet-etp-floating) {
+  min-height: var(--button-height-small, 32px);
+  height: var(--button-height-small, 32px);
+  padding: 0 var(--spacing-scale-baseh, 12px);
+  font-size: var(--font-size-scale-down-01, 12px);
+  line-height: var(--font-line-height-low, 1.15);
 }
 
 #siages-comprasnet-etp-open.siages-comprasnet-etp-floating {

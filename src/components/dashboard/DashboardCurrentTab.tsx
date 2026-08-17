@@ -9,7 +9,6 @@ import {
   Line,
   ResponsiveContainer,
   Tooltip,
-  Treemap,
   XAxis,
   YAxis,
 } from 'recharts';
@@ -20,7 +19,7 @@ import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCurrency } from '@/lib/utils';
 import type { Atividade, Descentralizacao, Empenho } from '@/types';
-import { BudgetHierarchyTooltip, BudgetTreemapContent, ExecutionTooltip } from './DashboardChartBits';
+import { ExecutionTooltip } from './DashboardChartBits';
 import { GaugeChart } from './GaugeChart';
 import { formatCompactCurrency } from './utils';
 
@@ -421,60 +420,6 @@ export function DashboardCurrentTab({
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-1">
-        <ChartPanel
-          title="Distribuição do Orçamento (Dimensão x Componentes Funcionais)"
-          description="Composição do Planejado por área de atuação e programas"
-          loading={isLoading}
-          heightClassName="h-[468px]"
-        >
-          <div className="space-y-3">
-            <div className="flex flex-wrap gap-2">
-              {budgetTreemapData.map((item) => (
-                <button
-                  type="button"
-                  key={item.name}
-                  className={`inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5 shadow-[0_6px_18px_rgba(15,23,42,0.06)] transition-all ${
-                    activeBudgetDimension === item.name
-                      ? 'border-slate-400 bg-white text-text-primary shadow-[0_12px_28px_rgba(15,23,42,0.14)] ring-2 ring-slate-200/80'
-                      : hoveredBudgetDimension === item.name
-                        ? 'border-slate-300 bg-white text-text-primary shadow-[0_10px_24px_rgba(15,23,42,0.12)]'
-                        : hoveredBudgetDimension && hoveredBudgetDimension !== item.name
-                          ? 'border-border-default/40 bg-white/55 text-text-muted opacity-60'
-                          : 'border-border-default/60 bg-white/85 text-text-secondary'
-                  }`}
-                  title={`${item.name} | ${formatCurrency(item.value || 0)}`}
-                  onClick={() => onSelectBudgetDimension(item.dimensionCode)}
-                  onMouseEnter={() => onHoverBudgetDimension(item.name)}
-                  onMouseLeave={() => onHoverBudgetDimension(null)}
-                  onFocus={() => onHoverBudgetDimension(item.name)}
-                  onBlur={() => onHoverBudgetDimension(null)}
-                >
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: item.fill }} />
-                  <span className="max-w-[220px] truncate font-ui text-xs font-semibold">{item.name}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="h-[400px] rounded-[24px] border border-border-default/60 bg-[radial-gradient(circle_at_top,rgba(37,99,235,0.06),transparent_38%),linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.92))] p-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <Treemap
-                  data={budgetTreemapData}
-                  dataKey="value"
-                  aspectRatio={16 / 9}
-                  stroke="#ffffff"
-                  isAnimationActive={false}
-                  content={<BudgetTreemapContent highlightedDimension={highlightedBudgetDimension} />}
-                  onClick={(node: { dimensionCode?: string }) => onSelectBudgetDimension(node.dimensionCode)}
-                >
-                  <Tooltip content={<BudgetHierarchyTooltip />} />
-                </Treemap>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </ChartPanel>
-      </div>
-
       <div className="grid gap-6 md:grid-cols-2">
         <ChartPanel
           title="Descentralizações"
@@ -530,7 +475,7 @@ export function DashboardCurrentTab({
 
       <Card className="card-system overflow-hidden">
         <CardHeader className="border-b border-border-default/50 px-6 py-4">
-          <CardTitle className="table-title">Detalhamento por Origem</CardTitle>
+          <CardTitle className="text-lg sm:text-xl font-bold text-text-primary">Detalhamento por Origem</CardTitle>
           <CardDescription>Execução financeira por fonte de recurso</CardDescription>
         </CardHeader>
         <CardContent className="p-0">

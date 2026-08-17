@@ -496,4 +496,37 @@ export const licitacoesPncpService = {
       errors,
     };
   },
+
+  async enrichExistingItems() {
+    const { data, error } = await supabase.functions.invoke('sync-licitacoes-pncp', {
+      body: {
+        enrichExistingItems: true,
+      },
+    });
+
+    if (error) throw normalizeLicitacoesPncpSyncError(error);
+    return data as {
+      status: string;
+      totalChecked: number;
+      totalEligible: number;
+      enrichedCount: number;
+      errors?: Array<{ numeroControle: string; message: string }>;
+    };
+  },
+
+  async fetchItems(cnpj: string, anoCompra: number, sequencialCompra: number): Promise<Record<string, unknown>[]> {
+    const url = buildPncpItemsUrl({ cnpj, anoCompra, sequencialCompra });
+    try {
+      const response = await fetch(url, {
+        headers: {
+          Accept: 'application/json',
+        },
+      });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data : (data?.data ?? data?.itens ?? []);
+    } catch {
+      return [];
+    }
+  },
 };

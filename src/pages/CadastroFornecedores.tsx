@@ -260,10 +260,10 @@ export default function CadastroFornecedoresPage() {
   return (
     <div className="space-y-6 pb-10">
       {/* Header Panel */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 bg-surface-card border border-border-subtle/70 rounded-radius-xl shadow-soft">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 bg-card border border-border rounded-xl shadow-xs">
         <div className="space-y-1">
-          <h3 className="text-xl font-bold text-sebrae-navy">Cadastro e Mapa de Fornecedores</h3>
-          <p className="text-sm text-text-muted">
+          <h3 className="text-xl font-bold text-foreground">Cadastro e Mapa de Fornecedores</h3>
+          <p className="text-sm text-muted-foreground">
             Base de fornecedores do órgão, controle de certidões negativas e consultas de idoneidade (TCU, CNJ, CEIS, CNEP).
           </p>
         </div>
@@ -273,7 +273,7 @@ export default function CadastroFornecedoresPage() {
             handleCancelEdit();
             setIsModalOpen(true);
           }}
-          className="btn-primary gap-2 bg-sebrae-blue hover:bg-sebrae-navy text-white font-semibold text-sm h-10 px-4 rounded-radius-md transition-all shrink-0 flex items-center justify-center shadow-md shadow-primary/20"
+          className="gap-2 shrink-0 shadow-sm"
         >
           <Plus className="h-4 w-4" />
           Cadastrar Fornecedor
@@ -282,65 +282,65 @@ export default function CadastroFornecedoresPage() {
 
       {/* Supplier Map & Conformity Stats Dashboard */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="border border-border-default bg-surface-card shadow-sm">
+        <Card className="border border-border bg-card shadow-xs">
           <CardContent className="pt-4 flex items-center gap-3">
-            <div className="p-2.5 bg-blue-50 text-blue-600 rounded-radius-md">
+            <div className="p-2.5 bg-primary/10 text-primary rounded-lg">
               <Users className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs text-text-muted font-medium">Fornecedores Cadastrados</p>
+              <p className="text-xs text-muted-foreground font-medium">Fornecedores Cadastrados</p>
               <h4 className="text-2xl font-bold text-foreground">{stats.total}</h4>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border border-border-default bg-surface-card shadow-sm">
+        <Card className="border border-border bg-card shadow-xs">
           <CardContent className="pt-4 flex items-center gap-3">
-            <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-radius-md">
+            <div className="p-2.5 bg-emerald-500/10 text-emerald-600 rounded-lg">
               <CheckCircle2 className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs text-text-muted font-medium">Regularizados (Bases Federais)</p>
+              <p className="text-xs text-muted-foreground font-medium">Regularizados (Bases Federais)</p>
               <h4 className="text-2xl font-bold text-foreground">
-                {stats.regular} <span className="text-xs font-normal text-text-muted">({stats.total > 0 ? Math.round((stats.regular/stats.total)*100) : 0}%)</span>
+                {stats.regular} <span className="text-xs font-normal text-muted-foreground">({stats.total > 0 ? Math.round((stats.regular/stats.total)*100) : 0}%)</span>
               </h4>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border border-border-default bg-surface-card shadow-sm">
+        <Card className="border border-border bg-card shadow-xs">
           <CardContent className="pt-4 flex items-center gap-3">
-            <div className="p-2.5 bg-red-50 text-red-600 rounded-radius-md">
+            <div className="p-2.5 bg-red-500/10 text-red-600 rounded-lg">
               <AlertTriangle className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs text-text-muted font-medium">Sanções ou Irregularidades</p>
+              <p className="text-xs text-muted-foreground font-medium">Sanções ou Irregularidades</p>
               <h4 className="text-2xl font-bold text-foreground">
-                {stats.irregular} <span className="text-xs font-normal text-text-muted">({stats.total > 0 ? Math.round((stats.irregular/stats.total)*100) : 0}%)</span>
+                {stats.irregular} <span className="text-xs font-normal text-muted-foreground">({stats.total > 0 ? Math.round((stats.irregular/stats.total)*100) : 0}%)</span>
               </h4>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border border-border-default bg-surface-card shadow-sm">
+        <Card className="border border-border bg-card shadow-xs">
           <CardHeader className="p-3 pb-0">
-            <CardTitle className="text-xs font-medium text-text-muted flex items-center gap-1.5">
-              <Globe2 className="h-3.5 w-3.5 text-sebrae-blue" />
+            <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+              <Globe2 className="h-3.5 w-3.5 text-primary" />
               Distribuição Geográfica (Mapa)
             </CardTitle>
           </CardHeader>
           <CardContent className="p-3 pt-1 flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
             {Object.keys(stats.ufCounts).length === 0 ? (
-              <p className="text-[10px] text-text-muted">Sem dados geográficos cadastrados.</p>
+              <p className="text-[10px] text-muted-foreground">Sem dados geográficos cadastrados.</p>
             ) : (
               Object.entries(stats.ufCounts)
                 .sort((a, b) => b[1] - a[1])
                 .map(([state, count]) => (
                   <span
                     key={state}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-800"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-muted text-foreground"
                   >
-                    {state}: <span className="font-bold text-sebrae-blue">{count}</span>
+                    {state}: <span className="font-bold text-primary">{count}</span>
                   </span>
                 ))
             )}
@@ -404,15 +404,15 @@ export default function CadastroFornecedoresPage() {
                       </TableCell>
                       <TableCell className="py-2.5 text-xs text-foreground">
                         {s.city || s.uf ? (
-                          <div className="flex items-center gap-1 text-text-muted text-xs">
-                            <MapPin className="h-3 w-3 text-sebrae-blue shrink-0" />
+                          <div className="flex items-center gap-1 text-muted-foreground text-xs">
+                            <MapPin className="h-3 w-3 text-primary shrink-0" />
                             <span>
                               {s.city ? s.city : '—'}
                               {s.uf ? ` - ${s.uf.toUpperCase()}` : ''}
                             </span>
                           </div>
                         ) : (
-                          <span className="text-text-muted">—</span>
+                          <span className="text-muted-foreground">—</span>
                         )}
                       </TableCell>
                       <TableCell className="py-2.5">
@@ -643,8 +643,8 @@ export default function CadastroFornecedoresPage() {
       <Dialog open={isCertModalOpen} onOpenChange={setIsCertModalOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-sebrae-navy">
-              <ShieldAlert className="w-5 h-5 text-sebrae-blue" />
+            <DialogTitle className="flex items-center gap-2 text-foreground">
+              <ShieldAlert className="w-5 h-5 text-primary" />
               Regularidade & Histórico de Certidões
             </DialogTitle>
             <DialogDescription>
