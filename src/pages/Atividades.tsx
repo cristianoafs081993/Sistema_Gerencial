@@ -4,11 +4,9 @@ import { Filter, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { HeaderActions } from '@/components/HeaderParts';
-import { StatCard } from '@/components/StatCard';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { TablePagination } from '@/components/design-system/TablePagination';
 import { AtividadeDialog } from '@/components/modals/AtividadeDialog';
-import { SuapPlanSyncCard } from '@/components/suap/SuapPlanSyncCard';
 import { ConfirmDialog } from '@/components/modals/ConfirmDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -177,10 +175,6 @@ export default function Atividades() {
     setPage(1);
   }, [searchTerm, filterDimensao, filterComponente, filterOrigem, perPage]);
 
-  const handleSuapSynced = useCallback(() => {
-    void fetchAtividades();
-  }, [fetchAtividades]);
-
   const filteredAtividades = useMemo(
     () =>
       scopedAtividades.filter((atividade) => {
@@ -220,11 +214,6 @@ export default function Atividades() {
       Array.from(
         new Set(scopedAtividades.map((atividade) => atividade.origemRecurso).filter(Boolean)),
       ).sort(),
-    [scopedAtividades],
-  );
-
-  const totalPlanejado = useMemo(
-    () => scopedAtividades.reduce((sum, atividade) => sum + (atividade.valorTotal || 0), 0),
     [scopedAtividades],
   );
 
@@ -321,39 +310,6 @@ export default function Atividades() {
           </div>
         )}
       </HeaderActions>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          title="Total Planejado"
-          value={formatCurrency(totalPlanejado)}
-          icon={Plus}
-          stitchColor="purple"
-          isLoading={isPageLoading}
-        />
-        <StatCard
-          title="Registros"
-          value={scopedAtividades.length}
-          icon={Filter}
-          stitchColor="vibrant-blue"
-          isLoading={isPageLoading}
-        />
-        <StatCard
-          title="Dimensoes"
-          value={new Set(scopedAtividades.map((atividade) => atividade.dimensao)).size}
-          icon={Search}
-          stitchColor="amber"
-          isLoading={isPageLoading}
-        />
-        <StatCard
-          title="Componentes"
-          value={componentesUnicos.length}
-          icon={Filter}
-          stitchColor="emerald-green"
-          isLoading={isPageLoading}
-        />
-      </div>
-
-      {resolvedScope === 'campus' ? <SuapPlanSyncCard onSynced={handleSuapSynced} /> : null}
 
       <FilterPanel className="shadow-sm">
         <CardContent className="p-0">

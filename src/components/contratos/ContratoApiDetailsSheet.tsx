@@ -590,14 +590,15 @@ export function ContratoApiDetailsSheet({
                   />
                 </AccordionTrigger>
                 <AccordionContent className="pb-4 pt-0">
-                  <Tabs defaultValue="item">
+                  <Tabs defaultValue="fatura">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <p className="text-xs font-semibold text-muted-foreground">Agrupar faturas por</p>
                       <TabsList aria-label="Agrupar faturas por">
-                        <TabsTrigger value="item">Item</TabsTrigger>
                         <TabsTrigger value="fatura">Fatura</TabsTrigger>
+                        <TabsTrigger value="item">Item</TabsTrigger>
                       </TabsList>
                     </div>
+
 
 
                     <TabsContent value="item" className="space-y-4">
@@ -680,6 +681,8 @@ export function ContratoApiDetailsSheet({
                                 Sem item vinculado na API.
                               </p>
                             )}
+
+
                           </div>
                         );
                       })}

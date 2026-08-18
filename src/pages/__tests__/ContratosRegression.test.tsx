@@ -547,7 +547,7 @@ describe('Contratos regressions', () => {
 
     expect(screen.getByText(/Assinatura - 00158\/2021/i)).toBeInTheDocument();
     expect(screen.getAllByText('PRESTACAO DE SERVICOS DE APOIO ADMINISTRATIVO').length).toBeGreaterThan(0);
-    expect(screen.getByText('Sem item vinculado')).toBeInTheDocument();
+    expect(screen.getByText(/Sem item vinculado/i)).toBeInTheDocument();
     expect(screen.getByText('48162')).toBeInTheDocument();
   });
   it('permite favoritar contrato sincronizado sem registro local', async () => {

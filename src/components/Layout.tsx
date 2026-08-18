@@ -45,6 +45,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { SuapSyncPanel } from '@/components/suap/SuapSyncPanel';
 import { SuapThemeSwitcher } from '@/components/suap/SuapThemeSwitcher';
 import { CommandPalette } from '@/components/CommandPalette';
+import { NotificationCenter } from '@/components/notifications/NotificationCenter';
 import { LogoIcon } from './Logo';
 
 interface LayoutProps {
@@ -341,39 +342,36 @@ export function Layout({ children }: LayoutProps) {
         >
           {/* Brand Header */}
           <div className={cn(
-            'border-b border-border flex flex-col transition-all duration-200 relative bg-muted/30',
-            isSidebarCollapsed ? 'p-3 items-center' : 'p-5 gap-1.5'
+            'h-14 border-b border-border flex items-center transition-all duration-200 relative bg-muted/30',
+            isSidebarCollapsed ? 'px-3 justify-center' : 'px-4 justify-between'
           )}>
+            <Link
+              to="/"
+              className={cn('flex items-center no-underline gap-3 min-w-0', isSidebarCollapsed && 'justify-center')}
+              onClick={() => setSidebarOpen(false)}
+            >
+              <LogoIcon size={isSidebarCollapsed ? 28 : 32} />
+              {!isSidebarCollapsed && (
+                <div className="min-w-0 flex-1">
+                  <h1 className="font-bold text-base tracking-tight leading-none text-foreground flex items-center gap-1.5 m-0">
+                    SIAGES <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full font-bold">Beta</span>
+                  </h1>
+                  <p className="text-[10px] text-muted-foreground tracking-wider m-0 mt-0.5 truncate">Administração e Gestão Estratégica</p>
+                </div>
+              )}
+            </Link>
+
             {/* Mobile Close Button */}
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="absolute top-3 right-3 h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground lg:hidden"
+              className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground lg:hidden shrink-0"
               onClick={() => setSidebarOpen(false)}
               aria-label="Fechar menu"
             >
               <X className="h-4 w-4" />
             </Button>
-
-            <Link to="/" className={cn('flex items-center no-underline gap-3', isSidebarCollapsed && 'justify-center')} onClick={() => setSidebarOpen(false)}>
-              <LogoIcon size={isSidebarCollapsed ? 28 : 32} />
-              {!isSidebarCollapsed && (
-                <div className="min-w-0 flex-1">
-                  <h1 className="font-bold text-lg tracking-tight leading-none text-foreground flex items-center gap-1.5 m-0">
-                    SIAGES <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full font-bold">Beta</span>
-                  </h1>
-                  <p className="text-[10px] text-muted-foreground tracking-wider m-0 mt-0.5 truncate">Administração & Gestão</p>
-                </div>
-              )}
-            </Link>
-
-            {!isSidebarCollapsed && (
-              <div className="mt-2.5 py-1 px-2.5 bg-card rounded-md border border-border text-[11px] text-foreground flex items-center gap-1.5 shadow-xs">
-                <span className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0"></span>
-                <span className="min-w-0 truncate font-medium" title={orgLabel}>{orgLabel}</span>
-              </div>
-            )}
           </div>
 
           {/* Navigation Section */}
@@ -661,16 +659,13 @@ export function Layout({ children }: LayoutProps) {
               {/* SUAP Theme Switcher */}
               <SuapThemeSwitcher />
 
-              {/* Notifications button */}
-              <button 
-                type="button" 
-                className="p-1.5 hover:bg-muted rounded-full text-muted-foreground hover:text-foreground transition-colors relative"
-                title="Notificações"
-                onClick={() => toast.info('Central de Notificações ativa.')}
-              >
-                <Bell className="w-4 h-4 md:w-4.5 md:h-4.5" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full border border-card" />
-              </button>
+              {/* Notification Center */}
+              <NotificationCenter
+                empenhos={dataContext?.empenhos}
+                descentralizacoes={dataContext?.descentralizacoes}
+                atividades={dataContext?.atividades}
+                onSaveEmpenho={dataContext?.updateEmpenho}
+              />
 
               {/* User settings */}
               {session && (
@@ -694,9 +689,15 @@ export function Layout({ children }: LayoutProps) {
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-64">
-                    <DropdownMenuLabel className="space-y-0.5">
-                      <p className="text-sm font-semibold">{userEmail ? userEmail.split('@')[0] : 'Usuário'}</p>
-                      <p className="truncate text-xs font-normal text-muted-foreground">{userEmail || ''}</p>
+                    <DropdownMenuLabel className="space-y-2">
+                      <div>
+                        <p className="text-sm font-semibold leading-tight">{userEmail ? userEmail.split('@')[0] : 'Usuário'}</p>
+                        <p className="truncate text-xs font-normal text-muted-foreground">{userEmail || ''}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 rounded-md border border-border/80 bg-muted/50 px-2 py-1 text-[11px] font-medium text-foreground">
+                        <span className="h-2 w-2 shrink-0 rounded-full bg-primary animate-pulse" />
+                        <span className="min-w-0 truncate" title={orgLabel}>{orgLabel}</span>
+                      </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onSelect={() => setIsCommandPaletteOpen(true)} className="gap-2">

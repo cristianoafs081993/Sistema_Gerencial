@@ -16,9 +16,16 @@ Container padrão para seções com título, descrição, ações, rodapé opcio
 
 Arquivo: `src/components/design-system/FilterPanel.tsx`
 
-Area padronizada de filtros. Deve ser usada antes de tabelas e consultas operacionais.
+Area padronizada de filtros. Deve ser usada antes de tabelas e consultas operacionais. Suporta slot de rodapé opcional (`footer`).
+
+### `ActiveFilterChips`
+
+Arquivo: `src/components/design-system/ActiveFilterChips.tsx`
+
+Barra institucional de chips e tags para filtros ativos (Eixo 04). Exibe badges individuais com remoção (`X`), botão "Limpar filtros" e contador comparativo de registros filtrados (`totalCount` / `filteredCount`).
 
 ### `DataTablePanel`
+
 
 Arquivo: `src/components/design-system/DataTablePanel.tsx`
 
@@ -76,6 +83,7 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 - `CommandPalette`: central de comandos e busca instantânea acionada por `Ctrl+K` ou `Cmd+K` e pelo cabeçalho global. Suporta busca direta por entidades com preview de saldos: pesquisa de Empenhos por número (ex: `2026NE...`), credor, processo ou PI com exibição de saldo disponível em tempo real e abertura imediata do `EmpenhoDialog`; pesquisa de Contratos por número, fornecedor ou objeto com abertura imediata do modal centralizado `ContratoApiDetailsSheet`; atalhos por prefixo (`ne `, `empenho `, `contrato `, `tela `, `acao `) e chips de escopo; atalhos para todos os módulos permitidos e ações rápidas (Nova Requisição, Pesquisa de Preços, Sincronizar SUAP).
 - `ContratoApiDetailsSheet`: modal centralizado (`Dialog`) de alta performance e acessibilidade para exibição detalhada de contratos, contendo métricas gerais de valor acumulado e executado, vigência, objeto, unidade de origem, histórico de termos aditivos, detalhamento por item/fatura com agrupamento em abas e faturas vinculadas.
 - `Layout`: shell global com sidebar responsiva com suporte a modo expandido (`w-72`) e modo compacto (*Rail Mode* `w-18`) com persistência em `localStorage`, tooltips flutuantes nos ícones, campo de busca com atalho visual `Ctrl K`, seletor de temas do SUAP (`SuapThemeSwitcher`) e drawer mobile.
+- `NotificationCenter`: central de notificações ativa ancorada no cabeçalho global (`Layout`). Exibe menu suspenso (`Popover`) com indicador visual de novidades (ponto verde animado e badges), feed unificado com os **últimos 20 eventos orçamentários** (empenhos emitidos e descentralizações de crédito consolidados cronologicamente na mesma lista), busca rápida interna, status de liquidação/pagamento, valores monetários formatados, inspeção direta de empenhos via `EmpenhoDialog`, ação de marcar todas como lidas e atalhos rápidos de navegação.
 
 - `AIAssistantWidget`: widget flutuante global de chat com IA para consultas gerenciais em linguagem natural sobre contratos, empenhos, orçamento, energia e conciliação; inclui alternador de tamanho (expandir/recolher), sugestões dinâmicas de perguntas, fontes consultadas, histórico persistido localmente por usuário autenticado e suporte completo a markdown.
 - `SuapeProcessToolkit` (extensao 1.9): painel lateral prefixado por `suape-`, inserido no topo do `<aside class="right">` da página de processos do SUAP, exibindo 4 abas no modo lateral (Resumo, Financeiro, IA e Configurações) e habilitando a 5ª aba (Atalhos) exclusivamente na visualização maximizada (`data-maximized="true"`). O cabeçalho possui botões de Minimizar (`−`/`⌄`) e Maximizar (`⛶`/`🗗`); a troca de tema permanece exclusiva na aba Configurações. Utiliza os tokens e paleta do Design System do SUAP (verde IFRN e superfícies neutras no modo claro/escuro) com distribuição limpa e sem sobreposição de texto.
@@ -97,6 +105,8 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 - Secao: `SectionPanel`.
 - Grafico: `ChartPanel`.
 - KPI: `StatCard` com `tone` ou `stitchColor` legado.
+
+
 
 - Almoxarifado: página operacional que combina HeaderActions, StatCard, FilterPanel, DataTablePanel, Tabs e Dialog para catálogo, saldos e movimentos, com estados explícitos de estoque crítico.
 O acordeao Resumo financeiro por dimensao segue a estrutura nativa do SUAP e exibe os totais das quatro colunas financeiras agrupados por dimensao.

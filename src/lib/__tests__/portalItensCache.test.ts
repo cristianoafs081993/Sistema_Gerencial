@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
-
 import {
+  DEFAULT_UASG,
+  extractUasgFromDescricao,
+  extractUasgFromProcesso,
   getPortalEmpenhoAvailableBalance,
   matchesPortalEmpenhoCacheStage,
 } from '../../../supabase/functions/_shared/portal_itens_cache';
@@ -28,4 +29,24 @@ describe('portal itens cache discovery helpers', () => {
     expect(matchesPortalEmpenhoCacheStage({ tipo: null }, 'exercicio')).toBe(true);
     expect(getPortalEmpenhoAvailableBalance({ tipo: 'exercicio', valor: 100, valor_pago_oficial: 100 })).toBe(0);
   });
+
+  it('extrai UASG a partir do prefixo do processo institucional', () => {
+    expect(DEFAULT_UASG).toBe('158366');
+    expect(extractUasgFromProcesso('23035001276.2026-51')).toBe('158366');
+    expect(extractUasgFromProcesso('23035.001276.2026-51')).toBe('158366');
+    expect(extractUasgFromProcesso('23421.000123.2026-00')).toBe('158155');
+    expect(extractUasgFromProcesso('23134.009999.2025-11')).toBe('158369');
+    expect(extractUasgFromProcesso('99999.000000.2026-00')).toBeNull();
+    expect(extractUasgFromProcesso('')).toBeNull();
+    expect(extractUasgFromProcesso(null)).toBeNull();
+  });
+
+  it('extrai UASG a partir da descricao do empenho ou informacao complementar', () => {
+    expect(extractUasgFromDescricao('EMPENHO PARA ATENDER DEMANDA DA UASG: 158366 DO CAMPUS')).toBe('158366');
+    expect(extractUasgFromDescricao('CONFORME UG 158155')).toBe('158155');
+    expect(extractUasgFromDescricao('UASG MINUTA 158369')).toBe('158369');
+    expect(extractUasgFromDescricao('SEM INFORMACAO DE UNIDADE')).toBeNull();
+    expect(extractUasgFromDescricao(null)).toBeNull();
+  });
 });
+

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Suape - Canivete Suico do IFRN",
-  "version": "1.9.22",
+  "version": "1.9.23",
   "description": "Resumo de processos, dados financeiros, atalhos, pesquisa Ctrl+K e documentos com IA no SUAP e no Comprasnet.",
   "permissions": [
     "activeTab",

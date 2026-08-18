@@ -25,7 +25,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
+import { ActiveFilterChips, type ActiveFilterItem } from '@/components/design-system/ActiveFilterChips';
 import { useAuth } from '@/contexts/AuthContext';
+
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 import { descentralizacoesContaSaldosService } from '@/services/descentralizacoesContaSaldos';
@@ -198,6 +200,46 @@ export default function Descentralizacoes() {
             filterOrigem,
         });
 
+    const handleClearAllFilters = () => {
+        setSearchTerm('');
+        setFilterDimensao('all');
+        setFilterOrigem('all');
+    };
+
+    const activeFilterList = useMemo<ActiveFilterItem[]>(() => {
+        const list: ActiveFilterItem[] = [];
+
+        if (searchTerm.trim()) {
+            list.push({
+                id: 'search',
+                label: 'Busca',
+                value: `"${searchTerm.trim()}"`,
+                onRemove: () => setSearchTerm(''),
+            });
+        }
+
+        if (filterDimensao !== 'all') {
+            const dimName = DIMENSOES.find((d) => d.codigo === filterDimensao)?.nome || filterDimensao;
+            list.push({
+                id: 'dimensao',
+                label: 'Dimensão',
+                value: dimName,
+                onRemove: () => setFilterDimensao('all'),
+            });
+        }
+
+        if (filterOrigem !== 'all') {
+            list.push({
+                id: 'origem',
+                label: 'Origem',
+                value: filterOrigem,
+                onRemove: () => setFilterOrigem('all'),
+            });
+        }
+
+        return list;
+    }, [searchTerm, filterDimensao, filterOrigem]);
+
     return (
         <div className="space-y-6 pb-10">
             {/* Filters */}
@@ -270,8 +312,17 @@ export default function Descentralizacoes() {
                             </div>
                         </div>
                     )}
+
+                    {/* Chips de Filtros Ativos (Eixo 04) */}
+                    <ActiveFilterChips
+                        filters={activeFilterList}
+                        onClearAll={activeFilterList.length > 0 ? handleClearAllFilters : undefined}
+                        filteredCount={sortedDescentralizacoes.length}
+                        totalCount={descentralizacoes.length}
+                    />
                 </CardContent>
             </FilterPanel>
+
 
             {/* Table */}
             <Card className="card-system overflow-hidden border-none shadow-none mt-6">

@@ -124,7 +124,7 @@ describe('Layout', () => {
     expect(screen.getByText('assistente-gerencial-widget')).toBeInTheDocument();
   });
 
-  it('mostra o orgao do usuario autenticado na sidebar', () => {
+  it('mostra o orgao do usuario autenticado no menu do perfil', () => {
     mockedUseAuth.mockReturnValue({
       ...mockedUseAuth(),
       userOrg: {
@@ -142,6 +142,8 @@ describe('Layout', () => {
         </Layout>
       </MemoryRouter>,
     );
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Abrir configurações do usuário' }), { key: 'ArrowDown' });
 
     expect(screen.getByText('IFRN Reitoria')).toBeInTheDocument();
     expect(screen.queryByText('IFRN Campus Currais Novos')).not.toBeInTheDocument();
@@ -359,5 +361,23 @@ describe('Layout', () => {
 
     expect(screen.getByRole('button', { name: /expandir barra lateral/i })).toBeInTheDocument();
   });
+
+  it('exibe o botão da central de notificações no cabeçalho e abre o popover', () => {
+    render(
+      <MemoryRouter>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    const notifButton = screen.getByRole('button', { name: /abrir central de notificações/i });
+    expect(notifButton).toBeInTheDocument();
+
+    fireEvent.click(notifButton);
+    expect(screen.getByText('Notificações')).toBeInTheDocument();
+    expect(screen.getByText(/eventos orçamentários/i)).toBeInTheDocument();
+  });
 });
+
 

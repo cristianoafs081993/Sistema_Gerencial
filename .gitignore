@@ -55,5 +55,7 @@ tmp/
 output/
 extracted_suap_cookies.json
 download_obs.html
+supabase/.temp/
+
 
 

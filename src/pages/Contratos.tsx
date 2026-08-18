@@ -12,7 +12,9 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { HeaderActions } from '@/components/HeaderParts';
 import { ContratosSyncDialog } from '@/components/modals/ContratosSyncDialog';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
+import { ActiveFilterChips, type ActiveFilterItem } from '@/components/design-system/ActiveFilterChips';
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { getRapBaseVigente, getRapReferenceYear, getRapSaldoAtual } from '@/utils/rapMetrics';
@@ -523,6 +525,42 @@ export default function Contratos() {
     return `Ultima sincronizacao: ${dateLabel} (${statusLabel})`;
   }, [lastApiSyncRun]);
 
+  const handleClearAllFilters = () => {
+    setSearchTerm('');
+    setViewFilter('all');
+  };
+
+  const activeFilterList = useMemo<ActiveFilterItem[]>(() => {
+    const list: ActiveFilterItem[] = [];
+
+    if (searchTerm.trim()) {
+      list.push({
+        id: 'search',
+        label: 'Busca',
+        value: `"${searchTerm.trim()}"`,
+        onRemove: () => setSearchTerm(''),
+      });
+    }
+
+    if (viewFilter === 'favorites') {
+      list.push({
+        id: 'view',
+        label: 'Visualização',
+        value: 'Apenas Favoritos',
+        onRemove: () => setViewFilter('all'),
+      });
+    } else if (viewFilter === 'expired120') {
+      list.push({
+        id: 'view',
+        label: 'Visualização',
+        value: 'Vencidos em 120 dias',
+        onRemove: () => setViewFilter('all'),
+      });
+    }
+
+    return list;
+  }, [searchTerm, viewFilter]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -576,7 +614,17 @@ export default function Contratos() {
             </Button>
           </div>
         </div>
+
+        {/* Chips de Filtros Ativos (Eixo 04) */}
+        <ActiveFilterChips
+          filters={activeFilterList}
+          onClearAll={activeFilterList.length > 0 ? handleClearAllFilters : undefined}
+          filteredCount={filteredContratos.length}
+          totalCount={visibleContratos.length}
+        />
       </FilterPanel>
+
+
 
       <DataTablePanel className="mt-6">
         <Table>

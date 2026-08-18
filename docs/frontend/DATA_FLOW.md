@@ -45,7 +45,7 @@ Usuarios autenticados podem trocar a propria senha pelo botao de chave no cabeca
 
 A tela `/controle-orgaos` usa a mesma Edge Function `admin-users` para cadastrar orgaos, habilitar modulos por orgao e vincular usuarios em `org_users`.
 
-O `AuthContext` carrega o orgao primario do usuario autenticado via `fetchUserAccess`. O chip institucional da sidebar em `Layout.tsx` exibe `userOrg.name`, inclusive para superadministrador; quando nao houver vinculo cadastrado, exibe estado neutro de orgao nao vinculado em vez de assumir um campus fixo.
+O `AuthContext` carrega o orgao primario do usuario autenticado via `fetchUserAccess`. O chip institucional no menu de perfil do usuario em `Layout.tsx` exibe `userOrg.name`, inclusive para superadministrador; quando nao houver vinculo cadastrado, exibe estado neutro de orgao nao vinculado em vez de assumir um campus fixo. O topo da sidebar mantem altura padronizada (`h-14`) alinhada a linha horizontal do header principal.
 
 Permissoes de modulo podem incluir subpaginas funcionais derivadas pelo catalogo `appScreens`. Autorizar `pesquisa-precos` tambem libera `cadastro-fornecedores` e `pesquisa-precos-ead`; essa expansao e aplicada tanto nas permissoes de grupo quanto nas permissoes do orgao, para que paginas filhas operacionais nao exijam marcacao separada no controle de orgaos.
 
@@ -371,7 +371,14 @@ A página carrega contexto e workspace em consultas separadas; os dados independ
 - A exclusao de requisicoes valida o numero de linhas afetadas; quando a RLS impede a operacao, a interface exibe o motivo em vez de confirmar uma exclusao inexistente.
 
 - O fluxo de itens da requisicao nao aceita um status de cache not_found isolado como vazio definitivo: revalida pela Edge Function e usa o Portal diretamente antes de habilitar o cadastro manual.
-O mesmo fluxo injeta abaixo do acordeao Legenda o acordeao nativo Resumo financeiro por dimensao, calculado pelas quatro colunas financeiras das tabelas originais.
+
+### Subitens do Empenho (Portal da Transparência)
+
+`EmpenhoDialog` / `RequisicaoCompra` -> `transparenciaService.getItensEmpenhoPortal` -> `portal_transparencia_empenho_itens_cache` / Edge Function `refresh-portal-transparencia-itens-cache` -> `/api-de-dados/despesas/itens-de-empenho`.
+
+- A resolução da UASG de cada empenho prioriza a tabela local `empenhos` pelo prefixo institucional do processo (ex: `23035` -> `158366`, `23421` -> `158155`) e descrição, antes de consultar tabelas de contratos complementares.
+- Isso impede contaminação de cache com empenhos de outros campi que compartilham o mesmo número serial (ex: `2026NE000080`).
+- Se o empenho do campus não tiver subitens no Portal da Transparência, o estado é tratado limpa e corretamente como vazio sem carregar itens de outras UGs.
 
 ## Revisão de TR e ETP nos cards do SUAP
 
@@ -383,7 +390,7 @@ A rota estabelece uma sessão efêmera, chama `analisar-documento-licitacao` e e
 
 ## Sincronizacao do Plano SUAP no Campus
 
-`/planejamento/campus` carrega os dados locais imediatamente e monta `SuapPlanSyncCard`. Ao entrar, o card chama `sync-suap-plan` em segundo plano; ao concluir, a tabela e recarregada. A primeira captura e uma previa com contagem de novas, atualizadas e arquivadas; a aplicacao ocorre apos a confirmacao do espelho inicial.
+A central de importação de dados (`/importacao-dados`), no Módulo Orçamentário, monta `SuapPlanSyncCard`. Ao entrar, o card chama `sync-suap-plan` em segundo plano; ao concluir, os dados são recarregados. A primeira captura é uma prévia com contagem de novas, atualizadas e arquivadas; a aplicação ocorre após a confirmação do espelho inicial. Na tela de planejamento de atividades (`/planejamento/campus`), o card não é exibido diretamente, mantendo a visualização da tabela limpa.
 
 O parser le todas as tabelas de atividades do Plano 8, inclusive linhas com `hidden`, usando o ID do link `listar_requisicoes_despesa/8/<id>/` como chave estavel. A extensao continua opcional para o fluxo automatico do Campus.
 

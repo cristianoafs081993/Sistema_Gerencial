@@ -10,6 +10,7 @@ interface FilterPanelProps {
   className?: string;
   contentClassName?: string;
   actions?: ReactNode;
+  footer?: ReactNode;
 }
 
 export function FilterPanel({
@@ -18,6 +19,7 @@ export function FilterPanel({
   className,
   contentClassName,
   actions,
+  footer,
 }: FilterPanelProps) {
   const isDefaultTitle = title.trim().toLowerCase() === 'filtros';
 
@@ -32,7 +34,11 @@ export function FilterPanel({
           {actions ? <div className="shrink-0">{actions}</div> : null}
         </div>
       </CardHeader>
-      <CardContent className={cn('filter-content', contentClassName)}>{children}</CardContent>
+      <CardContent className={cn('filter-content', contentClassName)}>
+        {children}
+        {footer ? <div className="mt-3 pt-3 border-t border-border/50">{footer}</div> : null}
+      </CardContent>
     </Card>
   );
 }
+

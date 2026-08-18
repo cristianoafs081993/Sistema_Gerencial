@@ -28,7 +28,9 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { EmpenhoDialog } from '@/components/modals/EmpenhoDialog';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
+import { ActiveFilterChips, type ActiveFilterItem } from '@/components/design-system/ActiveFilterChips';
 import { TablePagination } from '@/components/design-system/TablePagination';
+
 import { formatCurrency, formatarDocumento } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getRapReferenceYear, isRapReinscrito } from '@/utils/rapMetrics';
@@ -118,12 +120,118 @@ export default function Empenhos() {
     setIsDialogOpen(false);
   };
 
+  const handleClearAllFilters = () => {
+
+    setSearchTerm('');
+    setFilterStatus('all');
+    setFilterDimensao('all');
+    setFilterComponente('all');
+    setFilterOrigem('all');
+    setFilterPlanoInterno('all');
+    setDataInicio('');
+    setDataFim('');
+    setFavoritesFilter('all');
+  };
+
+  const activeFilterList = useMemo<ActiveFilterItem[]>(() => {
+    const list: ActiveFilterItem[] = [];
+
+    if (searchTerm.trim()) {
+      list.push({
+        id: 'search',
+        label: 'Busca',
+        value: `"${searchTerm.trim()}"`,
+        onRemove: () => setSearchTerm(''),
+      });
+    }
+
+    if (filterDimensao !== 'all') {
+      const dimName = DIMENSOES.find((d) => d.codigo === filterDimensao)?.nome || filterDimensao;
+      list.push({
+        id: 'dimensao',
+        label: 'Dimensão',
+        value: dimName,
+        onRemove: () => setFilterDimensao('all'),
+      });
+    }
+
+    if (filterStatus !== 'all') {
+      list.push({
+        id: 'status',
+        label: 'Status',
+        value: statusLabels[filterStatus] || filterStatus,
+        onRemove: () => setFilterStatus('all'),
+      });
+    }
+
+    if (favoritesFilter === 'favorites') {
+      list.push({
+        id: 'favorites',
+        label: 'Filtro',
+        value: 'Apenas Favoritos',
+        onRemove: () => setFavoritesFilter('all'),
+      });
+    }
+
+    if (filterComponente !== 'all') {
+      list.push({
+        id: 'componente',
+        label: 'Componente',
+        value: filterComponente,
+        onRemove: () => setFilterComponente('all'),
+      });
+    }
+
+    if (filterOrigem !== 'all') {
+      list.push({
+        id: 'origem',
+        label: 'Origem',
+        value: filterOrigem,
+        onRemove: () => setFilterOrigem('all'),
+      });
+    }
+
+    if (filterPlanoInterno !== 'all') {
+      list.push({
+        id: 'pi',
+        label: 'Plano Interno',
+        value: filterPlanoInterno,
+        onRemove: () => setFilterPlanoInterno('all'),
+      });
+    }
+
+    if (dataInicio || dataFim) {
+      list.push({
+        id: 'periodo',
+        label: 'Período',
+        value: `${dataInicio || 'Início'} até ${dataFim || 'Fim'}`,
+        onRemove: () => {
+          setDataInicio('');
+          setDataFim('');
+        },
+      });
+    }
+
+    return list;
+  }, [
+    searchTerm,
+    filterDimensao,
+    filterStatus,
+    favoritesFilter,
+    filterComponente,
+    filterOrigem,
+    filterPlanoInterno,
+    dataInicio,
+    dataFim,
+  ]);
+
   return (
     <div className="space-y-space-6 pb-space-10">
       <FilterPanel className="shadow-sm">
         <CardContent className="p-0">
           {/* Linha 1: Busca e Filtros Básicos */}
           <div className="flex flex-col sm:flex-row gap-4">
+
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -281,8 +389,18 @@ export default function Empenhos() {
               </div>
             </div>
           )}
+
+          {/* Chips de Filtros Ativos (Eixo 04) */}
+          <ActiveFilterChips
+            filters={activeFilterList}
+            onClearAll={activeFilterList.length > 0 ? handleClearAllFilters : undefined}
+            filteredCount={filteredEmpenhos.length}
+            totalCount={empenhos.length}
+          />
         </CardContent>
       </FilterPanel>
+
+
       {/* Container de Card Tab Integrado */}
       <div className="relative mt-6">
         {/* Tabs de Navegação - Layout Folder Tab */}

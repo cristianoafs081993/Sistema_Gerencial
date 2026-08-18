@@ -185,6 +185,11 @@
   color: #1d4ed8 !important;
 }
 
+.suape-cp-chip-count.count-teal {
+  background: rgba(10, 127, 112, 0.15) !important;
+  color: #0A7F70 !important;
+}
+
 /* Results List */
 .suape-cp-list {
   flex: 1 !important;
@@ -226,6 +231,10 @@
   text-transform: uppercase !important;
   letter-spacing: 0.05em !important;
   color: #64748b !important;
+}
+
+.suape-cp-group-title.process-group {
+  color: #0A7F70 !important;
 }
 
 .suape-cp-group-title.empenho-group {
@@ -429,6 +438,18 @@
   background: #ffe4e6 !important;
   color: #9f1239 !important;
   border-color: #fecdd3 !important;
+}
+
+.suape-cp-kbd-shortcut {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #0A7F70 !important;
+  background: rgba(10, 127, 112, 0.1) !important;
+  border: 1px solid rgba(10, 127, 112, 0.25) !important;
+  padding: 1px 6px !important;
+  border-radius: 4px !important;
+  text-transform: lowercase !important;
+  margin-left: 6px !important;
 }
 
 /* Meta column on right */

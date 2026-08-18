@@ -621,7 +621,7 @@ Uso:
 - em modo `refreshLinkedRequisicaoEmpenhos`, descobre empenhos vinculados diretamente a terceirizados e empenhos de requisicoes recentes em `draft`/`review`; para requisicoes usa `requisicao_compra_empenhos` e mantem fallback pelos campos legados `requisicoes_compra.empenho_id/empenho_numero`, pre-aquecendo o cache para `/requisicao-compra`
 - em modo `refreshPositiveEmpenhos`, percorre em paginas todas as NEs com saldo positivo em `empenhos`; `empenhoTipo = rap` processa RAP e `empenhoTipo = exercicio` processa empenhos do exercicio, usando a mesma regra de saldo da RPC `fn_empenho_saldo_disponivel`
 - em modo `readCacheOnly` com `returnRows`, devolve as linhas ja materializadas no cache sem consultar novamente o Portal
-- consulta `/api-de-dados/despesas/itens-de-empenho` resolvendo dinamicamente a UASG de emissão do empenho a partir de `contratos_api_empenhos`, tabela `empenhos` ou prefixo de processo (`codigoDocumento = <uasg> + 26435 + numero do empenho`)
+- consulta `/api-de-dados/despesas/itens-de-empenho` resolvendo dinamicamente a UASG de emissão do empenho a partir da tabela local `empenhos` (prefixo institucional do processo e descrição), com fallback complementar em `contratos_api_empenhos` e valor padrão `158366` (`codigoDocumento = <uasg> + 26435 + numero do empenho`), garantindo que empenhos do campus não sejam contaminados com subitens de outros campi que compartilham o mesmo número serial de NE
 - salva dados em `portal_transparencia_empenho_itens_cache_status` e `portal_transparencia_empenho_itens_cache`
 
 Dependencias:

@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.22');
+    expect(manifest.version).toBe('1.9.23');
     expect(manifest.host_permissions).toContain('<all_urls>');
     expect(manifest.permissions).toEqual(expect.arrayContaining(['activeTab', 'scripting', 'storage', 'alarms']));
     expect(manifest.background).toEqual({ service_worker: 'background.js' });
@@ -17,6 +17,7 @@ describe('pacote da extensao Suape 1.9', () => {
     const process = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('process-document.js'));
     const plan = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('plan-summary.js'));
     const comprasnet = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('comprasnet-etp.js'));
+    const commandPalette = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('command-palette.js'));
 
     expect(expander).toMatchObject({ matches: ['<all_urls>'], all_frames: true });
     expect(process.matches).toEqual([
@@ -36,6 +37,71 @@ describe('pacote da extensao Suape 1.9', () => {
       js: ['extension-auth-client.js', 'comprasnet-etp.js'],
       run_at: 'document_idle',
     });
+    expect(commandPalette).toMatchObject({
+      matches: ['https://suap.ifrn.edu.br/*'],
+      css: ['command-palette.css'],
+      js: ['extension-auth-client.js', 'command-palette.js'],
+      run_at: 'document_idle',
+    });
+  });
+
+  it('suporta atalhos rapidos de acoes em processos eletronicos no command-palette (Ctrl+K)', () => {
+    const cpScript = fs.readFileSync(extensionFixturePath('command-palette.js'), 'utf8');
+    const cpCss = fs.readFileSync(extensionFixturePath('command-palette.css'), 'utf8');
+
+    expect(cpScript).toContain('getCurrentProcessId');
+    expect(cpScript).toContain('getProcessActions');
+    expect(cpScript).toContain('scoreProcessAction');
+    expect(cpScript).toContain('/processo_eletronico/documento_upload/');
+    expect(cpScript).toContain('/processo_eletronico/processo/encaminhar/');
+    expect(cpScript).toContain('/processo_eletronico/processo/encaminhar_sem_despacho/');
+    expect(cpScript).toContain("'up'");
+    expect(cpScript).toContain("'enc'");
+    expect(cpScript).toContain("'encs'");
+    expect(cpScript).toContain('suape-cp-chip-processo');
+    expect(cpScript).toContain('suape-cp-kbd-shortcut');
+
+    expect(cpCss).toContain('.suape-cp-group-title.process-group');
+    expect(cpCss).toContain('.suape-cp-chip-count.count-teal');
+    expect(cpCss).toContain('.suape-cp-kbd-shortcut');
+  });
+
+  it('suporta pesquisa direta de contratos no SUAP via parâmetro q no command-palette (Ctrl+K)', () => {
+    const cpScript = fs.readFileSync(extensionFixturePath('command-palette.js'), 'utf8');
+
+    expect(cpScript).toContain('getSuapContractSearchUrl');
+    expect(cpScript).toContain('/admin/contratos/contrato/?');
+    expect(cpScript).toContain("baseParams.set('campi', campi)");
+    expect(cpScript).toContain("baseParams.set('q', query.trim())");
+    expect(cpScript).toContain("baseParams.set('tab', 'tab_ativos')");
+    expect(cpScript).toContain('suap_contract_search');
+    expect(cpScript).toContain('isExplicitContractSearch');
+  });
+
+  it('suporta pesquisa direta de processos eletrônicos no SUAP via parâmetro q no command-palette (Ctrl+K)', () => {
+    const cpScript = fs.readFileSync(extensionFixturePath('command-palette.js'), 'utf8');
+
+    expect(cpScript).toContain('getSuapProcessSearchUrl');
+    expect(cpScript).toContain('/admin/processo_eletronico/processo/?');
+    expect(cpScript).toContain("baseParams.set('q', query.trim())");
+    expect(cpScript).toContain('suap_process_search');
+    expect(cpScript).toContain('isExplicitProcessSearch');
+  });
+
+  it('suporta abertura de registro de aluno e busca de documentos no SUAP via command-palette (Ctrl+K)', () => {
+    const cpScript = fs.readFileSync(extensionFixturePath('command-palette.js'), 'utf8');
+
+    expect(cpScript).toContain('getSuapStudentUrl');
+    expect(cpScript).toContain('/edu/aluno/');
+    expect(cpScript).toContain('suap_student_search');
+    expect(cpScript).toContain('isExplicitStudentSearch');
+
+    expect(cpScript).toContain('getSuapDocumentSearchUrl');
+    expect(cpScript).toContain('/admin/documento_eletronico/documentotexto/?');
+    expect(cpScript).toContain("baseParams.set('opcao', '1')");
+    expect(cpScript).toContain("baseParams.set('q', query.trim())");
+    expect(cpScript).toContain('suap_document_search');
+    expect(cpScript).toContain('isExplicitDocumentSearch');
   });
 
   it('preserva autenticacao e extracao no popup sem expor a origem configuravel', () => {

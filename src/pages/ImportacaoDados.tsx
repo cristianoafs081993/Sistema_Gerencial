@@ -26,6 +26,7 @@ import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { SectionPanel } from '@/components/design-system/SectionPanel';
 import { ContratosSyncDialog } from '@/components/modals/ContratosSyncDialog';
 import { PFImportDialog } from '@/components/modals/PFImportDialog';
+import { SuapPlanSyncCard } from '@/components/suap/SuapPlanSyncCard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -739,7 +740,10 @@ export default function ImportacaoDados() {
         title="Módulo Orçamentário"
         description="Bases de descentralizações de crédito, crédito disponível, empenhos SIAFI e planejamento orçamentário."
       >
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-4">
+          <SuapPlanSyncCard onSynced={() => void refreshData()} />
+
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {/* Card: Descentralizações */}
           <Card className="flex flex-col justify-between border-border-default shadow-sm transition-all hover:border-primary/40">
             <CardHeader className="space-y-2">
@@ -947,6 +951,7 @@ export default function ImportacaoDados() {
               </Button>
             </CardFooter>
           </Card>
+        </div>
         </div>
       </SectionPanel>
 

@@ -43,6 +43,15 @@
     settings2: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>',
     clock3: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16.5 12"/></svg>',
     folderSync: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v.5"/><path d="M12 10v4h4"/><path d="m12 14 1.535-1.605a5 5 0 0 1 8 1.5"/><path d="M22 22v-4h-4"/><path d="m22 18-1.535 1.605a5 5 0 0 1-8-1.5"/></svg>',
+    upload: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
+    send: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>',
+    fastForward: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 19 22 12 13 5 13 19"/><polygon points="2 19 11 12 2 5 2 19"/></svg>',
+    folder: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>',
+    gitFork: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M18 9v2c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1V9"/><path d="M12 12v3"/></svg>',
+    filePlus: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 12v6"/></svg>',
+    bell: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',
+    graduationCap: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>',
+    user: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
   };
 
   // Screen groups definition (Exact 1:1 match with SIAGES appScreenGroups)
@@ -124,6 +133,130 @@
       color: '#0A7F70',
     },
   ];
+
+  // Process Actions & Shortcuts
+  function getCurrentProcessId() {
+    // 1. Direct match on pathname
+    const directMatch = window.location.pathname.match(
+      /\/(?:processo_eletronico\/(?:processo|visualizar_processo|documento_upload|adicionar_despacho|adicionar_documento_texto|solicitar_ciencia|processo\/(?:encaminhar|encaminhar_sem_despacho))|documento_eletronico\/(?:documento|visualizar_documento))\/(\d+)\/?/
+    );
+    if (directMatch && directMatch[1]) return directMatch[1];
+
+    // 2. Query param
+    const params = new URLSearchParams(window.location.search);
+    const paramId = params.get('processo') || params.get('processo_id') || params.get('suapId') || params.get('id');
+    if (paramId && /^\d+$/.test(paramId)) return paramId;
+
+    // 3. Document links in DOM if on a related process page
+    const processLink = document.querySelector('a[href*="/processo_eletronico/processo/"], a[href*="/processo_eletronico/visualizar_processo/"]');
+    if (processLink) {
+      const linkMatch = processLink.getAttribute('href')?.match(/\/processo_eletronico\/(?:processo|visualizar_processo)\/(\d+)\/?/);
+      if (linkMatch && linkMatch[1]) return linkMatch[1];
+    }
+
+    // 4. Referrer if available
+    if (document.referrer) {
+      const refMatch = document.referrer.match(/\/processo_eletronico\/(?:processo|visualizar_processo)\/(\d+)\/?/);
+      if (refMatch && refMatch[1]) return refMatch[1];
+    }
+
+    return null;
+  }
+
+  function getProcessActions(processId) {
+    if (!processId) return [];
+    return [
+      {
+        id: 'proc-upload',
+        title: 'Fazer Upload de Documento',
+        subtitle: `Anexar arquivo digitalizado ao processo #${processId}`,
+        shortcuts: ['up', 'upload', 'doc', 'upld', 'anexar'],
+        url: `/processo_eletronico/documento_upload/${processId}/`,
+        icon: 'upload',
+        color: '#0A7F70',
+        badge: 'up',
+      },
+      {
+        id: 'proc-encaminhar',
+        title: 'Encaminhar Processo',
+        subtitle: `Tramitar processo #${processId} com despacho`,
+        shortcuts: ['enc', 'encaminhar', 'despacho', 'tramitar'],
+        url: `/processo_eletronico/processo/encaminhar/${processId}/`,
+        icon: 'send',
+        color: '#2563eb',
+        badge: 'enc',
+      },
+      {
+        id: 'proc-encaminhar-sem-despacho',
+        title: 'Encaminhar Sem Despacho',
+        subtitle: `Tramitar processo #${processId} direto sem despacho`,
+        shortcuts: ['encs', 'semdespacho', 'encsem', 'tramitarsem', 'sem'],
+        url: `/processo_eletronico/processo/encaminhar_sem_despacho/${processId}/`,
+        icon: 'fastForward',
+        color: '#d97706',
+        badge: 'encs',
+      },
+      {
+        id: 'proc-capa',
+        title: 'Ver Capa do Processo',
+        subtitle: `Página principal e dados do processo #${processId}`,
+        shortcuts: ['capa', 'proc', 'processo', 'home'],
+        url: `/processo_eletronico/processo/${processId}/`,
+        icon: 'folder',
+        color: '#475569',
+        badge: 'capa',
+      },
+      {
+        id: 'proc-visualizar',
+        title: 'Visualizar Árvore de Documentos',
+        subtitle: `Ver todos os documentos e timeline do processo #${processId}`,
+        shortcuts: ['vis', 'docs', 'arvore', 'timeline'],
+        url: `/processo_eletronico/visualizar_processo/${processId}/`,
+        icon: 'gitFork',
+        color: '#7c3aed',
+        badge: 'vis',
+      },
+      {
+        id: 'proc-despacho',
+        title: 'Adicionar Despacho / Documento',
+        subtitle: `Criar novo documento no processo #${processId}`,
+        shortcuts: ['desp', 'add', 'novo', 'texto'],
+        url: `/processo_eletronico/adicionar_despacho/${processId}/`,
+        icon: 'filePlus',
+        color: '#059669',
+        badge: 'desp',
+      },
+      {
+        id: 'proc-ciencia',
+        title: 'Solicitar Ciência',
+        subtitle: `Notificar interessados sobre o processo #${processId}`,
+        shortcuts: ['cie', 'ciencia', 'notificar'],
+        url: `/processo_eletronico/solicitar_ciencia/${processId}/`,
+        icon: 'bell',
+        color: '#ea580c',
+        badge: 'cie',
+      },
+    ];
+  }
+
+  function scoreProcessAction(act, rawQuery) {
+    if (!rawQuery) return 100;
+    const q = rawQuery.trim().toLowerCase();
+
+    for (const shortcut of act.shortcuts) {
+      const s = shortcut.toLowerCase();
+      if (s === q) return 100000;
+      if (s.startsWith(q)) return 50000;
+    }
+
+    const title = act.title.toLowerCase();
+    const subtitle = act.subtitle.toLowerCase();
+    if (title.startsWith(q)) return 30000;
+    if (title.includes(q)) return 20000;
+    if (subtitle.includes(q)) return 10000;
+
+    return 0;
+  }
 
   // Formatting helpers
   function formatCurrency(value) {
@@ -450,6 +583,11 @@
               ${ICONS.sparkles}
               Ações Rápidas
             </button>
+            <button type="button" class="suape-cp-chip suape-cp-chip-processo" data-scope="processo" id="suape-cp-chip-processo" style="display:none;">
+              ${ICONS.folder}
+              Processo
+              <span class="suape-cp-chip-count count-teal" id="suape-cp-count-processo" style="display:none;">0</span>
+            </button>
           </div>
         </div>
         <div class="suape-cp-list"></div>
@@ -520,6 +658,19 @@
     });
   }
 
+  function updateProcessChip() {
+    const procId = getCurrentProcessId();
+    const chipProcesso = overlayEl?.querySelector('#suape-cp-chip-processo');
+    if (chipProcesso) {
+      chipProcesso.style.display = 'inline-flex';
+      chipProcesso.innerHTML = `
+        ${ICONS.folder}
+        ${procId ? `Processo #${procId}` : 'Processos'}
+        <span class="suape-cp-chip-count count-teal" id="suape-cp-count-processo" style="display:none;">0</span>
+      `;
+    }
+  }
+
   // Key navigation
   function handleKeyNavigation(e) {
     if (e.key === 'ArrowDown') {
@@ -537,7 +688,7 @@
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (currentResults[selectedIndex]) {
-        openResultDetail(currentResults[selectedIndex]);
+        openResultDetail(currentResults[selectedIndex], e);
       }
     } else if (e.key === 'Escape') {
       e.preventDefault();
@@ -557,25 +708,160 @@
     });
   }
 
+  function getSuapContractSearchUrl(query) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const campi = urlParams.get('campi') || '3';
+    const baseParams = new URLSearchParams();
+    baseParams.set('campi', campi);
+    if (query) {
+      baseParams.set('q', query.trim());
+    }
+    baseParams.set('tab', 'tab_ativos');
+    return `/admin/contratos/contrato/?${baseParams.toString()}`;
+  }
+
+  function getSuapProcessSearchUrl(query) {
+    if (!query) return '/admin/processo_eletronico/processo/';
+    const baseParams = new URLSearchParams();
+    baseParams.set('q', query.trim());
+    return `/admin/processo_eletronico/processo/?${baseParams.toString()}`;
+  }
+
+  function getSuapStudentUrl(query) {
+    const q = (query || '').trim();
+    if (/^\d+$/.test(q)) {
+      return `/edu/aluno/${q}/`;
+    }
+    return `/edu/alunos/?q=${encodeURIComponent(q)}`;
+  }
+
+  function getSuapDocumentSearchUrl(query) {
+    if (!query) return '/admin/documento_eletronico/documentotexto/?opcao=1';
+    const baseParams = new URLSearchParams();
+    baseParams.set('opcao', '1');
+    baseParams.set('q', query.trim());
+    return `/admin/documento_eletronico/documentotexto/?${baseParams.toString()}`;
+  }
+
   // Search filter matching SIAGES logic
   function getFilteredResults() {
     const rawVal = (inputEl?.value || '').trim();
     let query = rawVal;
     let scope = activeScope;
+    const currentProcId = getCurrentProcessId();
 
     // Detect prefix
+    let isExplicitContractSearch = false;
+    let isExplicitProcessSearch = false;
+    let isExplicitStudentSearch = false;
+    let isExplicitDocumentSearch = false;
+
     if (query.toLowerCase().startsWith('ne ') || query.toLowerCase().startsWith('empenho ') || query.toLowerCase().startsWith('ne:') || query.toLowerCase().startsWith('empenho:')) {
       query = rawVal.replace(/^(ne|empenho)[:\s]+/i, '').trim();
       scope = 'empenhos';
-    } else if (query.toLowerCase().startsWith('contrato ') || query.toLowerCase().startsWith('contrato:')) {
-      query = rawVal.replace(/^contrato[:\s]+/i, '').trim();
+    } else if (
+      query.toLowerCase().startsWith('contrato ') || query.toLowerCase().startsWith('contratos ') ||
+      query.toLowerCase().startsWith('contrato:') || query.toLowerCase().startsWith('contratos:') ||
+      query.toLowerCase().startsWith('con ') || query.toLowerCase().startsWith('con:') ||
+      query.toLowerCase().startsWith('c ') || query.toLowerCase().startsWith('c:')
+    ) {
+      query = rawVal.replace(/^(contratos|contrato|con|c)[:\s]+/i, '').trim();
       scope = 'contratos';
+      isExplicitContractSearch = true;
+    } else if (
+      query.toLowerCase().startsWith('processos ') || query.toLowerCase().startsWith('processo ') ||
+      query.toLowerCase().startsWith('processos:') || query.toLowerCase().startsWith('processo:') ||
+      query.toLowerCase().startsWith('proc ') || query.toLowerCase().startsWith('proc:') ||
+      query.toLowerCase().startsWith('p ') || query.toLowerCase().startsWith('p:')
+    ) {
+      query = rawVal.replace(/^(processos|processo|proc|p)[:\s]+/i, '').trim();
+      scope = 'processo';
+      isExplicitProcessSearch = true;
+    } else if (
+      query.toLowerCase().startsWith('alunos ') || query.toLowerCase().startsWith('aluno ') ||
+      query.toLowerCase().startsWith('alunos:') || query.toLowerCase().startsWith('aluno:') ||
+      query.toLowerCase().startsWith('alu ') || query.toLowerCase().startsWith('alu:') ||
+      query.toLowerCase().startsWith('matricula ') || query.toLowerCase().startsWith('matricula:') ||
+      query.toLowerCase().startsWith('mat ') || query.toLowerCase().startsWith('mat:') ||
+      query.toLowerCase().startsWith('a ') || query.toLowerCase().startsWith('a:')
+    ) {
+      query = rawVal.replace(/^(alunos|aluno|matricula|alu|mat|a)[:\s]+/i, '').trim();
+      isExplicitStudentSearch = true;
+    } else if (
+      query.toLowerCase().startsWith('documentos ') || query.toLowerCase().startsWith('documento ') ||
+      query.toLowerCase().startsWith('documentos:') || query.toLowerCase().startsWith('documento:') ||
+      query.toLowerCase().startsWith('docto ') || query.toLowerCase().startsWith('docto:') ||
+      query.toLowerCase().startsWith('doc ') || query.toLowerCase().startsWith('doc:') ||
+      query.toLowerCase().startsWith('d ') || query.toLowerCase().startsWith('d:')
+    ) {
+      query = rawVal.replace(/^(documentos|documento|docto|doc|d)[:\s]+/i, '').trim();
+      isExplicitDocumentSearch = true;
     } else if (query.toLowerCase().startsWith('tela ') || query.toLowerCase().startsWith('modulo ') || query.toLowerCase().startsWith('tela:') || query.toLowerCase().startsWith('modulo:')) {
       query = rawVal.replace(/^(tela|modulo)[:\s]+/i, '').trim();
       scope = 'screens';
     } else if (query.toLowerCase().startsWith('acao ') || query.toLowerCase().startsWith('atalho ') || query.toLowerCase().startsWith('acao:') || query.toLowerCase().startsWith('atalho:')) {
       query = rawVal.replace(/^(acao|atalho)[:\s]+/i, '').trim();
       scope = 'actions';
+    }
+
+    // Auto-detect format patterns
+    if (/^\d{5}\.\d{6}\.\d{4}-\d{2}$/.test(query) || /^230\d{2}\./.test(query)) {
+      isExplicitProcessSearch = true;
+    } else if (/^20\d{10,14}$/.test(query) || /^\d{13,15}$/.test(query)) {
+      isExplicitStudentSearch = true;
+    }
+
+    let matchingProcessActions = [];
+    if (currentProcId && (scope === 'all' || scope === 'processo' || scope === 'actions')) {
+      const allProcActions = getProcessActions(currentProcId);
+      matchingProcessActions = allProcActions
+        .map((act) => ({ act, score: scoreProcessAction(act, query) }))
+        .filter((item) => item.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map((item) => item.act);
+    }
+
+    let suapProcessSearchAction = null;
+    if (query && (scope === 'all' || scope === 'processo' || isExplicitProcessSearch)) {
+      const processUrl = getSuapProcessSearchUrl(query);
+      suapProcessSearchAction = {
+        id: 'suap-search-processo',
+        title: `Buscar "${query}" no SUAP Processos`,
+        subtitle: `Abrir consulta oficial de processos eletrônicos (${processUrl})`,
+        url: processUrl,
+        icon: 'search',
+        color: '#0d9488',
+        badge: 'suap',
+      };
+    }
+
+    let suapStudentAction = null;
+    if (query && (scope === 'all' || isExplicitStudentSearch)) {
+      const studentUrl = getSuapStudentUrl(query);
+      const isMatricula = /^\d+$/.test(query.trim());
+      suapStudentAction = {
+        id: 'suap-search-aluno',
+        title: isMatricula ? `Abrir Aluno #${query}` : `Buscar Aluno "${query}" no SUAP`,
+        subtitle: `Acessar registro acadêmico no SUAP (${studentUrl})`,
+        url: studentUrl,
+        icon: 'graduationCap',
+        color: '#6366f1',
+        badge: 'suap',
+      };
+    }
+
+    let suapDocumentSearchAction = null;
+    if (query && (scope === 'all' || isExplicitDocumentSearch)) {
+      const docUrl = getSuapDocumentSearchUrl(query);
+      suapDocumentSearchAction = {
+        id: 'suap-search-documento',
+        title: `Buscar "${query}" no SUAP Documentos`,
+        subtitle: `Abrir consulta oficial de documentos eletrônicos (${docUrl})`,
+        url: docUrl,
+        icon: 'fileText',
+        color: '#8b5cf6',
+        badge: 'suap',
+      };
     }
 
     let matchingEmpenhos = [];
@@ -596,6 +882,20 @@
         .sort((a, b) => b.score - a.score)
         .map((item) => item.cont)
         .slice(0, 8);
+    }
+
+    let suapContractSearchAction = null;
+    if (query && (scope === 'all' || scope === 'contratos')) {
+      const contractUrl = getSuapContractSearchUrl(query);
+      suapContractSearchAction = {
+        id: 'suap-search-contratos',
+        title: `Buscar "${query}" no SUAP Contratos`,
+        subtitle: `Abrir consulta oficial de contratos ativos (${contractUrl})`,
+        url: contractUrl,
+        icon: 'search',
+        color: '#2563eb',
+        badge: 'suap',
+      };
     }
 
     // Grouped screens
@@ -628,7 +928,23 @@
       });
     }
 
-    return { matchingEmpenhos, matchingContratos, groupedScreens, matchingActions, query };
+    return {
+      matchingProcessActions,
+      suapProcessSearchAction,
+      isExplicitProcessSearch,
+      suapStudentAction,
+      isExplicitStudentSearch,
+      suapDocumentSearchAction,
+      isExplicitDocumentSearch,
+      matchingEmpenhos,
+      matchingContratos,
+      suapContractSearchAction,
+      isExplicitContractSearch,
+      groupedScreens,
+      matchingActions,
+      query,
+      currentProcId,
+    };
   }
 
   // Render Results (Exact visual mirror of SIAGES)
@@ -647,18 +963,75 @@
       return;
     }
 
-    const { matchingEmpenhos, matchingContratos, groupedScreens, matchingActions, query } = getFilteredResults();
+    const {
+      matchingProcessActions,
+      suapProcessSearchAction,
+      isExplicitProcessSearch,
+      suapStudentAction,
+      isExplicitStudentSearch,
+      suapDocumentSearchAction,
+      isExplicitDocumentSearch,
+      matchingEmpenhos,
+      matchingContratos,
+      suapContractSearchAction,
+      isExplicitContractSearch,
+      groupedScreens,
+      matchingActions,
+      query,
+      currentProcId,
+    } = getFilteredResults();
+
+    const hasHighPriorityShortcut = query && matchingProcessActions.some((p) => {
+      const q = query.trim().toLowerCase();
+      return p.shortcuts.some((s) => s.toLowerCase() === q || s.toLowerCase().startsWith(q)) || p.title.toLowerCase().startsWith(q);
+    });
 
     currentResults = [];
+    if (isExplicitStudentSearch && suapStudentAction) {
+      currentResults.push({ type: 'suap_student_search', data: suapStudentAction });
+    }
+    if (isExplicitDocumentSearch && suapDocumentSearchAction) {
+      currentResults.push({ type: 'suap_document_search', data: suapDocumentSearchAction });
+    }
+    if (isExplicitProcessSearch && suapProcessSearchAction) {
+      currentResults.push({ type: 'suap_process_search', data: suapProcessSearchAction });
+    }
+    if (hasHighPriorityShortcut) {
+      matchingProcessActions.forEach((p) => currentResults.push({ type: 'process_action', data: p, processId: currentProcId }));
+    }
     matchingEmpenhos.forEach((e) => currentResults.push({ type: 'empenho', data: e }));
+
+    // Contratos
+    if (isExplicitContractSearch && suapContractSearchAction) {
+      currentResults.push({ type: 'suap_contract_search', data: suapContractSearchAction });
+    }
     matchingContratos.forEach((c) => currentResults.push({ type: 'contrato', data: c }));
+    if (!isExplicitContractSearch && suapContractSearchAction && (matchingContratos.length > 0 || activeScope === 'contratos')) {
+      currentResults.push({ type: 'suap_contract_search', data: suapContractSearchAction });
+    }
+
     groupedScreens.forEach((g) => {
       g.screens.forEach((s) => currentResults.push({ type: 'screen', data: s, group: g }));
     });
     matchingActions.forEach((a) => currentResults.push({ type: 'action', data: a }));
 
+    if (!hasHighPriorityShortcut && matchingProcessActions && matchingProcessActions.length > 0) {
+      matchingProcessActions.forEach((p) => currentResults.push({ type: 'process_action', data: p, processId: currentProcId }));
+    }
+    if (!isExplicitProcessSearch && suapProcessSearchAction && ((matchingProcessActions && matchingProcessActions.length > 0) || activeScope === 'processo')) {
+      currentResults.push({ type: 'suap_process_search', data: suapProcessSearchAction });
+    }
+
+    if (!isExplicitStudentSearch && suapStudentAction && (activeScope === 'all' || activeScope === 'actions')) {
+      currentResults.push({ type: 'suap_student_search', data: suapStudentAction });
+    }
+    if (!isExplicitDocumentSearch && suapDocumentSearchAction && (activeScope === 'all' || activeScope === 'actions')) {
+      currentResults.push({ type: 'suap_document_search', data: suapDocumentSearchAction });
+    }
+
     // Update counts on scope chips
     const countAllEl = overlayEl?.querySelector('#suape-cp-count-all');
+    const countProcEl = overlayEl?.querySelector('#suape-cp-count-processo');
     const countEmpEl = overlayEl?.querySelector('#suape-cp-count-empenhos');
     const countContEl = overlayEl?.querySelector('#suape-cp-count-contratos');
 
@@ -666,13 +1039,20 @@
       countAllEl.textContent = currentResults.length;
       countAllEl.style.display = query && currentResults.length > 0 ? 'inline-flex' : 'none';
     }
+    if (countProcEl) {
+      const showProcSearch = suapProcessSearchAction && (isExplicitProcessSearch || activeScope === 'processo' || (matchingProcessActions && matchingProcessActions.length > 0));
+      const procTotal = (matchingProcessActions ? matchingProcessActions.length : 0) + (showProcSearch ? 1 : 0);
+      countProcEl.textContent = procTotal;
+      countProcEl.style.display = procTotal > 0 ? 'inline-flex' : 'none';
+    }
     if (countEmpEl) {
       countEmpEl.textContent = matchingEmpenhos.length;
       countEmpEl.style.display = matchingEmpenhos.length > 0 ? 'inline-flex' : 'none';
     }
     if (countContEl) {
-      countContEl.textContent = matchingContratos.length;
-      countContEl.style.display = matchingContratos.length > 0 ? 'inline-flex' : 'none';
+      const contTotal = matchingContratos.length + (suapContractSearchAction ? 1 : 0);
+      countContEl.textContent = contTotal;
+      countContEl.style.display = contTotal > 0 ? 'inline-flex' : 'none';
     }
 
     if (currentResults.length === 0) {
@@ -682,7 +1062,7 @@
             ${ICONS.search}
           </div>
           <p class="suape-cp-empty-title">Nenhum resultado encontrado</p>
-          <p class="suape-cp-empty-desc">Não encontramos correspondências para "<strong>${escapeHtml(query)}</strong>". Tente o número da NE (ex: "32"), fornecedor ou módulo.</p>
+          <p class="suape-cp-empty-desc">Não encontramos correspondências para "<strong>${escapeHtml(query)}</strong>". Tente matrícula do aluno (ex: "alu 2009..."), documento (ex: "doc texto"), processo ou contrato.</p>
         </div>
       `;
       return;
@@ -691,8 +1071,193 @@
     let html = '';
     let globalIndex = 0;
 
+    function renderStudentBlock() {
+      if (!suapStudentAction) return '';
+      let block = '';
+      if (html.length > 0) {
+        block += `<div class="suape-cp-divider"></div>`;
+      }
+      block += `
+        <div class="suape-cp-group-header">
+          <span class="suape-cp-group-title" style="color: #6366f1;">
+            ${ICONS.graduationCap}
+            Aluno / Ensino
+          </span>
+        </div>
+      `;
+      const isSel = globalIndex === selectedIndex;
+      block += `
+        <div class="suape-cp-item ${isSel ? 'suape-cp-item-selected' : ''}" data-index="${globalIndex}">
+          <div class="suape-cp-item-icon" style="color: #6366f1; background: #6366f115;">
+            ${ICONS.graduationCap}
+          </div>
+          <div class="suape-cp-item-body">
+            <div class="suape-cp-item-title-row">
+              <span class="suape-cp-item-title-text">${highlightMatch(suapStudentAction.title, query)}</span>
+              <span class="suape-cp-badge badge-pago">SUAP Oficial</span>
+            </div>
+            <p class="suape-cp-item-subtitle">
+              <span class="suape-cp-subtitle-main">${escapeHtml(suapStudentAction.subtitle)}</span>
+            </p>
+          </div>
+          <span class="suape-cp-item-action-hint">Acessar ↵</span>
+        </div>
+      `;
+      globalIndex++;
+      return block;
+    }
+
+    function renderDocumentBlock() {
+      if (!suapDocumentSearchAction) return '';
+      let block = '';
+      if (html.length > 0) {
+        block += `<div class="suape-cp-divider"></div>`;
+      }
+      block += `
+        <div class="suape-cp-group-header">
+          <span class="suape-cp-group-title" style="color: #8b5cf6;">
+            ${ICONS.fileText}
+            Documentos Eletrônicos
+          </span>
+        </div>
+      `;
+      const isSel = globalIndex === selectedIndex;
+      block += `
+        <div class="suape-cp-item ${isSel ? 'suape-cp-item-selected' : ''}" data-index="${globalIndex}">
+          <div class="suape-cp-item-icon" style="color: #8b5cf6; background: #8b5cf615;">
+            ${ICONS.fileText}
+          </div>
+          <div class="suape-cp-item-body">
+            <div class="suape-cp-item-title-row">
+              <span class="suape-cp-item-title-text">${highlightMatch(suapDocumentSearchAction.title, query)}</span>
+              <span class="suape-cp-badge badge-pago">SUAP Oficial</span>
+            </div>
+            <p class="suape-cp-item-subtitle">
+              <span class="suape-cp-subtitle-main">${escapeHtml(suapDocumentSearchAction.subtitle)}</span>
+            </p>
+          </div>
+          <span class="suape-cp-item-action-hint">Pesquisar ↵</span>
+        </div>
+      `;
+      globalIndex++;
+      return block;
+    }
+
+    function renderProcessActionsBlock() {
+      const showProcSearch = suapProcessSearchAction && (isExplicitProcessSearch || activeScope === 'processo' || (matchingProcessActions && matchingProcessActions.length > 0));
+      const totalCount = (matchingProcessActions ? matchingProcessActions.length : 0) + (showProcSearch ? 1 : 0);
+      if (totalCount === 0) return '';
+
+      let block = '';
+      if (html.length > 0) {
+        block += `<div class="suape-cp-divider"></div>`;
+      }
+      block += `
+        <div class="suape-cp-group-header">
+          <span class="suape-cp-group-title process-group">
+            ${ICONS.folder}
+            ${currentProcId ? `Ações do Processo #${escapeHtml(currentProcId)}` : 'Processos Eletrônicos'}
+          </span>
+          <span class="suape-cp-group-count">${totalCount} resultado(s)</span>
+        </div>
+      `;
+
+      if (isExplicitProcessSearch && suapProcessSearchAction) {
+        const isSel = globalIndex === selectedIndex;
+        block += `
+          <div class="suape-cp-item ${isSel ? 'suape-cp-item-selected' : ''}" data-index="${globalIndex}">
+            <div class="suape-cp-item-icon" style="color: #0d9488; background: #0d948815;">
+              ${ICONS.search}
+            </div>
+            <div class="suape-cp-item-body">
+              <div class="suape-cp-item-title-row">
+                <span class="suape-cp-item-title-text">${highlightMatch(suapProcessSearchAction.title, query)}</span>
+                <span class="suape-cp-badge badge-pago">SUAP Oficial</span>
+              </div>
+              <p class="suape-cp-item-subtitle">
+                <span class="suape-cp-subtitle-main">${escapeHtml(suapProcessSearchAction.subtitle)}</span>
+              </p>
+            </div>
+            <span class="suape-cp-item-action-hint">Pesquisar ↵</span>
+          </div>
+        `;
+        globalIndex++;
+      }
+
+      if (matchingProcessActions) {
+        matchingProcessActions.forEach((act) => {
+          const isSel = globalIndex === selectedIndex;
+          const actIconSvg = ICONS[act.icon] || ICONS.folder;
+
+          block += `
+            <div class="suape-cp-item suape-cp-process-item ${isSel ? 'suape-cp-item-selected' : ''}" data-index="${globalIndex}">
+              <div class="suape-cp-item-icon" style="color: ${act.color}; background: ${act.color}15;">
+                ${actIconSvg}
+              </div>
+              <div class="suape-cp-item-body">
+                <div class="suape-cp-item-title-row">
+                  <span class="suape-cp-item-title-text">${highlightMatch(act.title, query)}</span>
+                  ${act.badge ? `<kbd class="suape-cp-kbd suape-cp-kbd-shortcut">${escapeHtml(act.badge)}</kbd>` : ''}
+                </div>
+                <p class="suape-cp-item-subtitle">
+                  <span class="suape-cp-subtitle-main">${highlightMatch(act.subtitle, query)}</span>
+                </p>
+              </div>
+              <div class="suape-cp-item-meta">
+                <span class="suape-cp-item-meta-label">Atalho</span>
+                <span class="suape-cp-item-meta-value"><kbd class="suape-cp-kbd">${escapeHtml(act.shortcuts[0])}</kbd></span>
+              </div>
+              <span class="suape-cp-item-action-hint">Abrir ↵</span>
+            </div>
+          `;
+          globalIndex++;
+        });
+      }
+
+      if (!isExplicitProcessSearch && showProcSearch) {
+        const isSel = globalIndex === selectedIndex;
+        block += `
+          <div class="suape-cp-item ${isSel ? 'suape-cp-item-selected' : ''}" data-index="${globalIndex}">
+            <div class="suape-cp-item-icon" style="color: #0d9488; background: #0d948815;">
+              ${ICONS.search}
+            </div>
+            <div class="suape-cp-item-body">
+              <div class="suape-cp-item-title-row">
+                <span class="suape-cp-item-title-text">${highlightMatch(suapProcessSearchAction.title, query)}</span>
+                <span class="suape-cp-badge badge-pago">SUAP Oficial</span>
+              </div>
+              <p class="suape-cp-item-subtitle">
+                <span class="suape-cp-subtitle-main">${escapeHtml(suapProcessSearchAction.subtitle)}</span>
+              </p>
+            </div>
+            <span class="suape-cp-item-action-hint">Pesquisar ↵</span>
+          </div>
+        `;
+        globalIndex++;
+      }
+
+      return block;
+    }
+
+    // Se houver busca explícita de aluno ou documento, exibe no topo
+    if (isExplicitStudentSearch) {
+      html += renderStudentBlock();
+    }
+    if (isExplicitDocumentSearch) {
+      html += renderDocumentBlock();
+    }
+
+    // Se houver atalho digitado de alta prioridade ou busca explícita de processo, exibe primeiro
+    if (isExplicitProcessSearch || hasHighPriorityShortcut) {
+      html += renderProcessActionsBlock();
+    }
+
     // 1. EMPENHOS ENCONTRADOS (Quando pesquisando)
     if (matchingEmpenhos.length > 0) {
+      if (html.length > 0) {
+        html += `<div class="suape-cp-divider"></div>`;
+      }
+
       html += `
         <div class="suape-cp-group-header">
           <span class="suape-cp-group-title empenho-group">
@@ -740,8 +1305,9 @@
     }
 
     // 2. CONTRATOS ATIVOS (Quando pesquisando)
-    if (matchingContratos.length > 0) {
-      if (matchingEmpenhos.length > 0) {
+    const showSuapSearch = suapContractSearchAction && (matchingContratos.length > 0 || activeScope === 'contratos' || isExplicitContractSearch);
+    if (matchingContratos.length > 0 || showSuapSearch) {
+      if (html.length > 0) {
         html += `<div class="suape-cp-divider"></div>`;
       }
 
@@ -749,11 +1315,33 @@
         <div class="suape-cp-group-header">
           <span class="suape-cp-group-title contrato-group">
             ${ICONS.fileStack}
-            Contratos Ativos
+            Contratos
           </span>
-          <span class="suape-cp-group-count">${matchingContratos.length} resultado(s)</span>
+          <span class="suape-cp-group-count">${matchingContratos.length + (showSuapSearch ? 1 : 0)} resultado(s)</span>
         </div>
       `;
+
+      if (isExplicitContractSearch && suapContractSearchAction) {
+        const isSel = globalIndex === selectedIndex;
+        html += `
+          <div class="suape-cp-item ${isSel ? 'suape-cp-item-selected item-selected-blue' : ''}" data-index="${globalIndex}">
+            <div class="suape-cp-item-icon contrato-icon">
+              ${ICONS.search}
+            </div>
+            <div class="suape-cp-item-body">
+              <div class="suape-cp-item-title-row">
+                <span class="suape-cp-item-title-text">${highlightMatch(suapContractSearchAction.title, query)}</span>
+                <span class="suape-cp-badge badge-pago">SUAP Oficial</span>
+              </div>
+              <p class="suape-cp-item-subtitle">
+                <span class="suape-cp-subtitle-main">${escapeHtml(suapContractSearchAction.subtitle)}</span>
+              </p>
+            </div>
+            <span class="suape-cp-item-action-hint hint-blue">Pesquisar ↵</span>
+          </div>
+        `;
+        globalIndex++;
+      }
 
       matchingContratos.forEach((cont) => {
         const isSel = globalIndex === selectedIndex;
@@ -781,12 +1369,34 @@
         `;
         globalIndex++;
       });
+
+      if (!isExplicitContractSearch && showSuapSearch) {
+        const isSel = globalIndex === selectedIndex;
+        html += `
+          <div class="suape-cp-item ${isSel ? 'suape-cp-item-selected item-selected-blue' : ''}" data-index="${globalIndex}">
+            <div class="suape-cp-item-icon contrato-icon">
+              ${ICONS.search}
+            </div>
+            <div class="suape-cp-item-body">
+              <div class="suape-cp-item-title-row">
+                <span class="suape-cp-item-title-text">${highlightMatch(suapContractSearchAction.title, query)}</span>
+                <span class="suape-cp-badge badge-pago">SUAP Oficial</span>
+              </div>
+              <p class="suape-cp-item-subtitle">
+                <span class="suape-cp-subtitle-main">${escapeHtml(suapContractSearchAction.subtitle)}</span>
+              </p>
+            </div>
+            <span class="suape-cp-item-action-hint hint-blue">Pesquisar ↵</span>
+          </div>
+        `;
+        globalIndex++;
+      }
     }
 
     // 3. MÓDULOS AGRUPADOS (ORÇAMENTÁRIO, FINANCEIRO, etc.)
     if (groupedScreens.length > 0) {
-      groupedScreens.forEach((group, gIdx) => {
-        if (matchingEmpenhos.length > 0 || matchingContratos.length > 0 || gIdx > 0) {
+      groupedScreens.forEach((group) => {
+        if (html.length > 0) {
           html += `<div class="suape-cp-divider"></div>`;
         }
 
@@ -824,7 +1434,7 @@
 
     // 4. AÇÕES RÁPIDAS
     if (matchingActions.length > 0) {
-      if (matchingEmpenhos.length > 0 || matchingContratos.length > 0 || groupedScreens.length > 0) {
+      if (html.length > 0) {
         html += `<div class="suape-cp-divider"></div>`;
       }
 
@@ -857,13 +1467,26 @@
       });
     }
 
+    // 5. AÇÕES DO PROCESSO / PESQUISA DE PROCESSOS (quando não for prioridade de atalho/pesquisa explícita, aparece no final)
+    if (!isExplicitProcessSearch && !hasHighPriorityShortcut) {
+      html += renderProcessActionsBlock();
+    }
+
+    // 6. ALUNO / DOCUMENTOS (quando busca geral)
+    if (!isExplicitStudentSearch && suapStudentAction && (activeScope === 'all' || activeScope === 'actions')) {
+      html += renderStudentBlock();
+    }
+    if (!isExplicitDocumentSearch && suapDocumentSearchAction && (activeScope === 'all' || activeScope === 'actions')) {
+      html += renderDocumentBlock();
+    }
+
     listEl.innerHTML = html;
 
     // Attach click and hover events
     listEl.querySelectorAll('.suape-cp-item').forEach((item) => {
-      item.addEventListener('click', () => {
+      item.addEventListener('click', (e) => {
         const idx = Number(item.dataset.index);
-        if (currentResults[idx]) openResultDetail(currentResults[idx]);
+        if (currentResults[idx]) openResultDetail(currentResults[idx], e);
       });
       item.addEventListener('mouseenter', () => {
         selectedIndex = Number(item.dataset.index);
@@ -873,7 +1496,23 @@
   }
 
   // Open Results Detail or Navigate
-  async function openResultDetail(result) {
+  async function openResultDetail(result, e) {
+    if (
+      result.type === 'process_action' ||
+      result.type === 'suap_contract_search' ||
+      result.type === 'suap_process_search' ||
+      result.type === 'suap_student_search' ||
+      result.type === 'suap_document_search'
+    ) {
+      const url = result.data.url;
+      closePalette();
+      if (e && (e.ctrlKey || e.metaKey)) {
+        window.open(url, '_blank');
+      } else {
+        window.location.href = url;
+      }
+      return;
+    }
     if (result.type === 'empenho') {
       openEmpenhoDetail(result.data);
     } else if (result.type === 'contrato') {
@@ -1100,8 +1739,15 @@
 
   function openPalette() {
     createPaletteDOM();
+    updateProcessChip();
     overlayEl.classList.add('suape-cp-visible');
     inputEl.value = '';
+    const procId = getCurrentProcessId();
+    if (procId) {
+      inputEl.placeholder = 'Digite um atalho (ex: up, enc, encs), NE, contrato ou módulo...';
+    } else {
+      inputEl.placeholder = 'Digite um comando, NE, contrato, fornecedor ou módulo...';
+    }
     selectedIndex = 0;
     inputEl.focus();
     renderResults();

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { transparenciaService } from '@/services/transparencia';
 import { DocumentoDespesa, DocumentoSituacao } from '@/types';
@@ -11,6 +11,9 @@ import { StatCard } from '@/components/StatCard';
 import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { retencoesService } from '@/services/retencoes';
+import { FilterPanel } from '@/components/design-system/FilterPanel';
+import { ActiveFilterChips, type ActiveFilterItem } from '@/components/design-system/ActiveFilterChips';
+
 import { 
     Table,
     TableBody,
@@ -120,9 +123,36 @@ export default function LiquidacoesPagamentos() {
         setIsDetailsOpen(true);
     };
 
-    const handleRefresh = () => {
-        queryClient.invalidateQueries({ queryKey: ['transparencia'] });
-    };
+    const activeFilterList = useMemo<ActiveFilterItem[]>(() => {
+        const list: ActiveFilterItem[] = [];
+
+        if (searchTerm.trim()) {
+            list.push({
+                id: 'search',
+                label: 'Busca',
+                value: `"${searchTerm.trim()}"`,
+                onRemove: () => {
+                    setSearchTerm('');
+                    setPage(1);
+                },
+            });
+        }
+
+        if (startDate || endDate) {
+            list.push({
+                id: 'periodo',
+                label: 'Período',
+                value: `${startDate || 'Início'} até ${endDate || 'Fim'}`,
+                onRemove: () => {
+                    setStartDate('');
+                    setEndDate('');
+                    setPage(1);
+                },
+            });
+        }
+
+        return list;
+    }, [searchTerm, startDate, endDate]);
 
     return (
         <div className="space-y-6 pb-10">
@@ -218,15 +248,18 @@ export default function LiquidacoesPagamentos() {
                                 className="h-10 text-sm input-system"
                             />
                         </div>
-                        {(searchTerm || startDate || endDate) && (
-                            <Button variant="ghost" onClick={clearFilters} className="h-10 px-3 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-destructive">
-                                <X className="h-4 w-4 mr-2" />
-                                Limpar
-                            </Button>
-                        )}
                     </div>
+
+                    {/* Chips de Filtros Ativos (Eixo 04) */}
+                    <ActiveFilterChips
+                        filters={activeFilterList}
+                        onClearAll={activeFilterList.length > 0 ? clearFilters : undefined}
+                        filteredCount={documentos.length}
+                        totalCount={totalRecords}
+                    />
                 </CardContent>
             </FilterPanel>
+
 
             {/* Main Table Card */}
             <Card className="card-system shadow-sm border-none shadow-none mt-6">

@@ -1,5 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import {
+  DEFAULT_UASG,
+  PROCESSO_PREFIX_TO_UASG,
+  extractUasgFromDescricao,
+  extractUasgFromProcesso,
   getPortalEmpenhoAvailableBalance,
   matchesPortalEmpenhoCacheStage,
   type PortalEmpenhoBalanceRow,
@@ -8,7 +12,7 @@ import {
 
 const PORTAL_API_BASE = 'https://api.portaldatransparencia.gov.br/api-de-dados/despesas';
 const DEFAULT_PORTAL_TRANSPARENCIA_API_KEY = '931d4d57337bef94e775337c318342e9';
-const UNIDADE_GESTORA = '158366';
+const UNIDADE_GESTORA = DEFAULT_UASG;
 const GESTAO = '26435';
 const FOUND_TTL_MS = 12 * 60 * 60 * 1000;
 const NOT_FOUND_TTL_MS = 60 * 60 * 1000;
@@ -124,28 +128,6 @@ function normalizeEmpenhoNumero(raw: unknown) {
   return match?.[1] ?? normalized;
 }
 
-const PROCESSO_PREFIX_TO_UASG: Record<string, string> = {
-  '23035': '158366', // Currais Novos
-  '23421': '158155', // Reitoria
-  '23134': '158369', // Natal Central
-  '23057': '158368', // Natal Zona Norte
-  '23133': '152711', // Natal Cidade Alta
-  '23135': '158365', // Mossoró
-  '23136': '158371', // Apodi
-  '23137': '158367', // Ipanguaçu
-  '23138': '158373', // João Câmara
-  '23139': '158374', // Pau dos Ferros
-  '23036': '158375', // Macau
-  '23038': '158370', // Caicó
-  '23039': '152756', // Parnamirim
-  '23040': '154840', // São Paulo do Potengi
-  '23041': '152757', // Nova Cruz
-  '23042': '158372', // Santa Cruz
-  '23044': '154839', // Canguaretama
-  '23045': '154838', // Ceará-Mirim
-  '23046': '154582', // São Gonçalo do Amarante
-};
-
 async function resolveEmpenhoUasg(
   supabase: SupabaseClient,
   empenhoNumero: string,
@@ -155,20 +137,7 @@ async function resolveEmpenhoUasg(
 
   const normalized = normalizeEmpenhoNumero(empenhoNumero);
 
-  const { data: ceRows } = await supabase
-    .from('contratos_api_empenhos')
-    .select('unidade_gestora, raw_data')
-    .eq('numero', normalized)
-    .limit(1);
-
-  if (ceRows && ceRows.length > 0) {
-    const ce = ceRows[0] as any;
-    if (ce.unidade_gestora && ce.unidade_gestora.length === 6) return ce.unidade_gestora;
-    const info = ce.raw_data?.informacao_complementar || '';
-    const match = info.match(/\b(?:UASG\s*(?:MINUTA)?|UG)\s*:?\s*(15\d{4})\b/i);
-    if (match) return match[1];
-  }
-
+  // 1. Fonte primária de verdade: tabela empenhos do campus
   const { data: empRows } = await supabase
     .from('empenhos')
     .select('processo, descricao')
@@ -177,15 +146,38 @@ async function resolveEmpenhoUasg(
 
   if (empRows && empRows.length > 0) {
     const emp = empRows[0] as any;
-    const proc = String(emp.processo || '').replace(/\D/g, '').slice(0, 5);
-    if (PROCESSO_PREFIX_TO_UASG[proc]) return PROCESSO_PREFIX_TO_UASG[proc];
-    const desc = emp.descricao || '';
-    const match = desc.match(/\b(?:UASG|UG)\s*:?\s*(15\d{4})\b/i);
-    if (match) return match[1];
+    const uasgFromProcesso = extractUasgFromProcesso(emp.processo);
+    if (uasgFromProcesso) return uasgFromProcesso;
+
+    const uasgFromDesc = extractUasgFromDescricao(emp.descricao);
+    if (uasgFromDesc) return uasgFromDesc;
+  }
+
+  // 2. Consulta complementar em contratos_api_empenhos (apenas se não encontrado em empenhos)
+  const { data: ceRows } = await supabase
+    .from('contratos_api_empenhos')
+    .select('unidade_gestora, raw_data')
+    .eq('numero', normalized)
+    .limit(10);
+
+  if (ceRows && ceRows.length > 0) {
+    const defaultRow = ceRows.find((ce: any) => ce.unidade_gestora === UNIDADE_GESTORA);
+    if (defaultRow) return UNIDADE_GESTORA;
+
+    const reitoriaRow = ceRows.find((ce: any) => ce.unidade_gestora === '158155');
+    if (reitoriaRow) return '158155';
+
+    for (const ce of ceRows as any[]) {
+      if (ce.unidade_gestora && ce.unidade_gestora.length === 6) return ce.unidade_gestora;
+      const info = ce.raw_data?.informacao_complementar || '';
+      const uasgFromInfo = extractUasgFromDescricao(info);
+      if (uasgFromInfo) return uasgFromInfo;
+    }
   }
 
   return UNIDADE_GESTORA;
 }
+
 
 function buildCodigoDocumento(empenhoNumero: string, uasg = UNIDADE_GESTORA) {
   const normalized = normalizeEmpenhoNumero(empenhoNumero);
