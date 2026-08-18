@@ -4,6 +4,7 @@ import {
   buildAtaItemSearchFilter,
   buildAtaSearchFilter,
   mapAtaRegistroPrecoRow,
+  mapAtaRegistroPrecoUnidadeRow,
 } from '@/services/atasRegistroPrecos';
 
 describe('atasRegistroPrecosService helpers', () => {
@@ -29,6 +30,34 @@ describe('atasRegistroPrecosService helpers', () => {
       updated_at: '2026-05-27T10:00:00.000Z',
     })).toMatchObject({
       itemCorrespondente: null,
+    });
+  });
+
+  it('mapeia unidades cotistas com quantidade registrada e saldo de empenho', () => {
+    const mapped = mapAtaRegistroPrecoUnidadeRow({
+      id: 'u-1',
+      unidade_item_key: '158366-00001/2026-00001-461517-55806684000105-158369',
+      item_key: '158366-00001/2026-00001-461517-55806684000105',
+      ata_key: '158366-00001/2026',
+      unidade_codigo: '158369',
+      unidade_nome: 'INST.FED.DO RN/CAMPUS NATAL - CENTRAL',
+      quantidade_autorizada: null,
+      quantidade_utilizada: null,
+      saldo_quantidade: null,
+      raw_data: {
+        tipoUnidade: 'PARTICIPANTE',
+        numeroItem: '00001',
+        quantidadeRegistrada: 150,
+        saldoRemanejamentoEmpenho: 150,
+      },
+    });
+
+    expect(mapped).toMatchObject({
+      unidadeCodigo: '158369',
+      tipoUnidade: 'PARTICIPANTE',
+      numeroItem: '00001',
+      quantidadeRegistrada: 150,
+      saldoRemanejamento: 150,
     });
   });
 });

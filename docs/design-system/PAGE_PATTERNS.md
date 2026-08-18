@@ -6,16 +6,17 @@ Este documento resume as diretrizes de composição e padrões visuais de págin
 
 O shell principal em [Layout.tsx](file:///c:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/components/Layout.tsx) usa a estrutura de sidebar e header:
 
-1. **Sidebar Branca Integrada**: Fundo branco e borda direita fina semi-transparente;
-2. **Identidade da Marca**: Logotipo GovAnalytics no topo com ícone oficial, posicionado com espaçamento elegante;
-3. **Busca no Header**: Campo de pesquisa com bordas levemente arredondadas e efeito de foco dinâmico verde;
-4. **Header com Efeito de Vidro**: Barra superior com translucidez (`backdrop-blur bg-white/80`) e sombra sutil;
-5. **Grupos de Módulos (Sidebar)**: Títulos em caixa alta/tamanho reduzido, ícone verde institucional quando ativo e chevrons dinâmicos que rotacionam suavemente;
-6. **Indicador Lateral Ativo**: Links de navegação ativa recebem uma barra lateral verde à esquerda (`before:bg-[#2f9e41]`) e fundo verde suave (`bg-[#f0f9f1]`);
-7. **Submenus Expansivos**: Subitens com pontos discretos verdes indicando a rota ativa com recuo visual;
+1. **Sidebar Responsiva (Expandida e Rail Mode)**: Fundo `bg-card`, borda divisória sutil, suporte a recolhimento compacto para modo ícones (`w-18`) com tooltips acessíveis e persistência em `localStorage`;
+2. **Identidade da Marca**: Logotipo oficial no topo com badge da versão e identificador do órgão vinculado;
+3. **Busca e Command Palette Global (`Cmd+K` / `Ctrl+K`)**: Campo de pesquisa rápido no header com atalho de teclado `Ctrl K` que abre a Command Palette para navegação instantânea por telas, módulos e ações rápidas;
+4. **Header com Efeito de Vidro**: Barra superior com translucidez (`backdrop-blur-md bg-card/90`) e sombra suave;
+5. **Grupos de Módulos (Sidebar)**: Títulos em caixa alta/tamanho reduzido, ícone com cor de destaque ativa e chevrons dinâmicos que rotacionam suavemente;
+6. **Indicador Lateral Ativo**: Links de navegação ativa recebem indicador vertical destacado e fundo sutil `bg-primary/10`;
+7. **Submenus Expansivos**: Subitens com pontos discretos indicando a rota ativa com recuo visual;
 8. **Responsividade**: Drawer lateral acionado via botão hambúrguer para dispositivos móveis;
-9. **Scrollbars**: Rolagem fina com trilha invisível e cantos arredondados na navegação interna.
+9. **Scrollbars**: Rolagem fina com trilha invisível e cantos arredondados na navegação interna;
 10. **Carregamento de Rotas**: Rotas lazy usam `RouteLoadingFallback`; páginas públicas exibem o modo de tela cheia e páginas internas mantêm sidebar/header visíveis enquanto a área de conteúdo carrega.
+
 
 ## Textos e encoding
 

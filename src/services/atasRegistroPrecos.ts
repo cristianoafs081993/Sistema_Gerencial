@@ -80,6 +80,23 @@ export type AtaRegistroPrecoItemRow = {
   valorTotal: number | null;
 };
 
+export type AtaRegistroPrecoUnidadeRow = {
+  id: string;
+  unidadeItemKey: string;
+  itemKey: string;
+  ataKey: string;
+  unidadeCodigo: string;
+  unidadeNome: string | null;
+  quantidadeAutorizada: number | null;
+  quantidadeUtilizada: number | null;
+  saldoQuantidade: number | null;
+  tipoUnidade: string | null;
+  quantidadeRegistrada: number | null;
+  saldoRemanejamento: number | null;
+  numeroItem: string | null;
+  rawData: Record<string, unknown>;
+};
+
 export type AtasRegistroPrecosSyncRun = {
   id: string;
   startedAt: string;
@@ -199,6 +216,26 @@ export function mapAtaRegistroPrecoItemRow(row: DbRow): AtaRegistroPrecoItemRow 
   };
 }
 
+export function mapAtaRegistroPrecoUnidadeRow(row: DbRow): AtaRegistroPrecoUnidadeRow {
+  const raw = recordOrEmpty(row.raw_data);
+  return {
+    id: String(row.id),
+    unidadeItemKey: String(row.unidade_item_key),
+    itemKey: String(row.item_key),
+    ataKey: String(row.ata_key),
+    unidadeCodigo: String(row.unidade_codigo),
+    unidadeNome: stringOrNull(row.unidade_nome),
+    quantidadeAutorizada: numberOrNull(row.quantidade_autorizada),
+    quantidadeUtilizada: numberOrNull(row.quantidade_utilizada),
+    saldoQuantidade: numberOrNull(row.saldo_quantidade),
+    tipoUnidade: stringOrNull(raw.tipoUnidade || raw.tipo_unidade),
+    quantidadeRegistrada: numberOrNull(raw.quantidadeRegistrada || raw.quantidade_registrada) ?? numberOrNull(row.quantidade_autorizada),
+    saldoRemanejamento: numberOrNull(raw.saldoRemanejamentoEmpenho || raw.saldo_remanejamento_empenho) ?? numberOrNull(row.saldo_quantidade),
+    numeroItem: stringOrNull(raw.numeroItem || raw.numero_item),
+    rawData: raw,
+  };
+}
+
 export function mapAtaRegistroPrecoSyncRun(row: DbRow): AtasRegistroPrecosSyncRun {
   return {
     id: String(row.id),
@@ -300,6 +337,17 @@ export const atasRegistroPrecosService = {
 
     if (error) throw error;
     return (data ?? []).map((row) => mapAtaRegistroPrecoItemRow(row as DbRow));
+  },
+
+  async listUnidades(ataKey: string): Promise<AtaRegistroPrecoUnidadeRow[]> {
+    if (!ataKey) return [];
+    const { data, error } = await supabase
+      .from('atas_registro_precos_unidades')
+      .select('id,unidade_item_key,item_key,ata_key,unidade_codigo,unidade_nome,quantidade_autorizada,quantidade_utilizada,saldo_quantidade,raw_data')
+      .eq('ata_key', ataKey);
+
+    if (error) throw error;
+    return (data ?? []).map((row) => mapAtaRegistroPrecoUnidadeRow(row as DbRow));
   },
 
   async getLastSyncRun(): Promise<AtasRegistroPrecosSyncRun | null> {

@@ -16,12 +16,13 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+
 import {
   Table,
   TableBody,
@@ -349,29 +350,34 @@ export function ContratoApiDetailsSheet({
     ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(lastSyncRun.finished_at))
     : '-';
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full overflow-y-auto bg-background sm:max-w-4xl">
-        <SheetHeader className="pr-8">
-          <SheetTitle className="flex flex-wrap items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-md bg-action-primary/10 text-action-primary">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex h-[min(90vh,880px)] w-[calc(100vw-2rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0 bg-background sm:rounded-2xl border border-border shadow-2xl">
+        <DialogHeader className="border-b border-border px-6 py-4 bg-card shrink-0">
+          <DialogTitle className="flex flex-wrap items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <FileText className="h-5 w-5" />
             </span>
-            <span>Contrato {contrato?.numero ?? '-'}</span>
+            <span className="text-lg font-bold text-foreground">Contrato {contrato?.numero ?? '-'}</span>
             {hasReitoriaOrigin ? <Badge variant="secondary" className="rounded-md">Origem Reitoria</Badge> : null}
-          </SheetTitle>
-          <SheetDescription>
+          </DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground mt-1">
             {contrato?.fornecedor_nome || 'Fornecedor não informado'} | Vigência {formatDate(contrato?.vigencia_inicio)} a {formatDate(contrato?.vigencia_fim)}
-          </SheetDescription>
-        </SheetHeader>
+          </DialogDescription>
+        </DialogHeader>
 
-        {loading ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">Carregando itens e faturas...</div>
-        ) : !details ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">Nenhum detalhe da API carregado.</div>
-        ) : (
-          <div className="mt-6 space-y-5">
-            <div className="rounded-md border border-border/70 bg-card p-4 shadow-sm">
-              <div className="flex flex-col gap-4">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5 scrollbar-thin">
+          {loading ? (
+            <div className="py-16 text-center text-sm font-medium text-muted-foreground flex flex-col items-center gap-2">
+              <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              Carregando itens, faturas e histórico do contrato...
+            </div>
+          ) : !details ? (
+            <div className="py-16 text-center text-sm font-medium text-muted-foreground">Nenhum detalhe da API carregado.</div>
+          ) : (
+            <div className="space-y-5">
+              <div className="rounded-xl border border-border bg-card p-4 shadow-xs">
+                <div className="flex flex-col gap-4">
+
                 <div>
                   <p className="text-[11px] font-semibold uppercase text-muted-foreground">Objeto</p>
                   <p className="mt-1 text-sm font-medium leading-6 text-foreground">
@@ -593,6 +599,7 @@ export function ContratoApiDetailsSheet({
                       </TabsList>
                     </div>
 
+
                     <TabsContent value="item" className="space-y-4">
                       {itemSummaries
                         .filter(({ links }) => links.length > 0)
@@ -689,7 +696,9 @@ export function ContratoApiDetailsSheet({
             </Accordion>
           </div>
         )}
-      </SheetContent>
-    </Sheet>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
+

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ArrowDown, PiggyBank, Receipt, TrendingUp, Wallet } from 'lucide-react';
 import {
   Area,
@@ -21,6 +22,7 @@ import { formatCurrency } from '@/lib/utils';
 import type { Atividade, Descentralizacao, Empenho } from '@/types';
 import { ExecutionTooltip } from './DashboardChartBits';
 import { GaugeChart } from './GaugeChart';
+import { DashboardOrigemAtividadesModal } from './DashboardOrigemAtividadesModal';
 import { formatCompactCurrency } from './utils';
 
 type DashboardFilteredData = {
@@ -97,6 +99,7 @@ type DashboardCurrentTabProps = {
   dadosDescentralizacao: Array<Record<string, string | number>>;
   uniqueOrigens: string[];
   dadosPorNatureza: NaturezaResumo[];
+  onSuccessAtividade?: () => void;
 };
 
 export function DashboardCurrentTab({
@@ -120,7 +123,16 @@ export function DashboardCurrentTab({
   dadosDescentralizacao,
   uniqueOrigens,
   dadosPorNatureza,
+  onSuccessAtividade,
 }: DashboardCurrentTabProps) {
+  const [selectedOrigem, setSelectedOrigem] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleRowClick = (origem: string) => {
+    setSelectedOrigem(origem);
+    setIsModalOpen(true);
+  };
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 auto-rows-[minmax(130px,auto)] md:grid-cols-3">
@@ -476,7 +488,9 @@ export function DashboardCurrentTab({
       <Card className="card-system overflow-hidden">
         <CardHeader className="border-b border-border-default/50 px-6 py-4">
           <CardTitle className="text-lg sm:text-xl font-bold text-text-primary">Detalhamento por Origem</CardTitle>
-          <CardDescription>Execução financeira por fonte de recurso</CardDescription>
+          <CardDescription>
+            Execução financeira por fonte de recurso (clique na linha para ver as atividades com saldo)
+          </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -491,27 +505,66 @@ export function DashboardCurrentTab({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {dadosPorOrigem.map((item, index) => (
-                  <TableRow key={index} className="border-b transition-colors last:border-0 hover:bg-slate-50/80">
-                    <TableCell className="px-6 py-4 text-sm font-medium">{item.origem}</TableCell>
-                    <TableCell className="px-4 py-4 text-right text-sm">{formatCurrency(item.planejado)}</TableCell>
-                    <TableCell className="px-4 py-4 text-right text-sm">{formatCurrency(item.empenhado)}</TableCell>
-                    <TableCell className={`px-4 py-4 text-right text-sm font-medium ${item.saldo >= 0 ? 'text-status-success' : 'text-status-error'}`}>
-                      {formatCurrency(item.saldo)}
-                    </TableCell>
-                    <TableCell className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Progress value={Math.min(item.percentual, 100)} className="h-2 w-16" />
-                        <span className="w-12 text-right text-sm text-muted-foreground">{item.percentual.toFixed(0)}%</span>
-                      </div>
+                {dadosPorOrigem.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-32 text-center italic text-muted-foreground">
+                      Nenhuma origem de recurso correspondente aos filtros foi encontrada.
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  dadosPorOrigem.map((item, index) => (
+                    <TableRow
+                      key={index}
+                      className="border-b transition-colors last:border-0 hover:bg-slate-100/70 dark:hover:bg-slate-800/60 cursor-pointer group"
+                      onClick={() => handleRowClick(item.origem)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleRowClick(item.origem);
+                        }
+                      }}
+                      title={`Clique para ver as atividades com saldo da origem ${item.origem}`}
+                    >
+                      <TableCell className="px-6 py-4 text-sm font-medium">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-text-primary group-hover:text-primary transition-colors">
+                            {item.origem}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 font-normal">
+                            (ver atividades)
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-4 py-4 text-right text-sm">{formatCurrency(item.planejado)}</TableCell>
+                      <TableCell className="px-4 py-4 text-right text-sm">{formatCurrency(item.empenhado)}</TableCell>
+                      <TableCell className={`px-4 py-4 text-right text-sm font-medium ${item.saldo >= 0 ? 'text-status-success' : 'text-status-error'}`}>
+                        {formatCurrency(item.saldo)}
+                      </TableCell>
+                      <TableCell className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Progress value={Math.min(item.percentual, 100)} className="h-2 w-16" />
+                          <span className="w-12 text-right text-sm text-muted-foreground">{item.percentual.toFixed(0)}%</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
         </CardContent>
       </Card>
+
+      <DashboardOrigemAtividadesModal
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        origem={selectedOrigem}
+        atividades={filteredData.atividades}
+        empenhos={filteredData.empenhosCorrente}
+        onSuccessAtividade={onSuccessAtividade}
+      />
     </div>
   );
 }

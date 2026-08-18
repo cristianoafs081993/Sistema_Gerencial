@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Suape - Canivete Suico do IFRN",
-  "version": "1.9.21",
-  "description": "Resumo de processos, dados financeiros, atalhos e documentos com IA no SUAP e no Comprasnet.",
+  "version": "1.9.22",
+  "description": "Resumo de processos, dados financeiros, atalhos, pesquisa Ctrl+K e documentos com IA no SUAP e no Comprasnet.",
   "permissions": [
     "activeTab",
     "scripting",
@@ -21,6 +21,19 @@
   "content_scripts": [
     {
       "matches": [
+        "https://suap.ifrn.edu.br/*"
+      ],
+      "css": [
+        "command-palette.css"
+      ],
+      "js": [
+        "extension-auth-client.js",
+        "command-palette.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
         "<all_urls>"
       ],
       "js": [
@@ -29,6 +42,7 @@
       "run_at": "document_idle",
       "all_frames": true
     },
+
     {
       "matches": [
         "https://suap.ifrn.edu.br/documento_eletronico/*"

@@ -209,10 +209,9 @@ describe('Descentralizacoes', () => {
     vi.clearAllMocks();
   });
 
-  it('mostra a soma liquida inicial no card e no total da tabela', () => {
+  it('mostra a soma liquida inicial no total da tabela', () => {
     render(<Descentralizacoes />);
 
-    expect(screen.getByTestId('stat-card-total-descentralizado')).toHaveTextContent('R$ 300,00');
     expect(screen.getByText('Total: R$ 300,00')).toBeInTheDocument();
   });
 
@@ -222,10 +221,9 @@ describe('Descentralizacoes', () => {
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'EN' } });
 
     await waitFor(() => {
-      expect(screen.getByTestId('stat-card-total-descentralizado')).toHaveTextContent('R$ 175,00');
+      expect(screen.getByText('Total: R$ 175,00')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Total: R$ 175,00')).toBeInTheDocument();
     expect(screen.getByText(/3 descentraliza/i)).toBeInTheDocument();
   });
 
@@ -238,172 +236,17 @@ describe('Descentralizacoes', () => {
     fireEvent.change(selects[1], { target: { value: '231802' } });
 
     await waitFor(() => {
-      expect(screen.getByTestId('stat-card-total-descentralizado')).toHaveTextContent('R$ 50,00');
+      expect(screen.getByText('Total: R$ 50,00')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Total: R$ 50,00')).toBeInTheDocument();
     expect(within(screen.getByRole('table')).getByText(/231802/)).toBeInTheDocument();
 
     fireEvent.change(selects[0], { target: { value: 'EN' } });
 
     await waitFor(() => {
-      expect(screen.getByTestId('stat-card-total-descentralizado')).toHaveTextContent('R$ 50,00');
+      expect(screen.getByText('Total: R$ 50,00')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Total: R$ 50,00')).toBeInTheDocument();
     expect(within(screen.getByRole('table')).getAllByText(/231802/)).toHaveLength(1);
-  });
-
-  it('reconcilia linha legada sem nota de credito ao reimportar CSV com NC', async () => {
-    testState.isSuperAdmin = true;
-    const addDescentralizacao = vi.fn();
-    const updateDescentralizacao = vi.fn().mockResolvedValue(undefined);
-
-    mockedUseData.mockReturnValue({
-      atividades: [],
-      empenhos: [],
-      descentralizacoes: [
-        makeDescentralizacao({
-          id: 'legacy-desc',
-          dataEmissao: new Date('2026-01-09'),
-          origemRecurso: '231796',
-          naturezaDespesa: '339000',
-          planoInterno: 'L20RLP01ADN',
-          valor: 10000,
-          notaCredito: undefined,
-          operacaoTipo: undefined,
-        }),
-      ],
-      contaDescentralizacoes: [],
-      contratos: [],
-      contratosEmpenhos: [],
-      creditosDisponiveis: [],
-      isLoading: false,
-      addAtividade: vi.fn(),
-      updateAtividade: vi.fn(),
-      deleteAtividade: vi.fn(),
-      addEmpenho: vi.fn(),
-      updateEmpenho: vi.fn(),
-      deleteEmpenho: vi.fn(),
-      addDescentralizacao,
-      updateDescentralizacao,
-      deleteDescentralizacao: vi.fn(),
-      getResumoOrcamentario: vi.fn(),
-      getTotalPlanejado: vi.fn(),
-      getTotalEmpenhado: vi.fn(),
-      getTotalDescentralizado: vi.fn(),
-      getADescentralizar: vi.fn(),
-      getSaldoTotal: vi.fn(),
-      refreshData: vi.fn(),
-    });
-
-    render(<Descentralizacoes />);
-
-    const importHandler = Array.from(testState.importHandlers.entries()).find(([title]) =>
-      title.includes('Descentraliza'),
-    )?.[1];
-
-    expect(importHandler).toBeDefined();
-    await importHandler?.([
-      {
-        nc: '158155264352026NC000002',
-        ncoperacaotipo: 'DESCENTRALIZACAO DE CREDITO',
-        ncdiaemissao: '09/01/2026',
-        ncdescricao: 'DESCENTRALIZACAO ORCAMENTARIA',
-        nccelulaptres: '231796',
-        nccelulanaturezadespesa: '339000',
-        nccelulaplanointerno: 'L20RLP01ADN',
-        nccelulavalor: '10000',
-      },
-    ]);
-
-    expect(updateDescentralizacao).toHaveBeenCalledWith(
-      'legacy-desc',
-      expect.objectContaining({
-        notaCredito: '2026NC000002',
-        operacaoTipo: 'DESCENTRALIZACAO DE CREDITO',
-        origemRecurso: '231796',
-        naturezaDespesa: '339000',
-        planoInterno: 'L20RLP01ADN',
-        valor: 10000,
-      }),
-    );
-    expect(addDescentralizacao).not.toHaveBeenCalled();
-  });
-
-  it('ignora linha de origem com rotulo complementar no upload principal', async () => {
-    testState.isSuperAdmin = true;
-    const addDescentralizacao = vi.fn();
-
-    mockedUseData.mockReturnValue({
-      atividades: [],
-      empenhos: [],
-      descentralizacoes: [],
-      contaDescentralizacoes: [],
-      contratos: [],
-      contratosEmpenhos: [],
-      creditosDisponiveis: [],
-      isLoading: false,
-      addAtividade: vi.fn(),
-      updateAtividade: vi.fn(),
-      deleteAtividade: vi.fn(),
-      addEmpenho: vi.fn(),
-      updateEmpenho: vi.fn(),
-      deleteEmpenho: vi.fn(),
-      addDescentralizacao,
-      updateDescentralizacao: vi.fn(),
-      deleteDescentralizacao: vi.fn(),
-      getResumoOrcamentario: vi.fn(),
-      getTotalPlanejado: vi.fn(),
-      getTotalEmpenhado: vi.fn(),
-      getTotalDescentralizado: vi.fn(),
-      getADescentralizar: vi.fn(),
-      getSaldoTotal: vi.fn(),
-      refreshData: vi.fn(),
-    });
-
-    render(<Descentralizacoes />);
-
-    const importHandler = Array.from(testState.importHandlers.entries()).find(([title]) =>
-      title.includes('Descentraliza'),
-    )?.[1];
-
-    expect(importHandler).toBeDefined();
-    await importHandler?.([
-      {
-        nc: '158155264352026NC000004',
-        nccelulatipo: 'Destino da NC',
-        ncoperacaotipo: 'DESCENTRALIZACAO DE CREDITO',
-        ncdiaemissao: '10/04/2026',
-        ncdescricao: 'CREDITO REGULAR',
-        nccelulaptres: '123456',
-        nccelulanaturezadespesa: '339000',
-        nccelulaplanointerno: 'PI123ADN',
-        nccelulavalor: '700,00',
-      },
-      {
-        nc: '158155264352026NC000004',
-        nccelulatipo: 'Origem da NC',
-        ncoperacaotipo: 'DESCENTRALIZACAO DE CREDITO',
-        ncdiaemissao: '10/04/2026',
-        ncdescricao: 'CREDITO REGULAR',
-        nccelulaptres: '123456',
-        nccelulanaturezadespesa: '339039',
-        nccelulaplanointerno: 'PI123ADN',
-        nccelulavalor: '700,00',
-      },
-    ]);
-
-    expect(addDescentralizacao).toHaveBeenCalledTimes(1);
-    expect(addDescentralizacao).toHaveBeenCalledWith(
-      expect.objectContaining({
-        notaCredito: '2026NC000004',
-        operacaoTipo: 'DESCENTRALIZACAO DE CREDITO',
-        origemRecurso: '123456',
-        naturezaDespesa: '339000',
-        planoInterno: 'PI123ADN',
-        valor: 700,
-      }),
-    );
   });
 });

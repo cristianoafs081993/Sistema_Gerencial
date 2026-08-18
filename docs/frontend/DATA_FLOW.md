@@ -94,6 +94,7 @@ Observacao:
 - quando o cache de liquidacoes possui linhas vencidas ou de uma tentativa anterior, contratosApiService devolve essas linhas imediatamente e aciona a atualizacao em background; assim o saldo por item nao fica aguardando a API publica para aparecer
 
 - o mesmo modal consulta `transparenciaService.getItensEmpenhoPortal` para ler `portal_transparencia_empenho_itens_cache*` e exibir somente descricao e subelemento dos subitens. Quando o cache esta ausente, vazio ou em erro, o service pede `returnRows: true` a Edge Function `refresh-portal-transparencia-itens-cache` e usa consulta direta pelo browser como fallback; quando o cache vencido possui linhas, elas continuam visiveis enquanto a atualizacao ocorre em background. O service retorna `valorAtual` e historico do item para uso posterior, e a UI carrega o saldo detalhado separadamente.
+- no [Dashboard.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Dashboard.tsx), a tabela "Detalhamento por Origem" da aba Exercício Corrente permite drill-down via `DashboardOrigemAtividadesModal.tsx`, exibindo as atividades planejadas daquela origem com saldo disponível remanescente (`saldo > 0`), com busca textual e abertura de `AtividadeDialog.tsx` para edição direta sincronizada com `refreshData`.
 
 ### Padrao B: pagina + service proprio
 
@@ -111,6 +112,7 @@ Usado quando a pagina tem pipeline proprio de importacao ou consulta:
 
 Usado em modulos com IA ou integracoes externas:
 
+- [AIAssistantWidget.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/ai/AIAssistantWidget.tsx)
 - [Consultor.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Consultor.tsx)
 - [ConsultorSessions.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/ConsultorSessions.tsx)
 - [EditorDocumentos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/EditorDocumentos.tsx)
@@ -175,6 +177,17 @@ Observacoes:
 - quando um cenario nao possui evento real no periodo, a estimativa mensal do catalogo e usada como fallback daquele cenario
 - extensoes e automacoes externas registram eventos pela Edge Function `record-automation-savings-event`
 - a extensao local `suap-atividades-extension` envia evento `atividades_sincronizadas` para o cenario `suap-processos` quando novas atividades sao inseridas
+
+### Assistente Gerencial IA
+
+`Layout.tsx` -> `AIAssistantWidget.tsx` -> `assistenteGerencialService` -> Edge Function `assistente-gerencial` -> Supabase + Gemini
+
+Observacoes:
+
+- o widget aparece nas rotas protegidas porque e montado dentro do `Layout`; a rota publica `/auth` nao passa por esse shell
+- o historico do widget fica em `localStorage` com chave derivada do usuario autenticado
+- a function valida o JWT recebido, consulta tabelas/views allowlisted com o mesmo token do usuario e calcula agregacoes deterministicas antes de chamar o Gemini
+- o widget pode exibir `warnings` e `sources` retornados pela function para indicar fontes consultadas e limitacoes discretamente junto da resposta
 
 ### Energia Campus
 

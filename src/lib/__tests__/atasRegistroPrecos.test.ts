@@ -68,7 +68,53 @@ describe('atasRegistroPrecos helpers', () => {
     }));
   });
 
+  it('preserva valores decimais nativos sem multiplicar por 10x/100x', () => {
+    const ata = mapAtaRegistroPreco({
+      numeroAtaRegistroPreco: '00002/2026',
+      codigoUnidadeGerenciadora: '158366',
+      valorTotal: 31354.2,
+    });
+
+    expect(ata.raw_data.valorTotal).toBe(31354.2);
+
+    const item1 = mapAtaRegistroPrecoItem({
+      numeroItem: '00001',
+      valorUnitario: 124.8,
+      valorTotal: 4992,
+      quantidadeHomologadaItem: 40,
+    }, ata);
+
+    expect(item1.valor_unitario).toBe(124.8);
+    expect(item1.valor_total).toBe(4992);
+    expect(item1.quantidade_homologada).toBe(40);
+
+    const item2 = mapAtaRegistroPrecoItem({
+      numeroItem: '00002',
+      valorUnitario: 439.37,
+      valorTotal: 26362.2,
+      quantidadeHomologadaItem: 60,
+    }, ata);
+
+    expect(item2.valor_unitario).toBe(439.37);
+    expect(item2.valor_total).toBe(26362.2);
+    expect(item2.quantidade_homologada).toBe(60);
+  });
+
   it('monta chave de ata por unidade gerenciadora e numero', () => {
     expect(buildAtaKey('158366', '0001/2026')).toBe('158366-0001/2026');
+  });
+
+  it('rejeita item quando o numero da ata retornado pela API diverge da ata alvo', () => {
+    const ata = mapAtaRegistroPreco({
+      numeroAtaRegistroPreco: '00006/2025',
+      codigoUnidadeGerenciadora: '158366',
+    });
+
+    expect(() => {
+      mapAtaRegistroPrecoItem({
+        numeroItem: '00001',
+        numeroAtaRegistroPreco: '00004/2025',
+      }, ata);
+    }).toThrow(/divergente/);
   });
 });

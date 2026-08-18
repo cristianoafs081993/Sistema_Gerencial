@@ -364,6 +364,37 @@ Observacao:
 - a geracao orienta a IA a evitar repetir excessivamente dados contextuais ja estabelecidos em respostas anteriores, usando-os novamente apenas quando forem relevantes para a secao atual
 - contexto institucional do `Campus Currais Novos` identifica a unidade demandante real e nao deve ser convertido em exemplo dentro de marcador pendente
 
+## 6B. Edge Function `assistente-gerencial`
+
+Uso:
+
+- widget global de perguntas gerenciais sobre dados do sistema
+- responde sobre orcamento, empenhos, creditos disponiveis, documentos habeis, financeiro, contratos API, PFs e conciliacao a partir de agregacoes deterministicas allowlisted
+- nao substitui o `consultor`, que continua juridico/normativo
+
+Chamador:
+
+- [AIAssistantWidget.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/ai/AIAssistantWidget.tsx)
+- [assistenteGerencial.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/assistenteGerencial.ts)
+
+Implementacao no repo:
+
+- [assistente-gerencial/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/assistente-gerencial/index.ts)
+- [assistente-gerencial/domain.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/assistente-gerencial/domain.ts)
+
+Dependencias externas:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional `GEMINI_ASSISTENTE_GERENCIAL_MODEL`
+
+Observacao:
+
+- o frontend chama `supabase.functions.invoke('assistente-gerencial')`, deixando o `supabase-js` enviar o JWT da sessao
+- a function valida o usuario com `supabase.auth.getUser()` e consulta dados com o token do proprio usuario, respeitando RLS
+- a function detecta intencao, calcula resumos por dominio e envia ao Gemini apenas os totais/evidencias/limitacoes ja apurados
+- em descentralizacoes, o detalhamento por Campus Currais Novos usa o escopo natural dos dados do sistema e agrega por `origem_recurso` (PTRES) e `plano_interno` (PI)
+- em contratos, a fonte principal e `contratos_api*`, com ativos por `situacao_derivada = true` e separacao entre Campus `158366` e Reitoria `158155` quando houver `campus_scope_reason`
+
 ## 7A. Edge Function `invite-user`
 
 Uso:

@@ -1,8 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Upload } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
 import {
   Table,
   TableBody,
@@ -13,22 +10,15 @@ import {
 } from '@/components/ui/table';
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
 import { TableSkeletonRows } from '@/components/design-system/TableSkeletonRows';
-import { HeaderActions } from '@/components/HeaderParts';
 import {
   FinanceiroDisponivelCard,
-  aggregateFinanceiroDisponivel,
   loadLatestFinanceiroCardsFromDb,
-  parseFinanceiroCsv,
-  saveFinanceiroRows,
 } from '@/services/financeiroImportService';
 
 export default function Financeiro() {
-  const { isSuperAdmin } = useAuth();
   const [cards, setCards] = useState<FinanceiroDisponivelCard[]>([]);
   const [fileName, setFileName] = useState('');
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const cardsComSaldo = useMemo(
     () => cards.filter((card) => (card.saldoDisponivel || 0) > 0),
@@ -55,50 +45,8 @@ export default function Financeiro() {
     loadLatest();
   }, []);
 
-  const handleUpload = async (file?: File) => {
-    if (!file) return;
-
-    try {
-      setIsUploading(true);
-      const rows = await parseFinanceiroCsv(file);
-      await saveFinanceiroRows(rows, file.name);
-      const nextCards = aggregateFinanceiroDisponivel(rows);
-      setCards(nextCards);
-      setFileName(file.name);
-    } catch (error) {
-      console.error('Erro ao importar financeiro:', error);
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
   return (
     <div className="space-y-6 pb-10">
-      <HeaderActions>
-        {isSuperAdmin ? (
-          <div className="flex items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,.xlsx,.xls"
-              className="hidden"
-              onChange={(e) => handleUpload(e.target.files?.[0])}
-            />
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              size="sm"
-              variant="outline"
-              disabled={isUploading}
-              className="gap-space-2 h-space-9 shadow-shadow-sm"
-            >
-              <Upload className="h-4 w-4" />
-              {isUploading ? 'Carregando...' : 'Upload CSV Financeiro'}
-            </Button>
-          </div>
-        ) : null}
-      </HeaderActions>
-
       <DataTablePanel>
         <Table>
           <TableHeader className="bg-slate-50/50">

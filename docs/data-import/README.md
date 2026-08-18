@@ -27,6 +27,15 @@ Sem isso, uma IA tende a errar porque tenta inferir o contrato lendo somente a U
 - [CREDITOS_DISPONIVEIS.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/data-import/CREDITOS_DISPONIVEIS.md)
 - [PESQUISA_PRECOS.md](PESQUISA_PRECOS.md)
 
+## Hub Central de Importações
+
+Todos os botões de upload e importação de dados por arquivo (CSV, XLSX, JSON) foram centralizados na página dedicada **`Importação de Dados`** (`/importacao-dados` e `/importacao`). Os cabeçalhos das páginas operacionais agora permanecem limpos, contendo apenas ações contextuais (como atualização e filtros).
+
+A página central está organizada em três seções principais:
+1. **Módulo Orçamentário**: Descentralizações de Crédito (CSV principal, Devoluções, Conta Contábil), Crédito Disponível (CSV), Empenhos SIAFI (CSV + Saldo RAP), Histórico Anual de RAP (CSV), Atividades do Planejamento (JSON).
+2. **Módulo Financeiro**: Financeiro por Fontes (CSV/XLSX), Lista de Credores LC (CSV/XLSX), Retenções EFD-Reinf (CSV), Rastreabilidade de PFs (XLSX com `PFImportDialog`), Liquidações e Pagamentos (Doc. Hábeis, Fonte SOF, Ordens Bancárias, Situações).
+3. **Contratos e Gestão Operacional**: Contratos Comprasnet (XLSX via `ContratosSyncDialog`), Energia Campus (`Levantamento de Consumo - COSERN.xlsx`).
+
 ## Fixture files uteis
 
 Arquivos reais de operacao presentes em [docs](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs):

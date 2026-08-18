@@ -1,7 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { Search, FileText, Calendar, DollarSign, ExternalLink, ArrowUpDown, ChevronUp, ChevronDown, RefreshCw, Eye, Star } from 'lucide-react';
+import { Search, Calendar, ArrowUpDown, ChevronUp, ChevronDown, RefreshCw, Eye, Star } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
-import { StatCard } from '@/components/StatCard';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -502,17 +501,6 @@ export default function Contratos() {
     [apiEmpenhosByContratoApiId],
   );
 
-  const totalALiquidarGlobal = useMemo(() => {
-    return visibleContratos.reduce((sumContrato, c) => {
-      const emps = getEmpenhosDoContrato(c.localId);
-      const apiContrato = c.apiContrato ?? apiContratoByNumero.get(normalizeContratoNumero(c.numero));
-      const empenhosApiSomente = getEmpenhosApiSomente(emps, apiContrato);
-      const saldoLocal = emps.reduce((sumEmp, e) => sumEmp + getSaldoEmpenhoLocal(e), 0);
-      const saldoApiSomente = empenhosApiSomente.reduce((sumEmp, e) => sumEmp + getSaldoEmpenhoApiPreferLocal(e), 0);
-      return sumContrato + saldoLocal + saldoApiSomente;
-    }, 0);
-  }, [visibleContratos, getEmpenhosDoContrato, apiContratoByNumero, getEmpenhosApiSomente, getSaldoEmpenhoLocal, getSaldoEmpenhoApiPreferLocal]);
-
   const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -545,54 +533,12 @@ export default function Contratos() {
   return (
     <div className="space-y-6 pb-10">
       <HeaderActions>
-        {isSuperAdmin ? (
+        {lastSyncLabel ? (
           <div className="flex flex-wrap items-center justify-end gap-2">
             <span className="text-xs text-text-secondary">{lastSyncLabel}</span>
-            <Button variant="outline" className="gap-2 h-8 text-xs sm:h-9 sm:text-sm bg-surface-card border-border-default shadow-sm transition-all" onClick={() => setIsSyncDialogOpen(true)}>
-              <RefreshCw className="h-4 w-4 text-action-primary" />
-              Atualizar Comprasnet
-            </Button>
           </div>
         ) : null}
       </HeaderActions>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
-        <StatCard title="Contratos Ativos" value={visibleContratos.length} icon={FileText} stitchColor="vibrant-blue" />
-
-        <StatCard
-          title="Valor Total"
-          value={formatCurrency(
-            visibleContratos.reduce((sum, c) => {
-              const apiContrato = c.apiContrato ?? apiContratoByNumero.get(normalizeContratoNumero(c.numero));
-              const historico = apiContrato ? (apiHistoricosByContratoApiId.get(apiContrato.id) ?? []) : [];
-              return sum + getValorTotalContrato(c, apiContrato, historico);
-            }, 0),
-          )}
-          icon={DollarSign}
-          stitchColor="purple"
-        />
-
-        <StatCard
-          title="Saldo dos empenhos"
-          value={formatCurrency(totalALiquidarGlobal)}
-          icon={Calendar}
-          stitchColor="amber"
-          progress={45} // Placeholder progress or calculate if possible
-        />
-
-        <StatCard
-          title="Valor Empenhado"
-          value={formatCurrency(
-            visibleContratos.reduce((sum, c) => {
-              const apiContrato = c.apiContrato ?? apiContratoByNumero.get(normalizeContratoNumero(c.numero));
-              return sum + getValorEmpenhadoContrato(c.localId, apiContrato);
-            }, 0),
-          )}
-          icon={ExternalLink}
-          stitchColor="emerald-green"
-        />
-      </div>
 
       {/* Standard Filter Card */}
       <FilterPanel className="shadow-sm">

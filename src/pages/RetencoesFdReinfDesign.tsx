@@ -1,4 +1,4 @@
-﻿import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, CheckCircle2, FileUp, RefreshCw, Search, ShieldAlert } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -83,7 +83,6 @@ export default function RetencoesFdReinfDesign() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(100);
   const [updatingCorrectionIds, setUpdatingCorrectionIds] = useState<Set<string>>(new Set());
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const deferredQuery = useDeferredValue(query);
 
   const loadLatest = async (mode: 'initial' | 'refresh' = 'initial') => {
@@ -111,29 +110,6 @@ export default function RetencoesFdReinfDesign() {
   useEffect(() => {
     void loadLatest();
   }, []);
-
-  const handleUpload = async (file?: File) => {
-    if (!file) return;
-    try {
-      setIsUploading(true);
-      const parsed = await parseRetencoesEfdReinfCsv(file);
-      await saveRetencoesEfdReinfRows(parsed, file.name);
-      const latest = await loadLatestRetencoesEfdReinfRowsFromDb();
-      const paymentDates = await loadRetencoesEfdReinfObPaymentDates(latest.rows);
-      setRows(latest.rows);
-      setObPaymentDates(paymentDates);
-      setFileName(latest.sourceFile || file.name);
-      setImportedAt(latest.importedAt || new Date().toISOString());
-      setPage(1);
-      toast.success(`${parsed.length} linha(s) de retencao importadas com sucesso.`);
-    } catch (error) {
-      console.error('Erro ao importar retencoes EFD-Reinf:', error);
-      toast.error((error as Error).message || 'Erro ao importar o arquivo de retencoes.');
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
 
   const rowsWithValidation = useMemo<ViewRow[]>(
     () => rows.map((row) => ({ row, validation: validateRetencaoEfdReinfRow(row, { obPaymentDates }) })),
@@ -263,19 +239,10 @@ export default function RetencoesFdReinfDesign() {
 
       <HeaderActions>
         <div className="flex items-center gap-2">
-          {isSuperAdmin ? (
-            <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={(event) => void handleUpload(event.target.files?.[0])} />
-          ) : null}
-          <Button onClick={() => void loadLatest('refresh')} size="sm" variant="outline" disabled={isRefreshing || isUploading} className="gap-space-2 h-space-9 shadow-shadow-sm">
+          <Button onClick={() => void loadLatest('refresh')} size="sm" variant="outline" disabled={isRefreshing} className="gap-space-2 h-space-9 shadow-shadow-sm">
             <RefreshCw className={cn('h-4 w-4', isRefreshing && 'animate-spin')} />
             {isRefreshing ? 'Atualizando...' : 'Atualizar base'}
           </Button>
-          {isSuperAdmin ? (
-            <Button onClick={() => fileInputRef.current?.click()} size="sm" variant="outline" disabled={isUploading} className="gap-space-2 h-space-9 shadow-shadow-sm">
-              <FileUp className="h-4 w-4" />
-              {isUploading ? 'Importando...' : 'Importar CSV FDReinf'}
-            </Button>
-          ) : null}
         </div>
       </HeaderActions>
 

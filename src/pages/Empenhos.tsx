@@ -1,5 +1,6 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Pencil, Search, Filter, Calendar, FileSpreadsheet, Loader2, History, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, Layers, X, Star } from 'lucide-react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+
+import { Plus, Pencil, Search, Filter, Calendar, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, Layers, X, Star, History } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Empenho, DIMENSOES, COMPONENTES_POR_DIMENSAO } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -25,21 +26,15 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { EmpenhoDialog } from '@/components/modals/EmpenhoDialog';
-import { HeaderActions } from '@/components/HeaderParts';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { TablePagination } from '@/components/design-system/TablePagination';
-import { toast } from 'sonner';
-import { formatCurrency, parseCurrency, formatarDocumento } from '@/lib/utils';
-import { parseSiafiCsv, syncSiafiDataToDb } from '@/lib/siafi-parser';
+import { formatCurrency, formatarDocumento } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getRapReferenceYear, isRapReinscrito } from '@/utils/rapMetrics';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserFavorites } from '@/services/userFavorites';
 import { filterEmpenhos, getRapBase, getRapLiquidado, getRapSaldo } from './empenhosFilters';
-
-type SiafiImportMode = 'empenhos' | 'rap-saldo';
 
 
 const statusColors: Record<string, string> = {
@@ -75,13 +70,6 @@ export default function Empenhos() {
   const { favoriteIdsByType, isFavorite, toggleFavorite, isPending: isFavoritePending } = useUserFavorites();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
-  const [isUpdatingSaldos, setIsUpdatingSaldos] = useState(false);
-  const [activeImportAction, setActiveImportAction] = useState<'empenhos' | 'rap-saldo' | null>(null);
-
-  const empenhosInputRef = useRef<HTMLInputElement>(null);
-  const rapSaldoInputRef = useRef<HTMLInputElement>(null);
-  const saldosInputRef = empenhosInputRef;
   const [selectedEmpenho, setSelectedEmpenho] = useState<Empenho | null>(null);
 
   // Extrair opções únicas para filtros
@@ -130,283 +118,8 @@ export default function Empenhos() {
     setIsDialogOpen(false);
   };
 
-
-
-  const handleJsonImport = (data: Record<string, string>[]) => {
-    // Build deduplication set from existing empenhos (in memory)
-    const existingNumeros = new Set(
-      empenhos.map(e => e.numero.trim().toUpperCase())
-    );
-
-    let importCount = 0;
-    let skipCount = 0;
-
-    data.forEach((row) => {
-      const parseDate = (dateStr: string): Date => {
-        if (!dateStr) return new Date();
-        const parts = dateStr.split(/[/-]/);
-        if (parts.length === 3) {
-          if (parts[0].length === 4) {
-            return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-          }
-          return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-        }
-        return new Date(dateStr);
-      };
-
-      const numero = (row['numero'] || '').trim().toUpperCase();
-
-      // Check for duplicate by numero
-      if (numero && existingNumeros.has(numero)) {
-        skipCount++;
-        return;
-      }
-
-      const empenho = {
-        numero,
-        descricao: row['descricao'] || '',
-        valor: parseCurrency(row['valor'] || '0'),
-        dimensao: row['dimensao'] || '',
-        componenteFuncional: row['componentefuncional'] || row['componente'] || '',
-        origemRecurso: row['origemrecurso'] || row['origem'] || row['ptres'] || '',
-        naturezaDespesa: row['naturezadespesa'] || row['natureza'] || '',
-        planoInterno: row['planointerno'] || row['plano'] || '',
-        favorecidoNome: row['favorecido'] || row['nomefavorecido'] || row['razaosocial'] || '',
-        favorecidoDocumento: row['documentofavorecido'] || row['cpf'] || row['cnpj'] || row['cpfcnpj'] || '',
-        dataEmpenho: parseDate(row['dataempenho'] || row['data'] || ''),
-        status: (row['status'] || 'pendente') as 'pendente' | 'liquidado' | 'pago' | 'cancelado',
-        atividadeId: row['atividadeid'] || '',
-        tipo: 'exercicio' as const,
-      };
-      if (empenho.numero && empenho.dimensao) {
-        addEmpenho(empenho);
-        existingNumeros.add(numero); // prevent duplicates within same import
-        importCount++;
-      }
-    });
-
-    if (importCount > 0 && skipCount > 0) {
-      toast.success(`${importCount} novo(s) importado(s), ${skipCount} já existente(s) ignorado(s).`);
-    } else if (importCount > 0) {
-      toast.success(`${importCount} empenho(s) importado(s) com sucesso!`);
-    } else {
-      toast.info(`Nenhum registro novo encontrado. ${skipCount} já existente(s) ignorado(s).`);
-    }
-  };
-
-  const empenhosJsonFields = [
-    'numero', 'descricao', 'valor', 'dimensao', 'componentefuncional', 'origemrecurso', 'naturezadespesa', 'dataempenho', 'planointerno', 'favorecido', 'cpfcnpj', 'ptres'
-  ];
-
-  const handleImportSaldos = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsUpdatingSaldos(true);
-    const toastId = toast.loading('Processando arquivo do SIAFI...');
-
-    try {
-      // 1. Parsear o CSV do SIAFI
-      const parsedData = await parseSiafiCsv(file);
-
-      if (parsedData.length === 0) {
-        toast.error('Nenhum dado válido encontrado no arquivo CSV.', { id: toastId });
-        return;
-      }
-
-      toast.loading(`Atualizando saldos de ${parsedData.length} empenhos no banco...`, { id: toastId });
-
-      // 2. Sincronizar com o Supabase
-      const result = await syncSiafiDataToDb(parsedData, (processed, total) => {
-        if (processed % 50 === 0) {
-          toast.loading(`Atualizando... ${processed}/${total}`, { id: toastId });
-        }
-      });
-
-      // 3. Atualizar UI
-      await refreshData();
-
-      if (result.atualizados > 0 || result.criados > 0) {
-        let msg = '';
-        if (result.atualizados > 0) msg += `${result.atualizados} atualizado(s)`;
-        if (result.criados > 0) msg += `${msg ? ', ' : ''}${result.criados} criado(s)`;
-        toast.success(`SIAFI: ${msg}!`, { id: toastId });
-      } else {
-        toast.info('Nenhum empenho do arquivo foi encontrado no sistema.', { id: toastId });
-      }
-
-      if (result.erros > 0) {
-        toast.error(`Houve erro ao salvar ${result.erros} registros.`, { duration: 5000 });
-      }
-
-    } catch (error: unknown) {
-      console.error('Erro ao processar SIAFI CSV:', error);
-      const message = error instanceof Error ? error.message : 'Erro ao ler a planilha. Verifique o formato do arquivo.';
-      toast.error(message, { id: toastId });
-    } finally {
-      setIsUpdatingSaldos(false);
-      if (saldosInputRef.current) {
-        saldosInputRef.current.value = '';
-      }
-    }
-  };
-
-  const importSiafiCsvFile = async (file: File, mode: SiafiImportMode) => {
-    setIsUpdatingSaldos(true);
-    setActiveImportAction(mode);
-    const importLabel = mode === 'empenhos' ? 'empenhos do exercicio' : 'saldo de RAP';
-    const toastId = toast.loading(`Processando arquivo de ${importLabel}...`);
-
-    try {
-      const parsedData = await parseSiafiCsv(file);
-
-      if (parsedData.length === 0) {
-        toast.error('Nenhum dado válido encontrado no arquivo CSV.', { id: toastId });
-        return;
-      }
-
-      const isRapSaldoCsv = parsedData.some(item => item.rapSaldoOnly);
-      if (mode === 'empenhos' && isRapSaldoCsv) {
-        toast.error('Este arquivo é de saldo de RAP. Use o botão "Importar Saldo RAP".', { id: toastId });
-        return;
-      }
-
-      if (mode === 'rap-saldo' && !isRapSaldoCsv) {
-        toast.error('Este botão espera o CSV específico de saldo de RAP.', { id: toastId });
-        return;
-      }
-
-      toast.loading(`Atualizando ${parsedData.length} registro(s) de ${importLabel} no banco...`, { id: toastId });
-
-      const result = await syncSiafiDataToDb(parsedData, (processed, total) => {
-        if (processed % 50 === 0) {
-          toast.loading(`Atualizando... ${processed}/${total}`, { id: toastId });
-        }
-      });
-
-      await refreshData();
-
-      if (result.atualizados > 0 || result.criados > 0) {
-        let msg = '';
-        if (result.atualizados > 0) msg += `${result.atualizados} atualizado(s)`;
-        if (result.criados > 0) msg += `${msg ? ', ' : ''}${result.criados} criado(s)`;
-        toast.success(`${mode === 'empenhos' ? 'Empenhos' : 'Saldo RAP'}: ${msg}!`, { id: toastId });
-      } else {
-        toast.info('Nenhum empenho do arquivo foi encontrado no sistema.', { id: toastId });
-      }
-
-      if (result.erros > 0) {
-        toast.error(`Houve erro ao salvar ${result.erros} registros.`, { duration: 5000 });
-      }
-    } catch (error: unknown) {
-      console.error('Erro ao processar SIAFI CSV:', error);
-      const message = error instanceof Error ? error.message : 'Erro ao ler a planilha. Verifique o formato do arquivo.';
-      toast.error(message, { id: toastId });
-    } finally {
-      setIsUpdatingSaldos(false);
-      setActiveImportAction(null);
-      if (empenhosInputRef.current) empenhosInputRef.current.value = '';
-      if (rapSaldoInputRef.current) rapSaldoInputRef.current.value = '';
-    }
-  };
-
-  const handleImportEmpenhos = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    await importSiafiCsvFile(file, 'empenhos');
-  };
-
-  const handleImportRapSaldo = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    await importSiafiCsvFile(file, 'rap-saldo');
-  };
-
-  const lastUpdate = empenhos.reduce((max, e) => {
-    if (!e.ultimaAtualizacaoSiafi) return max;
-    const date = new Date(e.ultimaAtualizacaoSiafi);
-    return date > max ? date : max;
-  }, new Date(0));
-  const hasLastUpdate = lastUpdate.getTime() > 0;
   return (
     <div className="space-y-space-6 pb-space-10">
-      <HeaderActions>
-        {isSuperAdmin ? (
-        <div className="flex gap-space-2">
-          <input
-            type="file"
-            ref={empenhosInputRef}
-            onChange={handleImportEmpenhos}
-            accept=".csv"
-            className="hidden"
-          />
-          <input
-            type="file"
-            ref={rapSaldoInputRef}
-            onChange={handleImportRapSaldo}
-            accept=".csv"
-            className="hidden"
-          />
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  onClick={() => empenhosInputRef.current?.click()}
-                  className="gap-space-2 h-space-8 text-text-xs sm:h-space-9 sm:text-text-sm bg-surface-card border-border-default shadow-shadow-sm transition-all"
-                  disabled={isUpdatingSaldos}
-                >
-                  {activeImportAction === 'empenhos' ? (
-                    <>
-                      <Loader2 className="h-space-4 w-space-4 animate-spin" />
-                      Processando...
-                    </>
-                  ) : (
-                    <>
-                      <FileSpreadsheet className="h-space-4 w-space-4 text-status-success" />
-                      Importar Empenhos
-                    </>
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Importar o CSV SIAFI de empenhos do exercicio atual</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  onClick={() => rapSaldoInputRef.current?.click()}
-                  className="gap-space-2 h-space-8 text-text-xs sm:h-space-9 sm:text-text-sm bg-surface-card border-border-default shadow-shadow-sm transition-all"
-                  disabled={isUpdatingSaldos}
-                >
-                  {activeImportAction === 'rap-saldo' ? (
-                    <>
-                      <Loader2 className="h-space-4 w-space-4 animate-spin" />
-                      Processando...
-                    </>
-                  ) : (
-                    <>
-                      <History className="h-space-4 w-space-4 text-status-warning" />
-                      Importar Saldo RAP
-                    </>
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Importar o CSV especifico de saldo dos restos a pagar</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
-        </div>
-        ) : null}
-      </HeaderActions>
-
       <FilterPanel className="shadow-sm">
         <CardContent className="p-0">
           {/* Linha 1: Busca e Filtros Básicos */}

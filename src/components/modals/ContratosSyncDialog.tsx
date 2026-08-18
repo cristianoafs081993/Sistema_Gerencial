@@ -15,6 +15,7 @@ type SyncSummary = {
   synced?: number;
   active?: number;
   inactive?: number;
+  empenhos?: number;
 };
 
 interface ContratosSyncDialogProps {
@@ -32,6 +33,7 @@ const getSummary = (payload: unknown): SyncSummary => {
       contratos_inativos?: number;
       derived_active_contracts?: number;
       derived_inactive_contracts?: number;
+      empenhos_upserted?: number;
     };
   } | null;
 
@@ -39,6 +41,7 @@ const getSummary = (payload: unknown): SyncSummary => {
     synced: data?.totals?.contracts_synced ?? data?.totals?.contratos_upserted,
     active: data?.totals?.derived_active_contracts ?? data?.totals?.contratos_ativos,
     inactive: data?.totals?.derived_inactive_contracts ?? data?.totals?.contratos_inativos,
+    empenhos: data?.totals?.empenhos_upserted,
   };
 };
 
@@ -98,19 +101,20 @@ export function ContratosSyncDialog({
           {running ? (
             <div className="flex items-center gap-3">
               <Loader2 className="h-4 w-4 animate-spin text-action-primary" />
-              Sincronizando UGs 158366 e 158155...
+              Sincronizando contratos e empenhos de todas as UASGs do IFRN...
             </div>
           ) : done ? (
             <div className="space-y-2">
               <div className="flex items-center gap-2 font-medium text-status-success">
                 <CheckCircle2 className="h-4 w-4" />
-                Sincronização solicitada com sucesso.
+                Sincronização concluída com sucesso.
               </div>
               {summary ? (
-                <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="grid grid-cols-4 gap-2 text-xs">
                   <span>Contratos: {summary.synced ?? '-'}</span>
                   <span>Ativos: {summary.active ?? '-'}</span>
                   <span>Inativos: {summary.inactive ?? '-'}</span>
+                  <span>Empenhos: {summary.empenhos ?? '-'}</span>
                 </div>
               ) : null}
             </div>

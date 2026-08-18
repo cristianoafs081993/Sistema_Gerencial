@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import AtasRegistroPrecos from '@/pages/AtasRegistroPrecos';
 import { atasRegistroPrecosService } from '@/services/atasRegistroPrecos';
+import { supabase } from '@/lib/supabase';
 
 vi.mock('@/components/HeaderParts', () => ({
   HeaderActions: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -17,6 +18,7 @@ vi.mock('@/services/atasRegistroPrecos', () => ({
   atasRegistroPrecosService: {
     list: vi.fn(),
     listItems: vi.fn(),
+    listUnidades: vi.fn(),
     getLastSyncRun: vi.fn(),
     sync: vi.fn(),
     syncInternalUasgs: vi.fn(),
@@ -95,6 +97,37 @@ describe('AtasRegistroPrecos', () => {
       valorUnitario: 100,
       valorTotal: 1000,
     }]);
+    mockedService.listUnidades.mockResolvedValue([{
+      id: 'u-1',
+      unidadeItemKey: '158366-0001/2026-1-123-00000000000100-158366',
+      itemKey: 'item-1',
+      ataKey: '158366-0001/2026',
+      unidadeCodigo: '158366',
+      unidadeNome: 'CAMPUS CURRAIS NOVOS',
+      quantidadeAutorizada: 4,
+      quantidadeUtilizada: 0,
+      saldoQuantidade: 4,
+      tipoUnidade: 'GERENCIADORA',
+      quantidadeRegistrada: 4,
+      saldoRemanejamento: 4,
+      numeroItem: '1',
+      rawData: {},
+    }, {
+      id: 'u-2',
+      unidadeItemKey: '158366-0001/2026-1-123-00000000000100-158155',
+      itemKey: 'item-1',
+      ataKey: '158366-0001/2026',
+      unidadeCodigo: '158155',
+      unidadeNome: 'REITORIA',
+      quantidadeAutorizada: 6,
+      quantidadeUtilizada: 0,
+      saldoQuantidade: 6,
+      tipoUnidade: 'PARTICIPANTE',
+      quantidadeRegistrada: 6,
+      saldoRemanejamento: 6,
+      numeroItem: '1',
+      rawData: {},
+    }]);
     mockedService.getLastSyncRun.mockResolvedValue({
       id: 'run-1',
       startedAt: '2026-05-05T10:00:00.000Z',
@@ -132,6 +165,241 @@ describe('AtasRegistroPrecos', () => {
     expect(screen.getByText('Fornecedor SA')).toBeInTheDocument();
     expect(screen.getAllByText('R$ 1.500,00').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Participantes e Adesões (Lei 14.133/2021)')).toBeInTheDocument();
+  });
+
+  it('expande o item ao clicar na linha para exibir detalhes de empenhos vinculados', async () => {
+    renderPage();
+
+    expect(await screen.findByText('Aquisicao de materiais de consumo')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Detalhar/i }));
+
+    expect(await screen.findByText('Material de consumo')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /1 Material de consumo/i }));
+
+    expect(await screen.findByText(/Nenhum empenho vinculado especificamente a este item/i)).toBeInTheDocument();
+  });
+
+  it('nao associa empenhos de fornecedores ou contratos divergentes da ata', async () => {
+    renderPage();
+
+    expect(await screen.findByText('Aquisicao de materiais de consumo')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Detalhar/i }));
+
+    expect(await screen.findByText('Material de consumo')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /1 Material de consumo/i }));
+
+    expect(await screen.findByText(/Nenhum empenho vinculado especificamente a este item/i)).toBeInTheDocument();
+    expect(screen.queryByText('LG. ADMINISTRADORA DE SERVICOS LTDA')).not.toBeInTheDocument();
+  });
+
+  it('formata valores com casas decimais corretamente sem multiplicar por 10x', async () => {
+    mockedService.list.mockResolvedValueOnce({
+      rows: [{
+        ...ata,
+        id: 'ata-gas',
+        ataKey: '158366-00002/2026',
+        numeroAta: '00002/2026',
+        objeto: 'Aquisicao de recarga de gas GLP',
+        rawData: {
+          valorTotal: 31354.2,
+          linkAtaPNCP: 'https://pncp.gov.br',
+        },
+      }],
+      count: 1,
+    });
+    mockedService.listItems.mockResolvedValue([
+      {
+        id: 'item-1',
+        itemKey: 'item-1',
+        ataKey: '158366-00002/2026',
+        numeroItem: '00001',
+        codigoItem: '461517',
+        tipoItem: 'Material',
+        descricaoItem: 'Botijao de gas P-13',
+        fornecedorNome: 'Zona Oeste Comercio',
+        fornecedorNi: '55806684000105',
+        quantidadeHomologada: 40,
+        valorUnitario: 124.8,
+        valorTotal: 4992,
+      },
+      {
+        id: 'item-2',
+        itemKey: 'item-2',
+        ataKey: '158366-00002/2026',
+        numeroItem: '00002',
+        codigoItem: '461515',
+        tipoItem: 'Material',
+        descricaoItem: 'Botijao de gas P-45',
+        fornecedorNome: 'Zona Oeste Comercio',
+        fornecedorNi: '55806684000105',
+        quantidadeHomologada: 60,
+        valorUnitario: 439.37,
+        valorTotal: 26362.2,
+      },
+    ]);
+
+    renderPage();
+
+    expect(await screen.findByText('Aquisicao de recarga de gas GLP')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Detalhar/i }));
+
+    // Garante que o modal abriu
+    expect(await screen.findByText('Ata 00002/2026')).toBeInTheDocument();
+
+    // Valor Homologado no card deve ser exatamente R$ 31.354,20 e NUNCA R$ 313.542,00
+    expect(screen.getAllByText('R$ 31.354,20').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('R$ 313.542,00')).not.toBeInTheDocument();
+
+    // Valores dos itens na tabela (aparecem em Valor Total e Saldo Disponível)
+    expect(screen.getAllByText('R$ 4.992,00').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('R$ 26.362,20').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('R$ 263.622,00')).not.toBeInTheDocument();
+  });
+
+  it('exibe estado claro de carregamento enquanto busca itens ou apura empenhos', async () => {
+    // Mock com promise pendente para items
+    let resolveItems!: (val: any) => void;
+    const itemsPromise = new Promise((resolve) => {
+      resolveItems = resolve;
+    });
+    mockedService.listItems.mockReturnValueOnce(itemsPromise as any);
+
+    renderPage();
+
+    expect(await screen.findByText('Aquisicao de materiais de consumo')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Detalhar/i }));
+
+    // Garante que o indicador de carregamento de itens aparece claramente na tela
+    expect(await screen.findByText('Carregando itens da ata...')).toBeInTheDocument();
+
+    // Resolve os itens
+    resolveItems([]);
+    expect(await screen.findByText('Itens detalhados não disponíveis no Dados Abertos')).toBeInTheDocument();
+  });
+
+  it('exibe o quadro de distribuicao de cotas por campus/UASG ao expandir o item', async () => {
+    renderPage();
+
+    expect(await screen.findByText('Aquisicao de materiais de consumo')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Detalhar/i }));
+
+    expect(await screen.findByText('Ata 0001/2026')).toBeInTheDocument();
+    expect(await screen.findByText('Material de consumo')).toBeInTheDocument();
+
+    // Clica na linha do item para expandir
+    fireEvent.click(screen.getByRole('button', { name: /1 Material de consumo/i }));
+
+    // Garante que o quadro de cotas por campus apareceu com as cotas de cada UASG
+    expect(await screen.findByText('Distribuição de Cotas por Campus (UASG)')).toBeInTheDocument();
+    expect(screen.getByText('2 unidade(s) cotista(s)')).toBeInTheDocument();
+    expect(screen.getAllByText(/Currais Novos/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Reitoria/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('4 un (R$ 400,00)')).toBeInTheDocument();
+    expect(screen.getByText('6 un (R$ 600,00)')).toBeInTheDocument();
+  });
+
+  it('nao replica empenhos globais de contrato em todos os itens de ata multi-itens', async () => {
+    mockedService.listItems.mockResolvedValueOnce([
+      {
+        id: 'item-1',
+        itemKey: 'item-1',
+        ataKey: ata.ataKey,
+        numeroItem: '00001',
+        codigoItem: '111',
+        tipoItem: 'Serviço',
+        descricaoItem: 'Energia eletrica Currais Novos',
+        fornecedorNome: 'MERCATTO COMERCIALIZADORA DE ENERGIA LTDA',
+        fornecedorNi: '37028928000194',
+        quantidadeHomologada: 62,
+        valorUnitario: 379.69,
+        valorTotal: 23540.78,
+      },
+      {
+        id: 'item-2',
+        itemKey: 'item-2',
+        ataKey: ata.ataKey,
+        numeroItem: '00002',
+        codigoItem: '222',
+        tipoItem: 'Serviço',
+        descricaoItem: 'Energia eletrica Currais Novos 2026',
+        fornecedorNome: 'MERCATTO COMERCIALIZADORA DE ENERGIA LTDA',
+        fornecedorNi: '37028928000194',
+        quantidadeHomologada: 183,
+        valorUnitario: 338.43,
+        valorTotal: 61932.69,
+      },
+    ]);
+
+    vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
+      if (table === 'contratos_api') {
+        return {
+          select: () => Promise.resolve({
+            data: [
+              {
+                id: 'c-merc',
+                api_contrato_id: 101,
+                numero: '00285/2025',
+                fornecedor_nome: 'MERCATTO COMERCIALIZADORA DE ENERGIA LTDA',
+                processo: '23421.001241/2025-87',
+                valor_global: 100000,
+                raw_data: {
+                  licitacao_numero: '0001/2026',
+                  informacao_complementar: 'Pregao 0001/2026',
+                  fornecedor: { cnpj_cpf_idgener: '37.028.928/0001-94' },
+                },
+              },
+            ],
+          }),
+        } as any;
+      }
+      if (table === 'contratos_api_itens') {
+        return {
+          select: () => ({
+            in: () => Promise.resolve({
+              data: [
+                { contrato_api_id: 'c-merc', numero_item_compra: '00001' },
+                { contrato_api_id: 'c-merc', numero_item_compra: '00002' },
+              ],
+            }),
+          }),
+        } as any;
+      }
+      if (table === 'contratos_api_empenhos') {
+        return {
+          select: () => ({
+            in: () => Promise.resolve({
+              data: [
+                {
+                  contrato_api_id: 'c-merc',
+                  numero: '2025NE000111',
+                  valor_empenhado: '10425.08',
+                  unidade_gestora: '158366',
+                  raw_data: {
+                    informacao_complementar: '15815505002852025 - UASG MINUTA: 158366',
+                  },
+                },
+              ],
+            }),
+          }),
+        } as any;
+      }
+      return {
+        select: () => Promise.resolve({ data: [] }),
+      } as any;
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('Aquisicao de materiais de consumo')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Detalhar/i }));
+
+    expect(await screen.findByText('Ata 0001/2026')).toBeInTheDocument();
+    expect(await screen.findByText('Energia eletrica Currais Novos')).toBeInTheDocument();
+
+    // Como o empenho do contrato nao tem subitens e o contrato tem 2 itens,
+    // ele nao deve ser duplicado como "empenhado" em nenhum dos dois itens especificos
+    expect(screen.queryByText('1 empenho(s)')).not.toBeInTheDocument();
+    expect(screen.queryByText('2 empenho(s)')).not.toBeInTheDocument();
   });
 
   it('mostra contagem clara de participantes com hover disponivel', async () => {

@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/lib/supabase';
+import { IFRN_UASG_CATALOG } from '@/lib/licitacoesPncp';
 import {
   getLicitacaoLinks,
   getProposalStatus,
@@ -265,23 +266,80 @@ function LicitacaoDetailsDialog({
           const licNumInContract = String(c.raw_data?.licitacao_numero || '').trim();
           const infoComp = String(c.raw_data?.informacao_complementar || '');
           const cProcClean = c.processo ? String(c.processo).replace(/\D/g, '') : '';
+          const cUnidadeCompra = String((c.raw_data as any)?.unidade_compra || '').trim();
+          const cContratanteUg = String((c.raw_data as any)?.contratante?.unidade_gestora?.codigo || '').trim();
+          const cOrigemUg = String((c.raw_data as any)?.contratante?.unidade_gestora_origem?.codigo || '').trim();
+          const cObjNorm = normalizeText(c.raw_data?.objeto || '');
 
-          if (numClean && ano) {
+          // TRAVA DE SEGURANÇA: Se AMBOS possuem processo SEI com 8+ dígitos e os processos são DIVERGENTES, REJEITA!
+          if (procClean && cProcClean && procClean.length >= 8 && cProcClean.length >= 8) {
+            const isProcessMatch = procClean === cProcClean || procClean.includes(cProcClean) || cProcClean.includes(procClean);
+            if (!isProcessMatch) {
+              return false;
+            }
+          }
+
+          // 1. Vínculo determinístico pelo processo SEI
+          if (procClean && cProcClean && procClean.length >= 8 && cProcClean.length >= 8) {
+            if (procClean === cProcClean || procClean.includes(cProcClean) || cProcClean.includes(procClean)) {
+              return true;
+            }
+          }
+
+          // 2. Vínculo determinístico pela minuta Comprasnet na informacao_complementar
+          if (uasg && numClean && ano) {
             if (
-              licNumInContract === `${numClean}/${ano}` ||
-              licNumInContract === `${padded5}/${ano}` ||
-              licNumInContract.includes(`${numClean}/${ano}`) ||
-              licNumInContract.includes(`${padded5}/${ano}`)
+              infoComp.includes(`${uasg}05${padded5}${ano}`) ||
+              infoComp.includes(`${uasg}05${numClean}${ano}`) ||
+              infoComp.includes(`${uasg}06${padded5}${ano}`) ||
+              infoComp.includes(`${uasg}06${numClean}${ano}`)
             ) {
               return true;
             }
-            if (infoComp.includes(`${padded5}${ano}`) || infoComp.includes(`${numClean}${ano}`)) {
-              return true;
+          }
+
+          // 3. Vínculo pelo número da licitação (ex.: 90001/2025 ou 00001/2025)
+          if (numClean && ano) {
+            const isDirectLicNumMatch = licNumInContract === `${numClean}/${ano}` ||
+              licNumInContract === `${padded5}/${ano}` ||
+              licNumInContract.includes(`${numClean}/${ano}`) ||
+              licNumInContract.includes(`${padded5}/${ano}`);
+
+            if (isDirectLicNumMatch) {
+              // A licitação pertence à mesma UASG se qualquer uma das UASGs do contrato coincidir
+              const isUgMatch = !uasg ||
+                cUnidadeCompra === uasg ||
+                cContratanteUg === uasg ||
+                cOrigemUg === uasg ||
+                infoComp.includes(uasg);
+
+              if (isUgMatch) {
+                // Validação de domínio de objeto para evitar cruzamento de contratos homônimos
+                if (licObjNorm && cObjNorm) {
+                  const isCombustivelLic = licObjNorm.includes('combustivel') || licObjNorm.includes('abastecimento') || licObjNorm.includes('diesel') || licObjNorm.includes('gasolina');
+                  const isLimpezaMotoristaContrato = cObjNorm.includes('limpeza') || cObjNorm.includes('motorista') || cObjNorm.includes('direcao veicular') || cObjNorm.includes('portaria') || cObjNorm.includes('recepcao');
+                  if (isCombustivelLic && isLimpezaMotoristaContrato) {
+                    return false;
+                  }
+
+                  const isLimpezaMotoristaLic = licObjNorm.includes('limpeza') || licObjNorm.includes('motorista') || licObjNorm.includes('direcao veicular') || licObjNorm.includes('portaria') || licObjNorm.includes('recepcao');
+                  const isCombustivelContrato = cObjNorm.includes('combustivel') || cObjNorm.includes('abastecimento') || cObjNorm.includes('diesel') || cObjNorm.includes('gasolina');
+                  if (isLimpezaMotoristaLic && isCombustivelContrato) {
+                    return false;
+                  }
+                }
+                return true;
+              }
+
+              // Se o contrato não tiver nenhuma UG definida, valida por similaridade de objeto
+              if (!cUnidadeCompra && !cContratanteUg && !cOrigemUg && licObjNorm) {
+                if (cObjNorm && (cObjNorm.includes(licObjNorm.slice(0, 20)) || licObjNorm.includes(cObjNorm.slice(0, 20)))) {
+                  return true;
+                }
+              }
             }
           }
-          if (procClean && cProcClean && (procClean === cProcClean || procClean.includes(cProcClean) || cProcClean.includes(procClean)) && procClean.length >= 8) {
-            return true;
-          }
+
           return false;
         });
 
@@ -329,21 +387,48 @@ function LicitacaoDetailsDialog({
             const matchedLocal = dbEmpenhos.filter((emp) => {
               const empProcClean = emp.processo ? String(emp.processo).replace(/\D/g, '') : '';
               const descNorm = normalizeText(emp.descricao || '');
-              const docKey = `15836626435${emp.numero}`;
+              const docKey = `${uasg || '158366'}26435${emp.numero}`;
               const docItems = cachedMap.get(docKey) || [];
 
               if (procClean && empProcClean && (procClean === empProcClean || empProcClean.includes(procClean) || procClean.includes(empProcClean)) && procClean.length >= 8) {
                 return true;
               }
-              if (numClean && ano) {
-                if (
-                  descNorm.includes(`pregao ${numClean}/${ano}`) ||
+              if (numClean && ano && uasg) {
+                const isPregaoMatch = descNorm.includes(`pregao ${numClean}/${ano}`) ||
                   descNorm.includes(`pe ${numClean}/${ano}`) ||
                   descNorm.includes(`pregao eletronico ${numClean}/${ano}`) ||
                   descNorm.includes(`pregao eletronico nº ${numClean}/${ano}`) ||
                   descNorm.includes(`pregao nº ${numClean}/${ano}`) ||
-                  descNorm.includes(`${numClean}/${ano}`)
-                ) {
+                  descNorm.includes(`${numClean}/${ano}`);
+
+                if (isPregaoMatch) {
+                  // Valida prefixo do processo para a UASG alvo
+                  if (empProcClean && empProcClean.length >= 5) {
+                    const procPrefix = empProcClean.slice(0, 5);
+                    const expectedPrefixes: Record<string, string> = {
+                      '158366': '23035',
+                      '158370': '23139',
+                      '158155': '23421',
+                      '158369': '23057',
+                      '158368': '23058',
+                      '158367': '23059',
+                      '158365': '23056',
+                      '152711': '23466',
+                      '158371': '23136',
+                      '158372': '23138',
+                      '158373': '23135',
+                      '158374': '23137',
+                      '158375': '23140',
+                      '154582': '23477',
+                      '154838': '23547',
+                      '154839': '23548',
+                      '154840': '23549',
+                      '152756': '23467',
+                      '152757': '23468',
+                    };
+                    const expected = expectedPrefixes[uasg];
+                    if (expected && procPrefix !== expected) return false;
+                  }
                   return true;
                 }
               }
@@ -353,13 +438,17 @@ function LicitacaoDetailsDialog({
                 (licObjNorm.includes('energia eletrica') && descNorm.includes('energia') && descNorm.includes('fornecimento')) ||
                 (licObjNorm.includes('recepcao') && (descNorm.includes('recepcao') || descNorm.includes('recepcionista')))
               ) {
-                return true;
+                if (procClean && empProcClean && (procClean === empProcClean || empProcClean.includes(procClean) || procClean.includes(empProcClean))) {
+                  return true;
+                }
               }
               if (docItems.some((di: any) => {
                 const itemDescNorm = normalizeText(di.descricao);
                 return licObjNorm.includes('arbitragem') && itemDescNorm.includes('arbitragem');
               })) {
-                return true;
+                if (procClean && empProcClean && (procClean === empProcClean || empProcClean.includes(procClean) || procClean.includes(empProcClean))) {
+                  return true;
+                }
               }
               return false;
             });
@@ -371,12 +460,15 @@ function LicitacaoDetailsDialog({
               if (!existingNums.has(ce.numero)) {
                 existingNums.add(ce.numero);
                 const parentContrato = matchedContratos.find((c) => c.id === ce.contrato_api_id);
+                const ugCodigo = ce.unidade_gestora || (parentContrato?.raw_data as any)?.contratante?.unidade_gestora?.codigo || (parentContrato?.raw_data as any)?.unidade_compra || licitacao.uasgCodigo;
+                const ugCatalog = IFRN_UASG_CATALOG.find((u) => u.codigo === ugCodigo);
+                const ugNome = ugCatalog?.nome || (ugCodigo === licitacao.uasgCodigo ? licitacao.uasgNome : `UASG ${ugCodigo}`);
                 empenhosList.push({
                   numeroEmpenho: ce.numero,
                   valor: ce.valor_empenhado,
                   dataEmissao: ce.data_emissao,
                   credor: { nome: parentContrato?.fornecedor_nome },
-                  unidadeGestora: { codigo: ce.unidade_gestora || licitacao.uasgCodigo, nome: licitacao.uasgNome || 'IFRN' },
+                  unidadeGestora: { codigo: ugCodigo, nome: ugNome },
                   descricao: `Contrato Comprasnet ${parentContrato?.numero || ''}`,
                 });
               }
@@ -385,11 +477,14 @@ function LicitacaoDetailsDialog({
             for (const mc of matchedContratos) {
               if (mc.numero && mc.numero.includes('NE') && !existingNums.has(mc.numero)) {
                 existingNums.add(mc.numero);
+                const ugCodigo = (mc.raw_data as any)?.contratante?.unidade_gestora?.codigo || (mc.raw_data as any)?.unidade_compra || licitacao.uasgCodigo;
+                const ugCatalog = IFRN_UASG_CATALOG.find((u) => u.codigo === ugCodigo);
+                const ugNome = ugCatalog?.nome || (ugCodigo === licitacao.uasgCodigo ? licitacao.uasgNome : `UASG ${ugCodigo}`);
                 empenhosList.push({
                   numeroEmpenho: mc.numero,
                   valor: mc.valor_global,
                   credor: { nome: mc.fornecedor_nome },
-                  unidadeGestora: { codigo: licitacao.uasgCodigo, nome: licitacao.uasgNome || 'IFRN' },
+                  unidadeGestora: { codigo: ugCodigo, nome: ugNome },
                   descricao: `Instrumento Comprasnet ${mc.numero}`,
                 });
               }
@@ -399,12 +494,15 @@ function LicitacaoDetailsDialog({
             for (const local of matchedLocal) {
               if (!existingNums.has(local.numero)) {
                 existingNums.add(local.numero);
+                const ugCodigo = licitacao.uasgCodigo;
+                const ugCatalog = IFRN_UASG_CATALOG.find((u) => u.codigo === ugCodigo);
+                const ugNome = ugCatalog?.nome || licitacao.uasgNome || `UASG ${ugCodigo}`;
                 empenhosList.push({
                   numeroEmpenho: local.numero,
                   valor: local.valor,
                   dataEmissao: local.data_empenho,
                   credor: { nome: local.favorecido_nome },
-                  unidadeGestora: { codigo: licitacao.uasgCodigo, nome: licitacao.uasgNome || 'IFRN' },
+                  unidadeGestora: { codigo: ugCodigo, nome: ugNome },
                   descricao: local.descricao,
                 });
               }
@@ -1089,7 +1187,6 @@ export default function LicitacoesPregoes() {
                   <TableRow key={row.id}>
                     <TableCell className="min-w-[170px]">
                       <p className="font-mono text-xs font-semibold text-text-primary">{row.numeroCompra}/{row.anoCompra}</p>
-                      <p className="mt-0.5 font-mono text-[11px] text-text-secondary">{row.numeroControlePncp}</p>
                       {row.processo ? <p className="mt-0.5 font-mono text-[11px] text-text-secondary">{row.processo}</p> : null}
                     </TableCell>
                     <TableCell className="min-w-[320px]">
