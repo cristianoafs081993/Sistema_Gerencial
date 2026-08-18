@@ -485,8 +485,7 @@ export default function ImportacaoDados() {
     setLoadingPipeline('empenhos-siafi');
     const toastId = toast.loading('Processando arquivo SIAFI de empenhos...');
     try {
-      const text = await file.text();
-      const parsedRows = parseSiafiCsv(text);
+      const parsedRows = await parseSiafiCsv(file);
       if (!parsedRows.length) {
         toast.error('Nenhum dado válido encontrado no CSV.', { id: toastId });
         return;
@@ -494,7 +493,7 @@ export default function ImportacaoDados() {
       const syncResult = await syncSiafiDataToDb(parsedRows);
       await refreshData();
       toast.success(
-        `SIAFI processado: ${syncResult.updated} atualizado(s), ${syncResult.created} criado(s), ${syncResult.errors} erro(s).`,
+        `SIAFI processado: ${syncResult.atualizados} atualizado(s), ${syncResult.criados} criado(s), ${syncResult.erros} erro(s).`,
         { id: toastId },
       );
     } catch (error) {
@@ -510,8 +509,7 @@ export default function ImportacaoDados() {
     setLoadingPipeline('rap-saldo');
     const toastId = toast.loading('Processando saldo de Restos a Pagar...');
     try {
-      const text = await file.text();
-      const parsedRows = parseSiafiCsv(text);
+      const parsedRows = await parseSiafiCsv(file);
       if (!parsedRows.length) {
         toast.error('Nenhum dado válido encontrado no CSV de Saldo RAP.', { id: toastId });
         return;
@@ -519,7 +517,7 @@ export default function ImportacaoDados() {
       const syncResult = await syncSiafiDataToDb(parsedRows);
       await refreshData();
       toast.success(
-        `Saldo RAP processado: ${syncResult.updated} atualizado(s), ${syncResult.created} criado(s).`,
+        `Saldo RAP processado: ${syncResult.atualizados} atualizado(s), ${syncResult.criados} criado(s).`,
         { id: toastId },
       );
     } catch (error) {

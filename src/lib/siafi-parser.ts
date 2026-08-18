@@ -1,4 +1,4 @@
-﻿import { parseCurrency, formatarDocumento } from '@/lib/utils';
+import { parseCurrency, formatarDocumento } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 
 export interface SiafiEmpenhoData {
@@ -77,12 +77,13 @@ const isRapSaldoHeader = (line: string) => {
 };
 
 function parseCsvLine(line: string, delimiter: string): string[] {
+    const cleanLine = line.replace(/\0/g, '');
     const result: string[] = [];
     let current = '';
     let inQuotes = false;
 
-    for (let i = 0; i < line.length; i++) {
-        const char = line[i];
+    for (let i = 0; i < cleanLine.length; i++) {
+        const char = cleanLine[i];
         if (char === '"') {
             inQuotes = !inQuotes;
         } else if (char === delimiter && !inQuotes) {
@@ -100,31 +101,44 @@ function parseCsvLine(line: string, delimiter: string): string[] {
         if (value.startsWith('"') && value.endsWith('"') && value.length >= 2) {
             value = value.substring(1, value.length - 1);
         }
-        return value.replace(/""/g, '"');
+        return value.replace(/""/g, '"').trim();
     });
 }
 
-function decodeCsvBytes(bytes: Uint8Array) {
+function decodeCsvBytes(bytes: Uint8Array): string {
     if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
-        return new TextDecoder('utf-16le').decode(bytes);
+        return new TextDecoder('utf-16le').decode(bytes.subarray(2));
     }
 
     if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
-        return new TextDecoder('utf-16be').decode(bytes);
+        return new TextDecoder('utf-16be').decode(bytes.subarray(2));
     }
 
-    const utf8 = new TextDecoder('utf-8').decode(bytes);
-    if (utf8.includes('\ufffd')) {
-        return new TextDecoder('iso-8859-1').decode(bytes);
+    if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+        return new TextDecoder('utf-8').decode(bytes.subarray(3));
     }
 
-    return utf8;
+    // Detecta UTF-16 sem BOM via alternância de bytes nulos no range ASCII
+    if (bytes.length >= 4) {
+        if (bytes[0] === 0x00 && bytes[2] === 0x00) {
+            return new TextDecoder('utf-16be').decode(bytes);
+        }
+        if (bytes[1] === 0x00 && bytes[3] === 0x00) {
+            return new TextDecoder('utf-16le').decode(bytes);
+        }
+    }
+
+    try {
+        return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    } catch {
+        return new TextDecoder('windows-1252').decode(bytes);
+    }
 }
 
 const padDatePart = (value: string) => value.padStart(2, '0');
 
 const parseSiafiDate = (value: string): string | null => {
-    const cleanValue = String(value || '').trim();
+    const cleanValue = String(value || '').replace(/\0/g, '').trim();
     if (!cleanValue) return null;
 
     const brDate = cleanValue.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4}|\d{2})/);
@@ -167,7 +181,8 @@ const parseSiafiDate = (value: string): string | null => {
 const defaultEmpenhoDate = (numeroResumido: string) => `${numeroResumido.substring(0, 4)}-01-01`;
 
 const parseRapSaldoCsvText = (text: string): SiafiEmpenhoData[] => {
-    const lines = text.split(/\r?\n/);
+    const cleanText = text.replace(/\0/g, '');
+    const lines = cleanText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     let headerIndex = -1;
     let delimiter = ';';
 
@@ -180,7 +195,7 @@ const parseRapSaldoCsvText = (text: string): SiafiEmpenhoData[] => {
     }
 
     if (headerIndex === -1) {
-        throw new Error('Colunas do CSV de saldo de RAP nao encontradas. Verifique o cabecalho com "NE CCor" e "Metrica".');
+        throw new Error('Colunas do CSV de saldo de RAP não encontradas. Verifique o cabeçalho com "NE CCor" e "Métrica".');
     }
 
     const headers = parseCsvLine(lines[headerIndex], delimiter);
@@ -188,8 +203,8 @@ const parseRapSaldoCsvText = (text: string): SiafiEmpenhoData[] => {
     const colMetrica = findSiafiColumn(headers, 'Metrica');
     const colValor = findSiafiColumn(headers, 'Valor', 'Saldo', 'Saldo - Moeda Origem');
 
-    if (colNE === -1 || colMetrica === -1) {
-        throw new Error('Colunas "NE CCor" e "Metrica" sao obrigatorias no CSV de saldo de RAP.');
+    if (colNE === -1) {
+        throw new Error('Coluna "NE CCor" é obrigatória no CSV de saldo de RAP.');
     }
 
     const data: SiafiEmpenhoData[] = [];
@@ -202,7 +217,7 @@ const parseRapSaldoCsvText = (text: string): SiafiEmpenhoData[] => {
         const numeroCompleto = String(cols[colNE] || '').trim();
         if (!numeroCompleto || !numeroCompleto.includes('NE')) continue;
 
-        const metrica = String(cols[colMetrica] || '').trim();
+        const metrica = colMetrica >= 0 ? String(cols[colMetrica] || '').trim() : '';
         if (metrica && !normalizeSiafiHeader(metrica).includes('SALDO')) continue;
 
         const fallbackValue = cols.find((value, index) => index !== colNE && index !== colMetrica && String(value || '').trim());
@@ -238,14 +253,15 @@ const parseRapSaldoCsvText = (text: string): SiafiEmpenhoData[] => {
 };
 
 export function parseSiafiCsvText(text: string): SiafiEmpenhoData[] {
-    const lines = text.split(/\r?\n/);
+    const cleanText = text.replace(/\0/g, '');
+    const lines = cleanText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
     if (lines.length < 2) {
         throw new Error('Arquivo vazio ou com formato invalido.');
     }
 
     if (lines.slice(0, 15).some(isRapSaldoHeader)) {
-        return parseRapSaldoCsvText(text);
+        return parseRapSaldoCsvText(cleanText);
     }
 
     let headerIndex = -1;

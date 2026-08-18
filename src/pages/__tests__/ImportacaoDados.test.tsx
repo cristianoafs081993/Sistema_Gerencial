@@ -42,6 +42,11 @@ vi.mock('@/services/descentralizacoes', () => ({
   },
 }));
 
+vi.mock('@/lib/siafi-parser', () => ({
+  parseSiafiCsv: vi.fn(),
+  syncSiafiDataToDb: vi.fn(),
+}));
+
 vi.mock('sonner', () => ({
   toast: {
     success: vi.fn(),
@@ -218,5 +223,51 @@ describe('ImportacaoDados', () => {
       }),
     );
     expect(addDescentralizacao).not.toHaveBeenCalled();
+  });
+
+  it('processa upload de Saldo RAP passando o File para o parser e sincronizando no banco', async () => {
+    const { parseSiafiCsv, syncSiafiDataToDb } = await import('@/lib/siafi-parser');
+    vi.mocked(parseSiafiCsv).mockResolvedValue([
+      {
+        numeroCompleto: '158366264352024NE000010',
+        numeroResumido: '2024NE000010',
+        processo: '',
+        favorecidoNome: '',
+        favorecidoDocumento: '',
+        descricao: '',
+        naturezaDespesa: '',
+        planoInterno: '',
+        ptres: '',
+        isRap: true,
+        valorLiquidadoOficial: 0,
+        valorPagoOficial: 0,
+        valorEmpenhado: 0,
+        rapInscrito: 0,
+        rapALiquidar: 0,
+        rapLiquidado: 0,
+        rapPago: 0,
+        rapAPagar: 3570,
+        valorLiquidadoAPagar: 0,
+        saldoRapOficial: 3570,
+        rapSaldoOnly: true,
+      },
+    ]);
+    vi.mocked(syncSiafiDataToDb).mockResolvedValue({
+      atualizados: 1,
+      criados: 0,
+      erros: 0,
+    });
+
+    const { container } = renderPage();
+    const rapInput = container.querySelector('input[type="file"][accept=".csv"]:nth-of-type(3)') as HTMLInputElement;
+    expect(rapInput).toBeInTheDocument();
+
+    const file = new File(['"NE CCor","Métrica"\n"158366264352024NE000010","Saldo","3570"'], 'saldo_rap.csv', { type: 'text/csv' });
+    fireEvent.change(rapInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(parseSiafiCsv).toHaveBeenCalledWith(file);
+      expect(syncSiafiDataToDb).toHaveBeenCalled();
+    });
   });
 });

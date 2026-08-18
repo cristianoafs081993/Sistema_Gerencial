@@ -8,7 +8,7 @@ vi.mock('@/lib/supabase', () => ({
   },
 }));
 
-import { parseSiafiCsvText, syncSiafiDataToDb } from '@/lib/siafi-parser';
+import { parseSiafiCsv, parseSiafiCsvText, syncSiafiDataToDb } from '@/lib/siafi-parser';
 
 describe('siafi-parser', () => {
   beforeEach(() => {
@@ -186,5 +186,54 @@ describe('siafi-parser', () => {
     expect(updateMock.mock.calls[0][0]).not.toHaveProperty('valor_liquidado_a_pagar');
     expect(updateMock.mock.calls[0][0]).not.toHaveProperty('rap_inscrito');
     expect(updateEqMock).toHaveBeenCalledWith('id', 'rap-2');
+  });
+
+  it('parseia o CSV de saldo de RAP com separador por virgula e cabecalho NE CCor / Metrica', () => {
+    const csvContent = [
+      '"NE CCor","Métrica",',
+      '"158366264352024NE000010","Saldo - Moeda Origem (Conta Contábil)","0,00"',
+      '"158366264352024NE000046","Saldo - Moeda Origem (Conta Contábil)","0,00"',
+      '"158366264352025NE000016","Saldo - Moeda Origem (Conta Contábil)","1.246,27"',
+      '"158366264352025NE000023","Saldo - Moeda Origem (Conta Contábil)","2.429,56"',
+    ].join('\n');
+
+    const rows = parseSiafiCsvText(csvContent);
+    expect(rows).toHaveLength(4);
+    expect(rows[0]).toMatchObject({
+      numeroResumido: '2024NE000010',
+      saldoRapOficial: 0,
+      isRap: true,
+      rapSaldoOnly: true,
+    });
+    expect(rows[2]).toMatchObject({
+      numeroResumido: '2025NE000016',
+      saldoRapOficial: 1246.27,
+      isRap: true,
+      rapSaldoOnly: true,
+    });
+    expect(rows[3]).toMatchObject({
+      numeroResumido: '2025NE000023',
+      saldoRapOficial: 2429.56,
+      isRap: true,
+      rapSaldoOnly: true,
+    });
+  });
+
+  it('parseia arquivo File com caracteres nulos ou codificado em UTF-16LE sem BOM', async () => {
+    const csvContent = [
+      '"NE CCor","Métrica",',
+      '"158366264352025NE000016","Saldo - Moeda Origem (Conta Contábil)","1.246,27"',
+    ].join('\n');
+
+    const buf = Buffer.from(csvContent, 'utf16le');
+    const file = new File([buf], 'saldo_rap_le.csv', { type: 'text/csv' });
+    const rows = await parseSiafiCsv(file);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      numeroResumido: '2025NE000016',
+      saldoRapOficial: 1246.27,
+      isRap: true,
+    });
   });
 });
