@@ -292,6 +292,6 @@ describe('Contratos', () => {
     renderContratos();
 
     expect(await screen.findByText(/Ultima sincronizacao:/i)).toHaveTextContent('sucesso');
-    expect(screen.getByRole('button', { name: /Atualizar Comprasnet/i })).toBeInTheDocument();
   });
 });
+

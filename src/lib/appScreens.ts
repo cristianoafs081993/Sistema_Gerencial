@@ -10,6 +10,7 @@ import {
   FileSearch,
   FileStack,
   FileText,
+  FolderSync,
   GraduationCap,
   LayoutDashboard,
   MessageSquare,
@@ -145,6 +146,15 @@ export const appScreens: AppScreen[] = [
     path: '/modelos-documentos',
     icon: FileText,
     sortOrder: 30,
+    isAdminOnly: true,
+  },
+  {
+    id: 'importacao-dados',
+    groupId: 'administracao',
+    name: 'Importação de Dados',
+    path: '/importacao-dados',
+    icon: FolderSync,
+    sortOrder: 35,
     isAdminOnly: true,
   },
   {

@@ -51,7 +51,7 @@ Tokens principais:
 - `Table`: cabecalho suave, linhas com divisor claro e texto denso.
 - `StatCard`: tons `default`, `primary`, `plus`, `luxe` e `error`; o legado `stitchColor` segue aceito para compatibilidade.
 - `SectionPanel`, `FilterPanel`, `DataTablePanel`, `ChartPanel` e `TablePagination` sao os blocos oficiais de composicao.
-- A pagina `/credito-disponivel` reutiliza `StatCard`, `FilterPanel`, `DataTablePanel` e `TablePagination` para exibir o relatorio detalhado sem introduzir tokens visuais novos.
+- A pagina `/credito-disponivel` reutiliza `FilterPanel`, `DataTablePanel` e `TablePagination` para exibir o relatorio detalhado sem introduzir tokens visuais novos.
 
 ## Regras
 

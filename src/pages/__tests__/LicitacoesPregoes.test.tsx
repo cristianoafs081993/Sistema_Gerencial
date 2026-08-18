@@ -150,7 +150,8 @@ describe('LicitacoesPregoes', () => {
     renderPage();
 
     expect(await screen.findByText('Servicos de combustiveis para o campus')).toBeInTheDocument();
-    expect(screen.getByText('10877412000168-1-000198/2025')).toBeInTheDocument();
+    expect(screen.getByText('90001/2025')).toBeInTheDocument();
+    expect(screen.getByText('23035001765202521')).toBeInTheDocument();
     expect(mockedService.list).toHaveBeenCalledWith(expect.objectContaining({
       uasgCodigo: undefined,
     }));
@@ -160,7 +161,8 @@ describe('LicitacoesPregoes', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Detalhar/i }));
 
-    expect(await screen.findByText('Retirada do edital nos portais oficiais.')).toBeInTheDocument();
+    expect(await screen.findByText('10877412000168-1-000198/2025')).toBeInTheDocument();
+    expect(screen.getByText('Retirada do edital nos portais oficiais.')).toBeInTheDocument();
     expect(screen.getByText('Lei 14.133/2021, Art. 28, I')).toBeInTheDocument();
     expect(screen.getByText('Itens PNCP')).toBeInTheDocument();
     expect(screen.getByText('Óleo diesel S10 para frota oficial')).toBeInTheDocument();
@@ -228,5 +230,30 @@ describe('LicitacoesPregoes', () => {
         source: 'frontend-ifrn-cache',
       }));
     });
+  });
+
+  it('nao associa contratos e empenhos de outros campi com mesmo numero de licitacao', async () => {
+    const licitacaoCaico = {
+      ...licitacao,
+      id: 'lic-caico',
+      numeroControlePncp: '10877412000168-1-000110/2026',
+      uasgCodigo: '158370',
+      uasgNome: 'CAMPUS CAICÓ',
+      numeroCompra: '90001',
+      anoCompra: 2026,
+      processo: '23139003046202587',
+      objetoCompra: 'Manutencao predial Caico',
+    };
+
+    mockedService.list.mockResolvedValueOnce({ rows: [licitacaoCaico], count: 1 });
+
+    renderPage();
+
+    expect(await screen.findByText('Manutencao predial Caico')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Detalhar/i }));
+
+    expect(await screen.findByText('10877412000168-1-000110/2026')).toBeInTheDocument();
+    // Garante que não carrega o empenho de recepcionista da UG 158366
+    expect(screen.queryByText('LG. ADMINISTRADORA DE SERVICOS LTDA')).not.toBeInTheDocument();
   });
 });

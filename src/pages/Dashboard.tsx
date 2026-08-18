@@ -1012,6 +1012,7 @@ export default function Dashboard() {
     contaDescentralizacoes,
     isLoading,
     updateEmpenho,
+    refreshData,
   } = useData();
   const [hoveredBudgetDimension, setHoveredBudgetDimension] = useState<string | null>(null);
   const [selectedBudgetDimensionCode, setSelectedBudgetDimensionCode] = useState<string | null>(null);
@@ -1819,6 +1820,7 @@ export default function Dashboard() {
             dadosDescentralizacao={dadosDescentralizacao}
             uniqueOrigens={uniqueOrigens}
             dadosPorNatureza={dadosPorNatureza}
+            onSuccessAtividade={refreshData}
           />
         </TabsContent>
 

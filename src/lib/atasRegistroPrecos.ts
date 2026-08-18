@@ -58,11 +58,11 @@ export type AtaRegistroPrecoAdesaoPayload = {
   raw_data: AtaRegistroPrecoRaw;
 };
 
-function asRecord(value: unknown): Record<string, unknown> {
+export function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
-function firstString(raw: Record<string, unknown>, keys: string[]) {
+export function firstString(raw: Record<string, unknown>, keys: string[]) {
   for (const key of keys) {
     const value = raw[key];
     if (value === null || value === undefined) continue;
@@ -73,11 +73,23 @@ function firstString(raw: Record<string, unknown>, keys: string[]) {
 }
 
 function firstNumber(raw: Record<string, unknown>, keys: string[]) {
-  const value = firstString(raw, keys);
-  if (!value) return null;
-  const normalized = value.replace(/\./g, '').replace(',', '.');
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : null;
+  for (const key of keys) {
+    const value = raw[key];
+    if (value === null || value === undefined) continue;
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : null;
+    }
+    const str = String(value).trim();
+    if (!str) continue;
+    if (str.includes(',')) {
+      const parsed = Number(str.replace(/\./g, '').replace(',', '.'));
+      if (Number.isFinite(parsed)) return parsed;
+    } else {
+      const parsed = Number(str);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+  return null;
 }
 
 function firstDate(raw: Record<string, unknown>, keys: string[]) {
@@ -159,6 +171,11 @@ export function mapAtaRegistroPrecoItem(raw: AtaRegistroPrecoRaw, ata: Pick<AtaR
   const row = asRecord(raw);
   const numeroItem = firstString(row, ['numeroItem', 'numero_item', 'item']);
   if (!numeroItem) throw new Error(`Item de ata ${ata.ata_key} sem numero.`);
+
+  const rawNumeroAta = firstString(row, ['numeroAtaRegistroPreco', 'numeroAta', 'numero_ata']);
+  if (rawNumeroAta && rawNumeroAta !== ata.numero_ata) {
+    throw new Error(`Item com numero de ata divergente (${rawNumeroAta}) da ata ${ata.numero_ata}.`);
+  }
 
   return {
     item_key: buildAtaItemKey(ata.ata_key, raw),

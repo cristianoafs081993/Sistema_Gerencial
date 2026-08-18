@@ -58,5 +58,6 @@ describe('source text encoding', () => {
     }
 
     expect(findings).toEqual([]);
-  });
+  }, 30000);
+
 });

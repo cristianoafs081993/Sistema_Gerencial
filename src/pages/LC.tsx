@@ -93,10 +93,8 @@ export default function LCPage() {
   const [dialogTab, setDialogTab] = useState<'macro' | 'grid'>('grid');
   const [isCopied, setIsCopied] = useState(false);
   const [pageLC, setPageLC] = useState(1);
-  const [pagePendencias, setPagePendencias] = useState(1);
   const [pageSizeLC, setPageSizeLC] = useState(100);
   const [pageSizePendencias, setPageSizePendencias] = useState(100);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
   const queryLCDeferred = useDeferredValue(queryLC);
   const queryPendenciasDeferred = useDeferredValue(queryPendencias);
@@ -124,23 +122,6 @@ export default function LCPage() {
   useEffect(() => {
     loadLatest();
   }, []);
-
-  const handleUpload = async (file?: File) => {
-    if (!file) return;
-
-    try {
-      setIsUploading(true);
-      const parsed = await parseLCCsv(file);
-      await saveLCRows(parsed, file.name);
-      setRows(parsed);
-      setPageLC(1);
-    } catch (error) {
-      console.error('Erro ao importar LC:', error);
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
 
   const consolidatedRows = useMemo(() => {
     const byCpf = new Map<string, LCRegistro[]>();
@@ -399,13 +380,6 @@ export default function LCPage() {
   return (
     <div className="space-y-6 pb-10">
       <input
-        ref={fileInputRef}
-        type="file"
-        accept=".csv,.xlsx,.xls"
-        className="hidden"
-        onChange={(e) => handleUpload(e.target.files?.[0])}
-      />
-      <input
         ref={pdfInputRef}
         type="file"
         accept=".pdf"
@@ -418,16 +392,6 @@ export default function LCPage() {
         title="Lista de Credores (LC)"
         actions={
           <div className="flex items-center gap-2">
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              size="sm"
-              variant="outline"
-              disabled={isUploading}
-              className="gap-space-2 h-space-9 shadow-shadow-sm"
-            >
-              <Upload className="h-4 w-4" />
-              {isUploading ? 'Carregando...' : 'Upload CSV LC'}
-            </Button>
             <Button
               onClick={() => pdfInputRef.current?.click()}
               size="sm"

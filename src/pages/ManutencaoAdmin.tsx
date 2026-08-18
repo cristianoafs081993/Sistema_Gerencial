@@ -1490,7 +1490,7 @@ export default function ManutencaoAdmin() {
 
         {/* Tab: Dashboard */}
         <TabsContent value="dashboard" className="mt-0">
-          <SectionPanel contentClassName="space-y-6">
+          <SectionPanel contentClassName="space-y-6" className="rounded-tl-none">
             {/* Dashboard Filters Toolbar */}
             <div className="bg-surface-subtle/40 border border-border-default/60 rounded-xl p-3.5 mb-6 flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
@@ -2162,10 +2162,7 @@ export default function ManutencaoAdmin() {
         {/* Tab: Visão Geral / Mapa */}
         <TabsContent value="mapa" className="mt-0 space-y-6">
           {/* Campus map */}
-          <div className={cn(
-            "bg-white p-4 border border-border-default/80 shadow-soft space-y-3 relative z-0 rounded-b-2xl rounded-tr-2xl",
-            activeTab === 'mapa' ? 'rounded-tl-none' : 'rounded-tl-2xl'
-          )}>
+          <div className="bg-white p-4 border border-border-default/80 shadow-soft space-y-3 relative z-0 rounded-2xl">
                 <div className="flex items-center justify-between">
                   <h3 className="font-extrabold text-slate-800 text-sm uppercase tracking-wide">
                     Mapa do Campus - Currais Novos

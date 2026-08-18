@@ -53,6 +53,58 @@ Dependencias:
 - `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
 - opcional `GEMINI_LIQUIDACAO_MODEL`, com fallback para `gemini-2.5-flash-lite` e `gemini-2.5-flash`
 
+### `assistente-gerencial`
+
+Local:
+
+- [assistente-gerencial/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/assistente-gerencial/index.ts)
+- [assistente-gerencial/domain.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/assistente-gerencial/domain.ts)
+
+Chamador:
+
+- [assistenteGerencial.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/assistenteGerencial.ts)
+- [AIAssistantWidget.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/ai/AIAssistantWidget.tsx)
+
+Uso:
+
+- responde perguntas gerenciais sobre dados do sistema em linguagem natural
+- consulta fontes allowlisted e calcula agregações determinísticas antes de chamar o Gemini
+- cobre orçamento, empenhos, créditos disponíveis, documentos hábeis, financeiro, contratos API, PFs e conciliação
+- valida o usuário autenticado pelo JWT recebido e usa o cliente Supabase com esse mesmo token, respeitando RLS
+- para descentralizações, detalha total líquido por PTRES e PI e trata Campus Currais Novos como o escopo natural dos dados do sistema
+- para contratos, usa `contratos_api.situacao_derivada = true`, separa Campus `158366` e Reitoria `158155` com evidência operacional do campus, e calcula rankings por empenhado/saldo
+
+Entrada esperada:
+
+```json
+{
+  "message": "Quais empenhos tem maior saldo?",
+  "history": [{ "role": "user", "content": "Resumo da execucao" }]
+}
+```
+
+Saída:
+
+```json
+{
+  "response": "Resposta em Markdown simples.",
+  "suggestions": ["Próxima pergunta"],
+  "warnings": [],
+  "sources": [{ "label": "descentralizacoes", "totalAmostra": 36, "totalDisponivel": 36 }],
+  "model": "gemini-2.5-flash-lite"
+}
+```
+
+Dependências:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- opcional `GEMINI_ASSISTENTE_GERENCIAL_MODEL`
+
+Observação:
+
+- publicada com `verify_jwt = false`, pois a validação do token acontece dentro da própria function
+- o LLM não recebe tabelas cruas como fonte primária de cálculo; ele recebe blocos de `Resumo calculado`, `Evidências principais`, `Limitações dos dados` e `Fontes consultadas`
+
 ### `process-pdf` e `process-pdf-worker`
 
 Local:
@@ -404,14 +456,13 @@ Local:
 
 Uso:
 
-- sincroniza contratos das UGs `158366` e `158155` a partir de `https://contratos.comprasnet.gov.br/api`
+- sincroniza contratos e empenhos de todas as 19 Unidades Gestoras (UASGs) do catálogo institucional do IFRN (`DEFAULT_PNCP_UASGS`) a partir de `https://contratos.comprasnet.gov.br/api`
 - busca contratos ativos, inativos, historico, empenhos, faturas e itens
 - deriva `situacao_derivada`, `vigencia_inicio_derivada`, `vigencia_fim_derivada`, `situacao_derivada_motivo` e `campus_scope_reason` em `contratos_api`
 - considera ativo somente contrato com vigencia derivada pelo historico ainda vigente; termos de rescisao/cancelamento tornam o contrato inativo; sem historico, usa `vigencia_fim` da listagem como fallback com motivo registrado. Se o historico estiver vencido mas o contrato for ativo na API com faturas nos ultimos 120 dias, e reativado com motivo `historico_vencido_com_fatura_recente`
-- contratos da UG `158155` entram no escopo somente com evidencia operacional estruturada do campus `158366`, como empenho ou fatura com UG/contratante do campus
+- contratos da UG `158155` entram no escopo do campus somente com evidencia operacional estruturada do campus `158366`, como empenho ou fatura com UG/contratante do campus
 - contratos com UASG/origem `158366` cujo objeto indique atendimento a outro campus avancado, como Parelhas ou Jucurutu, sao marcados fora do escopo com `ug_campus_objeto_fora_currais_novos`
-- na UG `158155`, a coleta e feita em etapas para reduzir consumo do worker: historico e empenhos primeiro; faturas e itens apenas para contratos ativos e em escopo, ou quando a fatura ainda pode comprovar escopo
-- grava em `contratos_api_empenhos` somente empenhos cuja `unidade_gestora` seja `158366`; empenhos de outras unidades do contrato global nao entram nos totais nem nos badges da tela do campus
+- grava em `contratos_api_empenhos` os empenhos de todas as UASGs participantes do contrato, registrando sua respectiva `unidade_gestora`
 - deriva vinculos fatura-item de `dados_item_faturado`
 - deriva vinculos fatura-empenho de `dados_empenho`
 - grava contadores e falhas em `contratos_api_sync_runs`
@@ -424,8 +475,8 @@ Dependencias:
 Observacao:
 
 - publicada com `verify_jwt = false`, pois o cron chama a function por HTTP e a function usa service role apenas internamente
-- a migration agenda `sync-contratos-comprasnet-daily` com Supabase Cron/pg_net para executar diariamente as `03:00` no horario de Brasilia
-- a chamada sem `unidadeCodigo` sincroniza as UGs padrao `158366` e `158155`; valores fora desse conjunto sao rejeitados nesta versao
+- a migration `20260817170000_schedule_daily_sync_all_uasgs_empenhos.sql` agenda `sync-contratos-comprasnet-daily` com Supabase Cron/pg_net para executar diariamente as `03:00` no horario de Brasilia (`06:00 UTC`), sincronizando automaticamente contratos e empenhos de todas as 19 UASGs do IFRN
+- aceita `unidadeCodigos` ou `unidadeCodigo` para sincronizar UASGs específicas, e executa a varredura completa das 19 UASGs quando omitido
 - o endpoint de "ativos" do Comprasnet nao e fonte de verdade de vigencia; a exibicao da UI usa `situacao_derivada`, nao `situacao`
 
 ### `sync-licitacoes-pncp`
@@ -516,9 +567,9 @@ Observacao:
 
 - publicada com `verify_jwt = false`, seguindo o padrao das functions chamadas pelo frontend e por cron
 - se `ATAS_RP_SYNC_SECRET` for configurada, chamadas HTTP precisam enviar `x-atas-rp-sync-secret`
-- por padrao usa o catalogo interno IFRN de UASGs
 - o frontend chama a sincronizacao do catalogo interno em lotes por UASG; uma chamada HTTP unica com todas as UASGs pode exceder o limite da Edge Function quando o Compras.gov.br demora
 - `objetoBusca` e aplicado sobre os dados da ata antes da materializacao
+- a coleta de itens e realizada de forma agregada por UASG (`/modulo-arp/2_consultarARPItem`), com validacao estrita de correspondencia (`numeroAtaRegistroPreco`, `idCompra`, `numeroControlePncpAta`) antes do mapeamento para a ata pai, impedindo que itens de outras licitacoes/atas sejam indevidamente vinculados
 - os endpoints `modulo-arp/*` podem oscilar; a function registra falhas por escopo em `details.errors` e retorna `partial_success` quando alguma parte foi materializada
 - para evitar `504 Gateway Timeout` na Edge Function, a sincronizacao chamada pela tela usa `includeDetalhes=false` e materializa primeiro somente a lista de atas; itens, participantes e adesoes devem ser enriquecidos em chamadas especificas/posteriores quando necessario
 - `includeParticipantes=true` materializa itens e unidades de `/modulo-arp/3_consultarUnidadesItem` sem obrigar a consulta de adesoes; a tela usa esse modo ao buscar `Participante` para uma UASG IFRN, varrendo o catalogo interno em lotes porque a API nao filtra participantes diretamente por UASG
@@ -570,8 +621,7 @@ Uso:
 - em modo `refreshLinkedRequisicaoEmpenhos`, descobre empenhos vinculados diretamente a terceirizados e empenhos de requisicoes recentes em `draft`/`review`; para requisicoes usa `requisicao_compra_empenhos` e mantem fallback pelos campos legados `requisicoes_compra.empenho_id/empenho_numero`, pre-aquecendo o cache para `/requisicao-compra`
 - em modo `refreshPositiveEmpenhos`, percorre em paginas todas as NEs com saldo positivo em `empenhos`; `empenhoTipo = rap` processa RAP e `empenhoTipo = exercicio` processa empenhos do exercicio, usando a mesma regra de saldo da RPC `fn_empenho_saldo_disponivel`
 - em modo `readCacheOnly` com `returnRows`, devolve as linhas ja materializadas no cache sem consultar novamente o Portal
-- com `returnRows`, a atualizacao pode devolver as linhas recem-materializadas para o primeiro acesso do frontend; se a function estiver indisponivel, o frontend usa consulta direta como fallback
-- consulta `/api-de-dados/despesas/itens-de-empenho` usando `codigoDocumento = 158366 + 26435 + numero do empenho`
+- consulta `/api-de-dados/despesas/itens-de-empenho` resolvendo dinamicamente a UASG de emissão do empenho a partir de `contratos_api_empenhos`, tabela `empenhos` ou prefixo de processo (`codigoDocumento = <uasg> + 26435 + numero do empenho`)
 - salva dados em `portal_transparencia_empenho_itens_cache_status` e `portal_transparencia_empenho_itens_cache`
 
 Dependencias:

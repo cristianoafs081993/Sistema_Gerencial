@@ -244,10 +244,8 @@ export default function EnergiaCampus() {
   const location = useLocation();
   const view = getView(location.pathname);
   const { isSuperAdmin } = useAuth();
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [data, setData] = useState<EnergiaCampusData>(emptyData);
   const [isLoading, setIsLoading] = useState(true);
-  const [isUploading, setIsUploading] = useState(false);
   const [startDate, setStartDate] = useState(DEFAULT_START_DATE);
   const [endDate, setEndDate] = useState(DEFAULT_END_DATE);
   const [sourceFilter, setSourceFilter] = useState<'all' | EnergiaFonte>('all');
@@ -332,24 +330,6 @@ export default function EnergiaCampus() {
   const quantidadeFaturasVisaoGeral = metrics.faturasQuantidade + mercattoContratosApi.faturas.length;
   const title = getTitle(view);
 
-  const handleUpload = async (file?: File) => {
-    if (!file) return;
-
-    setIsUploading(true);
-    try {
-      const parsed = await parseEnergiaCampusWorkbook(file);
-      await saveEnergiaCampusImport(parsed, file.name);
-      toast.success(`Base de energia importada: ${file.name}`);
-      await loadData();
-    } catch (error) {
-      console.error(error);
-      toast.error(error instanceof Error ? error.message : 'Falha ao importar planilha de energia.');
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
   const commonActions = (
     <div className="flex flex-wrap items-center justify-end gap-2">
       <input
@@ -377,28 +357,6 @@ export default function EnergiaCampus() {
         <option value="mercatto">Mercatto</option>
         <option value="solar">UFVs</option>
       </select>
-      {isSuperAdmin ? (
-        <>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            className="hidden"
-            onChange={(event) => void handleUpload(event.target.files?.[0])}
-          />
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-9 gap-2"
-            disabled={isUploading}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Upload className="h-4 w-4" />
-            {isUploading ? 'Importando...' : 'Importar XLSX'}
-          </Button>
-        </>
-      ) : null}
     </div>
   );
 

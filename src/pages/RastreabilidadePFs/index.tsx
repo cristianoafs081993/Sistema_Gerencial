@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { RastreabilidadePF } from '@/types/pfs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,19 +22,14 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Upload, Search, Filter, ArrowUpDown, ChevronRight, Eye } from 'lucide-react';
-import { PFImportDialog } from '@/components/modals/PFImportDialog';
+import { Search, Filter, ArrowUpDown, ChevronRight, Eye } from 'lucide-react';
 import { PFDetailsDialog } from '@/components/modals/PFDetailsDialog';
-import { HeaderActions } from '@/components/HeaderParts';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
-import { useAuth } from '@/contexts/AuthContext';
 import { rastreabilidadePFsService } from '@/services/rastreabilidadePFs';
 
 export default function RastreabilidadePFs() {
-  const { isSuperAdmin } = useAuth();
   const [data, setData] = useState<RastreabilidadePF[]>([]);
   const [loading, setLoading] = useState(true);
-  const [importOpen, setImportOpen] = useState(false);
 
   // Filtros
   const currentMonth = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'][new Date().getMonth()];
@@ -155,16 +150,6 @@ export default function RastreabilidadePFs() {
 
   return (
     <div className="space-y-6 pb-10">
-
-      <HeaderActions>
-        {isSuperAdmin ? (
-          <Button onClick={() => setImportOpen(true)} size="sm" className="gap-space-2 h-space-9 shadow-shadow-sm">
-            <Upload className="h-4 w-4" />
-            Importar arquivos
-          </Button>
-        ) : null}
-      </HeaderActions>
-
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard
           title="Total Solicitado"
@@ -364,14 +349,6 @@ export default function RastreabilidadePFs() {
           </div>
         </CardContent>
       </Card>
-
-      {isSuperAdmin ? (
-        <PFImportDialog
-          open={importOpen}
-          onOpenChange={setImportOpen}
-          onSuccess={fetchData}
-        />
-      ) : null}
 
       <PFDetailsDialog
         pf={selectedPF}

@@ -224,3 +224,8 @@ export function useData() {
 
   return context;
 }
+
+export function useOptionalData() {
+  return useContext(DataContext);
+}
+

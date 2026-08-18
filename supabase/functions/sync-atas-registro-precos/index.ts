@@ -2,6 +2,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 
 import { DEFAULT_PNCP_UASGS } from '../../../src/lib/licitacoesPncp.ts';
 import {
+  asRecord,
+  buildAtaKey,
+  firstString,
   mapAtaRegistroPreco,
   mapAtaRegistroPrecoAdesao,
   mapAtaRegistroPrecoItem,
@@ -326,22 +329,40 @@ async function runSync(supabase: SupabaseClient, body: SyncRequest) {
 
     const atas = Array.from(atasByKey.values());
     if (includeParticipantes || includeAdesoes) {
-      const ataItems = await mapWithConcurrency(atas, async (ata) => {
+      await mapWithConcurrency(unidadeCodigos, async (unidadeCodigo) => {
         try {
-          const rawItems = await fetchAtaItems(ata.unidade_gerenciadora_codigo, dataInicial, dataFinal, ata.numero_ata);
-          return {
-            ata,
-            items: rawItems.map((rawItem) => mapAtaRegistroPrecoItem(rawItem, ata)),
-          } satisfies AtaWithItems;
+          const rawItems = await fetchAtaItems(unidadeCodigo, dataInicial, dataFinal, numeroAta);
+          for (const rawItem of rawItems) {
+            const raw = asRecord(rawItem);
+            const rawNumAta = firstString(raw, ['numeroAtaRegistroPreco', 'numeroAta', 'numero_ata']);
+            if (!rawNumAta) continue;
+
+            const targetAtaKey = buildAtaKey(unidadeCodigo, rawNumAta);
+            const parentAta = atasByKey.get(targetAtaKey);
+            if (!parentAta) continue;
+
+            const rawIdCompra = firstString(raw, ['idCompra', 'id_compra']);
+            const ataIdCompra = firstString(parentAta.raw_data, ['idCompra', 'id_compra']);
+            if (rawIdCompra && ataIdCompra && rawIdCompra !== ataIdCompra) continue;
+
+            const rawPncpAta = firstString(raw, ['numeroControlePncpAta', 'numeroControlePncp']);
+            const ataPncpAta = firstString(parentAta.raw_data, ['numeroControlePncpAta', 'numeroControlePncp']);
+            if (rawPncpAta && ataPncpAta && rawPncpAta !== ataPncpAta) continue;
+
+            const rawNumCompra = firstString(raw, ['numeroCompra', 'numero_compra']);
+            if (rawNumCompra && parentAta.numero_compra && rawNumCompra !== parentAta.numero_compra) continue;
+
+            try {
+              const mappedItem = mapAtaRegistroPrecoItem(rawItem, parentAta);
+              itemsByKey.set(mappedItem.item_key, mappedItem);
+            } catch {
+              // Ignora item divergente
+            }
+          }
         } catch (error) {
-          errors.push({ scope: `${ata.ata_key}:itens`, message: errorToMessage(error) });
-          return { ata, items: [] } satisfies AtaWithItems;
+          errors.push({ scope: `${unidadeCodigo}:itens`, message: errorToMessage(error) });
         }
       }, 3);
-
-      for (const ataItem of ataItems) {
-        for (const item of ataItem.items) itemsByKey.set(item.item_key, item);
-      }
 
       await mapWithConcurrency(Array.from(itemsByKey.values()), async (item) => {
         if (includeParticipantes) {

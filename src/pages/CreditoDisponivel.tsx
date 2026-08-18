@@ -1,23 +1,16 @@
-import { useMemo, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Banknote, FileSpreadsheet, Layers, Loader2, RefreshCw, Search, Upload } from 'lucide-react';
-import { toast } from 'sonner';
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Loader2, RefreshCw, Search } from 'lucide-react';
 
 import { HeaderActions, HeaderSubtitle } from '@/components/HeaderParts';
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { TablePagination } from '@/components/design-system/TablePagination';
-import { StatCard } from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useAuth } from '@/contexts/AuthContext';
-import { dataQueryKeys } from '@/contexts/dataQueryKeys';
-import {
-  creditosDisponiveisDetalhesService,
-  parseCreditoDisponivelFile,
-} from '@/services/creditosDisponiveisDetalhes';
+import { creditosDisponiveisDetalhesService } from '@/services/creditosDisponiveisDetalhes';
 
 type SaldoFilter = 'todos' | 'com-saldo' | 'zerado';
 
@@ -25,15 +18,7 @@ function formatCurrency(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function formatDateTime(value: string) {
-  return value ? new Date(value).toLocaleString('pt-BR') : '-';
-}
-
 export default function CreditoDisponivel() {
-  const queryClient = useQueryClient();
-  const { isSuperAdmin } = useAuth();
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [isUploading, setIsUploading] = useState(false);
   const [search, setSearch] = useState('');
   const [ptresFilter, setPtresFilter] = useState('todos');
   const [saldoFilter, setSaldoFilter] = useState<SaldoFilter>('com-saldo');
@@ -68,36 +53,11 @@ export default function CreditoDisponivel() {
     });
   }, [ptresFilter, report.rows, saldoFilter, search]);
 
-  const totalSaldo = filteredRows.reduce((sum, row) => sum + row.valor, 0);
-  const rowsWithBalance = filteredRows.filter((row) => row.valor !== 0).length;
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const paginatedRows = filteredRows.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const resetPage = () => setPage(1);
-
-  const handleUpload = async (file?: File) => {
-    if (!file) return;
-
-    setIsUploading(true);
-    const toastId = toast.loading('Processando relatório de crédito disponível...');
-
-    try {
-      const rows = await parseCreditoDisponivelFile(file);
-      await creditosDisponiveisDetalhesService.importReport(rows, file.name);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['creditos-disponiveis-detalhes'] }),
-        queryClient.invalidateQueries({ queryKey: dataQueryKeys.creditosDisponiveis }),
-      ]);
-      toast.success(`${rows.length} linha(s) importada(s) de crédito disponível.`, { id: toastId });
-      resetPage();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Não foi possível importar o relatório.', { id: toastId });
-    } finally {
-      setIsUploading(false);
-      if (inputRef.current) inputRef.current.value = '';
-    }
-  };
 
   return (
     <div className="space-y-6 pb-10">
@@ -110,58 +70,8 @@ export default function CreditoDisponivel() {
             {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             Atualizar
           </Button>
-          {isSuperAdmin ? (
-            <>
-              <input
-                ref={inputRef}
-                className="hidden"
-                type="file"
-                accept=".csv"
-                onChange={(event) => void handleUpload(event.target.files?.[0])}
-              />
-              <Button type="button" className="gap-2" onClick={() => inputRef.current?.click()} disabled={isUploading}>
-                {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                Importar CSV
-              </Button>
-            </>
-          ) : null}
         </div>
       </HeaderActions>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          title="Saldo disponível"
-          value={formatCurrency(totalSaldo)}
-          subtitle="Total no filtro atual"
-          icon={Banknote}
-          stitchColor="emerald-green"
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Linhas exibidas"
-          value={filteredRows.length}
-          subtitle={`${rowsWithBalance} com saldo`}
-          icon={FileSpreadsheet}
-          stitchColor="vibrant-blue"
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="PTRES"
-          value={new Set(filteredRows.map((row) => row.ptres)).size}
-          subtitle="Origens no filtro atual"
-          icon={Layers}
-          stitchColor="purple"
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Última importação"
-          value={report.importedAt ? new Date(report.importedAt).toLocaleDateString('pt-BR') : '-'}
-          subtitle={formatDateTime(report.importedAt)}
-          icon={RefreshCw}
-          stitchColor="amber"
-          isLoading={isLoading}
-        />
-      </div>
 
       <FilterPanel>
         <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_180px_180px]">

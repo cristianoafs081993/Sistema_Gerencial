@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
-import { Filter, Pencil, Plus, Search, Trash2, Upload } from 'lucide-react';
+import { Filter, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { HeaderActions } from '@/components/HeaderParts';
-import { JsonImportDialog } from '@/components/JsonImportDialog';
 import { StatCard } from '@/components/StatCard';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { TablePagination } from '@/components/design-system/TablePagination';
@@ -238,35 +237,6 @@ export default function Atividades() {
     setIsDialogOpen(true);
   };
 
-  const handleImport = async (data: Record<string, string>[]) => {
-    const toastId = toast.loading('Processando importacao...');
-
-    try {
-      const mappedData = data.map((row) => ({
-        dimensao: row.dimensao || '',
-        componenteFuncional: row.componentefuncional || '',
-        tipoAtividade: currentView.scope,
-        atividade: row.atividade || '',
-        descricao: row.descricao || '',
-        valorTotal: parseCurrency(row.valortotal || row.valor || '0'),
-        origemRecurso: row.origemrecurso || '',
-        naturezaDespesa: row.naturezadespesa || '',
-        planoInterno: row.planointerno || '',
-      }));
-
-      for (const item of mappedData) {
-        await atividadesService.create(item);
-      }
-
-      toast.success('Importacao concluida com sucesso.', { id: toastId });
-      setIsImportDialogOpen(false);
-      void fetchAtividades();
-    } catch (error) {
-      console.error('Erro ao importar JSON:', error);
-      toast.error('Erro ao processar importacao.', { id: toastId });
-    }
-  };
-
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
 
@@ -337,18 +307,6 @@ export default function Atividades() {
               >
                 <Trash2 className="h-4 w-4" />
                 Excluir ({selectedIds.size})
-              </Button>
-            ) : null}
-
-            {isSuperAdmin ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsImportDialogOpen(true)}
-                className="h-8 gap-2 px-4 text-xs sm:h-9 sm:text-sm"
-              >
-                <Upload className="h-4 w-4" />
-                Importar JSON
               </Button>
             ) : null}
 
@@ -671,16 +629,6 @@ export default function Atividades() {
         description={`Tem certeza que deseja excluir as ${selectedIds.size} atividades selecionadas? Esta ação não poderá ser desfeita.`}
         confirmText="Excluir atividades"
       />
-
-      {isSuperAdmin ? (
-        <JsonImportDialog
-          open={isImportDialogOpen}
-          onOpenChange={setIsImportDialogOpen}
-          onImport={handleImport}
-          title="Importar Atividades (JSON)"
-          expectedFields={atividadesJsonFields}
-        />
-      ) : null}
     </div>
   );
 }

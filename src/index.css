@@ -28,14 +28,14 @@
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 10%;
 
-    --border: 0 0% 88%;                 /* #E0E0E0 */
-    --input: 0 0% 88%;
+    --border: 0 0% 80%;                 /* Divisores nítidos */
+    --input: 0 0% 80%;
     --ring: 172 85% 27%;                /* SUAP Teal #0A7F70 */
 
-    --muted: 172 25% 96%;               /* #F0FAF8 */
-    --muted-foreground: 0 0% 40%;       /* #666666 */
+    --muted: 172 25% 94%;               /* #EAF5F3 */
+    --muted-foreground: 0 0% 32%;       /* Contraste alto #525252 (7:1+) */
 
-    --secondary: 0 0% 95%;              /* #F2F2F2 */
+    --secondary: 0 0% 93%;              /* #EEEEEE */
     --secondary-foreground: 0 0% 10%;
 
     /* === ACCENT / PRIMARY (SUAP Teal #0A7F70 / #00BDA4) === */
@@ -48,11 +48,11 @@
     /* === FEEDBACK SEMÂNTICO (SUAP Official) === */
     --destructive: 0 90% 40%;           /* #C20A0A */
     --destructive-foreground: 0 0% 100%;
-    --success: 130 70% 40%;             /* #1FAD34 */
+    --success: 130 70% 35%;             /* #1B972E */
     --success-foreground: 0 0% 100%;
-    --warning: 58 98% 30%;              /* #989301 */
+    --warning: 45 100% 30%;             /* #996800 */
     --warning-foreground: 0 0% 100%;
-    --info: 199 100% 40%;               /* #008DCC */
+    --info: 199 100% 36%;               /* #007BB3 */
     --info-foreground: 0 0% 100%;
 
     /* Raio padrão SUAP */
@@ -63,23 +63,23 @@
     --sidebar-foreground: 0 0% 15%;
     --sidebar-primary: 172 85% 27%;     /* #0A7F70 */
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 172 35% 95%;      /* #E5FFFC */
-    --sidebar-accent-foreground: 172 85% 22%;
-    --sidebar-border: 0 0% 90%;
+    --sidebar-accent: 172 35% 93%;      /* #E0FBF7 */
+    --sidebar-accent-foreground: 172 85% 20%;
+    --sidebar-border: 0 0% 82%;
     --sidebar-ring: 172 85% 27%;
 
     /* === SOMBRAS SUAP === */
-    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
-    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
-    --shadow-md: 0 4px 10px -4px rgba(10, 127, 112, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
-    --shadow-lg: 0 10px 20px -10px rgba(10, 127, 112, 0.12), 0 4px 8px -4px rgba(0, 0, 0, 0.05);
-    --shadow-xl: 0 18px 30px -15px rgba(10, 127, 112, 0.15);
-    --shadow-primary: 0 8px 20px -8px rgba(10, 127, 112, 0.35);
+    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 10px -4px rgba(10, 127, 112, 0.12), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 20px -10px rgba(10, 127, 112, 0.15), 0 4px 8px -4px rgba(0, 0, 0, 0.08);
+    --shadow-xl: 0 18px 30px -15px rgba(10, 127, 112, 0.18);
+    --shadow-primary: 0 8px 20px -8px rgba(10, 127, 112, 0.40);
 
     /* Glassmorphism SUAP */
-    --glass-border: rgba(10, 127, 112, 0.10);
-    --glass-bg: rgba(255, 255, 255, 0.92);
-    --glass-highlight: rgba(255, 255, 255, 0.70);
+    --glass-border: rgba(10, 127, 112, 0.15);
+    --glass-bg: rgba(255, 255, 255, 0.95);
+    --glass-highlight: rgba(255, 255, 255, 0.85);
 
     /* Gradientes */
     --gradient-primary: linear-gradient(135deg, #0A7F70 0%, #031C18 100%);
@@ -92,19 +92,20 @@
   [data-suap-theme="ifs"] {
     --background: 120 15% 98%;
     --foreground: 120 20% 10%;
-    --border: 120 12% 88%;
-    --input: 120 12% 88%;
+    --border: 120 12% 80%;
+    --input: 120 12% 80%;
     --ring: 129 60% 30%;                /* Verde IFRN #1F7A2D */
-    --muted: 129 30% 96%;
-    --muted-foreground: 120 10% 40%;
+    --muted: 129 30% 94%;
+    --muted-foreground: 120 10% 32%;
     --primary: 129 60% 30%;             /* Verde IFRN #1F7A2D */
     --primary-foreground: 0 0% 100%;
     --accent: 129 60% 30%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 359 80% 50%;         /* Vermelho IFs #E41D1B */
+    --destructive: 359 80% 48%;         /* Vermelho IFs #E41D1B */
     --sidebar-primary: 129 60% 30%;
-    --sidebar-accent: 129 35% 94%;
-    --sidebar-accent-foreground: 129 60% 24%;
+    --sidebar-accent: 129 35% 92%;
+    --sidebar-accent-foreground: 129 60% 20%;
+    --sidebar-border: 120 12% 82%;
     --gradient-primary: linear-gradient(135deg, #1F7A2D 0%, #0A290E 100%);
     --gradient-accent:  linear-gradient(135deg, #33CC49 0%, #1F7A2D 100%);
   }
@@ -113,18 +114,19 @@
   [data-suap-theme="aurora"] {
     --background: 230 30% 98%;
     --foreground: 231 45% 10%;
-    --border: 230 20% 88%;
-    --input: 230 20% 88%;
+    --border: 230 20% 80%;
+    --input: 230 20% 80%;
     --ring: 231 49% 50%;                /* Aurora Roxo #4456BB */
-    --muted: 231 35% 96%;
-    --muted-foreground: 231 15% 42%;
+    --muted: 231 35% 94%;
+    --muted-foreground: 231 15% 32%;
     --primary: 231 49% 50%;             /* #4456BB */
     --primary-foreground: 0 0% 100%;
     --accent: 231 49% 50%;
     --accent-foreground: 0 0% 100%;
     --sidebar-primary: 231 49% 50%;
-    --sidebar-accent: 231 45% 95%;
-    --sidebar-accent-foreground: 231 49% 35%;
+    --sidebar-accent: 231 45% 93%;
+    --sidebar-accent-foreground: 231 49% 30%;
+    --sidebar-border: 230 20% 82%;
     --gradient-primary: linear-gradient(135deg, #4456BB 0%, #0E1125 100%);
     --gradient-accent:  linear-gradient(135deg, #6978C9 0%, #4456BB 100%);
   }
@@ -133,18 +135,19 @@
   [data-suap-theme="dunas"] {
     --background: 35 25% 98%;
     --foreground: 30 25% 10%;
-    --border: 35 20% 88%;
-    --input: 35 20% 88%;
-    --ring: 34 47% 50%;                 /* Dunas Ocre #B98746 */
-    --muted: 35 30% 95%;
-    --muted-foreground: 30 15% 42%;
-    --primary: 34 47% 50%;              /* #B98746 */
+    --border: 35 20% 80%;
+    --input: 35 20% 80%;
+    --ring: 34 47% 48%;                 /* Dunas Ocre #B98746 */
+    --muted: 35 30% 93%;
+    --muted-foreground: 30 15% 32%;
+    --primary: 34 47% 48%;              /* #B98746 */
     --primary-foreground: 0 0% 100%;
-    --accent: 34 47% 50%;
+    --accent: 34 47% 48%;
     --accent-foreground: 0 0% 100%;
-    --sidebar-primary: 34 47% 50%;
-    --sidebar-accent: 35 40% 94%;
-    --sidebar-accent-foreground: 34 47% 32%;
+    --sidebar-primary: 34 47% 48%;
+    --sidebar-accent: 35 40% 92%;
+    --sidebar-accent-foreground: 34 47% 28%;
+    --sidebar-border: 35 20% 82%;
     --gradient-primary: linear-gradient(135deg, #B98746 0%, #251B0E 100%);
     --gradient-accent:  linear-gradient(135deg, #D5B790 0%, #B98746 100%);
   }
@@ -153,18 +156,19 @@
   [data-suap-theme="govbr"] {
     --background: 215 30% 98%;
     --foreground: 217 33% 12%;
-    --border: 215 25% 88%;
-    --input: 215 25% 88%;
+    --border: 215 25% 80%;
+    --input: 215 25% 80%;
     --ring: 217 81% 39%;                /* Azul Gov.br #1351B4 */
-    --muted: 215 35% 95%;
-    --muted-foreground: 215 15% 42%;
+    --muted: 215 35% 93%;
+    --muted-foreground: 215 15% 32%;
     --primary: 217 81% 39%;             /* #1351B4 */
     --primary-foreground: 0 0% 100%;
     --accent: 217 81% 39%;
     --accent-foreground: 0 0% 100%;
     --sidebar-primary: 217 81% 39%;
-    --sidebar-accent: 215 45% 95%;
-    --sidebar-accent-foreground: 217 81% 30%;
+    --sidebar-accent: 215 45% 93%;
+    --sidebar-accent-foreground: 217 81% 26%;
+    --sidebar-border: 215 25% 82%;
     --gradient-primary: linear-gradient(135deg, #1351B4 0%, #05152E 100%);
     --gradient-accent:  linear-gradient(135deg, #2670E8 0%, #1351B4 100%);
   }
@@ -185,34 +189,35 @@
     --secondary-foreground: 0 0% 96%;
 
     --muted: 0 0% 18%;
-    --muted-foreground: 0 0% 65%;
+    --muted-foreground: 0 0% 75%;       /* Texto claro e legível */
 
-    --border: 0 0% 22%;
-    --input: 0 0% 22%;
-    --ring: 175 80% 40%;                /* Luna Cyan #14B8AA */
+    --border: 0 0% 28%;                 /* Bordas destacadas no escuro */
+    --input: 0 0% 28%;
+    --ring: 175 80% 45%;                /* Luna Cyan #14B8AA */
 
-    --primary: 175 80% 40%;             /* #14B8AA */
-    --primary-foreground: 0 0% 10%;
+    --primary: 175 80% 45%;             /* #14B8AA */
+    --primary-foreground: 0 0% 5%;
 
-    --accent: 175 80% 40%;
-    --accent-foreground: 0 0% 10%;
+    --accent: 175 80% 45%;
+    --accent-foreground: 0 0% 5%;
 
     --destructive: 0 85% 55%;
     --destructive-foreground: 0 0% 98%;
 
     --sidebar-background: 0 0% 12%;
-    --sidebar-foreground: 0 0% 90%;
-    --sidebar-primary: 175 80% 40%;
-    --sidebar-primary-foreground: 0 0% 10%;
-    --sidebar-accent: 175 25% 18%;
-    --sidebar-accent-foreground: 175 80% 55%;
-    --sidebar-border: 0 0% 18%;
+    --sidebar-foreground: 0 0% 92%;
+    --sidebar-primary: 175 80% 45%;
+    --sidebar-primary-foreground: 0 0% 5%;
+    --sidebar-accent: 175 30% 20%;
+    --sidebar-accent-foreground: 175 85% 65%;
+    --sidebar-border: 0 0% 24%;
 
-    --shadow-primary: 0 8px 18px 0 rgba(20, 184, 170, 0.25);
-    --glass-bg: rgba(26, 26, 26, 0.88);
+    --shadow-primary: 0 8px 18px 0 rgba(20, 184, 170, 0.35);
+    --glass-bg: rgba(26, 26, 26, 0.92);
     --gradient-primary: linear-gradient(135deg, #14B8AA 0%, #052E2B 100%);
     --gradient-accent:  linear-gradient(135deg, #1AE5D5 0%, #14B8AA 100%);
   }
+
 
   /* TEMA ALTO CONTRASTE */
   [data-suap-theme="alto-contraste"] {
@@ -602,6 +607,11 @@
   .shadow-lifted  { box-shadow: var(--shadow-lg); }
   .shadow-primary { box-shadow: var(--shadow-primary); }
 
+  /* Keyboard shortcut badge */
+  .kbd-shortcut {
+    @apply inline-flex items-center justify-center font-mono text-[10px] font-semibold text-muted-foreground bg-muted border border-border rounded px-1.5 py-0.5 shadow-xs select-none;
+  }
+
   /* SUAP App Background */
   .app-bg-soft {
     background-color: hsl(var(--background));
@@ -625,3 +635,4 @@
     background-color: hsl(var(--muted-foreground) / 0.5);
   }
 }
+

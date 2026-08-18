@@ -132,16 +132,17 @@ describe('Empenhos', () => {
     expect(screen.queryByText('2026NE000002')).not.toBeInTheDocument();
   });
 
-  it('nao exibe credito disponivel nem importacao legada na tela de empenhos', () => {
+  it('nao exibe credito disponivel nem botoes de upload legados no header da tela de empenhos', () => {
     mockedUseAuth.mockReturnValue({ isSuperAdmin: true } as never);
     renderEmpenhos();
 
     expect(screen.queryByText('Crédito Disponível')).not.toBeInTheDocument();
     expect(screen.queryByText('R$ 75.867,00')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Importar Crédito/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Importar Empenhos/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Importar Saldo RAP/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Importar Empenhos/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Importar Saldo RAP/i })).not.toBeInTheDocument();
   });
+
 
   it('exibe a previa da descricao e metadados na tabela de execucao do ano atual', () => {
     renderEmpenhos();

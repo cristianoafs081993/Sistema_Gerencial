@@ -24,6 +24,9 @@ vi.mock('@/components/auth/InviteUserDialog', () => ({
 vi.mock('@/components/suap/SuapSyncPanel', () => ({
   SuapSyncPanel: () => <div>Painel de integração SUAP</div>,
 }));
+vi.mock('@/components/ai/AIAssistantWidget', () => ({
+  AIAssistantWidget: () => <div>assistente-gerencial-widget</div>,
+}));
 
 
 vi.mock('@/components/ui/tooltip', () => ({
@@ -33,11 +36,24 @@ vi.mock('@/components/ui/tooltip', () => ({
   TooltipContent: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
+if (typeof window !== 'undefined') {
+  class ResizeObserverMock {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  window.ResizeObserver = window.ResizeObserver || ResizeObserverMock;
+  if (!Element.prototype.scrollIntoView) {
+    Element.prototype.scrollIntoView = vi.fn();
+  }
+}
+
 const mockedUseAuth = vi.mocked(useAuth);
 const mockedToast = vi.mocked(toast);
 const updatePasswordMock = vi.fn();
 
 describe('Layout', () => {
+
   beforeEach(() => {
     mockedToast.warning.mockReset();
     updatePasswordMock.mockReset();
@@ -94,6 +110,18 @@ describe('Layout', () => {
     expect(mockedToast.warning).toHaveBeenCalledWith(
       'Sua conta foi criada com a senha padrão "ifrn". Recomenda-se trocar a senha no próximo acesso.',
     );
+  });
+
+  it('monta o widget global do assistente gerencial', () => {
+    render(
+      <MemoryRouter>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('assistente-gerencial-widget')).toBeInTheDocument();
   });
 
   it('mostra o orgao do usuario autenticado na sidebar', () => {
@@ -301,4 +329,35 @@ describe('Layout', () => {
       'Contrato de Serviço IFRN',
     ]);
   });
+
+  it('abre a Command Palette ao clicar no atalho do header', () => {
+    render(
+      <MemoryRouter>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /abrir busca e comandos/i }));
+
+    expect(screen.getByPlaceholderText(/digite um comando/i)).toBeInTheDocument();
+  });
+
+
+  it('permite alternar a sidebar para o modo compacto (Rail Mode)', () => {
+    render(
+      <MemoryRouter>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    const toggleButton = screen.getByRole('button', { name: /recolher barra lateral/i });
+    fireEvent.click(toggleButton);
+
+    expect(screen.getByRole('button', { name: /expandir barra lateral/i })).toBeInTheDocument();
+  });
 });
+

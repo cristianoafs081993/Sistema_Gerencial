@@ -25,7 +25,27 @@ import {
 
 const CONTRATOS_API_BASE = 'https://contratos.comprasnet.gov.br/api';
 const DEFAULT_UASG = '158366';
-const DEFAULT_SYNC_UASGS = [DEFAULT_UASG, '158155'];
+const DEFAULT_SYNC_UASGS = [
+  '152711', // Natal - Cidade Alta
+  '152756', // Parnamirim
+  '152757', // Nova Cruz
+  '154582', // São Gonçalo do Amarante
+  '154838', // Ceará-Mirim
+  '154839', // Canguaretama
+  '154840', // São Paulo do Potengi
+  '158155', // Reitoria
+  '158365', // Mossoró
+  '158366', // Currais Novos
+  '158367', // Ipanguaçu
+  '158368', // Natal - Zona Norte
+  '158369', // Natal - Central
+  '158370', // Caicó
+  '158371', // Apodi
+  '158372', // Santa Cruz
+  '158373', // João Câmara
+  '158374', // Pau dos Ferros
+  '158375', // Macau
+];
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -328,7 +348,7 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
             contratoApiId: contractDb.id,
             apiContratoId: contractDb.api_contrato_id,
             rawFaturas: derived.situacao_derivada ? campusRawFaturas : [],
-            empenhos: derived.situacao_derivada ? campusEmpenhos : [],
+            empenhos: empenhos,
             faturas: derived.situacao_derivada ? campusFaturas : [],
             itens: derived.situacao_derivada
               ? apiItens.map((item) => mapItem(contractDb.id, item)).filter((item) => item.api_item_id)
@@ -348,9 +368,9 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
         return {
           contratoApiId: contractDb.id,
           apiContratoId: contractDb.api_contrato_id,
-          rawFaturas: (apiFaturas ?? []).filter((fatura) => isContratoApiDisplayFatura(fatura)),
-          empenhos: (apiEmpenhos ?? []).map((empenho) => mapEmpenho(contractDb.id, empenho)).filter((empenho) => empenho.api_empenho_id && isContratoApiCampusEmpenho(empenho)),
-          faturas: (apiFaturas ?? []).map((fatura) => mapFatura(contractDb.id, fatura)).filter((fatura) => fatura.api_fatura_id && isContratoApiDisplayFatura(fatura)),
+          rawFaturas: apiFaturas ?? [],
+          empenhos: (apiEmpenhos ?? []).map((empenho) => mapEmpenho(contractDb.id, empenho)).filter((empenho) => empenho.api_empenho_id),
+          faturas: (apiFaturas ?? []).map((fatura) => mapFatura(contractDb.id, fatura)).filter((fatura) => fatura.api_fatura_id),
           itens: (apiItens ?? []).map((item) => mapItem(contractDb.id, item)).filter((item) => item.api_item_id),
           historico: (apiHistorico ?? []).map((historico) => mapHistorico(contractDb.id, historico)).filter((historico) => historico.api_historico_id),
           derived: null,
@@ -528,8 +548,16 @@ Deno.serve(async (request) => {
     });
 
     const results = [];
+    const errors: Array<{ unidadeCodigo: string; error: string }> = [];
+
     for (const unidadeCodigo of unidadeCodigos) {
-      results.push(await runSync(supabase, unidadeCodigo, body.source || 'manual'));
+      try {
+        results.push(await runSync(supabase, unidadeCodigo, body.source || 'manual'));
+      } catch (err) {
+        const errorMsg = errorToMessage(err);
+        console.error(`Falha ao sincronizar UASG ${unidadeCodigo}:`, err);
+        errors.push({ unidadeCodigo, error: errorMsg });
+      }
     }
 
     const totals = results.reduce(
@@ -561,7 +589,13 @@ Deno.serve(async (request) => {
       },
     );
 
-    return jsonResponse({ status: 'processed', unidadeCodigos, results, totals });
+    return jsonResponse({
+      status: errors.length === 0 ? 'processed' : results.length > 0 ? 'partial_success' : 'error',
+      unidadeCodigos,
+      results,
+      errors: errors.length > 0 ? errors : undefined,
+      totals,
+    });
   } catch (error) {
     if (error instanceof Response) {
       return error;

@@ -10,7 +10,8 @@ import {
   type ApiFatura,
 } from '@/services/contratosApiMappers';
 import { isContratoApiCampusEmpenho } from '@/utils/contratosApiStatus';
-import { buildEmpenhoLookupKeys } from '@/utils/contratosSync';
+import { buildEmpenhoLookupKeys, normalizeContratoNumero } from '@/utils/contratosSync';
+
 
 const CONTRATOS_API_BASE = '/api-contratos/api';
 const DEFAULT_UASG = '158366';
@@ -647,7 +648,36 @@ export const contratosApiService = {
     return (data ?? []) as ContratoApiRow[];
   },
 
+  async getContratoApiByNumeroOrId(numeroOrId: string): Promise<ContratoApiRow | null> {
+    const clean = String(numeroOrId || '').trim();
+    if (!clean) return null;
+
+    // 1. Tenta encontrar por UUID
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean)) {
+      const { data } = await supabase
+        .from('contratos_api')
+        .select('id, api_contrato_id, numero, fornecedor_nome, fornecedor_documento, unidade_codigo, unidade_nome, unidade_origem_codigo, unidade_origem_nome, objeto, processo, vigencia_inicio, vigencia_fim, vigencia_inicio_derivada, vigencia_fim_derivada, valor_global, valor_acumulado, situacao, situacao_derivada, situacao_derivada_motivo, campus_scope_reason, updated_at, categoria, prorrogavel:raw_data->>prorrogavel')
+        .eq('id', clean)
+        .maybeSingle();
+      if (data) return data as ContratoApiRow;
+    }
+
+    // 2. Tenta por número normalizado (ex: 00280/2024 ou 280/2024)
+    const normalized = normalizeContratoNumero(clean);
+    const { data: byNumero } = await supabase
+      .from('contratos_api')
+      .select('id, api_contrato_id, numero, fornecedor_nome, fornecedor_documento, unidade_codigo, unidade_nome, unidade_origem_codigo, unidade_origem_nome, objeto, processo, vigencia_inicio, vigencia_fim, vigencia_inicio_derivada, vigencia_fim_derivada, valor_global, valor_acumulado, situacao, situacao_derivada, situacao_derivada_motivo, campus_scope_reason, updated_at, categoria, prorrogavel:raw_data->>prorrogavel')
+      .or(`numero.eq.${normalized},numero.eq.${clean},numero.ilike.%${clean}%`)
+      .limit(1)
+      .maybeSingle();
+
+    if (byNumero) return byNumero as ContratoApiRow;
+
+    return null;
+  },
+
   async getEmpenhosApi(contratoApiIds?: string[]): Promise<ContratoApiEmpenhoRow[]> {
+
     let query = supabase
       .from('contratos_api_empenhos')
       .select('id, contrato_api_id, api_empenho_id, numero, unidade_gestora, gestao, data_emissao, credor, fonte_recurso, plano_interno, natureza_despesa, valor_empenhado, valor_a_liquidar, valor_liquidado, valor_pago, rp_inscrito, rp_a_pagar, raw_data');
@@ -659,7 +689,7 @@ export const contratosApiService = {
     const { data, error } = await query;
 
     if (error) throwMigrationRequired(error);
-    const all = ((data ?? []) as ContratoApiEmpenhoRow[]).filter((empenho) => isContratoApiCampusEmpenho(empenho));
+    const all = (data ?? []) as ContratoApiEmpenhoRow[];
     if (!contratoApiIds || contratoApiIds.length === 0 || contratoApiIds.length <= 100) return all;
     const set = new Set(contratoApiIds);
     return all.filter((row) => set.has(row.contrato_api_id));
@@ -749,9 +779,7 @@ export const contratosApiService = {
       faturasResult.error ||
       faturaItensResult.error ||
       faturaEmpenhosResult.error;
-    if (firstError) throwMigrationRequired(firstError);
-
-    const empenhos = ((empenhosResult.data ?? []) as ContratoApiEmpenhoRow[]).filter((empenho) => isContratoApiCampusEmpenho(empenho));
+    const empenhos = (empenhosResult.data ?? []) as ContratoApiEmpenhoRow[];
     const empenhoIds = new Set(empenhos.map((empenho) => empenho.id));
     const apiEmpenhoIds = new Set(empenhos.map((empenho) => Number(empenho.api_empenho_id)));
 
@@ -955,9 +983,10 @@ export const contratosApiService = {
     return (data as ContratoApiSyncRun | null) ?? null;
   },
 
-  async runSync() {
+  async runSync(unidadeCodigos?: string[]) {
     const { data, error } = await supabase.functions.invoke('sync-contratos-comprasnet', {
       body: {
+        unidadeCodigos,
         source: 'frontend-manual',
       },
     });

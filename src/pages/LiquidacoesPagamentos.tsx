@@ -49,22 +49,10 @@ import { DocumentoDetalhesDialog } from '@/components/DocumentoDetalhesDialog';
 import { HeaderActions } from '@/components/HeaderParts';
 import { TablePagination } from '@/components/design-system/TablePagination';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
-import { 
-    DropdownMenu, 
-    DropdownMenuContent, 
-    DropdownMenuItem, 
-    DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
-
-type CsvRow = Record<string, string>;
 
 export default function LiquidacoesPagamentos() {
     const { isSuperAdmin } = useAuth();
     const queryClient = useQueryClient();
-    const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
-    const [isImportDocsOpen, setIsImportDocsOpen] = useState(false);
-    const [isImportFonteOpen, setIsImportFonteOpen] = useState(false);
-    const [isImportOBOpen, setIsImportOBOpen] = useState(false);
 
     // Filtros
     const [searchTerm, setSearchTerm] = useState('');
@@ -134,83 +122,7 @@ export default function LiquidacoesPagamentos() {
 
     const handleRefresh = () => {
         queryClient.invalidateQueries({ queryKey: ['transparencia'] });
-        toast.success('Dados atualizados!');
     };
-
-    const handleImportDocs = async (data: Record<string, string>[]) => {
-        const toastId = toast.loading('Importando documentos...');
-        try {
-            await transparenciaService.importDocumentosHabeis(data);
-            toast.success('Importação concluída!', { id: toastId });
-            handleRefresh();
-        } catch (error) {
-            console.error(error);
-            toast.error('Erro na importação', { id: toastId });
-        }
-    };
-
-    const handleImportOB = async (data: CsvRow[]) => {
-        const toastId = toast.loading('Processando Ordens Bancárias...');
-        try {
-            await transparenciaService.importOrdensBancarias(data);
-            toast.success(`${data.length} ordens bancárias importadas com sucesso!`, { id: toastId });
-            setIsImportOBOpen(false);
-            handleRefresh();
-        } catch (error: unknown) {
-            console.error('Erro import OB:', error);
-            const message = error instanceof Error ? error.message : 'Erro desconhecido';
-            toast.error(`Falha na importação: ${message}`, { id: toastId });
-        }
-    };
-
-    const handleImportFonte = async (data: Record<string, string>[]) => {
-        const toastId = toast.loading('Atualizando fontes SOF...');
-        try {
-            await transparenciaService.importLiquidacoes(data);
-            toast.success('Fontes atualizadas!', { id: toastId });
-            handleRefresh();
-            setIsImportFonteOpen(false);
-        } catch (error) {
-            console.error(error);
-            toast.error('Erro na atualização', { id: toastId });
-        }
-    };
-
-    const handleRetencoesImport = async (data: CsvRow[]) => {
-        const toastId = toast.loading('Processando importação de situações...');
-        
-        try {
-            // Mapeamos para o novo formato de Situações
-            const mappedData: Partial<DocumentoSituacao>[] = data.map(row => {
-                const situacaoCodigo = row['dhsituacao'] || '';
-                return {
-                    documento_habil_id: row['documentohabil'],
-                    situacao_codigo: situacaoCodigo,
-                    valor: parseCurrency(row['dhvalordocorigem']),
-                    is_retencao: situacaoCodigo.startsWith('DDF') || 
-                                situacaoCodigo.startsWith('DDU') || 
-                                situacaoCodigo === 'DOB001' || 
-                                situacaoCodigo === 'DOB035'
-                };
-            });
-
-            await retencoesService.upsertSituacoesBatch(mappedData as DocumentoSituacao[]);
-            
-            toast.success(`${mappedData.length} situações processadas com sucesso!`, { id: toastId });
-            setIsImportDialogOpen(false);
-            
-            // Invalida transparência para atualizar os documentos
-            queryClient.invalidateQueries({ queryKey: ['transparencia'] });
-        } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : 'Erro desconhecido';
-            console.error('Erro ao importar situações:', error);
-            toast.error(`Erro na importação: ${message}`, { id: toastId });
-        }
-    };
-
-    const retencoesFields = [
-        'Documento Hábil', 'DH - Situação', 'DH - Valor Doc.Origem'
-    ];
 
     return (
         <div className="space-y-6 pb-10">
@@ -222,35 +134,6 @@ export default function LiquidacoesPagamentos() {
 
             <HeaderActions>
                 <div className="flex items-center gap-3">
-                    {isSuperAdmin ? (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="h-9 gap-2 font-bold uppercase text-[10px] tracking-widest px-4 border-slate-200/60 shadow-sm hover:bg-slate-50 bg-white"
-                            >
-                                <FileSpreadsheetIcon className="h-3.5 w-3.5 text-emerald-600" />
-                                Importar
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56">
-                            <DropdownMenuItem onClick={() => setIsImportDocsOpen(true)} className="text-xs font-semibold py-2">
-                                Documentos Hábeis (.csv)
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setIsImportFonteOpen(true)} className="text-xs font-semibold py-2">
-                                Fonte SOF / Liquidações (.csv)
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setIsImportOBOpen(true)} className="text-xs font-semibold py-2">
-                                Ordens Bancárias / Pagos (.csv)
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setIsImportDialogOpen(true)} className="text-xs font-semibold py-2 border-t mt-1">
-                                Situações / Retenções (.csv)
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                    ) : null}
-
                     <Button 
                         variant="outline" 
                         size="sm" 
@@ -484,47 +367,11 @@ export default function LiquidacoesPagamentos() {
             />
         </Card>
 
-            {isSuperAdmin ? (
-                <>
-            <JsonImportDialog 
-                open={isImportDocsOpen} 
-                onOpenChange={setIsImportDocsOpen} 
-                onImport={handleImportDocs}
-                title="Importar Documentos Hábeis"
-                expectedFields={['Documento Hábil', 'DH - Valor Doc.Origem', 'DH - Processo', 'DH - Estado', 'DH - Credor']}
-                acceptCsv
-                csvSeparator="\t"
-            />
-
-            <JsonImportDialog 
-                open={isImportFonteOpen} 
-                onOpenChange={setIsImportFonteOpen} 
-                onImport={handleImportFonte}
-                title="Importar Fonte SOF (Liquidações)"
-                expectedFields={['NE CCor', 'Documento Origem', 'Fonte SOF', 'Fonte']}
-                acceptCsv
-                csvSeparator="\t"
-            />
-
-            </>
-            ) : null}
-
             <DocumentoDetalhesDialog 
                 open={isDetailsOpen}
                 onOpenChange={setIsDetailsOpen}
                 documento={selectedDoc}
             />
-            {isSuperAdmin ? (
-            <JsonImportDialog 
-                open={isImportOBOpen} 
-                onOpenChange={setIsImportOBOpen} 
-                onImport={handleImportOB}
-                title="Importar Ordens Bancárias"
-                expectedFields={['Documento', 'Documento Origem', 'DESPESAS PAGAS', 'RESTOS A PAGAR PAGOS', 'Dia Lançamento']}
-                acceptCsv={true}
-                csvSeparator="\t"
-            />
-            ) : null}
         </div>
     );
 }

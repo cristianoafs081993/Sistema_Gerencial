@@ -183,7 +183,7 @@ Mostrar a linhagem operacional dos dados de forma curta:
     - `atas_registro_precos_sync_runs`
   - view de consumo: `atas_registro_precos_resumo`
   - pagina: [AtasRegistroPrecos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/AtasRegistroPrecos.tsx)
-- observacao: a tela filtra por UASG e tipo de vinculo (`gerenciadora`, `participante`, `aderente` ou qualquer vinculo). O endpoint de ARP do Compras.gov.br pode oscilar; a Edge Function registra falhas por escopo em `details.errors` e preserva o payload bruto em `raw_data`.
+- observacao: a tela filtra por UASG e tipo de vinculo (`gerenciadora`, `participante`, `aderente` ou qualquer vinculo). O endpoint de ARP do Compras.gov.br pode oscilar; a Edge Function registra falhas por escopo em `details.errors` e preserva o payload bruto em `raw_data`. O modal de detalhes reconcilia os saldos e empenhos por item cruzando `contratos_api`, `contratos_api_itens`, `contratos_api_empenhos`, a tabela `empenhos` (SIAFI) e subitens de `portal_transparencia_empenho_itens_cache`, permitindo expandir cada item com clique na linha para inspecionar as NEs vinculadas.
 - observacao: para filtro `participante`, a API nao possui parametro direto por UASG participante; o frontend materializa o cache das atas gerenciadas pelas UASGs IFRN com `includeParticipantes=true` e filtra localmente a view `atas_registro_precos_resumo`. Para filtro `aderente`, a API exige ata, gerenciadora e item antes de consultar adesoes; por isso o frontend varre gerenciadoras IFRN e envia a UASG alvo em `adesaoUnidadeCodigos`. A view exclui `raw_data.tipoUnidade = GERENCIADORA` do agregado `unidades_participantes`.
 
 ### Favoritos de empenhos e contratos

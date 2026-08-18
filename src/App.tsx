@@ -49,6 +49,7 @@ const ModelosDocumentos = lazy(() => import('./pages/ModelosDocumentos'));
 const DesignSystemPreview = lazy(() => import('./pages/DesignSystemPreview'));
 const DashboardCloudscapePreview = lazy(() => import('./pages/DashboardCloudscapePreview'));
 const ManutencaoAdmin = lazy(() => import('./pages/ManutencaoAdmin'));
+const ImportacaoDados = lazy(() => import('./pages/ImportacaoDados'));
 const Almoxarifado = lazy(() => import('./pages/Almoxarifado'));
 const ControleOrgaos = lazy(() => import('./pages/ControleOrgaos'));
 const AuditLog = lazy(() => import('./pages/AuditLog'));
@@ -152,6 +153,8 @@ const App = () => (
                   <Route path="/design-system-preview" element={<DesignSystemPreview />} />
                   <Route path="/dashboard-cloudscape-preview" element={<DashboardCloudscapePreview />} />
                   <Route path="/manutencao" element={<ManutencaoAdmin />} />
+                  <Route path="/importacao-dados" element={<ImportacaoDados />} />
+                  <Route path="/importacao" element={<Navigate replace to="/importacao-dados" />} />
                   <Route path="/almoxarifado" element={<Almoxarifado />} />
                   {/* Multi-órgão e auditoria — apenas superadmin */}
                   <Route path="/controle-orgaos" element={<ControleOrgaos />} />

@@ -41,6 +41,7 @@ type SupabaseClient = ReturnType<typeof createClient>;
 type RefreshRequest = {
   empenhoNumero?: string;
   empenhos?: string[];
+  unidadeCodigo?: string;
   refreshDue?: boolean;
   refreshPositiveEmpenhos?: boolean;
   empenhoTipo?: PortalEmpenhoCacheStage;
@@ -123,9 +124,72 @@ function normalizeEmpenhoNumero(raw: unknown) {
   return match?.[1] ?? normalized;
 }
 
-function buildCodigoDocumento(empenhoNumero: string) {
+const PROCESSO_PREFIX_TO_UASG: Record<string, string> = {
+  '23035': '158366', // Currais Novos
+  '23421': '158155', // Reitoria
+  '23134': '158369', // Natal Central
+  '23057': '158368', // Natal Zona Norte
+  '23133': '152711', // Natal Cidade Alta
+  '23135': '158365', // Mossoró
+  '23136': '158371', // Apodi
+  '23137': '158367', // Ipanguaçu
+  '23138': '158373', // João Câmara
+  '23139': '158374', // Pau dos Ferros
+  '23036': '158375', // Macau
+  '23038': '158370', // Caicó
+  '23039': '152756', // Parnamirim
+  '23040': '154840', // São Paulo do Potengi
+  '23041': '152757', // Nova Cruz
+  '23042': '158372', // Santa Cruz
+  '23044': '154839', // Canguaretama
+  '23045': '154838', // Ceará-Mirim
+  '23046': '154582', // São Gonçalo do Amarante
+};
+
+async function resolveEmpenhoUasg(
+  supabase: SupabaseClient,
+  empenhoNumero: string,
+  explicitUasg?: string | null,
+): Promise<string> {
+  if (explicitUasg && explicitUasg.length === 6) return explicitUasg;
+
   const normalized = normalizeEmpenhoNumero(empenhoNumero);
-  return normalized ? `${UNIDADE_GESTORA}${GESTAO}${normalized}` : '';
+
+  const { data: ceRows } = await supabase
+    .from('contratos_api_empenhos')
+    .select('unidade_gestora, raw_data')
+    .eq('numero', normalized)
+    .limit(1);
+
+  if (ceRows && ceRows.length > 0) {
+    const ce = ceRows[0] as any;
+    if (ce.unidade_gestora && ce.unidade_gestora.length === 6) return ce.unidade_gestora;
+    const info = ce.raw_data?.informacao_complementar || '';
+    const match = info.match(/\b(?:UASG\s*(?:MINUTA)?|UG)\s*:?\s*(15\d{4})\b/i);
+    if (match) return match[1];
+  }
+
+  const { data: empRows } = await supabase
+    .from('empenhos')
+    .select('processo, descricao')
+    .ilike('numero', `%${normalized}%`)
+    .limit(1);
+
+  if (empRows && empRows.length > 0) {
+    const emp = empRows[0] as any;
+    const proc = String(emp.processo || '').replace(/\D/g, '').slice(0, 5);
+    if (PROCESSO_PREFIX_TO_UASG[proc]) return PROCESSO_PREFIX_TO_UASG[proc];
+    const desc = emp.descricao || '';
+    const match = desc.match(/\b(?:UASG|UG)\s*:?\s*(15\d{4})\b/i);
+    if (match) return match[1];
+  }
+
+  return UNIDADE_GESTORA;
+}
+
+function buildCodigoDocumento(empenhoNumero: string, uasg = UNIDADE_GESTORA) {
+  const normalized = normalizeEmpenhoNumero(empenhoNumero);
+  return normalized ? `${uasg}${GESTAO}${normalized}` : '';
 }
 
 function parseCurrency(raw: unknown) {
@@ -192,9 +256,9 @@ function mapPortalItem(
   };
 }
 
-async function discoverItens(empenhoNumero: string): Promise<PortalItemCacheRow[]> {
+async function discoverItens(empenhoNumero: string, uasg = UNIDADE_GESTORA): Promise<PortalItemCacheRow[]> {
   const lookupKey = normalizeEmpenhoNumero(empenhoNumero);
-  const codigoDocumento = buildCodigoDocumento(empenhoNumero);
+  const codigoDocumento = buildCodigoDocumento(empenhoNumero, uasg);
   if (!lookupKey || !codigoDocumento) return [];
 
   const rows = await fetchPortalPaginated<Record<string, unknown>>(
@@ -216,15 +280,17 @@ async function replaceCacheRows(
   supabase: SupabaseClient,
   empenhoNumero: string,
   returnRows = false,
+  explicitUasg?: string | null,
 ) {
   const lookupKey = normalizeEmpenhoNumero(empenhoNumero);
-  const codigoDocumento = buildCodigoDocumento(empenhoNumero);
+  const uasg = await resolveEmpenhoUasg(supabase, empenhoNumero, explicitUasg);
+  const codigoDocumento = buildCodigoDocumento(empenhoNumero, uasg);
   if (!lookupKey || !codigoDocumento) {
     return { empenhoNumero, lookupKey, status: 'not_found', rowsCount: 0 };
   }
 
   try {
-    const rows = await discoverItens(empenhoNumero);
+    const rows = await discoverItens(empenhoNumero, uasg);
     const now = new Date();
     const status = rows.length > 0 ? 'found' : 'not_found';
 
@@ -492,7 +558,7 @@ Deno.serve(async (request) => {
       if (body.readCacheOnly) {
         results.push(await readCacheRows(supabase, empenho, Boolean(body.returnRows)));
       } else {
-        results.push(await replaceCacheRows(supabase, empenho, Boolean(body.returnRows)));
+        results.push(await replaceCacheRows(supabase, empenho, Boolean(body.returnRows), body.unidadeCodigo));
       }
     }
 

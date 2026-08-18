@@ -1,0 +1,794 @@
+/* ==========================================================================
+   Suape Extension — Command Palette (Ctrl+K) Styles
+   Exact 1:1 Mirror of SIAGES CommandPalette UI
+   ========================================================================== */
+
+#suape-cp-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483645 !important;
+  background-color: rgba(15, 23, 42, 0.65) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding: 10vh 16px 24px !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transition: opacity 0.15s ease, visibility 0.15s ease !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  box-sizing: border-box !important;
+}
+
+#suape-cp-overlay * {
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+#suape-cp-overlay.suape-cp-visible {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+#suape-cp-dialog {
+  width: 100% !important;
+  max-width: 672px !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-radius: 16px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  max-height: 80vh !important;
+  transform: scale(0.96) translateY(-8px) !important;
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  border: 1px solid rgba(226, 232, 240, 0.9) !important;
+}
+
+#suape-cp-overlay.suape-cp-visible #suape-cp-dialog {
+  transform: scale(1) translateY(0) !important;
+}
+
+/* Header & Search Input */
+.suape-cp-header {
+  padding: 0 !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  background: #ffffff !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.suape-cp-search-box {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  background: #ffffff !important;
+  padding: 14px 18px !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+.suape-cp-search-icon-box {
+  width: 20px !important;
+  height: 20px !important;
+  color: #0A7F70 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+.suape-cp-search-icon-box svg {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.suape-cp-input {
+  flex: 1 !important;
+  border: none !important;
+  background: transparent !important;
+  font-size: 15px !important;
+  font-weight: 400 !important;
+  color: #0f172a !important;
+  outline: none !important;
+  box-shadow: none !important;
+  width: 100% !important;
+  height: 24px !important;
+  line-height: 24px !important;
+}
+
+.suape-cp-input::placeholder {
+  color: #94a3b8 !important;
+  font-weight: 400 !important;
+}
+
+.suape-cp-kbd {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  color: #64748b !important;
+  background: rgba(241, 245, 249, 0.8) !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  border: 1px solid #e2e8f0 !important;
+  user-select: none !important;
+}
+
+/* Filter Scope Chips */
+.suape-cp-chips {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 8px 16px !important;
+  background: rgba(248, 250, 252, 0.5) !important;
+  border-top: 1px solid rgba(226, 232, 240, 0.4) !important;
+  overflow-x: auto !important;
+}
+
+.suape-cp-chip {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 4px 12px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  border-radius: 9999px !important;
+  border: 1px solid #e2e8f0 !important;
+  background: #ffffff !important;
+  color: #64748b !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  transition: all 0.15s !important;
+}
+
+.suape-cp-chip svg {
+  width: 13px !important;
+  height: 13px !important;
+}
+
+.suape-cp-chip:hover {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+.suape-cp-chip.suape-cp-chip-active {
+  background: #0A7F70 !important;
+  color: #ffffff !important;
+  border-color: #0A7F70 !important;
+  box-shadow: 0 1px 2px rgba(10, 127, 112, 0.2) !important;
+}
+
+.suape-cp-chip-count {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  padding: 1px 5px !important;
+  border-radius: 9999px !important;
+  background: rgba(0, 0, 0, 0.08) !important;
+  color: inherit !important;
+}
+
+.suape-cp-chip.suape-cp-chip-active .suape-cp-chip-count {
+  background: rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
+}
+
+.suape-cp-chip-count.count-emerald {
+  background: rgba(16, 185, 129, 0.15) !important;
+  color: #047857 !important;
+}
+
+.suape-cp-chip-count.count-blue {
+  background: rgba(37, 99, 235, 0.15) !important;
+  color: #1d4ed8 !important;
+}
+
+/* Results List */
+.suape-cp-list {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  padding: 8px !important;
+  max-height: 480px !important;
+}
+
+.suape-cp-list::-webkit-scrollbar {
+  width: 6px !important;
+}
+
+.suape-cp-list::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+.suape-cp-list::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.5) !important;
+  border-radius: 9999px !important;
+}
+
+.suape-cp-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.7) !important;
+}
+
+.suape-cp-group-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 8px 8px 4px !important;
+}
+
+.suape-cp-group-title {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: #64748b !important;
+}
+
+.suape-cp-group-title.empenho-group {
+  color: #0A7F70 !important;
+}
+
+.suape-cp-group-title.contrato-group {
+  color: #2563eb !important;
+}
+
+.suape-cp-group-title.action-group {
+  color: #d97706 !important;
+}
+
+.suape-cp-group-count {
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: #94a3b8 !important;
+}
+
+.suape-cp-divider {
+  height: 1px !important;
+  background: #f1f5f9 !important;
+  margin: 6px 0 !important;
+}
+
+/* Item styling */
+.suape-cp-item {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 10px 14px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  transition: all 0.12s ease !important;
+  user-select: none !important;
+  margin-bottom: 2px !important;
+}
+
+.suape-cp-screen-item {
+  padding: 8px 12px !important;
+}
+
+.suape-cp-item:hover,
+.suape-cp-item.suape-cp-item-selected {
+  background: rgba(10, 127, 112, 0.07) !important;
+  border-color: rgba(10, 127, 112, 0.22) !important;
+}
+
+.suape-cp-item.item-selected-blue:hover,
+.suape-cp-item.item-selected-blue.suape-cp-item-selected {
+  background: rgba(37, 99, 235, 0.07) !important;
+  border-color: rgba(37, 99, 235, 0.22) !important;
+}
+
+/* Icons */
+.suape-cp-item-icon {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+.suape-cp-item-icon.empenho-icon {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 10px !important;
+  background: rgba(10, 127, 112, 0.1) !important;
+  color: #0A7F70 !important;
+}
+
+.suape-cp-item-icon.contrato-icon {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 10px !important;
+  background: rgba(37, 99, 235, 0.1) !important;
+  color: #2563eb !important;
+}
+
+.suape-cp-item-icon.screen-icon {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+}
+
+.suape-cp-item-body {
+  flex: 1 !important;
+  min-width: 0 !important;
+}
+
+.suape-cp-item-title-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  flex-wrap: wrap !important;
+}
+
+.suape-cp-item-title {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  letter-spacing: -0.01em !important;
+}
+
+.suape-cp-item-title-text {
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+}
+
+.suape-cp-screen-title {
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  color: #0f172a !important;
+}
+
+.suape-cp-group-tag {
+  font-size: 12px !important;
+  color: #64748b !important;
+  margin-left: 6px !important;
+  font-weight: 400 !important;
+}
+
+.suape-cp-action-sub {
+  font-size: 12px !important;
+  color: #64748b !important;
+  margin-left: 6px !important;
+  font-weight: 400 !important;
+}
+
+.suape-cp-item-subtitle {
+  font-size: 12px !important;
+  color: #64748b !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  margin-top: 3px !important;
+  font-weight: 500 !important;
+}
+
+.suape-cp-subtitle-main {
+  font-weight: 600 !important;
+  color: #334155 !important;
+}
+
+.suape-cp-subtitle-extra {
+  color: #64748b !important;
+  margin-left: 4px !important;
+}
+
+.suape-cp-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-weight: 600 !important;
+  color: #1e293b !important;
+}
+
+/* Badges */
+.suape-cp-badge {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  padding: 1px 6px !important;
+  border-radius: 6px !important;
+  border: 1px solid #e2e8f0 !important;
+  background: #f8fafc !important;
+  color: #475569 !important;
+}
+
+.suape-cp-badge.badge-rap {
+  background: #fef3c7 !important;
+  color: #92400e !important;
+  border-color: #fde68a !important;
+}
+
+.suape-cp-badge.badge-pago {
+  background: #dcfce7 !important;
+  color: #166534 !important;
+  border-color: #bbf7d0 !important;
+}
+
+.suape-cp-badge.badge-liquidado {
+  background: #e0f2fe !important;
+  color: #075985 !important;
+  border-color: #bae6fd !important;
+}
+
+.suape-cp-badge.badge-pendente {
+  background: #fef3c7 !important;
+  color: #b45309 !important;
+  border-color: #fde68a !important;
+}
+
+.suape-cp-badge.badge-cancelado {
+  background: #ffe4e6 !important;
+  color: #9f1239 !important;
+  border-color: #fecdd3 !important;
+}
+
+/* Meta column on right */
+.suape-cp-item-meta {
+  text-align: right !important;
+  flex-shrink: 0 !important;
+}
+
+.suape-cp-item-meta-label {
+  font-size: 9.5px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: #94a3b8 !important;
+  display: block !important;
+  margin-bottom: 1px !important;
+}
+
+.suape-cp-item-meta-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-size: 13.5px !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+}
+
+.suape-cp-item-meta-value.value-saldo {
+  color: #059669 !important;
+}
+
+.suape-cp-item-meta-value.value-dark {
+  color: #0f172a !important;
+}
+
+.suape-cp-item-action-hint {
+  display: none !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: #0A7F70 !important;
+  margin-left: 8px !important;
+}
+
+.suape-cp-item-action-hint.hint-blue {
+  color: #2563eb !important;
+}
+
+.suape-cp-item.suape-cp-item-selected .suape-cp-item-action-hint {
+  display: inline-block !important;
+}
+
+/* Search Term Highlighting */
+.suape-cp-highlight {
+  background: transparent !important;
+  color: #0A7F70 !important;
+  font-weight: 700 !important;
+  text-decoration: underline !important;
+  text-decoration-color: rgba(10, 127, 112, 0.6) !important;
+  text-decoration-thickness: 2px !important;
+}
+
+/* Empty State & Spinner */
+.suape-cp-empty {
+  padding: 40px 20px !important;
+  text-align: center !important;
+  color: #64748b !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.suape-cp-empty-icon {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 50% !important;
+  background: #f1f5f9 !important;
+  color: #94a3b8 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-bottom: 12px !important;
+}
+
+.suape-cp-empty-title {
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  margin-bottom: 4px !important;
+}
+
+.suape-cp-empty-desc {
+  font-size: 12.5px !important;
+  color: #64748b !important;
+  max-width: 380px !important;
+  line-height: 1.4 !important;
+}
+
+.suape-cp-spinner {
+  width: 28px !important;
+  height: 28px !important;
+  border: 3px solid #e2e8f0 !important;
+  border-top-color: #0A7F70 !important;
+  border-radius: 50% !important;
+  animation: suape-cp-spin 0.8s linear infinite !important;
+  margin-bottom: 12px !important;
+}
+
+@keyframes suape-cp-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Footer info */
+.suape-cp-footer {
+  padding: 8px 16px !important;
+  background: rgba(248, 250, 252, 0.8) !important;
+  border-top: 1px solid #f1f5f9 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  font-size: 11px !important;
+  color: #64748b !important;
+}
+
+.suape-cp-footer-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+.suape-cp-footer-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.suape-cp-footer-dot {
+  color: #cbd5e1 !important;
+}
+
+.suape-cp-key {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 4px !important;
+  padding: 2px 5px !important;
+  color: #334155 !important;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05) !important;
+}
+
+.suape-cp-key-accent {
+  color: #0A7F70 !important;
+  border-color: rgba(10, 127, 112, 0.3) !important;
+}
+
+/* Details Modal Dialog */
+#suape-cp-detail-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483646 !important;
+  background-color: rgba(15, 23, 42, 0.7) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 20px !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transition: opacity 0.15s ease, visibility 0.15s ease !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  box-sizing: border-box !important;
+}
+
+#suape-cp-detail-overlay.suape-cp-visible {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+#suape-cp-detail-dialog {
+  width: 100% !important;
+  max-width: 760px !important;
+  max-height: 86vh !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-radius: 16px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.suape-cp-detail-header {
+  padding: 16px 20px !important;
+  background: #ffffff !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+}
+
+.suape-cp-detail-title-group {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.suape-cp-detail-title {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+}
+
+.suape-cp-detail-close {
+  background: #f1f5f9 !important;
+  border: none !important;
+  font-size: 14px !important;
+  font-weight: bold !important;
+  color: #64748b !important;
+  cursor: pointer !important;
+  padding: 6px 10px !important;
+  border-radius: 8px !important;
+  transition: all 0.15s !important;
+}
+
+.suape-cp-detail-close:hover {
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+.suape-cp-detail-body {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  padding: 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 14px !important;
+}
+
+/* Metric Cards */
+.suape-cp-metric-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) !important;
+  gap: 10px !important;
+}
+
+.suape-cp-metric-card {
+  padding: 12px 14px !important;
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+}
+
+.suape-cp-metric-card.metric-highlight {
+  background: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
+}
+
+.suape-cp-metric-label {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: #64748b !important;
+  margin-bottom: 4px !important;
+}
+
+.suape-cp-metric-card.metric-highlight .suape-cp-metric-label {
+  color: #065f46 !important;
+}
+
+.suape-cp-metric-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+}
+
+.suape-cp-metric-card.metric-highlight .suape-cp-metric-value {
+  color: #047857 !important;
+}
+
+/* Info Details Card */
+.suape-cp-info-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  padding: 14px 16px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+}
+
+.suape-cp-info-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+  font-size: 12.5px !important;
+  padding-bottom: 8px !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+.suape-cp-info-row:last-child {
+  border-bottom: none !important;
+  padding-bottom: 0 !important;
+}
+
+.suape-cp-info-key {
+  font-weight: 600 !important;
+  color: #64748b !important;
+  flex-shrink: 0 !important;
+}
+
+.suape-cp-info-val {
+  font-weight: 600 !important;
+  color: #1e293b !important;
+  text-align: right !important;
+}
+
+.suape-cp-tabs {
+  display: flex !important;
+  gap: 6px !important;
+}
+
+.suape-cp-tab-btn {
+  padding: 4px 10px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  border-radius: 6px !important;
+  border: 1px solid #e2e8f0 !important;
+  background: #f8fafc !important;
+  color: #64748b !important;
+  cursor: pointer !important;
+}
+
+.suape-cp-tab-btn.suape-cp-tab-active {
+  background: #0A7F70 !important;
+  color: #ffffff !important;
+  border-color: #0A7F70 !important;
+}
+
+.suape-cp-entry-card {
+  padding: 10px 12px !important;
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+}
+
+.suape-cp-entry-top {
+  display: flex !important;
+  justify-content: space-between !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+}
+
+.suape-cp-entry-desc {
+  font-size: 11.5px !important;
+  color: #64748b !important;
+  margin-top: 4px !important;
+}

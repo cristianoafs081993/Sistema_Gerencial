@@ -79,7 +79,7 @@ describe('CreditoDisponivel', () => {
     expect(await screen.findByText('PNAE - ALIMENTACAO ESCOLAR')).toBeInTheDocument();
     expect(screen.queryByText('L20RLP19ENN')).not.toBeInTheDocument();
     expect(screen.getByText('Somente com saldo')).toBeInTheDocument();
-    expect(screen.getAllByText('R$ 75.867,00')).toHaveLength(2);
+    expect(screen.getByText('R$ 75.867,00')).toBeInTheDocument();
     expect(screen.queryByText('Saldo - Moeda Origem')).not.toBeInTheDocument();
     expect(screen.queryByText('3 - Crédito Disponível.csv')).not.toBeInTheDocument();
 
@@ -89,16 +89,10 @@ describe('CreditoDisponivel', () => {
     expect(screen.queryByText('L20RLP19ENN')).not.toBeInTheDocument();
   });
 
-  it('permite importar somente para superadmin', async () => {
-    const { unmount } = renderPage();
-
-    expect(await screen.findByRole('button', { name: /Importar CSV/i })).toBeInTheDocument();
-
-    unmount();
-    mockedUseAuth.mockReturnValue({ isSuperAdmin: false } as never);
+  it('exibe o botao de atualizar e nao exibe mais botao de upload no header', async () => {
     renderPage();
 
-    expect(await screen.findByText('PNAE - ALIMENTACAO ESCOLAR')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Atualizar/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Importar CSV/i })).not.toBeInTheDocument();
   });
 });

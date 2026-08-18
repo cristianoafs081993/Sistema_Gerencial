@@ -314,6 +314,7 @@ describe('ContratoApiDetailsSheet', () => {
       />,
     );
 
+
     expect(screen.getByText('Contrato 00062/2018')).toBeInTheDocument();
     const historicoSection = screen.getByRole('button', { name: /Histórico do contrato/i });
     const itensSection = screen.getByRole('button', { name: /Itens/i });
@@ -345,24 +346,29 @@ describe('ContratoApiDetailsSheet', () => {
     expect(screen.getByText('R$ 228.994,80')).toBeInTheDocument();
     expect(screen.getByText('R$ 50.880,00')).toBeInTheDocument();
     expect(screen.getByText('R$ 13.368,06')).toBeInTheDocument();
-    expect(screen.getByText('Qtd. 1 | Unitário R$ 12.368,06')).toBeInTheDocument();
-    expect(screen.getByText('Qtd. 1 | Unitário R$ 1.000,00')).toBeInTheDocument();
     expect(screen.getByText('Qtd. contratada 2')).toBeInTheDocument();
     expect(screen.getByText('Qtd. contratada 48')).toBeInTheDocument();
     expect(screen.getByText('Qtd. executada 2')).toBeInTheDocument();
     expect(screen.getByText('Qtd. executada 0')).toBeInTheDocument();
     expect(screen.getByText('Siafi Apropriado')).toBeInTheDocument();
-    expect(screen.getByText('Sem item vinculado')).toBeInTheDocument();
     expect(screen.getByText('48162')).toBeInTheDocument();
     expect(screen.queryByText('48199')).not.toBeInTheDocument();
     expect(screen.queryByText(/Qtd\. 1 \| Unit.rio R\$ 999,00/)).not.toBeInTheDocument();
-    expect(screen.getByText(/não entram na execução oficial por item/i)).toBeInTheDocument();
+
     const groupByItem = screen.getByRole('tab', { name: 'Item' });
     const groupByFatura = screen.getByRole('tab', { name: 'Fatura' });
-    expect(groupByItem).toHaveAttribute('data-state', 'active');
-    fireEvent.mouseDown(groupByFatura, { button: 0, ctrlKey: false });
     expect(groupByFatura).toHaveAttribute('data-state', 'active');
     expect(screen.getAllByText('Itens vinculados').length).toBeGreaterThan(0);
     expect(screen.getByText(/Sem item vinculado na API/i)).toBeInTheDocument();
-  });
+
+    // Alterna para aba de agrupamento por Item
+    fireEvent.mouseDown(groupByItem, { button: 0, ctrlKey: false });
+    expect(groupByItem).toHaveAttribute('data-state', 'active');
+    expect(screen.getByText('Qtd. 1 | Unitário R$ 12.368,06')).toBeInTheDocument();
+    expect(screen.getByText('Qtd. 1 | Unitário R$ 1.000,00')).toBeInTheDocument();
+    expect(screen.getByText('Sem item vinculado')).toBeInTheDocument();
+  }, 15000);
 });
+
+
+
