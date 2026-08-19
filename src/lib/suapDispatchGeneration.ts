@@ -2,7 +2,7 @@ import type { ResolvedDocumentContext } from '@/lib/documentGeneration';
 import type { SuapProcesso } from '@/types';
 
 export type DispatchQueueItemStatus = 'pending' | 'copied' | 'cloned' | 'skipped' | 'error';
-export type DespachoFinalidade = 'contrato' | 'projeto' | 'bolsa-sem-projeto' | 'auxilio-transporte' | 'pafe' | 'auxilio-moradia';
+export type DespachoFinalidade = 'servico' | 'aquisicao' | 'projeto' | 'bolsa-sem-projeto' | 'auxilio-transporte' | 'pafe' | 'auxilio-moradia';
 
 export type ManualDespachoFields = {
   finalidade: DespachoFinalidade;
@@ -13,7 +13,11 @@ export type ManualDespachoFields = {
   empenho: string;
   projeto: string;
   edital: string;
-  tipo: 'servico' | 'aquisicao';
+};
+
+type LegacyManualDespachoFields = Omit<Partial<ManualDespachoFields>, 'finalidade'> & {
+  finalidade?: DespachoFinalidade | 'contrato';
+  tipo?: 'servico' | 'aquisicao';
 };
 
 export type DispatchQueueItem = {
@@ -74,7 +78,10 @@ export function loadDispatchQueue(): DispatchQueueState | null {
     return {
       version: 1,
       currentIndex: Math.max(0, Math.min(parsed.currentIndex, Math.max(parsed.items.length - 1, 0))),
-      items: parsed.items,
+      items: parsed.items.map((item) => {
+        const manualFields = migrateManualDespachoFields(item.manualFields);
+        return manualFields ? { ...item, manualFields } : item;
+      }),
     };
   } catch {
     return null;
@@ -98,7 +105,6 @@ export function createManualDespachoFields(processo: SuapProcesso): ManualDespac
     objeto: processo.assunto,
     projeto: undefined,
   });
-  const tipo = /\baquisi|material|equipamento|produto|fornecimento|compra\b/.test(normalizeText(processo.assunto)) ? 'aquisicao' : 'servico';
 
   return {
     finalidade,
@@ -109,13 +115,12 @@ export function createManualDespachoFields(processo: SuapProcesso): ManualDespac
     empenho: processo.dadosCompletos?.empenhos?.join(', ') || '',
     projeto: finalidade === 'projeto' ? processo.assunto || '' : '',
     edital: '',
-    tipo,
   };
 }
 
 export function createStandaloneManualDespachoFields(): ManualDespachoFields {
   return {
-    finalidade: 'contrato',
+    finalidade: 'servico',
     processo: '',
     favorecido: '',
     descricao: '',
@@ -123,7 +128,6 @@ export function createStandaloneManualDespachoFields(): ManualDespachoFields {
     empenho: '',
     projeto: '',
     edital: '',
-    tipo: 'servico',
   };
 }
 
@@ -131,6 +135,23 @@ const normalizeText = (value: string | undefined) => (value || '')
   .toLowerCase()
   .normalize('NFD')
   .replace(/[\u0300-\u036f]/g, '');
+
+const isAcquisitionObject = (value: string | undefined) => /\baquisi|material|equipamento|produto|fornecimento|compra\b/.test(normalizeText(value));
+
+function migrateManualDespachoFields(fields: unknown): ManualDespachoFields | undefined {
+  if (!fields || typeof fields !== 'object') return undefined;
+
+  const legacyFields = fields as LegacyManualDespachoFields;
+  if (legacyFields.finalidade !== 'contrato') {
+    return legacyFields as ManualDespachoFields;
+  }
+
+  const { tipo, ...currentFields } = legacyFields;
+  return {
+    ...currentFields,
+    finalidade: tipo === 'aquisicao' ? 'aquisicao' : 'servico',
+  } as ManualDespachoFields;
+}
 
 const formatManualValue = (value: number | string | undefined) => {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -148,12 +169,11 @@ export function inferManualDespachoFinalidade(context: Pick<ResolvedDocumentCont
   if (/auxilio\s+moradia/.test(haystack)) return 'auxilio-moradia';
   if (context.projeto || /\bprojet[oa]s?\b/.test(haystack)) return 'projeto';
   if (context.tipoPessoa === 'PF' || isFolhaPagamento || /\bbolsa\b|\bbolsista\b|\bauxilio\b/.test(haystack)) return 'bolsa-sem-projeto';
-  return 'contrato';
+  return isAcquisitionObject(context.objeto) ? 'aquisicao' : 'servico';
 }
 
 export function createManualDespachoFieldsFromResolvedContext(context: ResolvedDocumentContext): ManualDespachoFields {
   const finalidade = inferManualDespachoFinalidade(context);
-  const normalizedObject = normalizeText(context.objeto);
   return {
     finalidade,
     processo: context.processo || '',
@@ -163,7 +183,6 @@ export function createManualDespachoFieldsFromResolvedContext(context: ResolvedD
     empenho: context.empenho || '',
     projeto: context.projeto || (finalidade === 'projeto' ? context.objeto || '' : ''),
     edital: context.edital || '',
-    tipo: /\baquisi|material|equipamento|produto|fornecimento|compra\b/.test(normalizedObject) ? 'aquisicao' : 'servico',
   };
 }
 
@@ -192,10 +211,13 @@ export function buildManualDespachoHtml(fields: ManualDespachoFields) {
         ? 'Programa de Apoio a Formacao Estudantil (PAFE)'
         : 'Programa de Auxilio Moradia';
     body = `Considerando a regularidade dos documentos apresentados e o acompanhamento do ${programa}${processReference}, <b>AUTORIZO</b> a liquidacao da despesa no valor de ${valor}, referente ao empenho ${empenho}.`;
+  } else if (fields.finalidade === 'aquisicao') {
+    const objetoAdquirido = required(fields.descricao, 'objeto da aquisicao');
+    const destino = `destinado a este <i>Campus</i> Currais Novos${fields.processo.trim() ? ` (Processo n&ordm; ${required(fields.processo, 'numero do processo')})` : ''}`;
+    body = `Considerando a regularidade da documenta&ccedil;&atilde;o apresentada e o ateste do recebimento do objeto adquirido &mdash; ${objetoAdquirido} &mdash; ${destino}, <b>AUTORIZO</b> a liquida&ccedil;&atilde;o da despesa no valor de ${valor}, referente ao empenho ${empenho}, em favor de ${favorecido}.`;
   } else {
-    const reference = required(fields.descricao, fields.tipo === 'aquisicao' ? 'objeto da aquisicao' : 'objeto do servico');
-    const action = fields.tipo === 'aquisicao' ? 'do fornecimento de' : 'da prestacao de servicos de';
-    body = `Considerando a regularidade dos documentos apresentados e o ateste ${action} ${reference}${processReference}, <b>AUTORIZO</b> a liquidacao da despesa no valor de ${valor}, referente ao empenho ${empenho}, em favor de ${favorecido}.`;
+    const reference = required(fields.descricao, 'objeto do servico');
+    body = `Considerando a regularidade dos documentos apresentados e o ateste da prestacao de servicos de ${reference}${processReference}, <b>AUTORIZO</b> a liquidacao da despesa no valor de ${valor}, referente ao empenho ${empenho}, em favor de ${favorecido}.`;
   }
 
   const nextStep = fields.processo.trim() ? 'Na sequencia, encaminhe-se o processo a Direcao-Geral para analise e posterior autorizacao do pagamento.' : 'Na sequencia, encaminhe-se o documento a Direcao-Geral para analise e posterior autorizacao do pagamento.';

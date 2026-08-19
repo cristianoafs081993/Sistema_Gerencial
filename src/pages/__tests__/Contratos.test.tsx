@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import Contratos from '@/pages/Contratos';
@@ -244,7 +244,9 @@ describe('Contratos', () => {
   it('exibe detalhes da API quando o contrato local casa por numero normalizado', async () => {
     renderContratos();
 
-    const detailsButton = (await screen.findAllByRole('button', { name: /Detalhes/i }))[0];
+    const row = (await screen.findByText('62/2018')).closest('tr');
+    expect(row).not.toBeNull();
+    const detailsButton = within(row as HTMLElement).getByRole('button', { name: /Detalhes/i });
     fireEvent.click(detailsButton);
 
     await waitFor(() => {
@@ -257,6 +259,42 @@ describe('Contratos', () => {
     fireEvent.click(itensSection);
 
     expect(screen.getAllByText('PRESTAÇÃO DE SERVIÇOS DE APOIO ADMINISTRATIVO').length).toBeGreaterThan(0);
+  });
+
+  it('ordena inicialmente por inicio de vigencia mais recente (decrescente)', async () => {
+    renderContratos();
+
+    await screen.findByText('15/2026');
+    const table = screen.getByRole('table');
+    const rows = within(table).getAllByRole('row');
+    // rows[0] is table header; rows[1] is 15/2026 (vigencia 2026); rows[2] is 62/2018 (vigencia 2023)
+    const dataRows = rows.slice(1);
+    expect(within(dataRows[0]).getByText('15/2026')).toBeInTheDocument();
+    expect(within(dataRows[1]).getByText('62/2018')).toBeInTheDocument();
+  });
+
+  it('alterna ordenacao ao clicar no cabecalho de Vigencia', async () => {
+    renderContratos();
+
+    await screen.findByText('15/2026');
+    const vigenciaHeader = screen.getByRole('columnheader', { name: /Vigência/i });
+
+    // Initial state: desc (15/2026 first, 62/2018 second)
+    let rows = within(screen.getByRole('table')).getAllByRole('row').slice(1);
+    expect(within(rows[0]).getByText('15/2026')).toBeInTheDocument();
+    expect(within(rows[1]).getByText('62/2018')).toBeInTheDocument();
+
+    // Click 1: toggle to asc (62/2018 first, 15/2026 second)
+    fireEvent.click(vigenciaHeader);
+    rows = within(screen.getByRole('table')).getAllByRole('row').slice(1);
+    expect(within(rows[0]).getByText('62/2018')).toBeInTheDocument();
+    expect(within(rows[1]).getByText('15/2026')).toBeInTheDocument();
+
+    // Click 2: toggle back to desc (15/2026 first, 62/2018 second)
+    fireEvent.click(vigenciaHeader);
+    rows = within(screen.getByRole('table')).getAllByRole('row').slice(1);
+    expect(within(rows[0]).getByText('15/2026')).toBeInTheDocument();
+    expect(within(rows[1]).getByText('62/2018')).toBeInTheDocument();
   });
 
   it('filtra contratos favoritos sem remover o acesso aos detalhes da API', async () => {

@@ -144,7 +144,10 @@ export default function Contratos() {
   const [sortConfig, setSortConfig] = useState<{
     key: string;
     direction: 'asc' | 'desc';
-  } | null>(null);
+  } | null>({
+    key: 'data_inicio',
+    direction: 'desc',
+  });
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
   const [apiContratos, setApiContratos] = useState<ContratoApiRow[]>([]);
   const [apiEmpenhos, setApiEmpenhos] = useState<ContratoApiEmpenhoRow[]>([]);
@@ -366,19 +369,43 @@ export default function Contratos() {
 
     if (sortConfig) {
       result = [...result].sort((a, b) => {
-        let aValue: string | number = '';
-        let bValue: string | number = '';
-
         if (sortConfig.key === 'numero') {
-          aValue = a.numero;
-          bValue = b.numero;
-        } else if (sortConfig.key === 'data_termino') {
-          aValue = a.data_termino ? new Date(a.data_termino).getTime() : 0;
-          bValue = b.data_termino ? new Date(b.data_termino).getTime() : 0;
+          const res = a.numero.localeCompare(b.numero, undefined, { numeric: true, sensitivity: 'base' });
+          return sortConfig.direction === 'asc' ? res : -res;
         }
 
-        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        if (sortConfig.key === 'data_inicio') {
+          const aTime = a.data_inicio ? new Date(a.data_inicio).getTime() : null;
+          const bTime = b.data_inicio ? new Date(b.data_inicio).getTime() : null;
+          const aValid = aTime !== null && !Number.isNaN(aTime);
+          const bValid = bTime !== null && !Number.isNaN(bTime);
+
+          if (!aValid && !bValid) return a.numero.localeCompare(b.numero, undefined, { numeric: true, sensitivity: 'base' });
+          if (!aValid) return 1;
+          if (!bValid) return -1;
+
+          if (aTime !== bTime) {
+            return sortConfig.direction === 'asc' ? aTime! - bTime! : bTime! - aTime!;
+          }
+          return a.numero.localeCompare(b.numero, undefined, { numeric: true, sensitivity: 'base' });
+        }
+
+        if (sortConfig.key === 'data_termino') {
+          const aTime = a.data_termino ? new Date(a.data_termino).getTime() : null;
+          const bTime = b.data_termino ? new Date(b.data_termino).getTime() : null;
+          const aValid = aTime !== null && !Number.isNaN(aTime);
+          const bValid = bTime !== null && !Number.isNaN(bTime);
+
+          if (!aValid && !bValid) return a.numero.localeCompare(b.numero, undefined, { numeric: true, sensitivity: 'base' });
+          if (!aValid) return 1;
+          if (!bValid) return -1;
+
+          if (aTime !== bTime) {
+            return sortConfig.direction === 'asc' ? aTime! - bTime! : bTime! - aTime!;
+          }
+          return a.numero.localeCompare(b.numero, undefined, { numeric: true, sensitivity: 'base' });
+        }
+
         return 0;
       });
     }
@@ -505,7 +532,9 @@ export default function Contratos() {
 
   const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+    if (sortConfig && sortConfig.key === key) {
+      direction = sortConfig.direction === 'asc' ? 'desc' : 'asc';
+    } else if (key === 'data_inicio' || key === 'data_termino') {
       direction = 'desc';
     }
     setSortConfig({ key, direction });
@@ -637,10 +666,10 @@ export default function Contratos() {
                 </div>
               </TableHead>
               <TableHead className="h-11 px-4">Contratada</TableHead>
-              <TableHead className="h-11 cursor-pointer px-4 text-right transition-colors hover:bg-surface-subtle" onClick={() => handleSort('data_termino')}>
+              <TableHead className="h-11 cursor-pointer px-4 text-right transition-colors hover:bg-surface-subtle" onClick={() => handleSort('data_inicio')}>
                 <div className="flex items-center justify-end">
                   Vigência
-                  <SortIcon columnKey="data_termino" />
+                  <SortIcon columnKey="data_inicio" />
                 </div>
               </TableHead>
               <TableHead className="h-11 px-4 text-right">Valor Total</TableHead>

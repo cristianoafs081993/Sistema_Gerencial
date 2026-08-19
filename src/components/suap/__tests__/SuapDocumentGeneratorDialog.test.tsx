@@ -106,6 +106,19 @@ describe('SuapDocumentGeneratorDialog', () => {
     expect(screen.getByLabelText('Previa editavel do despacho')).toBeInTheDocument();
   });
 
+  it('oferece Servico e Aquisicao como modelos manuais independentes', () => {
+    renderDialog([{ ...processoCompleto, status: 'queued_extraction' }]);
+
+    expect(screen.queryByText('Tipo')).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('combobox')[0]);
+    expect(screen.getAllByText('Servi\u00e7o')).not.toHaveLength(0);
+    fireEvent.click(screen.getByText('Aquisi\u00e7\u00e3o'));
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar despacho' }));
+
+    expect(screen.getByLabelText('Previa editavel do despacho')).toHaveTextContent('recebimento do objeto adquirido');
+    expect(screen.queryByText('Tipo')).not.toBeInTheDocument();
+  });
+
   it('navega e preserva a fila por processo', async () => {
     renderDialog([processoCompleto, { ...processoCompleto, id: 'proc-2', suapId: '2', numProcesso: '23035.000002.2026-12' }]);
 

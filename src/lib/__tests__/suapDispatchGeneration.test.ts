@@ -65,12 +65,28 @@ describe('suapDispatchGeneration', () => {
 
   it('preenche o formulario manual com os dados disponiveis do processo', () => {
     expect(createManualDespachoFields(processo)).toMatchObject({
+      finalidade: 'servico',
       processo: '23035.000123.2026-11',
       favorecido: 'Fornecedor Teste Ltda',
       descricao: 'Servico de apoio',
       valor: '1.250,00',
       empenho: '2026NE000123',
     });
+  });
+
+  it('classifica aquisicoes e servicos em modelos distintos', () => {
+    expect(inferManualDespachoFinalidade({
+      tipoPessoa: 'PJ',
+      favorecido: 'Fornecedor Teste Ltda',
+      objeto: 'Compra de equipamentos de informatica',
+      projeto: undefined,
+    })).toBe('aquisicao');
+    expect(inferManualDespachoFinalidade({
+      tipoPessoa: 'PJ',
+      favorecido: 'Fornecedor Teste Ltda',
+      objeto: 'Servico de manutencao preventiva',
+      projeto: undefined,
+    })).toBe('servico');
   });
 
 
@@ -121,6 +137,33 @@ describe('suapDispatchGeneration', () => {
     expect(html).toContain('[empenho]');
   });
 
+  it('gera o texto especifico de aquisicao e preserva o texto atual de servico', () => {
+    const aquisicao = buildManualDespachoHtml({
+      ...createStandaloneManualDespachoFields(),
+      finalidade: 'aquisicao',
+      processo: '23035.000123.2026-11',
+      favorecido: 'Fornecedor Teste',
+      descricao: 'equipamentos de informatica',
+      valor: '1.250,00',
+      empenho: '2026NE000123',
+    });
+    const servico = buildManualDespachoHtml({
+      ...createStandaloneManualDespachoFields(),
+      finalidade: 'servico',
+      processo: '23035.000123.2026-11',
+      favorecido: 'Fornecedor Teste',
+      descricao: 'manutencao preventiva',
+      valor: '1.250,00',
+      empenho: '2026NE000123',
+    });
+
+    expect(aquisicao).toContain('ateste do recebimento do objeto adquirido');
+    expect(aquisicao).toContain('destinado a este <i>Campus</i> Currais Novos (Processo n&ordm; <b>23035.000123.2026-11</b>)');
+    expect(aquisicao).toContain('<b>equipamentos de informatica</b>');
+    expect(servico).toContain('ateste da prestacao de servicos de <b>manutencao preventiva</b>');
+    expect(servico).not.toContain('recebimento do objeto adquirido');
+  });
+
   it('omite a referencia ao processo no despacho avulso e a inclui quando informada', () => {
     const fields = {
       ...createStandaloneManualDespachoFields(),
@@ -133,5 +176,35 @@ describe('suapDispatchGeneration', () => {
     expect(buildManualDespachoHtml(fields)).not.toContain('Processo n.');
     expect(buildManualDespachoHtml(fields)).not.toContain('encaminhe-se o processo');
     expect(buildManualDespachoHtml({ ...fields, processo: '23035.000123.2026-11' })).toContain('Processo n. <b>23035.000123.2026-11</b>');
+  });
+
+  it('migra filas salvas do modelo contrato para servico ou aquisicao', () => {
+    const legacyServiceFields = {
+      ...createStandaloneManualDespachoFields(),
+      finalidade: 'contrato',
+      tipo: 'servico',
+      descricao: 'Manutencao preventiva',
+    };
+    const legacyAcquisitionFields = {
+      ...createStandaloneManualDespachoFields(),
+      finalidade: 'contrato',
+      tipo: 'aquisicao',
+      descricao: 'Compra de materiais',
+    };
+    sessionStorage.setItem(SUAP_DISPATCH_QUEUE_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      currentIndex: 0,
+      items: [
+        { standalone: true, status: 'pending', manualFields: legacyServiceFields },
+        { standalone: true, status: 'pending', manualFields: legacyAcquisitionFields },
+      ],
+    }));
+
+    const migratedItems = loadDispatchQueue()?.items;
+
+    expect(migratedItems?.[0].manualFields).toMatchObject({ finalidade: 'servico', descricao: 'Manutencao preventiva' });
+    expect(migratedItems?.[1].manualFields).toMatchObject({ finalidade: 'aquisicao', descricao: 'Compra de materiais' });
+    expect(migratedItems?.[0].manualFields).not.toHaveProperty('tipo');
+    expect(migratedItems?.[1].manualFields).not.toHaveProperty('tipo');
   });
 });
