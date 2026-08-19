@@ -118,13 +118,13 @@ describe('NotificationCenter', () => {
     expect(screen.getByText('Origem: 8100 - Custeio')).toBeInTheDocument();
     expect(screen.getByText('Empenho 2026NE000102')).toBeInTheDocument();
 
-    // Valida a ordem cronológica decrescente dos eventos (NE000102 [10/08] antes de NC000045 [05/08] antes de NE000101 [01/08])
-    const empenho2 = screen.getByText('Empenho 2026NE000102');
+    // Valida a intercalação decrescente dos eventos (NC000045 antes de NE000102 antes de NE000101)
     const desc1 = screen.getByText('Descentralização 2026NC000045');
+    const empenho2 = screen.getByText('Empenho 2026NE000102');
     const empenho1 = screen.getByText('Empenho 2026NE000101');
 
-    expect(empenho2.compareDocumentPosition(desc1) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(desc1.compareDocumentPosition(empenho1) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(desc1.compareDocumentPosition(empenho2) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(empenho2.compareDocumentPosition(empenho1) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('limita a exibição aos últimos 20 eventos', () => {

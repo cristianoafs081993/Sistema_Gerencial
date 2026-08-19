@@ -65,20 +65,62 @@ function parseDate(value: Date | string | number | undefined | null): Date {
 
   if (typeof value === 'string') {
     const trimmed = value.trim();
+    if (!trimmed) return new Date(0);
+    // Caso DD/MM/YYYY ou DD/MM/YYYY HH:mm:ss
     if (trimmed.includes('/')) {
-      const parts = trimmed.split('/');
+      const [datePart, timePart] = trimmed.split(' ');
+      const parts = datePart.split('/');
       if (parts.length === 3) {
         const [d, m, y] = parts;
-        const parsed = new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T12:00:00`);
+        const time = timePart || '12:00:00';
+        const iso = `${y.length === 2 ? '20' + y : y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T${time}`;
+        const parsed = new Date(iso);
         if (!isNaN(parsed.getTime())) return parsed;
       }
     }
-    const d = new Date(trimmed.includes('T') ? trimmed : `${trimmed}T12:00:00`);
+    // Caso YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      const parsed = new Date(`${trimmed}T12:00:00`);
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
+    const d = new Date(trimmed);
     if (!isNaN(d.getTime())) return d;
   }
 
   const d = new Date(value);
   return isNaN(d.getTime()) ? new Date(0) : d;
+}
+
+function extractDocNumber(numero?: string | null): number {
+  if (!numero) return 0;
+  const match = numero.match(/(\d{4})[A-Za-z]+(\d+)/);
+  if (match) {
+    const year = parseInt(match[1], 10);
+    const seq = parseInt(match[2], 10);
+    return year * 10_000_000 + seq;
+  }
+  const digits = numero.replace(/\D/g, '');
+  return digits ? parseInt(digits, 10) : 0;
+}
+
+function interleaveEvents(
+  empenhos: NotificationItem[],
+  descentralizacoes: NotificationItem[],
+  maxTotal = 20,
+): NotificationItem[] {
+  const result: NotificationItem[] = [];
+  const maxLen = Math.max(empenhos.length, descentralizacoes.length);
+
+  for (let i = 0; i < maxLen && result.length < maxTotal; i++) {
+    if (descentralizacoes[i] && result.length < maxTotal) {
+      result.push(descentralizacoes[i]);
+    }
+    if (empenhos[i] && result.length < maxTotal) {
+      result.push(empenhos[i]);
+    }
+  }
+
+  return result;
 }
 
 function formatNotificationDate(date: Date): string {
@@ -121,61 +163,76 @@ export function NotificationCenter({
     }
   });
 
-  // Consolidar empenhos e descentralizações juntos na mesma lista, com a mais recente no topo (decrescente por data de evento/emissão)
+  // Consolidar os últimos empenhos emitidos e as últimas descentralizações de forma intercalada (máx 20 eventos)
   const allNotifications = useMemo<NotificationItem[]>(() => {
-    const empenhoItems: NotificationItem[] = empenhos.map((e) => {
-      const docDate = parseDate(e.dataEmpenho || e.createdAt);
-      const createdDate = parseDate(e.createdAt || e.dataEmpenho);
-      const effectiveDate = docDate.getTime() > 0 ? docDate : createdDate;
+    // 1. Mapear e ordenar descentralizações decrescentemente pela data oficial de emissão (as mais recentes primeiro)
+    const sortedDescentralizacoes: NotificationItem[] = descentralizacoes
+      .map((d) => {
+        const docDate = parseDate(d.dataEmissao || d.createdAt);
+        const createdDate = parseDate(d.createdAt || d.dataEmissao);
+        const effectiveDate = docDate.getTime() > 0 ? docDate : createdDate;
 
-      return {
-        id: `emp-${e.id || e.numero}`,
-        type: 'empenho',
-        date: effectiveDate,
-        createdAt: createdDate,
-        documentDate: docDate,
-        title: `Empenho ${e.numero}`,
-        subtitle: e.favorecidoNome || 'Favorecido não informado',
-        description: e.descricao || '',
-        valor: Number(e.valor) || 0,
-        dimensao: e.dimensao,
-        status: e.status || 'pendente',
-        raw: e,
-      };
-    });
-
-    const descItems: NotificationItem[] = descentralizacoes.map((d) => {
-      const docDate = parseDate(d.dataEmissao || d.createdAt);
-      const createdDate = parseDate(d.createdAt || d.dataEmissao);
-      const effectiveDate = docDate.getTime() > 0 ? docDate : createdDate;
-
-      return {
-        id: `desc-${d.id || d.notaCredito || Math.random().toString()}`,
-        type: 'descentralizacao',
-        date: effectiveDate,
-        createdAt: createdDate,
-        documentDate: docDate,
-        title: d.notaCredito ? `Descentralização ${d.notaCredito}` : 'Descentralização de Crédito',
-        subtitle: d.origemRecurso ? `Origem: ${d.origemRecurso}` : 'Origem não informada',
-        description: d.descricao || (d.planoInterno ? `PI: ${d.planoInterno}` : ''),
-        valor: Number(d.valor) || 0,
-        dimensao: d.dimensao,
-        origem: d.origemRecurso,
-        raw: d,
-      };
-    });
-
-    return [...empenhoItems, ...descItems]
+        return {
+          id: `desc-${d.id || d.notaCredito || Math.random().toString()}`,
+          type: 'descentralizacao' as const,
+          date: effectiveDate,
+          createdAt: createdDate,
+          documentDate: docDate,
+          title: d.notaCredito ? `Descentralização ${d.notaCredito}` : 'Descentralização de Crédito',
+          subtitle: d.origemRecurso ? `Origem: ${d.origemRecurso}` : 'Origem não informada',
+          description: d.descricao || (d.planoInterno ? `PI: ${d.planoInterno}` : ''),
+          valor: Number(d.valor) || 0,
+          dimensao: d.dimensao,
+          origem: d.origemRecurso,
+          raw: d,
+        };
+      })
       .sort((a, b) => {
-        // Ordena por data decrescente (a mais recente fica no topo)
         const dateDiff = b.date.getTime() - a.date.getTime();
         if (dateDiff !== 0) return dateDiff;
-        // Desempate por timestamp de criação
-        const createdDiff = b.createdAt.getTime() - a.createdAt.getTime();
-        if (createdDiff !== 0) return createdDiff;
-        return b.title.localeCompare(a.title);
+        const numA = extractDocNumber(a.raw.notaCredito);
+        const numB = extractDocNumber(b.raw.notaCredito);
+        if (numA !== 0 && numB !== 0 && numA !== numB) {
+          return numB - numA;
+        }
+        return b.createdAt.getTime() - a.createdAt.getTime();
+      });
+
+    // 2. Mapear e ordenar empenhos pelos últimos emitidos (maior número sequencial de NE primeiro)
+    const sortedEmpenhos: NotificationItem[] = empenhos
+      .map((e) => {
+        const docDate = parseDate(e.dataEmpenho || e.createdAt);
+        const createdDate = parseDate(e.createdAt || e.dataEmpenho);
+        const effectiveDate = docDate.getTime() > 0 ? docDate : createdDate;
+
+        return {
+          id: `emp-${e.id || e.numero}`,
+          type: 'empenho' as const,
+          date: effectiveDate,
+          createdAt: createdDate,
+          documentDate: docDate,
+          title: `Empenho ${e.numero}`,
+          subtitle: e.favorecidoNome || 'Favorecido não informado',
+          description: e.descricao || '',
+          valor: Number(e.valor) || 0,
+          dimensao: e.dimensao,
+          status: e.status || 'pendente',
+          raw: e,
+        };
       })
-      .slice(0, MAX_EVENTS);
+      .sort((a, b) => {
+        const numA = extractDocNumber(a.raw.numero);
+        const numB = extractDocNumber(b.raw.numero);
+        if (numA !== 0 && numB !== 0 && numA !== numB) {
+          return numB - numA;
+        }
+        const dateDiff = b.date.getTime() - a.date.getTime();
+        if (dateDiff !== 0) return dateDiff;
+        return b.createdAt.getTime() - a.createdAt.getTime();
+      });
+
+    // 3. Intercalar os últimos empenhos e as últimas descentralizações para exibição balanceada dos 20 eventos mais recentes
+    return interleaveEvents(sortedEmpenhos, sortedDescentralizacoes, MAX_EVENTS);
   }, [empenhos, descentralizacoes]);
 
   // Contagem de itens não lidos dentre os últimos eventos
@@ -271,7 +328,7 @@ export function NotificationCenter({
             )}
           </div>
 
-          {/* Lista Unificada de Notificações (Empenhos + Descentralizações juntos na mesma lista) */}
+          {/* Lista Unificada e Intercalada de Notificações */}
           <ScrollArea className="max-h-[390px] overflow-y-auto pl-2 pr-3.5 py-2">
             {allNotifications.length === 0 ? (
               <div className="py-8 text-center px-4 space-y-2">
