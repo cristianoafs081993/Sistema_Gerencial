@@ -21,10 +21,13 @@ type TestTinyEditor = {
 interface ExtensionTestWindow extends Window {
   tinymce?: { activeEditor: TestTinyEditor | null; editors: TestTinyEditor[] };
   __SIAGES_SUAP_CLONE_TEST__?: boolean;
+  __siagesSuapCloneTestNavigate?: (url: string) => void;
   __siagesSuapCloneAutomation?: {
     parsePayloadFromHash: (hash: string) => unknown;
     runCloneAutomation: (payload: unknown) => boolean;
     openTextEditorFromView: () => Promise<boolean>;
+    openTextEditorFromDocumentList: () => Promise<boolean>;
+    findCreatedDraftEditorPath: (root: ParentNode, subject: string) => string | null;
     fillTextEditorWhenReady: () => Promise<boolean>;
     loadPendingAutomation: () => { payload: { contentHtml?: string } } | null;
     storePendingAutomation: (payload: unknown, stage: string) => void;
@@ -119,6 +122,7 @@ describe('suap-atividades-extension clone-document.js', () => {
     const testWindow = window as ExtensionTestWindow;
     delete testWindow.__siagesSuapCloneAutomation;
     delete testWindow.__SIAGES_SUAP_CLONE_TEST__;
+    delete testWindow.__siagesSuapCloneTestNavigate;
     delete testWindow.tinymce;
     window.history.replaceState(null, document.title, '/');
   });
@@ -164,6 +168,34 @@ describe('suap-atividades-extension clone-document.js', () => {
     vi.advanceTimersByTime(2000);
     expect(clickSpy).not.toHaveBeenCalled();
     expect(document.getElementById('siages-suap-clone-notice')?.textContent).toContain('Revise os campos e clique em Salvar');
+  });
+
+  it('marca a automacao para localizar o rascunho apos o formulario de clone ser salvo', () => {
+    const automation = loadContentScript();
+    document.body.innerHTML = '<form><input id="id_assunto"><button type="submit">Salvar</button></form>';
+
+    automation.runCloneAutomation(automationPayload);
+    document.querySelector('form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    expect(automation.loadPendingAutomation()).toMatchObject({ stage: 'awaiting-created-document' });
+  });
+
+  it('localiza o rascunho recem-criado na listagem e abre seu editor de texto', async () => {
+    const automation = loadContentScript();
+    const testWindow = window as ExtensionTestWindow;
+    const navigate = vi.fn();
+    testWindow.__siagesSuapCloneTestNavigate = navigate;
+    automation.storePendingAutomation(automationPayload, 'awaiting-created-document');
+    document.body.innerHTML = `
+      <table><tbody>
+        <tr><td>Autorizacao para Liquidacao da Despesa anterior</td><td>Rascunho</td><td><a href="/admin/documento_eletronico/documentotexto/1111111/change/">Editar</a></td></tr>
+        <tr><td>Autorizacao para Liquidacao da Despesa</td><td>Rascunho</td><td><a href="/admin/documento_eletronico/documentotexto/2222222/change/">Editar</a></td></tr>
+      </tbody></table>
+    `;
+    expect(automation.findCreatedDraftEditorPath(document, automationPayload.subject)).toBe('/documento_eletronico/editar_documento/2222222/');
+    await expect(automation.openTextEditorFromDocumentList()).resolves.toBe(true);
+    expect(navigate).toHaveBeenCalledWith('/documento_eletronico/editar_documento/2222222/');
+    expect(automation.loadPendingAutomation()).toMatchObject({ stage: 'opening-text-editor' });
   });
 
   it('apos visualizar documento, abre o menu Editar e clica em Texto', async () => {

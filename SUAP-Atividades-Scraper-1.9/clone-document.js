@@ -51,6 +51,10 @@
     return /\/documento_eletronico\/visualizar_documento\/\d+\//.test(window.location.pathname);
   }
 
+  function isDocumentListPage() {
+    return /\/admin\/documento_eletronico\/documentotexto\/$/.test(window.location.pathname);
+  }
+
   function looksLikeTextEditPage() {
     const path = window.location.pathname.toLowerCase();
     if (path.includes('texto') || path.includes('editar_documento')) return true;
@@ -149,6 +153,16 @@
     return findClickableByText(root || document, 'salvar');
   }
 
+  function armCloneSaveContinuation(subjectField) {
+    const form = subjectField?.form || findSaveButton(document)?.closest('form');
+    const saveButton = findSaveButton(document);
+    if (!form) return;
+
+    const markSubmitted = () => updatePendingStage('awaiting-created-document');
+    form.addEventListener('submit', markSubmitted, { once: true });
+    saveButton?.addEventListener('click', markSubmitted, { once: true });
+  }
+
   function showNotice(message, type) {
     const previous = document.getElementById(NOTICE_ID);
     if (previous) previous.remove();
@@ -208,8 +222,68 @@
 
     fillSubject(subjectField, payload.subject);
     storePendingAutomation(payload, 'awaiting-document-view');
+    armCloneSaveContinuation(subjectField);
 
-    showNotice('SIAGES: assunto preenchido. Revise os campos e clique em Salvar para abrir o editor de texto.', 'success');
+    showNotice('SIAGES: assunto preenchido. Revise os campos e clique em Salvar para continuar o preenchimento do texto.', 'success');
+    return true;
+  }
+
+  function findCreatedDraftEditorPath(root, subject) {
+    const normalizedSubject = cleanText(subject);
+    if (!normalizedSubject) return null;
+
+    const editLinks = Array.from((root || document).querySelectorAll(
+      'a[href*="/admin/documento_eletronico/documentotexto/"]',
+    ));
+
+    for (const editLink of editLinks) {
+      const match = (editLink.getAttribute('href') || '').match(
+        /\/admin\/documento_eletronico\/documentotexto\/(\d+)\/change/,
+      );
+      if (!match) continue;
+
+      const row = editLink.closest('tr');
+      if (!row) continue;
+
+      const cellTexts = Array.from(row.children).map((cell) => cleanText(cell.textContent || ''));
+      const hasExactSubject = cellTexts.includes(normalizedSubject);
+      const isDraft = cellTexts.some((cellText) => cellText.toLowerCase().includes('rascunho'));
+      if (hasExactSubject && isDraft) {
+        return `/documento_eletronico/editar_documento/${match[1]}/`;
+      }
+    }
+
+    return null;
+  }
+
+  function navigateTo(url) {
+    if (
+      window.__SIAGES_SUAP_CLONE_TEST__
+      && typeof window.__siagesSuapCloneTestNavigate === 'function'
+    ) {
+      window.__siagesSuapCloneTestNavigate(url);
+      return;
+    }
+
+    window.location.assign(url);
+  }
+
+  async function openTextEditorFromDocumentList() {
+    const pending = loadPendingAutomation();
+    if (pending?.stage !== 'awaiting-created-document' || !pending.payload?.contentHtml) return false;
+
+    const editorPath = await waitFor(
+      () => findCreatedDraftEditorPath(document, pending.payload.subject),
+      10000,
+    );
+    if (!editorPath) {
+      showNotice('SIAGES: o rascunho criado nao foi localizado na listagem para abrir o editor de texto.', 'error');
+      return false;
+    }
+
+    updatePendingStage('opening-text-editor');
+    showNotice('SIAGES: abrindo o editor de texto do rascunho criado...', 'success');
+    navigateTo(editorPath);
     return true;
   }
 
@@ -526,6 +600,11 @@
       return;
     }
 
+    if (isDocumentListPage()) {
+      await openTextEditorFromDocumentList();
+      return;
+    }
+
     await fillTextEditorWhenReady();
   }
 
@@ -536,6 +615,8 @@
     findSaveButton,
     runCloneAutomation,
     openTextEditorFromView,
+    openTextEditorFromDocumentList,
+    findCreatedDraftEditorPath,
     fillTextEditor,
     fillTextEditorWhenReady,
     loadPendingAutomation,
