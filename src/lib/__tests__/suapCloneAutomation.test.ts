@@ -272,6 +272,37 @@ describe('suap-atividades-extension clone-document.js', () => {
     expect(automation.loadPendingAutomation()).toBeNull();
   });
 
+  it('navega diretamente por link com editar_texto_documento na visualizacao', async () => {
+    const automation = loadContentScript();
+    automation.storePendingAutomation(automationPayload, 'awaiting-document-view');
+    const clickSpy = vi.fn((e: MouseEvent) => e.preventDefault());
+    document.body.innerHTML = '<a id="direct-link" href="/documento_eletronico/editar_texto_documento/1113677/">Editar Texto</a>';
+    document.querySelector('#direct-link')?.addEventListener('click', clickSpy as unknown as EventListener);
+
+    await expect(automation.openTextEditorFromView()).resolves.toBe(true);
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('protege o envio de formulario garantindo preenchimento do textarea no submit', async () => {
+    const automation = loadContentScript();
+    automation.storePendingAutomation(automationPayload, 'opening-text-editor');
+    document.body.innerHTML = `
+      <form id="doc-form">
+        <textarea id="id_texto"></textarea>
+        <button type="submit" id="save-btn">Salvar e Visualizar</button>
+      </form>
+    `;
+    const form = document.querySelector<HTMLFormElement>('#doc-form')!;
+    const textarea = document.querySelector<HTMLTextAreaElement>('#id_texto')!;
+
+    await automation.fillTextEditorWhenReady();
+
+    // Dispara submit do form
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    expect(textarea.value).toContain('Conteudo gerado');
+  });
+
   it('ignora payload invalido ou ausente', () => {
     const automation = loadContentScript();
 

@@ -52,6 +52,8 @@
     bell: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',
     graduationCap: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>',
     user: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+    sun: '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>',
+    moon: '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>',
   };
 
   // Screen groups definition (Exact 1:1 match with SIAGES appScreenGroups)
@@ -287,10 +289,15 @@
 
   function calculateEmpenhoSaldo(emp) {
     if (emp.tipo === 'rap') {
+      if (emp.saldo_rap_oficial != null && !Number.isNaN(Number(emp.saldo_rap_oficial))) {
+        return Math.max(0, Number(emp.saldo_rap_oficial));
+      }
       const rapInscrito = Number(emp.rap_inscrito || 0);
+      const rapALiquidar = Number(emp.rap_a_liquidar || 0);
       const rapLiquidado = Number(emp.rap_liquidado || 0);
       const rapPago = Number(emp.rap_pago || 0);
-      return Math.max(0, rapInscrito - Math.max(rapLiquidado, rapPago));
+      const base = rapInscrito > 0 ? rapInscrito : rapALiquidar;
+      return Math.max(0, base - Math.max(rapLiquidado, rapPago));
     }
     const valor = Number(emp.valor || 0);
     const liquidadoAPagar = Number(emp.valor_liquidado_a_pagar || 0);
@@ -412,6 +419,12 @@
 
     let score = 0;
 
+    // 1. Termo genérico de busca
+    if (q === 'contrato' || q === 'contratos' || q === 'ct') {
+      score += 1000;
+    }
+
+    // 2. Número do contrato
     if (num === q) score += 20000;
     else if (num.startsWith(q)) score += 15000;
     else if (num.includes(q)) score += 10000;
@@ -423,17 +436,20 @@
       else if (num.replace(/\D/g, '').includes(digits)) score += 6000;
     }
 
+    // 3. Fornecedor
     if (forn) {
       if (forn.startsWith(q)) score += 5000;
       else if (forn.includes(q)) score += 3000;
       else if (words.length > 1 && words.every((w) => forn.includes(w))) score += 4000;
     }
 
+    // 4. Objeto
     if (obj) {
       if (obj.includes(q)) score += 2000;
       else if (words.length > 1 && words.every((w) => obj.includes(w))) score += 2500;
     }
 
+    // 5. Processo
     if (proc && q.length >= 3 && proc.includes(q)) score += 1500;
 
     return score;
@@ -471,8 +487,8 @@
     isFetching = true;
     try {
       const [empenhosData, contratosApiData, contratosLocaisData] = await Promise.allSettled([
-        fetchFromSupabase('empenhos', 'select=id,numero,descricao,valor,natureza_despesa,plano_interno,favorecido_nome,favorecido_documento,valor_liquidado,valor_liquidado_oficial,valor_pago_oficial,valor_liquidado_a_pagar,status,tipo,rap_inscrito,rap_liquidado,rap_pago,processo&order=numero.desc&limit=1500'),
-        fetchFromSupabase('contratos_api', 'select=id,api_contrato_id,numero,fornecedor_nome,fornecedor_documento,unidade_codigo,unidade_nome,unidade_origem_codigo,unidade_origem_nome,objeto,processo,vigencia_inicio,vigencia_fim,vigencia_inicio_derivada,vigencia_fim_derivada,valor_global,valor_acumulado,situacao,situacao_derivada,updated_at&order=numero.asc'),
+        fetchFromSupabase('empenhos', 'select=id,numero,descricao,valor,natureza_despesa,plano_interno,favorecido_nome,favorecido_documento,valor_liquidado,valor_liquidado_oficial,valor_pago_oficial,valor_liquidado_a_pagar,status,tipo,rap_inscrito,rap_a_liquidar,rap_liquidado,rap_pago,saldo_rap_oficial,processo&order=numero.desc&limit=1500'),
+        fetchFromSupabase('contratos_api', 'select=id,api_contrato_id,numero,fornecedor_nome,fornecedor_documento,unidade_codigo,unidade_nome,unidade_origem_codigo,unidade_origem_nome,objeto,processo,vigencia_inicio,vigencia_fim,vigencia_inicio_derivada,vigencia_fim_derivada,valor_global,valor_acumulado,situacao,situacao_derivada,campus_scope_reason,updated_at&situacao_derivada=eq.true&campus_scope_reason=in.(ug_campus,reitoria_com_empenho_campus,reitoria_com_fatura_campus)&order=numero.asc'),
         fetchFromSupabase('contratos', 'select=id,numero,contratada,objeto,processo,valor,data_inicio,data_termino,status'),
       ]);
 
@@ -485,8 +501,10 @@
 
       const contratosMap = new Map();
       for (const api of apiContratos) {
-        const isAtivo = api.situacao_derivada === true || (api.situacao_derivada === undefined && api.situacao === true);
-        if (!isAtivo) continue;
+        if (api.situacao_derivada !== true) continue;
+        if (api.campus_scope_reason && !['ug_campus', 'reitoria_com_empenho_campus', 'reitoria_com_fatura_campus'].includes(api.campus_scope_reason)) {
+          continue;
+        }
 
         const norm = normalizeContratoNumero(api.numero) || api.numero;
         contratosMap.set(norm, {
@@ -544,6 +562,69 @@
     }
   }
 
+  const THEME_STORAGE_KEY = 'siages-palette-theme';
+  let currentPaletteTheme = 'auto'; // 'auto' | 'light' | 'dark'
+
+  try {
+    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    if (savedTheme === 'light' || savedTheme === 'dark') {
+      currentPaletteTheme = savedTheme;
+    }
+  } catch (_) {}
+
+  function getEffectiveTheme() {
+    if (currentPaletteTheme === 'light' || currentPaletteTheme === 'dark') {
+      return currentPaletteTheme;
+    }
+    if (
+      document.body.classList.contains('theme-luna') ||
+      document.documentElement.classList.contains('dark') ||
+      document.body.classList.contains('dark') ||
+      document.body.getAttribute('data-theme') === 'dark' ||
+      window.matchMedia?.('(prefers-color-scheme: dark)').matches
+    ) {
+      return 'dark';
+    }
+    return 'light';
+  }
+
+  function applyPaletteTheme(theme) {
+    currentPaletteTheme = theme;
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch (_) {}
+
+    const effective = getEffectiveTheme();
+    if (overlayEl) {
+      overlayEl.dataset.theme = effective;
+    }
+    if (detailOverlayEl) {
+      detailOverlayEl.dataset.theme = effective;
+    }
+
+    const iconHtml = effective === 'dark' ? ICONS.sun : ICONS.moon;
+    const titleText = effective === 'dark' ? 'Alternar para modo claro' : 'Alternar para modo escuro';
+
+    const mainBtn = overlayEl?.querySelector('#suape-cp-theme-toggle');
+    if (mainBtn) {
+      mainBtn.innerHTML = iconHtml;
+      mainBtn.title = titleText;
+      mainBtn.setAttribute('aria-label', titleText);
+    }
+    const detailBtn = detailOverlayEl?.querySelector('#suape-cp-detail-theme-toggle');
+    if (detailBtn) {
+      detailBtn.innerHTML = iconHtml;
+      detailBtn.title = titleText;
+      detailBtn.setAttribute('aria-label', titleText);
+    }
+  }
+
+  function togglePaletteTheme() {
+    const current = getEffectiveTheme();
+    const next = current === 'dark' ? 'light' : 'dark';
+    applyPaletteTheme(next);
+  }
+
   // Create Palette DOM (Exact match with SIAGES UI)
   function createPaletteDOM() {
     if (overlayEl) return;
@@ -557,7 +638,8 @@
             <div class="suape-cp-search-icon-box">
               ${ICONS.search}
             </div>
-            <input type="text" class="suape-cp-input" placeholder="Digite um comando, NE, contrato, fornecedor ou módulo..." autocomplete="off" spellcheck="false" />
+            <input type="text" class="suape-cp-input" placeholder="Digite um comando, NE, contrato, fornecedor ou módulo..." autocomplete="off" spellcheck="false" autofocus />
+            <button type="button" class="suape-cp-theme-btn" id="suape-cp-theme-toggle" title="Alternar tema claro/escuro" aria-label="Alternar tema claro/escuro"></button>
             <span class="suape-cp-kbd">ESC</span>
           </div>
           <div class="suape-cp-chips">
@@ -622,6 +704,13 @@
       });
     });
 
+    // Theme toggle events
+    overlayEl.querySelector('#suape-cp-theme-toggle')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePaletteTheme();
+      inputEl?.focus();
+    });
+
     // Input events
     inputEl.addEventListener('input', () => {
       selectedIndex = 0;
@@ -644,7 +733,10 @@
           <div class="suape-cp-detail-title-group">
             <h3 class="suape-cp-detail-title">Detalhes</h3>
           </div>
-          <button type="button" class="suape-cp-detail-close" title="Fechar (Esc)">✕</button>
+          <div class="suape-cp-detail-header-actions">
+            <button type="button" class="suape-cp-theme-btn" id="suape-cp-detail-theme-toggle" title="Alternar tema claro/escuro" aria-label="Alternar tema claro/escuro"></button>
+            <button type="button" class="suape-cp-detail-close" title="Fechar (Esc)">✕</button>
+          </div>
         </div>
         <div class="suape-cp-detail-body"></div>
       </div>
@@ -653,9 +745,15 @@
 
     detailDialogEl = detailOverlayEl.querySelector('#suape-cp-detail-dialog');
     detailOverlayEl.querySelector('.suape-cp-detail-close').addEventListener('click', closeDetailModal);
+    detailOverlayEl.querySelector('#suape-cp-detail-theme-toggle')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePaletteTheme();
+    });
     detailOverlayEl.addEventListener('click', (e) => {
       if (e.target === detailOverlayEl) closeDetailModal();
     });
+
+    applyPaletteTheme(currentPaletteTheme);
   }
 
   function updateProcessChip() {
@@ -865,23 +963,32 @@
     }
 
     let matchingEmpenhos = [];
-    if (query && (scope === 'all' || scope === 'empenhos') && empenhosCache) {
-      matchingEmpenhos = empenhosCache
-        .map((emp) => ({ emp, score: scoreEmpenho(emp, query) }))
-        .filter((item) => item.score > 0)
-        .sort((a, b) => b.score - a.score)
-        .map((item) => item.emp)
-        .slice(0, 10);
+    if ((scope === 'all' || scope === 'empenhos') && empenhosCache) {
+      const withSaldo = empenhosCache.filter((emp) => calculateEmpenhoSaldo(emp) > 0);
+      if (!query && scope === 'empenhos') {
+        matchingEmpenhos = withSaldo.slice(0, 15);
+      } else if (query) {
+        matchingEmpenhos = withSaldo
+          .map((emp) => ({ emp, score: scoreEmpenho(emp, query) }))
+          .filter((item) => item.score > 0)
+          .sort((a, b) => b.score - a.score)
+          .map((item) => item.emp)
+          .slice(0, 10);
+      }
     }
 
     let matchingContratos = [];
-    if (query && (scope === 'all' || scope === 'contratos') && contratosCache) {
-      matchingContratos = contratosCache
-        .map((cont) => ({ cont, score: scoreContrato(cont, query) }))
-        .filter((item) => item.score > 0)
-        .sort((a, b) => b.score - a.score)
-        .map((item) => item.cont)
-        .slice(0, 8);
+    if ((scope === 'all' || scope === 'contratos') && contratosCache) {
+      if (!query && scope === 'contratos') {
+        matchingContratos = contratosCache.slice(0, 15);
+      } else if (query) {
+        matchingContratos = contratosCache
+          .map((cont) => ({ cont, score: scoreContrato(cont, query) }))
+          .filter((item) => item.score > 0)
+          .sort((a, b) => b.score - a.score)
+          .map((item) => item.cont)
+          .slice(0, 8);
+      }
     }
 
     let suapContractSearchAction = null;
@@ -1271,11 +1378,6 @@
       matchingEmpenhos.forEach((emp) => {
         const saldo = calculateEmpenhoSaldo(emp);
         const isSel = globalIndex === selectedIndex;
-        const statusStr = (emp.status || 'pendente').toLowerCase();
-        let statusBadgeClass = 'badge-pendente';
-        if (statusStr === 'pago') statusBadgeClass = 'badge-pago';
-        else if (statusStr === 'liquidado') statusBadgeClass = 'badge-liquidado';
-        else if (statusStr === 'cancelado') statusBadgeClass = 'badge-cancelado';
 
         html += `
           <div class="suape-cp-item ${isSel ? 'suape-cp-item-selected' : ''}" data-index="${globalIndex}">
@@ -1286,7 +1388,6 @@
               <div class="suape-cp-item-title-row">
                 <span class="suape-cp-item-title">${highlightMatch(emp.numero, query)}</span>
                 ${emp.tipo === 'rap' ? '<span class="suape-cp-badge badge-rap">RAP</span>' : ''}
-                <span class="suape-cp-badge ${statusBadgeClass}">${escapeHtml(emp.status || 'Pendente')}</span>
               </div>
               <p class="suape-cp-item-subtitle">
                 <span class="suape-cp-subtitle-main">${highlightMatch(emp.favorecido_nome || 'Favorecido não informado', query)}</span>
@@ -1739,6 +1840,7 @@
 
   function openPalette() {
     createPaletteDOM();
+    applyPaletteTheme(currentPaletteTheme);
     updateProcessChip();
     overlayEl.classList.add('suape-cp-visible');
     inputEl.value = '';
@@ -1749,9 +1851,25 @@
       inputEl.placeholder = 'Digite um comando, NE, contrato, fornecedor ou módulo...';
     }
     selectedIndex = 0;
-    inputEl.focus();
     renderResults();
     loadData(false);
+
+    // Garantir foco imediato e em frames subsequentes
+    inputEl.focus();
+    requestAnimationFrame(() => {
+      inputEl.focus();
+      inputEl.select();
+    });
+    setTimeout(() => {
+      if (document.activeElement !== inputEl && overlayEl?.classList.contains('suape-cp-visible')) {
+        inputEl.focus();
+      }
+    }, 20);
+    setTimeout(() => {
+      if (document.activeElement !== inputEl && overlayEl?.classList.contains('suape-cp-visible')) {
+        inputEl.focus();
+      }
+    }, 80);
   }
 
   function closePalette() {
@@ -1767,19 +1885,26 @@
     }
   }
 
-  // Global keydown listener
-  document.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
-      e.preventDefault();
-      togglePalette();
-    } else if (e.key === 'Escape') {
-      if (detailOverlayEl?.classList.contains('suape-cp-visible')) {
-        closeDetailModal();
-      } else if (overlayEl?.classList.contains('suape-cp-visible')) {
-        closePalette();
+  // Global keydown listener com fase de captura para precedência imediata
+  document.addEventListener(
+    'keydown',
+    (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK')) {
+        e.preventDefault();
+        e.stopPropagation();
+        togglePalette();
+      } else if (e.key === 'Escape') {
+        if (detailOverlayEl?.classList.contains('suape-cp-visible')) {
+          e.preventDefault();
+          closeDetailModal();
+        } else if (overlayEl?.classList.contains('suape-cp-visible')) {
+          e.preventDefault();
+          closePalette();
+        }
       }
-    }
-  });
+    },
+    true
+  );
 
   // Pre-load data on idle
   if (typeof requestIdleCallback !== 'undefined') {

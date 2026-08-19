@@ -252,7 +252,12 @@ function scoreContrato(
 
   let score = 0;
 
-  // 1. Número do contrato
+  // 1. Termo genérico de busca por contrato
+  if (q === 'contrato' || q === 'contratos' || q === 'ct') {
+    score += 1000;
+  }
+
+  // 2. Número do contrato
   if (num === q) {
     score += 20000;
   } else if (num.startsWith(q)) {
@@ -272,20 +277,20 @@ function scoreContrato(
     }
   }
 
-  // 2. Fornecedor
+  // 3. Fornecedor
   if (forn) {
     if (forn.startsWith(q)) score += 5000;
     else if (forn.includes(q)) score += 3000;
     else if (words.length > 1 && words.every((w) => forn.includes(w))) score += 4000;
   }
 
-  // 3. Objeto
+  // 4. Objeto
   if (obj) {
     if (obj.includes(q)) score += 2000;
     else if (words.length > 1 && words.every((w) => obj.includes(w))) score += 2500;
   }
 
-  // 4. Processo
+  // 5. Processo
   if (proc && q.length >= 3 && proc.includes(q)) {
     score += 1500;
   }
@@ -414,7 +419,7 @@ export function CommandPalette({
 
     // 1. Contratos da API ativos
     for (const api of apiContratos) {
-      const isAtivo = api.situacao_derivada === true || (api.situacao_derivada === undefined && api.situacao === true);
+      const isAtivo = api.situacao_derivada === true;
       if (!isAtivo) continue;
 
       const norm = normalizeContratoNumero(api.numero) || api.numero;
@@ -535,11 +540,19 @@ export function CommandPalette({
     }
   };
 
-  // High-precision scored Empenhos (ranked by relevance)
+  // High-precision scored Empenhos (ranked by relevance) - omite empenhos com saldo zero
   const matchingEmpenhos = useMemo(() => {
-    if (!effectiveQuery || (currentScope !== 'all' && currentScope !== 'empenhos')) return [];
+    if (currentScope !== 'all' && currentScope !== 'empenhos') return [];
+    const withSaldo = empenhosList.filter((emp) => getEmpenhoAvailableBalance(emp) > 0);
 
-    const scored = empenhosList
+    if (!effectiveQuery) {
+      if (currentScope === 'empenhos') {
+        return withSaldo.slice(0, 15);
+      }
+      return [];
+    }
+
+    const scored = withSaldo
       .map((emp) => ({
         emp,
         score: scoreEmpenho(emp, effectiveQuery),
@@ -553,7 +566,14 @@ export function CommandPalette({
 
   // High-precision scored Contratos (ranked by relevance)
   const matchingContratos = useMemo(() => {
-    if (!effectiveQuery || (currentScope !== 'all' && currentScope !== 'contratos')) return [];
+    if (currentScope !== 'all' && currentScope !== 'contratos') return [];
+
+    if (!effectiveQuery) {
+      if (currentScope === 'contratos') {
+        return combinedContratos.slice(0, 15);
+      }
+      return [];
+    }
 
     const scored = combinedContratos
       .map((cont) => ({
@@ -738,15 +758,6 @@ export function CommandPalette({
             >
               {matchingEmpenhos.map((empenho) => {
                 const saldo = getEmpenhoAvailableBalance(empenho);
-                const statusStr = (empenho.status || 'pendente').toLowerCase();
-                const statusBadgeStyle =
-                  statusStr === 'pago'
-                    ? 'border-emerald-500/30 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
-                    : statusStr === 'liquidado'
-                    ? 'border-sky-500/30 bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300'
-                    : statusStr === 'cancelado'
-                    ? 'border-rose-500/30 bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300'
-                    : 'border-amber-500/30 bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300';
 
                 return (
                   <CommandItem
@@ -769,9 +780,6 @@ export function CommandPalette({
                             RAP
                           </Badge>
                         )}
-                        <Badge variant="outline" className={`text-[10px] px-2 py-0 font-bold uppercase tracking-wider rounded-md ${statusBadgeStyle}`}>
-                          {empenho.status || 'Pendente'}
-                        </Badge>
                       </div>
 
                       <p className="text-xs text-muted-foreground font-medium truncate mt-1">

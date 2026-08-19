@@ -129,13 +129,10 @@ export function SuapDocumentGeneratorDialog({ open, onOpenChange, processos, que
 
   const cloneCurrent = () => {
     if (!queue || !currentItem?.html) return;
-    const mode: SuapCloneAutomationMode = window.confirm(
-      'Deseja que a extensao tente salvar no SUAP apos preencher o assunto?',
-    ) ? 'save-after-confirmation' : 'review';
-    const url = buildSuapCloneUrl({ documentType: 'despacho', html: currentItem.html, mode });
+    const url = buildSuapCloneUrl({ documentType: 'despacho', html: currentItem.html, mode: 'review' });
     window.open(url, '_blank', 'noopener,noreferrer');
     onQueueChange(updateCurrentItem(queue, { status: 'cloned' }));
-    toast.success(mode === 'review' ? 'Clone aberto para revisao no SUAP.' : 'Clone aberto no SUAP.');
+    toast.success('Clone aberto para revisao no SUAP.');
   };
 
   const skipCurrent = () => {

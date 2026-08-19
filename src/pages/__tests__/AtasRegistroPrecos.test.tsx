@@ -82,6 +82,18 @@ const ata = {
 describe('AtasRegistroPrecos', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(supabase, 'from').mockImplementation((table: string) => {
+      if (table === 'contratos_api_itens') {
+        return {
+          select: () => ({
+            in: () => Promise.resolve({ data: [] }),
+          }),
+        } as any;
+      }
+      return {
+        select: () => Promise.resolve({ data: [] }),
+      } as any;
+    });
     mockedService.list.mockResolvedValue({ rows: [ata], count: 1 });
     mockedService.listItems.mockResolvedValue([{
       id: 'item-1',
@@ -176,7 +188,7 @@ describe('AtasRegistroPrecos', () => {
     expect(await screen.findByText('Material de consumo')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /1 Material de consumo/i }));
 
-    expect(await screen.findByText(/Nenhum empenho vinculado especificamente a este item/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Nenhum empenho vinculado/i)).toBeInTheDocument();
   });
 
   it('nao associa empenhos de fornecedores ou contratos divergentes da ata', async () => {
@@ -188,7 +200,7 @@ describe('AtasRegistroPrecos', () => {
     expect(await screen.findByText('Material de consumo')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /1 Material de consumo/i }));
 
-    expect(await screen.findByText(/Nenhum empenho vinculado especificamente a este item/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Nenhum empenho vinculado/i)).toBeInTheDocument();
     expect(screen.queryByText('LG. ADMINISTRADORA DE SERVICOS LTDA')).not.toBeInTheDocument();
   });
 

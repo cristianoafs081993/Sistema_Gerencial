@@ -1,9 +1,38 @@
 /* ==========================================================================
    Suape Extension — Command Palette (Ctrl+K) Styles
-   Exact 1:1 Mirror of SIAGES CommandPalette UI
+   Exact 1:1 Mirror of SIAGES CommandPalette UI with Full Dark/Light Theme Support
+   Spacious Layout with Generous Margins, Paddings, and High Contrast
    ========================================================================== */
 
 #suape-cp-overlay {
+  --suape-cp-bg: #ffffff;
+  --suape-cp-dialog-bg: #ffffff;
+  --suape-cp-header-bg: #ffffff;
+  --suape-cp-border: #e2e8f0;
+  --suape-cp-border-subtle: #f1f5f9;
+  --suape-cp-text: #0f172a;
+  --suape-cp-text-muted: #64748b;
+  --suape-cp-text-dim: #94a3b8;
+  --suape-cp-primary: #0A7F70;
+  --suape-cp-primary-soft: rgba(10, 127, 112, 0.12);
+  --suape-cp-primary-border: rgba(10, 127, 112, 0.25);
+  --suape-cp-chip-bg: #ffffff;
+  --suape-cp-chip-border: #e2e8f0;
+  --suape-cp-chip-text: #64748b;
+  --suape-cp-chip-hover-bg: #f8fafc;
+  --suape-cp-chip-active-bg: #0A7F70;
+  --suape-cp-chip-active-text: #ffffff;
+  --suape-cp-screen-icon-bg: #f1f5f9;
+  --suape-cp-screen-icon-color: #475569;
+  --suape-cp-kbd-bg: rgba(241, 245, 249, 0.9);
+  --suape-cp-kbd-border: #e2e8f0;
+  --suape-cp-kbd-text: #64748b;
+  --suape-cp-footer-bg: rgba(248, 250, 252, 0.9);
+  --suape-cp-item-hover: rgba(10, 127, 112, 0.08);
+  --suape-cp-item-selected: rgba(10, 127, 112, 0.09);
+  --suape-cp-item-selected-border: rgba(10, 127, 112, 0.25);
+  --suape-cp-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.08);
+
   position: fixed !important;
   inset: 0 !important;
   z-index: 2147483645 !important;
@@ -13,18 +42,120 @@
   display: flex !important;
   align-items: flex-start !important;
   justify-content: center !important;
-  padding: 10vh 16px 24px !important;
+  padding: 8vh 16px 24px !important;
   opacity: 0 !important;
   visibility: hidden !important;
   transition: opacity 0.15s ease, visibility 0.15s ease !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
   box-sizing: border-box !important;
+  text-align: left !important;
+  line-height: 1.5 !important;
 }
 
-#suape-cp-overlay * {
+/* Dark mode auto-detection for SUAP */
+@media (prefers-color-scheme: dark) {
+  #suape-cp-overlay {
+    --suape-cp-bg: #0f172a;
+    --suape-cp-dialog-bg: #0f172a;
+    --suape-cp-header-bg: #0f172a;
+    --suape-cp-border: #334155;
+    --suape-cp-border-subtle: #1e293b;
+    --suape-cp-text: #f8fafc;
+    --suape-cp-text-muted: #94a3b8;
+    --suape-cp-text-dim: #64748b;
+    --suape-cp-primary: #2dd4bf;
+    --suape-cp-primary-soft: rgba(45, 212, 191, 0.15);
+    --suape-cp-primary-border: rgba(45, 212, 191, 0.3);
+    --suape-cp-chip-bg: #1e293b;
+    --suape-cp-chip-border: #334155;
+    --suape-cp-chip-text: #cbd5e1;
+    --suape-cp-chip-hover-bg: #334155;
+    --suape-cp-chip-active-bg: #0A7F70;
+    --suape-cp-chip-active-text: #ffffff;
+    --suape-cp-screen-icon-bg: #1e293b;
+    --suape-cp-screen-icon-color: #94a3b8;
+    --suape-cp-kbd-bg: #1e293b;
+    --suape-cp-kbd-border: #334155;
+    --suape-cp-kbd-text: #94a3b8;
+    --suape-cp-footer-bg: rgba(15, 23, 42, 0.95);
+    --suape-cp-item-hover: rgba(45, 212, 191, 0.1);
+    --suape-cp-item-selected: rgba(45, 212, 191, 0.12);
+    --suape-cp-item-selected-border: rgba(45, 212, 191, 0.3);
+    --suape-cp-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  }
+}
+
+body.theme-luna #suape-cp-overlay:not([data-theme="light"]),
+html.dark #suape-cp-overlay:not([data-theme="light"]),
+body.dark #suape-cp-overlay:not([data-theme="light"]),
+[data-theme="dark"] #suape-cp-overlay:not([data-theme="light"]),
+[data-darkreader-scheme="dark"] #suape-cp-overlay:not([data-theme="light"]),
+#suape-cp-overlay[data-theme="dark"],
+#suape-cp-detail-overlay[data-theme="dark"] {
+  --suape-cp-bg: #0f172a;
+  --suape-cp-dialog-bg: #0f172a;
+  --suape-cp-header-bg: #0f172a;
+  --suape-cp-border: #334155;
+  --suape-cp-border-subtle: #1e293b;
+  --suape-cp-text: #f8fafc;
+  --suape-cp-text-muted: #94a3b8;
+  --suape-cp-text-dim: #64748b;
+  --suape-cp-primary: #2dd4bf;
+  --suape-cp-primary-soft: rgba(45, 212, 191, 0.15);
+  --suape-cp-primary-border: rgba(45, 212, 191, 0.3);
+  --suape-cp-chip-bg: #1e293b;
+  --suape-cp-chip-border: #334155;
+  --suape-cp-chip-text: #cbd5e1;
+  --suape-cp-chip-hover-bg: #334155;
+  --suape-cp-chip-active-bg: #0A7F70;
+  --suape-cp-chip-active-text: #ffffff;
+  --suape-cp-screen-icon-bg: #1e293b;
+  --suape-cp-screen-icon-color: #94a3b8;
+  --suape-cp-kbd-bg: #1e293b;
+  --suape-cp-kbd-border: #334155;
+  --suape-cp-kbd-text: #94a3b8;
+  --suape-cp-footer-bg: rgba(15, 23, 42, 0.95);
+  --suape-cp-item-hover: rgba(45, 212, 191, 0.1);
+  --suape-cp-item-selected: rgba(45, 212, 191, 0.12);
+  --suape-cp-item-selected-border: rgba(45, 212, 191, 0.3);
+  --suape-cp-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+#suape-cp-overlay[data-theme="light"],
+#suape-cp-detail-overlay[data-theme="light"] {
+  --suape-cp-bg: #ffffff;
+  --suape-cp-dialog-bg: #ffffff;
+  --suape-cp-header-bg: #ffffff;
+  --suape-cp-border: #e2e8f0;
+  --suape-cp-border-subtle: #f1f5f9;
+  --suape-cp-text: #0f172a;
+  --suape-cp-text-muted: #64748b;
+  --suape-cp-text-dim: #94a3b8;
+  --suape-cp-primary: #0A7F70;
+  --suape-cp-primary-soft: rgba(10, 127, 112, 0.12);
+  --suape-cp-primary-border: rgba(10, 127, 112, 0.25);
+  --suape-cp-chip-bg: #ffffff;
+  --suape-cp-chip-border: #e2e8f0;
+  --suape-cp-chip-text: #64748b;
+  --suape-cp-chip-hover-bg: #f8fafc;
+  --suape-cp-chip-active-bg: #0A7F70;
+  --suape-cp-chip-active-text: #ffffff;
+  --suape-cp-screen-icon-bg: #f1f5f9;
+  --suape-cp-screen-icon-color: #475569;
+  --suape-cp-kbd-bg: rgba(241, 245, 249, 0.9);
+  --suape-cp-kbd-border: #e2e8f0;
+  --suape-cp-kbd-text: #64748b;
+  --suape-cp-footer-bg: rgba(248, 250, 252, 0.9);
+  --suape-cp-item-hover: rgba(10, 127, 112, 0.08);
+  --suape-cp-item-selected: rgba(10, 127, 112, 0.09);
+  --suape-cp-item-selected-border: rgba(10, 127, 112, 0.25);
+  --suape-cp-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+#suape-cp-overlay *,
+#suape-cp-detail-overlay * {
   box-sizing: border-box !important;
-  margin: 0 !important;
-  padding: 0 !important;
+  font-family: inherit !important;
 }
 
 #suape-cp-overlay.suape-cp-visible {
@@ -35,17 +166,19 @@
 #suape-cp-dialog {
   width: 100% !important;
   max-width: 672px !important;
-  background: #ffffff !important;
-  color: #0f172a !important;
+  background: var(--suape-cp-dialog-bg) !important;
+  color: var(--suape-cp-text) !important;
   border-radius: 16px !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
+  box-shadow: var(--suape-cp-shadow) !important;
   overflow: hidden !important;
   display: flex !important;
   flex-direction: column !important;
   max-height: 80vh !important;
   transform: scale(0.96) translateY(-8px) !important;
   transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
-  border: 1px solid rgba(226, 232, 240, 0.9) !important;
+  border: 1px solid var(--suape-cp-border) !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 #suape-cp-overlay.suape-cp-visible #suape-cp-dialog {
@@ -55,8 +188,9 @@
 /* Header & Search Input */
 .suape-cp-header {
   padding: 0 !important;
-  border-bottom: 1px solid #f1f5f9 !important;
-  background: #ffffff !important;
+  margin: 0 !important;
+  border-bottom: 1px solid var(--suape-cp-border-subtle) !important;
+  background: var(--suape-cp-header-bg) !important;
   display: flex !important;
   flex-direction: column !important;
 }
@@ -65,15 +199,17 @@
   display: flex !important;
   align-items: center !important;
   gap: 12px !important;
-  background: #ffffff !important;
+  background: var(--suape-cp-header-bg) !important;
   padding: 14px 18px !important;
-  border-bottom: 1px solid #f1f5f9 !important;
+  min-height: 52px !important;
+  border-bottom: 1px solid var(--suape-cp-border-subtle) !important;
+  margin: 0 !important;
 }
 
 .suape-cp-search-icon-box {
   width: 20px !important;
   height: 20px !important;
-  color: #0A7F70 !important;
+  color: var(--suape-cp-primary) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -83,91 +219,139 @@
 .suape-cp-search-icon-box svg {
   width: 20px !important;
   height: 20px !important;
+  display: block !important;
 }
 
 .suape-cp-input {
   flex: 1 !important;
   border: none !important;
   background: transparent !important;
-  font-size: 15px !important;
-  font-weight: 400 !important;
-  color: #0f172a !important;
+  font-size: 15.5px !important;
+  font-weight: 500 !important;
+  color: var(--suape-cp-text) !important;
   outline: none !important;
   box-shadow: none !important;
   width: 100% !important;
-  height: 24px !important;
-  line-height: 24px !important;
+  height: 32px !important;
+  line-height: 32px !important;
+  padding: 0 !important;
+  margin: 0 !important;
 }
 
 .suape-cp-input::placeholder {
-  color: #94a3b8 !important;
+  color: var(--suape-cp-text-dim) !important;
   font-weight: 400 !important;
 }
 
 .suape-cp-kbd {
-  font-size: 10px !important;
+  font-size: 11px !important;
   font-weight: 700 !important;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-  color: #64748b !important;
-  background: rgba(241, 245, 249, 0.8) !important;
-  padding: 2px 6px !important;
+  color: var(--suape-cp-kbd-text) !important;
+  background: var(--suape-cp-kbd-bg) !important;
+  padding: 3px 7px !important;
   border-radius: 4px !important;
-  border: 1px solid #e2e8f0 !important;
+  border: 1px solid var(--suape-cp-kbd-border) !important;
   user-select: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Theme Toggle Button */
+.suape-cp-theme-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 6px !important;
+  border: 1px solid var(--suape-cp-border) !important;
+  background: var(--suape-cp-chip-bg) !important;
+  color: var(--suape-cp-text-muted) !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  padding: 0 !important;
+  margin: 0 4px 0 0 !important;
+  flex-shrink: 0 !important;
+}
+
+.suape-cp-theme-btn:hover {
+  background: var(--suape-cp-chip-hover-bg) !important;
+  color: var(--suape-cp-text) !important;
+  border-color: var(--suape-cp-primary-border) !important;
+  transform: scale(1.05);
+}
+
+.suape-cp-theme-btn svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.suape-cp-detail-header-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
 }
 
 /* Filter Scope Chips */
 .suape-cp-chips {
   display: flex !important;
   align-items: center !important;
-  gap: 6px !important;
-  padding: 8px 16px !important;
-  background: rgba(248, 250, 252, 0.5) !important;
-  border-top: 1px solid rgba(226, 232, 240, 0.4) !important;
+  gap: 8px !important;
+  padding: 10px 18px !important;
+  background: var(--suape-cp-header-bg) !important;
+  border-top: 1px solid var(--suape-cp-border-subtle) !important;
   overflow-x: auto !important;
+  margin: 0 !important;
 }
 
 .suape-cp-chip {
   display: inline-flex !important;
   align-items: center !important;
   gap: 6px !important;
-  padding: 4px 12px !important;
+  padding: 5px 12px !important;
   font-size: 12px !important;
   font-weight: 600 !important;
   border-radius: 9999px !important;
-  border: 1px solid #e2e8f0 !important;
-  background: #ffffff !important;
-  color: #64748b !important;
+  border: 1px solid var(--suape-cp-chip-border) !important;
+  background: var(--suape-cp-chip-bg) !important;
+  color: var(--suape-cp-chip-text) !important;
   cursor: pointer !important;
   white-space: nowrap !important;
   transition: all 0.15s !important;
+  outline: none !important;
+  line-height: 1.3 !important;
+  margin: 0 !important;
 }
 
 .suape-cp-chip svg {
-  width: 13px !important;
-  height: 13px !important;
+  width: 14px !important;
+  height: 14px !important;
+  display: block !important;
 }
 
 .suape-cp-chip:hover {
-  background: #f8fafc !important;
-  color: #0f172a !important;
-  border-color: #cbd5e1 !important;
+  background: var(--suape-cp-chip-hover-bg) !important;
+  color: var(--suape-cp-text) !important;
+  border-color: var(--suape-cp-primary) !important;
 }
 
 .suape-cp-chip.suape-cp-chip-active {
-  background: #0A7F70 !important;
-  color: #ffffff !important;
-  border-color: #0A7F70 !important;
+  background: var(--suape-cp-chip-active-bg) !important;
+  color: var(--suape-cp-chip-active-text) !important;
+  border-color: var(--suape-cp-chip-active-bg) !important;
   box-shadow: 0 1px 2px rgba(10, 127, 112, 0.2) !important;
 }
 
 .suape-cp-chip-count {
   font-size: 10px !important;
   font-weight: 700 !important;
-  padding: 1px 5px !important;
+  padding: 1px 6px !important;
   border-radius: 9999px !important;
-  background: rgba(0, 0, 0, 0.08) !important;
+  background: rgba(0, 0, 0, 0.1) !important;
   color: inherit !important;
+  margin-left: 2px !important;
 }
 
 .suape-cp-chip.suape-cp-chip-active .suape-cp-chip-count {
@@ -194,8 +378,10 @@
 .suape-cp-list {
   flex: 1 !important;
   overflow-y: auto !important;
-  padding: 8px !important;
-  max-height: 480px !important;
+  padding: 10px 12px !important;
+  max-height: 520px !important;
+  background: var(--suape-cp-dialog-bg) !important;
+  margin: 0 !important;
 }
 
 .suape-cp-list::-webkit-scrollbar {
@@ -219,18 +405,20 @@
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  padding: 8px 8px 4px !important;
+  padding: 10px 8px 6px !important;
+  margin: 0 !important;
 }
 
 .suape-cp-group-title {
   display: inline-flex !important;
   align-items: center !important;
-  gap: 6px !important;
-  font-size: 11px !important;
+  gap: 7px !important;
+  font-size: 11.5px !important;
   font-weight: 700 !important;
   text-transform: uppercase !important;
-  letter-spacing: 0.05em !important;
-  color: #64748b !important;
+  letter-spacing: 0.06em !important;
+  color: var(--suape-cp-text-muted) !important;
+  margin: 0 !important;
 }
 
 .suape-cp-group-title.process-group {
@@ -238,7 +426,7 @@
 }
 
 .suape-cp-group-title.empenho-group {
-  color: #0A7F70 !important;
+  color: var(--suape-cp-primary) !important;
 }
 
 .suape-cp-group-title.contrato-group {
@@ -252,13 +440,13 @@
 .suape-cp-group-count {
   font-size: 11px !important;
   font-weight: 500 !important;
-  color: #94a3b8 !important;
+  color: var(--suape-cp-text-dim) !important;
 }
 
 .suape-cp-divider {
   height: 1px !important;
-  background: #f1f5f9 !important;
-  margin: 6px 0 !important;
+  background: var(--suape-cp-border-subtle) !important;
+  margin: 8px 0 !important;
 }
 
 /* Item styling */
@@ -266,114 +454,119 @@
   position: relative !important;
   display: flex !important;
   align-items: center !important;
-  gap: 12px !important;
-  padding: 10px 14px !important;
+  justify-content: space-between !important;
+  gap: 14px !important;
+  padding: 12px 14px !important;
   border-radius: 12px !important;
   cursor: pointer !important;
   border: 1px solid transparent !important;
   background: transparent !important;
   transition: all 0.12s ease !important;
   user-select: none !important;
-  margin-bottom: 2px !important;
+  margin-bottom: 4px !important;
 }
 
 .suape-cp-screen-item {
-  padding: 8px 12px !important;
+  padding: 10px 14px !important;
+  margin-bottom: 3px !important;
 }
 
 .suape-cp-item:hover,
 .suape-cp-item.suape-cp-item-selected {
-  background: rgba(10, 127, 112, 0.07) !important;
-  border-color: rgba(10, 127, 112, 0.22) !important;
+  background: var(--suape-cp-item-selected) !important;
+  border-color: var(--suape-cp-item-selected-border) !important;
 }
 
 .suape-cp-item.item-selected-blue:hover,
 .suape-cp-item.item-selected-blue.suape-cp-item-selected {
-  background: rgba(37, 99, 235, 0.07) !important;
-  border-color: rgba(37, 99, 235, 0.22) !important;
+  background: rgba(37, 99, 235, 0.1) !important;
+  border-color: rgba(37, 99, 235, 0.25) !important;
 }
 
 /* Icons */
 .suape-cp-item-icon {
-  width: 32px !important;
-  height: 32px !important;
-  border-radius: 8px !important;
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 9px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   flex-shrink: 0 !important;
+  margin: 0 !important;
 }
 
 .suape-cp-item-icon.empenho-icon {
-  width: 36px !important;
-  height: 36px !important;
-  border-radius: 10px !important;
-  background: rgba(10, 127, 112, 0.1) !important;
-  color: #0A7F70 !important;
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 11px !important;
+  background: var(--suape-cp-primary-soft) !important;
+  color: var(--suape-cp-primary) !important;
 }
 
 .suape-cp-item-icon.contrato-icon {
-  width: 36px !important;
-  height: 36px !important;
-  border-radius: 10px !important;
-  background: rgba(37, 99, 235, 0.1) !important;
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 11px !important;
+  background: rgba(37, 99, 235, 0.12) !important;
   color: #2563eb !important;
 }
 
 .suape-cp-item-icon.screen-icon {
-  background: #f1f5f9 !important;
-  color: #475569 !important;
+  background: var(--suape-cp-screen-icon-bg) !important;
+  color: var(--suape-cp-screen-icon-color) !important;
 }
 
 .suape-cp-item-body {
   flex: 1 !important;
   min-width: 0 !important;
+  margin: 0 !important;
 }
 
 .suape-cp-item-title-row {
   display: flex !important;
   align-items: center !important;
-  gap: 6px !important;
+  gap: 7px !important;
   flex-wrap: wrap !important;
+  margin: 0 0 2px !important;
 }
 
 .suape-cp-item-title {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-  font-size: 13.5px !important;
+  font-size: 14px !important;
   font-weight: 700 !important;
-  color: #0f172a !important;
+  color: var(--suape-cp-text) !important;
   letter-spacing: -0.01em !important;
 }
 
 .suape-cp-item-title-text {
-  font-size: 13.5px !important;
+  font-size: 14px !important;
   font-weight: 700 !important;
-  color: #0f172a !important;
+  color: var(--suape-cp-text) !important;
 }
 
 .suape-cp-screen-title {
-  font-size: 13.5px !important;
+  font-size: 14px !important;
   font-weight: 600 !important;
-  color: #0f172a !important;
+  color: var(--suape-cp-text) !important;
 }
 
 .suape-cp-group-tag {
   font-size: 12px !important;
-  color: #64748b !important;
+  color: var(--suape-cp-text-muted) !important;
   margin-left: 6px !important;
   font-weight: 400 !important;
 }
 
 .suape-cp-action-sub {
   font-size: 12px !important;
-  color: #64748b !important;
+  color: var(--suape-cp-text-muted) !important;
   margin-left: 6px !important;
   font-weight: 400 !important;
 }
 
 .suape-cp-item-subtitle {
-  font-size: 12px !important;
-  color: #64748b !important;
+  font-size: 12.5px !important;
+  color: var(--suape-cp-text-muted) !important;
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
@@ -383,18 +576,18 @@
 
 .suape-cp-subtitle-main {
   font-weight: 600 !important;
-  color: #334155 !important;
+  color: var(--suape-cp-text) !important;
 }
 
 .suape-cp-subtitle-extra {
-  color: #64748b !important;
+  color: var(--suape-cp-text-muted) !important;
   margin-left: 4px !important;
 }
 
 .suape-cp-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
   font-weight: 600 !important;
-  color: #1e293b !important;
+  color: var(--suape-cp-text) !important;
 }
 
 /* Badges */
@@ -403,11 +596,11 @@
   font-weight: 700 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.04em !important;
-  padding: 1px 6px !important;
+  padding: 2px 7px !important;
   border-radius: 6px !important;
-  border: 1px solid #e2e8f0 !important;
-  background: #f8fafc !important;
-  color: #475569 !important;
+  border: 1px solid var(--suape-cp-border) !important;
+  background: var(--suape-cp-chip-bg) !important;
+  color: var(--suape-cp-text-muted) !important;
 }
 
 .suape-cp-badge.badge-rap {
@@ -456,23 +649,24 @@
 .suape-cp-item-meta {
   text-align: right !important;
   flex-shrink: 0 !important;
+  margin: 0 !important;
 }
 
 .suape-cp-item-meta-label {
-  font-size: 9.5px !important;
+  font-size: 10px !important;
   font-weight: 700 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.05em !important;
-  color: #94a3b8 !important;
+  color: var(--suape-cp-text-dim) !important;
   display: block !important;
-  margin-bottom: 1px !important;
+  margin-bottom: 2px !important;
 }
 
 .suape-cp-item-meta-value {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-  font-size: 13.5px !important;
+  font-size: 14px !important;
   font-weight: 800 !important;
-  color: #0f172a !important;
+  color: var(--suape-cp-text) !important;
 }
 
 .suape-cp-item-meta-value.value-saldo {
@@ -480,14 +674,14 @@
 }
 
 .suape-cp-item-meta-value.value-dark {
-  color: #0f172a !important;
+  color: var(--suape-cp-text) !important;
 }
 
 .suape-cp-item-action-hint {
   display: none !important;
   font-size: 12px !important;
   font-weight: 600 !important;
-  color: #0A7F70 !important;
+  color: var(--suape-cp-primary) !important;
   margin-left: 8px !important;
 }
 
@@ -502,18 +696,18 @@
 /* Search Term Highlighting */
 .suape-cp-highlight {
   background: transparent !important;
-  color: #0A7F70 !important;
+  color: var(--suape-cp-primary) !important;
   font-weight: 700 !important;
   text-decoration: underline !important;
-  text-decoration-color: rgba(10, 127, 112, 0.6) !important;
+  text-decoration-color: var(--suape-cp-primary-border) !important;
   text-decoration-thickness: 2px !important;
 }
 
 /* Empty State & Spinner */
 .suape-cp-empty {
-  padding: 40px 20px !important;
+  padding: 44px 20px !important;
   text-align: center !important;
-  color: #64748b !important;
+  color: var(--suape-cp-text-muted) !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
@@ -524,8 +718,8 @@
   width: 48px !important;
   height: 48px !important;
   border-radius: 50% !important;
-  background: #f1f5f9 !important;
-  color: #94a3b8 !important;
+  background: var(--suape-cp-screen-icon-bg) !important;
+  color: var(--suape-cp-text-dim) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -535,13 +729,13 @@
 .suape-cp-empty-title {
   font-size: 15px !important;
   font-weight: 700 !important;
-  color: #0f172a !important;
+  color: var(--suape-cp-text) !important;
   margin-bottom: 4px !important;
 }
 
 .suape-cp-empty-desc {
   font-size: 12.5px !important;
-  color: #64748b !important;
+  color: var(--suape-cp-text-muted) !important;
   max-width: 380px !important;
   line-height: 1.4 !important;
 }
@@ -549,8 +743,8 @@
 .suape-cp-spinner {
   width: 28px !important;
   height: 28px !important;
-  border: 3px solid #e2e8f0 !important;
-  border-top-color: #0A7F70 !important;
+  border: 3px solid var(--suape-cp-border) !important;
+  border-top-color: var(--suape-cp-primary) !important;
   border-radius: 50% !important;
   animation: suape-cp-spin 0.8s linear infinite !important;
   margin-bottom: 12px !important;
@@ -562,14 +756,15 @@
 
 /* Footer info */
 .suape-cp-footer {
-  padding: 8px 16px !important;
-  background: rgba(248, 250, 252, 0.8) !important;
-  border-top: 1px solid #f1f5f9 !important;
+  padding: 10px 18px !important;
+  background: var(--suape-cp-footer-bg) !important;
+  border-top: 1px solid var(--suape-cp-border-subtle) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  font-size: 11px !important;
-  color: #64748b !important;
+  font-size: 11.5px !important;
+  color: var(--suape-cp-text-muted) !important;
+  margin: 0 !important;
 }
 
 .suape-cp-footer-left {
@@ -585,24 +780,24 @@
 }
 
 .suape-cp-footer-dot {
-  color: #cbd5e1 !important;
+  color: var(--suape-cp-text-dim) !important;
 }
 
 .suape-cp-key {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
   font-size: 10px !important;
   font-weight: 700 !important;
-  background: #ffffff !important;
-  border: 1px solid #cbd5e1 !important;
+  background: var(--suape-cp-chip-bg) !important;
+  border: 1px solid var(--suape-cp-border) !important;
   border-radius: 4px !important;
-  padding: 2px 5px !important;
-  color: #334155 !important;
+  padding: 2px 6px !important;
+  color: var(--suape-cp-text) !important;
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05) !important;
 }
 
 .suape-cp-key-accent {
-  color: #0A7F70 !important;
-  border-color: rgba(10, 127, 112, 0.3) !important;
+  color: var(--suape-cp-primary) !important;
+  border-color: var(--suape-cp-primary-border) !important;
 }
 
 /* Details Modal Dialog */
@@ -633,19 +828,20 @@
   width: 100% !important;
   max-width: 760px !important;
   max-height: 86vh !important;
-  background: #ffffff !important;
-  color: #0f172a !important;
+  background: var(--suape-cp-dialog-bg) !important;
+  color: var(--suape-cp-text) !important;
   border-radius: 16px !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
+  box-shadow: var(--suape-cp-shadow) !important;
   overflow: hidden !important;
   display: flex !important;
   flex-direction: column !important;
+  border: 1px solid var(--suape-cp-border) !important;
 }
 
 .suape-cp-detail-header {
-  padding: 16px 20px !important;
-  background: #ffffff !important;
-  border-bottom: 1px solid #f1f5f9 !important;
+  padding: 18px 22px !important;
+  background: var(--suape-cp-header-bg) !important;
+  border-bottom: 1px solid var(--suape-cp-border-subtle) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
@@ -661,15 +857,15 @@
 .suape-cp-detail-title {
   font-size: 16px !important;
   font-weight: 700 !important;
-  color: #0f172a !important;
+  color: var(--suape-cp-text) !important;
 }
 
 .suape-cp-detail-close {
-  background: #f1f5f9 !important;
+  background: var(--suape-cp-screen-icon-bg) !important;
   border: none !important;
   font-size: 14px !important;
   font-weight: bold !important;
-  color: #64748b !important;
+  color: var(--suape-cp-text-muted) !important;
   cursor: pointer !important;
   padding: 6px 10px !important;
   border-radius: 8px !important;
@@ -677,36 +873,36 @@
 }
 
 .suape-cp-detail-close:hover {
-  background: #e2e8f0 !important;
-  color: #0f172a !important;
+  background: var(--suape-cp-border) !important;
+  color: var(--suape-cp-text) !important;
 }
 
 .suape-cp-detail-body {
   flex: 1 !important;
   overflow-y: auto !important;
-  padding: 20px !important;
+  padding: 22px !important;
   display: flex !important;
   flex-direction: column !important;
-  gap: 14px !important;
+  gap: 16px !important;
 }
 
 /* Metric Cards */
 .suape-cp-metric-grid {
   display: grid !important;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) !important;
-  gap: 10px !important;
+  gap: 12px !important;
 }
 
 .suape-cp-metric-card {
-  padding: 12px 14px !important;
-  background: #f8fafc !important;
-  border: 1px solid #e2e8f0 !important;
+  padding: 14px 16px !important;
+  background: var(--suape-cp-chip-bg) !important;
+  border: 1px solid var(--suape-cp-border) !important;
   border-radius: 12px !important;
 }
 
 .suape-cp-metric-card.metric-highlight {
-  background: #ecfdf5 !important;
-  border-color: #a7f3d0 !important;
+  background: var(--suape-cp-primary-soft) !important;
+  border-color: var(--suape-cp-primary-border) !important;
 }
 
 .suape-cp-metric-label {
@@ -714,44 +910,44 @@
   font-weight: 700 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.05em !important;
-  color: #64748b !important;
+  color: var(--suape-cp-text-muted) !important;
   margin-bottom: 4px !important;
 }
 
 .suape-cp-metric-card.metric-highlight .suape-cp-metric-label {
-  color: #065f46 !important;
+  color: var(--suape-cp-primary) !important;
 }
 
 .suape-cp-metric-value {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
   font-size: 16px !important;
   font-weight: 800 !important;
-  color: #0f172a !important;
+  color: var(--suape-cp-text) !important;
 }
 
 .suape-cp-metric-card.metric-highlight .suape-cp-metric-value {
-  color: #047857 !important;
+  color: var(--suape-cp-primary) !important;
 }
 
 /* Info Details Card */
 .suape-cp-info-card {
-  background: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
+  background: var(--suape-cp-chip-bg) !important;
+  border: 1px solid var(--suape-cp-border) !important;
   border-radius: 12px !important;
-  padding: 14px 16px !important;
+  padding: 16px 18px !important;
   display: flex !important;
   flex-direction: column !important;
-  gap: 10px !important;
+  gap: 12px !important;
 }
 
 .suape-cp-info-row {
   display: flex !important;
   justify-content: space-between !important;
   align-items: flex-start !important;
-  gap: 12px !important;
-  font-size: 12.5px !important;
-  padding-bottom: 8px !important;
-  border-bottom: 1px solid #f1f5f9 !important;
+  gap: 14px !important;
+  font-size: 13px !important;
+  padding-bottom: 10px !important;
+  border-bottom: 1px solid var(--suape-cp-border-subtle) !important;
 }
 
 .suape-cp-info-row:last-child {
@@ -761,55 +957,55 @@
 
 .suape-cp-info-key {
   font-weight: 600 !important;
-  color: #64748b !important;
+  color: var(--suape-cp-text-muted) !important;
   flex-shrink: 0 !important;
 }
 
 .suape-cp-info-val {
   font-weight: 600 !important;
-  color: #1e293b !important;
+  color: var(--suape-cp-text) !important;
   text-align: right !important;
 }
 
 .suape-cp-tabs {
   display: flex !important;
-  gap: 6px !important;
+  gap: 8px !important;
 }
 
 .suape-cp-tab-btn {
-  padding: 4px 10px !important;
-  font-size: 11px !important;
+  padding: 5px 12px !important;
+  font-size: 11.5px !important;
   font-weight: 700 !important;
   border-radius: 6px !important;
-  border: 1px solid #e2e8f0 !important;
-  background: #f8fafc !important;
-  color: #64748b !important;
+  border: 1px solid var(--suape-cp-border) !important;
+  background: var(--suape-cp-chip-bg) !important;
+  color: var(--suape-cp-text-muted) !important;
   cursor: pointer !important;
 }
 
 .suape-cp-tab-btn.suape-cp-tab-active {
-  background: #0A7F70 !important;
+  background: var(--suape-cp-primary) !important;
   color: #ffffff !important;
-  border-color: #0A7F70 !important;
+  border-color: var(--suape-cp-primary) !important;
 }
 
 .suape-cp-entry-card {
-  padding: 10px 12px !important;
-  background: #f8fafc !important;
-  border: 1px solid #e2e8f0 !important;
+  padding: 12px 14px !important;
+  background: var(--suape-cp-chip-bg) !important;
+  border: 1px solid var(--suape-cp-border) !important;
   border-radius: 8px !important;
 }
 
 .suape-cp-entry-top {
   display: flex !important;
   justify-content: space-between !important;
-  font-size: 13px !important;
+  font-size: 13.5px !important;
   font-weight: 700 !important;
-  color: #0f172a !important;
+  color: var(--suape-cp-text) !important;
 }
 
 .suape-cp-entry-desc {
-  font-size: 11.5px !important;
-  color: #64748b !important;
+  font-size: 12px !important;
+  color: var(--suape-cp-text-muted) !important;
   margin-top: 4px !important;
 }

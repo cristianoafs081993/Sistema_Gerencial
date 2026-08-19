@@ -288,7 +288,71 @@ describe('CommandPalette — Entity Search & Navigation', () => {
     expect(screen.queryByText('2026NE000078')).not.toBeInTheDocument();
     expect(screen.queryByText('2026NE000068')).not.toBeInTheDocument();
   });
+
+  it('não exibe empenhos com saldo zero nos resultados da busca', () => {
+    const empenhosComSaldos: Empenho[] = [
+      {
+        id: 'emp-com-saldo',
+        numero: '2026NE000080',
+        favorecidoNome: 'VAREJAO L B LTDA',
+        valor: 25500,
+        valorLiquidadoAPagar: 0,
+        valorPagoOficial: 0,
+        tipo: 'exercicio',
+        status: 'pendente',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: 'emp-exercicio-zerado',
+        numero: '2026NE000081',
+        favorecidoNome: 'FORNECEDOR TOTALMENTE PAGO',
+        valor: 15000,
+        valorPagoOficial: 15000,
+        tipo: 'exercicio',
+        status: 'pago',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: 'emp-rap-zerado',
+        numero: '2025NE000280',
+        favorecidoNome: 'ROBERIO BATISTA DE AZEVEDO JUNIOR',
+        valor: 10000,
+        tipo: 'rap',
+        rapInscrito: 10000,
+        rapPago: 10000,
+        saldoRapOficial: 0,
+        status: 'pago',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
+
+    renderWithProviders(
+      <CommandPalette
+        open={true}
+        onOpenChange={vi.fn()}
+        empenhosList={empenhosComSaldos}
+        contratosList={[]}
+      />,
+    );
+
+    const searchInput = screen.getByPlaceholderText(/digite um comando, ne, contrato/i);
+    fireEvent.change(searchInput, { target: { value: '80' } });
+
+    // Empenho com saldo deve aparecer
+    expect(screen.getByText('2026NE000080')).toBeInTheDocument();
+    expect(screen.getByText(/VAREJAO L B LTDA/i)).toBeInTheDocument();
+    expect(screen.getByText('R$ 25.500,00')).toBeInTheDocument();
+
+    // Empenhos com saldo zero não devem aparecer
+    expect(screen.queryByText('2026NE000081')).not.toBeInTheDocument();
+    expect(screen.queryByText('2025NE000280')).not.toBeInTheDocument();
+    expect(screen.queryByText(/ROBERIO BATISTA DE AZEVEDO JUNIOR/i)).not.toBeInTheDocument();
+  });
 });
+
 
 
 

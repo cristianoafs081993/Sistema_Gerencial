@@ -48,6 +48,16 @@
         "https://suap.ifrn.edu.br/documento_eletronico/*"
       ],
       "js": [
+        "clone-document-main.js"
+      ],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://suap.ifrn.edu.br/documento_eletronico/*"
+      ],
+      "js": [
         "clone-document.js"
       ],
       "run_at": "document_idle"

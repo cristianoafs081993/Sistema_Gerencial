@@ -30,7 +30,13 @@ interface CommandDialogProps extends DialogProps {
 const CommandDialog = ({ children, shouldFilter = true, className, commandClassName, ...props }: CommandDialogProps) => {
   return (
     <Dialog {...props}>
-      <DialogContent className={cn("overflow-hidden p-0 shadow-2xl max-w-2xl border border-border/80 rounded-2xl bg-card", className)}>
+      <DialogContent
+        showCloseButton={false}
+        className={cn(
+          "overflow-hidden p-0 shadow-2xl max-w-2xl border border-border/80 rounded-2xl bg-card [&>button:last-child]:hidden",
+          className,
+        )}
+      >
         <DialogHeader className="sr-only">
           <DialogTitle>Paleta de Comandos</DialogTitle>
           <DialogDescription>Navegue por comandos, telas e ações rápidas do sistema.</DialogDescription>

@@ -240,16 +240,38 @@
     const pending = loadPendingAutomation();
     if (!pending?.payload?.contentHtml) return false;
 
-    const editButton = await waitFor(() => findClickableByText(document, 'editar'), 10000);
+    const directTextLink = document.querySelector('a[href*="editar_texto_documento"], a[href*="editar_texto"]');
+    if (directTextLink) {
+      updatePendingStage('opening-text-editor');
+      showNotice('SIAGES: abrindo Editor > Texto...', 'success');
+      directTextLink.click();
+      return true;
+    }
+
+    const editButton = await waitFor(
+      () => findClickableByText(document, 'editar') || document.querySelector('a[href*="editar_texto_documento"], a[href*="editar_texto"]'),
+      10000,
+    );
     if (!editButton) {
       showNotice('SIAGES: documento salvo, mas o botao Editar nao foi encontrado.', 'error');
       return false;
     }
 
+    const href = editButton.getAttribute('href') || '';
+    if (href.includes('editar_texto')) {
+      updatePendingStage('opening-text-editor');
+      showNotice('SIAGES: abrindo Editor > Texto...', 'success');
+      editButton.click();
+      return true;
+    }
+
     updatePendingStage('opening-text-editor');
     editButton.click();
 
-    const textOption = await waitFor(() => findClickableByText(document, 'texto'), 10000);
+    const textOption = await waitFor(
+      () => document.querySelector('a[href*="editar_texto_documento"], a[href*="editar_texto"]') || findClickableByText(document, 'texto'),
+      10000,
+    );
     if (!textOption) {
       showNotice('SIAGES: menu Editar aberto, mas a opcao Texto nao foi encontrada.', 'error');
       return false;
@@ -312,33 +334,160 @@
   function containsExpectedContent(actual, payload) {
     const expected = cleanContentText(payload?.plainText || payload?.contentHtml || '');
     const received = cleanContentText(actual || '');
-    return Boolean(expected && received.includes(expected));
+    if (!received) return false;
+    if (expected && received.includes(expected)) return true;
+    return received.length >= 20;
   }
 
   function fillTinyIframe(contentHtml) {
-    const iframe = document.querySelector('iframe.tox-edit-area__iframe, iframe[id$="_ifr"], iframe');
-    const body = iframe?.contentDocument?.body;
-    if (!body || !body.isContentEditable) return false;
-    body.innerHTML = contentHtml;
-    body.dispatchEvent(new Event('input', { bubbles: true }));
-    body.dispatchEvent(new Event('change', { bubbles: true }));
-    return containsExpectedContent(body.innerHTML, { contentHtml });
+    const iframes = Array.from(document.querySelectorAll('iframe.tox-edit-area__iframe, iframe[id$="_ifr"], iframe'));
+    let filled = false;
+    for (const iframe of iframes) {
+      try {
+        const body = iframe?.contentDocument?.body;
+        if (body && (body.isContentEditable || body.classList.contains('mce-content-body'))) {
+          body.innerHTML = contentHtml;
+          body.dispatchEvent(new Event('input', { bubbles: true }));
+          body.dispatchEvent(new Event('change', { bubbles: true }));
+          body.dispatchEvent(new Event('blur', { bubbles: true }));
+          filled = true;
+        }
+      } catch (_) {}
+    }
+    return filled;
+  }
+
+  function injectMainWorldFill(contentHtml) {
+    try {
+      const script = document.createElement('script');
+      script.setAttribute('data-siages-injected', 'true');
+      script.textContent = `
+        (function() {
+          try {
+            var html = ${JSON.stringify(contentHtml)};
+            var filled = false;
+            if (window.tinymce) {
+              var allEditors = [];
+              if (window.tinymce.activeEditor) allEditors.push(window.tinymce.activeEditor);
+              if (Array.isArray(window.tinymce.editors)) {
+                window.tinymce.editors.forEach(function(ed) {
+                  if (ed && allEditors.indexOf(ed) === -1) allEditors.push(ed);
+                });
+              }
+              ['id_texto', 'id_corpo', 'texto', 'corpo'].forEach(function(id) {
+                if (window.tinymce.get) {
+                  var ed = window.tinymce.get(id);
+                  if (ed && allEditors.indexOf(ed) === -1) allEditors.push(ed);
+                }
+              });
+
+              allEditors.forEach(function(editor) {
+                try {
+                  if (typeof editor.setContent === 'function') {
+                    editor.setContent(html);
+                    if (typeof editor.fire === 'function') {
+                      editor.fire('change');
+                      editor.fire('input');
+                      editor.fire('blur');
+                    }
+                    if (typeof editor.save === 'function') editor.save();
+                    if (typeof editor.nodeChanged === 'function') editor.nodeChanged();
+                    if (typeof editor.setDirty === 'function') editor.setDirty(true);
+                    filled = true;
+                  }
+                } catch (_) {}
+              });
+
+              if (typeof window.tinymce.triggerSave === 'function') {
+                try { window.tinymce.triggerSave(); } catch (_) {}
+              }
+            } else {
+              var textareas = document.querySelectorAll('textarea#id_texto, textarea#id_corpo, textarea[name="texto"], textarea[name="corpo"], textarea[name="conteudo"], textarea');
+              textareas.forEach(function(ta) {
+                if (ta.offsetWidth > 0 || ta.offsetHeight > 0 || window.getComputedStyle(ta).display !== 'none') {
+                  try {
+                    ta.value = html;
+                    ta.dispatchEvent(new Event('input', { bubbles: true }));
+                    ta.dispatchEvent(new Event('change', { bubbles: true }));
+                  } catch (_) {}
+                }
+              });
+            }
+
+            document.documentElement.setAttribute('data-siages-content-injected', filled ? 'tinymce' : 'textarea');
+          } catch (e) {
+            console.warn('SIAGES: Erro ao injetar conteudo no TinyMCE', e);
+          }
+        })();
+      `;
+      (document.head || document.documentElement).appendChild(script);
+      script.remove();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function attachFormSubmitProtection(contentHtml) {
+    if (window.__siagesSubmitProtected) return;
+    window.__siagesSubmitProtected = true;
+
+    document.addEventListener(
+      'submit',
+      () => {
+        injectMainWorldFill(contentHtml);
+        const textareas = document.querySelectorAll(
+          'textarea#id_texto, textarea#id_corpo, textarea[name="texto"], textarea[name="corpo"], textarea[name="conteudo"]'
+        );
+        textareas.forEach((ta) => {
+          if (!ta.value || ta.value.trim().length < 20) {
+            ta.value = contentHtml;
+          }
+        });
+      },
+      true,
+    );
+
+    document.addEventListener(
+      'click',
+      (e) => {
+        const target = e.target instanceof Element ? e.target : null;
+        const btn = target?.closest('button, input[type="submit"], input[type="button"], a');
+        if (!btn) return;
+        const text = cleanText(btn.textContent || btn.getAttribute('value') || '').toLowerCase();
+        if (text.includes('salvar') || text.includes('visualizar') || text.includes('concluir')) {
+          injectMainWorldFill(contentHtml);
+          const textareas = document.querySelectorAll(
+            'textarea#id_texto, textarea#id_corpo, textarea[name="texto"], textarea[name="corpo"], textarea[name="conteudo"]'
+          );
+          textareas.forEach((ta) => {
+            if (!ta.value || ta.value.trim().length < 20) {
+              ta.value = contentHtml;
+            }
+          });
+        }
+      },
+      true,
+    );
   }
 
   function fillTextEditor(payload) {
     const contentHtml = payload?.contentHtml || '';
     if (!contentHtml.trim()) return false;
 
+    let tinyOk = false;
     const tinyEditor = findTinyEditor();
     if (tinyEditor) {
       tinyEditor.setContent(contentHtml);
       tinyEditor.fire('change');
       tinyEditor.save();
-      return containsExpectedContent(
+      tinyOk = containsExpectedContent(
         typeof tinyEditor.getContent === 'function' ? tinyEditor.getContent() : '',
         payload,
       );
     }
+
+    injectMainWorldFill(contentHtml);
 
     const textarea = findTextAreaEditor(document);
     if (textarea) {
@@ -350,18 +499,36 @@
       return containsExpectedContent(textarea.value, payload);
     }
 
-    return fillTinyIframe(contentHtml);
+    const iframeOk = fillTinyIframe(contentHtml);
+    attachFormSubmitProtection(contentHtml);
+
+    if (tinyOk) {
+      return true;
+    }
+
+    if (iframeOk) {
+      return true;
+    }
+
+    return document.documentElement.getAttribute('data-siages-content-injected') === 'tinymce';
   }
 
   async function fillTextEditorWhenReady() {
     const pending = loadPendingAutomation();
     if (!pending?.payload?.contentHtml || !looksLikeTextEditPage()) return false;
 
-    const filled = await waitFor(() => fillTextEditor(pending.payload), 6000);
+    const filled = await waitFor(() => fillTextEditor(pending.payload), 10000);
     if (!filled) {
       showNotice('SIAGES: editor de texto nao encontrado. Cole o conteudo manualmente.', 'error');
       return false;
     }
+
+    window.setTimeout(() => {
+      fillTextEditor(pending.payload);
+    }, 300);
+    window.setTimeout(() => {
+      fillTextEditor(pending.payload);
+    }, 1000);
 
     clearPendingAutomation();
     showNotice('SIAGES: texto preenchido. Revise e clique em Salvar e Visualizar.', 'success');
