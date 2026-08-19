@@ -149,6 +149,7 @@ export default function Contratos() {
     direction: 'desc',
   });
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
+  const [isApiLoading, setIsApiLoading] = useState(true);
   const [apiContratos, setApiContratos] = useState<ContratoApiRow[]>([]);
   const [apiEmpenhos, setApiEmpenhos] = useState<ContratoApiEmpenhoRow[]>([]);
   const [apiHistoricos, setApiHistoricos] = useState<ContratoApiHistoricoRow[]>([]);
@@ -161,6 +162,7 @@ export default function Contratos() {
 
   const loadApiContracts = useCallback(async (isCancelled: () => boolean = () => false) => {
     try {
+      setIsApiLoading(true);
       const contratosApi = await contratosApiService.getContratosApi(true);
       const contratoApiIds = contratosApi.map((contrato) => contrato.id);
       const [empenhosApi, historicosApi, faturasApi, lastSync] = await Promise.all([
@@ -177,6 +179,10 @@ export default function Contratos() {
       setLastApiSyncRun(lastSync);
     } catch (error) {
       console.warn('Contratos: nao foi possivel carregar dados da API do Comprasnet', error);
+    } finally {
+      if (!isCancelled()) {
+        setIsApiLoading(false);
+      }
     }
   }, []);
 
@@ -590,7 +596,7 @@ export default function Contratos() {
     return list;
   }, [searchTerm, viewFilter]);
 
-  if (isLoading) {
+  if (isLoading || isApiLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
