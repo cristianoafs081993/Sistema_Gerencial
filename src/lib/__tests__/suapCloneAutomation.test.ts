@@ -140,7 +140,7 @@ describe('suap-atividades-extension clone-document.js', () => {
     expect(input.value).toBe('Autorizacao para Liquidacao da Despesa');
     expect(events).toEqual(['input', 'change']);
     expect(automation.loadPendingAutomation()?.payload.contentHtml).toContain('Conteudo gerado');
-    expect(document.getElementById('siages-suap-clone-notice')?.textContent).toContain('Ao salvar');
+    expect(document.getElementById('siages-suap-clone-notice')?.textContent).toContain('Revise os campos e clique em Salvar');
   });
 
   it('preenche input[name=assunto] quando nao ha id padrao', () => {
@@ -152,37 +152,18 @@ describe('suap-atividades-extension clone-document.js', () => {
     expect(document.querySelector<HTMLInputElement>('input[name="assunto"]')?.value).toBe('Assunto alternativo');
   });
 
-  it('clica Salvar somente no modo confirmado', () => {
+  it('nao clica em Salvar automaticamente e deixa o usuario revisar os metadados', () => {
     vi.useFakeTimers();
     const automation = loadContentScript();
     document.body.innerHTML = '<input id="id_assunto"><button type="submit">Salvar</button>';
     const clickSpy = vi.fn();
     document.querySelector('button')?.addEventListener('click', clickSpy);
 
-    automation.runCloneAutomation({ ...automationPayload, mode: 'save-after-confirmation' });
+    automation.runCloneAutomation({ ...automationPayload, mode: 'review' });
 
+    vi.advanceTimersByTime(2000);
     expect(clickSpy).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(250);
-    expect(clickSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it('espera o botao Salvar quando a tela de clone ainda esta carregando', async () => {
-    vi.useFakeTimers();
-    const automation = loadContentScript();
-    document.body.innerHTML = '<input id="id_assunto">';
-    const clickSpy = vi.fn();
-    const runResult = automation.runCloneAutomation({ ...automationPayload, mode: 'save-after-confirmation' });
-
-    expect(runResult).toBe(true);
-    window.setTimeout(() => {
-      const saveButton = document.createElement('button');
-      saveButton.textContent = 'Salvar';
-      saveButton.addEventListener('click', clickSpy);
-      document.body.appendChild(saveButton);
-    }, 400);
-
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(clickSpy).toHaveBeenCalledTimes(1);
+    expect(document.getElementById('siages-suap-clone-notice')?.textContent).toContain('Revise os campos e clique em Salvar');
   });
 
   it('apos visualizar documento, abre o menu Editar e clica em Texto', async () => {

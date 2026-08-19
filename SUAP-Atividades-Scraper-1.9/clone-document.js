@@ -209,30 +209,7 @@
     fillSubject(subjectField, payload.subject);
     storePendingAutomation(payload, 'awaiting-document-view');
 
-    if (payload.mode === 'save-after-confirmation') {
-      const scheduleSave = (saveButton) => {
-        if (!saveButton) {
-          showNotice('SIAGES: assunto preenchido, mas o botao Salvar nao foi encontrado.', 'error');
-          return;
-        }
-
-        showNotice('SIAGES: assunto preenchido. Salvando documento...', 'success');
-        window.setTimeout(() => {
-          const currentSaveButton = document.contains(saveButton) ? saveButton : findSaveButton(document);
-          currentSaveButton?.click();
-        }, 250);
-      };
-
-      const saveButton = findSaveButton(document);
-      if (saveButton) {
-        scheduleSave(saveButton);
-      } else {
-        void waitFor(() => findSaveButton(document), 10000).then(scheduleSave);
-      }
-      return true;
-    }
-
-    showNotice('SIAGES: assunto preenchido. Ao salvar, a extensao tentara abrir Editar > Texto.', 'success');
+    showNotice('SIAGES: assunto preenchido. Revise os campos e clique em Salvar para abrir o editor de texto.', 'success');
     return true;
   }
 
