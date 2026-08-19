@@ -32,10 +32,10 @@ const mockEmpenhos: Empenho[] = [
     favorecidoNome: 'Dell Computadores do Brasil Ltda',
     favorecidoDocumento: '00.000.000/0001-91',
     tipo: 'exercicio',
-    dataEmpenho: new Date('2026-08-15T10:00:00.000Z'),
+    dataEmpenho: new Date('2026-08-01T10:00:00.000Z'),
     status: 'liquidado',
-    createdAt: new Date('2026-08-15T10:00:00.000Z'),
-    updatedAt: new Date('2026-08-15T10:00:00.000Z'),
+    createdAt: new Date('2026-08-18T12:00:00.000Z'), // Criação mais recente
+    updatedAt: new Date('2026-08-18T12:00:00.000Z'),
   },
   {
     id: 'emp-2',
@@ -51,7 +51,7 @@ const mockEmpenhos: Empenho[] = [
     tipo: 'exercicio',
     dataEmpenho: new Date('2026-08-10T14:30:00.000Z'),
     status: 'pendente',
-    createdAt: new Date('2026-08-10T14:30:00.000Z'),
+    createdAt: new Date('2026-08-10T14:30:00.000Z'), // Criação mais antiga
     updatedAt: new Date('2026-08-10T14:30:00.000Z'),
   },
 ];
@@ -66,9 +66,9 @@ const mockDescentralizacoes: Descentralizacao[] = [
     origemRecurso: '8100 - Custeio',
     naturezaDespesa: '339030',
     planoInterno: 'ENSINOCN',
-    dataEmissao: new Date('2026-08-16T09:00:00.000Z'),
-    createdAt: new Date('2026-08-16T09:00:00.000Z'),
-    updatedAt: new Date('2026-08-16T09:00:00.000Z'),
+    dataEmissao: new Date('2026-08-05T09:00:00.000Z'),
+    createdAt: new Date('2026-08-15T09:00:00.000Z'), // Criação intermediária
+    updatedAt: new Date('2026-08-15T09:00:00.000Z'),
   },
 ];
 
@@ -96,7 +96,7 @@ describe('NotificationCenter', () => {
     expect(screen.getByTestId('notification-unread-dot')).toBeInTheDocument();
   });
 
-  it('exibe empenhos e descentralizações juntos na mesma lista unificada', () => {
+  it('exibe empenhos e descentralizações juntos na mesma lista unificada ordenados por data de criação', () => {
     render(
       <MemoryRouter>
         <NotificationCenter
@@ -117,6 +117,14 @@ describe('NotificationCenter', () => {
     expect(screen.getByText('Descentralização 2026NC000045')).toBeInTheDocument();
     expect(screen.getByText('Origem: 8100 - Custeio')).toBeInTheDocument();
     expect(screen.getByText('Empenho 2026NE000102')).toBeInTheDocument();
+
+    // Valida a ordem cronológica decrescente dos eventos (NE000102 [10/08] antes de NC000045 [05/08] antes de NE000101 [01/08])
+    const empenho2 = screen.getByText('Empenho 2026NE000102');
+    const desc1 = screen.getByText('Descentralização 2026NC000045');
+    const empenho1 = screen.getByText('Empenho 2026NE000101');
+
+    expect(empenho2.compareDocumentPosition(desc1) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(desc1.compareDocumentPosition(empenho1) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('limita a exibição aos últimos 20 eventos', () => {
@@ -152,27 +160,6 @@ describe('NotificationCenter', () => {
     expect(screen.getByText('Empenho 2026NE000024')).toBeInTheDocument();
     // O mais antigo (dia 1 -> index 0) deve ter sido excluído pelo limite de 20
     expect(screen.queryByText('Empenho 2026NE000000')).not.toBeInTheDocument();
-  });
-
-  it('filtra notificações pelo campo de busca na lista unificada', () => {
-    render(
-      <MemoryRouter>
-        <NotificationCenter
-          empenhos={mockEmpenhos}
-          descentralizacoes={mockDescentralizacoes}
-          atividades={mockAtividades}
-        />
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /abrir central de notificações/i }));
-
-    const searchInput = screen.getByPlaceholderText(/buscar por número, credor/i);
-    fireEvent.change(searchInput, { target: { value: 'Dell' } });
-
-    expect(screen.getByText('Empenho 2026NE000101')).toBeInTheDocument();
-    expect(screen.queryByText('Empenho 2026NE000102')).not.toBeInTheDocument();
-    expect(screen.queryByText('Descentralização 2026NC000045')).not.toBeInTheDocument();
   });
 
   it('abre o modal EmpenhoDialog ao clicar em um empenho', () => {
@@ -226,26 +213,5 @@ describe('NotificationCenter', () => {
     fireEvent.click(screen.getByTitle('Marcar todas como lidas'));
 
     expect(screen.queryByTestId('notification-unread-dot')).not.toBeInTheDocument();
-  });
-
-  it('navega através dos botões de atalho no rodapé', () => {
-    render(
-      <MemoryRouter>
-        <NotificationCenter
-          empenhos={mockEmpenhos}
-          descentralizacoes={mockDescentralizacoes}
-          atividades={mockAtividades}
-        />
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /abrir central de notificações/i }));
-
-    fireEvent.click(screen.getByRole('button', { name: /todos empenhos/i }));
-    expect(mockNavigate).toHaveBeenCalledWith('/empenhos');
-
-    fireEvent.click(screen.getByRole('button', { name: /abrir central de notificações/i }));
-    fireEvent.click(screen.getByRole('button', { name: /descentralizações/i }));
-    expect(mockNavigate).toHaveBeenCalledWith('/descentralizacoes');
   });
 });

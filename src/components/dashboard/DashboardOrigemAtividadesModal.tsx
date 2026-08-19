@@ -31,6 +31,7 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { AtividadeDialog } from '@/components/modals/AtividadeDialog';
 import { formatCurrency } from '@/lib/utils';
+import { extractPlanoInternoCode, matchEmpenhosToAtividades } from '@/utils/atividadeEmpenhoMatching';
 import type { Atividade, Empenho } from '@/types';
 
 export interface DashboardOrigemAtividadesModalProps {
@@ -61,26 +62,17 @@ export function DashboardOrigemAtividadesModal({
     return atividades.filter((a) => (a.origemRecurso || 'Sem origem') === origem);
   }, [atividades, origem]);
 
-  // Mapeia empenhos por atividade_id
-  const empenhosPorAtividadeMap = useMemo(() => {
-    const map = new Map<string, { total: number; count: number; empenhos: Empenho[] }>();
-    empenhos.forEach((emp) => {
-      if (emp.atividadeId && emp.status !== 'cancelado') {
-        const current = map.get(emp.atividadeId) || { total: 0, count: 0, empenhos: [] };
-        current.total += emp.valor || 0;
-        current.count += 1;
-        current.empenhos.push(emp);
-        map.set(emp.atividadeId, current);
-      }
-    });
-    return map;
-  }, [empenhos]);
-
   // Empenhos totais da origem
   const empenhosDaOrigem = useMemo(() => {
     if (!origem) return [];
     return empenhos.filter((e) => (e.origemRecurso || 'Sem origem') === origem && e.status !== 'cancelado');
   }, [empenhos, origem]);
+
+  // Correlaciona de forma inteligente os empenhos às atividades da origem
+  const { empenhosPorAtividadeMap, unmatchedEmpenhos } = useMemo(() => {
+    if (!origem) return { empenhosPorAtividadeMap: new Map(), unmatchedEmpenhos: [] };
+    return matchEmpenhosToAtividades(atividadesDaOrigem, empenhosDaOrigem);
+  }, [atividadesDaOrigem, empenhosDaOrigem, origem]);
 
   // Enriquece as atividades com valores de execução e saldo
   const enrichedAtividades = useMemo(() => {
@@ -354,9 +346,9 @@ export function DashboardOrigemAtividadesModal({
                               {atividade.atividade || 'Sem código'}
                             </span>
                             {atividade.tipoAtividade && (
-                              <Badge variant="outline" className="w-fit px-1.5 py-0 text-[10px] font-normal uppercase">
+                              <span className="inline-flex w-fit items-center rounded border border-border-default/60 bg-muted/40 px-1.5 py-0 text-[10px] font-medium uppercase text-muted-foreground">
                                 {atividade.tipoAtividade}
-                              </Badge>
+                              </span>
                             )}
                           </div>
                         </TableCell>
@@ -386,15 +378,28 @@ export function DashboardOrigemAtividadesModal({
                         {/* Plano Interno / Natureza de Despesa */}
                         <TableCell className="px-4 py-3 align-top text-xs text-text-muted">
                           {atividade.planoInterno ? (
-                            <Badge variant="outline" className="px-1 py-0 text-[10px] font-mono">
-                              PI: {atividade.planoInterno}
-                            </Badge>
+                            <div>
+                              <div className="font-mono text-xs font-semibold text-text-primary">
+                                PI: {extractPlanoInternoCode(atividade.planoInterno) || atividade.planoInterno}
+                              </div>
+                              {atividade.planoInterno.includes(' - ') && (
+                                <div
+                                  className="text-[11px] text-muted-foreground line-clamp-2 max-w-[200px] mt-0.5"
+                                  title={atividade.planoInterno}
+                                >
+                                  {atividade.planoInterno.split(' - ').slice(1).join(' - ')}
+                                </div>
+                              )}
+                            </div>
                           ) : (
                             <span className="italic text-slate-400">—</span>
                           )}
                           {atividade.naturezaDespesa && (
-                            <div className="mt-1 font-mono text-[10px] text-muted-foreground truncate max-w-[150px]" title={atividade.naturezaDespesa}>
-                              {atividade.naturezaDespesa}
+                            <div
+                              className="mt-1 font-mono text-[10px] text-muted-foreground truncate max-w-[180px]"
+                              title={atividade.naturezaDespesa}
+                            >
+                              ND: {atividade.naturezaDespesa}
                             </div>
                           )}
                         </TableCell>

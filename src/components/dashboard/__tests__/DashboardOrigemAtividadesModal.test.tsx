@@ -197,4 +197,85 @@ describe('DashboardOrigemAtividadesModal', () => {
 
     expect(screen.getByTestId('atividade-dialog')).toHaveTextContent('Atividade 01');
   });
+
+  it('correlaciona empenhos SIAFI sem atividadeId por processo, descrição e siglas garantindo saldos corretos', () => {
+    const atividadesSiafi: Atividade[] = [
+      {
+        id: 'atv-pafe-siafi',
+        atividade: 'Programa de Apoio à Formação Estudantil (PAFE)',
+        descricao: 'Programa de Apoio à Formação Estudantil (PAFE)',
+        valorTotal: 110000,
+        origemRecurso: '231802',
+        planoInterno: 'L2994P23AEN - DIAE-Ações de assistência estudantil - Aux. bolsas e outras despesas',
+        naturezaDespesa: '339018',
+        dimensao: 'AE',
+        componenteFuncional: 'Atividades Estudantis',
+        tipoAtividade: 'campus',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: 'atv-transporte-siafi',
+        atividade: 'Programa de Auxílio Transporte',
+        descricao: 'Programa de Auxílio Transporte',
+        valorTotal: 94377.12,
+        origemRecurso: '231802',
+        planoInterno: 'L2994P23AEN - DIAE-Ações de assistência estudantil - Aux. bolsas e outras despesas',
+        naturezaDespesa: '339018',
+        dimensao: 'AE',
+        componenteFuncional: 'Atividades Estudantis',
+        tipoAtividade: 'campus',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
+
+    const empenhosSiafi: Empenho[] = [
+      {
+        id: 'emp-pafe-1',
+        numero: '2026NE000012',
+        descricao: 'RECURSO PARA PAGAMENTO DE BOLSA PAFE, CONFORME PROCESSO 23035.000591.2026-61',
+        valor: 53100,
+        origemRecurso: '231802',
+        planoInterno: 'L2994P23AEN',
+        naturezaDespesa: '339018',
+        tipo: 'exercicio',
+        status: 'pendente',
+        dataEmpenho: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: 'emp-transporte-1',
+        numero: '2026NE000013',
+        descricao: 'RECURSO PARA PAGAMENTO DE AUXILIO TRANSPORTE, CONFORME PROCESSO 23035.000593.2026-50',
+        valor: 83258,
+        origemRecurso: '231802',
+        planoInterno: 'L2994P23AEN',
+        naturezaDespesa: '339018',
+        tipo: 'exercicio',
+        status: 'pendente',
+        dataEmpenho: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
+
+    render(
+      <DashboardOrigemAtividadesModal
+        open={true}
+        onOpenChange={onOpenChange}
+        origem="231802"
+        atividades={atividadesSiafi}
+        empenhos={empenhosSiafi}
+      />,
+    );
+
+    // PAFE deve exibir saldo de R$ 56.900,00 (110.000 - 53.100) e NÃO R$ 110.000,00
+    expect(screen.getByText(/R\$\s*56\.900,00/i)).toBeInTheDocument();
+    // Auxílio transporte deve exibir saldo de R$ 11.119,12 (94.377,12 - 83.258)
+    expect(screen.getByText(/R\$\s*11\.119,12/i)).toBeInTheDocument();
+    // O código do PI deve ser exibido de forma limpa
+    expect(screen.getAllByText(/PI:\s*L2994P23AEN/i).length).toBeGreaterThanOrEqual(1);
+  });
 });
