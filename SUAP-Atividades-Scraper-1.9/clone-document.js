@@ -270,7 +270,11 @@
 
   async function openTextEditorFromDocumentList() {
     const pending = loadPendingAutomation();
-    if (pending?.stage !== 'awaiting-created-document' || !pending.payload?.contentHtml) return false;
+    const canRecoverFromList = (
+      pending?.stage === 'awaiting-created-document'
+      || pending?.stage === 'opening-text-editor'
+    );
+    if (!canRecoverFromList || !pending.payload?.contentHtml) return false;
 
     const editorPath = await waitFor(
       () => findCreatedDraftEditorPath(document, pending.payload.subject),
@@ -290,6 +294,16 @@
   async function openTextEditorFromView() {
     const pending = loadPendingAutomation();
     if (!pending?.payload?.contentHtml) return false;
+
+    const documentId = window.location.pathname.match(
+      /\/documento_eletronico\/visualizar_documento\/(\d+)\//,
+    )?.[1];
+    if (documentId) {
+      updatePendingStage('opening-text-editor');
+      showNotice('SIAGES: abrindo o editor de texto do rascunho criado...', 'success');
+      navigateTo(`/documento_eletronico/editar_documento/${documentId}/`);
+      return true;
+    }
 
     const directTextLink = document.querySelector('a[href*="editar_texto_documento"], a[href*="editar_texto"]');
     if (directTextLink) {

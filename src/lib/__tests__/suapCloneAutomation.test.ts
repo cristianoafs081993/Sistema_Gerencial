@@ -198,6 +198,37 @@ describe('suap-atividades-extension clone-document.js', () => {
     expect(automation.loadPendingAutomation()).toMatchObject({ stage: 'opening-text-editor' });
   });
 
+  it('abre diretamente o editor pelo identificador da pagina de visualizacao', async () => {
+    const automation = loadContentScript();
+    const testWindow = window as ExtensionTestWindow;
+    const navigate = vi.fn();
+    testWindow.__siagesSuapCloneTestNavigate = navigate;
+    automation.storePendingAutomation(automationPayload, 'awaiting-created-document');
+    window.history.replaceState(null, document.title, '/documento_eletronico/visualizar_documento/1127834/');
+
+    await expect(automation.openTextEditorFromView()).resolves.toBe(true);
+
+    expect(navigate).toHaveBeenCalledWith('/documento_eletronico/editar_documento/1127834/');
+    expect(automation.loadPendingAutomation()).toMatchObject({ stage: 'opening-text-editor' });
+  });
+
+  it('recupera pela listagem quando a navegacao da visualizacao ja iniciou o editor', async () => {
+    const automation = loadContentScript();
+    const testWindow = window as ExtensionTestWindow;
+    const navigate = vi.fn();
+    testWindow.__siagesSuapCloneTestNavigate = navigate;
+    automation.storePendingAutomation(automationPayload, 'opening-text-editor');
+    document.body.innerHTML = `
+      <table><tbody>
+        <tr><td>Autorizacao para Liquidacao da Despesa</td><td>Rascunho</td><td><a href="/admin/documento_eletronico/documentotexto/3333333/change/">Editar</a></td></tr>
+      </tbody></table>
+    `;
+
+    await expect(automation.openTextEditorFromDocumentList()).resolves.toBe(true);
+
+    expect(navigate).toHaveBeenCalledWith('/documento_eletronico/editar_documento/3333333/');
+  });
+
   it('apos visualizar documento, abre o menu Editar e clica em Texto', async () => {
     const automation = loadContentScript();
     automation.storePendingAutomation(automationPayload, 'awaiting-document-view');
