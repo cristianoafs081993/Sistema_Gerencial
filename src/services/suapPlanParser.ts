@@ -7,6 +7,7 @@ export type SuapPlanActivity = {
   origemRecursoRaw: string;
   planoInterno: string;
   valorTotal: number;
+  saldoDisponivel?: number;
   rawData: Record<string, string>;
 };
 
@@ -113,6 +114,7 @@ export function parseSuapPlanHtml(html: string, Parser: HtmlParserConstructor = 
     const updatedValueIndex = findColumn(headers, 'valor atualizado da atividade');
     if (activityIndex < 0 || updatedValueIndex < 0) continue;
 
+    const balanceIndex = findColumn(headers, 'saldo disponivel para empenho da atividade');
     const origemIndex = findColumn(headers, 'origem de recurso');
     const planoIndex = findColumn(headers, 'plano interno');
     const componenteIndex = findColumn(headers, 'componente funcional');
@@ -146,6 +148,7 @@ export function parseSuapPlanHtml(html: string, Parser: HtmlParserConstructor = 
         origemRecursoRaw,
         planoInterno: cells[planoIndex] ?? '',
         valorTotal: parseCurrency(cells[updatedValueIndex] ?? ''),
+        saldoDisponivel: balanceIndex >= 0 ? parseCurrency(cells[balanceIndex] ?? '') : undefined,
         rawData: {
           atividade,
           dimensao: dimension,
@@ -153,6 +156,7 @@ export function parseSuapPlanHtml(html: string, Parser: HtmlParserConstructor = 
           origemRecurso: origemRecursoRaw,
           planoInterno: cells[planoIndex] ?? '',
           valorAtualizado: cells[updatedValueIndex] ?? '',
+          saldoDisponivel: balanceIndex >= 0 ? cells[balanceIndex] ?? '' : '',
         },
       });
     }

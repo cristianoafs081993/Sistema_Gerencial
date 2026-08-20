@@ -17,6 +17,7 @@ const mockAtividades: Atividade[] = [
     origemRecurso: '231796',
     dimensao: 'Administração',
     componenteFuncional: 'Serviços Terceirizados',
+    saldoDisponivel: 55000,
     planoInterno: 'L20RLP0100N',
     naturezaDespesa: '339037',
     tipoAtividade: 'campus',
@@ -31,6 +32,7 @@ const mockAtividades: Atividade[] = [
     origemRecurso: '231796',
     dimensao: 'Administração',
     componenteFuncional: 'Material de Consumo',
+    saldoDisponivel: 0,
     planoInterno: 'L20RLP0200N',
     naturezaDespesa: '339030',
     tipoAtividade: 'campus',
@@ -110,12 +112,38 @@ describe('DashboardOrigemAtividadesModal', () => {
     expect(screen.getByText(/Origem \/ PTRES: 231796/i)).toBeInTheDocument();
 
     // Cards de resumo
-    expect(screen.getByText('Saldo Disponível')).toBeInTheDocument();
-    expect(screen.getByText('Atividades c/ saldo')).toBeInTheDocument();
-    // Saldo da origem 231796 = 60.000 + 0 = 60.000 (total planejado: 130.000, total empenhado: 70.000)
-    expect(screen.getAllByText(/R\$\s*60\.000,00/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/R\$\s*130\.000,00/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/R\$\s*70\.000,00/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Saldo Disponível (SUAP)')).toBeInTheDocument();
+    expect(screen.getByText('Atividades exibidas')).toBeInTheDocument();
+    // O saldo oficial do SUAP prevalece sobre o calculo planejado - empenhado (55.000 vs. 60.000).
+    expect(screen.getAllByText(/R\$\s*55\.000,00/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/R\$\s*100\.000,00/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/R\$\s*40\.000,00/i).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('mantem os cards financeiros iguais ao total das linhas exibidas', () => {
+    render(
+      <DashboardOrigemAtividadesModal
+        open={true}
+        onOpenChange={onOpenChange}
+        origem="231796"
+        atividades={mockAtividades}
+        empenhos={mockEmpenhos}
+      />,
+    );
+
+    // Com o filtro padrao, card e rodape representam a mesma linha e o saldo oficial do SUAP.
+    expect(screen.getByText('Atividades exibidas:').parentElement).toHaveTextContent('1');
+    expect(screen.getAllByText(/R\$\s*100\.000,00/i).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText(/R\$\s*40\.000,00/i).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText(/R\$\s*55\.000,00/i).length).toBeGreaterThanOrEqual(2);
+
+    fireEvent.click(screen.getByRole('button', { name: /Apenas com saldo/i }));
+
+    // Ao exibir todas, o mesmo contrato continua valendo para todas as linhas.
+    expect(screen.getByText('Atividades exibidas:').parentElement).toHaveTextContent('2');
+    expect(screen.getAllByText(/R\$\s*130\.000,00/i).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText(/R\$\s*70\.000,00/i).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText(/R\$\s*55\.000,00/i).length).toBeGreaterThanOrEqual(2);
   });
 
   it('exibe exclusivamente as atividades com saldo > 0 por padrão', () => {

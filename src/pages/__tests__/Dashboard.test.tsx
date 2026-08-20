@@ -1325,4 +1325,116 @@ describe('Dashboard', () => {
     expect(screen.getByTestId('rap-origem-liquidado')).toHaveTextContent('130');
     expect(screen.getByTestId('rap-origem-saldo')).toHaveTextContent('80');
   });
+
+  it('ignora a origem de recurso externa 230446 nos cálculos e filtros do dashboard', () => {
+    mockedUseData.mockReturnValue({
+      atividades: [
+        makeAtividade({
+          id: 'ativ-interna',
+          origemRecurso: '231796',
+          dimensao: 'AD - Administração',
+          valorTotal: 500,
+        }),
+        makeAtividade({
+          id: 'ativ-externa',
+          origemRecurso: '230446',
+          dimensao: 'AD - Administração',
+          valorTotal: 1000,
+        }),
+      ],
+      empenhos: [
+        makeEmpenho({
+          id: 'emp-interno',
+          numero: '2026NE000100',
+          origemRecurso: '231796',
+          tipo: 'exercicio',
+          valor: 300,
+          valorLiquidadoOficial: 150,
+          valorPagoOficial: 100,
+        }),
+        makeEmpenho({
+          id: 'emp-externo',
+          numero: '2026NE000200',
+          origemRecurso: '230446',
+          tipo: 'exercicio',
+          valor: 70,
+          valorLiquidadoOficial: 70,
+          valorPagoOficial: 70,
+        }),
+        makeEmpenho({
+          id: 'emp-rap-externo',
+          numero: '2025NE000300',
+          origemRecurso: '230446',
+          tipo: 'rap',
+          valor: 50,
+          saldoRapOficial: 50,
+        }),
+      ],
+      descentralizacoes: [
+        makeDescentralizacao({
+          id: 'desc-interna',
+          origemRecurso: '231796',
+          dimensao: 'AD - Administração',
+          valor: 400,
+        }),
+        makeDescentralizacao({
+          id: 'desc-externa',
+          origemRecurso: '230446',
+          dimensao: 'AD - Administração',
+          valor: 100,
+        }),
+      ],
+      contaDescentralizacoes: [
+        {
+          id: 'conta-interna',
+          ptres: '231796',
+          valor: 400,
+          metrica: 'Saldo',
+          updatedAt: '2026-08-20T00:00:00Z',
+        },
+        {
+          id: 'conta-externa',
+          ptres: '230446',
+          valor: 70,
+          metrica: 'Saldo',
+          updatedAt: '2026-08-20T00:00:00Z',
+        },
+      ],
+      contratos: [],
+      contratosEmpenhos: [],
+      creditosDisponiveis: [],
+      isLoading: false,
+      addAtividade: vi.fn(),
+      updateAtividade: vi.fn(),
+      deleteAtividade: vi.fn(),
+      addEmpenho: vi.fn(),
+      updateEmpenho: vi.fn(),
+      deleteEmpenho: vi.fn(),
+      addDescentralizacao: vi.fn(),
+      updateDescentralizacao: vi.fn(),
+      deleteDescentralizacao: vi.fn(),
+      getResumoOrcamentario: vi.fn(),
+      getTotalPlanejado: vi.fn(),
+      getTotalEmpenhado: vi.fn(),
+      getTotalDescentralizado: vi.fn(),
+      getADescentralizar: vi.fn(),
+      getSaldoTotal: vi.fn(),
+      refreshData: vi.fn(),
+    });
+
+    render(<Dashboard />);
+
+    // Total Planejado: apenas os 500 da origem interna (1000 ignorado)
+    expect(screen.getByTestId('current-planejado')).toHaveTextContent('500');
+    // Total Descentralizado: apenas os 400 da origem interna (70 ignorado)
+    expect(screen.getByTestId('current-descentralizado')).toHaveTextContent('400');
+    // Total Liquidado: apenas os 150 da origem interna (70 ignorado)
+    expect(screen.getByTestId('current-liquidado')).toHaveTextContent('150');
+    // Total Pago: apenas os 100 da origem interna (70 ignorado)
+    expect(screen.getByTestId('current-pago')).toHaveTextContent('100');
+    // Quantidade de empenhos do exercício: 1 (exclui 230446)
+    expect(screen.getByTestId('current-empenhos-corrente')).toHaveTextContent('1');
+    // Quantidade de empenhos RAP: 0 (exclui 230446)
+    expect(screen.getByTestId('current-empenhos-rap')).toHaveTextContent('0');
+  });
 });

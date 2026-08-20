@@ -179,6 +179,7 @@ function toSnapshot(activity: SuapPlanActivity, orgId: string, runId: string) {
     origem_recurso_raw: activity.origemRecursoRaw,
     plano_interno: activity.planoInterno,
     valor_total: activity.valorTotal,
+    saldo_disponivel: activity.saldoDisponivel ?? null,
     raw_data: activity.rawData,
   };
 }

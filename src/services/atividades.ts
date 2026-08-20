@@ -5,7 +5,7 @@ import { Atividade } from '@/types';
 import { normalizeActivityName, normalizeFunctionalComponentName } from '@/utils/functionalComponentLabels';
 import { resolveTipoAtividade } from '@/utils/atividadeScopes';
 
-const ATIVIDADES_SELECT = 'id,dimensao,dimensao_id,componente_funcional,componente_funcional_id,processo,tipo_atividade,atividade,descricao,valor_total,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,sync_active,created_at,updated_at';
+const ATIVIDADES_SELECT = 'id,dimensao,dimensao_id,componente_funcional,componente_funcional_id,processo,tipo_atividade,atividade,descricao,valor_total,saldo_disponivel,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,sync_active,created_at,updated_at';
 
 type AtividadeRow = {
     id: string;
@@ -18,6 +18,7 @@ type AtividadeRow = {
     atividade: string;
     descricao: string;
     valor_total: number | string;
+    saldo_disponivel?: number | string | null;
     origem_recurso: string;
     origem_recurso_id?: string | null;
     natureza_despesa: string;
@@ -39,6 +40,7 @@ const mapAtividadeRow = (item: AtividadeRow): Atividade => ({
     atividade: normalizeActivityName(item.atividade, item.dimensao),
     descricao: item.descricao,
     valorTotal: Number(item.valor_total),
+    saldoDisponivel: item.saldo_disponivel == null ? undefined : Number(item.saldo_disponivel),
     origemRecurso: item.origem_recurso,
     origemRecursoId: item.origem_recurso_id || undefined,
     naturezaDespesa: item.natureza_despesa,

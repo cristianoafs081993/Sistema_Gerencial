@@ -69,18 +69,19 @@ export function DashboardOrigemAtividadesModal({
   }, [empenhos, origem]);
 
   // Correlaciona de forma inteligente os empenhos às atividades da origem
-  const { empenhosPorAtividadeMap, unmatchedEmpenhos } = useMemo(() => {
+  const { empenhosPorAtividadeMap } = useMemo(() => {
     if (!origem) return { empenhosPorAtividadeMap: new Map(), unmatchedEmpenhos: [] };
     return matchEmpenhosToAtividades(atividadesDaOrigem, empenhosDaOrigem);
   }, [atividadesDaOrigem, empenhosDaOrigem, origem]);
 
-  // Enriquece as atividades com valores de execução e saldo
+  // Enriquece as atividades com execução e com o saldo oficial do Plano 8 do SUAP.
+  // O fallback preserva atividades legadas que ainda não possuem o campo sincronizado.
   const enrichedAtividades = useMemo(() => {
     return atividadesDaOrigem.map((atividade) => {
       const empInfo = empenhosPorAtividadeMap.get(atividade.id) || { total: 0, count: 0, empenhos: [] };
       const planejado = atividade.valorTotal || 0;
       const empenhado = empInfo.total;
-      const saldo = planejado - empenhado;
+      const saldo = atividade.saldoDisponivel ?? (planejado - empenhado);
       const percentual = planejado > 0 ? (empenhado / planejado) * 100 : 0;
 
       return {
@@ -96,32 +97,9 @@ export function DashboardOrigemAtividadesModal({
   }, [atividadesDaOrigem, empenhosPorAtividadeMap]);
 
   // Métricas agregadas da origem inteira
-  const metricasOrigem = useMemo(() => {
-    let totalPlanejado = 0;
-    let totalEmpenhadoAtividades = 0;
-    let totalSaldo = 0;
-    let countComSaldo = 0;
-
-    enrichedAtividades.forEach((item) => {
-      totalPlanejado += item.planejado;
-      totalEmpenhadoAtividades += item.empenhado;
-      totalSaldo += item.saldo;
-      if (item.saldo > 0) {
-        countComSaldo += 1;
-      }
-    });
-
-    const totalEmpenhadoGeralOrigem = empenhosDaOrigem.reduce((acc, e) => acc + (e.valor || 0), 0);
-    const empenhadoReal = totalEmpenhadoGeralOrigem > 0 ? totalEmpenhadoGeralOrigem : totalEmpenhadoAtividades;
-
-    return {
-      totalPlanejado,
-      totalEmpenhado: empenhadoReal,
-      totalSaldo: totalPlanejado - empenhadoReal,
-      totalAtividades: enrichedAtividades.length,
-      countComSaldo,
-    };
-  }, [enrichedAtividades, empenhosDaOrigem]);
+  const metricasOrigem = useMemo(() => ({
+    totalAtividades: enrichedAtividades.length,
+  }), [enrichedAtividades]);
 
   // Lista filtrada e ordenada (maior saldo primeiro)
   const filteredAtividades = useMemo(() => {
@@ -194,16 +172,16 @@ export function DashboardOrigemAtividadesModal({
               </div>
             </div>
 
-            {/* KPI Cards da Origem */}
+            {/* KPI Cards da selecao atual */}
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="rounded-lg border border-border-default/70 bg-slate-50/50 p-3 dark:bg-slate-900/30">
                 <div className="flex items-center justify-between text-xs text-text-muted">
-                  <span>Atividades c/ saldo</span>
+                  <span>Atividades exibidas</span>
                   <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
                 </div>
                 <div className="mt-1 flex items-baseline gap-1.5">
                   <span className="text-lg font-bold text-text-primary">
-                    {metricasOrigem.countComSaldo}
+                    {filteredAtividades.length}
                   </span>
                   <span className="text-xs text-text-muted">
                     de {metricasOrigem.totalAtividades}
@@ -213,11 +191,11 @@ export function DashboardOrigemAtividadesModal({
 
               <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 dark:bg-emerald-950/20">
                 <div className="flex items-center justify-between text-xs font-medium text-status-success">
-                  <span>Saldo Disponível</span>
+                  <span>Saldo Disponível (SUAP)</span>
                   <Wallet className="h-3.5 w-3.5 text-status-success" />
                 </div>
                 <div className="mt-1 text-lg font-bold text-status-success">
-                  {formatCurrency(metricasOrigem.totalSaldo)}
+                  {formatCurrency(totaisVisiveis.saldo)}
                 </div>
               </div>
 
@@ -227,7 +205,7 @@ export function DashboardOrigemAtividadesModal({
                   <PiggyBank className="h-3.5 w-3.5 text-slate-500" />
                 </div>
                 <div className="mt-1 text-base font-semibold text-text-primary">
-                  {formatCurrency(metricasOrigem.totalPlanejado)}
+                  {formatCurrency(totaisVisiveis.planejado)}
                 </div>
               </div>
 
@@ -237,7 +215,7 @@ export function DashboardOrigemAtividadesModal({
                   <TrendingUp className="h-3.5 w-3.5 text-slate-500" />
                 </div>
                 <div className="mt-1 text-base font-semibold text-text-primary">
-                  {formatCurrency(metricasOrigem.totalEmpenhado)}
+                  {formatCurrency(totaisVisiveis.empenhado)}
                 </div>
               </div>
             </div>

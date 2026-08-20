@@ -9,12 +9,12 @@ const html = `
       <thead><tr>
         <th>Unidade gestora</th><th>Origem de recurso</th><th>Plano interno</th>
         <th>Componente funcional</th><th>Atividade</th>
-        <th>Valor atualizado da atividade (R$)</th><th>Opções</th>
+        <th>Valor atualizado da atividade (R$)</th><th>Saldo disponível para empenho da atividade (R$)</th><th>Opções</th>
       </tr></thead>
       <tbody>
         <tr hidden="">
           <td></td><td>AD.20RL.231796.3</td><td>PI-001 - Gestão</td><td>-</td>
-          <td>Compra de materiais</td><td>R$ 1.234,56</td>
+          <td>Compra de materiais</td><td>R$ 1.234,56</td><td>R$ 987,65</td>
           <td><a href="/plan_estrategico/listar_requisicoes_despesa/8/32658/">Detalhar</a></td>
         </tr>
       </tbody>
@@ -55,6 +55,7 @@ describe('parseSuapPlanHtml', () => {
       origemRecurso: '231796',
       origemRecursoRaw: 'AD.20RL.231796.3',
       valorTotal: 1234.56,
+      saldoDisponivel: 987.65,
     });
   });
 

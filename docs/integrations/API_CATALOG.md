@@ -701,6 +701,7 @@ Function chamada pela extensão na rota oficial de edição de ETP.
 - Acoes: `connect`, `connect-cookie`, `sync`, `sync-html`, `apply`, `status` e `disconnect`.
 - `sync` usa a sessao SUAP cifrada no backend. `sync-html` recebe somente o HTML capturado da URL canonica do Plano 8 e nao exige `suap_connections` nem novo login SUAP.
 - O HTML enviado pela extensao e validado por host/caminho, tamanho maximo de 15 MB e parser com IDs estaveis; URLs arbitrarias e conteudo incompleto sao rejeitados.
+- O parser captura a coluna oficial `Saldo disponível para empenho da atividade (R$)` e o snapshot/materialização preserva esse valor em `atividades.saldo_disponivel` para o drill-down do Dashboard.
 - A primeira execucao fica em `preview`; depois da conferencia, `apply_suap_plan_snapshot` atualiza/inclui os registros e arquiva os ausentes sem exclusao fisica.
 - O Campus nao depende da extensao. Quando a extensao e usada no popup, ela captura a aba SUAP atual e envia o HTML ao backend; na pagina Campus ela apenas dispara `siages:suap-plan-sync-request`.
 - O popup mantem o `runId` da previa em `chrome.storage.local` e oferece a aplicacao explicita pelo mesmo endpoint, sem abrir uma aba do SIAGES.

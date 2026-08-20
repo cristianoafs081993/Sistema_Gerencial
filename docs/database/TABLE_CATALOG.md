@@ -19,6 +19,7 @@ Campos-chave:
 - `atividade`
 - `descricao`
 - `valor_total`
+- `saldo_disponivel` (saldo oficial do Plano 8 do SUAP para atividades sincronizadas)
 - `origem_recurso`
 - `natureza_despesa`
 - `plano_interno`
@@ -1217,10 +1218,10 @@ Sessões SUAP cifradas, de curta duração, vinculadas ao usuário e ao órgão.
 Histórico das capturas do Plano 8: modo (`preview`/`apply`), status, checksum, contagens, tempos e erro.
 
 ### `suap_plan_activity_snapshots`
-Snapshot normalizado e bruto de cada atividade capturada, por execução e ID estável do SUAP.
+Snapshot normalizado e bruto de cada atividade capturada, por execução e ID estável do SUAP. Preserva `saldo_disponivel`, lido da coluna "Saldo disponível para empenho da atividade".
 
 ### Campos de sincronização em `atividades`
-`sync_source`, `suap_plan_id`, `suap_activity_id`, `sync_active` e `sync_last_seen_run_id` permitem upsert idempotente e arquivamento lógico dos itens ausentes.
+`sync_source`, `suap_plan_id`, `suap_activity_id`, `sync_active` e `sync_last_seen_run_id` permitem upsert idempotente e arquivamento lógico dos itens ausentes. Para registros `suap_plan_8`, `saldo_disponivel` é a fonte oficial do saldo exibido no drill-down do Dashboard.
 
 ### `suap_document_reviews`
 

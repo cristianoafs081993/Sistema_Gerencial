@@ -794,6 +794,7 @@ Function versionada para revisão temporária de Termo de Referência e Estudo T
 - A sessao SUAP e cifrada no backend em `suap_connections`; o navegador recebe apenas um identificador opaco e nunca persiste matricula, senha ou cookie.
 - `sync-html` aceita somente o HTML da pagina canonica do Plano 8, com limite de 15 MB, e permite que a extensao envie a captura da aba SUAP ja autenticada sem abrir o SIAGES ou exigir novo login SUAP.
 - A captura inclui linhas ocultas, valida IDs e grava snapshots antes da reconciliacao transacional.
+- A captura preserva o saldo oficial da coluna `Saldo disponível para empenho da atividade (R$)` em `saldo_disponivel`; esse valor prevalece sobre qualquer saldo calculado a partir de empenhos na UI do Dashboard.
 - O worker Deno usa linkedom como parser HTML injetado; o parser do navegador continua usando DOMParser nativo.
 - A dimensao de cada atividade e resolvida pela secao estrutural (accordion) que contem a tabela; o parser nao depende da ordem global de headings, que varia entre runtimes DOM.
 - A primeira execucao fica em `preview`; depois da conferencia, `apply_suap_plan_snapshot` atualiza/inclui os registros e arquiva os ausentes sem exclusao fisica.

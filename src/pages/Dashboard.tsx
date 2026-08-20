@@ -49,6 +49,11 @@ import {
   shouldIgnoreContratoNumero,
 } from '@/utils/contratosSync';
 
+export const EXCLUDED_DASHBOARD_ORIGENS = new Set(['230446']);
+
+export const isExcludedDashboardOrigem = (origem?: string | null) =>
+  Boolean(origem && EXCLUDED_DASHBOARD_ORIGENS.has(origem.trim()));
+
 
 
 type MonthlyExecutionBucket = {
@@ -1042,22 +1047,40 @@ export default function Dashboard() {
     const origens = new Set<string>();
 
     atividades.forEach((atividade) => {
-      if (atividade.origemRecurso) origens.add(atividade.origemRecurso);
+      if (atividade.origemRecurso && !isExcludedDashboardOrigem(atividade.origemRecurso)) {
+        origens.add(atividade.origemRecurso);
+      }
     });
     empenhos.forEach((empenho) => {
-      if (empenho.origemRecurso) origens.add(empenho.origemRecurso);
+      if (empenho.origemRecurso && !isExcludedDashboardOrigem(empenho.origemRecurso)) {
+        origens.add(empenho.origemRecurso);
+      }
     });
     descentralizacoes.forEach((descentralizacao) => {
-      if (descentralizacao.origemRecurso) origens.add(descentralizacao.origemRecurso);
+      if (descentralizacao.origemRecurso && !isExcludedDashboardOrigem(descentralizacao.origemRecurso)) {
+        origens.add(descentralizacao.origemRecurso);
+      }
     });
     contaDescentralizacoes.forEach((saldo) => {
-      if (saldo.ptres) origens.add(saldo.ptres);
+      if (saldo.ptres && !isExcludedDashboardOrigem(saldo.ptres)) {
+        origens.add(saldo.ptres);
+      }
     });
     return Array.from(origens).sort();
   }, [atividades, empenhos, descentralizacoes, contaDescentralizacoes]);
 
+  const dashboardDescentralizacoes = useMemo(
+    () => descentralizacoes.filter((d) => !isExcludedDashboardOrigem(d.origemRecurso)),
+    [descentralizacoes],
+  );
+  const dashboardContaDescentralizacoes = useMemo(
+    () => contaDescentralizacoes.filter((c) => !isExcludedDashboardOrigem(c.ptres)),
+    [contaDescentralizacoes],
+  );
+
   const filteredData = useMemo(() => {
     const filteredAtividades = atividades.filter((atividade) => {
+      if (isExcludedDashboardOrigem(atividade.origemRecurso)) return false;
       const matchDimensao = matchesDimensionFilter({
         dimensionValue: atividade.dimensao,
         planInternal: atividade.planoInterno,
@@ -1069,8 +1092,12 @@ export default function Dashboard() {
       return matchDimensao && matchOrigem;
     });
 
-    const empenhosCorrente = empenhos.filter((empenho) => empenho.tipo === 'exercicio');
-    const empenhosRap = empenhos.filter((empenho) => empenho.tipo === 'rap');
+    const empenhosCorrente = empenhos.filter(
+      (empenho) => empenho.tipo === 'exercicio' && !isExcludedDashboardOrigem(empenho.origemRecurso),
+    );
+    const empenhosRap = empenhos.filter(
+      (empenho) => empenho.tipo === 'rap' && !isExcludedDashboardOrigem(empenho.origemRecurso),
+    );
 
     const matchDateRange = (data: string) => {
       if (!dateStart || !dateEnd) return true;
@@ -1105,7 +1132,7 @@ export default function Dashboard() {
       return matchDimensao && matchOrigem && matchDateRange(empenho.dataEmpenho) && empenho.status !== 'cancelado';
     });
 
-    const filteredDescentralizacoes = descentralizacoes.filter((descentralizacao) => {
+    const filteredDescentralizacoes = dashboardDescentralizacoes.filter((descentralizacao) => {
       const matchDimensao = matchesDimensionFilter({
         dimensionValue: descentralizacao.dimensao,
         planInternal: descentralizacao.planoInterno,
@@ -1123,15 +1150,23 @@ export default function Dashboard() {
       empenhosRap: filteredEmpenhosRap,
       descentralizacoes: filteredDescentralizacoes,
     };
-  }, [atividades, empenhos, descentralizacoes, effectiveFilterDimensao, filterOrigem, dateStart, dateEnd]);
+  }, [
+    atividades,
+    empenhos,
+    dashboardDescentralizacoes,
+    effectiveFilterDimensao,
+    filterOrigem,
+    dateStart,
+    dateEnd,
+  ]);
 
   const resumoDescentralizacoes = useMemo(
     () =>
       buildDescentralizacaoSummaryRows({
-        descentralizacoes,
-        contaSaldos: contaDescentralizacoes,
+        descentralizacoes: dashboardDescentralizacoes,
+        contaSaldos: dashboardContaDescentralizacoes,
       }),
-    [descentralizacoes, contaDescentralizacoes],
+    [dashboardDescentralizacoes, dashboardContaDescentralizacoes],
   );
 
   const totalDescentralizado = getFilteredDescentralizacaoSummaryTotal({
@@ -1153,7 +1188,10 @@ export default function Dashboard() {
     0,
   );
 
-  const rapReferenceYear = useMemo(() => getRapReferenceYear(empenhos), [empenhos]);
+  const rapReferenceYear = useMemo(
+    () => getRapReferenceYear(empenhos.filter((e) => !isExcludedDashboardOrigem(e.origemRecurso))),
+    [empenhos],
+  );
 
   const rapTotalInscrito = filteredData.empenhosRap.reduce((total, empenho) => {
     if (isRapReinscrito(empenho, rapReferenceYear)) return total;

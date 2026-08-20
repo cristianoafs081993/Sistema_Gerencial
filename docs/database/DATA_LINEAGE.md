@@ -362,9 +362,9 @@ Cadastros seguem inventoryService  operational_entities / measurement_units / ca
 ## Plano 8 do SUAP → Campus
 
 - origem: HTML autenticado de `/plan_estrategico/plano_concluido/8/`;
-- parser: `src/services/suapPlanParser.ts`, que ignora a tabela-resumo e lê as 12 tabelas de atividades, inclusive linhas ocultas;
+- parser: `src/services/suapPlanParser.ts`, que ignora a tabela-resumo e lê as 12 tabelas de atividades, inclusive linhas ocultas, capturando também a coluna oficial `Saldo disponível para empenho da atividade (R$)`;
 - auditoria: `suap_plan_sync_runs` e `suap_plan_activity_snapshots`;
-- materialização: função SQL `apply_suap_plan_snapshot` grava `atividades` com `sync_source = suap_plan_8`;
+- materialização: função SQL `apply_suap_plan_snapshot` grava `atividades` com `sync_source = suap_plan_8` e persiste o valor em `saldo_disponivel`;
 - ausência na captura: `sync_active = false`, preservando o registro e o histórico.
 
 ## Analise e historico de documentos SUAP

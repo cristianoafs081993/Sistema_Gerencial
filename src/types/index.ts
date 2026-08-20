@@ -13,6 +13,8 @@ export interface Atividade {
   atividade: string;
   descricao: string;
   valorTotal: number;
+  /** Saldo oficial do Plano 8 do SUAP, quando a atividade veio da sincronização. */
+  saldoDisponivel?: number;
   origemRecurso: string;
   origemRecursoId?: string;
   naturezaDespesa: string;
