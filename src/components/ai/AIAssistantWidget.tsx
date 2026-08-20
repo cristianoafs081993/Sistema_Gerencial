@@ -139,10 +139,10 @@ export function AIAssistantWidget() {
       });
 
       const assistantMessage: AssistenteGerencialMessage = {
-        ...createMessage('assistant', response.resposta),
-        sources: response.fontes,
-        suggestions: response.sugestoes,
-        warnings: response.avisos,
+        ...createMessage('assistant', response.resposta || response.response || ''),
+        sources: response.fontes || response.sources || [],
+        suggestions: response.sugestoes || response.suggestions || [],
+        warnings: response.avisos || response.warnings || [],
       };
 
       setSession((current) => replaceAssistenteGerencialMessages(current, [...updatedMessages, assistantMessage]));
@@ -284,7 +284,7 @@ export function AIAssistantWidget() {
                         ) : null}
                       </div>
                     ) : (
-                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      <p className="whitespace-pre-wrap text-primary-foreground">{message.content}</p>
                     )}
                   </div>
                 </div>

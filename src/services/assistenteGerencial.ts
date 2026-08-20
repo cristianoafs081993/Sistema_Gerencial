@@ -7,16 +7,23 @@ export type AssistenteGerencialHistoryMessage = {
 };
 
 export type AssistenteGerencialRequest = {
-  message: string;
-  history?: AssistenteGerencialMessage[];
+  message?: string;
+  pergunta?: string;
+  history?: AssistenteGerencialMessage[] | AssistenteGerencialHistoryMessage[];
+  historico?: AssistenteGerencialMessage[] | AssistenteGerencialHistoryMessage[];
 };
 
 export type AssistenteGerencialResponse = {
   response: string;
+  resposta: string;
   suggestions: string[];
+  sugestoes: string[];
   model?: string | null;
+  modelo?: string | null;
   warnings: string[];
+  avisos: string[];
   sources: AssistenteGerencialSource[];
+  fontes: AssistenteGerencialSource[];
 };
 
 const MAX_HISTORY_MESSAGES = 8;
@@ -47,10 +54,12 @@ export function parseAssistenteGerencialSuggestions(text: string) {
 }
 
 export function buildAssistenteGerencialPayload(params: AssistenteGerencialRequest) {
-  const message = cleanContent(params.message, MAX_MESSAGE_LENGTH);
-  const history = (params.history || [])
+  const rawMessage = params.message ?? params.pergunta ?? '';
+  const message = cleanContent(rawMessage, MAX_MESSAGE_LENGTH);
+  const rawHistory = params.history || params.historico || [];
+  const history = rawHistory
     .filter((item) => item.role === 'user' || item.role === 'assistant')
-    .filter((item) => item.content.trim())
+    .filter((item) => Boolean(item.content && item.content.trim()))
     .slice(-MAX_HISTORY_MESSAGES)
     .map<AssistenteGerencialHistoryMessage>((item) => ({
       role: item.role,
@@ -102,36 +111,70 @@ export const assistenteGerencialService = {
       throw new Error(String(responseData.error));
     }
 
-    const rawResponse = typeof responseData?.response === 'string' ? responseData.response : '';
+    const rawResponse = typeof responseData?.response === 'string'
+      ? responseData.response
+      : typeof responseData?.resposta === 'string'
+      ? responseData.resposta
+      : '';
     if (!rawResponse.trim()) {
       throw new Error('O Assistente Gerencial nao retornou conteudo.');
     }
 
     const parsed = parseAssistenteGerencialSuggestions(rawResponse);
-    const serverSuggestions = Array.isArray(responseData?.suggestions)
-      ? responseData.suggestions.filter((item: unknown): item is string => typeof item === 'string').slice(0, 3)
+    const rawSuggestions = Array.isArray(responseData?.suggestions)
+      ? responseData.suggestions
+      : Array.isArray(responseData?.sugestoes)
+      ? responseData.sugestoes
       : [];
-    const warnings = Array.isArray(responseData?.warnings)
-      ? responseData.warnings.filter((item: unknown): item is string => typeof item === 'string')
+    const serverSuggestions = rawSuggestions
+      .filter((item: unknown): item is string => typeof item === 'string')
+      .slice(0, 3);
+    const finalSuggestions = serverSuggestions.length ? serverSuggestions : parsed.suggestions;
+
+    const rawWarnings = Array.isArray(responseData?.warnings)
+      ? responseData.warnings
+      : Array.isArray(responseData?.avisos)
+      ? responseData.avisos
       : [];
-    const sources = Array.isArray(responseData?.sources)
+    const warnings = rawWarnings
+      .filter((item: unknown): item is string => typeof item === 'string');
+
+    const rawSources = Array.isArray(responseData?.sources)
       ? responseData.sources
-        .filter((item: unknown): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
-        .map((item) => ({
-          label: String(item.label || ''),
-          totalAmostra: typeof item.totalAmostra === 'number' ? item.totalAmostra : undefined,
-          totalDisponivel: typeof item.totalDisponivel === 'number' ? item.totalDisponivel : null,
-          warning: typeof item.warning === 'string' ? item.warning : undefined,
-        }))
-        .filter((item) => item.label)
+      : Array.isArray(responseData?.fontes)
+      ? responseData.fontes
       : [];
+    const sources = rawSources
+      .filter((item: unknown): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
+      .map((item) => ({
+        label: String(item.label || ''),
+        totalAmostra: typeof item.totalAmostra === 'number' ? item.totalAmostra : undefined,
+        totalDisponivel: typeof item.totalDisponivel === 'number' ? item.totalDisponivel : null,
+        warning: typeof item.warning === 'string' ? item.warning : undefined,
+      }))
+      .filter((item) => item.label);
+
+    const model = typeof responseData?.model === 'string'
+      ? responseData.model
+      : typeof responseData?.modelo === 'string'
+      ? responseData.modelo
+      : null;
 
     return {
       response: parsed.response,
-      suggestions: serverSuggestions.length ? serverSuggestions : parsed.suggestions,
-      model: typeof responseData?.model === 'string' ? responseData.model : null,
+      resposta: parsed.response,
+      suggestions: finalSuggestions,
+      sugestoes: finalSuggestions,
+      model,
+      modelo: model,
       warnings,
+      avisos: warnings,
       sources,
+      fontes: sources,
     };
+  },
+
+  async perguntar(params: AssistenteGerencialRequest): Promise<AssistenteGerencialResponse> {
+    return this.ask(params);
   },
 };

@@ -75,7 +75,7 @@ describe('assistenteGerencialService', () => {
         body: expect.objectContaining({ message: 'saldo' }),
       }),
     );
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       response: 'Saldo total: **R$ 10,00**',
       suggestions: ['Detalhar por PTRES'],
       model: 'gemini-2.5-flash-lite',
@@ -104,7 +104,7 @@ describe('assistenteGerencialService', () => {
 
     await vi.advanceTimersByTimeAsync(650);
 
-    await expect(request).resolves.toEqual({
+    await expect(request).resolves.toMatchObject({
       response: 'Consulta recuperada.',
       suggestions: [],
       model: null,
@@ -120,5 +120,39 @@ describe('assistenteGerencialService', () => {
       'Digite uma pergunta',
     );
     expect(mockedInvoke).not.toHaveBeenCalled();
+  });
+
+  it('permite consulta via perguntar() com parametros e resposta em portugues', async () => {
+    mockedInvoke.mockResolvedValueOnce({
+      data: {
+        response: 'Saldo apurado com sucesso.',
+        suggestions: ['Ver empenhos'],
+        model: 'gemini-2.5-flash-lite',
+        sources: [{ label: 'empenhos_siafi', totalAmostra: 10 }],
+      },
+      error: null,
+    });
+
+    const result = await assistenteGerencialService.perguntar({
+      pergunta: 'qual o saldo do empenho 2026ne000080',
+      historico: [{ role: 'user', content: 'pergunta anterior' }],
+    });
+
+    expect(mockedInvoke).toHaveBeenCalledWith(
+      'assistente-gerencial',
+      expect.objectContaining({
+        body: {
+          message: 'qual o saldo do empenho 2026ne000080',
+          history: [{ role: 'user', content: 'pergunta anterior' }],
+        },
+      }),
+    );
+
+    expect(result.resposta).toBe('Saldo apurado com sucesso.');
+    expect(result.response).toBe('Saldo apurado com sucesso.');
+    expect(result.sugestoes).toEqual(['Ver empenhos']);
+    expect(result.fontes).toEqual([
+      expect.objectContaining({ label: 'empenhos_siafi', totalAmostra: 10 }),
+    ]);
   });
 });
