@@ -49,6 +49,11 @@ import {
   shouldIgnoreContratoNumero,
 } from '@/utils/contratosSync';
 
+export const EXCLUDED_DESCENTRALIZACAO_ORIGENS = new Set(['230446']);
+
+export const isExcludedDescentralizacaoOrigem = (origem?: string | null) =>
+  Boolean(origem && EXCLUDED_DESCENTRALIZACAO_ORIGENS.has(origem.trim()));
+
 
 
 type MonthlyExecutionBucket = {
@@ -1106,6 +1111,7 @@ export default function Dashboard() {
     });
 
     const filteredDescentralizacoes = descentralizacoes.filter((descentralizacao) => {
+      if (isExcludedDescentralizacaoOrigem(descentralizacao.origemRecurso)) return false;
       const matchDimensao = matchesDimensionFilter({
         dimensionValue: descentralizacao.dimensao,
         planInternal: descentralizacao.planoInterno,
@@ -1125,13 +1131,22 @@ export default function Dashboard() {
     };
   }, [atividades, empenhos, descentralizacoes, effectiveFilterDimensao, filterOrigem, dateStart, dateEnd]);
 
+  const dashboardDescentralizacoes = useMemo(
+    () => descentralizacoes.filter((d) => !isExcludedDescentralizacaoOrigem(d.origemRecurso)),
+    [descentralizacoes],
+  );
+  const dashboardContaDescentralizacoes = useMemo(
+    () => contaDescentralizacoes.filter((c) => !isExcludedDescentralizacaoOrigem(c.ptres)),
+    [contaDescentralizacoes],
+  );
+
   const resumoDescentralizacoes = useMemo(
     () =>
       buildDescentralizacaoSummaryRows({
-        descentralizacoes,
-        contaSaldos: contaDescentralizacoes,
+        descentralizacoes: dashboardDescentralizacoes,
+        contaSaldos: dashboardContaDescentralizacoes,
       }),
-    [descentralizacoes, contaDescentralizacoes],
+    [dashboardDescentralizacoes, dashboardContaDescentralizacoes],
   );
 
   const totalDescentralizado = getFilteredDescentralizacaoSummaryTotal({

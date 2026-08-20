@@ -1426,8 +1426,8 @@ describe('Dashboard', () => {
 
     // Total Planejado: 500 + 1000 = 1500
     expect(screen.getByTestId('current-planejado')).toHaveTextContent('1500');
-    // Total Descentralizado: 400 + 70 = 470
-    expect(screen.getByTestId('current-descentralizado')).toHaveTextContent('470');
+    // Total Descentralizado: apenas 400 (exclui 230446)
+    expect(screen.getByTestId('current-descentralizado')).toHaveTextContent('400');
     // Total Liquidado: 150 + 70 = 220
     expect(screen.getByTestId('current-liquidado')).toHaveTextContent('220');
     // Total Pago: 100 + 70 = 170
