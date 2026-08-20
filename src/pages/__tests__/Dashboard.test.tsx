@@ -1326,7 +1326,7 @@ describe('Dashboard', () => {
     expect(screen.getByTestId('rap-origem-saldo')).toHaveTextContent('80');
   });
 
-  it('ignora a origem de recurso externa 230446 nos cálculos e filtros do dashboard', () => {
+  it('inclui a origem de recurso 230446 nos cálculos, filtros e tabelas do dashboard', () => {
     mockedUseData.mockReturnValue({
       atividades: [
         makeAtividade({
@@ -1424,17 +1424,17 @@ describe('Dashboard', () => {
 
     render(<Dashboard />);
 
-    // Total Planejado: apenas os 500 da origem interna (1000 ignorado)
-    expect(screen.getByTestId('current-planejado')).toHaveTextContent('500');
-    // Total Descentralizado: apenas os 400 da origem interna (70 ignorado)
-    expect(screen.getByTestId('current-descentralizado')).toHaveTextContent('400');
-    // Total Liquidado: apenas os 150 da origem interna (70 ignorado)
-    expect(screen.getByTestId('current-liquidado')).toHaveTextContent('150');
-    // Total Pago: apenas os 100 da origem interna (70 ignorado)
-    expect(screen.getByTestId('current-pago')).toHaveTextContent('100');
-    // Quantidade de empenhos do exercício: 1 (exclui 230446)
-    expect(screen.getByTestId('current-empenhos-corrente')).toHaveTextContent('1');
-    // Quantidade de empenhos RAP: 0 (exclui 230446)
-    expect(screen.getByTestId('current-empenhos-rap')).toHaveTextContent('0');
+    // Total Planejado: 500 + 1000 = 1500
+    expect(screen.getByTestId('current-planejado')).toHaveTextContent('1500');
+    // Total Descentralizado: 400 + 70 = 470
+    expect(screen.getByTestId('current-descentralizado')).toHaveTextContent('470');
+    // Total Liquidado: 150 + 70 = 220
+    expect(screen.getByTestId('current-liquidado')).toHaveTextContent('220');
+    // Total Pago: 100 + 70 = 170
+    expect(screen.getByTestId('current-pago')).toHaveTextContent('170');
+    // Quantidade de empenhos do exercício: 2 (inclui 230446)
+    expect(screen.getByTestId('current-empenhos-corrente')).toHaveTextContent('2');
+    // Quantidade de empenhos RAP: 1 (inclui 230446)
+    expect(screen.getByTestId('current-empenhos-rap')).toHaveTextContent('1');
   });
 });
