@@ -1125,6 +1125,25 @@ Observações operacionais:
 - O inventário preserva dados e PDFs em `processos`, mas a visibilidade na UI depende de pelo menos um vínculo ativo em `suap_processo_caixas`.
 - Processos ausentes de uma caixa lida com sucesso perdem apenas esse vínculo; se retornarem a qualquer caixa cadastrada, reaparecem com o mesmo histórico.
 
+### `process_mappings`
+
+Finalidade:
+
+- Publicar o mapeamento BPMN e o guia operacional usado para explicar o caminho esperado de cada tipo de processo.
+
+Campos-chave:
+
+- `id`, `org_id`, `code`, `slug`, `title`, `category` e `version`;
+- `status` (`draft`, `published` ou `archived`);
+- `definition` (JSONB com raias, nos, conexoes, responsaveis, prazos, checklists e links);
+- `created_by`, `created_at`, `updated_at` e `published_at`.
+
+Observacoes operacionais:
+
+- O isolamento e feito por `org_id` com `current_user_org_id()`.
+- Usuarios autenticados leem mapas do proprio orgao; insercao, edicao e exclusao exigem papel `admin` do orgao ou superadmin.
+- A extensao recebe somente um resumo derivado do mapa publicado. A pagina `/mapeamentos/:mappingId` renderiza a definicao completa em modo somente leitura.
+
 ### `suap_processo_caixas`
 
 Finalidade:

@@ -37,6 +37,8 @@ A migration `20260716103000` adiciona `public.default_org_id()` como default de 
 `energia_solar_geracao`, `energia_contratos`, `energia_contrato_execucoes`,
 `price_researches`, `suppliers`, `supplier_certificates`
 
+`process_mappings` tambem e isolada por `org_id`; somente mapas publicados sao consumidos pela extensao, enquanto a escrita e a publicacao ficam restritas ao administrador do orgao ou superadmin.
+
 ### Tabelas globais/compartilhadas (sem org_id)
 
 `contratos_api*`, `licitacoes_pncp*`, `atas_registro_precos*`, `price_research_ead_videos`, `normativos*`,
@@ -117,6 +119,7 @@ A migration `20260716103000` adiciona `public.default_org_id()` como default de 
 
 ### Processos SUAP
 
+- `process_mappings` armazena definicoes BPMN versionadas em `definition` (JSONB), com status `draft`, `published` ou `archived`; o visualizador completo e a extensao consomem apenas a versao publicada.
 - `processos` preserva os dados extraídos e o histórico de cada processo.
 - `suap_caixas` contém as caixas cadastradas pelo usuário.
 - `suap_processo_caixas` mantém os vínculos ativos processo–caixa; a UI do SUAP exibe apenas processos com pelo menos um vínculo. Inventários de caixas lidas com sucesso removem somente os vínculos ausentes, sem apagar processos ou PDFs.

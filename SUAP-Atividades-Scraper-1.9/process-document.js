@@ -12,6 +12,7 @@
   const COLLAPSED_KEY = 'siages-toolkit-collapsed';
   const SNIPPETS_KEY = 'siages-snippets';
   const PROCESS_STATE_KEY_PREFIX = 'siages-process-state:';
+  const PROCESS_MAPPING_KEY_PREFIX = 'siages-process-mapping:';
   const DOCUMENT_REVIEW_MAX_BYTES = 20 * 1024 * 1024;
   const DOCUMENT_VIEWER_PATH = /^\/documento_eletronico\/visualizar_documento(?:_digitalizado)?\/(\d+)\/?$/;
   const DEFAULT_SNIPPETS = {
@@ -23,7 +24,7 @@
   const state = {
     activeTab: 'summary', theme: 'dark', collapsed: false, maximized: false, snapshot: null,
     syncStatus: { stage: 'checking', message: 'Preparando a consulta do processo...' },
-    financeSummary: null, hasFinanceSummary: false, snippets: { ...DEFAULT_SNIPPETS }, editingKey: null,
+    financeSummary: null, hasFinanceSummary: false, flow: null, selectedMappingId: '', mappings: [], snippets: { ...DEFAULT_SNIPPETS }, editingKey: null,
   };
   let documentAnalysisObserver = null;
   let documentAnalysisCleanup = null;
@@ -107,6 +108,23 @@
     }
     return location.origin + location.pathname;
   }
+  function getProcessMappingKey(suapId = getProcessId()) {
+    return suapId ? `${PROCESS_MAPPING_KEY_PREFIX}${suapId}` : '';
+  }
+  function parseProcessRoute() {
+    const containers = Array.from(document.querySelectorAll('#timeline > *, aside.right > *, aside > *, [id*="timeline"] > *, [class*="timeline"] > *'));
+    const candidates = containers.length ? containers : Array.from(document.querySelectorAll('main div, main li, main article'));
+    const events = []; const seen = new Set();
+    candidates.forEach((element) => {
+      const rawText = cleanText(element.textContent);
+      if (!rawText || rawText.length > 320 || !/(recebido|encaminhado|enviado|distribu[ií]do|atribu[ií]do|movido|remetido)/i.test(rawText)) return;
+      const key = rawText.toLowerCase(); if (seen.has(key)) return; seen.add(key);
+      const match = rawText.match(/(?:recebido|encaminhado|enviado|distribu[ií]do|atribu[ií]do|movido|remetido)\s+(?:por|para|a|à)\s+(.+)/i);
+      const unit = cleanText(match?.[1] || '').replace(/\s*[|·-]\s*\d{1,2}\/\d{1,2}\/\d{2,4}.*$/i, '').replace(/\s+às?\s+.*$/i, '').trim();
+      events.push({ id: `route-${events.length + 1}`, label: rawText, unit: unit || undefined, rawText, order: events.length });
+    });
+    return events.slice(0, 100);
+  }
   function getProcessStateKey(suapId = getProcessId()) {
     return suapId ? `${PROCESS_STATE_KEY_PREFIX}${suapId}` : '';
   }
@@ -134,6 +152,7 @@
       syncStatus: state.syncStatus,
       activeTab: state.activeTab,
       ...(state.hasFinanceSummary ? { financeSummary: state.financeSummary } : {}),
+      ...(state.flow ? { flow: state.flow } : {}),
     };
     try {
       globalThis.sessionStorage?.setItem(key, JSON.stringify(persisted));
@@ -156,6 +175,7 @@
       state.hasFinanceSummary = true;
       window.__siagesLatestFinanceSummary = persisted.financeSummary;
     }
+    if (persisted.flow) { state.flow = persisted.flow; state.mappings = persisted.flow.mappings || []; }
     return Boolean(state.snapshot || state.hasFinanceSummary);
   }
   function storageGet(area, key, fallback) {
@@ -192,6 +212,7 @@
       source: 'siages-suap-extension', type: 'siages:suap-process-context', version: 1,
       payload: {
         suapId, processNumber: getProcessNumber(), processUrl: getProcessUrl(),
+        route: { events: parseProcessRoute(), ...(state.selectedMappingId ? { selectedMappingId: state.selectedMappingId } : {}) },
         ...(session ? { extensionSession: { accessToken: session.accessToken, refreshToken: session.refreshToken } } : {}),
       },
     };
@@ -390,6 +411,7 @@
       appendCopyRow(section, 'SUAP ID', process?.suapId || fallback.suapId, true);
       appendCopyRow(section, 'Caixa', process?.caixa);
     });
+    renderProcessFlow(container);
     if (!process) return;
     const full = process.dadosCompletos || {}; const bank = full.dados_bancarios || {}; const taxes = full.retencoes_tributarias || {};
     const invoices = Array.isArray(full.notas_fiscais)
@@ -440,6 +462,36 @@
       appendCopyRow(section, 'Concluído por', workflow.concluidoPor);
       appendCopyRow(section, 'Análise', workflow.analiseLiquidacao?.resumo);
     });
+  }
+
+  function renderProcessFlow(container) {
+    if (!state.flow?.summary) return;
+    const summary = state.flow.summary;
+    const section = createElement('section', 'suape-flow-card');
+    const header = createElement('div', 'suape-flow-header');
+    const heading = createElement('div', 'suape-flow-heading');
+    heading.append(createElement('span', 'suape-flow-eyebrow', 'Caminho do processo'), createElement('strong', 'suape-flow-title', summary.mappingTitle));
+    heading.appendChild(createElement('span', 'suape-flow-version', `v${summary.mappingVersion}`));
+    header.appendChild(heading);
+    const open = createElement('a', 'suape-flow-open', 'Mapa completo ↗'); open.href = `${SIAGES_ORIGIN}${summary.fullPagePath}`; open.target = '_blank'; open.rel = 'noreferrer'; header.appendChild(open); section.appendChild(header);
+    if (state.mappings.length > 1) {
+      const chooser = createElement('label', 'suape-flow-chooser'); chooser.appendChild(createElement('span', '', 'Mapeamento aplicado'));
+      const select = document.createElement('select'); select.className = 'suape-flow-select';
+      state.mappings.forEach((mapping) => { const option = document.createElement('option'); option.value = mapping.id; option.textContent = `${mapping.title} · v${mapping.version}`; option.selected = mapping.id === state.selectedMappingId || mapping.id === summary.mappingId; select.appendChild(option); });
+      select.addEventListener('change', async () => { state.selectedMappingId = select.value; const key = getProcessMappingKey(); await storageSet('local', { [key]: state.selectedMappingId }); state.flow = null; renderSummary(); restartBridge(); }); chooser.appendChild(select); section.appendChild(chooser);
+    }
+    const list = createElement('div', 'suape-flow-list');
+    summary.steps.forEach((step) => {
+      const item = createElement('div', `suape-flow-step suape-flow-step-${step.status}`);
+      const dot = createElement('span', 'suape-flow-dot');
+      const body = createElement('div', 'suape-flow-step-body');
+      const title = createElement('div', 'suape-flow-step-title'); title.append(createElement('span', 'suape-flow-code', step.code), createElement('strong', '', step.title));
+      const meta = createElement('div', 'suape-flow-step-meta', [step.responsible, step.status === 'completed' ? 'Concluída' : step.status === 'current' ? 'Etapa atual' : step.status === 'next' ? 'Próxima etapa' : 'Pendente'].join(' · '));
+      body.append(title, meta); if (step.evidence) body.appendChild(createElement('div', 'suape-flow-evidence', `SUAP: ${step.evidence}`)); item.append(dot, body); list.appendChild(item);
+    });
+    section.appendChild(list);
+    if (summary.note) section.appendChild(createElement('div', 'suape-flow-note', summary.note));
+    container.appendChild(section);
   }
 
   function getThemeColors() {
@@ -809,6 +861,7 @@
         if (isSiagesFrameMessage(event, frame, 'siages:suap-process-info-ready')) { postContext(); return; }
         if (isSiagesFrameMessage(event, frame, 'siages:suap-process-snapshot')) { state.snapshot = event.data.payload; persistProcessState(); renderSummary(); return; }
         if (isSiagesFrameMessage(event, frame, 'siages:suap-process-sync-status')) { state.syncStatus = event.data.payload; persistProcessState(); renderSummary(); return; }
+        if (isSiagesFrameMessage(event, frame, 'siages:suap-process-flow')) { state.flow = event.data.payload; state.mappings = event.data.payload?.mappings || []; persistProcessState(); renderSummary(); return; }
         if (isSiagesFrameMessage(event, frame, 'siages:suap-process-finance-summary')) { renderFinanceSummary(event.data.payload); return; }
         if (isSiagesFrameMessage(event, frame, 'siages:suap-process-pdf-request')) {
           const suapId = event.data.payload?.suapId; if (suapId !== getProcessId()) return;
@@ -860,9 +913,9 @@
 
   async function installToolkit() {
     if (!getProcessId() || document.getElementById(ROOT_ID)) return;
-    const [theme, collapsed, storedSnippets] = await Promise.all([storageGet('local', THEME_KEY, 'dark'), storageGet('local', COLLAPSED_KEY, false), storageGet('sync', SNIPPETS_KEY, null)]);
+    const [theme, collapsed, storedSnippets, selectedMappingId] = await Promise.all([storageGet('local', THEME_KEY, 'dark'), storageGet('local', COLLAPSED_KEY, false), storageGet('sync', SNIPPETS_KEY, null), storageGet('local', getProcessMappingKey(), '')]);
     const hasPersistedProcessState = await restorePersistedProcessState();
-    state.theme = theme === 'light' ? 'light' : 'dark'; state.collapsed = Boolean(collapsed); state.snippets = storedSnippets && Object.keys(storedSnippets).length ? storedSnippets : { ...DEFAULT_SNIPPETS };
+    state.theme = theme === 'light' ? 'light' : 'dark'; state.collapsed = Boolean(collapsed); state.selectedMappingId = typeof selectedMappingId === 'string' ? selectedMappingId : ''; state.snippets = storedSnippets && Object.keys(storedSnippets).length ? storedSnippets : { ...DEFAULT_SNIPPETS };
     if (!storedSnippets) await storageSet('sync', { [SNIPPETS_KEY]: state.snippets });
     const root = buildShell(); isolateTabTitles(root); const host = findToolkitHost(); host.prepend(root); fitToolkitToHost(host, root);
     renderSummary(hasPersistedProcessState ? state.snapshot : { process: null, fallback: { suapId: getProcessId(), processNumber: getProcessNumber(), processUrl: getProcessUrl() } });
@@ -872,6 +925,6 @@
   }
   window.addEventListener('pagehide', persistProcessState);
   globalThis.chrome?.storage?.onChanged?.addListener((changes, area) => { if (area === 'sync' && changes[SNIPPETS_KEY]) { state.snippets = changes[SNIPPETS_KEY].newValue || { ...DEFAULT_SNIPPETS }; renderShortcuts(); } });
-  window.__siagesSuapProcessDocument = { getProcessId, getProcessNumber, buildContext, installToolkit, installButton: installToolkit, installFinancePanel: openProcessBridge, openFinanceBridge: openProcessBridge, renderFinanceSummary, openModal, closeModal, openDocumentAnalysisModal, closeDocumentAnalysisModal, scanDocumentCards, installDocumentAnalysis, disposeDocumentAnalysis, classifyDocumentForAnalysis, downloadProcessPdfFromSuap, normalizeSnippetKey, selectTab, retrySync, toggleTheme, toggleMaximized, toggleCollapsed };
+  window.__siagesSuapProcessDocument = { getProcessId, getProcessNumber, buildContext, parseProcessRoute, installToolkit, installButton: installToolkit, installFinancePanel: openProcessBridge, openFinanceBridge: openProcessBridge, renderFinanceSummary, openModal, closeModal, openDocumentAnalysisModal, closeDocumentAnalysisModal, scanDocumentCards, installDocumentAnalysis, disposeDocumentAnalysis, classifyDocumentForAnalysis, downloadProcessPdfFromSuap, normalizeSnippetKey, selectTab, retrySync, toggleTheme, toggleMaximized, toggleCollapsed };
   if (!window.__SIAGES_SUAP_PROCESS_TEST__) void installToolkit();
 })();

@@ -8,6 +8,7 @@ type ExtensionApi = {
   getProcessId: () => string | null;
   getProcessNumber: () => string;
   buildContext: (session?: unknown) => { payload: { suapId: string; processNumber: string } } | null;
+  parseProcessRoute: () => Array<{ unit?: string; label: string }>;
   installToolkit: () => Promise<void>;
   renderFinanceSummary: (summary: unknown) => void;
   openModal: () => void;
@@ -136,6 +137,10 @@ describe('process-document 1.9', () => {
     expect(api.getProcessId()).toBe('321');
     expect(api.getProcessNumber()).toBe('23035.000001.2026-11');
     expect(api.buildContext()).toMatchObject({ payload: { suapId: '321', processNumber: '23035.000001.2026-11' } });
+    expect(api.parseProcessRoute()).toEqual([
+      expect.objectContaining({ unit: 'COFINC/CN' }),
+      expect.objectContaining({ unit: 'DIAD/CN' }),
+    ]);
 
     delete (window as typeof window & Record<string, unknown>).__siagesSuapProcessDocument;
     window.history.replaceState(null, '', '/processo_eletronico/visualizar_processo/654/');
@@ -256,6 +261,37 @@ describe('process-document 1.9', () => {
     expect(summary).not.toHaveTextContent('25,00');
     expect(summary).toHaveTextContent('2026NE000002');
     expect(summary?.querySelectorAll('.suape-copy').length).toBeGreaterThan(8);
+  });
+
+  it('renderiza o caminho BPMN compacto e o link para o mapa completo', async () => {
+    const api = loadProcessScript();
+    await api.installToolkit();
+    await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeTruthy());
+    const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
+    window.dispatchEvent(new MessageEvent('message', {
+      origin: 'https://www.siages.com.br', source: frame.contentWindow,
+      data: {
+        source: 'siages', type: 'siages:suap-process-flow', version: 1,
+        payload: {
+          suapId: '321', mappings: [{ id: 'map-1', title: 'Liquidação e pagamento', code: 'PROC-FIN-001', version: '1.0' }],
+          summary: {
+            mappingId: 'map-1', mappingTitle: 'Liquidação e pagamento', mappingVersion: '1.0', fullPagePath: '/mapeamentos/map-1?suapId=321',
+            confidence: 'medium', currentNodeId: 'step-2', nextNodeId: 'step-3', observedEvents: [], note: 'Acompanhamento assistido',
+            steps: [
+              { nodeId: 'step-1', code: '1', title: 'Conferir documentos', responsible: 'DIAD/CN', status: 'completed', evidence: 'Encaminhado por DIAD/CN' },
+              { nodeId: 'step-2', code: '2', title: 'Registrar liquidação', responsible: 'COFINC/CN', status: 'current' },
+              { nodeId: 'step-3', code: '3', title: 'Autorizar pagamento', responsible: 'Ordenador', status: 'next' },
+            ],
+          },
+        },
+      },
+    }));
+
+    const flow = document.querySelector('.suape-flow-card');
+    expect(flow).toHaveTextContent('Liquidação e pagamento');
+    expect(flow).toHaveTextContent('Etapa atual');
+    expect(flow).toHaveTextContent('Registrar liquidação');
+    expect(flow?.querySelector('.suape-flow-open')).toHaveAttribute('href', 'https://www.siages.com.br/mapeamentos/map-1?suapId=321');
   });
   it('mantem o snapshot ao navegar do processo para um documento relacionado', async () => {
     const firstApi = loadProcessScript();

@@ -7,6 +7,7 @@ import {
   isValidSuapExtensionProcessRetry,
   SUAP_EXTENSION_ORIGIN,
   SUAP_EXTENSION_PROCESS_FINANCE_SUMMARY_TYPE,
+  SUAP_EXTENSION_PROCESS_FLOW_TYPE,
   SUAP_EXTENSION_PROCESS_INFO_READY_MESSAGE,
   SUAP_EXTENSION_PROCESS_PDF_REQUEST_TYPE,
   SUAP_EXTENSION_PROCESS_SNAPSHOT_TYPE,
@@ -17,6 +18,8 @@ import {
 import { suapProcessFinanceService, type SuapProcessFinanceSummary } from '@/services/suapProcessFinance';
 import { suapProcessosService } from '@/services/suapProcessos';
 import { suapScraperService } from '@/services/suapScraperService';
+import { processMappingsService } from '@/services/processMappings';
+import { buildSuapProcessFlowSummary } from '@/lib/suapProcessFlow';
 import { supabase } from '@/lib/supabase';
 import type { SuapProcesso } from '@/types';
 
@@ -54,6 +57,28 @@ function postSnapshot(context: SuapExtensionProcessContext, process: SuapProcess
 
 function postSyncStatus(payload: SuapExtensionProcessSyncStatus) {
   postMessageToSuapParent({ source: 'siages', type: SUAP_EXTENSION_PROCESS_SYNC_STATUS_TYPE, version: 1, payload });
+}
+
+async function postProcessFlow(context: SuapExtensionProcessContext, process: SuapProcesso | null) {
+  const mappings = await processMappingsService.listPublished();
+  const mapping = mappings.find((item) => item.id === context.route?.selectedMappingId) || mappings[0];
+  if (!mapping) return;
+
+  const summary = buildSuapProcessFlowSummary(mapping, context.route, {
+    suapId: context.suapId,
+    processCompleted: Boolean(process?.dadosCompletos?.workflow?.concluido),
+  });
+
+  postMessageToSuapParent({
+    source: 'siages',
+    type: SUAP_EXTENSION_PROCESS_FLOW_TYPE,
+    version: 1,
+    payload: {
+      suapId: context.suapId,
+      summary,
+      mappings: mappings.map(({ id, title, code, version }) => ({ id, title, code, version })),
+    },
+  });
 }
 
 function waitForPdf(context: SuapExtensionProcessContext, isActive: () => boolean) {
@@ -176,6 +201,7 @@ export default function SuapExtensionProcessInfo() {
       }
       if (!process) throw new Error('Nao foi possivel registrar o processo no SIAGES.');
 
+      await postProcessFlow(context, process);
       await publishFinance();
       if (READY_STATUSES.has(process.status)) {
         postSyncStatus({ stage: 'ready', message: 'Dados do processo atualizados.' });

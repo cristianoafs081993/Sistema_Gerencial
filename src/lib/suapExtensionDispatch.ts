@@ -1,6 +1,7 @@
 import type { SuapPlanSummary } from '@/services/suapPlanSummary';
 import type { SuapDocumentReviewType } from '@/lib/suapDocumentReview';
 import type { SuapProcesso } from '@/types';
+import type { ProcessMappingRecord, SuapProcessFlowSummary, SuapProcessRouteSnapshot } from '@/types/processMapping';
 
 export const SUAP_EXTENSION_ORIGIN = 'https://suap.ifrn.edu.br';
 
@@ -13,6 +14,7 @@ export type SuapExtensionProcessContext = {
     accessToken: string;
     refreshToken: string;
   };
+  route?: SuapProcessRouteSnapshot;
 };
 
 export type SuapExtensionProcessContextMessage = {
@@ -46,6 +48,13 @@ export const SUAP_EXTENSION_PROCESS_SYNC_STATUS_TYPE = 'siages:suap-process-sync
 export const SUAP_EXTENSION_PROCESS_PDF_REQUEST_TYPE = 'siages:suap-process-pdf-request' as const;
 export const SUAP_EXTENSION_PROCESS_PDF_RESULT_TYPE = 'siages:suap-process-pdf-result' as const;
 export const SUAP_EXTENSION_PROCESS_RETRY_TYPE = 'siages:suap-process-retry' as const;
+export const SUAP_EXTENSION_PROCESS_FLOW_TYPE = 'siages:suap-process-flow' as const;
+
+export type SuapExtensionProcessFlowPayload = {
+  suapId: string;
+  summary: SuapProcessFlowSummary;
+  mappings: Array<Pick<ProcessMappingRecord, 'id' | 'title' | 'code' | 'version'>>;
+};
 
 export type SuapExtensionDocumentAnalysisContext = {
   suapId: string;
@@ -114,6 +123,13 @@ export type SuapExtensionProcessSnapshot = {
     processNumber?: string;
     processUrl: string;
   };
+};
+
+export type SuapExtensionProcessFlowMessage = {
+  source: 'siages';
+  type: typeof SUAP_EXTENSION_PROCESS_FLOW_TYPE;
+  version: 1;
+  payload: SuapExtensionProcessFlowPayload;
 };
 
 export type SuapExtensionProcessSyncStatus = {
@@ -300,6 +316,13 @@ export function isValidSuapExtensionProcessContext(value: unknown): value is Sua
     !/^\d+$/.test(payload.suapId) ||
     typeof payload.processUrl !== 'string' ||
     (payload.processNumber !== undefined && typeof payload.processNumber !== 'string') ||
+    (payload.route !== undefined && (
+      typeof payload.route !== 'object' ||
+      !Array.isArray(payload.route.events) ||
+      payload.route.events.length > 200 ||
+      payload.route.events.some((event) => !event || typeof event !== 'object' || typeof event.id !== 'string' || typeof event.label !== 'string' || typeof event.rawText !== 'string' || typeof event.order !== 'number') ||
+      (payload.route.selectedMappingId !== undefined && typeof payload.route.selectedMappingId !== 'string')
+    )) ||
     (payload.extensionSession !== undefined && (
       typeof payload.extensionSession !== 'object' ||
       typeof payload.extensionSession.accessToken !== 'string' ||
@@ -327,7 +350,7 @@ export function getSuapExtensionProcessContext(event: MessageEvent, expectedSour
     return null;
   }
 
-  const { suapId, processUrl, processNumber, extensionSession } = event.data.payload;
+  const { suapId, processUrl, processNumber, extensionSession, route } = event.data.payload;
   return {
     suapId,
     processUrl,
@@ -338,6 +361,7 @@ export function getSuapExtensionProcessContext(event: MessageEvent, expectedSour
         refreshToken: extensionSession.refreshToken,
       },
     } : {}),
+    ...(route ? { route } : {}),
   };
 }
 

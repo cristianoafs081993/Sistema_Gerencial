@@ -40,6 +40,7 @@ const Suap = lazy(() => import('./pages/Suap'));
 const SuapCallback = lazy(() => import('./pages/SuapCallback'));
 const SuapExtensionDispatch = lazy(() => import('./pages/SuapExtensionDispatch'));
 const SuapExtensionProcessInfo = lazy(() => import('./pages/SuapExtensionProcessInfo'));
+const SuapProcessMapping = lazy(() => import('./pages/SuapProcessMapping'));
 const SuapExtensionDocumentAnalysis = lazy(() => import('./pages/SuapExtensionDocumentAnalysis'));
 const SuapExtensionPlanSummary = lazy(() => import('./pages/SuapExtensionPlanSummary'));
 const ComprasnetEtpExtension = lazy(() => import('./pages/ComprasnetEtpExtension'));
@@ -114,6 +115,7 @@ const App = () => (
                 </Route>
                 <Route path="/suap-extensao/plano-resumo" element={<SuapExtensionPlanSummary />} />
                 <Route element={<AppShell />}>
+                  <Route path="/mapeamentos/:mappingId" element={<SuapProcessMapping />} />
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/atividades/*" element={<Navigate replace to="/planejamento/campus" />} />
                   <Route path="/planejamento" element={<Navigate replace to="/planejamento/campus" />} />
