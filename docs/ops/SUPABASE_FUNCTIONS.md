@@ -19,7 +19,7 @@ Uso:
 - recebe anexos CSV vindos do Gmail via Apps Script
 - detecta o pipeline por hint, nome do arquivo ou cabecalho
 - grava o resultado em `email_csv_ingestion_runs` e na tabela final do dominio
-- tambem aceita a conta agregada de descentralizacoes como pipeline separado, gravando em `descentralizacoes_conta_saldos`
+- suporta todos os pipelines CSV operacionais: `financeiro`, `lc`, `retencoes_efd_reinf`, `descentralizacoes`, `descentralizacoes_conta_saldos`, `documentos_habeis`, `liquidacoes`, `ordens_bancarias`, `situacoes_documentos`, `creditos_disponiveis`, `siafi_empenhos` (exercício e saldo RAP), `pf_solicitacoes` e `pf_aprovacoes` (com reconciliação automática de vínculos)
 - em credito disponivel e conta de descentralizacoes, ignora linhas sem valor preenchido ou parseavel para evitar sobrescrita indevida com zero
 
 Dependencias:

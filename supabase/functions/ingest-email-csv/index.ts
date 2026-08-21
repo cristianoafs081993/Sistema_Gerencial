@@ -12,9 +12,30 @@ import {
   type LCRegistro,
   type OrdemBancariaImportItem,
   type ParsedEmailCsvImport,
+  type PfAprovacaoLiberacaoImportRow,
+  type PfSolicitacaoImportRow,
   type RetencaoEfdReinfRegistro,
   type SiafiEmpenhoData,
 } from '../../../src/lib/emailCsvIngestion.ts';
+
+function extractErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  if (error && typeof error === 'object') {
+    if ('message' in error && typeof (error as { message: unknown }).message === 'string') {
+      const msg = (error as { message: string }).message;
+      const details = 'details' in error ? String((error as { details: unknown }).details || '') : '';
+      const hint = 'hint' in error ? String((error as { hint: unknown }).hint || '') : '';
+      return [msg, details, hint].filter(Boolean).join(' | ');
+    }
+    try {
+      return JSON.stringify(error);
+    } catch {
+      // ignore
+    }
+  }
+  return 'Falha inesperada na ingestao.';
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -472,17 +493,35 @@ async function fetchEmpenhoFonteMap(
 ) {
   if (!empenhoNumbers.length) return new Map<string, string>();
 
+  const allVariants = new Set<string>();
+  empenhoNumbers.forEach((num) => {
+    const raw = String(num || '').trim();
+    if (!raw) return;
+    allVariants.add(raw);
+    const resumido = raw.match(/(\d{4}NE\d+)/)?.[1];
+    if (resumido) allVariants.add(resumido);
+  });
+
   const rows = await selectRowsByColumnValues(
     supabase,
     'empenhos',
     'numero, origem_recurso',
     'numero',
-    empenhoNumbers,
+    Array.from(allVariants),
   );
 
-  return new Map(
-    rows.map((row) => [String(row.numero || ''), String(row.origem_recurso || '')]),
-  );
+  const map = new Map<string, string>();
+  rows.forEach((row) => {
+    const num = String(row.numero || '').trim();
+    const origem = String(row.origem_recurso || '').trim();
+    if (num && origem) {
+      map.set(num, origem);
+      const resumido = num.match(/(\d{4}NE\d+)/)?.[1];
+      if (resumido) map.set(resumido, origem);
+    }
+  });
+
+  return map;
 }
 
 async function applyLiquidacoesImport(
@@ -494,10 +533,12 @@ async function applyLiquidacoesImport(
     .map((update) => {
       const payload: Record<string, unknown> = {};
       if (update.empenhoNumero) {
-        payload.empenho_numero = update.empenhoNumero;
+        payload.empenho_numero = update.empenhoNumero.match(/(\d{4}NE\d+)/)?.[1] || update.empenhoNumero;
       }
 
-      const fonte = update.fonteSof || (update.empenhoNumero ? empenhoFonteMap.get(update.empenhoNumero) : '');
+      const fonte =
+        update.fonteSof ||
+        (update.empenhoNumero ? empenhoFonteMap.get(update.empenhoNumero) : '');
       if (fonte) {
         payload.fonte_sof = fonte;
       }
@@ -544,13 +585,22 @@ async function applyOrdensBancariasImport(
 
   const empenhoFonteMap = await fetchEmpenhoFonteMap(supabase, parsed.empenhoNumbers);
   const parentUpdates = parsed.parentUpdates
-    .map((update) => ({
-      id: update.documentoHabilId,
-      payload: {
-        empenho_numero: update.empenhoNumero,
-        fonte_sof: update.empenhoNumero ? empenhoFonteMap.get(update.empenhoNumero) || null : null,
-      },
-    }))
+    .map((update) => {
+      const empenhoResumido = update.empenhoNumero
+        ? update.empenhoNumero.match(/(\d{4}NE\d+)/)?.[1] || update.empenhoNumero
+        : undefined;
+      const fonteSof = update.empenhoNumero
+        ? empenhoFonteMap.get(update.empenhoNumero) || (empenhoResumido ? empenhoFonteMap.get(empenhoResumido) : null) || null
+        : null;
+
+      return {
+        id: update.documentoHabilId,
+        payload: {
+          empenho_numero: empenhoResumido || update.empenhoNumero,
+          fonte_sof: fonteSof,
+        },
+      };
+    })
     .filter((update) => Boolean(update.payload.empenho_numero || update.payload.fonte_sof));
 
   for (const chunk of chunkArray(parentUpdates, 50)) {
@@ -569,6 +619,172 @@ async function applyOrdensBancariasImport(
     tableStats: [
       { table: 'documentos_habeis_itens', rows: items.length },
       { table: 'documentos_habeis', rows: parentUpdates.length },
+    ],
+  };
+}
+
+async function ensurePfFontes(supabase: ReturnType<typeof createClient>, fontes: string[]) {
+  const uniqueFontes = Array.from(new Set(fontes.map((f) => String(f || '').trim()).filter(Boolean)));
+  if (!uniqueFontes.length) return;
+  const payload = uniqueFontes.map((codigo) => ({
+    codigo,
+    descricao: `Fonte ${codigo}`,
+  }));
+  await upsertInChunks(supabase, 'pf_fonte_recurso', payload, 'codigo');
+}
+
+async function reconcilePfLinks(supabase: ReturnType<typeof createClient>) {
+  const { data: solicitacoes } = await supabase
+    .from('pf_solicitacao')
+    .select('id, numero_pf, evento, acao, valor, data_emissao')
+    .order('data_emissao', { ascending: true });
+
+  const { data: aprovacoes } = await supabase
+    .from('pf_aprovacao')
+    .select('id, numero_pf, evento, valor, data_emissao, solicitacao_id')
+    .order('data_emissao', { ascending: true });
+
+  const { data: liberacoes } = await supabase
+    .from('pf_liberacao')
+    .select('id, numero_pf, evento, valor, data_emissao, aprovacao_id')
+    .order('data_emissao', { ascending: true });
+
+  if (!solicitacoes?.length || !aprovacoes?.length) return;
+
+  const usedAprIds = new Set<string>(
+    aprovacoes.filter((a) => a.solicitacao_id).map((a) => a.id),
+  );
+
+  for (const sol of solicitacoes) {
+    const tipoSol = ['591292', '591296'].includes(String(sol.evento || '')) ? 'EXE' : 'RP';
+    const solDate = sol.data_emissao || '';
+
+    const matchingApr = aprovacoes.find((apr) => {
+      if (usedAprIds.has(apr.id)) return false;
+      const tipoApr = ['591290', '591294'].includes(String(apr.evento || '')) ? 'EXE' : 'RP';
+      const aprDate = apr.data_emissao || '';
+      return (
+        Number(apr.valor) === Number(sol.valor) &&
+        tipoApr === tipoSol &&
+        aprDate >= solDate
+      );
+    });
+
+    if (matchingApr) {
+      usedAprIds.add(matchingApr.id);
+      if (matchingApr.solicitacao_id !== sol.id) {
+        await supabase
+          .from('pf_aprovacao')
+          .update({ solicitacao_id: sol.id })
+          .eq('id', matchingApr.id);
+      }
+
+      if (liberacoes?.length) {
+        const matchingLib = liberacoes.find(
+          (lib) =>
+            lib.data_emissao === matchingApr.data_emissao &&
+            Number(lib.valor) === Number(matchingApr.valor) &&
+            ['561611', '561618', '701230', '701330'].includes(String(lib.evento || '')),
+        );
+        if (matchingLib && matchingLib.aprovacao_id !== matchingApr.id) {
+          await supabase
+            .from('pf_liberacao')
+            .update({ aprovacao_id: matchingApr.id })
+            .eq('id', matchingLib.id);
+        }
+      }
+    }
+  }
+}
+
+async function applyPfSolicitacoesImport(
+  supabase: ReturnType<typeof createClient>,
+  rows: PfSolicitacaoImportRow[],
+) {
+  await ensurePfFontes(
+    supabase,
+    rows.map((row) => row.fonteRecurso),
+  );
+
+  const payload = rows.map((row) => ({
+    numero_pf: row.numeroPf,
+    ug_emitente: row.ugEmitente,
+    ug_favorecida: row.ugFavorecida || null,
+    evento: row.evento || null,
+    acao: row.acao || null,
+    fonte_recurso: row.fonteRecurso || null,
+    vinculacao: row.vinculacao || null,
+    modalidade: row.modalidade || null,
+    mes_referencia: row.mesReferencia || null,
+    data_emissao: row.dataEmissao,
+    valor: row.valor,
+    finalidade: row.finalidade || null,
+  }));
+
+  await upsertInChunks(supabase, 'pf_solicitacao', payload, 'numero_pf');
+  await reconcilePfLinks(supabase);
+
+  return {
+    pipeline: 'pf_solicitacoes' as const,
+    rowsDetected: rows.length,
+    rowsWritten: payload.length,
+    tableStats: [{ table: 'pf_solicitacao', rows: payload.length }],
+  };
+}
+
+async function applyPfAprovacoesImport(
+  supabase: ReturnType<typeof createClient>,
+  rows: PfAprovacaoLiberacaoImportRow[],
+) {
+  await ensurePfFontes(
+    supabase,
+    rows.map((row) => row.fonteRecurso),
+  );
+
+  const aprRows = rows.filter((row) => row.acao !== '7');
+  const libRows = rows.filter((row) => row.acao === '7');
+
+  const aprPayload = aprRows.map((row) => ({
+    numero_pf: row.numeroPf,
+    ug_emitente: row.ugEmitente,
+    evento: row.evento || null,
+    fonte_recurso: row.fonteRecurso || null,
+    vinculacao: row.vinculacao || null,
+    modalidade: row.modalidade || null,
+    data_emissao: row.dataEmissao,
+    valor: row.valor,
+    observacao: row.observacao || null,
+  }));
+
+  const libPayload = libRows.map((row) => ({
+    numero_pf: row.numeroPf,
+    ug_emitente: row.ugEmitente,
+    evento: row.evento || null,
+    fonte_recurso: row.fonteRecurso || null,
+    vinculacao: row.vinculacao || null,
+    modalidade: row.modalidade || null,
+    data_emissao: row.dataEmissao,
+    valor: row.valor,
+    observacao: row.observacao || null,
+  }));
+
+  if (aprPayload.length > 0) {
+    await upsertInChunks(supabase, 'pf_aprovacao', aprPayload, 'numero_pf');
+  }
+
+  if (libPayload.length > 0) {
+    await upsertInChunks(supabase, 'pf_liberacao', libPayload, 'numero_pf');
+  }
+
+  await reconcilePfLinks(supabase);
+
+  return {
+    pipeline: 'pf_aprovacoes' as const,
+    rowsDetected: rows.length,
+    rowsWritten: aprPayload.length + libPayload.length,
+    tableStats: [
+      { table: 'pf_aprovacao', rows: aprPayload.length },
+      { table: 'pf_liberacao', rows: libPayload.length },
     ],
   };
 }
@@ -804,6 +1020,10 @@ async function applyParsedImport(
       return await applyCreditosDisponiveisImport(supabase, parsed.rows);
     case 'siafi_empenhos':
       return await applySiafiEmpenhosImport(supabase, parsed.rows);
+    case 'pf_solicitacoes':
+      return await applyPfSolicitacoesImport(supabase, parsed.rows);
+    case 'pf_aprovacoes':
+      return await applyPfAprovacoesImport(supabase, parsed.rows);
   }
 }
 
@@ -965,6 +1185,8 @@ Deno.serve(async (request) => {
       return error;
     }
 
+    const errorMessage = extractErrorMessage(error);
+
     if (runId) {
       try {
         const supabaseUrl = requireEnv('SUPABASE_URL');
@@ -974,7 +1196,7 @@ Deno.serve(async (request) => {
         });
         await updateRun(supabase, runId, {
           status: 'failed' satisfies IngestionRunStatus,
-          error_message: error instanceof Error ? error.message : 'Falha inesperada na ingestao.',
+          error_message: errorMessage,
           processed_at: new Date().toISOString(),
         });
       } catch (updateError) {
@@ -985,7 +1207,7 @@ Deno.serve(async (request) => {
     console.error('ingest-email-csv', error);
     return jsonResponse(
       {
-        error: error instanceof Error ? error.message : 'Falha inesperada ao processar o CSV recebido por e-mail.',
+        error: errorMessage,
         runId,
       },
       500,

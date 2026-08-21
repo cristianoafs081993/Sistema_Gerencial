@@ -471,5 +471,124 @@ describe('emailCsvIngestion', () => {
     const bytes = new Uint8Array([0x43, 0x72, 0xe9, 0x64, 0x69, 0x74, 0x6f]);
     expect(decodeCsvBytes(bytes)).toBe('Crédito');
   });
+
+  it('detecta e parseia solicitacoes de PFs (11- PFs - solicitaçãode recurso.csv)', () => {
+    const parsed = parseEmailCsvImport({
+      fileName: '11- PFs - solicitaçãode recurso.csv',
+      text: [
+        'PF;Favorecido Doc.;PF - Evento;PF - Ação;PF - Fonte Recursos;PF - Vinculação Pagamento;PF - Situação;PF - Mês;Emissão - Dia;PF - Valor Linha;Doc - Observação',
+        '158366000012026PF000001;158366;591292;1;0100;144;NORMAL;MAR;18/03/2026;5.000,00;Solicitacao de recurso para diarias',
+        '158366000012026PF000002;158366;591296;2;0100;144;NORMAL;MAR;19/03/2026;3.000,00;Solicitacao complementar',
+      ].join('\n'),
+    });
+
+    expect(parsed.pipeline).toBe('pf_solicitacoes');
+    if (parsed.pipeline !== 'pf_solicitacoes') {
+      throw new Error('pipeline inesperado');
+    }
+
+    expect(parsed.rows).toHaveLength(2);
+    expect(parsed.rows[0]).toMatchObject({
+      numeroPf: '158366000012026PF000001',
+      ugEmitente: '158366',
+      ugFavorecida: '158366',
+      evento: '591292',
+      acao: '1',
+      fonteRecurso: '0100',
+      vinculacao: '144',
+      modalidade: 'NORMAL',
+      mesReferencia: 'MAR',
+      dataEmissao: '2026-03-18',
+      valor: 5000,
+      finalidade: 'Solicitacao de recurso para diarias',
+    });
+  });
+
+  it('detecta e parseia aprovacoes e liberacoes de PFs (10 - Aprovações PFs.csv)', () => {
+    const parsed = parseEmailCsvImport({
+      fileName: '10 - Aprovações PFs.csv',
+      text: [
+        'PF;PF - Evento;PF - Ação;PF - Fonte Recursos;PF - Vinculação Pagamento;PF - Situação;Emissão - Dia;PF - Valor Linha;Doc - Observação',
+        '158366000012026PF000003;591290;3;0100;144;NORMAL;19/03/2026;5.000,00;Aprovacao de PF',
+        '158366000012026PF000004;561611;7;0100;144;NORMAL;19/03/2026;5.000,00;Liberacao de PF',
+      ].join('\n'),
+    });
+
+    expect(parsed.pipeline).toBe('pf_aprovacoes');
+    if (parsed.pipeline !== 'pf_aprovacoes') {
+      throw new Error('pipeline inesperado');
+    }
+
+    expect(parsed.rows).toHaveLength(2);
+    expect(parsed.rows[0]).toMatchObject({
+      numeroPf: '158366000012026PF000003',
+      ugEmitente: '158366',
+      evento: '591290',
+      acao: '3',
+      fonteRecurso: '0100',
+      valor: 5000,
+      dataEmissao: '2026-03-19',
+      observacao: 'Aprovacao de PF',
+    });
+    expect(parsed.rows[1]).toMatchObject({
+      numeroPf: '158366000012026PF000004',
+      acao: '7',
+      evento: '561611',
+      valor: 5000,
+    });
+  });
+
+  it('detecta 6 - restos a pagar-NE-RO-Documento.csv mesmo com subject formatado com setas', () => {
+    const parsed = parseEmailCsvImport({
+      fileName: '6 - restos a pagar-NE-RO-Documento.csv',
+      subject: '6 - restos a pagar->NE->RO->Documento',
+      text: [
+        '"NE CCor"\t"Restos a Pagar"\t"Observacao"',
+        '"158366264352024NE000015"\t"12.450,00"\t"Saldo empenho"',
+      ].join('\n'),
+    });
+
+    expect(parsed.pipeline).toBe('siafi_empenhos');
+    if (parsed.pipeline !== 'siafi_empenhos') {
+      throw new Error('pipeline inesperado');
+    }
+
+    expect(parsed.rows[0]).toMatchObject({
+      numeroResumido: '2024NE000015',
+      isRap: true,
+      saldoRapOficial: 12450,
+      rapSaldoOnly: true,
+    });
+  });
+
+  it('parseia 12 - Ordens Bancárias.csv com nomes de colunas alternativos e datas com traco/ponto', () => {
+    const parsed = parseEmailCsvImport({
+      fileName: '12 - Ordens Bancárias.csv',
+      text: [
+        'Documento\tDocumento Origem\tNE CCor\tDoc - Tipo\tDESPESAS PAGAS\tRESTOS A PAGAR PAGOS\tDia de Lancamento',
+        '2026OB800001\t2026DH000001\t158366264352026NE000001\tOB\t1.500,00\t0,00\t21/08/2026',
+        '2026OB800002\t2026DH000002\t2026NE000002\tOB\t0,00\t750,50\t21-08-2026',
+      ].join('\n'),
+    });
+
+    expect(parsed.pipeline).toBe('ordens_bancarias');
+    if (parsed.pipeline !== 'ordens_bancarias') {
+      throw new Error('pipeline inesperado');
+    }
+
+    expect(parsed.items).toHaveLength(2);
+    expect(parsed.items[0]).toMatchObject({
+      id: '2026OB800001',
+      documento_habil_id: '2026DH000001',
+      doc_tipo: 'OB',
+      valor: 1500,
+      data_emissao: '2026-08-21',
+    });
+    expect(parsed.parentUpdates).toHaveLength(2);
+    expect(parsed.parentUpdates[0]).toMatchObject({
+      documentoHabilId: '2026DH000001',
+      empenhoNumero: '2026NE000001',
+    });
+  });
 });
 

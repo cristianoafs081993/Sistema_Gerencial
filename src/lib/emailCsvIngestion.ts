@@ -9,7 +9,9 @@ export type SupportedEmailCsvPipeline =
   | 'ordens_bancarias'
   | 'situacoes_documentos'
   | 'creditos_disponiveis'
-  | 'siafi_empenhos';
+  | 'siafi_empenhos'
+  | 'pf_solicitacoes'
+  | 'pf_aprovacoes';
 
 export type EmailCsvPipelineHint = SupportedEmailCsvPipeline | 'auto';
 
@@ -160,6 +162,34 @@ export interface SiafiEmpenhoData {
   rapSaldoOnly?: boolean;
 }
 
+export interface PfSolicitacaoImportRow {
+  numeroPf: string;
+  ugEmitente: string;
+  ugFavorecida: string;
+  evento: string;
+  acao: string;
+  fonteRecurso: string;
+  vinculacao: string;
+  modalidade: string;
+  mesReferencia: string;
+  dataEmissao: string | null;
+  valor: number;
+  finalidade: string;
+}
+
+export interface PfAprovacaoLiberacaoImportRow {
+  numeroPf: string;
+  ugEmitente: string;
+  evento: string;
+  acao: string;
+  fonteRecurso: string;
+  vinculacao: string;
+  modalidade: string;
+  dataEmissao: string | null;
+  valor: number;
+  observacao: string;
+}
+
 export type ParsedEmailCsvImport =
   | {
       pipeline: 'financeiro';
@@ -220,6 +250,16 @@ export type ParsedEmailCsvImport =
       pipeline: 'siafi_empenhos';
       rowCount: number;
       rows: SiafiEmpenhoData[];
+    }
+  | {
+      pipeline: 'pf_solicitacoes';
+      rowCount: number;
+      rows: PfSolicitacaoImportRow[];
+    }
+  | {
+      pipeline: 'pf_aprovacoes';
+      rowCount: number;
+      rows: PfAprovacaoLiberacaoImportRow[];
     };
 
 type HeaderCandidate = {
@@ -248,6 +288,8 @@ const SUPPORTED_PIPELINES = new Set<SupportedEmailCsvPipeline>([
   'situacoes_documentos',
   'creditos_disponiveis',
   'siafi_empenhos',
+  'pf_solicitacoes',
+  'pf_aprovacoes',
 ]);
 const CANDIDATE_SEPARATORS = ['\t', ';', ',', '|'];
 
@@ -512,18 +554,25 @@ function toIsoDate(value: unknown): string | null {
   const raw = String(value || '').trim();
   if (!raw) return null;
 
-  const dateOnly = raw.split(' ')[0];
+  const dateOnly = raw.split(' ')[0].trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) {
     return dateOnly;
   }
 
-  const brMatch = dateOnly.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const brMatch = dateOnly.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})$/);
   if (brMatch) {
     const [, day, month, year] = brMatch;
     return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   }
 
-  return dateOnly.length >= 10 ? dateOnly.slice(0, 10) : null;
+  const shortYearMatch = dateOnly.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{2})$/);
+  if (shortYearMatch) {
+    const [, day, month, shortYear] = shortYearMatch;
+    const fullYear = Number(shortYear) > 70 ? `19${shortYear}` : `20${shortYear}`;
+    return `${fullYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+
+  return null;
 }
 
 function formatDateForImports(value: unknown) {
@@ -705,7 +754,24 @@ function inferredPipelineByFileName(fileName: string): SupportedEmailCsvPipeline
     return 'descentralizacoes_conta_saldos';
   }
   if (normalized.includes('descentraliz')) return 'descentralizacoes';
-  if (normalized.includes('exec_ne_exercicio_rap') || normalized.includes('siafi')) return 'siafi_empenhos';
+  if (
+    normalized.includes('exec_ne_exercicio_rap') ||
+    normalized.includes('siafi') ||
+    normalized.includes('restos a pagar') ||
+    normalized.includes('restos_a_pagar') ||
+    normalized.includes('rap')
+  ) {
+    return 'siafi_empenhos';
+  }
+  if (
+    (normalized.includes('solicit') && (normalized.includes('pf') || normalized.includes('recurso'))) ||
+    normalized.includes('solicitacaode recurso')
+  ) {
+    return 'pf_solicitacoes';
+  }
+  if (normalized.includes('aprov') && (normalized.includes('pf') || normalized.includes('liber'))) {
+    return 'pf_aprovacoes';
+  }
 
   const lcToken = normalized.match(/(^|[^a-z])lc([^a-z]|$)/);
   if (lcToken) return 'lc';
@@ -774,7 +840,9 @@ function autoDetectPipeline(text: string, fileName: string, subject?: string) {
       (candidate) =>
         (candidate.normalizedKeys.includes('neccor') && candidate.normalizedKeys.includes('metrica')) ||
         candidate.normalizedKeys.includes('despesasempenhadascontroleempenho') ||
-        candidate.normalizedKeys.includes('restosapagarinscritos'),
+        candidate.normalizedKeys.includes('restosapagarinscritos') ||
+        (candidate.normalizedKeys.includes('neccor') &&
+          candidate.normalizedKeys.some((k) => k.includes('saldo') || k.includes('rap') || k.includes('ro'))),
     )
   ) {
     return 'siafi_empenhos';
@@ -834,6 +902,31 @@ function autoDetectPipeline(text: string, fileName: string, subject?: string) {
     )
   ) {
     return 'creditos_disponiveis';
+  }
+
+  if (
+    hasHeader(
+      (candidate) =>
+        candidate.normalizedKeys.includes('pf') &&
+        (candidate.normalizedKeys.includes('favorecidodoc') ||
+          candidate.normalizedJoined.includes('solicit') ||
+          candidate.normalizedJoined.includes('solicitacaode recurso')),
+    )
+  ) {
+    return 'pf_solicitacoes';
+  }
+
+  if (
+    hasHeader(
+      (candidate) =>
+        candidate.normalizedKeys.includes('pf') &&
+        (candidate.normalizedJoined.includes('aprov') ||
+          candidate.normalizedJoined.includes('liber') ||
+          candidate.normalizedKeys.includes('pfevento') ||
+          candidate.normalizedKeys.includes('pfacao')),
+    )
+  ) {
+    return 'pf_aprovacoes';
   }
 
   throw new Error(`Nao foi possivel identificar automaticamente o pipeline do arquivo ${fileName}.`);
@@ -1271,11 +1364,12 @@ function parseOrdensBancarias(text: string): ParsedEmailCsvImport {
   const empenhoNumbers = new Set<string>();
 
   parsed.rows.forEach((row) => {
-    const itemId = normalizeDocId(row.documento || '');
-    const documentoHabilId = normalizeDocId(row.documentoorigem || row['documento origem'] || '');
+    const itemId = normalizeDocId(row.documento || row.documentoid || row.ob || '');
+    const documentoHabilId = normalizeDocId(row.documentoorigem || row['documento origem'] || row.dh || row.neccor || '');
     if (!itemId || !documentoHabilId) return;
 
-    const empenhoNumero = (row['ne ccor'] || row.neccor || row.empenho || '').trim();
+    const rawEmpenho = (row['ne ccor'] || row.neccor || row.empenho || '').trim();
+    const empenhoNumero = rawEmpenho.match(/(\d{4}NE\d+)/)?.[1] || rawEmpenho;
     if (empenhoNumero) {
       parentUpdates.set(documentoHabilId, {
         documentoHabilId,
@@ -1284,7 +1378,21 @@ function parseOrdensBancarias(text: string): ParsedEmailCsvImport {
       empenhoNumbers.add(empenhoNumero);
     }
 
-    const valor = parseCurrency(row.despesaspagas || row.restosapagarpagosprocenproc || row.valor || '0');
+    const valor = parseCurrency(
+      row.despesaspagas ||
+        row.restosapagarpagosprocenproc ||
+        row.restosapagarpagos ||
+        row.valor ||
+        '0',
+    );
+    const dataLancamento =
+      row.dialancamento ||
+      row.diadelancamento ||
+      row.diaemissao ||
+      row.dataemissao ||
+      row.data ||
+      '';
+
     const current = itemsMap.get(itemId);
     if (current) {
       current.valor += valor;
@@ -1296,8 +1404,8 @@ function parseOrdensBancarias(text: string): ParsedEmailCsvImport {
       documento_habil_id: documentoHabilId,
       doc_tipo: row.doctipo || 'OB',
       valor,
-      data_emissao: formatDateForImports(row.dialancamento),
-      observacao: row.docobservacao || '',
+      data_emissao: formatDateForImports(dataLancamento),
+      observacao: row.docobservacao || row.observacao || '',
     });
   });
 
@@ -1401,8 +1509,10 @@ function parseSiafiEmpenhos(text: string): ParsedEmailCsvImport {
     text,
     (candidate) =>
       candidate.normalizedKeys.includes('neccor') &&
-      candidate.normalizedKeys.includes('metrica') &&
-      !candidate.normalizedKeys.includes('despesasempenhadascontroleempenho'),
+      !candidate.normalizedKeys.includes('despesasempenhadascontroleempenho') &&
+      (candidate.normalizedKeys.includes('metrica') ||
+        candidate.normalizedKeys.includes('restosapagar') ||
+        candidate.normalizedKeys.some((k) => k.includes('saldo') || k.includes('rap') || k.includes('ro') || k.includes('valor'))),
   );
 
   if (rapSaldoHeader) {
@@ -1422,10 +1532,17 @@ function parseSiafiEmpenhos(text: string): ParsedEmailCsvImport {
 
     const colNE = headers.findIndex((headerCell) => normalizeSiafiHeader(headerCell) === 'NECCOR');
     const colMetrica = findCol('Metrica');
-    const colValor = findCol('Valor', 'Saldo', 'Saldo - Moeda Origem');
+    const colValor = findCol(
+      'Valor',
+      'Saldo',
+      'Saldo - Moeda Origem',
+      'RESTOS A PAGAR',
+      'RESTOS A PAGAR A PAGAR',
+      'RESTOS A PAGAR INSCRITOS',
+    );
 
-    if (colNE === -1 || colMetrica === -1) {
-      throw new Error('Colunas "NE CCor" e "Metrica" sao obrigatorias no CSV de saldo de RAP.');
+    if (colNE === -1) {
+      throw new Error('Coluna "NE CCor" e obrigatoria no CSV de saldo de RAP.');
     }
 
     const rows = lines
@@ -1435,12 +1552,17 @@ function parseSiafiEmpenhos(text: string): ParsedEmailCsvImport {
         const numeroCompleto = String(cols[colNE] || '').trim();
         if (!numeroCompleto || !numeroCompleto.includes('NE')) return null;
 
-        const metrica = String(cols[colMetrica] || '').trim();
-        if (metrica && !normalizeImportText(metrica).includes('SALDO')) return null;
+        const metrica = colMetrica >= 0 ? String(cols[colMetrica] || '').trim() : '';
+        if (metrica && !normalizeImportText(metrica).includes('SALDO') && !normalizeImportText(metrica).includes('RAP')) return null;
 
-        const fallbackValue = cols.find(
-          (value, index) => index !== colNE && index !== colMetrica && String(value || '').trim(),
-        );
+        const fallbackValue =
+          cols.find(
+            (value, index) =>
+              index !== colNE && index !== colMetrica && String(value || '').trim() && parseCurrency(value) !== 0,
+          ) ||
+          cols.find(
+            (value, index) => index !== colNE && index !== colMetrica && String(value || '').trim(),
+          );
         const saldoRapOficial = parseCurrency(colValor >= 0 ? cols[colValor] : fallbackValue || '');
         const numeroResumido = numeroCompleto.match(/(\d{4}NE\d+)/)?.[1] || numeroCompleto;
 
@@ -1601,6 +1723,83 @@ function parseSiafiEmpenhos(text: string): ParsedEmailCsvImport {
   return { pipeline: 'siafi_empenhos', rowCount: rows.length, rows };
 }
 
+function parsePfSolicitacoes(text: string): ParsedEmailCsvImport {
+  const parsed = parseNormalizedCsv(text, ['PF', 'PF - Evento', 'PF - Acao']);
+  const rows: PfSolicitacaoImportRow[] = [];
+
+  parsed.rows.forEach((row) => {
+    const rawPf = String(row.pf || row.numeropf || '').trim();
+    if (!rawPf) return;
+
+    const acao = String(row.pfacao || row.acao || '').trim();
+    const evento = String(row.pfevento || row.evento || '').trim();
+    const valor = parseCurrency(row.pfvalorlinha || row.valorlinha || row.valor || '0');
+
+    if (acao && !['1', '2'].includes(acao) && !['591292', '591296'].includes(evento)) {
+      return;
+    }
+
+    const ugFavorecida = String(row.favorecidodoc || row.favorecidonumero || row.ugfavorecida || '').trim();
+    const dataEmissao = formatDateForImports(row.emissaodia || row.dataemissao || row.diaemissao || row.data || '');
+    const finalidade = String(row.docobservacao || row.observacao || row.finalidade || '').trim();
+    const fonteRecurso = String(row.pffonterecursos || row.fonterecursos || row.fonterecurso || row.fonte || '').trim();
+    const vinculacao = String(row.pfvinculacaopagamento || row.vinculacaopagamento || row.vinculacao || '').trim();
+    const modalidade = String(row.pfsituacao || row.situacao || row.modalidade || '').trim();
+    const mesReferencia = String(row.pfmes || row.mes || row.mesreferencia || '').trim();
+
+    rows.push({
+      numeroPf: rawPf,
+      ugEmitente: rawPf.substring(0, 6),
+      ugFavorecida,
+      evento,
+      acao,
+      fonteRecurso,
+      vinculacao,
+      modalidade,
+      mesReferencia,
+      dataEmissao,
+      valor,
+      finalidade,
+    });
+  });
+
+  return { pipeline: 'pf_solicitacoes', rowCount: rows.length, rows };
+}
+
+function parsePfAprovacoes(text: string): ParsedEmailCsvImport {
+  const parsed = parseNormalizedCsv(text, ['PF', 'PF - Evento', 'PF - Acao']);
+  const rows: PfAprovacaoLiberacaoImportRow[] = [];
+
+  parsed.rows.forEach((row) => {
+    const rawPf = String(row.pf || row.numeropf || '').trim();
+    if (!rawPf) return;
+
+    const acao = String(row.pfacao || row.acao || '').trim();
+    const evento = String(row.pfevento || row.evento || '').trim();
+    const valor = parseCurrency(row.pfvalorlinha || row.valorlinha || row.valor || '0');
+    const dataEmissao = formatDateForImports(row.emissaodia || row.dataemissao || row.diaemissao || row.data || '');
+    const observacao = String(row.docobservacao || row.observacao || '').trim();
+    const fonteRecurso = String(row.pffonterecursos || row.fonterecursos || row.fonterecurso || row.fonte || '').trim();
+    const vinculacao = String(row.pfvinculacaopagamento || row.vinculacaopagamento || row.vinculacao || '').trim();
+    const modalidade = String(row.pfsituacao || row.situacao || row.modalidade || '').trim();
+
+    rows.push({
+      numeroPf: rawPf,
+      ugEmitente: rawPf.substring(0, 6),
+      evento,
+      acao,
+      fonteRecurso,
+      vinculacao,
+      modalidade,
+      dataEmissao,
+      valor,
+      observacao,
+    });
+  });
+
+  return { pipeline: 'pf_aprovacoes', rowCount: rows.length, rows };
+}
+
 export function decodeCsvBytes(bytes: Uint8Array) {
   if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
     return new TextDecoder('utf-16le').decode(bytes);
@@ -1663,6 +1862,10 @@ export function parseEmailCsvImport({
       return parseCreditosDisponiveis(normalizedText);
     case 'siafi_empenhos':
       return parseSiafiEmpenhos(normalizedText);
+    case 'pf_solicitacoes':
+      return parsePfSolicitacoes(normalizedText);
+    case 'pf_aprovacoes':
+      return parsePfAprovacoes(normalizedText);
     default:
       throw new Error(`Pipeline nao suportado: ${pipeline satisfies never}`);
   }
