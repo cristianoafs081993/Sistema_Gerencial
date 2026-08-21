@@ -389,6 +389,8 @@ O botão `siages-suap-document-ai-button` é inserido dentro do mesmo card/linha
 
 A rota estabelece uma sessão efêmera, chama `analisar-documento-licitacao` e exibe achados, sugestões, limitações e fontes. Os achados aparecem em acordeões fechados inicialmente; a tela permite baixar uma análise HTML independente, alternar o modo claro/escuro e imprimir mesmo quando o navegador bloqueia a abertura de popup, usando uma janela ou iframe de impressão próprio. A análise não edita o documento nem consulta `normativos`, `normativos_chunks` ou `buscar_normativos`.
 
+Ao abrir um documento relacionado a partir do processo, a nova instancia de `process-document.js` recupera da sessao da aba o snapshot, o resumo financeiro, a aba ativa e o status ja conhecido, identificados pelo `suap_id`. Assim, os dados permanecem visiveis durante a navegacao enquanto a consulta de atualizacao ocorre em segundo plano. O contexto continua usando o processo encontrado no `referer`; uma pagina de documento aberta diretamente nao trata o ID do documento como ID de processo.
+
 ## Sincronizacao do Plano SUAP no Campus
 
 A central de importação de dados (`/importacao-dados`), no Módulo Orçamentário, monta `SuapPlanSyncCard`. Ao entrar, o card chama `sync-suap-plan` em segundo plano; ao concluir, os dados são recarregados. A primeira captura é uma prévia com contagem de novas, atualizadas e arquivadas; a aplicação ocorre após a confirmação do espelho inicial. Na tela de planejamento de atividades (`/planejamento/campus`), o card não é exibido diretamente, mantendo a visualização da tabela limpa.

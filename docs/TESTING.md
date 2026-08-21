@@ -129,6 +129,8 @@ A pasta corrente e centralizada por `src/test/extensionFixtures.ts`. As suites `
 
 - No Plano de Atividades concluído 8, cobrir a ordenação nos cabeçalhos das tabelas originais e o checkbox `Exibir somente atividades com saldo` inserido no card nativo de filtros, sem esconder linhas com saldo positivo.
 
+- `suapProcessDocumentExtension.test.ts` cobre a restauração do snapshot e do resumo financeiro ao navegar de um processo para o documento SUAP relacionado, sem voltar ao estado transitório de preparação.
+
 Antes de publicar uma nova versao, execute as suites focadas, `src/__tests__/encoding.test.ts`, `npm test`, `npm run build` e `npm run check`; em seguida compare os arquivos do diretorio da extensao com o ZIP gerado.
 
 ### Validacao da versao 1.9 em 2026-08-02

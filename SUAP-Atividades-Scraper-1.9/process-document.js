@@ -11,6 +11,7 @@
   const THEME_KEY = 'siages-toolkit-theme';
   const COLLAPSED_KEY = 'siages-toolkit-collapsed';
   const SNIPPETS_KEY = 'siages-snippets';
+  const PROCESS_STATE_KEY_PREFIX = 'siages-process-state:';
   const DOCUMENT_REVIEW_MAX_BYTES = 20 * 1024 * 1024;
   const DOCUMENT_VIEWER_PATH = /^\/documento_eletronico\/visualizar_documento(?:_digitalizado)?\/(\d+)\/?$/;
   const DEFAULT_SNIPPETS = {
@@ -21,7 +22,8 @@
   };
   const state = {
     activeTab: 'summary', theme: 'dark', collapsed: false, maximized: false, snapshot: null,
-    syncStatus: { stage: 'checking', message: 'Preparando a consulta do processo...' }, snippets: { ...DEFAULT_SNIPPETS }, editingKey: null,
+    syncStatus: { stage: 'checking', message: 'Preparando a consulta do processo...' },
+    financeSummary: null, hasFinanceSummary: false, snippets: { ...DEFAULT_SNIPPETS }, editingKey: null,
   };
   let documentAnalysisObserver = null;
   let documentAnalysisCleanup = null;
@@ -88,14 +90,73 @@
       if (refMatch) return refMatch[1];
     }
 
-    const docMatch = location.pathname.match(/^\/documento_eletronico\/(?:documento|visualizar_documento)\/(\d+)\/?$/);
-    if (docMatch) return docMatch[1];
-
     return null;
   }
   function getProcessNumber() {
     const match = cleanText(document.body?.innerText || document.body?.textContent || '').match(/\b\d{5}\.\d{6}(?:[./])\d{4}-\d{2}\b/);
-    return match ? match[0] : '';
+    return match?.[0] || state.snapshot?.process?.numProcesso || state.snapshot?.fallback?.processNumber || '';
+  }
+  function getProcessUrl() {
+    const processPath = /^\/processo_eletronico\/(?:processo|visualizar_processo)\/\d+\/?$/;
+    if (processPath.test(location.pathname)) return location.origin + location.pathname;
+    try {
+      const referrer = new URL(document.referrer || '');
+      if (referrer.origin === 'https://suap.ifrn.edu.br' && processPath.test(referrer.pathname)) return referrer.origin + referrer.pathname;
+    } catch {
+      // O documento pode nao possuir referer quando aberto diretamente.
+    }
+    return location.origin + location.pathname;
+  }
+  function getProcessStateKey(suapId = getProcessId()) {
+    return suapId ? `${PROCESS_STATE_KEY_PREFIX}${suapId}` : '';
+  }
+  async function readPersistedProcessState() {
+    const key = getProcessStateKey();
+    if (!key) return null;
+    let persisted = null;
+    if (globalThis.sessionStorage) {
+      try {
+        const raw = globalThis.sessionStorage.getItem(key);
+        if (raw) persisted = JSON.parse(raw);
+      } catch {
+        persisted = null;
+      }
+    }
+    if (!persisted) persisted = await storageGet('session', key, null);
+    return persisted?.suapId === getProcessId() ? persisted : null;
+  }
+  function persistProcessState() {
+    const key = getProcessStateKey();
+    if (!key) return;
+    const persisted = {
+      suapId: getProcessId(),
+      snapshot: state.snapshot,
+      syncStatus: state.syncStatus,
+      activeTab: state.activeTab,
+      ...(state.hasFinanceSummary ? { financeSummary: state.financeSummary } : {}),
+    };
+    try {
+      globalThis.sessionStorage?.setItem(key, JSON.stringify(persisted));
+    } catch {
+      // O cache e apenas uma otimizacao; a consulta continua funcionando sem ele.
+    }
+    void storageSet('session', { [key]: persisted });
+  }
+  async function restorePersistedProcessState() {
+    const persisted = await readPersistedProcessState();
+    if (!persisted) return false;
+    if (persisted.snapshot) state.snapshot = persisted.snapshot;
+    if (persisted.syncStatus?.stage && persisted.syncStatus?.message) state.syncStatus = persisted.syncStatus;
+    if (['success', 'incomplete_extraction'].includes(state.snapshot?.process?.status) && state.syncStatus.stage === 'checking') {
+      state.syncStatus = { stage: 'ready', message: 'Dados do processo atualizados.' };
+    }
+    if (typeof persisted.activeTab === 'string') state.activeTab = persisted.activeTab;
+    if (Object.prototype.hasOwnProperty.call(persisted, 'financeSummary')) {
+      state.financeSummary = persisted.financeSummary;
+      state.hasFinanceSummary = true;
+      window.__siagesLatestFinanceSummary = persisted.financeSummary;
+    }
+    return Boolean(state.snapshot || state.hasFinanceSummary);
   }
   function storageGet(area, key, fallback) {
     return new Promise((resolve) => {
@@ -130,7 +191,7 @@
     return {
       source: 'siages-suap-extension', type: 'siages:suap-process-context', version: 1,
       payload: {
-        suapId, processNumber: getProcessNumber(), processUrl: location.origin + location.pathname,
+        suapId, processNumber: getProcessNumber(), processUrl: getProcessUrl(),
         ...(session ? { extensionSession: { accessToken: session.accessToken, refreshToken: session.refreshToken } } : {}),
       },
     };
@@ -231,6 +292,7 @@
     const root = document.getElementById(ROOT_ID);
     root?.querySelectorAll('[data-tab]').forEach((button) => button.setAttribute('aria-selected', String(button.dataset.tab === tab)));
     root?.querySelectorAll('[data-panel]').forEach((panel) => { panel.dataset.active = String(panel.dataset.panel === tab); });
+    persistProcessState();
   }
   async function toggleTheme() {
     state.theme = state.theme === 'dark' ? 'light' : 'dark';
@@ -405,8 +467,11 @@
     const strong = createElement('strong', '', formatCurrency(value)); Object.assign(strong.style, { display: 'block', color: colors.panelText, fontSize: '13px' }); cell.append(small, strong); return cell;
   }
   function renderFinanceSummary(summary) {
+    state.financeSummary = summary;
+    state.hasFinanceSummary = true;
     window.__siagesLatestFinanceSummary = summary;
-    if (!summary || summary.status === 'missing-process' || summary.status === 'missing-beneficiary') { removeFinancePanel(); return; }
+    persistProcessState();
+    if (!summary || summary.status === 'missing-process' || summary.status === 'missing-beneficiary') { removeFinancePanel(); persistProcessState(); return; }
     if (summary.status === 'empty') { renderFinanceEmpty(summary.escopoContrato ? 'Nenhum empenho do beneficiário foi encontrado para o contrato deste processo.' : 'Nenhum empenho foi encontrado para o beneficiário identificado neste processo.'); return; }
     const colors = getThemeColors(); const finance = ensureFinancePanel(); finance.innerHTML = '';
     const wrapper = createElement('section', 'suape-section'); Object.assign(wrapper.style, { background: colors.panelBg, color: colors.panelText, borderColor: colors.panelBorder });
@@ -438,6 +503,7 @@
     });
     if ((summary.empenhos || []).length > 6) list.appendChild(createElement('div', 'suape-empty', `+${summary.empenhos.length - 6} empenho(s) adicional(is)`));
     wrapper.append(header, totals, list); finance.appendChild(wrapper);
+    persistProcessState();
   }
 
   function renderAiPanel() {
@@ -734,14 +800,15 @@
   function retrySync() { const frame = document.getElementById(BRIDGE_FRAME_ID); const suapId = getProcessId(); if (frame?.contentWindow && suapId) frame.contentWindow.postMessage({ source: 'siages-suap-extension', type: 'siages:suap-process-retry', version: 1, payload: { suapId } }, SIAGES_ORIGIN); }
   function restartBridge() { document.getElementById(BRIDGE_FRAME_ID)?.remove(); openProcessBridge(); }
   function openProcessBridge() {
-    if (!getProcessId() || document.getElementById(BRIDGE_FRAME_ID)) return; renderFinanceLoading();
+    if (!getProcessId() || document.getElementById(BRIDGE_FRAME_ID)) return;
+    if (!state.hasFinanceSummary) renderFinanceLoading();
     void getExtensionSession().then((session) => {
       if (document.getElementById(BRIDGE_FRAME_ID)) return; const context = buildContext(session); const frame = document.createElement('iframe'); frame.id = BRIDGE_FRAME_ID; frame.src = `${SIAGES_ORIGIN}/suap-extensao/processo-info`; frame.title = 'Sincronização do processo com o SIAGES'; Object.assign(frame.style, { position: 'absolute', width: '1px', height: '1px', opacity: '0', pointerEvents: 'none', border: '0' });
       const postContext = () => frame.contentWindow?.postMessage(context, SIAGES_ORIGIN);
       const receive = async (event) => {
         if (isSiagesFrameMessage(event, frame, 'siages:suap-process-info-ready')) { postContext(); return; }
-        if (isSiagesFrameMessage(event, frame, 'siages:suap-process-snapshot')) { state.snapshot = event.data.payload; renderSummary(); return; }
-        if (isSiagesFrameMessage(event, frame, 'siages:suap-process-sync-status')) { state.syncStatus = event.data.payload; renderSummary(); return; }
+        if (isSiagesFrameMessage(event, frame, 'siages:suap-process-snapshot')) { state.snapshot = event.data.payload; persistProcessState(); renderSummary(); return; }
+        if (isSiagesFrameMessage(event, frame, 'siages:suap-process-sync-status')) { state.syncStatus = event.data.payload; persistProcessState(); renderSummary(); return; }
         if (isSiagesFrameMessage(event, frame, 'siages:suap-process-finance-summary')) { renderFinanceSummary(event.data.payload); return; }
         if (isSiagesFrameMessage(event, frame, 'siages:suap-process-pdf-request')) {
           const suapId = event.data.payload?.suapId; if (suapId !== getProcessId()) return;
@@ -794,10 +861,16 @@
   async function installToolkit() {
     if (!getProcessId() || document.getElementById(ROOT_ID)) return;
     const [theme, collapsed, storedSnippets] = await Promise.all([storageGet('local', THEME_KEY, 'dark'), storageGet('local', COLLAPSED_KEY, false), storageGet('sync', SNIPPETS_KEY, null)]);
+    const hasPersistedProcessState = await restorePersistedProcessState();
     state.theme = theme === 'light' ? 'light' : 'dark'; state.collapsed = Boolean(collapsed); state.snippets = storedSnippets && Object.keys(storedSnippets).length ? storedSnippets : { ...DEFAULT_SNIPPETS };
     if (!storedSnippets) await storageSet('sync', { [SNIPPETS_KEY]: state.snippets });
-    const root = buildShell(); isolateTabTitles(root); const host = findToolkitHost(); host.prepend(root); fitToolkitToHost(host, root); renderSummary({ process: null, fallback: { suapId: getProcessId(), processNumber: getProcessNumber(), processUrl: location.href } }); renderShortcuts(); renderAiPanel(); renderSettings(); selectTab('summary'); installDocumentAnalysis(); openProcessBridge();
+    const root = buildShell(); isolateTabTitles(root); const host = findToolkitHost(); host.prepend(root); fitToolkitToHost(host, root);
+    renderSummary(hasPersistedProcessState ? state.snapshot : { process: null, fallback: { suapId: getProcessId(), processNumber: getProcessNumber(), processUrl: getProcessUrl() } });
+    renderShortcuts(); renderAiPanel(); renderSettings();
+    if (state.hasFinanceSummary) renderFinanceSummary(state.financeSummary);
+    selectTab(state.activeTab || 'summary'); installDocumentAnalysis(); openProcessBridge();
   }
+  window.addEventListener('pagehide', persistProcessState);
   globalThis.chrome?.storage?.onChanged?.addListener((changes, area) => { if (area === 'sync' && changes[SNIPPETS_KEY]) { state.snippets = changes[SNIPPETS_KEY].newValue || { ...DEFAULT_SNIPPETS }; renderShortcuts(); } });
   window.__siagesSuapProcessDocument = { getProcessId, getProcessNumber, buildContext, installToolkit, installButton: installToolkit, installFinancePanel: openProcessBridge, openFinanceBridge: openProcessBridge, renderFinanceSummary, openModal, closeModal, openDocumentAnalysisModal, closeDocumentAnalysisModal, scanDocumentCards, installDocumentAnalysis, disposeDocumentAnalysis, classifyDocumentForAnalysis, downloadProcessPdfFromSuap, normalizeSnippetKey, selectTab, retrySync, toggleTheme, toggleMaximized, toggleCollapsed };
   if (!window.__SIAGES_SUAP_PROCESS_TEST__) void installToolkit();

@@ -111,6 +111,8 @@ describe('process-document 1.9', () => {
   beforeEach(() => {
     document.body.innerHTML = '<main><aside id="timeline"><div>Recebido por COFINC/CN</div><div>Encaminhado por DIAD/CN</div></aside><p>Processo 23035.000001.2026-11</p></main>';
     window.history.replaceState(null, '', '/processo_eletronico/processo/321/');
+    window.sessionStorage.clear();
+    Object.defineProperty(document, 'referrer', { configurable: true, value: '' });
     localValues['siages-extension-session'] = { accessToken: 'access', refreshToken: 'refresh', expiresAt: Date.now() / 1000 + 3600 };
     localValues['siages-toolkit-theme'] = 'dark';
     localValues['siages-toolkit-collapsed'] = false;
@@ -255,6 +257,40 @@ describe('process-document 1.9', () => {
     expect(summary).toHaveTextContent('2026NE000002');
     expect(summary?.querySelectorAll('.suape-copy').length).toBeGreaterThan(8);
   });
+  it('mantem o snapshot ao navegar do processo para um documento relacionado', async () => {
+    const firstApi = loadProcessScript();
+    await firstApi.installToolkit();
+    await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeTruthy());
+    const firstFrame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
+
+    window.dispatchEvent(new MessageEvent('message', {
+      origin: 'https://www.siages.com.br', source: firstFrame.contentWindow,
+      data: { source: 'siages', type: 'siages:suap-process-snapshot', version: 1, payload: {
+        fallback: { suapId: '321', processNumber: '23035.000001.2026-11' },
+        process: { suapId: '321', numProcesso: '23035.000001.2026-11', status: 'success', beneficiario: 'Fornecedor Alfa', dadosCompletos: {} },
+      } },
+    }));
+    firstApi.renderFinanceSummary(financeSummary());
+    expect(window.sessionStorage.getItem('siages-process-state:321')).toBeTruthy();
+
+    document.body.innerHTML = '<main><p>Documento relacionado</p></main>';
+    Object.defineProperty(document, 'referrer', {
+      configurable: true,
+      value: 'https://suap.ifrn.edu.br/processo_eletronico/processo/321/',
+    });
+    window.history.replaceState(null, '', '/documento_eletronico/visualizar_documento/1129003/');
+    delete (window as typeof window & Record<string, unknown>).__siagesSuapProcessDocument;
+
+    const secondApi = loadProcessScript();
+    await secondApi.installToolkit();
+
+    expect(secondApi.getProcessId()).toBe('321');
+    expect(document.querySelector('[data-panel="summary"]')).toHaveTextContent('Fornecedor Alfa');
+    expect(document.querySelector('[data-panel="summary"]')).toHaveTextContent('23035.000001.2026-11');
+    expect(document.querySelector('[data-panel="summary"]')).not.toHaveTextContent('Preparando a consulta do processo');
+    expect(document.getElementById('siages-suap-finance-panel')).toHaveTextContent('00040/2026');
+  });
+
   it('mantem as retenções quando o processo tem uma única nota', async () => {
     const api = loadProcessScript();
     await api.installToolkit();
