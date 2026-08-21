@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, RefreshCw, Search } from 'lucide-react';
+import { Eye, Loader2, RefreshCw, Search } from 'lucide-react';
 
 import { HeaderActions, HeaderSubtitle } from '@/components/HeaderParts';
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
@@ -10,7 +10,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { creditosDisponiveisDetalhesService } from '@/services/creditosDisponiveisDetalhes';
+import { useData } from '@/contexts/DataContext';
+import { CreditoDisponivelMovimentacoesModal } from '@/components/modals/CreditoDisponivelMovimentacoesModal';
+import { creditosDisponiveisDetalhesService, type CreditoDisponivelDetalheRow } from '@/services/creditosDisponiveisDetalhes';
 
 type SaldoFilter = 'todos' | 'com-saldo' | 'zerado';
 
@@ -19,11 +21,14 @@ function formatCurrency(value: number) {
 }
 
 export default function CreditoDisponivel() {
+  const { empenhos, descentralizacoes, atividades, updateEmpenho } = useData();
   const [search, setSearch] = useState('');
   const [ptresFilter, setPtresFilter] = useState('todos');
   const [saldoFilter, setSaldoFilter] = useState<SaldoFilter>('com-saldo');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [selectedRowForMovimentacoes, setSelectedRowForMovimentacoes] = useState<CreditoDisponivelDetalheRow | null>(null);
+  const [isMovimentacoesOpen, setIsMovimentacoesOpen] = useState(false);
 
   const { data: report = { rows: [], sourceFile: '', importedAt: '' }, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['creditos-disponiveis-detalhes', 'latest'],
@@ -58,6 +63,11 @@ export default function CreditoDisponivel() {
   const paginatedRows = filteredRows.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const resetPage = () => setPage(1);
+
+  const handleOpenMovimentacoes = (row: CreditoDisponivelDetalheRow) => {
+    setSelectedRowForMovimentacoes(row);
+    setIsMovimentacoesOpen(true);
+  };
 
   return (
     <div className="space-y-6 pb-10">
@@ -121,7 +131,10 @@ export default function CreditoDisponivel() {
         </div>
       </FilterPanel>
 
-      <DataTablePanel title="Relatório de crédito disponível">
+      <DataTablePanel
+        title="Relatório de crédito disponível"
+        description="Clique em uma linha para ver as movimentações (empenhos e descentralizações) do PTRES."
+      >
         <Table>
           <TableHeader>
             <TableRow>
@@ -129,12 +142,13 @@ export default function CreditoDisponivel() {
               <TableHead>PI</TableHead>
               <TableHead>Descrição</TableHead>
               <TableHead className="text-right">Valor</TableHead>
+              <TableHead className="text-center w-[70px]">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={4}>
+                <TableCell colSpan={5}>
                   <div className="flex items-center justify-center gap-2 py-10 text-sm text-text-secondary">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Carregando crédito disponível...
@@ -143,13 +157,18 @@ export default function CreditoDisponivel() {
               </TableRow>
             ) : paginatedRows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4}>
+                <TableCell colSpan={5}>
                   <div className="py-10 text-center text-sm text-text-secondary">Nenhuma linha encontrada.</div>
                 </TableCell>
               </TableRow>
             ) : (
               paginatedRows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow
+                  key={row.id}
+                  onClick={() => handleOpenMovimentacoes(row)}
+                  className="cursor-pointer transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/50"
+                  title="Clique para ver movimentações (empenhos e descentralizações)"
+                >
                   <TableCell className="font-mono text-xs font-semibold text-text-primary">{row.ptres}</TableCell>
                   <TableCell className="font-mono text-xs text-text-primary">{row.planoInterno || '-'}</TableCell>
                   <TableCell className="min-w-[280px]">
@@ -157,6 +176,19 @@ export default function CreditoDisponivel() {
                   </TableCell>
                   <TableCell className="text-right font-mono text-sm font-semibold text-primary">
                     {formatCurrency(row.valor)}
+                  </TableCell>
+                  <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleOpenMovimentacoes(row)}
+                      title="Ver movimentações (empenhos e descentralizações)"
+                      className="h-7 w-7 p-0 text-text-muted hover:text-primary"
+                    >
+                      <Eye className="h-4 w-4" />
+                      <span className="sr-only">Ver movimentações</span>
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))
@@ -175,6 +207,22 @@ export default function CreditoDisponivel() {
           }}
         />
       </DataTablePanel>
+
+      <CreditoDisponivelMovimentacoesModal
+        open={isMovimentacoesOpen}
+        onOpenChange={(isOpen) => {
+          setIsMovimentacoesOpen(isOpen);
+          if (!isOpen) {
+            setSelectedRowForMovimentacoes(null);
+          }
+        }}
+        selectedRow={selectedRowForMovimentacoes}
+        descentralizacoes={descentralizacoes}
+        empenhos={empenhos}
+        atividades={atividades}
+        onSaveEmpenho={updateEmpenho}
+      />
     </div>
   );
 }
+

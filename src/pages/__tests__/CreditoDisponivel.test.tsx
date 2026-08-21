@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { useData } from '@/contexts/DataContext';
 import CreditoDisponivel from '@/pages/CreditoDisponivel';
 import { creditosDisponiveisDetalhesService } from '@/services/creditosDisponiveisDetalhes';
 
@@ -16,6 +17,10 @@ vi.mock('@/contexts/AuthContext', () => ({
   useAuth: vi.fn(),
 }));
 
+vi.mock('@/contexts/DataContext', () => ({
+  useData: vi.fn(),
+}));
+
 vi.mock('@/services/creditosDisponiveisDetalhes', () => ({
   creditosDisponiveisDetalhesService: {
     getLatestReport: vi.fn(),
@@ -25,6 +30,7 @@ vi.mock('@/services/creditosDisponiveisDetalhes', () => ({
 }));
 
 const mockedUseAuth = vi.mocked(useAuth);
+const mockedUseData = vi.mocked(useData);
 const mockedService = vi.mocked(creditosDisponiveisDetalhesService);
 
 function renderPage() {
@@ -43,6 +49,44 @@ describe('CreditoDisponivel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedUseAuth.mockReturnValue({ isSuperAdmin: true } as never);
+    mockedUseData.mockReturnValue({
+      empenhos: [
+        {
+          id: 'emp-1',
+          numero: '2026NE000100',
+          descricao: 'Empenho PNAE',
+          valor: 25000,
+          origemRecurso: '230446',
+          dimensao: 'EN - Ensino',
+          componenteFuncional: 'Ensino',
+          naturezaDespesa: '339030',
+          planoInterno: 'CFF53M9601N',
+          favorecidoNome: 'Fornecedor Alimentar Ltda',
+          dataEmpenho: new Date('2026-03-01'),
+          status: 'pendente',
+          tipo: 'exercicio',
+          createdAt: new Date('2026-03-01'),
+          updatedAt: new Date('2026-03-01'),
+        },
+      ],
+      descentralizacoes: [
+        {
+          id: 'desc-1',
+          origemRecurso: '230446',
+          dimensao: 'EN - Ensino',
+          notaCredito: '2026NC000050',
+          planoInterno: 'CFF53M9601N',
+          descricao: 'Descentralização PNAE',
+          valor: 100000,
+          dataEmissao: new Date('2026-02-01'),
+          createdAt: new Date('2026-02-01'),
+          updatedAt: new Date('2026-02-01'),
+        },
+      ],
+      atividades: [],
+      updateEmpenho: vi.fn(),
+    } as never);
+
     mockedService.getLatestReport.mockResolvedValue({
       sourceFile: '3 - Crédito Disponível.csv',
       importedAt: '2026-05-26T13:00:00.000Z',
@@ -95,4 +139,23 @@ describe('CreditoDisponivel', () => {
     expect(await screen.findByRole('button', { name: /Atualizar/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Importar CSV/i })).not.toBeInTheDocument();
   });
+
+  it('abre o modal de movimentações ao clicar na linha do PTRES', async () => {
+    renderPage();
+
+    const rowItem = await screen.findByText('PNAE - ALIMENTACAO ESCOLAR');
+    fireEvent.click(rowItem);
+
+    expect(screen.getByText(/Movimentações da Origem \/ PTRES/i)).toBeInTheDocument();
+    expect(screen.getByText('PTRES: 230446')).toBeInTheDocument();
+    expect(screen.getByText('2026NC000050')).toBeInTheDocument();
+    expect(screen.getByText('Descentralização PNAE')).toBeInTheDocument();
+
+    // Alterna para aba de empenhos
+    const empenhosTab = screen.getByRole('tab', { name: /Empenhos/i });
+    fireEvent.mouseDown(empenhosTab, { button: 0, ctrlKey: false });
+    expect(screen.getByText('2026NE000100')).toBeInTheDocument();
+    expect(screen.getByText('Fornecedor Alimentar Ltda')).toBeInTheDocument();
+  });
 });
+

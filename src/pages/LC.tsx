@@ -93,6 +93,7 @@ export default function LCPage() {
   const [dialogTab, setDialogTab] = useState<'macro' | 'grid'>('grid');
   const [isCopied, setIsCopied] = useState(false);
   const [pageLC, setPageLC] = useState(1);
+  const [pagePendencias, setPagePendencias] = useState(1);
   const [pageSizeLC, setPageSizeLC] = useState(100);
   const [pageSizePendencias, setPageSizePendencias] = useState(100);
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
