@@ -223,4 +223,44 @@ describe('CreditoDisponivelMovimentacoesModal', () => {
     expect(screen.getByText('2026NE000123')).toBeInTheDocument();
     expect(screen.queryByText('2026NE000456')).not.toBeInTheDocument();
   });
+
+  it('ordena a lista de empenhos sequencialmente pelo número da NE de forma estritamente decrescente (ex: 85, 84, 10, 7, 6, 5, 2)', () => {
+    const empenhosListaSeq: Empenho[] = [
+      { id: '1', numero: '2026NE000010', tipo: 'exercicio', valor: 100, origemRecurso: '231796' } as Empenho,
+      { id: '2', numero: '2026NE000007', tipo: 'exercicio', valor: 100, origemRecurso: '231796' } as Empenho,
+      { id: '3', numero: '2026NE000002', tipo: 'exercicio', valor: 100, origemRecurso: '231796' } as Empenho,
+      { id: '4', numero: '2026NE000006', tipo: 'exercicio', valor: 100, origemRecurso: '231796' } as Empenho,
+      { id: '5', numero: '2026NE000005', tipo: 'exercicio', valor: 100, origemRecurso: '231796' } as Empenho,
+      { id: '6', numero: '2026NE000084', tipo: 'exercicio', valor: 100, origemRecurso: '231796' } as Empenho,
+      { id: '7', numero: '2026NE000085', tipo: 'exercicio', valor: 100, origemRecurso: '231796' } as Empenho,
+    ];
+
+    render(
+      <CreditoDisponivelMovimentacoesModal
+        open={true}
+        onOpenChange={vi.fn()}
+        selectedRow={sampleRow}
+        descentralizacoes={[]}
+        empenhos={empenhosListaSeq}
+      />,
+    );
+
+    const rows = screen.getAllByRole('row');
+    const fullText = rows.map((r) => r.textContent).join(' ');
+
+    const pos85 = fullText.indexOf('2026NE000085');
+    const pos84 = fullText.indexOf('2026NE000084');
+    const pos10 = fullText.indexOf('2026NE000010');
+    const pos07 = fullText.indexOf('2026NE000007');
+    const pos06 = fullText.indexOf('2026NE000006');
+    const pos05 = fullText.indexOf('2026NE000005');
+    const pos02 = fullText.indexOf('2026NE000002');
+
+    expect(pos85).toBeLessThan(pos84);
+    expect(pos84).toBeLessThan(pos10);
+    expect(pos10).toBeLessThan(pos07);
+    expect(pos07).toBeLessThan(pos06);
+    expect(pos06).toBeLessThan(pos05);
+    expect(pos05).toBeLessThan(pos02);
+  });
 });

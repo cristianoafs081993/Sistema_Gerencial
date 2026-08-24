@@ -109,6 +109,45 @@ function getEmpenhoSortTime(empenho: Empenho): number {
   return 0;
 }
 
+export function extractEmpenhoNumeroSeq(numero: string | undefined): { ano: number; seq: number; raw: string } {
+  if (!numero) return { ano: 0, seq: 0, raw: '' };
+  const clean = numero.trim().toUpperCase();
+  const match = clean.match(/^(\d{4})NE(\d+)/i);
+  if (match) {
+    return {
+      ano: parseInt(match[1], 10),
+      seq: parseInt(match[2], 10),
+      raw: clean,
+    };
+  }
+  return { ano: 0, seq: 0, raw: clean };
+}
+
+export function compareEmpenhosMaisRecentesPrimeiro(a: Empenho, b: Empenho): number {
+  const seqA = extractEmpenhoNumeroSeq(a.numero);
+  const seqB = extractEmpenhoNumeroSeq(b.numero);
+
+  // 1º critério: Ano da NE decrescente (ex: 2026 antes de 2025)
+  if (seqA.ano !== seqB.ano && seqA.ano > 0 && seqB.ano > 0) {
+    return seqB.ano - seqA.ano;
+  }
+
+  // 2º critério: Sequencial da NE decrescente (ex: 2026NE000085 antes de 2026NE000084, 2026NE000010, etc.)
+  if (seqA.seq !== seqB.seq && seqA.seq > 0 && seqB.seq > 0) {
+    return seqB.seq - seqA.seq;
+  }
+
+  // 3º critério: Data do empenho decrescente (fallback se não houver padrão SIAFI)
+  const timeA = getEmpenhoSortTime(a);
+  const timeB = getEmpenhoSortTime(b);
+  if (timeB !== timeA) {
+    return timeB - timeA;
+  }
+
+  // 4º critério: Comparação textual numérica
+  return (b.numero || '').localeCompare(a.numero || '', undefined, { numeric: true });
+}
+
 export function CreditoDisponivelMovimentacoesModal({
   open,
   onOpenChange,
@@ -193,7 +232,7 @@ export function CreditoDisponivelMovimentacoesModal({
       });
   }, [descentralizacoesDoPtres, filterOnlyCurrentPi, targetPi, searchTerm]);
 
-  // Filtros aplicados aos empenhos (ordenados do mais recente para o mais antigo)
+  // Filtros aplicados aos empenhos (ordenados do mais recente para o mais antigo pelo número sequencial da NE)
   const filteredEmpenhos = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
     return empenhosDoPtres
@@ -213,14 +252,7 @@ export function CreditoDisponivelMovimentacoesModal({
           (statusLabels[e.status] || '').toLowerCase().includes(search)
         );
       })
-      .sort((a, b) => {
-        const timeA = getEmpenhoSortTime(a);
-        const timeB = getEmpenhoSortTime(b);
-        if (timeB !== timeA) {
-          return timeB - timeA;
-        }
-        return (b.numero || '').localeCompare(a.numero || '', undefined, { numeric: true });
-      });
+      .sort(compareEmpenhosMaisRecentesPrimeiro);
   }, [empenhosDoPtres, filterOnlyCurrentPi, targetPi, searchTerm]);
 
   // Totais visíveis das listas filtradas
