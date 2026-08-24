@@ -210,9 +210,10 @@ Observacoes:
 
 `App.tsx` -> `Dashboard.tsx` -> `useData()` -> `DataContext` -> `useDataQueries` -> services -> Supabase
 
-Observacao para a aba RAP do dashboard:
+Observações para o Dashboard:
 
-- os cards de topo devem usar os campos proprios de RAP do empenho
+- a soma do valor empenhado (`totalEmpenhado`) e a evolução mensal da execução orçamentária excluem empenhos da origem de recurso / PTRES `230446` por padrão (quando a visualização está em todas as origens), evitando que essa fonte de recursos infle a execução orçamentária geral do exercício; ao filtrar explicitamente por essa origem, os valores correspondentes são exibidos normalmente
+- os cards de topo da aba RAP devem usar os campos proprios de RAP do empenho
 - a tabela "Resumo de RAPs por Origem" permite drill-down via clique em cada linha de origem de recurso / PTRES, abrindo o modal `DashboardRapOrigemEmpenhosModal` com os empenhos daquela origem filtrados com saldo > 0 por padrão, busca e visualização detalhada via `EmpenhoDialog`
 - separar `…6485 tokens truncated…peracionais, mostrando uma orientacao curta e o campo original do modelo em uma caixa fixa compacta
 - no modal do Termo de Referencia, a tela mostra apenas copy resumida e operacional; o texto original do modelo AGU, com artigos e redacao integral, fica disponivel na dica nativa do navegador ao passar o mouse ou focar perguntas e opcoes, evitando duplicacao visual

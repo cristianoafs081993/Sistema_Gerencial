@@ -186,6 +186,12 @@ const getContractExpenseStatus = (situacao?: string | null): ContractExpenseStat
 const getContractExpenseValue = (fatura: Pick<ContratoApiFaturaRow, 'valor_liquido' | 'valor_bruto'>) =>
   Number(fatura.valor_liquido ?? fatura.valor_bruto ?? 0) || 0;
 
+export const isOrigemRecursoIgnoradaNoEmpenhado = (origem?: string | null) => {
+  if (!origem) return false;
+  const trimmed = origem.trim();
+  return /\b230446\b/.test(trimmed) || trimmed.startsWith('230446');
+};
+
 const getContractCommitmentValue = (empenho: Pick<ContratoApiEmpenhoRow, 'valor_empenhado'>) =>
   Math.max(0, Number(empenho.valor_empenhado) || 0);
 
@@ -1155,8 +1161,17 @@ export default function Dashboard() {
     filterOrigem,
   });
 
+  const empenhosCorrenteParaSoma = useMemo(() => {
+    if (filterOrigem !== 'all') {
+      return filteredData.empenhosCorrente;
+    }
+    return filteredData.empenhosCorrente.filter(
+      (empenho) => !isOrigemRecursoIgnoradaNoEmpenhado(empenho.origemRecurso),
+    );
+  }, [filteredData.empenhosCorrente, filterOrigem]);
+
   const totalPlanejado = filteredData.atividades.reduce((total, atividade) => total + atividade.valorTotal, 0);
-  const totalEmpenhado = filteredData.empenhosCorrente.reduce((total, empenho) => total + empenho.valor, 0);
+  const totalEmpenhado = empenhosCorrenteParaSoma.reduce((total, empenho) => total + empenho.valor, 0);
   const aDescentralizar = totalPlanejado - totalDescentralizado;
   const percentualExecutado = totalPlanejado > 0 ? (totalEmpenhado / totalPlanejado) * 100 : 0;
   const totalLiquidado = filteredData.empenhosCorrente.reduce(
@@ -1537,11 +1552,11 @@ export default function Dashboard() {
 
   const dadosMensais = useMemo(
     () =>
-      buildDadosMensais(filteredData.atividades, filteredData.empenhosCorrente, liquidacoesPorEmpenho, liquidacoesApiPorEmpenho, contratosApiEmpenhos, {
+      buildDadosMensais(filteredData.atividades, empenhosCorrenteParaSoma, liquidacoesPorEmpenho, liquidacoesApiPorEmpenho, contratosApiEmpenhos, {
         startDate: dateStart ? parseISO(dateStart) : null,
         endDate: dateEnd ? parseISO(dateEnd) : new Date(),
       }),
-    [filteredData.atividades, filteredData.empenhosCorrente, liquidacoesPorEmpenho, liquidacoesApiPorEmpenho, contratosApiEmpenhos, dateStart, dateEnd],
+    [filteredData.atividades, empenhosCorrenteParaSoma, liquidacoesPorEmpenho, liquidacoesApiPorEmpenho, contratosApiEmpenhos, dateStart, dateEnd],
   );
 
   const budgetTreemapData = useMemo(() => {

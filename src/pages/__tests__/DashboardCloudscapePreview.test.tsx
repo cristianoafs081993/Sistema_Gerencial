@@ -128,4 +128,38 @@ describe('DashboardCloudscapePreview', () => {
       expect(screen.getAllByText('R$ 250,00').length).toBeGreaterThan(0);
     });
   });
+
+  it('exclui a origem de recurso 230446 da soma do valor empenhado', () => {
+    mockedUseData.mockReturnValue({
+      ...dataFixture,
+      empenhos: [
+        ...dataFixture.empenhos,
+        {
+          id: 'empenho-230446',
+          numero: '2026NE0002',
+          descricao: 'Empenho PNAE',
+          valor: 500,
+          dimensao: 'EN',
+          componenteFuncional: 'Ensino',
+          origemRecurso: '230446',
+          naturezaDespesa: '339030',
+          tipo: 'exercicio',
+          dataEmpenho: new Date('2026-01-22'),
+          status: 'pendente',
+          createdAt: new Date('2026-01-22'),
+          updatedAt: new Date('2026-01-22'),
+        },
+      ],
+    } as never);
+
+    render(
+      <MemoryRouter>
+        <DashboardCloudscapePreview />
+      </MemoryRouter>,
+    );
+
+    // O valor empenhado deve continuar R$ 400,00 e não R$ 900,00
+    expect(screen.getAllByText('R$ 400,00').length).toBeGreaterThan(0);
+    expect(screen.queryByText('R$ 900,00')).not.toBeInTheDocument();
+  });
 });

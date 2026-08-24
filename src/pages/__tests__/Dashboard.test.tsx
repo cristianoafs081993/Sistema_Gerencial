@@ -1,7 +1,11 @@
 import type { ReactNode } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useQuery } from '@tanstack/react-query';
-import Dashboard, { buildContractExpenseAggregation, buildContractProjectionBullets } from '@/pages/Dashboard';
+import Dashboard, {
+  buildContractExpenseAggregation,
+  buildContractProjectionBullets,
+  isOrigemRecursoIgnoradaNoEmpenhado,
+} from '@/pages/Dashboard';
 import { useData } from '@/contexts/DataContext';
 
 vi.mock('@/contexts/DataContext', () => ({
@@ -56,6 +60,7 @@ vi.mock('@/components/dashboard/DashboardCurrentTab', () => ({
   DashboardCurrentTab: ({
     filteredData,
     totalPlanejado,
+    totalEmpenhado,
     totalDescentralizado,
     totalLiquidado,
     totalPago,
@@ -65,6 +70,7 @@ vi.mock('@/components/dashboard/DashboardCurrentTab', () => ({
   }: {
     filteredData: { empenhosCorrente: unknown[]; empenhosRap: unknown[] };
     totalPlanejado: number;
+    totalEmpenhado: number;
     totalDescentralizado: number;
     totalLiquidado: number;
     totalPago: number;
@@ -74,6 +80,7 @@ vi.mock('@/components/dashboard/DashboardCurrentTab', () => ({
   }) => (
     <div data-testid="current-tab">
       <span data-testid="current-planejado">{totalPlanejado}</span>
+      <span data-testid="current-empenhado">{totalEmpenhado}</span>
       <span data-testid="current-descentralizado">{totalDescentralizado}</span>
       <span data-testid="current-liquidado">{totalLiquidado}</span>
       <span data-testid="current-pago">{totalPago}</span>
@@ -1326,7 +1333,7 @@ describe('Dashboard', () => {
     expect(screen.getByTestId('rap-origem-saldo')).toHaveTextContent('80');
   });
 
-  it('inclui a origem de recurso 230446 nos cálculos, filtros e tabelas do dashboard', () => {
+  it('inclui a origem de recurso 230446 nas atividades e tabelas, mas exclui da soma de empenhado no dashboard', () => {
     mockedUseData.mockReturnValue({
       atividades: [
         makeAtividade({
@@ -1426,6 +1433,8 @@ describe('Dashboard', () => {
 
     // Total Planejado: 500 + 1000 = 1500
     expect(screen.getByTestId('current-planejado')).toHaveTextContent('1500');
+    // Total Empenhado: 300 (exclui os 70 da origem 230446)
+    expect(screen.getByTestId('current-empenhado')).toHaveTextContent('300');
     // Total Descentralizado: apenas 400 (exclui 230446)
     expect(screen.getByTestId('current-descentralizado')).toHaveTextContent('400');
     // Total Liquidado: 150 + 70 = 220
@@ -1436,5 +1445,16 @@ describe('Dashboard', () => {
     expect(screen.getByTestId('current-empenhos-corrente')).toHaveTextContent('2');
     // Quantidade de empenhos RAP: 1 (inclui 230446)
     expect(screen.getByTestId('current-empenhos-rap')).toHaveTextContent('1');
+  });
+
+  it('identifica corretamente a origem de recurso 230446 para ignorar na soma de empenhado', () => {
+    expect(isOrigemRecursoIgnoradaNoEmpenhado('230446')).toBe(true);
+    expect(isOrigemRecursoIgnoradaNoEmpenhado('230446 - PNAE')).toBe(true);
+    expect(isOrigemRecursoIgnoradaNoEmpenhado('AD.20RL.230446.3')).toBe(true);
+    expect(isOrigemRecursoIgnoradaNoEmpenhado(' 230446 ')).toBe(true);
+    expect(isOrigemRecursoIgnoradaNoEmpenhado('231796')).toBe(false);
+    expect(isOrigemRecursoIgnoradaNoEmpenhado('Tesouro')).toBe(false);
+    expect(isOrigemRecursoIgnoradaNoEmpenhado(null)).toBe(false);
+    expect(isOrigemRecursoIgnoradaNoEmpenhado(undefined)).toBe(false);
   });
 });

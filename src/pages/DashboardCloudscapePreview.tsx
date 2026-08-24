@@ -19,6 +19,7 @@ import { useData } from '@/contexts/DataContext';
 import { DIMENSOES, type Atividade, type Descentralizacao, type Empenho } from '@/types';
 import { matchesDimensionFilter } from '@/utils/dimensionFilters';
 import { formatCurrency } from '@/lib/utils';
+import { isOrigemRecursoIgnoradaNoEmpenhado } from '@/pages/Dashboard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -187,9 +188,13 @@ export default function DashboardCloudscapePreview() {
 
   const metrics = useMemo(() => {
     const currentEmpenhos = filtered.empenhos.filter((item) => item.tipo === 'exercicio' && item.status !== 'cancelado');
+    const currentEmpenhosParaSoma =
+      filterOrigem !== 'all'
+        ? currentEmpenhos
+        : currentEmpenhos.filter((item) => !isOrigemRecursoIgnoradaNoEmpenhado(item.origemRecurso));
     const rapEmpenhos = filtered.empenhos.filter((item) => item.tipo === 'rap' && item.status !== 'cancelado');
     const planejado = sum(filtered.atividades.map((item) => item.valorTotal));
-    const empenhado = sum(currentEmpenhos.map((item) => item.valor));
+    const empenhado = sum(currentEmpenhosParaSoma.map((item) => item.valor));
     const descentralizado = sum(filtered.descentralizacoes.map((item) => item.valor));
     const liquidado = sum(currentEmpenhos.map((item) => getExecutionValue(item, 'liquidado')));
     const pago = sum(currentEmpenhos.map((item) => getExecutionValue(item, 'pago')));
@@ -199,8 +204,8 @@ export default function DashboardCloudscapePreview() {
     const monthly = Array.from({ length: 12 }, (_, month) => {
       const monthEnd = new Date(new Date().getFullYear(), month + 1, 0, 23, 59, 59);
       const plannedToDate = sum(filtered.atividades.filter((item) => (toDate(item.createdAt) || monthEnd) <= monthEnd).map((item) => item.valorTotal));
-      const monthEmpenhos = currentEmpenhos.filter((item) => (toDate(item.dataEmpenho) || monthEnd).getMonth() === month);
-      const committedToDate = sum(currentEmpenhos.filter((item) => (toDate(item.dataEmpenho) || monthEnd) <= monthEnd).map((item) => item.valor));
+      const monthEmpenhos = currentEmpenhosParaSoma.filter((item) => (toDate(item.dataEmpenho) || monthEnd).getMonth() === month);
+      const committedToDate = sum(currentEmpenhosParaSoma.filter((item) => (toDate(item.dataEmpenho) || monthEnd) <= monthEnd).map((item) => item.valor));
       const paidToDate = sum(currentEmpenhos.filter((item) => (toDate(item.dataEmpenho) || monthEnd) <= monthEnd).map((item) => getExecutionValue(item, 'pago')));
       return {
         name: format(new Date(new Date().getFullYear(), month, 1), 'MMM', { locale: ptBR }).replace('.', ''),
