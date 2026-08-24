@@ -140,7 +140,7 @@ describe('CreditoDisponivel', () => {
     expect(screen.queryByRole('button', { name: /Importar CSV/i })).not.toBeInTheDocument();
   });
 
-  it('abre o modal de movimentações ao clicar na linha do PTRES', async () => {
+  it('abre o modal de movimentações ao clicar na linha do PTRES exibindo os empenhos do ano', async () => {
     renderPage();
 
     const rowItem = await screen.findByText('PNAE - ALIMENTACAO ESCOLAR');
@@ -148,14 +148,16 @@ describe('CreditoDisponivel', () => {
 
     expect(screen.getByText(/Movimentações da Origem \/ PTRES/i)).toBeInTheDocument();
     expect(screen.getByText('PTRES: 230446')).toBeInTheDocument();
-    expect(screen.getByText('2026NC000050')).toBeInTheDocument();
-    expect(screen.getByText('Descentralização PNAE')).toBeInTheDocument();
 
-    // Alterna para aba de empenhos
-    const empenhosTab = screen.getByRole('tab', { name: /Empenhos/i });
-    fireEvent.mouseDown(empenhosTab, { button: 0, ctrlKey: false });
+    // Abre diretamente na aba de empenhos do ano
     expect(screen.getByText('2026NE000100')).toBeInTheDocument();
     expect(screen.getByText('Fornecedor Alimentar Ltda')).toBeInTheDocument();
+
+    // Alterna para aba de descentralizações
+    const descTab = screen.getByRole('tab', { name: /Descentralizações/i });
+    fireEvent.mouseDown(descTab, { button: 0, ctrlKey: false });
+    expect(screen.getByText('2026NC000050')).toBeInTheDocument();
+    expect(screen.getByText('Descentralização PNAE')).toBeInTheDocument();
   });
 });
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -75,6 +75,40 @@ function matchesPtres(origemRecurso: string | undefined, targetPtres: string): b
   return o === t || o.startsWith(`${t} `) || o.startsWith(`${t}-`) || o.startsWith(`${t}/`);
 }
 
+export function isEmpenhoDoAno(empenho: Empenho, currentYear = new Date().getFullYear()): boolean {
+  if (empenho.tipo === 'rap') return false;
+
+  if (empenho.numero) {
+    const match = empenho.numero.match(/^(\d{4})NE/i);
+    if (match) {
+      return Number(match[1]) === currentYear;
+    }
+  }
+
+  if (empenho.dataEmpenho) {
+    const d = new Date(empenho.dataEmpenho);
+    if (!isNaN(d.getTime())) {
+      return d.getFullYear() === currentYear;
+    }
+  }
+
+  return empenho.tipo === 'exercicio';
+}
+
+function getEmpenhoSortTime(empenho: Empenho): number {
+  if (empenho.dataEmpenho) {
+    const d = new Date(empenho.dataEmpenho);
+    const time = d.getTime();
+    if (!isNaN(time)) return time;
+  }
+  if (empenho.createdAt) {
+    const d = new Date(empenho.createdAt);
+    const time = d.getTime();
+    if (!isNaN(time)) return time;
+  }
+  return 0;
+}
+
 export function CreditoDisponivelMovimentacoesModal({
   open,
   onOpenChange,
@@ -84,11 +118,19 @@ export function CreditoDisponivelMovimentacoesModal({
   atividades = [],
   onSaveEmpenho,
 }: CreditoDisponivelMovimentacoesModalProps) {
-  const [activeTab, setActiveTab] = useState<'descentralizacoes' | 'empenhos'>('descentralizacoes');
+  const [activeTab, setActiveTab] = useState<'descentralizacoes' | 'empenhos'>('empenhos');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterOnlyCurrentPi, setFilterOnlyCurrentPi] = useState(false);
   const [selectedEmpenhoForDialog, setSelectedEmpenhoForDialog] = useState<Empenho | null>(null);
   const [isEmpenhoDialogOpen, setIsEmpenhoDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setActiveTab('empenhos');
+      setSearchTerm('');
+      setFilterOnlyCurrentPi(false);
+    }
+  }, [open, selectedRow]);
 
   const targetPtres = selectedRow?.ptres?.trim() || '';
   const targetPi = selectedRow?.planoInterno?.trim() || '';
@@ -99,13 +141,13 @@ export function CreditoDisponivelMovimentacoesModal({
     return descentralizacoes.filter((d) => matchesPtres(d.origemRecurso, targetPtres));
   }, [descentralizacoes, targetPtres]);
 
-  // Filtra empenhos daquele PTRES
+  // Filtra apenas empenhos do ano daquele PTRES
   const empenhosDoPtres = useMemo(() => {
     if (!targetPtres) return [];
-    return empenhos.filter((e) => matchesPtres(e.origemRecurso, targetPtres));
+    return empenhos.filter((e) => matchesPtres(e.origemRecurso, targetPtres) && isEmpenhoDoAno(e));
   }, [empenhos, targetPtres]);
 
-  // Métricas agregadas da origem inteira
+  // Métricas agregadas da origem inteira (somente empenhos do ano)
   const metricasOrigem = useMemo(() => {
     const totalDescentralizado = descentralizacoesDoPtres.reduce((acc, d) => acc + d.valor, 0);
     const empenhosNaoCancelados = empenhosDoPtres.filter((e) => e.status !== 'cancelado');
@@ -151,7 +193,7 @@ export function CreditoDisponivelMovimentacoesModal({
       });
   }, [descentralizacoesDoPtres, filterOnlyCurrentPi, targetPi, searchTerm]);
 
-  // Filtros aplicados aos empenhos
+  // Filtros aplicados aos empenhos (ordenados do mais recente para o mais antigo)
   const filteredEmpenhos = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
     return empenhosDoPtres
@@ -172,9 +214,12 @@ export function CreditoDisponivelMovimentacoesModal({
         );
       })
       .sort((a, b) => {
-        const timeA = a.dataEmpenho ? new Date(a.dataEmpenho).getTime() : 0;
-        const timeB = b.dataEmpenho ? new Date(b.dataEmpenho).getTime() : 0;
-        return timeB - timeA;
+        const timeA = getEmpenhoSortTime(a);
+        const timeB = getEmpenhoSortTime(b);
+        if (timeB !== timeA) {
+          return timeB - timeA;
+        }
+        return (b.numero || '').localeCompare(a.numero || '', undefined, { numeric: true });
       });
   }, [empenhosDoPtres, filterOnlyCurrentPi, targetPi, searchTerm]);
 
@@ -274,14 +319,14 @@ export function CreditoDisponivelMovimentacoesModal({
 
               <div className="rounded-lg border border-border-default/70 bg-slate-50/50 p-3 dark:bg-slate-900/30">
                 <div className="flex items-center justify-between text-xs text-text-muted">
-                  <span>Total Empenhado</span>
+                  <span>Empenhado no Ano</span>
                   <Receipt className="h-3.5 w-3.5 text-slate-500" />
                 </div>
                 <div className="mt-1 text-lg font-bold text-text-primary">
                   {formatCurrency(metricasOrigem.totalEmpenhado)}
                 </div>
                 <span className="text-[10px] text-text-muted">
-                  {metricasOrigem.countEmpenhos} {metricasOrigem.countEmpenhos === 1 ? 'empenho' : 'empenhos'} emitidos
+                  {metricasOrigem.countEmpenhos} {metricasOrigem.countEmpenhos === 1 ? 'empenho' : 'empenhos'} do ano
                 </span>
               </div>
 
@@ -338,13 +383,13 @@ export function CreditoDisponivelMovimentacoesModal({
           >
             <div className="border-b border-border-default/60 bg-slate-50/70 px-6 py-2 dark:bg-slate-900/40">
               <TabsList className="grid w-full max-w-md grid-cols-2">
+                <TabsTrigger value="empenhos" className="text-xs gap-2">
+                  <ArrowUpRight className="h-3.5 w-3.5 text-amber-500" />
+                  Empenhos do Ano ({empenhosDoPtres.length})
+                </TabsTrigger>
                 <TabsTrigger value="descentralizacoes" className="text-xs gap-2">
                   <ArrowDownRight className="h-3.5 w-3.5 text-action-primary" />
                   Descentralizações ({descentralizacoesDoPtres.length})
-                </TabsTrigger>
-                <TabsTrigger value="empenhos" className="text-xs gap-2">
-                  <ArrowUpRight className="h-3.5 w-3.5 text-amber-500" />
-                  Empenhos ({empenhosDoPtres.length})
                 </TabsTrigger>
               </TabsList>
             </div>

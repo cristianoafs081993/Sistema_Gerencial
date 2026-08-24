@@ -133,7 +133,7 @@ export default function CreditoDisponivel() {
 
       <DataTablePanel
         title="Relatório de crédito disponível"
-        description="Clique em uma linha para ver as movimentações (empenhos e descentralizações) do PTRES."
+        description="Clique em uma linha para ver os empenhos do ano e descentralizações do PTRES."
       >
         <Table>
           <TableHeader>
@@ -167,7 +167,7 @@ export default function CreditoDisponivel() {
                   key={row.id}
                   onClick={() => handleOpenMovimentacoes(row)}
                   className="cursor-pointer transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/50"
-                  title="Clique para ver movimentações (empenhos e descentralizações)"
+                  title="Clique para ver os empenhos do ano e descentralizações do PTRES"
                 >
                   <TableCell className="font-mono text-xs font-semibold text-text-primary">{row.ptres}</TableCell>
                   <TableCell className="font-mono text-xs text-text-primary">{row.planoInterno || '-'}</TableCell>
@@ -183,11 +183,11 @@ export default function CreditoDisponivel() {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleOpenMovimentacoes(row)}
-                      title="Ver movimentações (empenhos e descentralizações)"
+                      title="Ver empenhos do ano e descentralizações do PTRES"
                       className="h-7 w-7 p-0 text-text-muted hover:text-primary"
                     >
                       <Eye className="h-4 w-4" />
-                      <span className="sr-only">Ver movimentações</span>
+                      <span className="sr-only">Ver empenhos do ano</span>
                     </Button>
                   </TableCell>
                 </TableRow>

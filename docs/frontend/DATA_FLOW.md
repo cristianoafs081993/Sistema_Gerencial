@@ -82,7 +82,7 @@ Paginas que dependem fortemente disso:
 
 Consulta dedicada com React Query:
 
-- [CreditoDisponivel.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/CreditoDisponivel.tsx) consulta o snapshot mais recente em `creditos_disponiveis_detalhes`, com filtro e paginacao por PI; seu upload atualiza tambem o agregado `creditos_disponiveis`. A tela de Empenhos nao apresenta mais cards nem importacao de credito disponivel.
+- [CreditoDisponivel.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/CreditoDisponivel.tsx) consulta o snapshot mais recente em `creditos_disponiveis_detalhes`, com filtro e paginacao por PI; seu upload atualiza tambem o agregado `creditos_disponiveis`. A tela de Empenhos nao apresenta mais cards nem importacao de credito disponivel. Ao clicar em qualquer linha do relatório, o modal `CreditoDisponivelMovimentacoesModal` abre diretamente na aba de empenhos do ano corrente (desconsiderando RAPs/anos anteriores e ordenando do mais recente para o mais antigo).
 
 Observacao:
 
