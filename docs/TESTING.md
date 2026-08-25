@@ -123,7 +123,9 @@ Rollout: executar A/B manual em 10 processos de pagamento representativos. Promo
 
 ## Regressao da extensao Suape
 
-A pasta corrente e centralizada por `src/test/extensionFixtures.ts`. As suites `suapExtensionPackage`, `suapProcessDocumentExtension`, `suapTextExpander`, `suapExtensionDispatch`, `SuapExtensionProcessInfo`, `suapPlanContentScript` e `suapCloneAutomation` protegem manifesto e rotas, painel de processo, bridge segura, sincronizacao, Financeiro, atalhos, popup, Plano de Atividades e clonagem.
+A pasta corrente e centralizada por `src/test/extensionFixtures.ts`. As suites `suapExtensionPackage`, `suapCommandPaletteGlobal`, `suapProcessDocumentExtension`, `suapTextExpander`, `suapExtensionDispatch`, `SuapExtensionProcessInfo`, `suapPlanContentScript` e `suapCloneAutomation` protegem manifesto e rotas, painel de processo, bridge segura, sincronizacao, Financeiro, atalhos, popup, Plano de Atividades e clonagem.
+
+- `suapExtensionPackage.test.ts` protege a configuracao da paleta global: o modo generico cobre `<all_urls>` sem SIAGES, SUAP ou Comprasnet; o modo especializado do SUAP continua separado, e telas/acoes apontam para a origem publica do SIAGES. `suapCommandPaletteGlobal.test.ts` valida que, em um site comum, nao ha consulta em segundo plano e comandos do SUAP nao sao exibidos antes ou depois de abrir `Ctrl/Cmd+K`.
 
 - `suapExtensionAuth.test.ts` cobre a sessão persistente da extensão: renovação concorrente serializada, preservação da sessão quando a renovação falha e logout explícito durante uma renovação em andamento. `suapExtensionPackage.test.ts` também garante que o service worker, o popup e os content scripts usem a mesma anon key do projeto.
 

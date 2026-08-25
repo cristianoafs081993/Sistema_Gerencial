@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.24');
+    expect(manifest.version).toBe('1.9.25');
     expect(manifest.host_permissions).toContain('<all_urls>');
     expect(manifest.permissions).toEqual(expect.arrayContaining(['activeTab', 'scripting', 'storage', 'alarms']));
     expect(manifest.background).toEqual({ service_worker: 'background.js' });
@@ -17,7 +17,9 @@ describe('pacote da extensao Suape 1.9', () => {
     const process = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('process-document.js'));
     const plan = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('plan-summary.js'));
     const comprasnet = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('comprasnet-etp.js'));
-    const commandPalette = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('command-palette.js'));
+    const commandPalettes = manifest.content_scripts.filter((entry: { js: string[] }) => entry.js.includes('command-palette.js'));
+    const suapCommandPalette = commandPalettes.find((entry: { matches: string[] }) => entry.matches.includes('https://suap.ifrn.edu.br/*'));
+    const globalCommandPalette = commandPalettes.find((entry: { matches: string[] }) => entry.matches.includes('<all_urls>'));
 
     expect(expander).toMatchObject({ matches: ['<all_urls>'], all_frames: true });
     expect(process.matches).toEqual([
@@ -37,8 +39,19 @@ describe('pacote da extensao Suape 1.9', () => {
       js: ['extension-auth-client.js', 'comprasnet-etp.js'],
       run_at: 'document_idle',
     });
-    expect(commandPalette).toMatchObject({
+    expect(suapCommandPalette).toMatchObject({
       matches: ['https://suap.ifrn.edu.br/*'],
+      css: ['command-palette.css'],
+      js: ['extension-auth-client.js', 'command-palette.js'],
+      run_at: 'document_idle',
+    });
+    expect(globalCommandPalette).toMatchObject({
+      matches: ['<all_urls>'],
+      exclude_matches: [
+        'https://www.siages.com.br/*',
+        'https://suap.ifrn.edu.br/*',
+        'https://cnetmobile.estaleiro.serpro.gov.br/*',
+      ],
       css: ['command-palette.css'],
       js: ['extension-auth-client.js', 'command-palette.js'],
       run_at: 'document_idle',
@@ -64,6 +77,8 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(cpCss).toContain('.suape-cp-group-title.process-group');
     expect(cpCss).toContain('.suape-cp-chip-count.count-teal');
     expect(cpCss).toContain('.suape-cp-kbd-shortcut');
+    expect(cpScript).toContain("const IS_SUAP_PAGE = window.location.hostname === 'suap.ifrn.edu.br';");
+    expect(cpScript).toContain('if (!IS_SUAP_PAGE) return null;');
   });
 
   it('suporta pesquisa direta de contratos no SUAP via parâmetro q no command-palette (Ctrl+K)', () => {
@@ -141,5 +156,13 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(backgroundScript).toContain("const EXTENSION_SESSION_STORAGE_KEY = 'siages-extension-session'");
     expect(backgroundScript).toContain('refresh_token');
     expect(backgroundScript).toContain('chrome.alarms.create');
+  });
+
+  it('abre telas e acoes da paleta na origem publica do SIAGES', () => {
+    const cpScript = fs.readFileSync(extensionFixturePath('command-palette.js'), 'utf8');
+
+    expect(cpScript).toContain("const SIAGES_APP_URL = 'https://www.siages.com.br';");
+    expect(cpScript).not.toContain("const SIAGES_APP_URL = 'http://localhost:5173';");
+    expect(cpScript).toContain('if (IS_SUAP_PAGE)');
   });
 });

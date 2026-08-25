@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Suape - Canivete Suico do IFRN",
-  "version": "1.9.24",
-  "description": "Resumo de processos, caminho BPMN, dados financeiros, atalhos, pesquisa Ctrl+K e documentos com IA no SUAP e no Comprasnet.",
+  "version": "1.9.25",
+  "description": "Paleta Ctrl+K, resumo de processos, caminho BPMN, dados financeiros, atalhos e documentos com IA no SIAGES, SUAP e Comprasnet.",
   "permissions": [
     "activeTab",
     "scripting",
@@ -22,6 +22,24 @@
     {
       "matches": [
         "https://suap.ifrn.edu.br/*"
+      ],
+      "css": [
+        "command-palette.css"
+      ],
+      "js": [
+        "extension-auth-client.js",
+        "command-palette.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "exclude_matches": [
+        "https://www.siages.com.br/*",
+        "https://suap.ifrn.edu.br/*",
+        "https://cnetmobile.estaleiro.serpro.gov.br/*"
       ],
       "css": [
         "command-palette.css"

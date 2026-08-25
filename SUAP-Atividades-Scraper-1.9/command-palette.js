@@ -4,7 +4,8 @@
 
   const SUPABASE_URL = 'https://mnqhwyrzhgykjlyyqodd.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ucWh3eXJ6aGd5a2pseXlxb2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNzk4NjIsImV4cCI6MjA4NTg1NTg2Mn0.g9h5nF0l8yKG-yjQRI8i_mq084IzKTrH64F2FpreVIg';
-  const SIAGES_APP_URL = 'http://localhost:5173';
+  const SIAGES_APP_URL = 'https://www.siages.com.br';
+  const IS_SUAP_PAGE = window.location.hostname === 'suap.ifrn.edu.br';
 
   let empenhosCache = null;
   let contratosCache = null;
@@ -138,6 +139,8 @@
 
   // Process Actions & Shortcuts
   function getCurrentProcessId() {
+    if (!IS_SUAP_PAGE) return null;
+
     // 1. Direct match on pathname
     const directMatch = window.location.pathname.match(
       /\/(?:processo_eletronico\/(?:processo|visualizar_processo|documento_upload|adicionar_despacho|adicionar_documento_texto|solicitar_ciencia|processo\/(?:encaminhar|encaminhar_sem_despacho))|documento_eletronico\/(?:documento|visualizar_documento))\/(\d+)\/?/
@@ -920,7 +923,7 @@
     }
 
     let suapProcessSearchAction = null;
-    if (query && (scope === 'all' || scope === 'processo' || isExplicitProcessSearch)) {
+    if (IS_SUAP_PAGE && query && (scope === 'all' || scope === 'processo' || isExplicitProcessSearch)) {
       const processUrl = getSuapProcessSearchUrl(query);
       suapProcessSearchAction = {
         id: 'suap-search-processo',
@@ -934,7 +937,7 @@
     }
 
     let suapStudentAction = null;
-    if (query && (scope === 'all' || isExplicitStudentSearch)) {
+    if (IS_SUAP_PAGE && query && (scope === 'all' || isExplicitStudentSearch)) {
       const studentUrl = getSuapStudentUrl(query);
       const isMatricula = /^\d+$/.test(query.trim());
       suapStudentAction = {
@@ -949,7 +952,7 @@
     }
 
     let suapDocumentSearchAction = null;
-    if (query && (scope === 'all' || isExplicitDocumentSearch)) {
+    if (IS_SUAP_PAGE && query && (scope === 'all' || isExplicitDocumentSearch)) {
       const docUrl = getSuapDocumentSearchUrl(query);
       suapDocumentSearchAction = {
         id: 'suap-search-documento',
@@ -992,7 +995,7 @@
     }
 
     let suapContractSearchAction = null;
-    if (query && (scope === 'all' || scope === 'contratos')) {
+    if (IS_SUAP_PAGE && query && (scope === 'all' || scope === 'contratos')) {
       const contractUrl = getSuapContractSearchUrl(query);
       suapContractSearchAction = {
         id: 'suap-search-contratos',
@@ -1906,10 +1909,13 @@
     true
   );
 
-  // Pre-load data on idle
-  if (typeof requestIdleCallback !== 'undefined') {
-    requestIdleCallback(() => loadData(false));
-  } else {
-    setTimeout(() => loadData(false), 2000);
+  // No SUAP a consulta antecipada preserva a resposta imediata da paleta atual.
+  // Em sites comuns, os dados do SIAGES so sao carregados quando o usuario abre a paleta.
+  if (IS_SUAP_PAGE) {
+    if (typeof requestIdleCallback !== 'undefined') {
+      requestIdleCallback(() => loadData(false));
+    } else {
+      setTimeout(() => loadData(false), 2000);
+    }
   }
 })();
