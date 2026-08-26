@@ -80,7 +80,7 @@ describe('NotificationCenter', () => {
     mockNavigate.mockReset();
   });
 
-  it('renderiza o botão da central de notificações com indicador visual de novidades', () => {
+  it('renderiza o botão da central de notificações com indicador visual de novidades contendo o número de não lidas', () => {
     render(
       <MemoryRouter>
         <NotificationCenter
@@ -93,7 +93,25 @@ describe('NotificationCenter', () => {
 
     const button = screen.getByRole('button', { name: /abrir central de notificações/i });
     expect(button).toBeInTheDocument();
-    expect(screen.getByTestId('notification-unread-dot')).toBeInTheDocument();
+    const badge = screen.getByTestId('notification-unread-badge');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveTextContent('3');
+  });
+
+  it('não renderiza o badge quando não houver eventos ou notificações', () => {
+    render(
+      <MemoryRouter>
+        <NotificationCenter
+          empenhos={[]}
+          descentralizacoes={[]}
+          atividades={mockAtividades}
+        />
+      </MemoryRouter>,
+    );
+
+    const button = screen.getByRole('button', { name: /abrir central de notificações/i });
+    expect(button).toBeInTheDocument();
+    expect(screen.queryByTestId('notification-unread-badge')).not.toBeInTheDocument();
   });
 
   it('exibe empenhos e descentralizações juntos na mesma lista unificada ordenados por data de criação', () => {
@@ -154,6 +172,9 @@ describe('NotificationCenter', () => {
       </MemoryRouter>,
     );
 
+    // O badge deve exibir 20 (limite de eventos suportado)
+    expect(screen.getByTestId('notification-unread-badge')).toHaveTextContent('20');
+
     fireEvent.click(screen.getByRole('button', { name: /abrir central de notificações/i }));
 
     // Os mais recentes (dia 25 até dia 6) devem estar presentes (20 itens)
@@ -196,7 +217,7 @@ describe('NotificationCenter', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/descentralizacoes');
   });
 
-  it('marca todas as notificações como lidas ao clicar na ação', () => {
+  it('marca todas as notificações como lidas ao clicar na ação e remove o badge numérico', () => {
     render(
       <MemoryRouter>
         <NotificationCenter
@@ -207,11 +228,13 @@ describe('NotificationCenter', () => {
       </MemoryRouter>,
     );
 
+    expect(screen.getByTestId('notification-unread-badge')).toHaveTextContent('3');
+
     fireEvent.click(screen.getByRole('button', { name: /abrir central de notificações/i }));
     expect(screen.getByTitle('Marcar todas como lidas')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTitle('Marcar todas como lidas'));
 
-    expect(screen.queryByTestId('notification-unread-dot')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('notification-unread-badge')).not.toBeInTheDocument();
   });
 });

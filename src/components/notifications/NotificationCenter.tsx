@@ -275,16 +275,18 @@ export function NotificationCenter({
               isOpen && 'bg-muted text-foreground',
               className,
             )}
-            title="Central de Notificações"
-            aria-label="Abrir central de notificações"
+            title={hasUnread ? `Central de Notificações (${unreadCount} não lida${unreadCount > 1 ? 's' : ''})` : 'Central de Notificações'}
+            aria-label={hasUnread ? `Abrir central de notificações (${unreadCount} não lida${unreadCount > 1 ? 's' : ''})` : 'Abrir central de notificações'}
           >
             <Bell className="w-4 h-4 md:w-4.5 md:h-4.5" />
             {hasUnread && (
               <span
-                data-testid="notification-unread-dot"
-                className="absolute top-1 right-1 w-2 h-2 bg-emerald-500 rounded-full border border-card animate-pulse"
+                data-testid="notification-unread-badge"
+                className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-primary text-primary-foreground font-bold text-[10px] leading-none border-2 border-card shadow-xs select-none pointer-events-none"
                 title={`${unreadCount} novidade(s)`}
-              />
+              >
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
             )}
           </button>
         </PopoverTrigger>
