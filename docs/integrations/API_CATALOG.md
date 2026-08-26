@@ -231,6 +231,7 @@ Observacao:
 - no resumo de itens do drawer, `Contratado` e `Executado` tambem devem mostrar quantidade agregada: contratado pela soma de `historico_item[].quantidade` quando houver historico, e executado pela soma de `quantidade_faturado` nas faturas `Pago` ou `Siafi Apropriado`
 - quando houver `dados_item_faturado`, o drawer deve exibir tambem `quantidade_faturado` e `valor_unitario_faturado` na linha da fatura
 - a tela de contratos usa a lista sincronizada de `contratos_api` filtrada por `situacao_derivada`; dados locais de `contratos` e `contratos_empenhos` servem apenas como complemento para favoritos, CNPJ e saldos locais quando houver match por numero normalizado
+- Documentos e PDFs oficiais do contrato e seus termos aditivos sao consultados via API do PNCP em `https://pncp.gov.br/api/pncp/v1/orgaos/{cnpj}/contratos/{ano}/{sequencial}/arquivos`, armazenados persistentemente na tabela `contratos_api_documentos` e atualizados diariamente às 05:00 BRT pelo job `sync-contratos-pncp-documentos`. O modal `ContratoApiDetailsSheet.tsx` carrega os documentos diretamente do banco de dados (0 ms de espera) com suporte a reconsulta sob demanda via `pncpContratos.ts`.
 
 ## 4A. Supabase Database para Energia Campus
 

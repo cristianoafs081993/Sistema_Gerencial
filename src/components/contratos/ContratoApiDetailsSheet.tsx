@@ -1,13 +1,20 @@
+import { useState, useEffect, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   AlertTriangle,
   Building2,
   CalendarClock,
   CircleDollarSign,
+  Download,
+  ExternalLink,
+  FileDown,
   FileText,
   History,
+  Loader2,
   Package,
   ReceiptText,
+  RefreshCw,
 } from 'lucide-react';
 import {
   Accordion,
@@ -37,7 +44,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import { formatCurrency } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { getValorTotalFromHistorico } from '@/utils/contratosApiHistorico';
 import type {
   ContratoApiDetails,
@@ -49,6 +56,12 @@ import type {
   ContratoApiRow,
   ContratoApiSyncRun,
 } from '@/services/contratosApi';
+import {
+  buscarDocumentosContratoPncp,
+  buildPncpContratoWebUrl,
+  type PncpDocumentoContrato,
+  type PncpContratoRef,
+} from '@/services/pncpContratos';
 
 interface ContratoApiDetailsSheetProps {
   open: boolean;
@@ -349,6 +362,105 @@ export function ContratoApiDetailsSheet({
   const lastSyncLabel = lastSyncRun?.finished_at
     ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(lastSyncRun.finished_at))
     : '-';
+
+  const [pncpDocs, setPncpDocs] = useState<PncpDocumentoContrato[]>([]);
+  const [pncpRef, setPncpRef] = useState<PncpContratoRef | null>(null);
+  const [isLoadingPncpDocs, setIsLoadingPncpDocs] = useState(false);
+  const [pncpError, setPncpError] = useState<string | null>(null);
+
+  const fetchPncpDocs = useCallback((forceLive = false) => {
+    if (!contrato) return;
+
+    // Se já existem documentos sincronizados no banco de dados e não é refresh forçado, usa direto do banco
+    const dbDocs = details?.documentos;
+    if (!forceLive && dbDocs && dbDocs.length > 0) {
+      setPncpDocs(
+        dbDocs.map((d) => ({
+          sequencialDocumento: d.sequencial_documento,
+          titulo: d.titulo,
+          tipoDocumentoId: d.tipo_documento_id,
+          tipoDocumentoNome: d.tipo_documento_nome,
+          url: d.url,
+          uri: d.uri ?? undefined,
+          dataPublicacaoPncp: d.data_publicacao_pncp,
+          tamanho: d.tamanho,
+        }))
+      );
+
+      let resolvedRef: PncpContratoRef | null = null;
+      if (contrato.pncp_control_number && contrato.pncp_sequencial) {
+        resolvedRef = {
+          cnpj: '10877412000168',
+          ano: contrato.pncp_ano || (contrato.vigencia_inicio ? new Date(contrato.vigencia_inicio).getFullYear() : new Date().getFullYear()),
+          sequencial: String(contrato.pncp_sequencial),
+          numeroControlePNCP: contrato.pncp_control_number,
+          hasPncpRecord: true,
+        };
+      } else if (dbDocs.length > 0) {
+        const firstUrl = dbDocs[0].url || dbDocs[0].uri || '';
+        const match = firstUrl.match(/orgaos\/(\d{14})\/contratos\/(\d{4})\/(\d+)\/arquivos/);
+        if (match) {
+          resolvedRef = {
+            cnpj: match[1],
+            ano: Number(match[2]),
+            sequencial: match[3],
+            numeroControlePNCP: contrato.pncp_control_number || `${match[1]}-2-${match[3].padStart(6, '0')}/${match[2]}`,
+            hasPncpRecord: true,
+          };
+        }
+      }
+      setPncpRef(resolvedRef);
+      setIsLoadingPncpDocs(false);
+      return;
+    }
+
+    // Se o banco já registrou que não possui registro no PNCP e foi checado recentemente, evita requisição
+    if (!forceLive && contrato.pncp_has_record === false && contrato.pncp_documentos_checked_at) {
+      setPncpDocs([]);
+      setPncpRef(null);
+      setIsLoadingPncpDocs(false);
+      return;
+    }
+
+    const abortController = new AbortController();
+    setIsLoadingPncpDocs(true);
+    setPncpError(null);
+
+    buscarDocumentosContratoPncp(contrato, { signal: abortController.signal })
+      .then((res) => {
+        setPncpDocs(res.documentos);
+        setPncpRef(res.ref);
+        if (res.error && res.documentos.length === 0) {
+          setPncpError(res.error);
+        }
+      })
+      .catch((err) => {
+        if ((err as Error)?.name !== 'AbortError') {
+          console.warn('ContratoApiDetailsSheet: erro ao consultar documentos PNCP', err);
+          setPncpError('Não foi possível carregar os documentos do PNCP.');
+        }
+      })
+      .finally(() => {
+        setIsLoadingPncpDocs(false);
+      });
+
+    return () => {
+      abortController.abort();
+    };
+  }, [contrato, details?.documentos]);
+
+  useEffect(() => {
+    if (!open || !contrato) {
+      setPncpDocs([]);
+      setPncpRef(null);
+      setIsLoadingPncpDocs(false);
+      setPncpError(null);
+      return;
+    }
+
+    return fetchPncpDocs(false);
+  }, [open, contrato, fetchPncpDocs]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[min(90vh,880px)] w-[calc(100vw-2rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0 bg-background sm:rounded-2xl border border-border shadow-2xl">
@@ -359,6 +471,18 @@ export function ContratoApiDetailsSheet({
             </span>
             <span className="text-lg font-bold text-foreground">Contrato {contrato?.numero ?? '-'}</span>
             {hasReitoriaOrigin ? <Badge variant="secondary" className="rounded-md">Origem Reitoria</Badge> : null}
+            {pncpRef ? (
+              <a
+                href={buildPncpContratoWebUrl(pncpRef)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-action-primary bg-action-primary/10 hover:bg-action-primary/20 px-2.5 py-1 rounded-md transition-colors border border-action-primary/20 ml-auto"
+                title={`Abrir página do contrato ${pncpRef.numeroControlePNCP || ''} no Portal Nacional de Contratações Públicas (PNCP)`}
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                <span>Portal PNCP</span>
+              </a>
+            ) : null}
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground mt-1">
             {contrato?.fornecedor_nome || 'Fornecedor não informado'} | Vigência {formatDate(contrato?.vigencia_inicio)} a {formatDate(contrato?.vigencia_fim)}
@@ -694,6 +818,162 @@ export function ContratoApiDetailsSheet({
                       </div>
                     ) : null}
                   </Tabs>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="documentos" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+                <AccordionTrigger className="gap-3 py-4 hover:no-underline">
+                  <AccordionSectionTitle
+                    icon={<FileDown className="h-4 w-4" />}
+                    title="Documentos e Anexos Oficiais (PNCP)"
+                    description="Contrato assinado, termos aditivos e publicações em PDF disponibilizados no PNCP."
+                    count={
+                      isLoadingPncpDocs
+                        ? 'Carregando...'
+                        : pncpDocs.length > 0
+                          ? `${pncpDocs.length} ${pncpDocs.length === 1 ? 'documento' : 'documentos'}`
+                          : pncpRef?.hasPncpRecord
+                            ? 'Publicado (sem PDF)'
+                            : 'Não localizado'
+                    }
+                  />
+                </AccordionTrigger>
+                <AccordionContent className="pb-4 pt-0 space-y-3">
+                  {isLoadingPncpDocs ? (
+                    <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      <span>Consultando base de contratos e arquivos do PNCP...</span>
+                    </div>
+                  ) : pncpDocs.length > 0 ? (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                        <span>
+                          {pncpDocs.length} {pncpDocs.length === 1 ? 'arquivo oficial encontrado' : 'arquivos oficiais encontrados'} no PNCP
+                          {pncpRef?.numeroControlePNCP ? ` (${pncpRef.numeroControlePNCP})` : ''}
+                        </span>
+                        <div className="flex items-center gap-3">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground gap-1"
+                            onClick={() => fetchPncpDocs(true)}
+                            disabled={isLoadingPncpDocs}
+                            title="Consultar PNCP novamente e atualizar banco"
+                          >
+                            <RefreshCw className={cn("h-3 w-3", isLoadingPncpDocs && "animate-spin")} />
+                            <span>Atualizar</span>
+                          </Button>
+                          {pncpRef ? (
+                            <a
+                              href={buildPncpContratoWebUrl(pncpRef)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 font-medium text-action-primary hover:underline"
+                            >
+                              <span>Ver contrato no Portal PNCP</span>
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="overflow-x-auto rounded-md border border-border/70">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Documento</TableHead>
+                              <TableHead>Tipo</TableHead>
+                              <TableHead>Publicação</TableHead>
+                              <TableHead className="text-right">Ação</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {pncpDocs.map((doc) => (
+                              <TableRow key={`${doc.sequencialDocumento}-${doc.url}`}>
+                                <TableCell>
+                                  <div className="font-medium text-foreground max-w-md truncate" title={doc.titulo}>
+                                    {doc.titulo || `Documento ${doc.sequencialDocumento}`}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="secondary" className="text-[10px] font-normal">
+                                    {doc.tipoDocumentoNome || 'Documento'}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-xs text-muted-foreground">
+                                  {formatDate(doc.dataPublicacaoPncp)}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 gap-1.5 text-xs text-action-primary border-action-primary/30 hover:bg-action-primary/10"
+                                    onClick={() => window.open(doc.url, '_blank', 'noopener,noreferrer')}
+                                    title="Abrir ou baixar arquivo PDF"
+                                  >
+                                    <Download className="h-3.5 w-3.5" />
+                                    <span>Abrir PDF</span>
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  ) : pncpRef?.hasPncpRecord ? (
+                    <div className="rounded-md border border-border/70 bg-muted/20 p-5 text-center space-y-3">
+                      <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                        <span>Contrato publicado no PNCP</span>
+                        <Badge variant="secondary" className="text-[10px] font-mono">
+                          ID: {pncpRef.numeroControlePNCP}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground max-w-xl mx-auto">
+                        O registro deste contrato está publicado no PNCP para a UG {pncpRef.unidadeCodigo || 'do campus'}, porém o órgão ainda não disponibilizou arquivos PDF para download nesta contratação.
+                      </p>
+                      <div className="flex items-center justify-center gap-3 pt-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1 text-xs"
+                          onClick={() => fetchPncpDocs(true)}
+                          disabled={isLoadingPncpDocs}
+                        >
+                          <RefreshCw className={cn("h-3 w-3", isLoadingPncpDocs && "animate-spin")} />
+                          <span>Reconsultar PNCP</span>
+                        </Button>
+                        <a
+                          href={buildPncpContratoWebUrl(pncpRef)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-action-primary hover:underline"
+                        >
+                          <span>Acessar no Portal PNCP</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-md border border-dashed border-border/70 p-6 text-center space-y-3">
+                      <p className="text-sm font-medium text-foreground">
+                        Nenhum documento do PNCP sincronizado no banco de dados.
+                      </p>
+                      <p className="text-xs text-muted-foreground max-w-lg mx-auto">
+                        Contratos anteriores à Lei 14.133/2021 ou pendentes de envio pelo órgão ao PNCP não constam no portal nacional.
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 text-xs text-action-primary border-action-primary/30"
+                        onClick={() => fetchPncpDocs(true)}
+                        disabled={isLoadingPncpDocs}
+                      >
+                        <RefreshCw className={cn("h-3.5 w-3.5", isLoadingPncpDocs && "animate-spin")} />
+                        <span>Consultar no PNCP agora</span>
+                      </Button>
+                    </div>
+                  )}
                 </AccordionContent>
               </AccordionItem>
             </Accordion>

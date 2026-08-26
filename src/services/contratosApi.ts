@@ -118,6 +118,12 @@ export interface ContratoApiRow {
   updated_at: string;
   categoria?: string | null;
   prorrogavel?: string | null;
+  pncp_sequencial?: number | null;
+  pncp_ano?: number | null;
+  pncp_control_number?: string | null;
+  pncp_has_record?: boolean | null;
+  pncp_documentos_checked_at?: string | null;
+  pncp_documentos_count?: number | null;
 }
 
 export interface ContratoApiEmpenhoRow {
@@ -222,6 +228,22 @@ export interface ContratoApiHistoricoRow {
   situacao_contrato: string | null;
 }
 
+export interface ContratoApiDocumentoRow {
+  id: string;
+  contrato_api_id: string;
+  sequencial_documento: number;
+  titulo: string;
+  tipo_documento_id?: number | null;
+  tipo_documento_nome: string;
+  url: string;
+  uri?: string | null;
+  data_publicacao_pncp?: string | null;
+  tamanho?: number | null;
+  raw_data?: Record<string, unknown> | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface ContratoApiDetails {
   historico: ContratoApiHistoricoRow[];
   empenhos: ContratoApiEmpenhoRow[];
@@ -229,6 +251,7 @@ export interface ContratoApiDetails {
   faturas: ContratoApiFaturaRow[];
   faturaItens: ContratoApiFaturaItemRow[];
   faturaEmpenhos: ContratoApiFaturaEmpenhoRow[];
+  documentos?: ContratoApiDocumentoRow[];
 }
 
 export interface ContratoApiSyncRun {
@@ -631,7 +654,7 @@ export const contratosApiService = {
     const today = new Date().toISOString().slice(0, 10);
     let query = supabase
       .from('contratos_api')
-      .select('id, api_contrato_id, numero, fornecedor_nome, fornecedor_documento, unidade_codigo, unidade_nome, unidade_origem_codigo, unidade_origem_nome, objeto, processo, vigencia_inicio, vigencia_fim, vigencia_inicio_derivada, vigencia_fim_derivada, valor_global, valor_acumulado, situacao, situacao_derivada, situacao_derivada_motivo, campus_scope_reason, updated_at, categoria, prorrogavel:raw_data->>prorrogavel')
+      .select('id, api_contrato_id, numero, fornecedor_nome, fornecedor_documento, unidade_codigo, unidade_nome, unidade_origem_codigo, unidade_origem_nome, objeto, processo, vigencia_inicio, vigencia_fim, vigencia_inicio_derivada, vigencia_fim_derivada, valor_global, valor_acumulado, situacao, situacao_derivada, situacao_derivada_motivo, campus_scope_reason, updated_at, categoria, prorrogavel:raw_data->>prorrogavel, pncp_sequencial, pncp_ano, pncp_control_number, pncp_has_record, pncp_documentos_checked_at, pncp_documentos_count')
       .in('campus_scope_reason', ['ug_campus', 'reitoria_com_empenho_campus', 'reitoria_com_fatura_campus'])
       .order('numero', { ascending: true });
 
@@ -740,8 +763,27 @@ export const contratosApiService = {
     return all.filter((row) => set.has(row.contrato_api_id));
   },
 
+  async getDocumentosApi(contratoApiIds?: string[]): Promise<ContratoApiDocumentoRow[]> {
+    let query = supabase
+      .from('contratos_api_documentos')
+      .select('id, contrato_api_id, sequencial_documento, titulo, tipo_documento_id, tipo_documento_nome, url, uri, data_publicacao_pncp, tamanho, raw_data, created_at, updated_at')
+      .order('sequencial_documento', { ascending: true });
+
+    if (contratoApiIds && contratoApiIds.length > 0 && contratoApiIds.length <= 100) {
+      query = query.in('contrato_api_id', contratoApiIds);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throwMigrationRequired(error);
+    const all = (data ?? []) as ContratoApiDocumentoRow[];
+    if (!contratoApiIds || contratoApiIds.length === 0 || contratoApiIds.length <= 100) return all;
+    const set = new Set(contratoApiIds);
+    return all.filter((row) => set.has(row.contrato_api_id));
+  },
+
   async getContratoApiDetails(contratoApiId: string): Promise<ContratoApiDetails> {
-    const [historicoResult, empenhosResult, itensResult, faturasResult, faturaItensResult, faturaEmpenhosResult] = await Promise.all([
+    const [historicoResult, empenhosResult, itensResult, faturasResult, faturaItensResult, faturaEmpenhosResult, documentosResult] = await Promise.all([
       supabase
         .from('contratos_api_historico')
         .select(CONTRATOS_API_HISTORICO_SELECT)
@@ -770,6 +812,11 @@ export const contratosApiService = {
         .from('contratos_api_fatura_empenhos')
         .select('id, contrato_api_id, contrato_api_fatura_id, contrato_api_empenho_id, api_empenho_id, numero_empenho, valor_empenho, subelemento')
         .eq('contrato_api_id', contratoApiId),
+      supabase
+        .from('contratos_api_documentos')
+        .select('id, contrato_api_id, sequencial_documento, titulo, tipo_documento_id, tipo_documento_nome, url, uri, data_publicacao_pncp, tamanho, raw_data, created_at, updated_at')
+        .eq('contrato_api_id', contratoApiId)
+        .order('sequencial_documento', { ascending: true }),
     ]);
 
     const firstError =
@@ -778,7 +825,8 @@ export const contratosApiService = {
       itensResult.error ||
       faturasResult.error ||
       faturaItensResult.error ||
-      faturaEmpenhosResult.error;
+      faturaEmpenhosResult.error ||
+      documentosResult.error;
     const empenhos = (empenhosResult.data ?? []) as ContratoApiEmpenhoRow[];
     const empenhoIds = new Set(empenhos.map((empenho) => empenho.id));
     const apiEmpenhoIds = new Set(empenhos.map((empenho) => Number(empenho.api_empenho_id)));
@@ -804,6 +852,7 @@ export const contratosApiService = {
       faturas,
       faturaItens,
       faturaEmpenhos,
+      documentos: (documentosResult.data ?? []) as ContratoApiDocumentoRow[],
     };
   },
 

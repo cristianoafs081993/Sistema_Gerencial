@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { ContratoApiDetailsSheet } from '@/components/contratos/ContratoApiDetailsSheet';
+import * as pncpService from '@/services/pncpContratos';
 import type { ContratoApiDetails, ContratoApiRow, ContratoApiSyncRun } from '@/services/contratosApi';
 
 const contrato: ContratoApiRow = {
@@ -368,7 +369,136 @@ describe('ContratoApiDetailsSheet', () => {
     expect(screen.getByText('Qtd. 1 | Unitário R$ 1.000,00')).toBeInTheDocument();
     expect(screen.getByText('Sem item vinculado')).toBeInTheDocument();
   }, 15000);
+
+  it('exibe documentos oficiais do PNCP e permite abrir o PDF', async () => {
+    const mockDocumentos = [
+      {
+        sequencialDocumento: 1,
+        titulo: 'Termo de Contrato 62/2018',
+        tipoDocumentoNome: 'Contrato',
+        url: 'https://pncp.gov.br/pncp-api/v1/orgaos/10877412000168/contratos/2018/62/arquivos/1',
+        dataPublicacaoPncp: '2018-05-10',
+      },
+      {
+        sequencialDocumento: 2,
+        titulo: '1º Termo Aditivo',
+        tipoDocumentoNome: 'Termo Aditivo',
+        url: 'https://pncp.gov.br/pncp-api/v1/orgaos/10877412000168/contratos/2018/62/arquivos/2',
+        dataPublicacaoPncp: '2019-05-09',
+      },
+    ];
+
+    vi.spyOn(pncpService, 'buscarDocumentosContratoPncp').mockResolvedValue({
+      ref: {
+        cnpj: '10877412000168',
+        ano: 2018,
+        sequencial: '62',
+      },
+      documentos: mockDocumentos,
+    });
+
+    const windowOpenSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+    render(
+      <ContratoApiDetailsSheet
+        open
+        onOpenChange={vi.fn()}
+        contrato={contrato}
+        details={details}
+        lastSyncRun={lastSyncRun}
+      />,
+    );
+
+    const docsSection = screen.getByRole('button', { name: /Documentos e Anexos Oficiais \(PNCP\)/i });
+    expect(docsSection).toBeInTheDocument();
+    fireEvent.click(docsSection);
+
+    await waitFor(() => {
+      expect(screen.getByText('Termo de Contrato 62/2018')).toBeInTheDocument();
+      expect(screen.getByText('1º Termo Aditivo')).toBeInTheDocument();
+      expect(screen.getByText('Ver contrato no Portal PNCP')).toBeInTheDocument();
+    });
+
+    const openPdfButtons = screen.getAllByRole('button', { name: /Abrir PDF/i });
+    expect(openPdfButtons).toHaveLength(2);
+
+    fireEvent.click(openPdfButtons[0]);
+    expect(windowOpenSpy).toHaveBeenCalledWith(
+      'https://pncp.gov.br/pncp-api/v1/orgaos/10877412000168/contratos/2018/62/arquivos/1',
+      '_blank',
+      'noopener,noreferrer',
+    );
+  });
+
+  it('exibe documentos persistidos do banco de dados diretamente sem chamar PNCP novamente', async () => {
+    const contrato: ContratoApiRow = {
+      id: 'c1',
+      api_contrato_id: 1,
+      numero: '00174/2026',
+      fornecedor_nome: 'LG. ADMINISTRADORA DE SERVICOS LTDA',
+      unidade_codigo: '158366',
+      unidade_nome: 'Campus Currais Novos',
+      unidade_origem_codigo: '158366',
+      unidade_origem_nome: 'Campus Currais Novos',
+      objeto: 'Serviços de recepção',
+      processo: '23035.001731/2025-37',
+      vigencia_inicio: '2026-07-01',
+      vigencia_fim: '2028-07-01',
+      valor_global: 84000,
+      valor_acumulado: 84000,
+      situacao: true,
+      updated_at: '2026-08-01T00:00:00Z',
+      pncp_control_number: '10877412000168-2-000293/2026',
+      pncp_sequencial: 293,
+      pncp_ano: 2026,
+      pncp_has_record: true,
+    };
+
+    const details: ContratoApiDetails = {
+      historico: [],
+      empenhos: [],
+      itens: [],
+      faturas: [],
+      faturaItens: [],
+      faturaEmpenhos: [],
+      documentos: [
+        {
+          id: 'doc-1',
+          contrato_api_id: 'c1',
+          sequencial_documento: 1,
+          titulo: 'Contrato 00174/2026',
+          tipo_documento_id: 1,
+          tipo_documento_nome: 'Contrato',
+          url: 'https://pncp.gov.br/pncp-api/v1/orgaos/10877412000168/contratos/2026/293/arquivos/1',
+          data_publicacao_pncp: '2026-07-02T15:45:49',
+        },
+      ],
+    };
+
+    const buscarSpy = vi.spyOn(pncpService, 'buscarDocumentosContratoPncp');
+
+    render(
+      <ContratoApiDetailsSheet
+        open
+        onOpenChange={vi.fn()}
+        contrato={contrato}
+        details={details}
+      />,
+    );
+
+    const docsSection = screen.getByRole('button', { name: /Documentos e Anexos Oficiais \(PNCP\)/i });
+    fireEvent.click(docsSection);
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Contrato 00174/2026').length).toBeGreaterThanOrEqual(2);
+      expect(screen.getByText('Ver contrato no Portal PNCP')).toBeInTheDocument();
+    });
+
+    // Como já constava em details.documentos, não precisa fazer requisição externa
+    expect(buscarSpy).not.toHaveBeenCalled();
+  });
 });
+
 
 
 

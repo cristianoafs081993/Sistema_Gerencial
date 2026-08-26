@@ -440,6 +440,19 @@ Observacoes operacionais:
 - vinculos entre faturas e empenhos, derivados de `dados_empenho`
 - usado como contexto no detalhe de faturas do contrato
 
+### `contratos_api_documentos`
+
+- documentos oficiais e anexos (PDFs de contratos, aditivos, apostilamentos e publicações) consultados e sincronizados a partir da API do PNCP (`GET /orgaos/{cnpj}/contratos/{ano}/{seq}/arquivos`)
+- campos principais:
+  - `contrato_api_id`: chave estrangeira referenciando `contratos_api(id)`
+  - `sequencial_documento`: sequencial do documento retornado pelo PNCP
+  - `titulo`: título ou nome amigável do documento
+  - `tipo_documento_nome`: tipo documental (ex: `Contrato`, `Termo Aditivo`, `Apostilamento`, `Outros Documentos`)
+  - `url`: link direto para visualização ou download do arquivo PDF oficial
+  - `data_publicacao_pncp`: data/hora de publicação no PNCP
+  - `tamanho`: tamanho em bytes do documento
+- consumido em tempo real pelo modal de detalhes do contrato ([`ContratoApiDetailsSheet.tsx`](file:///c:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/components/contratos/ContratoApiDetailsSheet.tsx)) e sincronizado pelo job diário `sync-contratos-pncp-documentos`
+
 ### `contratos_api_sync_runs`
 
 Consumido por:

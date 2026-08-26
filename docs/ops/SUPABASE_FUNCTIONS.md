@@ -479,6 +479,27 @@ Observacao:
 - aceita `unidadeCodigos` ou `unidadeCodigo` para sincronizar UASGs específicas, e executa a varredura completa das 19 UASGs quando omitido
 - o endpoint de "ativos" do Comprasnet nao e fonte de verdade de vigencia; a exibicao da UI usa `situacao_derivada`, nao `situacao`
 
+### `sync-contratos-pncp-documentos`
+
+Local:
+
+- [sync-contratos-pncp-documentos/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-contratos-pncp-documentos/index.ts)
+
+Uso:
+
+- sincroniza periodicamente os documentos oficiais (PDFs de contratos, aditivos, apostilamentos) a partir da API pública do PNCP (`GET /orgaos/{cnpj}/contratos/{ano}/{seq}/arquivos`)
+- resolve o `sequencialContrato` exato no PNCP via API de Consulta por UASG/Ano, com cache em memória durante a execução para evitar limites de taxa (503)
+- faz upsert direto na tabela `contratos_api_documentos` e atualiza as colunas de controle em `contratos_api` (`pncp_control_number`, `pncp_sequencial`, `pncp_ano`, `pncp_has_record`, `pncp_documentos_checked_at`, `pncp_documentos_count`)
+
+Dependencias:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Observacao:
+
+- publicada com `verify_jwt = false`, pois é chamada pelo cron do banco e pelo backend
+- agendada via `pg_cron` / `pg_net` para executar diariamente às **`05:00` no horário de Brasília (`08:00 UTC`)**, horário dedicado e posterior às sincronizações da madrugada (03:00 Comprasnet, 03:30 Licitações, 04:00/04:30 Transparência), garantindo zero contenção de recursos no servidor
+
 ### `sync-licitacoes-pncp`
 
 Local:
