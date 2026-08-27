@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import LCPage from '@/pages/LC';
+import { loadLcSavedLists } from '@/lib/lcSavedLists';
 import { extractBolsistasFromPdfFiles } from '@/services/bolsistasPdfService';
 import { compararBolsistasComLC } from '@/services/lcComparisonService';
 import { loadLatestLCRowsFromDb } from '@/services/lcImportService';
@@ -35,6 +36,7 @@ const mockedCompararBolsistasComLC = vi.mocked(compararBolsistasComLC);
 describe('LCPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     mockedLoadLatestLCRowsFromDb.mockResolvedValue({
       sourceFile: 'lista-credores.csv',
       rows: [
@@ -95,5 +97,30 @@ describe('LCPage', () => {
     for (const button of within(dialog).getAllByTitle('Copiar')) {
       expect(button).toBeEnabled();
     }
+
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Nome da lista de trabalho' }), {
+      target: { value: 'Pagamento de agosto' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar lista' }));
+
+    expect(loadLcSavedLists()).toEqual([
+      expect.objectContaining({
+        name: 'Pagamento de agosto',
+        rows: [expect.objectContaining({ cpf: '12345678901', selectedConta: '020846728' })],
+      }),
+    ]);
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Fechar' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Preenchimento SIAFI & Lista de Credores' })).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Listas salvas (1)' }));
+    const savedListsDialog = await screen.findByRole('dialog', { name: 'Listas de trabalho salvas' });
+    expect(within(savedListsDialog).getByText('Pagamento de agosto')).toBeInTheDocument();
+    fireEvent.click(within(savedListsDialog).getByRole('button', { name: 'Abrir' }));
+
+    const reopenedDialog = await screen.findByRole('dialog', { name: 'Preenchimento SIAFI & Lista de Credores' });
+    expect(within(reopenedDialog).getByRole('textbox', { name: 'Nome da lista de trabalho' })).toHaveValue('Pagamento de agosto');
   });
 });

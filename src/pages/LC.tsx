@@ -1,5 +1,5 @@
 import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { Upload, Search, ChevronLeft, ChevronRight, Copy, Check, Download, AlertCircle, Table as TableIcon } from 'lucide-react';
+import { Upload, Search, ChevronLeft, ChevronRight, Copy, Check, Download, AlertCircle, Save, FolderOpen, Trash2, Table as TableIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -30,12 +30,36 @@ import {
   type SiafiMacroInputRow,
 } from '@/services/siafiMacroService';
 import { env } from '@/lib/env';
+import { deleteLcSavedList, loadLcSavedLists, saveLcSavedList, type LcSavedList } from '@/lib/lcSavedLists';
 import { normalizeLcAccount, padLeftLcAccount } from '@/utils/lcAccount';
 
 const statusLabel: Record<PendenciaStatus, string> = {
   sem_cadastro_lc: 'Sem cadastro na LC',
   sem_conta_lc: 'Sem conta cadastrada na LC',
   conta_divergente: 'Conta divergente',
+};
+
+type LcAccountOption = {
+  bancoCodigo: string;
+  agenciaCodigo: string;
+  contaBancaria: string;
+};
+
+type LcGridRow = {
+  id: string;
+  cpf: string;
+  nome: string;
+  bancoPdf: string;
+  agenciaPdf: string;
+  contaPdf: string;
+  valor?: number;
+  selectedBanco: string;
+  selectedAgencia: string;
+  selectedConta: string;
+  contaPagadora: string;
+  status: 'ok' | 'aluno_nao_encontrado' | 'conta_nao_encontrada';
+  lcAccounts: LcAccountOption[];
+  originalLcAccounts: LcAccountOption[];
 };
 
 function CopyButton({ value, disabled }: { value: string; disabled?: boolean }) {
@@ -87,7 +111,11 @@ export default function LCPage() {
   const [macroRowsCount, setMacroRowsCount] = useState(0);
   const [macroContext, setMacroContext] = useState<'sem_pendencias' | 'com_pendencias'>('sem_pendencias');
   const [dialogMacroRows, setDialogMacroRows] = useState<SiafiMacroInputRow[]>([]);
-  const [gridRows, setGridRows] = useState<any[]>([]);
+  const [gridRows, setGridRows] = useState<LcGridRow[]>([]);
+  const [savedWorkLists, setSavedWorkLists] = useState<LcSavedList<LcGridRow>[]>(() => loadLcSavedLists<LcGridRow>());
+  const [savedListsDialogOpen, setSavedListsDialogOpen] = useState(false);
+  const [workListName, setWorkListName] = useState('Lista de trabalho');
+  const [activeSavedListId, setActiveSavedListId] = useState<string | null>(null);
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
   const [chunkIndex, setChunkIndex] = useState(0);
   const [dialogTab, setDialogTab] = useState<'macro' | 'grid'>('grid');
@@ -222,6 +250,84 @@ export default function LCPage() {
     return `${base}-siafi-${stamp}.mac`;
   };
 
+  const buildMacroRows = (workRows: LcGridRow[]): SiafiMacroInputRow[] =>
+    workRows
+      .filter((row) => row.status !== 'aluno_nao_encontrado')
+      .map((row) => ({
+        cpf: row.cpf,
+        bancoCodigo: row.selectedBanco,
+        agenciaCodigo: row.selectedAgencia,
+        contaPagadora: row.contaPagadora,
+        contaFavorecido: row.selectedConta,
+        valor: row.valor,
+      }));
+
+  const getDefaultWorkListName = (sourcePdfNames: string[]) => {
+    if (sourcePdfNames.length !== 1) return 'Lista de trabalho';
+    return sourcePdfNames[0].replace(/\.[^.]+$/, '') || 'Lista de trabalho';
+  };
+
+  const handleSaveWorkList = () => {
+    if (!gridRows.length) {
+      toast.error('Nao ha dados na grade para salvar.');
+      return;
+    }
+
+    try {
+      const savedList = saveLcSavedList({
+        id: activeSavedListId,
+        name: workListName,
+        sourcePdfNames: pdfFileNames,
+        rows: gridRows,
+      });
+      setSavedWorkLists(loadLcSavedLists<LcGridRow>());
+      setWorkListName(savedList.name);
+      setActiveSavedListId(savedList.id);
+      toast.success(`Lista "${savedList.name}" salva neste navegador.`);
+    } catch (error) {
+      console.error('Erro ao salvar lista de trabalho da LC:', error);
+      toast.error('Nao foi possivel salvar a lista neste navegador.');
+    }
+  };
+
+  const handleOpenSavedWorkList = (savedList: LcSavedList<LcGridRow>) => {
+    const macroRows = buildMacroRows(savedList.rows);
+    if (!macroRows.length) {
+      toast.error('A lista salva nao possui linhas aptas para preenchimento.');
+      return;
+    }
+
+    const hasPendencias = savedList.rows.some((row) => row.status !== 'ok');
+    const macro = buildSiafiListaCredoresMacro(macroRows, {
+      scriptName: hasPendencias ? 'Lista de Credores - Pendencias' : 'Lista de Credores',
+      author: 'sistema-gerencial',
+      includeFirstConfirmationEnter: true,
+    });
+
+    setGridRows(savedList.rows);
+    setPdfFileNames(savedList.sourcePdfNames);
+    setTotalBolsistasProcessados(savedList.rows.length);
+    setMacroContent(macro);
+    setMacroFileName(buildMacroFileName(savedList.sourcePdfNames));
+    setMacroRowsCount(macroRows.length);
+    setMacroContext(hasPendencias ? 'com_pendencias' : 'sem_pendencias');
+    setDialogMacroRows(macroRows);
+    setExpandedRowId(null);
+    setChunkIndex(0);
+    setDialogTab('grid');
+    setIsCopied(false);
+    setWorkListName(savedList.name);
+    setActiveSavedListId(savedList.id);
+    setSavedListsDialogOpen(false);
+    setMacroDialogOpen(true);
+  };
+
+  const handleDeleteSavedWorkList = (id: string) => {
+    deleteLcSavedList(id);
+    setSavedWorkLists(loadLcSavedLists<LcGridRow>());
+    if (activeSavedListId === id) setActiveSavedListId(null);
+  };
+
   const handleConfirmarGeracaoMacro = () => {
     if (!dialogMacroRows.length || !macroFileName) {
       toast.error('Nao foi possivel gerar a macro desta comparacao.');
@@ -324,16 +430,7 @@ export default function LCPage() {
         });
 
         // 2. Gerar linhas da macro a partir de fullGridRows, filtrando 'aluno_nao_encontrado'
-        const macroRows: SiafiMacroInputRow[] = fullGridRows
-          .filter((r) => r.status !== 'aluno_nao_encontrado')
-          .map((r) => ({
-            cpf: r.cpf,
-            bancoCodigo: r.selectedBanco,
-            agenciaCodigo: r.selectedAgencia,
-            contaPagadora: r.contaPagadora,
-            contaFavorecido: r.selectedConta,
-            valor: r.valor,
-          }));
+        const macroRows = buildMacroRows(fullGridRows);
 
         if (macroRows.length > 0) {
           const generatedFileName = buildMacroFileName(sourcePdfNames);
@@ -353,6 +450,8 @@ export default function LCPage() {
           setChunkIndex(0);
           setDialogTab('grid');
           setIsCopied(false);
+          setWorkListName(getDefaultWorkListName(sourcePdfNames));
+          setActiveSavedListId(null);
           setMacroDialogOpen(true);
         } else {
           setMacroContent('');
@@ -393,6 +492,15 @@ export default function LCPage() {
         title="Lista de Credores (LC)"
         actions={
           <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setSavedListsDialogOpen(true)}
+              size="sm"
+              variant="outline"
+              className="gap-space-2 h-space-9 shadow-shadow-sm"
+            >
+              <FolderOpen className="h-4 w-4" />
+              Listas salvas{savedWorkLists.length ? ` (${savedWorkLists.length})` : ''}
+            </Button>
             <Button
               onClick={() => pdfInputRef.current?.click()}
               size="sm"
@@ -976,16 +1084,91 @@ export default function LCPage() {
             )}
           </div>
 
-          <DialogFooter className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setMacroDialogOpen(false)}
-              className="text-xs h-8 px-4"
-            >
-              Fechar
-            </Button>
+          <DialogFooter className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <Input
+                aria-label="Nome da lista de trabalho"
+                value={workListName}
+                onChange={(event) => setWorkListName(event.target.value)}
+                placeholder="Nome da lista"
+                className="h-8 text-xs sm:max-w-xs"
+              />
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSaveWorkList}
+                  className="h-8 gap-1.5 px-3 text-xs"
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  Salvar lista
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMacroDialogOpen(false)}
+                  className="h-8 px-4 text-xs"
+                >
+                  Fechar
+                </Button>
+              </div>
+            </div>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={savedListsDialogOpen} onOpenChange={setSavedListsDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FolderOpen className="h-5 w-5 text-indigo-500" />
+              Listas de trabalho salvas
+            </DialogTitle>
+            <DialogDescription>
+              As listas ficam salvas somente neste navegador e mantêm as contas selecionadas durante o trabalho.
+            </DialogDescription>
+          </DialogHeader>
+
+          {savedWorkLists.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Nenhuma lista de trabalho foi salva ainda.
+            </p>
+          ) : (
+            <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+              {savedWorkLists.map((savedList) => (
+                <div
+                  key={savedList.id}
+                  className="flex items-center justify-between gap-3 rounded-md border border-border-default/60 p-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">{savedList.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {savedList.rows.length} aluno(s) • salvo em {new Date(savedList.updatedAt).toLocaleString('pt-BR')}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleOpenSavedWorkList(savedList)}
+                      className="h-8 px-3 text-xs"
+                    >
+                      Abrir
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => handleDeleteSavedWorkList(savedList.id)}
+                      aria-label={`Excluir lista ${savedList.name}`}
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
