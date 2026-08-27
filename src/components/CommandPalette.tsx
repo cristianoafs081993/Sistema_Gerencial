@@ -409,6 +409,8 @@ export function CommandPalette({
 
   // Lista unificada de contratos EXCLUSIVAMENTE ATIVOS (mesclando API e dados locais)
   const combinedContratos = useMemo(() => {
+    if (disableContractSearch) return [];
+
     const map = new Map<
       string,
       {
@@ -472,7 +474,7 @@ export function CommandPalette({
     }
 
     return Array.from(map.values());
-  }, [apiContratos, contratosList]);
+  }, [apiContratos, contratosList, disableContractSearch]);
 
   const handleSelectContrato = async (cont: (typeof combinedContratos)[number]) => {
     setIsContratoDetailsOpen(true);
