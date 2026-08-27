@@ -5,6 +5,7 @@
   const MESSAGE_SOURCE = 'siages';
   const MESSAGE_TYPE = 'siafi:fill-favorecidos';
   const MESSAGE_VERSION = 1;
+  const MAX_RECORDS_PER_BATCH = 10;
   const DEFAULT_TIMEOUT = 10000;
   const ROW_SELECTOR = 'tbody tr';
 
@@ -30,10 +31,7 @@
   }
 
   function formatCurrency(value) {
-    return value.toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
+    return String(Math.round((value + Number.EPSILON) * 100));
   }
 
   function validateRecords(records) {
@@ -146,6 +144,9 @@
 
   async function fillSiafiBeneficiaries(records) {
     const normalizedRecords = validateRecords(records);
+    if (normalizedRecords.length > MAX_RECORDS_PER_BATCH) {
+      throw new Error(`O SIAFI aceita no máximo ${MAX_RECORDS_PER_BATCH} favorecidos por vez. Divida a lista em blocos antes de tentar novamente.`);
+    }
     const container = findTableContainer();
     if (!container) {
       throw new Error('Não encontrei a tabela de favorecidos. Abra a transação de inclusão no SIAFI e tente novamente.');
@@ -196,6 +197,7 @@
     MESSAGE_SOURCE,
     MESSAGE_TYPE,
     MESSAGE_VERSION,
+    MAX_RECORDS_PER_BATCH,
     cleanText,
     normalizeCpf,
     parseCurrency,

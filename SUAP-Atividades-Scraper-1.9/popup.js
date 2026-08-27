@@ -7,6 +7,8 @@ const SIAFI_LISTS_QUERY = 'select=id,name,updated_at,rows&order=updated_at.desc'
 const SIAFI_MESSAGE_SOURCE = 'siages';
 const SIAFI_MESSAGE_TYPE = 'siafi:fill-favorecidos';
 const SIAFI_MESSAGE_VERSION = 1;
+const SIAFI_BATCH_SIZE = 10;
+const SIAFI_BATCH_PROGRESS_STORAGE_KEY = 'siages-siafi-batch-progress';
 
 const statusEl = document.getElementById('status');
 const btnExtractEn = document.getElementById('btn-extract-en');
@@ -26,6 +28,7 @@ const siafiFillButton = document.getElementById('btn-siafi-fill');
 const siafiFillStatus = document.getElementById('siafi-fill-status');
 
 let siafiLists = [];
+let siafiBatchProgress = null;
 
 function setExtensionAuthStatus(message, isError = false) {
   extensionAuthStatus.textContent = message;
@@ -249,6 +252,39 @@ function setSiafiListStatus(message, isError = false) {
   siafiFillStatus.style.color = isError ? '#fca5a5' : '#b8c5d1';
 }
 
+function siafiListUpdatedAt(list) {
+  return String(list?.updated_at || list?.updatedAt || '');
+}
+
+function getSiafiBatchOffset(list, tab) {
+  if (!list || !siafiBatchProgress) return 0;
+  if (siafiBatchProgress.listId !== list.id || siafiBatchProgress.updatedAt !== siafiListUpdatedAt(list)) return 0;
+  if (tab && (siafiBatchProgress.tabId !== tab.id || siafiBatchProgress.tabUrl !== tab.url)) return 0;
+  const total = Array.isArray(list.rows) ? list.rows.length : 0;
+  return Math.min(Math.max(Number(siafiBatchProgress.offset) || 0, 0), total);
+}
+
+async function loadSiafiBatchProgress() {
+  try {
+    const stored = await chrome.storage.local.get(SIAFI_BATCH_PROGRESS_STORAGE_KEY);
+    const progress = stored?.[SIAFI_BATCH_PROGRESS_STORAGE_KEY];
+    siafiBatchProgress = progress && typeof progress === 'object' ? progress : null;
+  } catch {
+    siafiBatchProgress = null;
+  }
+}
+
+async function saveSiafiBatchProgress(list, tab, offset) {
+  siafiBatchProgress = {
+    listId: list.id,
+    updatedAt: siafiListUpdatedAt(list),
+    tabId: tab.id,
+    tabUrl: tab.url || '',
+    offset,
+  };
+  await chrome.storage.local.set({ [SIAFI_BATCH_PROGRESS_STORAGE_KEY]: siafiBatchProgress });
+}
+
 function updateSiafiListInfo() {
   if (!siafiListSelect || !siafiListInfo || !siafiFillButton) return;
   const selected = siafiLists.find((list) => list.id === siafiListSelect.value);
@@ -260,8 +296,21 @@ function updateSiafiListInfo() {
 
   const validation = validateSiafiRecords(buildSiafiRecords(selected));
   const validCount = validation.records.length - validation.invalid.length;
-  siafiListInfo.textContent = `${validCount} favorecido(s) pronto(s) para colagem.${validation.invalid.length ? ` ${validation.invalid.length} registro(s) inválido(s): posições ${validation.invalid.join(', ')}.` : ''}`;
-  siafiFillButton.disabled = validCount === 0 || validation.invalid.length > 0;
+  if (validation.invalid.length) {
+    siafiListInfo.textContent = `${validCount} favorecido(s) pronto(s) para colagem. ${validation.invalid.length} registro(s) inválido(s): posições ${validation.invalid.join(', ')}.`;
+    siafiFillButton.disabled = true;
+    return;
+  }
+
+  const offset = getSiafiBatchOffset(selected);
+  const nextBatchEnd = Math.min(offset + SIAFI_BATCH_SIZE, validation.records.length);
+  if (offset >= validation.records.length) {
+    siafiListInfo.textContent = `${validCount} favorecido(s) preenchido(s). Todos os blocos foram concluídos.`;
+    siafiFillButton.disabled = true;
+    return;
+  }
+  siafiListInfo.textContent = `${validCount} favorecido(s) pronto(s) para colagem. Próximo bloco: posições ${offset + 1}-${nextBatchEnd} (máximo ${SIAFI_BATCH_SIZE}).`;
+  siafiFillButton.disabled = validCount === 0;
 }
 
 function renderSiafiLists() {
@@ -313,6 +362,7 @@ async function loadSiafiLists() {
   setSiafiListStatus('Carregando listas da LC...');
   try {
     siafiLists = await fetchSharedLcSavedLists();
+    await loadSiafiBatchProgress();
     renderSiafiLists();
     setSiafiListStatus('');
   } catch (error) {
@@ -376,14 +426,23 @@ async function handleSiafiFill() {
     const validation = validateSiafiRecords(buildSiafiRecords(selected));
     if (!validation.records.length) throw new Error('A lista selecionada nao possui favorecidos.');
     if (validation.invalid.length) throw new Error(`Registros inválidos nas posições: ${validation.invalid.join(', ')}.`);
+    const offset = getSiafiBatchOffset(selected, activeTab);
+    const batchRecords = validation.records.slice(offset, offset + SIAFI_BATCH_SIZE);
+    if (!batchRecords.length) throw new Error('Todos os blocos desta lista já foram preenchidos nesta transação.');
     setSiafiListStatus('Localizando a tabela de favorecidos...');
     const frameId = await findSiafiFrameId(activeTab.id);
     setSiafiListStatus('Preenchendo favorecidos no SIAFI...');
-    const response = await sendSiafiFill(activeTab, frameId, validation.records);
+    const response = await sendSiafiFill(activeTab, frameId, batchRecords);
     if (!response?.ok) throw new Error(response?.error || 'Nao foi possivel preencher os favorecidos no SIAFI.');
     if (response.matched === false) throw new Error('O frame selecionado nao contem a tabela de favorecidos do SIAFI.');
-    setSiafiListStatus(`${response.inserted || 0} favorecido(s) preenchido(s). Confirme cada linha manualmente no SIAFI.`);
-    log(`${response.inserted || 0} favorecido(s) preenchido(s) no SIAFI. A confirmação continua manual.`, 'success');
+    const nextOffset = offset + batchRecords.length;
+    await saveSiafiBatchProgress(selected, activeTab, nextOffset);
+    const remaining = Math.max(validation.records.length - nextOffset, 0);
+    const batchNumber = Math.floor(offset / SIAFI_BATCH_SIZE) + 1;
+    const totalBatches = Math.ceil(validation.records.length / SIAFI_BATCH_SIZE);
+    const nextMessage = remaining ? ` Clique novamente para o próximo bloco (${batchNumber + 1}/${totalBatches}).` : ' Todos os blocos foram preenchidos.';
+    setSiafiListStatus(`${batchRecords.length} favorecido(s) preenchido(s) no bloco ${batchNumber}/${totalBatches}.${nextMessage} Confirme cada linha manualmente no SIAFI.`);
+    log(`${batchRecords.length} favorecido(s) preenchido(s) no bloco ${batchNumber}/${totalBatches}. A confirmação continua manual.`, 'success');
   } catch (error) {
     console.error('SIAFI fill error:', error);
     setSiafiListStatus(error instanceof Error ? error.message : 'Nao foi possivel preencher os favorecidos no SIAFI.', true);

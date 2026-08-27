@@ -86,6 +86,34 @@ describe('popup da extensao: preenchimento SIAFI', () => {
     }), { frameId: 7 });
   });
 
+  it('divide listas grandes em blocos de dez e retoma o próximo bloco', async () => {
+    const rows = Array.from({ length: 21 }, (_, index) => ({
+      cpf: String(10000000000 + index),
+      valor: index + 1,
+    }));
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/rest/v1/lc_saved_lists')) {
+        return Promise.resolve({ ok: true, json: async () => [{ id: 'list-large', name: 'Lote grande', updated_at: '2026-08-27T12:00:00Z', rows }] });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    }));
+    const { sendMessage } = setupChrome('https://siafi.tesouro.gov.br/siafi2026/cpr-comp-ng/#/transacoes/inclx');
+    loadPopup();
+
+    await waitFor(() => expect(document.querySelector('#siafi-list-select option')).toHaveTextContent('Lote grande (21 favorecido(s))'));
+    const fillButton = document.getElementById('btn-siafi-fill') as HTMLButtonElement;
+    fillButton.click();
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1));
+    expect(sendMessage.mock.calls[0][1].records).toHaveLength(10);
+    expect(sendMessage.mock.calls[0][1].records[0]).toEqual({ cpf: '10000000000', valor: 1 });
+
+    await waitFor(() => expect(document.getElementById('siafi-fill-status')).toHaveTextContent('bloco 1/3'));
+    fillButton.click();
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(2));
+    expect(sendMessage.mock.calls[1][1].records).toHaveLength(10);
+    expect(sendMessage.mock.calls[1][1].records[0]).toEqual({ cpf: '10000000010', valor: 11 });
+  });
+
   it('informa quando a sessão da extensão está ausente', async () => {
     const fetchMock = vi.mocked(fetch);
     vi.stubGlobal('SiagesExtensionAuth', { getSession: vi.fn().mockResolvedValue(null) });

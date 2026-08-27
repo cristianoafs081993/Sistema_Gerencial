@@ -70,8 +70,8 @@ describe('content script de favorecidos SIAFI', () => {
     expect(includeClicks).toBe(2);
     expect(inputs).toEqual([
       { cpf: '123.456.789-01', valor: '100,00' },
-      { cpf: '98765432100', valor: '250,00' },
-      { cpf: '11122233344', valor: '80,50' },
+      { cpf: '98765432100', valor: '25000' },
+      { cpf: '11122233344', valor: '8050' },
     ]);
     expect(confirmClicks).toBe(0);
   });
@@ -81,7 +81,7 @@ describe('content script de favorecidos SIAFI', () => {
     const api = (window as typeof window & { __siagesSiafiFavorecidos: SiafiApi }).__siagesSiafiFavorecidos;
     await expect(api.fillSiafiBeneficiaries([{ cpf: '98765432100', valor: 1.5 }])).resolves.toMatchObject({ inserted: 1 });
     expect(includeClicks).toBe(0);
-    expect((document.querySelectorAll('tbody tr')[1].querySelector('input[siaficurrency]') as HTMLInputElement).value).toBe('1,50');
+    expect((document.querySelectorAll('tbody tr')[1].querySelector('input[siaficurrency]') as HTMLInputElement).value).toBe('150');
   });
 
   it('valida todos os registros antes de alterar o SIAFI', async () => {
@@ -109,6 +109,13 @@ describe('content script de favorecidos SIAFI', () => {
   it('expõe as funções de normalização usadas pelo popup', () => {
     const api = (window as typeof window & { __siagesSiafiFavorecidos: SiafiApi }).__siagesSiafiFavorecidos;
     expect(api.normalizeCpf('123.456.789-01')).toBe('12345678901');
-    expect(api.formatCurrency(250)).toBe('250,00');
+    expect(api.formatCurrency(250)).toBe('25000');
+  });
+
+  it('recusa mais de dez registros em uma única mensagem', async () => {
+    const api = (window as typeof window & { __siagesSiafiFavorecidos: SiafiApi }).__siagesSiafiFavorecidos;
+    const records = Array.from({ length: 11 }, (_, index) => ({ cpf: String(10000000000 + index), valor: 1 }));
+    await expect(api.fillSiafiBeneficiaries(records)).rejects.toThrow('no máximo 10 favorecidos');
+    expect(includeClicks).toBe(0);
   });
 });
