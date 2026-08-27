@@ -120,18 +120,6 @@ export default function RequisicaoCompraPage() {
     userIdentity,
   ]);
 
-  const linkedContracts = useMemo(() => {
-    if (!isTerceirizado || isSuperAdmin) return [];
-
-    const allowedContractIds = new Set(
-      permissions
-        .filter((permission) => permissionMatchesAuthUser(permission, userIdentity) && permission.contratoId)
-        .map((permission) => permission.contratoId),
-    );
-
-    return contratos.filter((contrato) => allowedContractIds.has(contrato.id));
-  }, [contratos, isSuperAdmin, isTerceirizado, permissions, userIdentity]);
-
   useEffect(() => {
     const allowedIds = new Set(allowedEmpenhos.map((empenho) => empenho.id));
     setSelectedEmpenhoIds((current) => {
@@ -1019,39 +1007,6 @@ export default function RequisicaoCompraPage() {
               </Button>
             )}
           </div>
-
-          {isTerceirizado && !isSuperAdmin && (
-            <Card className="border-primary/20 shadow-soft">
-              <CardHeader className="border-b border-border-default/50 bg-primary/[0.02]">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <FileText className="h-5 w-5 text-primary" />
-                  Contratos vinculados
-                </CardTitle>
-                <CardDescription>
-                  Consulte os contratos que foram autorizados para o seu acesso.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-4">
-                {linkedContracts.length === 0 ? (
-                  <p className="text-sm text-text-muted">
-                    Nenhum contrato está vinculado ao seu acesso.
-                  </p>
-                ) : (
-                  <ul className="grid gap-3 sm:grid-cols-2" aria-label="Contratos autorizados">
-                    {linkedContracts.map((contrato) => (
-                      <li key={contrato.id} className="rounded-radius-md border border-border-default bg-surface-subtle/30 p-3">
-                        <p className="font-mono text-sm font-bold text-text-primary">Contrato nº {contrato.numero}</p>
-                        <p className="mt-1 text-sm text-text-secondary">{contrato.contratada || 'Fornecedor não informado'}</p>
-                        {contrato.valor !== undefined && (
-                          <p className="mt-2 text-xs text-text-muted">Valor: {formatCurrency(contrato.valor)}</p>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
-          )}
 
           {isLoadingRequisicoes ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3 border rounded-radius-lg border-border-default">

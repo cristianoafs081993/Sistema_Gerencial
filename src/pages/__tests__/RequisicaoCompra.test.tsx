@@ -273,11 +273,7 @@ describe('RequisicaoCompraPage', () => {
 
     renderPage();
 
-    expect(await screen.findByRole('heading', { name: /Contratos vinculados/i })).toBeInTheDocument();
-    expect(screen.getByText('Contrato nº 00329/2025')).toBeInTheDocument();
-    expect(screen.getByText('Fornecedor Contrato')).toBeInTheDocument();
-    expect(screen.queryByText('Contrato nº 00001/2026')).not.toBeInTheDocument();
-
+    expect(screen.queryByRole('heading', { name: /Contratos vinculados/i })).not.toBeInTheDocument();
     fireEvent.click(await screen.findByRole('button', { name: /Nova Requisi.*Compra/i }));
     fireEvent.click(screen.getByRole('combobox', { name: /Buscar e selecionar empenhos/i }));
 

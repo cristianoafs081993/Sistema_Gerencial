@@ -543,7 +543,7 @@ Finalidade:
 - Controlar o escopo de contratos e empenhos que cada terceirizado pode ver/utilizar nas suas requisições.
 - O vinculo principal usa `user_matricula`; `user_email` permanece como fallback legado.
 - A página `/cadastro-terceirizados`, dentro da edição do prestador, pode criar múltiplos vínculos de empenho em lote, mas cada empenho autorizado continua sendo persistido como uma linha individual nesta tabela.
-- Para o terceirizado de refeitório, vínculos com `contrato_id` são exibidos como contratos autorizados em `/contratos` e, de forma resumida, em `/requisicao-compra`; eles são informativos e não liberam os empenhos do contrato sem vínculos diretos por `empenho_id`.
+- Para o terceirizado de refeitório, vínculos com `contrato_id` são exibidos como contratos autorizados em `/contratos`; eles não liberam os empenhos do contrato sem vínculos diretos por `empenho_id`.
 
 Campos-chave:
 - `id`
