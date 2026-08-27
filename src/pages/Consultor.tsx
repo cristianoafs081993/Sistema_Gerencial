@@ -368,7 +368,7 @@ export default function Consultor() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] bg-white overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-4rem)] bg-background overflow-hidden">
       
       {/* Subtitle Portal */}
       {portalTargets.subtitle && createPortal(
@@ -382,7 +382,7 @@ export default function Consultor() {
           variant="ghost" 
           size="sm" 
           onClick={clearChat} 
-          className="h-8 text-[12px] px-3 text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
+          className="h-8 text-[12px] px-3 text-muted-foreground hover:text-red-600 hover:bg-destructive/10 transition-colors"
         >
           <Trash2 className="w-3.5 h-3.5 mr-2" />
           Limpar Histórico
@@ -398,8 +398,8 @@ export default function Consultor() {
               
               {/* Avatar */}
               <div className={cn(
-                "w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-white",
-                msg.role === 'user' ? "bg-slate-300" : "bg-primary"
+                "w-10 h-10 shrink-0 rounded-full flex items-center justify-center",
+                msg.role === 'user' ? "bg-muted text-muted-foreground" : "bg-primary text-primary-foreground"
               )}>
                 {msg.role === 'user' ? <User className="w-6 h-6" /> : <Bot className="w-6 h-6" />}
               </div>
@@ -420,8 +420,8 @@ export default function Consultor() {
                   <div className={cn(
                     "text-[12px] leading-relaxed",
                     msg.role === 'user' 
-                      ? "px-5 py-3.5 bg-slate-100 text-slate-800 rounded-2xl rounded-tr-sm" 
-                      : "px-5 py-4 bg-primary/5 border border-primary/10 text-slate-900 rounded-2xl rounded-tl-sm prose prose-sm prose-slate prose-p:text-[12px] prose-li:text-[12px] prose-p:leading-relaxed prose-a:text-primary prose-li:mb-3 prose-ul:my-3 prose-p:mb-2 max-w-none"
+                      ? "px-5 py-3.5 bg-muted text-foreground rounded-2xl rounded-tr-sm" 
+                      : "px-5 py-4 bg-card border border-border text-foreground rounded-2xl rounded-tl-sm prose prose-sm dark:prose-invert prose-p:text-[12px] prose-li:text-[12px] prose-p:leading-relaxed prose-a:text-primary prose-li:mb-3 prose-ul:my-3 prose-p:mb-2 max-w-none shadow-xs"
                   )}>
                     {msg.role === 'user' ? (
                       <span className="whitespace-pre-wrap">{msg.content}</span>
@@ -450,15 +450,15 @@ export default function Consultor() {
                             return acc;
                           }, {})
                         ).map(([titulo, refs]: [string, SourceRef[]], i) => (
-                          <div key={i} className="p-2.5 bg-slate-50 border rounded-lg max-w-sm">
-                            <p className="text-[11px] font-bold text-slate-700">{titulo}</p>
+                          <div key={i} className="p-2.5 bg-muted/40 border border-border rounded-lg max-w-sm">
+                            <p className="text-[11px] font-bold text-foreground">{titulo}</p>
                             <div className="mt-1 space-y-1">
                                {refs.slice(0, 2).map((r, j) => (
-                                 <p key={j} className="text-[10px] text-slate-500 truncate flex items-center gap-1">
-                                    <span className="w-1 h-1 rounded-full bg-slate-300" /> {r.referencia}
+                                 <p key={j} className="text-[10px] text-muted-foreground truncate flex items-center gap-1">
+                                    <span className="w-1 h-1 rounded-full bg-muted-foreground/40" /> {r.referencia}
                                  </p>
                                ))}
-                               {refs.length > 2 && <p className="text-[10px] text-slate-400 italic">...e mais {refs.length - 2} trechos</p>}
+                               {refs.length > 2 && <p className="text-[10px] text-muted-foreground italic">...e mais {refs.length - 2} trechos</p>}
                             </div>
                           </div>
                        ))}
@@ -472,7 +472,7 @@ export default function Consultor() {
 
           {isLoading && (
             <div className="flex gap-4 sm:gap-6 w-full transition-opacity duration-300">
-              <div className="w-10 h-10 shrink-0 rounded-full bg-primary flex items-center justify-center text-white">
+              <div className="w-10 h-10 shrink-0 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
                 <Bot className="w-6 h-6 animate-pulse" />
               </div>
               <div className="relative top-1 px-6 py-4 rounded-2xl rounded-tl-sm bg-primary/5 border border-primary/10 flex items-center gap-3 text-[15px] text-primary font-semibold overflow-hidden min-w-[280px]">
@@ -487,7 +487,7 @@ export default function Consultor() {
       </div>
 
       {/* Input Area */}
-      <div className="border-t bg-white shrink-0 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.05)]">
+      <div className="border-t border-border bg-card shrink-0 shadow-lg">
         <div className="w-full px-4 md:px-10 pb-4 md:pb-5 pt-3">
           
           {/* Active File Preview */}
@@ -498,11 +498,11 @@ export default function Consultor() {
                   <FileText className="w-5 h-5" />
                 </div>
                 <div className="truncate shrink">
-                  <p className="text-sm font-bold text-slate-700 truncate">{attachedFile.name}</p>
-                  <p className="text-xs text-slate-400 truncate">PDF anexado para análise ({(attachedFile.file.size / 1024).toFixed(1)} KB)</p>
+                  <p className="text-sm font-bold text-foreground truncate">{attachedFile.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">PDF anexado para análise ({(attachedFile.file.size / 1024).toFixed(1)} KB)</p>
                 </div>
               </div>
-              <Button variant="ghost" size="icon" className="shrink-0 ml-4 hover:bg-red-50 hover:text-red-600" onClick={() => setAttachedFile(null)}>
+              <Button variant="ghost" size="icon" className="shrink-0 ml-4 hover:bg-destructive/10 hover:text-destructive" onClick={() => setAttachedFile(null)}>
                 <X className="w-4 h-4" />
               </Button>
             </div>
@@ -525,7 +525,7 @@ export default function Consultor() {
             <Button 
               size="icon" 
               variant="outline" 
-              className="h-12 w-12 shrink-0 bg-white border-slate-300 text-slate-500 hover:text-primary hover:border-primary disabled:opacity-50"
+              className="h-12 w-12 shrink-0 bg-card border-border text-muted-foreground hover:text-primary hover:border-primary disabled:opacity-50"
               onClick={() => fileInputRef.current?.click()}
               disabled={isLoading || !!attachedFile}
               title="Anexar arquivo PDF para análise"
@@ -536,7 +536,7 @@ export default function Consultor() {
             ) : null}
 
             <textarea
-              className="flex-1 min-h-[48px] max-h-32 px-4 py-3 bg-white border border-slate-300 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm text-[15px] placeholder:text-slate-400"
+              className="flex-1 min-h-[48px] max-h-32 px-4 py-3 bg-background text-foreground border border-border rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm text-[15px] placeholder:text-muted-foreground"
               placeholder={attachedFile ? "Faça uma pergunta ou peça para analisar o PDF anexado..." : "Tire uma dúvida com o Consultor Jurídico..."}
               value={input}
               onChange={(e) => setInput(e.target.value)}

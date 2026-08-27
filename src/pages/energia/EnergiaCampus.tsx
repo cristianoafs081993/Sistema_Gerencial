@@ -375,7 +375,7 @@ export default function EnergiaCampus() {
         <div className="h-[380px]">
           <ResponsiveContainer>
             <LineChart data={overviewMetrics.monthly} margin={{ top: 16, right: 28, bottom: 8, left: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="label" fontSize={12} />
               <YAxis fontSize={12} width={72} />
               <Tooltip formatter={(value) => formatKwh(Number(value))} />
@@ -418,7 +418,7 @@ export default function EnergiaCampus() {
           <div className="h-[340px]">
             <ResponsiveContainer>
               <BarChart data={overviewSubstationMonthly} margin={{ top: 16, right: 20, bottom: 8, left: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="label" fontSize={12} />
                 <YAxis fontSize={12} width={72} />
                 <Tooltip formatter={(value) => formatKwh(Number(value))} />
@@ -433,7 +433,7 @@ export default function EnergiaCampus() {
           <div className="h-[340px]">
             <ResponsiveContainer>
               <LineChart data={overviewMetrics.monthly} margin={{ top: 16, right: 20, bottom: 8, left: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="label" fontSize={12} />
                 <YAxis fontSize={12} width={72} />
                 <Tooltip formatter={(value) => formatKwh(Number(value))} />
@@ -447,7 +447,7 @@ export default function EnergiaCampus() {
           <div className="h-[340px]">
             <ResponsiveContainer>
               <BarChart data={overviewSourceBars} layout="vertical" margin={{ top: 16, left: 32, right: 40, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis type="number" fontSize={12} />
                 <YAxis type="category" dataKey="label" width={104} fontSize={12} />
                 <Tooltip formatter={(value) => formatKwh(Number(value))} />
@@ -519,7 +519,7 @@ export default function EnergiaCampus() {
             <div className="h-[320px]">
               <ResponsiveContainer>
                 <BarChart data={metrics.monthly}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="label" fontSize={12} />
                   <YAxis fontSize={12} />
                   <Tooltip formatter={(value) => formatKwh(Number(value))} />
@@ -532,7 +532,7 @@ export default function EnergiaCampus() {
             <div className="h-[320px]">
               <ResponsiveContainer>
                 <LineChart data={metrics.monthly}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="label" fontSize={12} />
                   <YAxis fontSize={12} />
                   <Tooltip formatter={(value) => formatCurrency(Number(value))} />
@@ -566,7 +566,7 @@ export default function EnergiaCampus() {
             <div className="h-[320px]">
               <ResponsiveContainer>
                 <BarChart data={metrics.monthly}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="label" fontSize={12} />
                   <YAxis fontSize={12} />
                   <Tooltip formatter={(value) => formatCurrency(Number(value))} />
@@ -607,7 +607,7 @@ export default function EnergiaCampus() {
             <div className="h-[320px]">
               <ResponsiveContainer>
                 <BarChart data={annual}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="name" fontSize={12} />
                   <YAxis fontSize={12} />
                   <Tooltip formatter={(value) => formatKwh(Number(value))} />
@@ -620,7 +620,7 @@ export default function EnergiaCampus() {
             <div className="h-[320px]">
               <ResponsiveContainer>
                 <LineChart data={monthly.map((item) => ({ label: `${String(item.mes).padStart(2, '0')}/${String(item.ano).slice(2)}`, value: item.energiaGeradaKwh }))}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="label" fontSize={12} />
                   <YAxis fontSize={12} />
                   <Tooltip formatter={(value) => formatKwh(Number(value))} />
@@ -664,7 +664,7 @@ export default function EnergiaCampus() {
         <div className="h-[340px]">
           <ResponsiveContainer>
             <BarChart data={metrics.monthly}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="label" fontSize={12} />
               <YAxis fontSize={12} />
               <Tooltip formatter={(value) => formatCurrency(Number(value))} />
@@ -694,7 +694,7 @@ export default function EnergiaCampus() {
           <div className="h-[320px]">
             <ResponsiveContainer>
               <BarChart data={solarAnnualByUfv(filteredData.solarGeracao).map((item) => ({ name: item.name, value: (item.value / 1000) * 0.5989 }))}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="name" fontSize={12} />
                 <YAxis fontSize={12} />
                 <Tooltip formatter={(value) => formatNumber(Number(value), { maximumFractionDigits: 2 })} />

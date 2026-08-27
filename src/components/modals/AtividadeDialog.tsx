@@ -97,15 +97,15 @@ export function AtividadeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden border-none shadow-2xl bg-white">
-        <DialogHeader className="p-6 bg-slate-50/80 border-b border-slate-100 relative">
+      <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden border border-border shadow-2xl bg-card text-foreground">
+        <DialogHeader className="p-6 bg-muted/40 border-b border-border relative">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
+            <div className="p-2 bg-blue-500/15 rounded-lg text-blue-600 dark:text-blue-400">
               {atividade ? <Pencil className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
             </div>
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-600/70">Gestão de Atividades</span>
-              <DialogTitle className="text-xl font-black tracking-tight text-slate-900">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-600/70 dark:text-blue-400/80">Gestão de Atividades</span>
+              <DialogTitle className="text-xl font-black tracking-tight text-foreground">
                 {atividade ? 'Editar Atividade' : 'Nova Atividade'}
               </DialogTitle>
             </div>
@@ -114,15 +114,15 @@ export function AtividadeDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
-          <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto bg-white">
+          <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto bg-card">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Dimensão</Label>
+                <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Dimensão</Label>
                 <Select 
                   value={formData.dimensao} 
                   onValueChange={(val) => setFormData({ ...formData, dimensao: val })}
                 >
-                  <SelectTrigger className="h-10 border-slate-200 bg-slate-50/50 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
+                  <SelectTrigger className="h-10 border-border bg-muted/30 text-foreground focus:ring-primary/20 transition-all">
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -133,57 +133,57 @@ export function AtividadeDialog({
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Componente Funcional</Label>
+                <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Componente Funcional</Label>
                 <Input 
                   value={formData.componenteFuncional || ''} 
                   onChange={e => setFormData({ ...formData, componenteFuncional: e.target.value })}
                   placeholder="Ex: Contratos"
-                  className="h-10 border-slate-200 bg-slate-50/50 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  className="h-10 border-border bg-muted/30 text-foreground focus:ring-primary/20 transition-all"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Atividade</Label>
+              <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Atividade</Label>
               <Input 
                 value={formData.atividade || ''} 
                 onChange={e => setFormData({ ...formData, atividade: e.target.value })}
                 placeholder="Título da atividade"
-                className="h-10 border-slate-200 bg-slate-50/50 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+                className="h-10 border-border bg-muted/30 text-foreground focus:ring-primary/20 transition-all font-medium"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Descrição</Label>
+              <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Descrição</Label>
               <Textarea 
                 value={formData.descricao || ''} 
                 onChange={e => setFormData({ ...formData, descricao: e.target.value })}
                 placeholder="Detalhes adicionais da atividade..."
-                className="min-h-[100px] border-slate-200 bg-slate-50/50 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none"
+                className="min-h-[100px] border-border bg-muted/30 text-foreground focus:ring-primary/20 transition-all resize-none"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Plano Interno (PI)</Label>
+                <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Plano Interno (PI)</Label>
                 <Input 
                   value={formData.planoInterno || ''} 
                   onChange={e => setFormData({ ...formData, planoInterno: e.target.value })}
                   placeholder="Ex: L20RLP01ADN"
-                  className="h-10 border-slate-200 bg-slate-50/50 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-mono text-sm"
+                  className="h-10 border-border bg-muted/30 text-foreground focus:ring-primary/20 transition-all font-mono text-sm"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Valor Total</Label>
+                <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Valor Total</Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">R$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-bold">R$</span>
                   <Input 
                     type="number"
                     step="0.01"
                     value={formData.valorTotal || 0} 
                     onChange={e => setFormData({ ...formData, valorTotal: parseFloat(e.target.value) })}
-                    className="h-10 pl-9 border-slate-200 bg-slate-50/50 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold"
+                    className="h-10 pl-9 border-border bg-muted/30 text-foreground focus:ring-primary/20 transition-all font-bold"
                   />
                 </div>
               </div>
@@ -191,33 +191,33 @@ export function AtividadeDialog({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Origem de Recurso (PTRES)</Label>
+                <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Origem de Recurso (PTRES)</Label>
                 <Input 
                   value={formData.origemRecurso || ''} 
                   onChange={e => setFormData({ ...formData, origemRecurso: e.target.value })}
                   placeholder="Ex: 231796"
-                  className="h-10 border-slate-200 bg-slate-50/50 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-mono text-sm"
+                  className="h-10 border-border bg-muted/30 text-foreground focus:ring-primary/20 transition-all font-mono text-sm"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Natureza de Despesa</Label>
+                <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Natureza de Despesa</Label>
                 <Input 
                   value={formData.naturezaDespesa || ''} 
                   onChange={e => setFormData({ ...formData, naturezaDespesa: e.target.value })}
                   placeholder="Ex: 339030"
-                  className="h-10 border-slate-200 bg-slate-50/50 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-mono text-sm"
+                  className="h-10 border-border bg-muted/30 text-foreground focus:ring-primary/20 transition-all font-mono text-sm"
                 />
               </div>
             </div>
           </div>
 
-          <DialogFooter className="p-4 bg-slate-50/80 border-t border-slate-100 flex items-center justify-end gap-3">
+          <DialogFooter className="p-4 bg-muted/40 border-t border-border flex items-center justify-end gap-3">
             <Button 
               type="button" 
-              variant="secondary" 
+              variant="outline" 
               onClick={() => onOpenChange(false)} 
               disabled={loading}
-              className="bg-white border-slate-200 text-slate-600 hover:bg-slate-100 font-bold uppercase text-[10px] tracking-widest px-6 shadow-sm"
+              className="border-border bg-card text-foreground hover:bg-muted font-bold uppercase text-[10px] tracking-widest px-6 shadow-sm"
             >
               Cancelar
             </Button>

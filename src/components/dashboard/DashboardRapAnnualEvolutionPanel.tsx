@@ -206,19 +206,20 @@ export function DashboardRapAnnualEvolutionPanel() {
               </span>
             </div>
 
-            <div className="h-[380px] rounded-[22px] border border-border-default/60 bg-[linear-gradient(180deg,rgba(248,250,252,0.95),rgba(255,255,255,0.85))] p-3">
+            <div className="h-[380px] rounded-[22px] border border-border bg-card/50 p-3">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={chartData} margin={{ top: 12, right: 12, left: 0, bottom: 8 }}>
-                  <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#dbe3f0" />
-                  <XAxis dataKey="ano" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }} />
+                  <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="hsl(var(--border))" />
+                  <XAxis dataKey="ano" axisLine={false} tickLine={false} tick={{ fill: 'currentColor', fontSize: 12, fontWeight: 600 }} className="text-muted-foreground" />
                   <YAxis
                     axisLine={false}
                     tickLine={false}
                     width={74}
-                    tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
+                    tick={{ fill: 'currentColor', fontSize: 12, fontWeight: 600 }}
+                    className="text-muted-foreground"
                     tickFormatter={formatCompactCurrency}
                   />
-                  <Tooltip content={<ExecutionTooltip />} cursor={{ stroke: '#cbd5e1', strokeDasharray: '4 4' }} />
+                  <Tooltip content={<ExecutionTooltip />} cursor={{ stroke: 'hsl(var(--border))', strokeDasharray: '4 4' }} />
                   <Bar
                     dataKey="processadoInscrito"
                     stackId="rap"

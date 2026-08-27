@@ -107,7 +107,7 @@ export function GaugeChart({ value, total, label, isLoading = false }: GaugeChar
           </mask>
         </defs>
 
-        <path d={arcPath(180, 0, R, r)} fill="#e2e8f0" />
+        <path d={arcPath(180, 0, R, r)} fill="hsl(var(--muted))" />
         <path d={arcPath(180, 0, R, r)} fill={`url(#${gradientId})`} mask={`url(#${maskId})`} />
 
         {[0.25, 0.5, 0.75].map((t) => {
@@ -122,9 +122,8 @@ export function GaugeChart({ value, total, label, isLoading = false }: GaugeChar
               y1={outer.y}
               x2={inner.x}
               y2={inner.y}
-              stroke="white"
+              stroke="hsl(var(--card))"
               strokeWidth={1.5}
-              opacity={0.6}
             />
           );
         })}
@@ -141,7 +140,8 @@ export function GaugeChart({ value, total, label, isLoading = false }: GaugeChar
               y1={outer.y}
               x2={inner.x}
               y2={inner.y}
-              stroke="#94a3b8"
+              stroke="currentColor"
+              className="text-muted-foreground/60"
               strokeWidth={1.5}
               strokeLinecap="round"
             />
@@ -161,7 +161,8 @@ export function GaugeChart({ value, total, label, isLoading = false }: GaugeChar
               dominantBaseline="middle"
               fontSize="7.5"
               fontWeight="600"
-              fill="#94a3b8"
+              fill="currentColor"
+              className="text-muted-foreground font-medium"
             >
               {`${(t * 100).toFixed(0)}%`}
             </text>
@@ -173,12 +174,13 @@ export function GaugeChart({ value, total, label, isLoading = false }: GaugeChar
           y1={cy}
           x2={needleTip.x}
           y2={needleTip.y}
-          stroke="#1e293b"
+          stroke="currentColor"
+          className="text-foreground"
           strokeWidth={2.5}
           strokeLinecap="round"
         />
-        <circle cx={cx} cy={cy} r={6} fill="#1e293b" />
-        <circle cx={cx} cy={cy} r={3} fill="white" />
+        <circle cx={cx} cy={cy} r={6} fill="currentColor" className="text-foreground" />
+        <circle cx={cx} cy={cy} r={3} fill="currentColor" className="text-card" />
 
         <text
           x={cx}
@@ -186,7 +188,8 @@ export function GaugeChart({ value, total, label, isLoading = false }: GaugeChar
           textAnchor="middle"
           fontSize="20"
           fontWeight="800"
-          fill="#0f172a"
+          fill="currentColor"
+          className="text-foreground"
           letterSpacing="-0.5"
         >
           {pctDisplay}%

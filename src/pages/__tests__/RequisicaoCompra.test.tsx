@@ -240,6 +240,14 @@ describe('RequisicaoCompraPage', () => {
           createdAt: new Date('2026-01-01T12:00:00Z'),
           updatedAt: new Date('2026-01-01T12:00:00Z'),
         },
+        {
+          id: 'contrato-nao-vinculado',
+          numero: '00001/2026',
+          contratada: 'Fornecedor sem acesso',
+          valor: 500,
+          createdAt: new Date('2026-01-01T12:00:00Z'),
+          updatedAt: new Date('2026-01-01T12:00:00Z'),
+        },
       ],
       contratosEmpenhos: [{ contrato_id: 'contrato-1', empenho_id: 'emp-contrato' }],
     } as never);
@@ -264,6 +272,11 @@ describe('RequisicaoCompraPage', () => {
     ] as never);
 
     renderPage();
+
+    expect(await screen.findByRole('heading', { name: /Contratos vinculados/i })).toBeInTheDocument();
+    expect(screen.getByText('Contrato nº 00329/2025')).toBeInTheDocument();
+    expect(screen.getByText('Fornecedor Contrato')).toBeInTheDocument();
+    expect(screen.queryByText('Contrato nº 00001/2026')).not.toBeInTheDocument();
 
     fireEvent.click(await screen.findByRole('button', { name: /Nova Requisi.*Compra/i }));
     fireEvent.click(screen.getByRole('combobox', { name: /Buscar e selecionar empenhos/i }));

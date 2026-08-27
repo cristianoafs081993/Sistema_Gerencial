@@ -265,35 +265,35 @@ export function JsonImportDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border-none shadow-2xl bg-white text-slate-900">
-        <DialogHeader className="p-6 bg-slate-50/80 border-b border-slate-100 space-y-1 relative">
+      <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border border-border shadow-2xl bg-card text-foreground">
+        <DialogHeader className="p-6 bg-muted/40 border-b border-border space-y-1 relative">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
+            <div className="p-2 bg-blue-500/15 rounded-lg text-blue-600 dark:text-blue-400">
               <Upload className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-600/70">Importação de Dados</span>
-              <DialogTitle className="text-xl font-black tracking-tight text-slate-900">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-600/70 dark:text-blue-400/80">Importação de Dados</span>
+              <DialogTitle className="text-xl font-black tracking-tight text-foreground">
                 {title}
               </DialogTitle>
             </div>
           </div>
           <div className="absolute top-0 left-0 w-full h-1 bg-blue-500" />
-          <DialogDescription className="text-xs text-slate-500 font-medium pt-1">
+          <DialogDescription className="text-xs text-muted-foreground font-medium pt-1">
             Selecione um arquivo {fileTypeLabel} para importar novos registros.
           </DialogDescription>
         </DialogHeader>
 
         <div className="p-6 space-y-6">
           {/* Expected fields info */}
-          <div className="rounded-xl bg-slate-50 p-4 border border-slate-100 text-[11px]">
-            <p className="font-black uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-2">
-              <Info className="w-3 h-3" />
+          <div className="rounded-xl bg-muted/30 p-4 border border-border text-[11px]">
+            <p className="font-black uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-2">
+              <Info className="w-3 h-3 text-primary" />
               Campos esperados no arquivo:
             </p>
             <div className="flex flex-wrap gap-1.5">
               {expectedFields.map(field => (
-                <Badge key={field} variant="outline" className="bg-white border-slate-200 text-slate-600 text-[9px] font-bold py-0.5 px-2">
+                <Badge key={field} variant="outline" className="bg-card border-border text-foreground text-[9px] font-bold py-0.5 px-2">
                   {field}
                 </Badge>
               ))}
@@ -303,7 +303,7 @@ export function JsonImportDialog({
           {/* File input */}
           {!file ? (
             <div
-              className="group border-2 border-dashed border-slate-200 rounded-2xl p-10 flex flex-col items-center justify-center gap-4 hover:border-blue-400 hover:bg-blue-50/50 transition-all cursor-pointer"
+              className="group border-2 border-dashed border-border rounded-2xl p-10 flex flex-col items-center justify-center gap-4 hover:border-primary/50 hover:bg-muted/20 transition-all cursor-pointer"
               onClick={() => fileInputRef.current?.click()}
             >
               <input
@@ -313,29 +313,29 @@ export function JsonImportDialog({
                 onChange={handleFileChange}
                 className="hidden"
               />
-              <div className="p-4 bg-slate-50 rounded-full group-hover:scale-110 transition-transform">
-                <Upload className="h-8 w-8 text-slate-400 group-hover:text-blue-500" />
+              <div className="p-4 bg-muted/50 rounded-full group-hover:scale-110 transition-transform">
+                <Upload className="h-8 w-8 text-muted-foreground group-hover:text-primary" />
               </div>
               <div className="text-center">
-                <p className="text-sm font-bold text-slate-700">Clique para selecionar</p>
-                <p className="text-xs text-slate-400 font-medium mt-1">ou arraste e solte o arquivo aqui</p>
+                <p className="text-sm font-bold text-foreground">Clique para selecionar</p>
+                <p className="text-xs text-muted-foreground font-medium mt-1">ou arraste e solte o arquivo aqui</p>
               </div>
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                <div className="p-2 bg-white rounded-lg shadow-sm">
-                  <FileJson className="w-6 h-6 text-blue-500" />
+              <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-xl border border-border">
+                <div className="p-2 bg-card rounded-lg shadow-sm border border-border/50">
+                  <FileJson className="w-6 h-6 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-slate-900 truncate">{file.name}</p>
-                  <p className="text-[10px] text-slate-500 font-medium">{(file.size / 1024).toFixed(1)} KB</p>
+                  <p className="text-sm font-bold text-foreground truncate">{file.name}</p>
+                  <p className="text-[10px] text-muted-foreground font-medium">{(file.size / 1024).toFixed(1)} KB</p>
                 </div>
                 <Button 
                   variant="ghost" 
                   size="sm" 
                   onClick={resetState}
-                  className="text-red-500 hover:text-red-600 hover:bg-red-50 text-[10px] font-bold"
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10 text-[10px] font-bold"
                 >
                   REMOVER
                 </Button>
@@ -343,7 +343,7 @@ export function JsonImportDialog({
 
               {/* Error message */}
               {error && (
-                <Alert variant="destructive" className="bg-red-50 border-red-100 text-red-700 rounded-xl py-3 animate-in slide-in-from-top-2">
+                <Alert variant="destructive" className="bg-destructive/10 border-destructive/30 text-destructive rounded-xl py-3 animate-in slide-in-from-top-2">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription className="text-xs font-bold ml-2">{error}</AlertDescription>
                 </Alert>
@@ -351,7 +351,7 @@ export function JsonImportDialog({
 
               {/* Success message */}
               {success && parsedData.length > 0 && (
-                <div className="flex items-center gap-3 p-4 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100 animate-in slide-in-from-top-2">
+                <div className="flex items-center gap-3 p-4 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-xl border border-emerald-500/30 animate-in slide-in-from-top-2">
                   <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                   <div>
                     <p className="text-xs font-black uppercase tracking-wider">Arquivo Validado</p>
@@ -363,11 +363,12 @@ export function JsonImportDialog({
           )}
         </div>
 
-        <DialogFooter className="p-4 bg-slate-50/80 border-t border-slate-100 flex items-center justify-end gap-3">
+        <DialogFooter className="p-4 bg-muted/40 border-t border-border flex items-center justify-end gap-3">
           <Button 
-            variant="secondary" 
+            type="button" 
+            variant="outline" 
             onClick={handleClose}
-            className="bg-white border-slate-200 text-slate-600 hover:bg-slate-100 font-bold uppercase text-[10px] tracking-widest px-6 shadow-sm shadow-slate-200/50"
+            className="border-border bg-card text-foreground hover:bg-muted font-bold uppercase text-[10px] tracking-widest px-6 shadow-sm"
           >
             Cancelar
           </Button>

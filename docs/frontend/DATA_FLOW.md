@@ -276,8 +276,9 @@ Observações:
 `App.tsx` -> `RequisicaoCompra.tsx` / `CadastroTerceirizados.tsx` -> `requisicoesCompra.ts` -> `requisicoes_compra` / `requisicao_compra_empenhos` / `requisicao_compra_itens` / `terceirizado_permissions`
 
 Observações:
-- O perfil `Terceirizado` acessa apenas a rota `/requisicao-compra` e gerencia suas próprias requisições de compra.
+- O perfil `Terceirizado` acessa as rotas `/requisicao-compra` e `/contratos`; gerencia suas próprias requisições e, na tela de contratos, vê somente os vínculos autorizados para si.
 - Um terceirizado so pode usar contratos e empenhos previamente associados a ele na tabela `terceirizado_permissions` por um gestor/fiscal. Na selecao de NE, somente vinculos explicitos por `empenho_id` liberam empenhos; vinculo de contrato nao expande automaticamente os empenhos disponiveis.
+- Para terceirizados de refeitório, `/requisicao-compra` também exibe somente os contratos diretamente autorizados por `terceirizado_permissions.contrato_id`. Essa lista é apenas informativa e não altera a regra de seleção de NEs.
 - Em `/cadastro-terceirizados`, o ícone de edição do prestador abre uma página inteira de edição com os dados cadastrais e a seção `Vincular Contratos e Empenhos`; `Empenho / NE` é o tipo de vínculo padrão e usa seletor pesquisável com múltipla seleção, criando uma linha de `terceirizado_permissions` para cada empenho escolhido, sem alteração de schema.
 - Perfis gestores (`fiscal-contratos`, `diretores`, `teste`) cadastram e editam terceirizados em `/cadastro-terceirizados`; a rota `/requisicao-compra` permanece focada na criação, auditoria e aprovação/rejeição das requisições de compra.
 - Ao criar ou editar uma requisicao, o formulario nao expoe processo nem contrato. O campo separado de favorecido filtra o combobox de NEs; a busca prioriza o numero completo da NE antes de prefixos, ocorrencias parciais, descricao e valor. Para terceirizados, a lista continua limitada a permissoes diretas por `terceirizado_permissions.empenho_id`.

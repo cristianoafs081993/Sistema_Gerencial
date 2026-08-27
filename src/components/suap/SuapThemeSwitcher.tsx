@@ -6,6 +6,9 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
@@ -87,9 +90,20 @@ export const SUAP_THEMES: SuapThemeOption[] = [
   },
 ];
 
-const SUAP_THEME_STORAGE_KEY = 'suap_theme_selected';
+export const SUAP_THEME_STORAGE_KEY = 'suap_theme_selected';
+
+export function getSavedSuapTheme(): SuapThemeId {
+  if (typeof window === 'undefined') return 'padrao';
+  try {
+    const saved = localStorage.getItem(SUAP_THEME_STORAGE_KEY) as SuapThemeId;
+    return SUAP_THEMES.some((t) => t.id === saved) ? saved : 'padrao';
+  } catch {
+    return 'padrao';
+  }
+}
 
 export function applySuapTheme(themeId: SuapThemeId) {
+  if (typeof document === 'undefined') return;
   const root = document.documentElement;
   root.setAttribute('data-suap-theme', themeId);
   
@@ -101,19 +115,111 @@ export function applySuapTheme(themeId: SuapThemeId) {
   }
 }
 
-export function SuapThemeSwitcher() {
-  const [currentTheme, setCurrentTheme] = useState<SuapThemeId>(() => {
-    if (typeof window === 'undefined') return 'padrao';
-    const saved = localStorage.getItem(SUAP_THEME_STORAGE_KEY) as SuapThemeId;
-    return SUAP_THEMES.some((t) => t.id === saved) ? saved : 'padrao';
-  });
+export function initSuapTheme(): SuapThemeId {
+  const theme = getSavedSuapTheme();
+  applySuapTheme(theme);
+  return theme;
+}
+
+export function useSuapTheme() {
+  const [currentTheme, setCurrentTheme] = useState<SuapThemeId>(() => getSavedSuapTheme());
 
   useEffect(() => {
     applySuapTheme(currentTheme);
-    localStorage.setItem(SUAP_THEME_STORAGE_KEY, currentTheme);
+    try {
+      localStorage.setItem(SUAP_THEME_STORAGE_KEY, currentTheme);
+    } catch {
+      // ignore storage errors
+    }
   }, [currentTheme]);
 
-  const activeThemeObj = SUAP_THEMES.find((t) => t.id === currentTheme) || SUAP_THEMES[0];
+  const setTheme = (themeId: SuapThemeId) => {
+    setCurrentTheme(themeId);
+    applySuapTheme(themeId);
+    try {
+      localStorage.setItem(SUAP_THEME_STORAGE_KEY, themeId);
+    } catch {
+      // ignore storage errors
+    }
+  };
+
+  const activeTheme = SUAP_THEMES.find((t) => t.id === currentTheme) || SUAP_THEMES[0];
+
+  return {
+    currentTheme,
+    activeTheme,
+    setTheme,
+    themes: SUAP_THEMES,
+  };
+}
+
+export function SuapThemeSubMenu() {
+  const { currentTheme, activeTheme, setTheme, themes } = useSuapTheme();
+
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger className="gap-2 cursor-pointer">
+        <Palette className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" />
+        <span className="flex-1 text-left">Padrão de design (SUAP)</span>
+        <span
+          className="h-2.5 w-2.5 rounded-full shrink-0 border border-black/15 shadow-xs"
+          style={{ backgroundColor: activeTheme.primaryColor }}
+          title={activeTheme.name}
+        />
+      </DropdownMenuSubTrigger>
+
+      <DropdownMenuSubContent className="w-64 p-1.5 shadow-xl">
+        <DropdownMenuLabel className="px-2.5 py-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+          <span>Padrões de Design SUAP</span>
+          <Sparkles className="h-3.5 w-3.5 text-primary" />
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+
+        <div className="space-y-0.5 max-h-[360px] overflow-y-auto scrollbar-thin">
+          {themes.map((theme) => {
+            const isSelected = theme.id === currentTheme;
+            return (
+              <DropdownMenuItem
+                key={theme.id}
+                onSelect={() => setTheme(theme.id)}
+                onClick={() => setTheme(theme.id)}
+                className="flex items-center justify-between px-2.5 py-2 rounded-lg cursor-pointer text-xs"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span
+                    className="h-4 w-4 rounded-full shrink-0 border border-black/15 shadow-xs"
+                    style={{ backgroundColor: theme.primaryColor }}
+                  />
+                  <div className="min-w-0">
+                    <p className="font-semibold text-foreground leading-none m-0 truncate">
+                      {theme.name}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground leading-tight m-0 mt-0.5 truncate">
+                      {theme.description}
+                    </p>
+                  </div>
+                </div>
+
+                {isSelected && <Check className="h-3.5 w-3.5 text-primary shrink-0 ml-1.5" />}
+              </DropdownMenuItem>
+            );
+          })}
+        </div>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}
+
+export interface SuapThemeSwitcherProps {
+  variant?: 'submenu' | 'button';
+}
+
+export function SuapThemeSwitcher({ variant = 'button' }: SuapThemeSwitcherProps) {
+  const { currentTheme, activeTheme, setTheme, themes } = useSuapTheme();
+
+  if (variant === 'submenu') {
+    return <SuapThemeSubMenu />;
+  }
 
   return (
     <DropdownMenu>
@@ -126,9 +232,9 @@ export function SuapThemeSwitcher() {
         >
           <span
             className="h-3 w-3 rounded-full shrink-0 border border-black/10"
-            style={{ backgroundColor: activeThemeObj.primaryColor }}
+            style={{ backgroundColor: activeTheme.primaryColor }}
           />
-          <span className="hidden sm:inline font-medium">{activeThemeObj.name}</span>
+          <span className="hidden sm:inline font-medium">{activeTheme.name}</span>
           <Palette className="h-3.5 w-3.5 text-muted-foreground ml-0.5" />
         </Button>
       </DropdownMenuTrigger>
@@ -141,12 +247,13 @@ export function SuapThemeSwitcher() {
         <DropdownMenuSeparator />
 
         <div className="space-y-0.5 max-h-[380px] overflow-y-auto scrollbar-thin">
-          {SUAP_THEMES.map((theme) => {
+          {themes.map((theme) => {
             const isSelected = theme.id === currentTheme;
             return (
               <DropdownMenuItem
                 key={theme.id}
-                onClick={() => setCurrentTheme(theme.id)}
+                onSelect={() => setTheme(theme.id)}
+                onClick={() => setTheme(theme.id)}
                 className="flex items-center justify-between px-2.5 py-2 rounded-lg cursor-pointer text-xs"
               >
                 <div className="flex items-center gap-2.5 min-w-0">

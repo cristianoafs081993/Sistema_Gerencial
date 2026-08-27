@@ -74,8 +74,8 @@ function ContractExpenseTooltip({
   const total = rows.reduce((sum, item) => sum + item.value, 0);
 
   return (
-    <div className="min-w-[240px] rounded-2xl border border-border-default/65 bg-white/95 px-4 py-3 shadow-[0_12px_28px_rgba(15,23,42,0.08)] backdrop-blur-[2px]">
-      <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">{label}</p>
+    <div className="min-w-[240px] rounded-2xl border border-border bg-card/95 px-4 py-3 text-foreground shadow-xl backdrop-blur-sm">
+      <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
       <div className="mt-2 space-y-2">
         {rows.map((item) => (
           <div key={item.label} className="flex items-center justify-between gap-4">
@@ -173,9 +173,9 @@ function ContractProjectionTraceHover({ item, targetMonths = 12 }: { item: Contr
             ['Saldo', item.saldoEmpenhos],
             ['Projetado', item.projetado],
           ].map(([label, value]) => (
-            <div key={label} className="rounded-xl bg-white">
-              <p className="font-ui text-[11px] font-semibold uppercase text-text-muted">{label}</p>
-              <p className="mt-1 font-ui text-sm font-bold text-text-primary">{formatCurrency(Number(value))}</p>
+            <div key={label} className="rounded-xl bg-card border border-border/60 p-2.5">
+              <p className="font-ui text-[11px] font-semibold uppercase text-muted-foreground">{label}</p>
+              <p className="mt-1 font-ui text-sm font-bold text-foreground">{formatCurrency(Number(value))}</p>
             </div>
           ))}
         </div>
@@ -203,7 +203,7 @@ function ContractProjectionTraceHover({ item, targetMonths = 12 }: { item: Contr
                 <span className="font-ui text-xs font-semibold text-text-muted">{item.liquidacoes.length} registro(s)</span>
               </div>
               {visibleLiquidacoes.length > 0 ? (
-                <div className="mt-2 divide-y divide-border-default/55 rounded-xl border border-border-default/60 bg-white">
+                <div className="mt-2 divide-y divide-border-default/55 rounded-xl border border-border bg-card/70">
                   {visibleLiquidacoes.map((liquidacao) => (
                     <div key={liquidacao.id} className="grid gap-2 px-3 py-2 sm:grid-cols-[1fr_auto]">
                       <div className="min-w-0">
@@ -212,7 +212,7 @@ function ContractProjectionTraceHover({ item, targetMonths = 12 }: { item: Contr
                           {formatTraceDate(liquidacao.dataEmissao)} · {liquidacao.situacao}
                         </p>
                       </div>
-                      <p className="font-ui text-xs font-bold text-emerald-700">{formatCurrency(liquidacao.valor)}</p>
+                      <p className="font-ui text-xs font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(liquidacao.valor)}</p>
                     </div>
                   ))}
                   {hiddenLiquidacoes > 0 ? <p className="px-3 py-2 font-ui text-xs font-semibold text-text-muted">+{hiddenLiquidacoes} liquidacao(oes)</p> : null}
@@ -230,7 +230,7 @@ function ContractProjectionTraceHover({ item, targetMonths = 12 }: { item: Contr
                 <span className="font-ui text-xs font-semibold text-text-muted">{item.empenhos.length} registro(s)</span>
               </div>
               {visibleEmpenhos.length > 0 ? (
-                <div className="mt-2 divide-y divide-border-default/55 rounded-xl border border-border-default/60 bg-white">
+                <div className="mt-2 divide-y divide-border-default/55 rounded-xl border border-border bg-card/70">
                   {visibleEmpenhos.map((empenho) => (
                     <div key={empenho.id} className="px-3 py-2">
                       <div className="flex items-start justify-between gap-3">
@@ -390,12 +390,12 @@ export function DashboardContractExecutionTab({
   return (
     <div className="space-y-6">
       {/* Heatmap de Cobertura de Empenhos (Seletor de Contratos) */}
-      <Card className="border border-border-default/80 bg-white p-5 rounded-[18px] shadow-soft">
+      <Card className="border border-border-default/80 bg-card p-5 rounded-[18px] shadow-soft">
         <CardContent className="p-0">
           {(allContractProjectionBullets.length > 0 ? allContractProjectionBullets : contractProjectionBullets).length > 0 ? (
             <div className="space-y-6">
               {/* Configuração de Filtros e Projeção */}
-              <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4 border border-slate-100/80 shadow-xs">
+              <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-muted/40 p-4 border border-border shadow-xs">
                 <div className="flex flex-wrap items-center gap-4 font-ui text-[11px] font-medium text-text-muted w-full justify-between gap-y-3">
                   <div className="flex flex-wrap items-center gap-4">
                     <div className="flex items-center gap-2">
@@ -403,7 +403,7 @@ export function DashboardContractExecutionTab({
                       <select
                         value={heatmapFilter}
                         onChange={(e) => setHeatmapFilter(e.target.value as any)}
-                        className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-text-primary focus:border-primary/50 focus:outline-none cursor-pointer"
+                        className="rounded-lg border border-border bg-card px-2 py-1 text-xs font-semibold text-foreground focus:border-primary/50 focus:outline-none cursor-pointer"
                       >
                         <option value="all">Todos os Contratos</option>
                         <option value="continuos_exclusiva">Serviços Continuados (Mão de Obra Exclusiva)</option>
@@ -412,13 +412,13 @@ export function DashboardContractExecutionTab({
                         <option value="outros">Outras Categorias</option>
                       </select>
                     </div>
-                    <div className="hidden sm:block text-slate-200">|</div>
+                    <div className="hidden sm:block text-border">|</div>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-text-secondary">Projetar cobertura até:</span>
                       <select
                         value={projectionTargetMonths}
                         onChange={(e) => onProjectionTargetMonthsChange?.(Number(e.target.value))}
-                        className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-text-primary focus:border-primary/50 focus:outline-none cursor-pointer"
+                        className="rounded-lg border border-border bg-card px-2 py-1 text-xs font-semibold text-foreground focus:border-primary/50 focus:outline-none cursor-pointer"
                       >
                         {projectionOptions.map((opt) => (
                           <option key={opt.months} value={opt.months}>
@@ -451,7 +451,7 @@ export function DashboardContractExecutionTab({
                       
                       const getCellColorClass = (percent: number) => {
                         if (percent === 0) {
-                          return 'bg-slate-50 border-slate-200/60 text-slate-500 opacity-70 hover:bg-slate-100/70 hover:border-slate-300/60 shadow-xs';
+                          return 'bg-muted/40 border-border text-muted-foreground opacity-70 hover:bg-muted/60 shadow-xs';
                         }
                         if (percent < 80) {
                           // Gradação de Vermelho para níveis críticos
@@ -479,7 +479,8 @@ export function DashboardContractExecutionTab({
                         return 'bg-[#22c55e] border border-green-600/20 text-white hover:bg-[#16a34a] shadow-md hover:brightness-105 ring-2 ring-green-500/10';
                       };
 
-                      const isDarkBackground = ratio > 0 && (ratio < 90 || ratio >= 100);
+                      const isAmberBackground = ratio >= 90 && ratio < 100;
+                      const isZeroRatio = ratio === 0;
                       const isSelected = selectedContractExpenseSet.has(item.id);
                       const hasSelection = selectedContractExpenseIds.length > 0;
 
@@ -498,20 +499,20 @@ export function DashboardContractExecutionTab({
                                 <div className="flex items-center justify-between gap-1">
                                   <p className={cn(
                                     "text-[9px] font-bold uppercase tracking-wider opacity-90 truncate",
-                                    isDarkBackground ? "text-white/80" : "text-slate-500"
+                                    isAmberBackground ? "text-slate-800" : isZeroRatio ? "text-muted-foreground" : "text-white/80"
                                   )}>
                                     {item.label.split(' - ').slice(-1)[0]}
                                   </p>
                                   {isSelected && (
                                     <Check className={cn(
                                       "w-3 h-3 shrink-0 stroke-[3px]",
-                                      isDarkBackground ? "text-white" : "text-slate-900"
+                                      isAmberBackground ? "text-slate-950" : isZeroRatio ? "text-foreground" : "text-white"
                                     )} />
                                   )}
                                 </div>
                                 <p className={cn(
                                   "mt-0.5 text-[11px] font-bold leading-tight line-clamp-2",
-                                  isDarkBackground ? "text-white" : "text-slate-900"
+                                  isAmberBackground ? "text-slate-950" : isZeroRatio ? "text-foreground" : "text-white"
                                 )}>
                                   {item.label.split(' - ')[0]}
                                 </p>
@@ -519,27 +520,27 @@ export function DashboardContractExecutionTab({
                               <div className="flex items-baseline justify-between mt-1">
                                 <span className={cn(
                                   "text-[9px] font-extrabold tracking-wider uppercase",
-                                  isDarkBackground ? "text-white/70" : "text-slate-500"
+                                  isAmberBackground ? "text-slate-800" : isZeroRatio ? "text-muted-foreground" : "text-white/70"
                                 )}>
                                   Cobertura
                                 </span>
                                 <span className={cn(
                                   "text-sm font-black tracking-tight",
-                                  isDarkBackground ? "text-white" : "text-slate-900"
+                                  isAmberBackground ? "text-slate-950" : isZeroRatio ? "text-foreground" : "text-white"
                                 )}>
                                   {ratio.toFixed(0)}%
                                 </span>
                               </div>
                             </div>
                           </HoverCardTrigger>
-                          <HoverCardContent className="w-80 rounded-2xl p-4 shadow-xl border border-border-default/80 bg-white font-ui text-sm z-50">
+                          <HoverCardContent className="w-80 rounded-2xl p-4 shadow-xl border border-border bg-popover text-popover-foreground font-ui text-sm z-50">
                             <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
                               <div>
-                                <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Detalhamento Orçamentário</p>
-                                <p className="font-bold text-text-primary mt-0.5">{item.label}</p>
+                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Detalhamento Orçamentário</p>
+                                <p className="font-bold text-foreground mt-0.5">{item.label}</p>
                               </div>
 
-                              <div className="h-px bg-slate-100" />
+                              <div className="h-px bg-border" />
 
                               <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div>
@@ -735,16 +736,17 @@ export function DashboardContractExecutionTab({
                     ))}
                   </div>
 
-                  <div className="h-[380px] rounded-[22px] border border-border-default/60 bg-[linear-gradient(180deg,rgba(248,250,252,0.95),rgba(255,255,255,0.85))] p-3">
+                  <div className="h-[380px] rounded-[22px] border border-border bg-card/50 p-3">
                     <ResponsiveContainer width="100%" height="100%">
                       <ComposedChart data={contractExpenseData} margin={{ top: 12, right: 12, left: 0, bottom: 8 }}>
-                        <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#dbe3f0" />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }} />
+                        <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="hsl(var(--border))" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'currentColor', fontSize: 12, fontWeight: 600 }} className="text-muted-foreground" />
                         <YAxis
                           axisLine={false}
                           tickLine={false}
                           width={74}
-                          tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
+                          tick={{ fill: 'currentColor', fontSize: 12, fontWeight: 600 }}
+                          className="text-muted-foreground"
                           tickFormatter={formatCompactCurrency}
                         />
                         <Tooltip content={<ContractExpenseTooltip series={contractExpenseSeries} />} />
@@ -812,7 +814,7 @@ export function DashboardContractExecutionTab({
                       <select
                         value={projectionTargetMonths}
                         onChange={(e) => onProjectionTargetMonthsChange?.(Number(e.target.value))}
-                        className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-text-primary focus:border-primary/50 focus:outline-none cursor-pointer"
+                        className="rounded-lg border border-border bg-card px-2 py-1 text-xs font-semibold text-foreground focus:border-primary/50 focus:outline-none cursor-pointer"
                       >
                         {projectionOptions.map((opt) => (
                           <option key={opt.months} value={opt.months}>
@@ -830,20 +832,20 @@ export function DashboardContractExecutionTab({
                     const ratio = item.projetado > 0 ? (totalCapacidade / item.projetado) * 100 : 0;
                     
                     let statusColor = 'bg-emerald-600';
-                    let statusBg = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+                    let statusBg = 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30';
                     let statusText = 'Adequado';
 
                     if (ratio === 0) {
                       statusColor = 'bg-slate-400';
-                      statusBg = 'bg-slate-50 text-slate-600 border-slate-200';
+                      statusBg = 'bg-muted text-muted-foreground border-border';
                       statusText = 'Sem Gasto';
                     } else if (ratio < 70) {
                       statusColor = 'bg-rose-600';
-                      statusBg = 'bg-rose-50 text-rose-700 border-rose-100';
+                      statusBg = 'bg-destructive/15 text-destructive border-destructive/30';
                       statusText = 'Crítico';
                     } else if (ratio < 100) {
                       statusColor = 'bg-yellow-500';
-                      statusBg = 'bg-yellow-50 text-amber-700 border-yellow-100';
+                      statusBg = 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30';
                       statusText = 'Atenção';
                     }
 
@@ -857,7 +859,7 @@ export function DashboardContractExecutionTab({
                     return (
                       <div
                         key={item.id}
-                        className="rounded-2xl border border-border-default/70 bg-white p-4 transition-all hover:shadow-[0_8px_24px_rgba(15,23,42,0.04)]"
+                        className="rounded-2xl border border-border bg-card p-4 transition-all hover:shadow-[0_8px_24px_rgba(15,23,42,0.04)]"
                       >
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div className="min-w-0 space-y-1">

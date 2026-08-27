@@ -43,7 +43,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { SuapSyncPanel } from '@/components/suap/SuapSyncPanel';
-import { SuapThemeSwitcher } from '@/components/suap/SuapThemeSwitcher';
+import { SuapThemeSubMenu } from '@/components/suap/SuapThemeSwitcher';
 import { CommandPalette } from '@/components/CommandPalette';
 import { NotificationCenter } from '@/components/notifications/NotificationCenter';
 import { LogoIcon } from './Logo';
@@ -139,7 +139,15 @@ function isItemActive(pathname: string, item: NavigationItem) {
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
-  const { isAccessLoading, session, signOut, updatePassword, canAccessScreen, userOrg } = useAuth();
+  const {
+    isAccessLoading,
+    session,
+    signOut,
+    updatePassword,
+    canAccessScreen,
+    userOrg,
+    userGroups = [],
+  } = useAuth();
   const dataContext = useOptionalData();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -158,6 +166,7 @@ export function Layout({ children }: LayoutProps) {
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('');
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [navigationSearch, setNavigationSearch] = useState('');
+  const isTerceirizado = userGroups.some((group) => group.slug === 'terceirizado');
 
   const navigationSections = useMemo(() => {
     const sections = buildNavigationSections(canAccessScreen);
@@ -656,9 +665,6 @@ export function Layout({ children }: LayoutProps) {
               {/* dynamic page action buttons (eg sync) */}
               <div id="header-actions" className="flex items-center gap-2" />
 
-              {/* SUAP Theme Switcher */}
-              <SuapThemeSwitcher />
-
               {/* Notification Center */}
               <NotificationCenter
                 empenhos={dataContext?.empenhos}
@@ -708,6 +714,7 @@ export function Layout({ children }: LayoutProps) {
                       <FolderSync className="h-4 w-4 text-emerald-600" />
                       Configurar integração com o SUAP
                     </DropdownMenuItem>
+                    <SuapThemeSubMenu />
                     <DropdownMenuItem onSelect={() => setIsPasswordDialogOpen(true)} className="gap-2">
                       <KeyRound className="h-4 w-4" />
                       Alterar senha
@@ -740,7 +747,8 @@ export function Layout({ children }: LayoutProps) {
           onOpenPasswordChange={() => setIsPasswordDialogOpen(true)}
           onSignOut={() => void handleSignOut()}
           empenhosList={dataContext?.empenhos}
-          contratosList={dataContext?.contratos}
+          contratosList={isTerceirizado ? [] : dataContext?.contratos}
+          disableContractSearch={isTerceirizado}
           atividadesList={dataContext?.atividades}
           onSaveEmpenho={dataContext?.updateEmpenho}
         />

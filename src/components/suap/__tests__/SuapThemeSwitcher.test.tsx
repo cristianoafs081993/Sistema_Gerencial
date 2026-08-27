@@ -1,6 +1,18 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { SuapThemeSwitcher, SUAP_THEMES, applySuapTheme } from '../SuapThemeSwitcher';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  SuapThemeSwitcher,
+  SuapThemeSubMenu,
+  SUAP_THEMES,
+  applySuapTheme,
+  initSuapTheme,
+  getSavedSuapTheme,
+} from '../SuapThemeSwitcher';
 
 describe('SuapThemeSwitcher', () => {
   beforeEach(() => {
@@ -48,5 +60,27 @@ describe('SuapThemeSwitcher', () => {
   it('renders button trigger with current theme name', () => {
     render(<SuapThemeSwitcher />);
     expect(screen.getByText('Padrão (SUAP)')).toBeDefined();
+  });
+
+  it('initializes theme correctly via initSuapTheme and getSavedSuapTheme', () => {
+    localStorage.setItem('suap_theme_selected', 'aurora');
+    expect(getSavedSuapTheme()).toBe('aurora');
+    
+    const theme = initSuapTheme();
+    expect(theme).toBe('aurora');
+    expect(document.documentElement.getAttribute('data-suap-theme')).toBe('aurora');
+  });
+
+  it('renders SuapThemeSubMenu inside a DropdownMenu and displays trigger label', () => {
+    render(
+      <DropdownMenu open>
+        <DropdownMenuTrigger>Abrir Menu</DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <SuapThemeSubMenu />
+        </DropdownMenuContent>
+      </DropdownMenu>,
+    );
+
+    expect(screen.getByText('Padrão de design (SUAP)')).toBeInTheDocument();
   });
 });

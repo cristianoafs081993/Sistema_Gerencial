@@ -683,7 +683,7 @@ Function chamada pela extensão na rota oficial de edição de ETP.
 - Persistencia da sessao (extensao 1.9.20): o service worker e o unico responsavel por renovar o `refresh_token`, com serializacao para impedir renovacoes concorrentes. A sessao permanece armazenada em falhas de rede ou de renovacao e so e removida pelo logout explicito.
 - Nao foram adicionados endpoints, migrations ou Edge Functions.
 
-- O callback suap-token-exchange tambem procura a matricula normalizada em registros legados de terceirizados; perfis do grupo terceirizado sao direcionados a /requisicao-compra. Na consulta de requisicao, a ausencia de cache de liquidacoes dispara atualizacao assincrona e nao bloqueia a exibicao do saldo base do subitem.
+- O callback suap-token-exchange tambem procura a matricula normalizada em registros legados de terceirizados; perfis do grupo terceirizado sao direcionados a /requisicao-compra e podem abrir /contratos. Nessa tela, o frontend filtra os contratos por `terceirizado_permissions.contrato_id`; na consulta de requisicao, a ausencia de cache de liquidacoes dispara atualizacao assincrona e nao bloqueia a exibicao do saldo base do subitem.
 
 - O consumo do cache de itens de empenho revalida registros not_found e faz fallback direto ao Portal da Transparencia para evitar que uma falha transitoria oculte subitens reais.
 

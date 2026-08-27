@@ -191,7 +191,7 @@ export async function fetchUserAccess(user: User, isSuperAdmin: boolean): Promis
 
     return {
       groups: groups.filter((group) => group.slug === 'terceirizado'),
-      screenIds: expandScreenAccessIds(['requisicao-compra']),
+      screenIds: expandScreenAccessIds(['contratos', 'requisicao-compra']),
       org: orgResult,
     };
   }

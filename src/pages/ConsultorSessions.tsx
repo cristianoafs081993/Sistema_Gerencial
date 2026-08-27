@@ -443,7 +443,7 @@ export default function ConsultorSessions() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col overflow-hidden bg-slate-50 md:flex-row">
+    <div className="flex h-[calc(100vh-4rem)] flex-col overflow-hidden bg-background md:flex-row">
       {portalTargets.actions &&
         createPortal(
           <div className="flex items-center gap-2">
@@ -451,20 +451,20 @@ export default function ConsultorSessions() {
               type="button"
               variant="ghost"
               size="sm"
-              className="h-8 px-3 text-[12px] text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600"
+              className="h-8 px-3 text-[12px] text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
               onClick={handleClearHistory}
             >
               <Trash2 className="mr-2 h-3.5 w-3.5" />
-              Limpar historico
+              Limpar histórico
             </Button>
           </div>,
           portalTargets.actions,
         )}
 
-      <aside className="flex w-full shrink-0 flex-col border-b border-slate-200 bg-white md:w-80 md:border-b-0 md:border-r">
-        <div className="border-b border-slate-100 px-4 py-4">
+      <aside className="flex w-full shrink-0 flex-col border-b border-border bg-card md:w-80 md:border-b-0 md:border-r">
+        <div className="border-b border-border px-4 py-4">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold text-slate-950">Conversas</h2>
+            <h2 className="text-base font-semibold text-foreground">Conversas</h2>
             <Button type="button" size="sm" className="h-9" onClick={handleCreateSession}>
               <Plus className="mr-2 h-4 w-4" />
               Nova
@@ -480,8 +480,8 @@ export default function ConsultorSessions() {
                 className={cn(
                   'group w-full rounded-2xl border px-4 py-3 transition-all',
                   activeSession?.id === session.id
-                    ? 'border-primary/20 bg-primary/5 shadow-sm'
-                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50',
+                    ? 'border-primary/30 bg-primary/10 shadow-xs'
+                    : 'border-border bg-card hover:border-border/80 hover:bg-muted/40',
                 )}
               >
                 <div className="flex items-start gap-3">
@@ -494,18 +494,18 @@ export default function ConsultorSessions() {
                     className="min-w-0 flex-1 text-left"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <p className="line-clamp-2 text-sm font-semibold text-slate-900">{session.title}</p>
-                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.15em] text-slate-400">
+                      <p className="line-clamp-2 text-sm font-semibold text-foreground">{session.title}</p>
+                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">
                         {formatSessionTimestamp(session.updatedAt)}
                       </span>
                     </div>
-                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{session.lastMessagePreview}</p>
+                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">{session.lastMessagePreview}</p>
                   </button>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 shrink-0 text-slate-400 opacity-0 transition group-hover:opacity-100 hover:bg-red-50 hover:text-red-600"
+                    className="h-7 w-7 shrink-0 text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive"
                     onClick={() => handleDeleteSession(session.id)}
                     title="Excluir conversa"
                   >
@@ -518,7 +518,7 @@ export default function ConsultorSessions() {
         </ScrollArea>
       </aside>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <div ref={scrollRef} className="flex-1 overflow-y-auto scroll-smooth">
           <div className="w-full space-y-8 px-4 py-6 md:px-10 md:py-8">
             {messages.map((message) => (
@@ -528,8 +528,8 @@ export default function ConsultorSessions() {
               >
                 <div
                   className={cn(
-                    'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white',
-                    message.role === 'user' ? 'bg-slate-300' : 'bg-primary',
+                    'flex h-10 w-10 shrink-0 items-center justify-center rounded-full',
+                    message.role === 'user' ? 'bg-muted text-muted-foreground' : 'bg-primary text-primary-foreground',
                   )}
                 >
                   {message.role === 'user' ? <User className="h-6 w-6" /> : <Bot className="h-6 w-6" />}
@@ -548,8 +548,8 @@ export default function ConsultorSessions() {
                       className={cn(
                         'text-[12px] leading-relaxed',
                         message.role === 'user'
-                          ? 'rounded-2xl rounded-tr-sm bg-slate-100 px-5 py-3.5 text-slate-800'
-                          : 'prose prose-sm max-w-none rounded-2xl rounded-tl-sm border border-primary/10 bg-primary/5 px-5 py-4 text-slate-900 prose-p:mb-2 prose-p:text-[12px] prose-p:leading-relaxed prose-li:mb-3 prose-li:text-[12px] prose-a:text-primary prose-ul:my-3',
+                          ? 'rounded-2xl rounded-tr-sm bg-muted px-5 py-3.5 text-foreground'
+                          : 'prose prose-sm dark:prose-invert max-w-none rounded-2xl rounded-tl-sm border border-border bg-card px-5 py-4 text-foreground prose-p:mb-2 prose-p:text-[12px] prose-p:leading-relaxed prose-li:mb-3 prose-li:text-[12px] prose-a:text-primary prose-ul:my-3 shadow-xs',
                       )}
                     >
                       {message.role === 'user' ? (
@@ -576,20 +576,20 @@ export default function ConsultorSessions() {
                             return acc;
                           }, {}),
                         ).map(([title, refs], index) => (
-                          <div key={`${title}-${index}`} className="max-w-sm rounded-lg border bg-slate-50 p-2.5">
-                            <p className="text-[11px] font-bold text-slate-700">{title}</p>
+                          <div key={`${title}-${index}`} className="max-w-sm rounded-lg border border-border bg-muted/40 p-2.5">
+                            <p className="text-[11px] font-bold text-foreground">{title}</p>
                             <div className="mt-1 space-y-1">
                               {refs.slice(0, 2).map((ref, refIndex) => (
                                 <p
                                   key={`${ref.referencia}-${refIndex}`}
-                                  className="flex items-center gap-1 truncate text-[10px] text-slate-500"
+                                  className="flex items-center gap-1 truncate text-[10px] text-muted-foreground"
                                 >
-                                  <span className="h-1 w-1 rounded-full bg-slate-300" />
+                                  <span className="h-1 w-1 rounded-full bg-muted-foreground/40" />
                                   {ref.referencia}
                                 </p>
                               ))}
                               {refs.length > 2 && (
-                                <p className="text-[10px] italic text-slate-400">...e mais {refs.length - 2} trechos</p>
+                                <p className="text-[10px] italic text-muted-foreground">...e mais {refs.length - 2} trechos</p>
                               )}
                             </div>
                           </div>
@@ -603,7 +603,7 @@ export default function ConsultorSessions() {
 
             {isLoading && (
               <div className="flex w-full gap-4 transition-opacity duration-300 sm:gap-6">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-white">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
                   <Bot className="h-6 w-6 animate-pulse" />
                 </div>
                 <div className="relative top-1 flex min-w-[280px] items-center gap-3 overflow-hidden rounded-2xl rounded-tl-sm border border-primary/10 bg-primary/5 px-6 py-4 text-[15px] font-semibold text-primary">
@@ -617,7 +617,7 @@ export default function ConsultorSessions() {
           </div>
         </div>
 
-        <div className="shrink-0 border-t bg-white shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.05)]">
+        <div className="shrink-0 border-t border-border bg-card shadow-lg">
           <div className="w-full px-4 pb-4 pt-3 md:px-10 md:pb-5">
             {attachedFile && (
               <div className="mb-3 flex max-w-full items-center justify-between rounded-xl border border-border bg-card p-3 shadow-xs">
@@ -626,8 +626,8 @@ export default function ConsultorSessions() {
                     <FileText className="h-5 w-5" />
                   </div>
                   <div className="shrink truncate">
-                    <p className="truncate text-sm font-bold text-slate-700">{attachedFile.name}</p>
-                    <p className="truncate text-xs text-slate-400">
+                    <p className="truncate text-sm font-bold text-foreground">{attachedFile.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">
                       PDF anexado para analise ({(attachedFile.file.size / 1024).toFixed(1)} KB)
                     </p>
                   </div>
@@ -636,7 +636,7 @@ export default function ConsultorSessions() {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="ml-4 shrink-0 hover:bg-red-50 hover:text-red-600"
+                  className="ml-4 shrink-0 hover:bg-destructive/10 hover:text-destructive"
                   onClick={() => setAttachedFile(null)}
                 >
                   <X className="h-4 w-4" />
@@ -657,7 +657,7 @@ export default function ConsultorSessions() {
                 type="button"
                 size="icon"
                 variant="outline"
-                className="h-12 w-12 shrink-0 border-slate-300 bg-white text-slate-500 hover:border-primary hover:text-primary disabled:opacity-50"
+                className="h-12 w-12 shrink-0 border-border bg-card text-muted-foreground hover:border-primary hover:text-primary disabled:opacity-50"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isLoading || Boolean(attachedFile)}
                 title="Anexar arquivo PDF para analise"
@@ -666,7 +666,7 @@ export default function ConsultorSessions() {
               </Button>
 
               <textarea
-                className="min-h-[48px] max-h-32 flex-1 resize-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-[15px] shadow-sm placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="min-h-[48px] max-h-32 flex-1 resize-none rounded-xl border border-border bg-background text-foreground px-4 py-3 text-[15px] shadow-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 placeholder={
                   attachedFile
                     ? 'Faca uma pergunta ou peca para analisar o PDF anexado...'

@@ -2286,7 +2286,7 @@ export default function ManutencaoAdmin() {
                         {editingBloco.badge_x && editingBloco.badge_y && (
                           <g>
                             <circle cx={editingBloco.badge_x} cy={editingBloco.badge_y} r="8" fill="#10b981" stroke="#ffffff" strokeWidth="2" />
-                            <text x={editingBloco.badge_x} y={editingBloco.badge_y - 12} textAnchor="middle" fill="#0f172a" fontSize="10" fontWeight="bold">Alerta</text>
+                            <text x={editingBloco.badge_x} y={editingBloco.badge_y - 12} textAnchor="middle" fill="currentColor" className="text-foreground" fontSize="10" fontWeight="bold">Alerta</text>
                           </g>
                         )}
                       </g>

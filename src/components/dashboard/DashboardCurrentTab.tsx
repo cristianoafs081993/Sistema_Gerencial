@@ -233,14 +233,14 @@ export function DashboardCurrentTab({
                 {isLoading ? (
                   <div className="h-4 w-24 animate-pulse rounded bg-muted" />
                 ) : (
-                  <span className="bg-gradient-to-r from-[#b45309] to-[#f59e0b] bg-clip-text text-sm font-black tracking-tight text-transparent">
+                  <span className="bg-gradient-to-r from-amber-600 to-amber-500 dark:from-amber-400 dark:to-yellow-300 bg-clip-text text-sm font-black tracking-tight text-transparent">
                     {formatCurrency(totalLiquidado)}
                   </span>
                 )}
               </div>
               <div className="h-1 overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-[#f59e0b]/70 to-[#f59e0b] transition-all duration-700 ease-spring"
+                  className="h-full rounded-full bg-gradient-to-r from-amber-500/70 to-amber-500 transition-all duration-700 ease-spring"
                   style={{ width: totalEmpenhado > 0 ? `${Math.min((totalLiquidado / totalEmpenhado) * 100, 100)}%` : '0%' }}
                 />
               </div>
@@ -254,14 +254,14 @@ export function DashboardCurrentTab({
                 {isLoading ? (
                   <div className="h-4 w-24 animate-pulse rounded bg-muted" />
                 ) : (
-                  <span className="bg-gradient-to-r from-[#047857] to-[#10b981] bg-clip-text text-sm font-black tracking-tight text-transparent">
+                  <span className="bg-gradient-to-r from-emerald-600 to-emerald-500 dark:from-emerald-400 dark:to-teal-300 bg-clip-text text-sm font-black tracking-tight text-transparent">
                     {formatCurrency(totalPago)}
                   </span>
                 )}
               </div>
               <div className="h-1 overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-[#10b981]/70 to-[#10b981] transition-all duration-700 ease-spring"
+                  className="h-full rounded-full bg-gradient-to-r from-emerald-500/70 to-emerald-500 transition-all duration-700 ease-spring"
                   style={{ width: totalLiquidado > 0 ? `${Math.min((totalPago / totalLiquidado) * 100, 100)}%` : '0%' }}
                 />
               </div>
@@ -271,7 +271,7 @@ export function DashboardCurrentTab({
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="relative flex min-h-[226px] items-stretch justify-center overflow-hidden rounded-2xl border border-border-default/80 bg-white p-5 shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card">
+        <div className="relative flex min-h-[226px] items-stretch justify-center overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card">
           <div className="flex w-full max-w-[420px] flex-col items-center justify-between">
             <p className="mb-1 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">Empenhado/Descentralizado</p>
             <GaugeChart
@@ -284,7 +284,7 @@ export function DashboardCurrentTab({
           </div>
         </div>
 
-        <div className="relative flex min-h-[226px] items-stretch justify-center overflow-hidden rounded-2xl border border-border-default/80 bg-white p-5 shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card">
+        <div className="relative flex min-h-[226px] items-stretch justify-center overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card">
           <div className="flex w-full max-w-[420px] flex-col items-center justify-between">
             <p className="mb-1 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">Liquidado/Descentralizado</p>
             <GaugeChart
@@ -337,7 +337,7 @@ export function DashboardCurrentTab({
             </span>
           </div>
 
-          <div className="h-[300px] rounded-[22px] border border-border-default/60 bg-[linear-gradient(180deg,rgba(248,250,252,0.95),rgba(255,255,255,0.85))] p-3">
+          <div className="h-[300px] rounded-[22px] border border-border bg-card/50 p-3">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={dadosMensais} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
                 <defs>
@@ -350,16 +350,17 @@ export function DashboardCurrentTab({
                     <stop offset="100%" stopColor={EXECUTION_CHART_COLORS.liquidado} stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#dbe3f0" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }} />
+                <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="hsl(var(--border))" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'currentColor', fontSize: 12, fontWeight: 600 }} className="text-muted-foreground" />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
                   width={74}
-                  tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
+                  tick={{ fill: 'currentColor', fontSize: 12, fontWeight: 600 }}
+                  className="text-muted-foreground"
                   tickFormatter={formatCompactCurrency}
                 />
-                <Tooltip content={<ExecutionTooltip />} cursor={{ stroke: '#cbd5e1', strokeDasharray: '4 4' }} />
+                <Tooltip content={<ExecutionTooltip />} cursor={{ stroke: 'hsl(var(--border))', strokeDasharray: '4 4' }} />
                 <Area type="monotone" dataKey="empenhado" stroke={EXECUTION_CHART_COLORS.empenhado} strokeWidth={2.5} fill="url(#colorEmpenhado)" name="Empenhado" />
                 <Area type="monotone" dataKey="liquidado" stroke={EXECUTION_CHART_COLORS.liquidado} strokeWidth={2.5} fill="url(#colorLiquidado)" name="Liquidado" />
                 <Line
@@ -383,7 +384,7 @@ export function DashboardCurrentTab({
           </CardHeader>
           <CardContent>
             <div className="relative flex min-h-[300px] flex-1 flex-col justify-center gap-4 py-4">
-              <div className="absolute left-1/2 top-0 bottom-0 z-0 hidden w-px -translate-x-1/2 bg-slate-100 md:block" />
+              <div className="absolute left-1/2 top-0 bottom-0 z-0 hidden w-px -translate-x-1/2 bg-border md:block" />
 
               <div className="relative z-10 flex flex-col items-center">
                 <div className="w-full max-w-[240px] rounded-lg bg-vibrant-blue px-4 py-3 text-center text-white shadow-sm">
@@ -392,11 +393,11 @@ export function DashboardCurrentTab({
                 </div>
 
                 <div className="flex h-6 items-center justify-center">
-                  <ArrowDown className="h-4 w-4 text-slate-300" />
+                  <ArrowDown className="h-4 w-4 text-muted-foreground" />
                 </div>
 
                 <div className="relative w-11/12 max-w-[220px] rounded-lg bg-purple px-4 py-3 text-center text-white shadow-sm">
-                  <div className="absolute -right-2 top-1/2 hidden -translate-y-1/2 rounded border border-slate-100 bg-white px-1.5 py-0.5 text-[10px] font-bold text-purple shadow-sm md:block">
+                  <div className="absolute -right-2 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-card px-1.5 py-0.5 text-[10px] font-bold text-purple shadow-sm md:block">
                     {totalPlanejado ? ((totalEmpenhado / totalPlanejado) * 100).toFixed(1) : '0'}%
                   </div>
                   <p className="mb-1 text-xs font-medium uppercase tracking-wider text-white/85">Empenhado</p>
@@ -404,11 +405,11 @@ export function DashboardCurrentTab({
                 </div>
 
                 <div className="flex h-6 items-center justify-center">
-                  <ArrowDown className="h-4 w-4 text-slate-300" />
+                  <ArrowDown className="h-4 w-4 text-muted-foreground" />
                 </div>
 
                 <div className="relative w-5/6 max-w-[200px] rounded-lg bg-amber px-4 py-3 text-center text-white shadow-sm">
-                  <div className="absolute -right-2 top-1/2 hidden -translate-y-1/2 rounded border border-slate-100 bg-white px-1.5 py-0.5 text-[10px] font-bold text-amber shadow-sm md:block">
+                  <div className="absolute -right-2 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-card px-1.5 py-0.5 text-[10px] font-bold text-amber shadow-sm md:block">
                     {totalEmpenhado ? ((totalLiquidado / totalEmpenhado) * 100).toFixed(1) : '0'}%
                   </div>
                   <p className="mb-1 text-xs font-medium uppercase tracking-wider text-white/85">Liquidado</p>
@@ -416,11 +417,11 @@ export function DashboardCurrentTab({
                 </div>
 
                 <div className="flex h-6 items-center justify-center">
-                  <ArrowDown className="h-4 w-4 text-slate-300" />
+                  <ArrowDown className="h-4 w-4 text-muted-foreground" />
                 </div>
 
                 <div className="relative w-4/5 max-w-[180px] rounded-lg bg-emerald-green px-4 py-3 text-center text-white shadow-sm">
-                  <div className="absolute -right-2 top-1/2 hidden -translate-y-1/2 rounded border border-slate-100 bg-white px-1.5 py-0.5 text-[10px] font-bold text-emerald-green shadow-sm md:block">
+                  <div className="absolute -right-2 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-card px-1.5 py-0.5 text-[10px] font-bold text-emerald-green shadow-sm md:block">
                     {totalLiquidado ? ((totalPago / totalLiquidado) * 100).toFixed(1) : '0'}%
                   </div>
                   <p className="mb-1 text-xs font-medium uppercase tracking-wider text-white/85">Pago</p>
@@ -442,7 +443,7 @@ export function DashboardCurrentTab({
           <div className="h-[350px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dadosDescentralizacao} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} stroke="#e2e8f0" />
+                <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} stroke="hsl(var(--border))" />
                 <XAxis type="number" tickFormatter={(value) => `R$${(value / 1000).toFixed(0)}k`} />
                 <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 11 }} />
                 <Tooltip formatter={(value: number) => formatCurrency(value)} />
@@ -474,7 +475,7 @@ export function DashboardCurrentTab({
           <div className="h-[350px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dadosPorNatureza} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} stroke="#e2e8f0" />
+                <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} stroke="hsl(var(--border))" />
                 <XAxis type="number" tickFormatter={(value) => `R$${(value / 1000).toFixed(0)}k`} />
                 <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 11 }} />
                 <Tooltip formatter={(value: number) => formatCurrency(value)} />
@@ -495,7 +496,7 @@ export function DashboardCurrentTab({
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader className="bg-slate-50/50">
+              <TableHeader className="bg-muted/50">
                 <TableRow className="border-b border-border-default/50 hover:bg-transparent">
                   <TableHead className="h-11 px-6 text-xs font-semibold uppercase tracking-wider">Origem de Recurso</TableHead>
                   <TableHead className="h-11 px-4 text-right text-xs font-semibold uppercase tracking-wider">Planejado</TableHead>

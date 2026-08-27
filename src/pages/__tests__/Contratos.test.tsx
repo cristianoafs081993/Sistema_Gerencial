@@ -6,20 +6,35 @@ import Contratos from '@/pages/Contratos';
 import { useData } from '@/contexts/DataContext';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { contratosApiService } from '@/services/contratosApi';
+import { requisicoesCompraService } from '@/services/requisicoesCompra';
 import { useUserFavorites } from '@/services/userFavorites';
 
-const authState = vi.hoisted(() => ({ isSuperAdmin: false }));
+const authState = vi.hoisted(() => ({
+  isSuperAdmin: false,
+  user: null as unknown,
+  userGroups: [] as Array<{ slug: string }>,
+}));
 
 vi.mock('@/contexts/DataContext', () => ({
   useData: vi.fn(),
 }));
 
 vi.mock('@/contexts/AuthContext', () => ({
-  useAuth: () => ({ isSuperAdmin: authState.isSuperAdmin }),
+  useAuth: () => ({
+    isSuperAdmin: authState.isSuperAdmin,
+    user: authState.user,
+    userGroups: authState.userGroups,
+  }),
 }));
 
 vi.mock('@/services/userFavorites', () => ({
   useUserFavorites: vi.fn(),
+}));
+
+vi.mock('@/services/requisicoesCompra', () => ({
+  requisicoesCompraService: {
+    listPermissions: vi.fn(),
+  },
 }));
 
 vi.mock('@/components/HeaderParts', () => ({
@@ -60,6 +75,8 @@ describe('Contratos', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authState.isSuperAdmin = false;
+    authState.user = null;
+    authState.userGroups = [];
 
     mockedUseData.mockReturnValue({
       atividades: [],
@@ -239,6 +256,33 @@ describe('Contratos', () => {
       isFavorite: (entityType, entityId) => entityType === 'contrato' && entityId === 'contrato-local-1',
       toggleFavorite: vi.fn(),
     });
+    vi.mocked(requisicoesCompraService.listPermissions).mockResolvedValue([]);
+  });
+
+  it('exibe somente os contratos vinculados ao terceirizado', async () => {
+    authState.user = {
+      id: 'terceirizado-1',
+      email: 'prestador@ifrn.edu.br',
+      user_metadata: { matricula: '3128880' },
+    };
+    authState.userGroups = [{ slug: 'terceirizado' }];
+    vi.mocked(requisicoesCompraService.listPermissions).mockResolvedValue([
+      {
+        id: 'permission-1',
+        userId: 'terceirizado-1',
+        userMatricula: '3128880',
+        userEmail: 'prestador@ifrn.edu.br',
+        contratoId: 'contrato-local-1',
+        createdBy: 'admin-1',
+        createdAt: new Date('2026-01-01'),
+      },
+    ]);
+
+    renderContratos();
+
+    expect(await screen.findByText('62/2018')).toBeInTheDocument();
+    expect(screen.queryByText('15/2026')).not.toBeInTheDocument();
+    expect(mockedContratosApiService.getContratosApi).not.toHaveBeenCalled();
   });
 
   it('exibe detalhes da API quando o contrato local casa por numero normalizado', async () => {

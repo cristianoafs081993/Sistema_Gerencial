@@ -176,6 +176,7 @@
   /* TEMA LUNA (DARK THEME COM CIANO) */
   .dark,
   [data-suap-theme="luna"] {
+    color-scheme: dark;
     --background: 0 0% 10%;             /* #1A1A1A */
     --foreground: 0 0% 96%;
 
@@ -201,8 +202,15 @@
     --accent: 175 80% 45%;
     --accent-foreground: 0 0% 5%;
 
-    --destructive: 0 85% 55%;
+    /* === FEEDBACK SEMÂNTICO (Otimizado para Dark / Luna) === */
+    --destructive: 0 85% 60%;           /* Vermelho vibrante contrastado */
     --destructive-foreground: 0 0% 98%;
+    --success: 142 70% 48%;             /* Verde vivo acessível no escuro */
+    --success-foreground: 0 0% 5%;
+    --warning: 43 96% 56%;              /* Âmbar/Amarelo vibrante #FBBF24 */
+    --warning-foreground: 0 0% 5%;
+    --info: 199 90% 60%;                /* Azul celeste vibrante #38BDF8 */
+    --info-foreground: 0 0% 5%;
 
     --sidebar-background: 0 0% 12%;
     --sidebar-foreground: 0 0% 92%;
@@ -212,15 +220,28 @@
     --sidebar-accent-foreground: 175 85% 65%;
     --sidebar-border: 0 0% 24%;
 
-    --shadow-primary: 0 8px 18px 0 rgba(20, 184, 170, 0.35);
-    --glass-bg: rgba(26, 26, 26, 0.92);
+    /* Sombras e elevação no escuro */
+    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.45);
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.55), 0 1px 2px -1px rgba(0, 0, 0, 0.45);
+    --shadow-md: 0 4px 14px -3px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    --shadow-lg: 0 10px 24px -6px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    --shadow-xl: 0 20px 35px -10px rgba(0, 0, 0, 0.85);
+    --shadow-primary: 0 8px 22px 0 rgba(20, 184, 170, 0.40);
+
+    /* Glassmorphism e gradientes escuros */
+    --glass-bg: rgba(26, 26, 26, 0.94);
+    --glass-border: rgba(255, 255, 255, 0.12);
+    --glass-highlight: rgba(255, 255, 255, 0.06);
+
     --gradient-primary: linear-gradient(135deg, #14B8AA 0%, #052E2B 100%);
     --gradient-accent:  linear-gradient(135deg, #1AE5D5 0%, #14B8AA 100%);
+    --gradient-warning: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+    --gradient-card:    linear-gradient(180deg, #242424 0%, #1e2021 100%);
   }
-
 
   /* TEMA ALTO CONTRASTE */
   [data-suap-theme="alto-contraste"] {
+    color-scheme: dark;
     --background: 0 0% 0%;              /* Preto absoluto */
     --foreground: 0 0% 100%;            /* Branco absoluto */
     --card: 0 0% 5%;
@@ -234,6 +255,16 @@
     --primary-foreground: 0 0% 0%;
     --accent: 60 100% 50%;
     --accent-foreground: 0 0% 0%;
+    --destructive: 0 100% 50%;          /* #FF0000 */
+    --destructive-foreground: 0 0% 100%;
+    --success: 120 100% 50%;            /* #00FF00 */
+    --success-foreground: 0 0% 0%;
+    --warning: 60 100% 50%;             /* #FFFF00 */
+    --warning-foreground: 0 0% 0%;
+    --info: 180 100% 50%;               /* #00FFFF */
+    --info-foreground: 0 0% 0%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 100%;
     --sidebar-background: 0 0% 0%;
     --sidebar-foreground: 0 0% 100%;
     --sidebar-primary: 60 100% 50%;
@@ -241,6 +272,7 @@
     --sidebar-accent: 0 0% 20%;
     --sidebar-accent-foreground: 60 100% 50%;
     --sidebar-border: 60 100% 50%;
+    --gradient-card: linear-gradient(180deg, #0d0d0d 0%, #000000 100%);
   }
 
   /* TEMA MODO DALTONISMO */
@@ -278,6 +310,10 @@
 
   html {
     scroll-behavior: smooth;
+  }
+
+  html.dark {
+    color-scheme: dark;
   }
 
   body {
@@ -601,6 +637,13 @@
   .row-hover:hover {
     background-color: hsl(var(--primary) / 0.04);
   }
+  .dark .row-hover:hover,
+  [data-suap-theme="luna"] .row-hover:hover {
+    background-color: hsl(var(--primary) / 0.10);
+  }
+  [data-suap-theme="alto-contraste"] .row-hover:hover {
+    background-color: hsl(var(--muted));
+  }
 
   .shadow-soft    { box-shadow: var(--shadow-sm); }
   .shadow-card    { box-shadow: var(--shadow-md); }
@@ -618,6 +661,12 @@
     background-image:
       radial-gradient(900px 380px at 10% -15%, hsl(var(--primary) / 0.04), transparent 60%),
       linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--secondary)) 100%);
+  }
+  .dark .app-bg-soft,
+  [data-suap-theme="luna"] .app-bg-soft {
+    background-image:
+      radial-gradient(900px 380px at 10% -15%, hsl(var(--primary) / 0.08), transparent 60%),
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--card)) 100%);
   }
 
   /* Custom Scrollbar */

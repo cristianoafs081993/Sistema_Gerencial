@@ -139,15 +139,15 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-4xl lg:max-w-5xl h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] flex flex-col p-0 overflow-hidden border-none shadow-2xl bg-white text-slate-900">
-        <DialogHeader className="shrink-0 p-6 bg-slate-50/80 border-b border-slate-100 space-y-1 relative">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-4xl lg:max-w-5xl h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] flex flex-col p-0 overflow-hidden border border-border shadow-2xl bg-card text-foreground">
+        <DialogHeader className="shrink-0 p-6 bg-muted/40 border-b border-border space-y-1 relative">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg text-purple-600">
+            <div className="p-2 bg-purple-500/15 rounded-lg text-purple-600 dark:text-purple-400">
               <Landmark className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-purple-600/70">Detalhes do Empenho</span>
-              <DialogTitle className="text-xl font-black tracking-tight text-slate-900">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-purple-600/70 dark:text-purple-400/80">Detalhes do Empenho</span>
+              <DialogTitle className="text-xl font-black tracking-tight text-foreground">
                 {empenho.numero}
               </DialogTitle>
             </div>
@@ -155,44 +155,44 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
           <div className="absolute top-0 left-0 w-full h-1 bg-purple-500" />
         </DialogHeader>
 
-        <ScrollArea className="min-h-0 flex-1 bg-white">
+        <ScrollArea className="min-h-0 flex-1 bg-card">
           <div className="p-6 space-y-6">
             {/* Resumo de Valores */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <Card className="border-none shadow-sm bg-slate-50 overflow-hidden group">
+              <Card className="border border-border/60 shadow-sm bg-muted/30 overflow-hidden group">
                 <div className="h-1 bg-blue-500 w-full" />
                 <CardContent className="p-3">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">{valorEmpenhadoLabel}</span>
                     <DollarSign className="w-3 h-3 text-blue-500" />
                   </div>
-                  <p className="text-lg font-black text-slate-900 tracking-tighter">
+                  <p className="text-lg font-black text-foreground tracking-tighter">
                     {formatCurrency(valorEmpenhadoResumo)}
                   </p>
                 </CardContent>
               </Card>
 
-              <Card className="border-none shadow-sm bg-slate-50 overflow-hidden group">
+              <Card className="border border-border/60 shadow-sm bg-muted/30 overflow-hidden group">
                 <div className="h-1 bg-amber-500 w-full" />
                 <CardContent className="p-3">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">{valorLiquidadoLabel}</span>
                     <Receipt className="w-3 h-3 text-amber-500" />
                   </div>
-                  <p className="text-lg font-black text-slate-900 tracking-tighter">
+                  <p className="text-lg font-black text-foreground tracking-tighter">
                     {formatCurrency(valorLiquidadoResumo)}
                   </p>
                 </CardContent>
               </Card>
 
-              <Card className="border-none shadow-sm bg-emerald-50 overflow-hidden group">
+              <Card className="border border-emerald-500/30 shadow-sm bg-emerald-500/10 overflow-hidden group">
                 <div className="h-1 bg-emerald-500 w-full" />
                 <CardContent className="p-3">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider">{valorPagoLabel}</span>
+                    <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">{valorPagoLabel}</span>
                     <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                   </div>
-                  <p className="text-lg font-black text-emerald-700 tracking-tighter">
+                  <p className="text-lg font-black text-emerald-700 dark:text-emerald-300 tracking-tighter">
                     {formatCurrency(valorPagoResumo)}
                   </p>
                 </CardContent>
@@ -200,82 +200,82 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
             </div>
 
             {/* Dados Básicos */}
-            <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 flex flex-col gap-3">
+            <div className="bg-muted/30 p-4 rounded-xl border border-border flex flex-col gap-3">
                <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col">
                       <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Data de Emissão</span>
-                      <span className="text-xs font-bold text-slate-700">{format(new Date(empenho.dataEmpenho), 'dd/MM/yyyy')}</span>
+                      <span className="text-xs font-bold text-foreground">{format(new Date(empenho.dataEmpenho), 'dd/MM/yyyy')}</span>
                   </div>
                   <div className="flex flex-col items-end">
                       <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Status</span>
-                      <Badge variant="outline" className="text-[8px] font-black uppercase px-2 py-0 border-slate-200">
+                      <Badge variant="outline" className="text-[8px] font-black uppercase px-2 py-0 border-border">
                         {empenho.status}
                       </Badge>
                   </div>
                </div>
-               <div className="h-[1px] bg-slate-200/50 w-full" />
+               <div className="h-[1px] bg-border/60 w-full" />
                <div className="flex flex-col">
                   <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Favorecido</span>
-                  <span className="text-xs font-black text-slate-800 break-words">{empenho.favorecidoNome}</span>
-                  <span className="text-[10px] font-mono font-medium text-slate-500 break-all">{empenho.favorecidoDocumento}</span>
+                  <span className="text-xs font-black text-foreground break-words">{empenho.favorecidoNome}</span>
+                  <span className="text-[10px] font-mono font-medium text-muted-foreground break-all">{empenho.favorecidoDocumento}</span>
                </div>
-               <div className="h-[1px] bg-slate-200/50 w-full" />
+               <div className="h-[1px] bg-border/60 w-full" />
                <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col">
                       <span className="text-[9px] font-bold text-muted-foreground uppercase mb-0.5">Processo</span>
-                      <span className="text-xs font-bold font-mono text-slate-700 break-all">{empenho.processo || 'N/I'}</span>
+                      <span className="text-xs font-bold font-mono text-foreground break-all">{empenho.processo || 'N/I'}</span>
                   </div>
                   <div className="flex flex-col items-end text-right">
                       <span className="text-[9px] font-bold text-muted-foreground uppercase mb-0.5">Natureza Despesa</span>
-                      <span className="text-xs font-black text-blue-600 break-words">{empenho.naturezaDespesa || '-'}</span>
+                      <span className="text-xs font-black text-blue-600 dark:text-blue-400 break-words">{empenho.naturezaDespesa || '-'}</span>
                   </div>
                </div>
-               <div className="h-[1px] bg-slate-200/50 w-full" />
+               <div className="h-[1px] bg-border/60 w-full" />
                <div className="flex flex-col">
                   <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Descrição</span>
-                  <p className="text-[11px] text-slate-600 leading-relaxed italic">{empenho.descricao}</p>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed italic">{empenho.descricao}</p>
                </div>
             </div>
 
             {/* Subitens do Portal da Transparencia */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-              <div className="px-5 py-3 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
-                <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
-                  <Receipt className="w-3 h-3" />
+            <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+              <div className="px-5 py-3 border-b border-border/60 bg-muted/40 flex justify-between items-center">
+                <h3 className="text-[11px] font-black uppercase tracking-wider text-foreground flex items-center gap-2">
+                  <Receipt className="w-3 h-3 text-primary" />
                   Subitens do Empenho
                 </h3>
-                {isLoadingItensPortal && <Loader2 className="w-3 h-3 animate-spin text-slate-400" />}
+                {isLoadingItensPortal && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
               </div>
-              <div className="divide-y divide-slate-50">
+              <div className="divide-y divide-border/40">
                 {isLoadingItensPortal ? (
                   <div className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
-                    Carregando subitens do Portal da Transparencia...
+                    Carregando subitens do Portal da Transparência...
                   </div>
                 ) : isItensPortalError ? (
                   <div className="px-5 py-6 text-center text-[10px] text-status-warning italic">
-                    Nao foi possivel consultar os subitens no Portal da Transparencia agora.
+                    Não foi possível consultar os subitens no Portal da Transparência agora.
                   </div>
                 ) : itensPortal.length > 0 ? (
                   itensPortal.map((item) => (
                     <div key={`${item.codigoItemEmpenho}-${item.sequencial}`} className="px-5 py-3">
                       <div className="mb-1 flex flex-wrap items-center gap-2">
-                        <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-none font-black uppercase bg-slate-50 text-slate-600">
+                        <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-border font-black uppercase bg-muted/60 text-foreground">
                           Subitem {item.codigoSubelemento || item.sequencial || '-'}
                         </Badge>
                         {item.descricaoSubelemento ? (
-                          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
                             {item.descricaoSubelemento}
                           </span>
                         ) : null}
                       </div>
-                      <p className="text-[11px] leading-relaxed text-slate-700">
-                        {item.descricao || 'Descricao nao informada no Portal da Transparencia.'}
+                      <p className="text-[11px] leading-relaxed text-foreground">
+                        {item.descricao || 'Descrição não informada no Portal da Transparência.'}
                       </p>
                     </div>
                   ))
                 ) : (
                   <div className="px-5 py-6 text-center text-[10px] text-muted-foreground italic">
-                    Nenhum subitem encontrado no Portal da Transparencia para este empenho.
+                    Nenhum subitem encontrado no Portal da Transparência para este empenho.
                   </div>
                 )}
               </div>
@@ -283,16 +283,16 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
 
             {/* Histórico de Operações */}
             {empenho.historicoOperacoes && empenho.historicoOperacoes.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
-                    <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
-                        <History className="w-3 h-3" />
+              <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+                <div className="px-5 py-3 border-b border-border/60 bg-muted/40 flex justify-between items-center">
+                    <h3 className="text-[11px] font-black uppercase tracking-wider text-foreground flex items-center gap-2">
+                        <History className="w-3 h-3 text-primary" />
                         Histórico de Operações
                     </h3>
                 </div>
                 <div className="p-0 overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50/30 text-[9px] uppercase font-bold text-slate-400">
+                    <thead className="bg-muted/30 text-[9px] uppercase font-bold text-muted-foreground">
                       <tr>
                         <th className="px-5 py-2">Data</th>
                         <th className="px-5 py-2 text-center">Operação</th>
@@ -309,21 +309,21 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                           return parseDate(a.data) - parseDate(b.data);
                         })
                         .map((op, idx) => (
-                          <tr key={idx} className="border-t border-slate-50 hover:bg-slate-50/50 transition-colors">
-                            <td className="px-5 py-3 font-mono text-slate-500">{op.data}</td>
+                          <tr key={idx} className="border-t border-border/40 hover:bg-muted/30 transition-colors">
+                            <td className="px-5 py-3 font-mono text-muted-foreground">{op.data}</td>
                             <td className="px-5 py-3 text-center">
                               <Badge 
                                 variant="outline"
                                 className={`text-[8px] px-1.5 py-0 border-none font-black uppercase ${
-                                  op.operacao === 'INCLUSAO' ? 'bg-blue-50 text-blue-600' :
-                                  op.operacao === 'REFORCO' ? 'bg-emerald-50 text-emerald-600' :
-                                  op.operacao === 'ANULACAO' ? 'bg-red-50 text-red-600' : 'bg-slate-50 text-slate-600'
+                                  op.operacao === 'INCLUSAO' ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400' :
+                                  op.operacao === 'REFORCO' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' :
+                                  op.operacao === 'ANULACAO' ? 'bg-red-500/15 text-red-600 dark:text-red-400' : 'bg-muted text-foreground'
                                 }`}
                               >
                                 {getOperacaoLabel(op.operacao)}
                               </Badge>
                             </td>
-                            <td className={`px-5 py-3 text-right font-black ${op.operacao === 'ANULACAO' ? 'text-red-500' : 'text-emerald-600'}`}>
+                            <td className={`px-5 py-3 text-right font-black ${op.operacao === 'ANULACAO' ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
                               {op.operacao === 'ANULACAO' ? '-' : '+'}{formatCurrency(op.valorTotal)}
                             </td>
                           </tr>
@@ -336,17 +336,17 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
 
             {/* Formulário de Edição */}
             {showLegacyLiquidacoesApiSection && (
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-              <div className="px-5 py-3 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
-                <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
-                  <Receipt className="w-3 h-3" />
+            <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+              <div className="px-5 py-3 border-b border-border/60 bg-muted/40 flex justify-between items-center">
+                <h3 className="text-[11px] font-black uppercase tracking-wider text-foreground flex items-center gap-2">
+                  <Receipt className="w-3 h-3 text-primary" />
                   Liquidações
                 </h3>
-                {isLoadingLiquidacoesApi && <Loader2 className="w-3 h-3 animate-spin text-slate-400" />}
+                {isLoadingLiquidacoesApi && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
               </div>
               <div className="p-0 overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50/30 text-[9px] uppercase font-bold text-slate-400">
+                  <thead className="bg-muted/30 text-[9px] uppercase font-bold text-muted-foreground">
                     <tr>
                       <th className="px-5 py-2">Emissão</th>
                       <th className="px-5 py-2">Fatura</th>
@@ -369,32 +369,32 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                       liquidacoesApi.map((liquidacao) => (
                         <tr
                           key={`${liquidacao.contrato_api_id}-${liquidacao.fatura_id}-${liquidacao.empenho_numero}`}
-                          className="border-t border-slate-50 hover:bg-slate-50/50 transition-colors"
+                          className="border-t border-border/40 hover:bg-muted/30 transition-colors"
                         >
-                          <td className="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">
+                          <td className="px-5 py-3 font-mono text-muted-foreground whitespace-nowrap">
                             {formatDateCell(liquidacao.data_emissao ?? undefined)}
                           </td>
                           <td className="px-5 py-3 font-mono font-bold text-primary whitespace-nowrap">
                             {liquidacao.numero_instrumento_cobranca || '-'}
                           </td>
-                          <td className="px-5 py-3 font-mono text-slate-600 whitespace-nowrap">
+                          <td className="px-5 py-3 font-mono text-foreground whitespace-nowrap">
                             {liquidacao.contrato_numero || '-'}
                           </td>
                           <td className="px-5 py-3">
-                            <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-none font-black uppercase bg-blue-50 text-blue-700">
+                            <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-none font-black uppercase bg-blue-500/15 text-blue-700 dark:text-blue-300">
                               {liquidacao.situacao || 'N/I'}
                             </Badge>
                           </td>
-                          <td className="px-5 py-3 font-mono text-slate-500 max-w-[220px] break-all">
+                          <td className="px-5 py-3 font-mono text-muted-foreground max-w-[220px] break-all">
                             {liquidacao.processo || 'N/I'}
                           </td>
-                          <td className="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">
+                          <td className="px-5 py-3 font-mono text-muted-foreground whitespace-nowrap">
                             {formatDateCell(liquidacao.data_vencimento ?? undefined)}
                           </td>
-                          <td className="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">
+                          <td className="px-5 py-3 font-mono text-muted-foreground whitespace-nowrap">
                             {formatDateCell(liquidacao.data_liquidacao ?? undefined)}
                           </td>
-                          <td className="px-5 py-3 text-right font-black text-slate-700 whitespace-nowrap">
+                          <td className="px-5 py-3 text-right font-black text-foreground whitespace-nowrap">
                             {formatCurrency(liquidacao.valor_bruto || 0)}
                           </td>
                         </tr>
@@ -412,17 +412,17 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
             </div>
             )}
 
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-              <div className="px-5 py-3 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
-                <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-2">
-                  <Receipt className="w-3 h-3" />
+            <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+              <div className="px-5 py-3 border-b border-border/60 bg-muted/40 flex justify-between items-center">
+                <h3 className="text-[11px] font-black uppercase tracking-wider text-foreground flex items-center gap-2">
+                  <Receipt className="w-3 h-3 text-primary" />
                   Liquidações
                 </h3>
-                {isLoadingLiquidacoesApi && <Loader2 className="w-3 h-3 animate-spin text-slate-400" />}
+                {isLoadingLiquidacoesApi && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
               </div>
               <div className="p-0 overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50/30 text-[9px] uppercase font-bold text-slate-400">
+                  <thead className="bg-muted/30 text-[9px] uppercase font-bold text-muted-foreground">
                     <tr>
                       <th className="px-5 py-2">Emissão</th>
                       <th className="px-5 py-2">Fatura</th>
@@ -445,32 +445,32 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                       liquidacoesApi.map((liquidacao) => (
                         <tr
                           key={`${liquidacao.contrato_api_id}-${liquidacao.fatura_id}-${liquidacao.empenho_numero}`}
-                          className="border-t border-slate-50 hover:bg-slate-50/50 transition-colors"
+                          className="border-t border-border/40 hover:bg-muted/30 transition-colors"
                         >
-                          <td className="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">
+                          <td className="px-5 py-3 font-mono text-muted-foreground whitespace-nowrap">
                             {formatDateCell(liquidacao.data_emissao ?? undefined)}
                           </td>
                           <td className="px-5 py-3 font-mono font-bold text-primary whitespace-nowrap">
                             {liquidacao.numero_instrumento_cobranca || '-'}
                           </td>
-                          <td className="px-5 py-3 font-mono text-slate-600 whitespace-nowrap">
+                          <td className="px-5 py-3 font-mono text-foreground whitespace-nowrap">
                             {liquidacao.contrato_numero || '-'}
                           </td>
                           <td className="px-5 py-3">
-                            <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-none font-black uppercase bg-blue-50 text-blue-700">
+                            <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-none font-black uppercase bg-blue-500/15 text-blue-700 dark:text-blue-300">
                               {liquidacao.situacao || 'N/I'}
                             </Badge>
                           </td>
-                          <td className="px-5 py-3 font-mono text-slate-500 max-w-[220px] break-all">
+                          <td className="px-5 py-3 font-mono text-muted-foreground max-w-[220px] break-all">
                             {liquidacao.processo || 'N/I'}
                           </td>
-                          <td className="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">
+                          <td className="px-5 py-3 font-mono text-muted-foreground whitespace-nowrap">
                             {formatDateCell(liquidacao.data_vencimento ?? undefined)}
                           </td>
-                          <td className="px-5 py-3 font-mono text-slate-500 whitespace-nowrap">
+                          <td className="px-5 py-3 font-mono text-muted-foreground whitespace-nowrap">
                             {formatDateCell(liquidacao.data_liquidacao ?? undefined)}
                           </td>
-                          <td className="px-5 py-3 text-right font-black text-slate-700 whitespace-nowrap">
+                          <td className="px-5 py-3 text-right font-black text-foreground whitespace-nowrap">
                             {formatCurrency(liquidacao.valor_bruto || 0)}
                           </td>
                         </tr>
@@ -489,18 +489,18 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
 
             <div className="space-y-4 pt-2">
               <div className="flex items-center gap-2 mb-1">
-                <Pencil className="w-3 h-3 text-blue-600" />
-                <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-600">Edição de Dados Estratégicos</h3>
+                <Pencil className="w-3 h-3 text-primary" />
+                <h3 className="text-[11px] font-black uppercase tracking-wider text-foreground">Edição de Dados Estratégicos</h3>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-[10px] font-bold uppercase text-slate-400">Dimensão</Label>
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground">Dimensão</Label>
                   <Select
                     value={formData.dimensao ?? ''}
                     onValueChange={(v) => setFormData({ ...formData, dimensao: v, componenteFuncional: '', origemRecurso: '' })}
                   >
-                    <SelectTrigger className="h-9 border-slate-200 bg-slate-50/50 focus:ring-blue-500/20">
+                    <SelectTrigger className="h-9 border-border bg-card text-foreground focus:ring-primary/20">
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -512,13 +512,13 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-[10px] font-bold uppercase text-slate-400">Componente Funcional</Label>
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground">Componente Funcional</Label>
                   <Select
                     value={formData.componenteFuncional ?? ''}
                     onValueChange={(v) => setFormData({ ...formData, componenteFuncional: v })}
                     disabled={!formData.dimensao}
                   >
-                    <SelectTrigger className="h-9 border-slate-200 bg-slate-50/50 focus:ring-blue-500/20">
+                    <SelectTrigger className="h-9 border-border bg-card text-foreground focus:ring-primary/20">
                       <SelectValue placeholder={formData.dimensao ? "Selecione..." : "Aguardando dimensão..."} />
                     </SelectTrigger>
                     <SelectContent>
@@ -534,13 +534,13 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-[10px] font-bold uppercase text-slate-400">Origem de Recurso (Datalist)</Label>
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground">Origem de Recurso (Datalist)</Label>
                   <Input
                     value={formData.origemRecurso ?? ''}
                     onChange={(e) => setFormData({ ...formData, origemRecurso: e.target.value })}
                     placeholder="Ex: Fonte 100"
                     list="origens-list"
-                    className="h-9 border-slate-200 bg-slate-50/50 focus:ring-blue-500/20 font-mono text-xs"
+                    className="h-9 border-border bg-card text-foreground focus:ring-primary/20 font-mono text-xs"
                   />
                   <datalist id="origens-list">
                     {origensDisponiveis.map((origem) => (
@@ -550,12 +550,12 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-[10px] font-bold uppercase text-slate-400">Plano Interno (PI)</Label>
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground">Plano Interno (PI)</Label>
                   <Input
                     value={formData.planoInterno || ''}
                     onChange={(e) => setFormData({ ...formData, planoInterno: e.target.value })}
                     placeholder="Ex: L20RLP..."
-                    className="h-9 border-slate-200 bg-slate-50/50 focus:ring-blue-500/20 font-mono text-xs"
+                    className="h-9 border-border bg-card text-foreground focus:ring-primary/20 font-mono text-xs"
                   />
                 </div>
               </div>
@@ -563,12 +563,12 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave 
           </div>
         </ScrollArea>
 
-        <DialogFooter className="shrink-0 p-4 bg-slate-50/80 border-t border-slate-100 flex items-center justify-end gap-3">
+        <DialogFooter className="shrink-0 p-4 bg-muted/40 border-t border-border flex items-center justify-end gap-3">
             <Button 
               type="button" 
-              variant="secondary" 
+              variant="outline" 
               onClick={() => onOpenChange(false)} 
-              className="bg-white border-slate-200 text-slate-600 hover:bg-slate-100 font-bold uppercase text-[10px] tracking-widest px-6 shadow-sm"
+              className="border-border bg-card text-foreground hover:bg-muted font-bold uppercase text-[10px] tracking-widest px-6 shadow-sm"
             >
               Cancelar
             </Button>

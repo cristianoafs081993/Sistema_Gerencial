@@ -20,9 +20,15 @@ import { TableSkeletonRows } from '@/components/design-system/TableSkeletonRows'
 import { TablePagination } from '@/components/design-system/TablePagination';
 import { HeaderActions } from '@/components/HeaderParts';
 import { ConfirmDialog } from '@/components/modals/ConfirmDialog';
+import { useAuth } from '@/contexts/AuthContext';
 import { LCRegistro, loadLatestLCRowsFromDb, parseLCCsv, saveLCRows } from '@/services/lcImportService';
 import { extractBolsistasFromPdfFiles } from '@/services/bolsistasPdfService';
 import { compararBolsistasComLC, type ComparacaoBolsista, type PendenciaStatus } from '@/services/lcComparisonService';
+import {
+  deleteSharedLcSavedList,
+  loadSharedLcSavedLists,
+  saveSharedLcSavedList,
+} from '@/services/lcSavedListsService';
 import {
   buildSiafiListaCredoresMacro,
   downloadSiafiMacroFile,
@@ -62,6 +68,9 @@ type LcGridRow = {
   originalLcAccounts: LcAccountOption[];
 };
 
+const isUuid = (value: string | null): value is string =>
+  Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value));
+
 function CopyButton({ value, disabled }: { value: string; disabled?: boolean }) {
   const [copied, setCopied] = useState(false);
 
@@ -96,6 +105,7 @@ function CopyButton({ value, disabled }: { value: string; disabled?: boolean }) 
 }
 
 export default function LCPage() {
+  const { isLoading: isAuthLoading, isAuthenticated } = useAuth();
   const [rows, setRows] = useState<LCRegistro[]>([]);
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
@@ -116,6 +126,7 @@ export default function LCPage() {
   const [savedListsDialogOpen, setSavedListsDialogOpen] = useState(false);
   const [workListName, setWorkListName] = useState('Lista de trabalho');
   const [activeSavedListId, setActiveSavedListId] = useState<string | null>(null);
+  const [isSavingWorkList, setIsSavingWorkList] = useState(false);
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
   const [chunkIndex, setChunkIndex] = useState(0);
   const [dialogTab, setDialogTab] = useState<'macro' | 'grid'>('grid');
@@ -151,6 +162,25 @@ export default function LCPage() {
   useEffect(() => {
     loadLatest();
   }, []);
+
+  useEffect(() => {
+    if (isAuthLoading || !isAuthenticated) return;
+
+    let mounted = true;
+    void loadSharedLcSavedLists<LcGridRow>()
+      .then((sharedLists) => {
+        if (mounted) setSavedWorkLists(sharedLists);
+      })
+      .catch((error) => {
+        // Mantem as listas locais como fallback temporario para indisponibilidade
+        // do backend, sem usar dados locais para preencher a lista compartilhada.
+        console.warn('Nao foi possivel carregar listas compartilhadas da LC:', error);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [isAuthLoading, isAuthenticated]);
 
   const consolidatedRows = useMemo(() => {
     const byCpf = new Map<string, LCRegistro[]>();
@@ -267,26 +297,52 @@ export default function LCPage() {
     return sourcePdfNames[0].replace(/\.[^.]+$/, '') || 'Lista de trabalho';
   };
 
-  const handleSaveWorkList = () => {
+  const handleSaveWorkList = async () => {
     if (!gridRows.length) {
       toast.error('Nao ha dados na grade para salvar.');
       return;
     }
 
+    setIsSavingWorkList(true);
     try {
-      const savedList = saveLcSavedList({
-        id: activeSavedListId,
+      const savedList = await saveSharedLcSavedList<LcGridRow>({
+        id: isUuid(activeSavedListId) ? activeSavedListId : null,
         name: workListName,
         sourcePdfNames: pdfFileNames,
         rows: gridRows,
       });
-      setSavedWorkLists(loadLcSavedLists<LcGridRow>());
+
+      // Mantem um espelho local para que a lista continue recuperavel durante
+      // uma indisponibilidade temporaria, mas o registro canonico e o do orgao.
+      saveLcSavedList({
+        id: savedList.id,
+        name: savedList.name,
+        sourcePdfNames: savedList.sourcePdfNames,
+        rows: savedList.rows,
+      });
+      setSavedWorkLists((current) => [savedList, ...current.filter((list) => list.id !== savedList.id)]);
       setWorkListName(savedList.name);
       setActiveSavedListId(savedList.id);
-      toast.success(`Lista "${savedList.name}" salva neste navegador.`);
+      toast.success(`Lista "${savedList.name}" compartilhada com seu órgão.`);
     } catch (error) {
-      console.error('Erro ao salvar lista de trabalho da LC:', error);
-      toast.error('Nao foi possivel salvar a lista neste navegador.');
+      console.error('Erro ao salvar lista compartilhada da LC:', error);
+      try {
+        const localList = saveLcSavedList({
+          id: activeSavedListId,
+          name: workListName,
+          sourcePdfNames: pdfFileNames,
+          rows: gridRows,
+        });
+        setSavedWorkLists(loadLcSavedLists<LcGridRow>());
+        setWorkListName(localList.name);
+        setActiveSavedListId(localList.id);
+        toast.warning('Servidor indisponível; lista salva somente neste navegador.');
+      } catch (fallbackError) {
+        console.error('Erro ao salvar fallback local da lista de trabalho da LC:', fallbackError);
+        toast.error('Nao foi possivel salvar a lista de trabalho.');
+      }
+    } finally {
+      setIsSavingWorkList(false);
     }
   };
 
@@ -322,10 +378,17 @@ export default function LCPage() {
     setMacroDialogOpen(true);
   };
 
-  const handleDeleteSavedWorkList = (id: string) => {
-    deleteLcSavedList(id);
-    setSavedWorkLists(loadLcSavedLists<LcGridRow>());
-    if (activeSavedListId === id) setActiveSavedListId(null);
+  const handleDeleteSavedWorkList = async (id: string) => {
+    try {
+      if (isUuid(id)) await deleteSharedLcSavedList(id);
+      deleteLcSavedList(id);
+      setSavedWorkLists((current) => current.filter((list) => list.id !== id));
+      if (activeSavedListId === id) setActiveSavedListId(null);
+      toast.success('Lista de trabalho excluída.');
+    } catch (error) {
+      console.error('Erro ao excluir lista compartilhada da LC:', error);
+      toast.error('Nao foi possivel excluir a lista de trabalho.');
+    }
   };
 
   const handleConfirmarGeracaoMacro = () => {

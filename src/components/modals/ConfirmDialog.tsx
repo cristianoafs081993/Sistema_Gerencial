@@ -36,23 +36,23 @@ export function ConfirmDialog({
     switch (variant) {
       case 'danger':
         return {
-          icon: <Trash2 className="w-5 h-5 text-red-600" />,
-          iconBg: 'bg-red-50',
+          icon: <Trash2 className="w-5 h-5 text-red-600 dark:text-red-400" />,
+          iconBg: 'bg-red-500/15',
           accent: 'bg-red-600 hover:bg-red-700 shadow-red-500/20',
           bar: 'bg-red-500'
         };
       case 'warning':
         return {
-          icon: <AlertTriangle className="w-5 h-5 text-amber-600" />,
-          iconBg: 'bg-amber-50',
+          icon: <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />,
+          iconBg: 'bg-amber-500/15',
           accent: 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/20',
           bar: 'bg-amber-500'
         };
       case 'info':
       default:
         return {
-          icon: <Info className="w-5 h-5 text-blue-600" />,
-          iconBg: 'bg-blue-50',
+          icon: <Info className="w-5 h-5 text-blue-600 dark:text-blue-400" />,
+          iconBg: 'bg-blue-500/15',
           accent: 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20',
           bar: 'bg-blue-500'
         };
@@ -63,7 +63,7 @@ export function ConfirmDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-[400px] p-0 overflow-hidden border-none shadow-2xl bg-white">
+      <AlertDialogContent className="max-w-[400px] p-0 overflow-hidden border border-border shadow-2xl bg-card text-foreground">
         <div className={`absolute top-0 left-0 w-full h-1 ${styles.bar}`} />
         
         <div className="p-6">
@@ -73,10 +73,10 @@ export function ConfirmDialog({
             </div>
             <div className="space-y-2">
               <AlertDialogHeader>
-                <AlertDialogTitle className="text-xl font-black tracking-tight text-slate-900">
+                <AlertDialogTitle className="text-xl font-black tracking-tight text-foreground">
                   {title}
                 </AlertDialogTitle>
-                <AlertDialogDescription className="text-sm text-slate-500 leading-relaxed font-medium">
+                <AlertDialogDescription className="text-sm text-muted-foreground leading-relaxed font-medium">
                   {description}
                 </AlertDialogDescription>
               </AlertDialogHeader>
@@ -84,8 +84,8 @@ export function ConfirmDialog({
           </div>
         </div>
 
-        <AlertDialogFooter className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3 sm:gap-0">
-          <AlertDialogCancel className="mt-0 bg-white border-slate-200 text-slate-600 hover:bg-slate-100 font-bold uppercase text-[10px] tracking-widest px-6 shadow-sm">
+        <AlertDialogFooter className="p-4 bg-muted/40 border-t border-border flex items-center justify-end gap-3 sm:gap-0">
+          <AlertDialogCancel className="mt-0 bg-card border-border text-foreground hover:bg-muted font-bold uppercase text-[10px] tracking-widest px-6 shadow-sm">
             {cancelText}
           </AlertDialogCancel>
           <AlertDialogAction

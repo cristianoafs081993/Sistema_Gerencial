@@ -13,8 +13,8 @@ export function ExecutionTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-      <div className="min-w-[210px] rounded-2xl border border-border-default/65 bg-white/92 px-4 py-3 shadow-[0_12px_28px_rgba(15,23,42,0.08)] backdrop-blur-[2px]">
-      <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">
+    <div className="min-w-[210px] rounded-2xl border border-border bg-card/95 px-4 py-3 text-foreground shadow-xl backdrop-blur-sm">
+      <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
         {label}
       </p>
       <div className="mt-2 space-y-2">
@@ -22,9 +22,9 @@ export function ExecutionTooltip({
           <div key={item.name} className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color || '#94a3b8' }} />
-              <span className="font-ui text-sm font-medium text-text-secondary">{item.name}</span>
+              <span className="font-ui text-sm font-medium text-muted-foreground">{item.name}</span>
             </div>
-            <span className="font-ui text-sm font-semibold text-text-primary">
+            <span className="font-ui text-sm font-semibold text-foreground">
               {formatCurrency(item.value || 0)}
             </span>
           </div>
@@ -45,15 +45,15 @@ export function BudgetHierarchyTooltip({
   if (!active || !item) return null;
 
   return (
-      <div className="min-w-[220px] rounded-2xl border border-border-default/65 bg-white/92 px-4 py-3 shadow-[0_12px_28px_rgba(15,23,42,0.08)] backdrop-blur-[2px]">
-      <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-text-muted">
+    <div className="min-w-[220px] rounded-2xl border border-border bg-card/95 px-4 py-3 text-foreground shadow-xl backdrop-blur-sm">
+      <p className="font-ui text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
         {item.nodeType === 'componente' ? 'Componente funcional' : 'Dimensao'}
       </p>
-      <p className="mt-1 font-ui text-sm font-semibold text-text-primary">{item.name}</p>
+      <p className="mt-1 font-ui text-sm font-semibold text-foreground">{item.name}</p>
       {item.parentName ? (
-        <p className="mt-1 font-ui text-xs text-text-muted">{item.parentName}</p>
+        <p className="mt-1 font-ui text-xs text-muted-foreground">{item.parentName}</p>
       ) : null}
-      <p className="mt-3 font-ui text-sm font-bold text-text-primary">{formatCurrency(item.value || 0)}</p>
+      <p className="mt-3 font-ui text-sm font-bold text-foreground">{formatCurrency(item.value || 0)}</p>
     </div>
   );
 }

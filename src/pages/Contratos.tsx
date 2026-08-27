@@ -16,6 +16,7 @@ import { ActiveFilterChips, type ActiveFilterItem } from '@/components/design-sy
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { getAuthUserMatricula, permissionMatchesAuthUser } from '@/lib/terceirizadoIdentity';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { getRapBaseVigente, getRapReferenceYear, getRapSaldoAtual } from '@/utils/rapMetrics';
 import { buildEmpenhoLookupKeys, normalizeContratoNumero, shouldIgnoreContratoNumero } from '@/utils/contratosSync';
@@ -24,6 +25,8 @@ import { isContratoApiCampusEmpenho } from '@/utils/contratosApiStatus';
 import { contratosApiService, type ContratoApiDetails, type ContratoApiEmpenhoRow, type ContratoApiHistoricoRow, type ContratoApiRow, type ContratoApiSyncRun, type ContratoApiFaturaRow } from '@/services/contratosApi';
 import { ContratoApiDetailsSheet } from '@/components/contratos/ContratoApiDetailsSheet';
 import { useUserFavorites } from '@/services/userFavorites';
+import { requisicoesCompraService } from '@/services/requisicoesCompra';
+import type { TerceirizadoPermission } from '@/types';
 
 const REITORIA_UG = '158155';
 const normalizeEmpenhoRef = (value: string) =>
@@ -136,8 +139,20 @@ const getEmpenhoSaldoBadgeClass = (saldo: number) =>
   );
 
 export default function Contratos() {
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, user = null, userGroups = [] } = useAuth();
   const { contratos, empenhos, contratosEmpenhos, isLoading, refreshData } = useData();
+  const isTerceirizado = userGroups.some((group) => group.slug === 'terceirizado');
+  const userMatricula = getAuthUserMatricula(user);
+  const userIdentity = useMemo(
+    () => ({
+      id: user?.id,
+      email: user?.email,
+      user_metadata: { matricula: userMatricula },
+    }),
+    [user?.email, user?.id, userMatricula],
+  );
+  const [terceirizadoPermissions, setTerceirizadoPermissions] = useState<TerceirizadoPermission[]>([]);
+  const [isPermissionsLoading, setIsPermissionsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewFilter, setViewFilter] = useState<'all' | 'favorites' | 'expired120'>('all');
   const { favoriteIdsByType, isFavorite, toggleFavorite, isPending: isFavoritePending } = useUserFavorites();
@@ -160,7 +175,55 @@ export default function Contratos() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isDetailsLoading, setIsDetailsLoading] = useState(false);
 
+  useEffect(() => {
+    if (!isTerceirizado || isSuperAdmin) {
+      setTerceirizadoPermissions([]);
+      setIsPermissionsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsPermissionsLoading(true);
+    requisicoesCompraService.listPermissions()
+      .then((permissions) => {
+        if (!cancelled) setTerceirizadoPermissions(permissions);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.warn('Contratos: nao foi possivel carregar os vinculos do terceirizado', error);
+          setTerceirizadoPermissions([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsPermissionsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isSuperAdmin, isTerceirizado]);
+
+  const allowedLocalContractIds = useMemo<Set<string> | null>(() => {
+    if (!isTerceirizado || isSuperAdmin) return null;
+
+    return new Set(
+      terceirizadoPermissions
+        .filter((permission) => permissionMatchesAuthUser(permission, userIdentity) && permission.contratoId)
+        .map((permission) => permission.contratoId as string),
+    );
+  }, [isSuperAdmin, isTerceirizado, terceirizadoPermissions, userIdentity]);
+
   const loadApiContracts = useCallback(async (isCancelled: () => boolean = () => false) => {
+    if (isTerceirizado && !isSuperAdmin) {
+      setApiContratos([]);
+      setApiEmpenhos([]);
+      setApiHistoricos([]);
+      setApiFaturas([]);
+      setLastApiSyncRun(null);
+      setIsApiLoading(false);
+      return;
+    }
+
     try {
       setIsApiLoading(true);
       const contratosApi = await contratosApiService.getContratosApi(true);
@@ -184,7 +247,7 @@ export default function Contratos() {
         setIsApiLoading(false);
       }
     }
-  }, []);
+  }, [isSuperAdmin, isTerceirizado]);
 
   useEffect(() => {
     let cancelled = false;
@@ -247,7 +310,10 @@ export default function Contratos() {
   const visibleContratos = useMemo<ContratoDisplay[]>(() => {
     if (apiContratos.length === 0) {
       return contratos
-        .filter((contrato) => !shouldIgnoreContratoNumero(contrato.numero))
+        .filter((contrato) =>
+          !shouldIgnoreContratoNumero(contrato.numero) &&
+          (allowedLocalContractIds === null || allowedLocalContractIds.has(contrato.id)),
+        )
         .map((contrato) => ({
           id: `local-${contrato.id}`,
           localId: contrato.id,
@@ -279,8 +345,12 @@ export default function Contratos() {
           apiContrato,
           localContrato,
         };
-      });
-  }, [apiContratos, contratos, localContratoByNumero]);
+      })
+      .filter((contrato) =>
+        allowedLocalContractIds === null ||
+        (contrato.localId !== null && allowedLocalContractIds.has(contrato.localId)),
+      );
+  }, [allowedLocalContractIds, apiContratos, contratos, localContratoByNumero]);
 
   const apiEmpenhosByContratoApiId = useMemo(() => {
     const map = new Map<string, ContratoApiEmpenhoRow[]>();
@@ -596,7 +666,7 @@ export default function Contratos() {
     return list;
   }, [searchTerm, viewFilter]);
 
-  if (isLoading || isApiLoading) {
+  if (isLoading || isApiLoading || isPermissionsLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>

@@ -165,6 +165,24 @@ describe('Layout', () => {
     expect(screen.getByText('Painel de integração SUAP')).toBeInTheDocument();
   });
 
+  it('exibe a opção de padrão de design do SUAP dentro do menu do usuário', () => {
+    render(
+      <MemoryRouter>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    // Não deve haver botão avulso de tema no header
+    expect(screen.queryByTitle('Alternar Tema do SUAP Design System')).not.toBeInTheDocument();
+
+    // Abrir o menu de configurações do usuário
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Abrir configurações do usuário' }), { key: 'ArrowDown' });
+
+    expect(screen.getByText('Padrão de design (SUAP)')).toBeInTheDocument();
+  });
+
   it('permite alterar a senha pelo menu do usuário', async () => {
     updatePasswordMock.mockResolvedValue(null);
 

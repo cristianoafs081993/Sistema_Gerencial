@@ -782,7 +782,7 @@ Para a automacao do Gmail:
 2. confirmar que o Apps Script aponta para a URL correta da function
 3. validar se `verify_jwt` e a estrategia de chamada externa estao alinhados com o ambiente real
 
-- suap-token-exchange sincroniza o terceirizado por user_id, matricula exata ou matricula normalizada legada antes de atribuir o grupo terceirizado; a aplicacao direciona esse grupo para /requisicao-compra.
+- suap-token-exchange sincroniza o terceirizado por user_id, matricula exata ou matricula normalizada legada antes de atribuir o grupo terceirizado; a aplicacao direciona esse grupo para /requisicao-compra, com /contratos liberada para a consulta dos vínculos autorizados.
 - refresh-comprasnet-liquidacoes-cache pode ser acionada em background pela requisicao de compra; a UI recebe o saldo base do subitem sem aguardar a funcao e invalida a consulta quando a atualizacao termina.
 
 - A leitura inicial do cache de itens revalida status not_found pela function e confirma o vazio via consulta direta quando necessario.

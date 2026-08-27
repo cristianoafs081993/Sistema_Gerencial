@@ -64,6 +64,7 @@ interface CommandPaletteProps {
   onSignOut?: () => void;
   empenhosList?: Empenho[];
   contratosList?: Contrato[];
+  disableContractSearch?: boolean;
   atividadesList?: Atividade[];
   onSaveEmpenho?: (id: string, data: Partial<Empenho>) => void;
 }
@@ -306,6 +307,7 @@ export function CommandPalette({
   onSignOut,
   empenhosList = [],
   contratosList = [],
+  disableContractSearch = false,
   atividadesList = [],
   onSaveEmpenho,
 }: CommandPaletteProps) {
@@ -323,6 +325,11 @@ export function CommandPalette({
 
   // Carrega apenas contratos ativos da API para enriquecer busca e detalhes com precisão
   useEffect(() => {
+    if (disableContractSearch) {
+      setApiContratos([]);
+      return;
+    }
+
     let isMounted = true;
     contratosApiService
       .getContratosApi(true)
@@ -335,7 +342,7 @@ export function CommandPalette({
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [disableContractSearch]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {

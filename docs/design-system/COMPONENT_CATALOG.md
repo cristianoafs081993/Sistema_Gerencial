@@ -56,6 +56,64 @@ Arquivo: `src/components/design-system/TablePagination.tsx`
 Rodape de tabela com seletor de quantidade, paginas e navegacao.
 
 ## Componentes base
+# COMPONENT_CATALOG
+
+Este catalogo resume os blocos oficiais do design system do GovAnalytics.
+
+Esta documentacao foi atualizada porque a mudanca altera comportamento visual real em area critica de design system.
+
+## Blocos de pagina
+
+### `SectionPanel`
+
+Arquivo: `src/components/design-system/SectionPanel.tsx`
+
+Container padrão para seções com título, descrição, ações, rodapé opcional e conteúdo. Usa superfície branca, borda clara, rodapé integrado com linha divisória e raio consistente.
+
+### `FilterPanel`
+
+Arquivo: `src/components/design-system/FilterPanel.tsx`
+
+Area padronizada de filtros. Deve ser usada antes de tabelas e consultas operacionais. Suporta slot de rodapé opcional (`footer`).
+
+### `ActiveFilterChips`
+
+Arquivo: `src/components/design-system/ActiveFilterChips.tsx`
+
+Barra institucional de chips e tags para filtros ativos (Eixo 04). Exibe badges individuais com remoção (`X`), botão "Limpar filtros" e contador comparativo de registros filtrados (`totalCount` / `filteredCount`).
+
+### `DataTablePanel`
+
+
+Arquivo: `src/components/design-system/DataTablePanel.tsx`
+
+Wrapper oficial de tabela baseado em `SectionPanel`, com overflow horizontal padronizado.
+
+### `ChartPanel`
+
+Arquivo: `src/components/design-system/ChartPanel.tsx`
+
+Painel para graficos. Deve aceitar a paleta analitica do dashboard quando o contexto pedir comparacao visual.
+
+### `TableSkeletonRows`
+
+Arquivo: `src/components/design-system/TableSkeletonRows.tsx`
+
+Skeleton reutilizavel para linhas tabulares.
+
+### `RouteLoadingFallback`
+
+Arquivo: `src/components/design-system/RouteLoadingFallback.tsx`
+
+Fallback acessivel para rotas carregadas sob demanda. O modo `screen` ocupa a viewport em paginas publicas e o modo `content` preserva o shell global nas paginas autenticadas. Ambos exibem mensagem visivel e anunciam o carregamento com `role="status"`, `aria-live="polite"` e `aria-busy`.
+
+### `TablePagination`
+
+Arquivo: `src/components/design-system/TablePagination.tsx`
+
+Rodape de tabela com seletor de quantidade, paginas e navegacao.
+
+## Componentes base
 
 - `Button`: estilo *pill* arredondado (`rounded-full`), 36px de altura padrão, com variantes `default` (primária do tema SUAP), `secondary`, `destructive`, `outline`, `ghost`, `link` e `suap`.
 - `Card`: superfície limpa (`bg-card`) com bordas sutis (`border-border`), raio de 12px e sombra suave.
@@ -63,7 +121,7 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 - `Badge`: padrão `span.status` do SUAP, formato pílula com borda de 1px, fundo translúcido e texto contrastado (`success`, `warning`, `danger`, `info`, `brand`).
 - `Tabs`: abas segmentadas com realce ativo na cor primária do tema SUAP.
 - `Dialog`, `Sheet`, `Popover`, `DropdownMenu`: superfícies de alta legibilidade com elevação suave.
-- `SuapThemeSwitcher`: componente seletor no Header que permite alternar instantaneamente entre os 8 temas oficiais do SUAP (Padrão, IFs, Aurora, Dunas, Gov.br, Luna Dark, Alto Contraste, Modo Daltonismo).
+- `SuapThemeSwitcher` / `SuapThemeSubMenu`: seletor de temas integrado ao menu de configurações do usuário que permite alternar instantaneamente entre os 8 temas oficiais do SUAP (Padrão, IFs, Aurora, Dunas, Gov.br, Luna Dark, Alto Contraste, Modo Daltonismo).
 - `RichTextEditor`: editor TipTap do fluxo de documentos; oferece negrito, itálico, sublinhado, listas, alinhamento, desfazer e refazer. Pode destacar marcadores `[CAMPO PENDENTE]` e, quando a página solicitar, placeholders entre colchetes com o token destrutivo.
 - `ArtefatosLicitacao`: pagina operacional que combina `SectionPanel`, `FilterPanel`, `DataTablePanel`, badges de tipo e botoes iconicos para abrir, copiar, baixar DOCX e excluir artefatos.
 - `LicitacoesPregoes`: pagina operacional que combina `FilterPanel` rotulado em grade responsiva com campos de UASG, objeto, item e busca geral, `DataTablePanel`, `TablePagination`, badges de prazo/status e modal centralizado de detalhe para compras PNCP; a UASG e opcional na consulta institucional e nao ha card de resumo acima dos filtros.
@@ -83,13 +141,11 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 - `RequisicaoCompra`: pagina operacional que apresenta "Gestão de Requisições de Compra" no header global por meio de `HeaderSubtitle`, sem repetir o titulo na area de conteudo. O formulario usa filtro separado de favorecido e `Empenho / Nota de Empenho` em `Popover + Command` com selecao multipla, relevancia para numero completo da NE, contador no trigger e badges removiveis; os itens ficam agrupados por NE selecionada com saldo, carregamento e botao `Adicionar Item` em cada grupo.
 - `CommandPalette`: central de comandos e busca instantânea acionada por `Ctrl+K` ou `Cmd+K` e pelo cabeçalho global. Suporta busca direta por entidades com preview de saldos: pesquisa de Empenhos por número (ex: `2026NE...`), credor, processo ou PI com exibição de saldo disponível em tempo real, omitindo empenhos com saldo zero, e abertura imediata do `EmpenhoDialog`; pesquisa de Contratos por número, fornecedor ou objeto com abertura imediata do modal centralizado `ContratoApiDetailsSheet`; atalhos por prefixo (`ne `, `empenho `, `contrato `, `tela `, `acao `) e chips de escopo; atalhos para todos os módulos permitidos e ações rápidas (Nova Requisição, Pesquisa de Preços, Sincronizar SUAP).
 - `ContratoApiDetailsSheet`: modal centralizado (`Dialog`) de alta performance e acessibilidade para exibição detalhada de contratos, contendo métricas gerais de valor acumulado e executado, vigência, objeto, unidade de origem, histórico de termos aditivos, detalhamento por item/fatura com agrupamento em abas e faturas vinculadas.
-- `Layout`: shell global com sidebar responsiva com suporte a modo expandido (`w-72`) e modo compacto (*Rail Mode* `w-18`) com persistência em `localStorage`, tooltips flutuantes nos ícones, campo de busca com atalho visual `Ctrl K`, seletor de temas do SUAP (`SuapThemeSwitcher`) e drawer mobile.
+- `Layout`: shell global com sidebar responsiva com suporte a modo expandido (`w-72`) e modo compacto (*Rail Mode* `w-18`) com persistência em `localStorage`, tooltips flutuantes nos ícones, campo de busca com atalho visual `Ctrl K`, seletor de temas do SUAP (`SuapThemeSubMenu`) no menu de configurações do usuário e drawer mobile.
 - `NotificationCenter`: central de notificações ativa ancorada no cabeçalho global (`Layout`). Exibe menu suspenso (`Popover`) com indicador visual de novidades (badge com a contagem de notificações não lidas no ícone e badges informativos), feed unificado e limpo com os **últimos 20 eventos orçamentários** (empenhos emitidos e descentralizações de crédito consolidados cronologicamente na mesma lista pela data de criação `createdAt`), status de liquidação/pagamento, valores monetários formatados, inspeção direta de empenhos via `EmpenhoDialog` e ação de marcar todas como lidas.
 
 - `AIAssistantWidget`: widget flutuante global de chat com IA para consultas gerenciais em linguagem natural sobre contratos, empenhos, orçamento, energia e conciliação; inclui alternador de tamanho (expandir/recolher), sugestões dinâmicas de perguntas, fontes consultadas, histórico persistido localmente por usuário autenticado e suporte completo a markdown.
 - `SuapeCommandPalette` (extensao 1.9.25): central de comandos e busca flutuante acionada por `Ctrl+K` ou `Cmd+K`. No SUAP, preserva as buscas e atalhos especializados, o tema integrado e o pré-carregamento de Empenhos e Contratos. Em páginas web comuns, disponibiliza a mesma consulta ao SIAGES e a navegação para seus módulos, sem sugerir ações ou buscas próprias do SUAP e sem consultar dados antes da abertura explícita da paleta. SIAGES e Comprasnet continuam exclusivamente com seus fluxos especializados atuais.
-
-
 
 - `ComprasnetEtpAssistant` (extensão 1.9.21): botão adicional `br-button secondary small` na tela oficial de ETP e modal responsivo com iframe isolado, dimensionado em harmonia com os botões nativos (`Voltar` e `Concluir ETP`). O cabeçalho dispõe de botão com ícone de engrenagem para abrir as configurações da minuta (`Configurar minuta`) e campo de número do processo com botão `Buscar processo` alinhado em linha. Usa `br-card`, `br-input`, alertas, estados de foco e tokens computados do próprio Comprasnet. A prévia completa marca as demais seções somente como referência e permite aplicar exclusivamente a seção atual. O painel não oferece modo escuro próprio, não altera o `body` da página e nunca aciona `Concluir ETP`.
 - `SuapePlanTableHeaders` (extensão 1.9): cabeçalhos das tabelas originais do Plano de Atividades concluído 8 viram botões de ordenação acessíveis, com indicador visual reforçado. O filtro `Exibir somente atividades com saldo` permanece no card nativo de filtros do SUAP.
