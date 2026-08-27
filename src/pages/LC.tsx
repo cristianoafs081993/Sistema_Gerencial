@@ -650,7 +650,6 @@ export default function LCPage() {
                             {currentChunk.map((row, idx) => {
                               const isSeventhRow = idx === 6 || (startIdx + idx + 1) % 7 === 0;
                               const isExpanded = expandedRowId === row.id;
-                              const hasDivergence = row.status === 'aluno_nao_encontrado' || row.status === 'conta_nao_encontrada';
                               
                               let rowClass = 'hover:bg-slate-50/50 dark:hover:bg-slate-850/30';
                               if (row.status === 'aluno_nao_encontrado') {
@@ -669,7 +668,7 @@ export default function LCPage() {
                                   >
                                     <TableCell className="px-4 py-2.5 text-xs font-mono flex items-center gap-1.5">
                                       <span>{padLeft(row.cpf, 11)}</span>
-                                      {hasDivergence && <CopyButton value={row.cpf} disabled={!isExpanded} />}
+                                      <CopyButton value={row.cpf} disabled={!isExpanded} />
                                       {row.status === 'aluno_nao_encontrado' && (
                                         <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-red-100 text-red-800 dark:bg-red-950/80 dark:text-red-300">
                                           Credor não localizado
@@ -679,7 +678,7 @@ export default function LCPage() {
                                     <TableCell className="px-4 py-2.5 text-xs font-mono">
                                       <div className="flex items-center gap-1">
                                         <span>{padLeft(row.selectedBanco, 3)}</span>
-                                        {hasDivergence && row.selectedBanco && (
+                                        {row.selectedBanco && (
                                           <CopyButton value={onlyDigits(row.selectedBanco)} disabled={!isExpanded} />
                                         )}
                                       </div>
@@ -687,14 +686,14 @@ export default function LCPage() {
                                     <TableCell className="px-4 py-2.5 text-xs font-mono">
                                       <div className="flex items-center gap-1">
                                         <span>{padLeft(row.selectedAgencia, 4)}</span>
-                                        {hasDivergence && row.selectedAgencia && (
+                                        {row.selectedAgencia && (
                                           <CopyButton value={onlyDigits(row.selectedAgencia)} disabled={!isExpanded} />
                                         )}
                                       </div>
                                     </TableCell>
                                     <TableCell className="px-4 py-2.5 text-xs font-mono flex items-center gap-1.5">
                                       <span>{normalizeLcAccount(row.selectedConta) || <span className="text-red-500 italic">Vazia</span>}</span>
-                                      {hasDivergence && normalizeLcAccount(row.selectedConta) && (
+                                      {normalizeLcAccount(row.selectedConta) && (
                                         <CopyButton value={normalizeLcAccount(row.selectedConta)} disabled={!isExpanded} />
                                       )}
                                       {row.status === 'conta_nao_encontrada' && (
