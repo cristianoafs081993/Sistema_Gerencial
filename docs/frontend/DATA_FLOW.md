@@ -277,6 +277,7 @@ Observações:
 
 Observações:
 - O perfil `Terceirizado` acessa as rotas `/requisicao-compra` e `/contratos`; gerencia suas próprias requisições e, na tela de contratos, vê somente os vínculos autorizados para si.
+- A tabela de `/contratos` exibe o ícone de detalhes para todos os contratos autorizados; em contratos locais, a consulta oficial da API é feita somente sob demanda e há fallback para os dados locais quando não existe correspondência.
 - Um terceirizado so pode usar contratos e empenhos previamente associados a ele na tabela `terceirizado_permissions` por um gestor/fiscal. Na selecao de NE, somente vinculos explicitos por `empenho_id` liberam empenhos; vinculo de contrato nao expande automaticamente os empenhos disponiveis.
 - Para terceirizados de refeitório, `/requisicao-compra` também exibe somente os contratos diretamente autorizados por `terceirizado_permissions.contrato_id`. Essa lista é apenas informativa e não altera a regra de seleção de NEs.
 - Em `/cadastro-terceirizados`, o ícone de edição do prestador abre uma página inteira de edição com os dados cadastrais e a seção `Vincular Contratos e Empenhos`; `Empenho / NE` é o tipo de vínculo padrão e usa seletor pesquisável com múltipla seleção, criando uma linha de `terceirizado_permissions` para cada empenho escolhido, sem alteração de schema.

@@ -138,6 +138,15 @@ const getEmpenhoSaldoBadgeClass = (saldo: number) =>
       : 'hover:bg-muted-foreground/20',
   );
 
+const createEmptyContratoApiDetails = (): ContratoApiDetails => ({
+  historico: [],
+  empenhos: [],
+  itens: [],
+  faturas: [],
+  faturaItens: [],
+  faturaEmpenhos: [],
+});
+
 export default function Contratos() {
   const { isSuperAdmin, user = null, userGroups = [] } = useAuth();
   const { contratos, empenhos, contratosEmpenhos, isLoading, refreshData } = useData();
@@ -414,6 +423,55 @@ export default function Contratos() {
       setIsDetailsLoading(false);
     }
   }, []);
+
+  const openContractDetails = useCallback(async (contract: ContratoDisplay) => {
+    let apiContract = contract.apiContrato;
+
+    // Terceirizados não carregam a listagem global da API. Quando solicitam
+    // detalhes, resolvemos apenas o contrato local já autorizado, por número.
+    if (!apiContract && typeof contratosApiService.getContratoApiByNumeroOrId === 'function') {
+      try {
+        apiContract = await contratosApiService.getContratoApiByNumeroOrId(contract.numero);
+      } catch (error) {
+        console.warn('Contratos: não foi possível localizar o contrato na API', error);
+      }
+    }
+
+    if (apiContract) {
+      await openApiDetails(apiContract);
+      return;
+    }
+
+    // Contratos legados podem não ter correspondente no cache da API. Ainda
+    // assim, o ícone deve abrir os dados locais autorizados, sem deixar a ação
+    // indisponível para o usuário.
+    const now = new Date().toISOString();
+    setSelectedApiContrato({
+      id: `local-${contract.localId ?? contract.id}`,
+      api_contrato_id: 0,
+      numero: contract.numero,
+      fornecedor_nome: contract.contratada || null,
+      fornecedor_documento: contract.cnpj || null,
+      unidade_codigo: null,
+      unidade_nome: null,
+      unidade_origem_codigo: null,
+      unidade_origem_nome: null,
+      objeto: null,
+      processo: null,
+      vigencia_inicio: contract.data_inicio ? new Date(contract.data_inicio).toISOString() : null,
+      vigencia_fim: contract.data_termino ? new Date(contract.data_termino).toISOString() : null,
+      valor_global: contract.valor ?? null,
+      valor_acumulado: contract.valor ?? null,
+      situacao: true,
+      situacao_derivada: true,
+      updated_at: now,
+      pncp_has_record: false,
+      pncp_documentos_checked_at: now,
+    });
+    setSelectedApiDetails(createEmptyContratoApiDetails());
+    setIsDetailsLoading(false);
+    setIsDetailsOpen(true);
+  }, [openApiDetails]);
 
   const filteredContratos = useMemo(() => {
     const searchNormalized = normalizeString(searchTerm);
@@ -1062,27 +1120,23 @@ export default function Contratos() {
                       </div>
                     </TableCell>
                     <TableCell className="py-4 px-4 text-center">
-                      {apiContrato ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-text-secondary hover:text-action-primary hover:bg-surface-subtle"
-                              aria-label="Ver detalhes"
-                              onClick={() => openApiDetails(apiContrato)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            Ver detalhes
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : (
-                        <span className="text-xs text-text-secondary">-</span>
-                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-text-secondary hover:text-action-primary hover:bg-surface-subtle"
+                            aria-label={`Ver detalhes do contrato ${c.numero}`}
+                            onClick={() => void openContractDetails(c)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Ver detalhes
+                        </TooltipContent>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 );

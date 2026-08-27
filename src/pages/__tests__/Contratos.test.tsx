@@ -51,6 +51,7 @@ vi.mock('@/services/contratosApi', async (importOriginal) => {
     ...actual,
     contratosApiService: {
       getContratosApi: vi.fn(),
+      getContratoApiByNumeroOrId: vi.fn(),
       getEmpenhosApi: vi.fn(),
       getHistoricosApi: vi.fn(),
       getLastSyncRun: vi.fn(),
@@ -244,6 +245,7 @@ describe('Contratos', () => {
       ],
       faturaEmpenhos: [],
     });
+    mockedContratosApiService.getContratoApiByNumeroOrId.mockResolvedValue(null);
 
     mockedUseUserFavorites.mockReturnValue({
       favorites: [],
@@ -283,6 +285,47 @@ describe('Contratos', () => {
     expect(await screen.findByText('62/2018')).toBeInTheDocument();
     expect(screen.queryByText('15/2026')).not.toBeInTheDocument();
     expect(mockedContratosApiService.getContratosApi).not.toHaveBeenCalled();
+
+    const linkedRow = screen.getByText('62/2018').closest('tr');
+    expect(linkedRow).not.toBeNull();
+    expect(within(linkedRow as HTMLElement).getByRole('button', { name: /Ver detalhes do contrato 62\/2018/i })).toBeInTheDocument();
+  });
+
+  it('busca os detalhes oficiais sob demanda ao abrir contrato autorizado', async () => {
+    authState.user = {
+      id: 'terceirizado-1',
+      email: 'prestador@ifrn.edu.br',
+      user_metadata: { matricula: '3128880' },
+    };
+    authState.userGroups = [{ slug: 'terceirizado' }];
+    vi.mocked(requisicoesCompraService.listPermissions).mockResolvedValue([
+      {
+        id: 'permission-1',
+        userId: 'terceirizado-1',
+        userMatricula: '3128880',
+        userEmail: 'prestador@ifrn.edu.br',
+        contratoId: 'contrato-local-1',
+        createdBy: 'admin-1',
+        createdAt: new Date('2026-01-01'),
+      },
+    ]);
+    mockedContratosApiService.getContratoApiByNumeroOrId.mockResolvedValueOnce({
+      id: 'contrato-api-1',
+      numero: '00062/2018',
+      fornecedor_nome: 'Fornecedor Teste',
+    } as never);
+
+    renderContratos();
+
+    const row = (await screen.findByText('62/2018')).closest('tr');
+    expect(row).not.toBeNull();
+    fireEvent.click(within(row as HTMLElement).getByRole('button', { name: /Ver detalhes do contrato 62\/2018/i }));
+
+    await waitFor(() => {
+      expect(mockedContratosApiService.getContratoApiByNumeroOrId).toHaveBeenCalledWith('62/2018');
+      expect(mockedContratosApiService.getContratoApiDetails).toHaveBeenCalledWith('contrato-api-1');
+    });
+    expect(await screen.findByText('Contrato 00062/2018')).toBeInTheDocument();
   });
 
   it('exibe detalhes da API quando o contrato local casa por numero normalizado', async () => {
