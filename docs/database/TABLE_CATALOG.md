@@ -560,6 +560,35 @@ Consumido por:
 
 ## Importacoes auxiliares
 
+### `lc_saved_lists`
+
+Finalidade:
+
+- persistir listas de trabalho da Lista de Credores, incluindo as contas selecionadas e os arquivos PDF de origem
+
+Campos-chave:
+
+- `id`
+- `org_id`
+- `name`
+- `source_pdf_names`
+- `rows`
+- `created_by`
+- `created_at`
+- `updated_at`
+
+Observacoes operacionais:
+
+- `rows` e `source_pdf_names` sao JSONB para preservar o snapshot da grade e permitir a reabertura sem alterar `lc_credores`
+- a RLS permite listar, inserir, atualizar e excluir listas para qualquer usuario autenticado do mesmo `org_id`; superadministrador pode operar em todos os orgaos
+- `org_id` e preenchido por `public.default_org_id()` no insert e nao precisa ser enviado pelo frontend
+- a tela `/lc` usa `lcSavedListsService.ts`; `localStorage` e somente fallback de contingencia e nao e fonte de compartilhamento entre orgaos
+
+Consumido por:
+
+- [lcSavedListsService.ts](/C:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/services/lcSavedListsService.ts)
+- [LC.tsx](/C:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/pages/LC.tsx)
+
 ### `price_researches`
 
 Finalidade:

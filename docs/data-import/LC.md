@@ -80,7 +80,8 @@ O sistema extrai os bolsistas e compara com a base carregada na LC. Suporta este
 
 O fluxo de comparação gera pendências de cruzamento e permite ao usuário:
 - Na grade de dados para cópia, exibir o ícone de cópia em todas as linhas e em cada campo disponível (CPF, banco, agência e conta). Os ícones só ficam habilitados depois que o usuário seleciona a linha correspondente.
-- Salvar uma lista de trabalho nomeada, incluindo as contas escolhidas na grade, para reabri-la ou excluí-la depois. Essas listas são persistidas somente no navegador atual e não alteram a base oficial `lc_credores`.
+- Salvar uma lista de trabalho nomeada, incluindo as contas escolhidas na grade, para reabri-la ou excluí-la depois. As listas são persistidas na tabela `lc_saved_lists`, com isolamento por `org_id`, e não alteram a base oficial `lc_credores`.
+- Usuários autenticados do mesmo órgão conseguem listar, abrir, atualizar e excluir as listas dos colegas; o navegador mantém apenas um espelho local para contingência quando o Supabase estiver indisponível.
 - Copiar blocos formatados de 7 alunos (com destaque em amarelo na 7ª linha) no mesmo padrão de leiaute da macro `.mac` para colagem direta (via Shift+Insert). Os campos são concatenados continuamente sem nenhum espaçador ou tabulador (CPF com 14, Banco com 3, Agência com 4, Operação/Resto com 24, Conta preenchida com 20 caracteres com zeros à esquerda, e Valor em centavos como última coluna). Isso garante o preenchimento exato de cada coluna limite do emulador, ativando o recurso de "auto-tab" nativo do SIAFI em cada transição de campo sem risco de pulos ou desalinhamentos.
 - Gerar e baixar arquivo de macro `.mac` para preenchimento automatizado no SIAFI.
 

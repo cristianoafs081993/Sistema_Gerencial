@@ -49,6 +49,12 @@ Mostrar a linhagem operacional dos dados de forma curta:
   - tabela: `lc_credores`
   - pagina: [LC.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/LC.tsx)
 
+- lista de trabalho nomeada na grade da LC
+  - pagina: [LC.tsx](/C:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/pages/LC.tsx)
+  - service: [lcSavedListsService.ts](/C:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/services/lcSavedListsService.ts)
+  - tabela: `lc_saved_lists`
+  - observacao: o `org_id` e aplicado pelo banco e as policies RLS permitem acesso compartilhado somente entre usuarios do mesmo orgao; o espelho em `localStorage` serve apenas como fallback offline
+
 - PDFs de pagamento
   - extracao: [bolsistasPdfService.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/bolsistasPdfService.ts)
   - comparacao: [lcComparisonService.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/lcComparisonService.ts)

@@ -39,6 +39,8 @@ A migration `20260716103000` adiciona `public.default_org_id()` como default de 
 
 `process_mappings` tambem e isolada por `org_id`; somente mapas publicados sao consumidos pela extensao, enquanto a escrita e a publicacao ficam restritas ao administrador do orgao ou superadmin.
 
+`lc_saved_lists` tambem e isolada por `org_id`; as listas de trabalho da Lista de Credores ficam disponiveis para todos os usuarios autenticados do mesmo orgao.
+
 ### Tabelas globais/compartilhadas (sem org_id)
 
 `contratos_api*`, `licitacoes_pncp*`, `atas_registro_precos*`, `price_research_ead_videos`, `normativos*`,
@@ -128,6 +130,7 @@ A migration `20260716103000` adiciona `public.default_org_id()` como default de 
 
 - `financeiro_fonte_vinculacao`
 - `lc_credores`
+- `lc_saved_lists`
 - `retencoes_efd_reinf`
 - `email_csv_ingestion_runs`
 
