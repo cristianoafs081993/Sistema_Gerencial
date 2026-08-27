@@ -132,6 +132,9 @@ A pasta corrente e centralizada por `src/test/extensionFixtures.ts`. As suites `
 - No Plano de Atividades concluído 8, cobrir a ordenação nos cabeçalhos das tabelas originais e o checkbox `Exibir somente atividades com saldo` inserido no card nativo de filtros, sem esconder linhas com saldo positivo.
 
 - `suapProcessDocumentExtension.test.ts` cobre a restauração do snapshot e do resumo financeiro ao navegar de um processo para o documento SUAP relacionado, sem voltar ao estado transitório de preparação.
+- `suapSiafiFavorecidos.test.ts` cobre a identificação da tabela SIAFI, validação prévia, normalização de CPF, moeda brasileira, inclusão de linhas, preservação de dados existentes e ausência de clique em `Confirmar`.
+- `suapSiafiPopup.test.ts` cobre carregamento REST de listas compartilhadas com a sessão da extensão, bloqueio sem sessão, ocultação fora do host SIAFI e envio para o frame interno correto.
+- A validação manual da extensão 1.9.26 deve usar uma transação SIAFI com uma linha curta e outra com múltiplos favorecidos, verificando que linhas antigas permanecem intactas e que a confirmação final continua manual.
 
 Antes de publicar uma nova versao, execute as suites focadas, `src/__tests__/encoding.test.ts`, `npm test`, `npm run build` e `npm run check`; em seguida compare os arquivos do diretorio da extensao com o ZIP gerado.
 

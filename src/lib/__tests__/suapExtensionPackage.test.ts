@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.25');
+    expect(manifest.version).toBe('1.9.26');
     expect(manifest.host_permissions).toContain('<all_urls>');
     expect(manifest.permissions).toEqual(expect.arrayContaining(['activeTab', 'scripting', 'storage', 'alarms']));
     expect(manifest.background).toEqual({ service_worker: 'background.js' });
@@ -17,6 +17,7 @@ describe('pacote da extensao Suape 1.9', () => {
     const process = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('process-document.js'));
     const plan = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('plan-summary.js'));
     const comprasnet = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('comprasnet-etp.js'));
+    const siafi = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('siafi-favorecidos.js'));
     const commandPalettes = manifest.content_scripts.filter((entry: { js: string[] }) => entry.js.includes('command-palette.js'));
     const suapCommandPalette = commandPalettes.find((entry: { matches: string[] }) => entry.matches.includes('https://suap.ifrn.edu.br/*'));
     const globalCommandPalette = commandPalettes.find((entry: { matches: string[] }) => entry.matches.includes('<all_urls>'));
@@ -44,6 +45,12 @@ describe('pacote da extensao Suape 1.9', () => {
       css: ['command-palette.css'],
       js: ['extension-auth-client.js', 'command-palette.js'],
       run_at: 'document_idle',
+    });
+    expect(siafi).toMatchObject({
+      matches: ['https://siafi.tesouro.gov.br/*'],
+      js: ['siafi-favorecidos.js'],
+      run_at: 'document_idle',
+      all_frames: true,
     });
     expect(globalCommandPalette).toMatchObject({
       matches: ['<all_urls>'],
@@ -156,6 +163,10 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(backgroundScript).toContain("const EXTENSION_SESSION_STORAGE_KEY = 'siages-extension-session'");
     expect(backgroundScript).toContain('refresh_token');
     expect(backgroundScript).toContain('chrome.alarms.create');
+    expect(popup).toContain('id="siafi-list-select"');
+    expect(popup).toContain('id="btn-siafi-fill"');
+    expect(popupScript).toContain("siafi:fill-favorecidos");
+    expect(fs.readFileSync(extensionFixturePath('siafi-favorecidos.js'), 'utf8')).toContain("Incluir Favorecido");
   });
 
   it('abre telas e acoes da paleta na origem publica do SIAGES', () => {

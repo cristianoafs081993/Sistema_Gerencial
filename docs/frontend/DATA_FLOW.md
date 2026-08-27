@@ -109,6 +109,8 @@ Usado quando a pagina tem pipeline proprio de importacao ou consulta:
 - [EnergiaCampus.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/energia/EnergiaCampus.tsx)
 - [RequisicaoCompra.tsx](file:///c:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/pages/RequisicaoCompra.tsx)
 
+Na tela `/lc`, a grade e a comparação continuam locais até o usuário salvar uma lista. O `lcSavedListsService.ts` persiste o snapshot no Supabase (`lc_saved_lists`); as policies RLS filtram automaticamente pelo órgão do usuário, de modo que colegas do mesmo órgão visualizam e reabrem as listas compartilhadas. O espelho em `localStorage` só é usado quando a consulta ou a gravação remota falha.
+
 ### Padrao C: pagina + Edge Function ou API externa
 
 Usado em modulos com IA ou integracoes externas:
@@ -279,7 +281,6 @@ Observações:
 - O perfil `Terceirizado` acessa as rotas `/requisicao-compra` e `/contratos`; gerencia suas próprias requisições e, na tela de contratos, vê somente os vínculos autorizados para si.
 - A tabela de `/contratos` exibe o ícone de detalhes para todos os contratos autorizados; em contratos locais, a consulta oficial da API é feita somente sob demanda e há fallback para os dados locais quando não existe correspondência.
 - Um terceirizado so pode usar contratos e empenhos previamente associados a ele na tabela `terceirizado_permissions` por um gestor/fiscal. Na selecao de NE, somente vinculos explicitos por `empenho_id` liberam empenhos; vinculo de contrato nao expande automaticamente os empenhos disponiveis.
-- Para terceirizados de refeitório, `/requisicao-compra` também exibe somente os contratos diretamente autorizados por `terceirizado_permissions.contrato_id`. Essa lista é apenas informativa e não altera a regra de seleção de NEs.
 - Em `/cadastro-terceirizados`, o ícone de edição do prestador abre uma página inteira de edição com os dados cadastrais e a seção `Vincular Contratos e Empenhos`; `Empenho / NE` é o tipo de vínculo padrão e usa seletor pesquisável com múltipla seleção, criando uma linha de `terceirizado_permissions` para cada empenho escolhido, sem alteração de schema.
 - Perfis gestores (`fiscal-contratos`, `diretores`, `teste`) cadastram e editam terceirizados em `/cadastro-terceirizados`; a rota `/requisicao-compra` permanece focada na criação, auditoria e aprovação/rejeição das requisições de compra.
 - Ao criar ou editar uma requisicao, o formulario nao expoe processo nem contrato. O campo separado de favorecido filtra o combobox de NEs; a busca prioriza o numero completo da NE antes de prefixos, ocorrencias parciais, descricao e valor. Para terceirizados, a lista continua limitada a permissoes diretas por `terceirizado_permissions.empenho_id`.
@@ -361,6 +362,8 @@ Quando existem duas ou mais notas fiscais validas, o resumo da extensao oculta r
 `command-palette.js` continua especializado no SUAP, com buscas e atalhos de processo e pré-carregamento em segundo plano. Em páginas web comuns, o manifesto injeta uma instância genérica da paleta, acionada por `Ctrl/Cmd+K`, que consulta Empenhos e Contratos somente após abertura explícita e abre módulos e ações em `https://www.siages.com.br`; resultados e navegação específicos do SUAP permanecem ocultos. A injeção genérica exclui SIAGES, SUAP e Comprasnet, preservando os content scripts e fluxos institucionais atuais desses domínios.
 
 O script `plan-summary.js` permanece isolado na rota exata do Plano de Atividades concluido 8. Ele acrescenta o filtro local `Exibir somente atividades com saldo` ao card de filtros nativo do SUAP e transforma os cabeçalhos das tabelas originais em controles de ordenação. `text-expander.js` e global e atua apenas no campo textual em edicao, sem ler nem modificar filtros, metricas ou drill-downs do plano.
+
+Na versão 1.9.26, quando a aba ativa é `siafi.tesouro.gov.br`, o popup consulta `lc_saved_lists` pelo Supabase REST usando o JWT persistido da extensão. O RLS da tabela limita as listas ao órgão do usuário. Após a seleção, o popup identifica entre todos os frames aquele que contém a tabela `cpr-table-itens-lista`, envia a mensagem interna `siafi:fill-favorecidos` somente para esse frame e o content script acrescenta os registros ao final: preserva linhas preenchidas, usa `Incluir Favorecido` quando necessário, normaliza CPF para 11 dígitos e aplica valor em reais com duas casas, disparando `input`, `change` e `blur`. O fluxo faz validação completa antes de alterar a página, não limpa nem sobrescreve dados existentes e nunca aciona o botão `Confirmar`; a confirmação de cada linha continua manual.
 
 ### Almoxarifado
 

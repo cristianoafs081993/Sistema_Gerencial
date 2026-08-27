@@ -43,6 +43,17 @@
       background: #182230;
       color: #eef4f8;
     }
+    select {
+      box-sizing: border-box;
+      width: 100%;
+      margin-top: 5px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 13px;
+      background: #182230;
+      color: #eef4f8;
+    }
     button {
       background-color: #2563eb;
       color: white;
@@ -84,6 +95,12 @@
       font-size: 12px;
       color: #b8c5d1;
     }
+    #siafi-list-info,
+    #siafi-fill-status {
+      margin: 8px 0;
+      font-size: 12px;
+      color: #b8c5d1;
+    }
     #status {
       margin-top: 12px;
       font-size: 13px;
@@ -118,6 +135,19 @@
     <button id="btn-extension-sign-in" type="button">Entrar no banco</button>
     <button id="btn-extension-sign-out" type="button" class="secondary">Sair do banco</button>
     <p id="extension-auth-status" aria-live="polite">A extensão consulta o banco com as permissões do seu usuário.</p>
+  </section>
+  <section id="siafi-favorecidos-card" class="auth-card" hidden aria-labelledby="siafi-favorecidos-title">
+    <h3 id="siafi-favorecidos-title">Preencher favorecidos no SIAFI</h3>
+    <label>
+      Lista de trabalho da LC
+      <select id="siafi-list-select" aria-label="Lista de trabalho da LC">
+        <option value="">Carregando listas...</option>
+      </select>
+    </label>
+    <p id="siafi-list-info" aria-live="polite">Selecione uma lista salva no SIAGES.</p>
+    <button id="btn-siafi-refresh" type="button" class="secondary">Atualizar listas</button>
+    <button id="btn-siafi-fill" type="button">Preencher SIAFI</button>
+    <p id="siafi-fill-status" aria-live="polite"></p>
   </section>
   <label>
     Segredo de automação
