@@ -1161,10 +1161,11 @@ export default function LCPage() {
                   variant="outline"
                   size="sm"
                   onClick={handleSaveWorkList}
+                  disabled={isSavingWorkList}
                   className="h-8 gap-1.5 px-3 text-xs"
                 >
                   <Save className="h-3.5 w-3.5" />
-                  Salvar lista
+                  {isSavingWorkList ? 'Salvando...' : 'Salvar lista'}
                 </Button>
                 <Button
                   variant="outline"
@@ -1188,7 +1189,7 @@ export default function LCPage() {
               Listas de trabalho salvas
             </DialogTitle>
             <DialogDescription>
-              As listas ficam salvas somente neste navegador e mantêm as contas selecionadas durante o trabalho.
+              As listas são compartilhadas com os usuários do mesmo órgão e mantêm as contas selecionadas durante o trabalho.
             </DialogDescription>
           </DialogHeader>
 
