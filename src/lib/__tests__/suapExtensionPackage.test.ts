@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.26');
+    expect(manifest.version).toBe('1.9.27');
     expect(manifest.host_permissions).toContain('<all_urls>');
     expect(manifest.permissions).toEqual(expect.arrayContaining(['activeTab', 'scripting', 'storage', 'alarms']));
     expect(manifest.background).toEqual({ service_worker: 'background.js' });
@@ -19,6 +19,7 @@ describe('pacote da extensao Suape 1.9', () => {
     const comprasnet = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('comprasnet-etp.js'));
     const siafi = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('siafi-favorecidos.js'));
     const commandPalettes = manifest.content_scripts.filter((entry: { js: string[] }) => entry.js.includes('command-palette.js'));
+    const clickHints = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('click-hints.js'));
     const suapCommandPalette = commandPalettes.find((entry: { matches: string[] }) => entry.matches.includes('https://suap.ifrn.edu.br/*'));
     const globalCommandPalette = commandPalettes.find((entry: { matches: string[] }) => entry.matches.includes('<all_urls>'));
 
@@ -62,6 +63,13 @@ describe('pacote da extensao Suape 1.9', () => {
       css: ['command-palette.css'],
       js: ['extension-auth-client.js', 'command-palette.js'],
       run_at: 'document_idle',
+    });
+    expect(clickHints).toMatchObject({
+      matches: ['<all_urls>'],
+      css: ['click-hints.css'],
+      js: ['click-hints.js'],
+      run_at: 'document_idle',
+      all_frames: true,
     });
   });
 
@@ -175,5 +183,17 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(cpScript).toContain("const SIAGES_APP_URL = 'https://www.siages.com.br';");
     expect(cpScript).not.toContain("const SIAGES_APP_URL = 'http://localhost:5173';");
     expect(cpScript).toContain('if (IS_SUAP_PAGE)');
+  });
+
+  it('inclui o modo global de atalhos mnemônicos sem permissões adicionais', () => {
+    const clickHints = fs.readFileSync(extensionFixturePath('click-hints.js'), 'utf8');
+    const clickHintsCss = fs.readFileSync(extensionFixturePath('click-hints.css'), 'utf8');
+
+    expect(clickHints).toContain("window.__suapeClickHintsLoaded");
+    expect(clickHints).toContain("event.key === 'm'");
+    expect(clickHints).toContain("event.key === 'Enter'");
+    expect(clickHints).toContain('mnemonicFromLabel');
+    expect(clickHints).toContain('assignInitialCodes');
+    expect(clickHintsCss).toContain('#suape-click-hints-root');
   });
 });
