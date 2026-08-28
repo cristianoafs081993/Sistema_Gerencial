@@ -1301,3 +1301,34 @@ RLS e indices:
 
 - leitura e insercao ficam restritas a `created_by = auth.uid()`;
 - indice por usuario, processo, documento e `checked_at` decrescente suporta a consulta do ultimo resultado.
+
+## Observabilidade e Ingestão de Dados
+
+### `data_import_runs`
+
+Finalidade:
+
+- Rastrear execuções de importação manual de dados (CSV, XLSX, JSON) para observabilidade, auditoria e detecção de falhas.
+
+Campos-chave:
+
+- `id`, `org_id`, `user_id`, `user_email`;
+- `pipeline` (identificador do pipeline, ex: `descentralizacoes`, `empenhos_siafi`, `financeiro_fontes`, `energia_campus`);
+- `pipeline_name` (rótulo amigável);
+- `source_type` (`manual_upload`, `email_csv`, `api_sync`);
+- `source_name` (nome do arquivo ou identificador da origem);
+- `status` (`processing`, `success`, `warning`, `failed`, `skipped`);
+- `rows_detected`, `rows_written`, `rows_skipped`, `rows_updated`;
+- `error_message`, `metadata` (JSONB com contagens e detalhes);
+- `started_at`, `finished_at`, `created_at`, `updated_at`.
+
+RLS e índices:
+
+- RLS por `org_id` permitindo `SELECT`, `INSERT`, `UPDATE` para usuários autenticados do órgão ou superadmin;
+- Índices em `(org_id, created_at DESC)`, `(pipeline, created_at DESC)` e `status`.
+
+Consumido por:
+
+- [dataImportLogsService.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/dataImportLogsService.ts)
+- [ImportacaoDados.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/ImportacaoDados.tsx)
+- [ObservabilityCenter.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/observabilidade/ObservabilityCenter.tsx)

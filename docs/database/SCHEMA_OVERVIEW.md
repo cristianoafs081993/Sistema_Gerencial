@@ -41,6 +41,9 @@ A migration `20260716103000` adiciona `public.default_org_id()` como default de 
 
 `lc_saved_lists` tambem e isolada por `org_id`; as listas de trabalho da Lista de Credores ficam disponiveis para todos os usuarios autenticados do mesmo orgao.
 
+`data_import_runs` tambem e isolada por `org_id`; registra auditoria e metricas de cada execucao de importacao manual por usuario e orgao.
+
+
 ### Tabelas globais/compartilhadas (sem org_id)
 
 `contratos_api*`, `licitacoes_pncp*`, `atas_registro_precos*`, `price_research_ead_videos`, `normativos*`,

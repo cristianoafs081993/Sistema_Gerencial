@@ -103,10 +103,15 @@ Arquivos reais de operacao presentes em [docs](/C:/Users/crist/OneDrive/Desktop/
 
 ## Automacao por e-mail
 
-- a automacao por Gmail foi centralizada na Edge Function `ingest-email-csv`
-- o roteamento do anexo depende do assunto, do nome do arquivo e do cabecalho real do CSV
-- hoje o fluxo automatizado cobre os pipelines CSV de arquivo unico
-- o CSV de conta agregada de descentralizacoes recebido por e-mail e tratado como pipeline proprio e grava `descentralizacoes_conta_saldos`; a terceira coluna de valor pode vir sem cabecalho
-- nos CSVs de credito disponivel recebidos por e-mail, linhas sem valor preenchido ou parseavel sao ignoradas para nao sobrescrever saldos com zero
-- o upload manual em `/credito-disponivel` tambem aceita o relatorio detalhado `PTRES / PI / descricao / Metrica / Valor`, ainda que descricao e valor venham em colunas sem cabecalho; ele persiste snapshots em `creditos_disponiveis_detalhes` e mantem o agregado legado por PTRES
 - PFs continuam fora da automacao porque exigem correlacao entre dois arquivos
+
+## Central de Observabilidade e Logs de Ingestão
+
+A página `/importacao-dados` possui uma **Central de Observabilidade** integrada que unifica a visão de saúde de todas as 17 bases de dados do sistema:
+
+- **Tabela de auditoria `data_import_runs`**: Registra cada upload manual no navegador com contadores de linhas detectadas, gravadas, reconciliadas/atualizadas, ignoradas, tempo de processamento e mensagens de erro completas.
+- **Integração com `email_csv_ingestion_runs`**: Exibe o status de cada anexo CSV processado pela Edge Function `ingest-email-csv`.
+- **Integração com jobs de API**: Consolida execuções de sincronização de Contratos Comprasnet (`contratos_api_sync_runs`), espelho SUAP Plano 8 (`suap_plan_sync_runs`), Licitações PNCP (`licitacoes_pncp_sync_runs`) e Catálogo de Atas (`atas_registro_precos_sync_runs`).
+- **Matriz de Datasets**: Exibe a data/hora e tempo relativo da última atualização de cada base, os canais suportados (Manual, E-mail, API) e alerta visual caso haja falha recente ou falta de dados por mais de 7 dias.
+- **Exportação e Auditoria**: Permite filtrar execuções por canal, status, módulo ou termo de busca e exportar todo o histórico em formato CSV.
+

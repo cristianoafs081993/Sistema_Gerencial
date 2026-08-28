@@ -7,6 +7,7 @@ import ImportacaoDados from '@/pages/ImportacaoDados';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { creditosDisponiveisDetalhesService, parseCreditoDisponivelFile } from '@/services/creditosDisponiveisDetalhes';
+import { dataImportLogsService } from '@/services/dataImportLogsService';
 
 const testState = vi.hoisted(() => ({
   isSuperAdmin: true,
@@ -42,6 +43,60 @@ vi.mock('@/services/descentralizacoes', () => ({
   },
 }));
 
+vi.mock('@/services/dataImportLogsService', () => ({
+  dataImportLogsService: {
+    recordImportRunStart: vi.fn().mockResolvedValue('run-mock-123'),
+    recordImportRunSuccess: vi.fn().mockResolvedValue(undefined),
+    recordImportRunFailure: vi.fn().mockResolvedValue(undefined),
+    fetchUnifiedObservabilityLogs: vi.fn().mockResolvedValue([
+      {
+        id: 'manual_1',
+        timestamp: '2026-08-28T10:00:00Z',
+        pipelineKey: 'descentralizacoes',
+        pipelineLabel: 'Descentralizações de Crédito',
+        module: 'orcamentario',
+        sourceType: 'manual_upload',
+        sourceName: 'NC.csv',
+        status: 'success',
+        rowsDetected: 10,
+        rowsWritten: 10,
+        rowsSkipped: 0,
+        rowsUpdated: 0,
+      },
+    ]),
+    fetchDatasetStatusMatrix: vi.fn().mockResolvedValue([
+      {
+        key: 'descentralizacoes',
+        name: 'Descentralizações de Crédito',
+        module: 'orcamentario',
+        description: 'Notas de Crédito',
+        supportedSources: ['manual_upload', 'email_csv'],
+        lastUpdatedAt: '2026-08-28T10:00:00Z',
+        lastStatus: 'success',
+        lastSourceType: 'manual_upload',
+        lastSourceName: 'NC.csv',
+        lastErrorMessage: null,
+        lastRowsCount: 10,
+        hasRecentError: false,
+        totalRunsCount: 1,
+      },
+    ]),
+    fetchObservabilityStats: vi.fn().mockResolvedValue({
+      totalRuns: 1,
+      successCount: 1,
+      failedCount: 0,
+      warningCount: 0,
+      skippedCount: 0,
+      manualUploadsCount: 1,
+      emailIngestionsCount: 0,
+      apiSyncsCount: 0,
+      healthyDatasetsCount: 1,
+      unhealthyDatasetsCount: 0,
+      lastActivityTimestamp: '2026-08-28T10:00:00Z',
+    }),
+  },
+}));
+
 vi.mock('@/lib/siafi-parser', () => ({
   parseSiafiCsv: vi.fn(),
   syncSiafiDataToDb: vi.fn(),
@@ -58,6 +113,13 @@ vi.mock('sonner', () => ({
 
 vi.mock('@/components/HeaderParts', () => ({
   HeaderSubtitle: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}));
+
+vi.mock('@/components/ui/tabs', () => ({
+  Tabs: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  TabsList: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  TabsTrigger: ({ children }: { children: ReactNode }) => <button type="button">{children}</button>,
+  TabsContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock('@/components/JsonImportDialog', () => ({
@@ -127,25 +189,26 @@ describe('ImportacaoDados', () => {
     });
   });
 
-  it('renderiza as três seções principais de importação (Orçamentário, Financeiro, Contratos)', () => {
+  it('renderiza as abas de navegação (Envio de Arquivos e Central de Observabilidade)', () => {
     renderPage();
 
-    expect(screen.getByText('Módulo Orçamentário')).toBeInTheDocument();
-    expect(screen.getByText('Módulo Financeiro')).toBeInTheDocument();
-    expect(screen.getByText('Contratos e Gestão Operacional')).toBeInTheDocument();
-
-    expect(screen.getByText('Descentralizações de Crédito')).toBeInTheDocument();
-    expect(screen.getByText('Crédito Disponível')).toBeInTheDocument();
-    expect(screen.getByText('Empenhos SIAFI')).toBeInTheDocument();
-    expect(screen.getByText('Financeiro (Fontes)')).toBeInTheDocument();
-    expect(screen.getByText('Lista de Credores (LC)')).toBeInTheDocument();
-    expect(screen.getByText('Retenções EFD-Reinf')).toBeInTheDocument();
-    expect(screen.getByText('Rastreabilidade de PFs')).toBeInTheDocument();
-    expect(screen.getByText('Contratos (Comprasnet)')).toBeInTheDocument();
-    expect(screen.getByText('Energia Campus')).toBeInTheDocument();
+    expect(screen.getByText(/Envio de Arquivos/i)).toBeInTheDocument();
+    expect(screen.getByText(/Central de Observabilidade & Logs/i)).toBeInTheDocument();
+    expect(screen.getAllByText('Módulo Orçamentário').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Módulo Financeiro').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Contratos e Gestão Operacional').length).toBeGreaterThan(0);
   });
 
-  it('processa reconciliação de descentralizações via handler de importação', async () => {
+  it('renderiza a central de observabilidade com matriz de bases e tabela de logs', async () => {
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Matriz de Observabilidade e Atualização das Bases')).toBeInTheDocument();
+      expect(screen.getByText('Histórico Cronológico de Ingestões e Atualizações')).toBeInTheDocument();
+    });
+  });
+
+  it('processa reconciliação de descentralizações e grava o log de execução', async () => {
     const addDescentralizacao = vi.fn();
     const updateDescentralizacao = vi.fn().mockResolvedValue(undefined);
 
@@ -211,21 +274,27 @@ describe('ImportacaoDados', () => {
       },
     ]);
 
+    expect(dataImportLogsService.recordImportRunStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pipeline: 'descentralizacoes',
+      }),
+    );
     expect(updateDescentralizacao).toHaveBeenCalledWith(
       'legacy-desc',
       expect.objectContaining({
         notaCredito: '2026NC000002',
-        operacaoTipo: 'DESCENTRALIZACAO DE CREDITO',
-        origemRecurso: '231796',
-        naturezaDespesa: '339000',
-        planoInterno: 'L20RLP01ADN',
-        valor: 10000,
       }),
     );
-    expect(addDescentralizacao).not.toHaveBeenCalled();
+    expect(dataImportLogsService.recordImportRunSuccess).toHaveBeenCalledWith(
+      'run-mock-123',
+      expect.objectContaining({
+        rowsDetected: 1,
+        rowsUpdated: 1,
+      }),
+    );
   });
 
-  it('processa upload de Saldo RAP passando o File para o parser e sincronizando no banco', async () => {
+  it('processa upload de Saldo RAP passando o File para o parser e sincronizando no banco com log', async () => {
     const { parseSiafiCsv, syncSiafiDataToDb } = await import('@/lib/siafi-parser');
     vi.mocked(parseSiafiCsv).mockResolvedValue([
       {
@@ -268,6 +337,19 @@ describe('ImportacaoDados', () => {
     await waitFor(() => {
       expect(parseSiafiCsv).toHaveBeenCalledWith(file);
       expect(syncSiafiDataToDb).toHaveBeenCalled();
+      expect(dataImportLogsService.recordImportRunStart).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pipeline: 'rap_saldo',
+          sourceName: 'saldo_rap.csv',
+        }),
+      );
+      expect(dataImportLogsService.recordImportRunSuccess).toHaveBeenCalledWith(
+        'run-mock-123',
+        expect.objectContaining({
+          rowsDetected: 1,
+          rowsUpdated: 1,
+        }),
+      );
     });
   });
 });

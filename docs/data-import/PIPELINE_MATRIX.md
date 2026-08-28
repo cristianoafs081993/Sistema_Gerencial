@@ -35,9 +35,8 @@
 - A UI de FD-Reinf aceita `.xlsx,.xls`, mas o service atual lanca erro para XLSX.
 - O dialogo de PF sugere principalmente XLSX/XLS, mas o service tambem trata CSV.
 - A sincronizacao de contratos depende de duas planilhas XLSX distintas: `Relatorio.xlsx` para contratos ativos e `Relatorio (1).xlsx` para valor do contrato e vinculos com empenhos. O dialogo identifica automaticamente a ordem correta pelos cabecalhos.
-- O parser do `Relatorio (3)` ignora `Valor Liquidado` e `Valor Pago`; esses campos nao devem alimentar o modulo local de contratos.
-- A escrita no banco pode cair para `insert/update` se o `upsert onConflict(numero)` nao estiver disponivel no ambiente.
-- Alguns imports operam com JSON e CSV no mesmo fluxo porque usam `JsonImportDialog`.
 - Na aba Restos a Pagar, o filtro `Pendente` usa saldo RAP operacional estritamente maior que zero; empenhos com saldo zerado por pagamento ou cancelamento ficam fora dele.
+- Todos os uploads manuais agora registram início, métricas de linhas processadas e eventuais falhas na tabela `data_import_runs`, consumida pela Central de Observabilidade na rota `/importacao-dados`.
+
 
 
