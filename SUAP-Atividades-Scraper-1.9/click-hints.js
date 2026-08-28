@@ -397,7 +397,8 @@
   }
 
   document.addEventListener('keydown', (event) => {
-    const isToggle = (event.ctrlKey || event.metaKey) && (event.key === 'm' || event.key === 'M' || event.code === 'KeyM');
+    const isToggle = (event.ctrlKey || event.metaKey) && !event.altKey
+      && (event.key === ';' || event.code === 'Semicolon');
     if (isToggle) {
       event.preventDefault();
       event.stopPropagation();

@@ -68,7 +68,9 @@ describe('modo de atalhos mnemônicos da extensão Suape', () => {
     save.addEventListener('click', onSave);
 
     window.eval(contentScript);
-    fireEvent.keyDown(document, { key: 'm', code: 'KeyM', ctrlKey: true });
+    fireEvent.keyDown(document, { key: 'm', code: 'KeyM', ctrlKey: true, altKey: true });
+    expect(document.getElementById('suape-click-hints-root')).toBeNull();
+    fireEvent.keyDown(document, { key: ';', code: 'Semicolon', ctrlKey: true });
 
     const root = document.getElementById('suape-click-hints-root')!;
     expect(root.hidden).toBe(false);
@@ -92,7 +94,7 @@ describe('modo de atalhos mnemônicos da extensão Suape', () => {
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(root.hidden).toBe(true);
 
-    fireEvent.keyDown(document, { key: 'm', code: 'KeyM', ctrlKey: true });
+    fireEvent.keyDown(document, { key: ';', code: 'Semicolon', ctrlKey: true });
     fireEvent.keyDown(document, { key: 'b' });
     fireEvent.keyDown(document, { key: 'c' });
     fireEvent.keyDown(document, { key: 'Enter' });
@@ -102,7 +104,7 @@ describe('modo de atalhos mnemônicos da extensão Suape', () => {
     document.dispatchEvent(regularKey);
     expect(regularKey.defaultPrevented).toBe(false);
 
-    fireEvent.keyDown(document, { key: 'm', code: 'KeyM', ctrlKey: true });
+    fireEvent.keyDown(document, { key: ';', code: 'Semicolon', ctrlKey: true });
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(root.hidden).toBe(true);
   });

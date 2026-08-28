@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.27');
+    expect(manifest.version).toBe('1.9.29');
     expect(manifest.host_permissions).toContain('<all_urls>');
     expect(manifest.permissions).toEqual(expect.arrayContaining(['activeTab', 'scripting', 'storage', 'alarms']));
     expect(manifest.background).toEqual({ service_worker: 'background.js' });
@@ -190,7 +190,8 @@ describe('pacote da extensao Suape 1.9', () => {
     const clickHintsCss = fs.readFileSync(extensionFixturePath('click-hints.css'), 'utf8');
 
     expect(clickHints).toContain("window.__suapeClickHintsLoaded");
-    expect(clickHints).toContain("event.key === 'm'");
+    expect(clickHints).toContain("event.key === ';'");
+    expect(clickHints).toContain("event.code === 'Semicolon'");
     expect(clickHints).toContain("event.key === 'Enter'");
     expect(clickHints).toContain('mnemonicFromLabel');
     expect(clickHints).toContain('assignInitialCodes');
