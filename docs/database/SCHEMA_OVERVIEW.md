@@ -91,7 +91,6 @@ A migration `20260716103000` adiciona `public.default_org_id()` como default de 
 - `contratos`
 - `contratos_empenhos`
 - `contratos_api`
-
 - `contratos_api_historico`
 - `contratos_api_empenhos`
 - `contratos_api_faturas`
@@ -101,6 +100,7 @@ A migration `20260716103000` adiciona `public.default_org_id()` como default de 
 - `contratos_api_empenho_liquidacoes_cache_status`
 - `contratos_api_empenho_liquidacoes_cache`
 - `contratos_api_documentos`
+- `contratos_api_instrumentos_cobranca`
 - `contratos_api_sync_runs`
 - `requisicoes_compra`
 - `requisicao_compra_empenhos` (relacao N:N entre requisicao e NEs selecionadas)
@@ -129,6 +129,7 @@ A migration `20260716103000` adiciona `public.default_org_id()` como default de 
 - `processos` preserva os dados extraídos e o histórico de cada processo.
 - `suap_caixas` contém as caixas cadastradas pelo usuário.
 - `suap_processo_caixas` mantém os vínculos ativos processo–caixa; a UI do SUAP exibe apenas processos com pelo menos um vínculo. Inventários de caixas lidas com sucesso removem somente os vínculos ausentes, sem apagar processos ou PDFs.
+
 ### Importacoes auxiliares
 
 - `financeiro_fonte_vinculacao`

@@ -461,4 +461,92 @@ describe('RequisicaoCompraPage', () => {
     expect(await screen.findByText(/R\$\s*200,00/)).toBeInTheDocument();
     expect(mockedTransparenciaService.getItensEmpenhoPortal).toHaveBeenCalledWith('2026NE000083');
   });
+
+  it('permite ao usuario editar o valor unitario de itens gerados a partir do empenho', async () => {
+    mockedUseData.mockReturnValue({
+      empenhos: [
+        {
+          id: 'emp-83',
+          numero: '2026NE000083',
+          descricao: 'Compra de alimentos',
+          valor: 1000,
+          tipo: 'exercicio',
+          status: 'pendente',
+          dataEmpenho: new Date('2026-07-01T12:00:00Z'),
+          createdAt: new Date('2026-07-01T12:00:00Z'),
+          updatedAt: new Date('2026-07-01T12:00:00Z'),
+        },
+      ],
+      contratos: [],
+      contratosEmpenhos: [],
+    } as never);
+
+    mockedService.listRecentRequisicoes.mockResolvedValue([
+      {
+        id: 'req-1',
+        title: 'Compra de alimentos',
+        number: 'REQ-2026-0001',
+        status: 'draft',
+        createdBy: 'admin-1',
+        createdByEmail: 'admin@ifrn.edu.br',
+        empenhoId: 'emp-83',
+        empenhoNumero: '2026NE000083',
+        createdAt: new Date('2026-07-01T12:00:00Z'),
+        updatedAt: new Date('2026-07-01T12:00:00Z'),
+      },
+    ] as never);
+
+    mockedService.getRequisicaoById.mockResolvedValue({
+      id: 'req-1',
+      title: 'Compra de alimentos',
+      number: 'REQ-2026-0001',
+      status: 'draft',
+      createdBy: 'admin-1',
+      createdByEmail: 'admin@ifrn.edu.br',
+      empenhoId: 'emp-83',
+      empenhoNumero: '2026NE000083',
+      createdAt: new Date('2026-07-01T12:00:00Z'),
+      updatedAt: new Date('2026-07-01T12:00:00Z'),
+      items: [
+        {
+          id: 'item-1',
+          requisicaoCompraId: 'req-1',
+          description: 'BOLO ALIMENTICIO MILHO',
+          quantity: 2,
+          unit: 'UN',
+          unitPrice: 50,
+          sourceType: 'portal_transparencia_empenho_item',
+          sourceItemKey: '2026NE000083|158366264352026NE000083|1',
+          sourceReference: '05 - MERCADORIAS PARA DOACAO',
+          sourceSnapshot: { saldoItem: 500 },
+          sortOrder: 0,
+          createdAt: new Date('2026-07-01T12:00:00Z'),
+          updatedAt: new Date('2026-07-01T12:00:00Z'),
+        },
+      ],
+    } as never);
+
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: /Editar requisição REQ-2026-0001/i }));
+
+    expect(await screen.findByText('BOLO ALIMENTICIO MILHO')).toBeInTheDocument();
+
+    const numberInputs = screen.getAllByRole('spinbutton');
+    // numberInputs: [quantity, unitPrice]
+    expect(numberInputs.length).toBeGreaterThanOrEqual(2);
+    const unitPriceInput = numberInputs[1];
+    expect(unitPriceInput).not.toBeDisabled();
+    expect(unitPriceInput).toHaveValue(50);
+
+    // Initial subtotal: 2 * 50 = 100
+    expect(screen.getAllByText(/R\$\s*100,00/).length).toBeGreaterThanOrEqual(1);
+
+    // Edit unitPrice to 75
+    fireEvent.change(unitPriceInput, { target: { value: '75' } });
+    expect(unitPriceInput).toHaveValue(75);
+
+    // New subtotal: 2 * 75 = 150
+    expect(screen.getAllByText(/R\$\s*150,00/).length).toBeGreaterThanOrEqual(1);
+  });
 });

@@ -85,6 +85,7 @@ export default function RequisicaoCompraPage() {
   const [items, setItems] = useState<Omit<RequisicaoCompraItem, 'id' | 'requisicaoCompraId' | 'createdAt' | 'updatedAt'>[]>([]);
   const [pendingAutoFillEmpenhoIds, setPendingAutoFillEmpenhoIds] = useState<string[]>([]);
   const [emptyQuantityInputKeys, setEmptyQuantityInputKeys] = useState<Set<string>>(new Set());
+  const [emptyUnitPriceInputKeys, setEmptyUnitPriceInputKeys] = useState<Set<string>>(new Set());
 
   // Queries
   const { data: requisicoes = [], isLoading: isLoadingRequisicoes } = useQuery({
@@ -378,6 +379,7 @@ export default function RequisicaoCompraPage() {
     setNotes('');
     setItems([]);
     setEmptyQuantityInputKeys(new Set());
+    setEmptyUnitPriceInputKeys(new Set());
     setPendingAutoFillEmpenhoIds([]);
     setIsEditing(true);
   };
@@ -401,6 +403,7 @@ export default function RequisicaoCompraPage() {
       setSelectedEmpenhoIds(requisicaoEmpenhoIds);
       setNotes(fullRequisicao.notes || '');
       setEmptyQuantityInputKeys(new Set());
+      setEmptyUnitPriceInputKeys(new Set());
       setItems(fullRequisicao.items.map((item, index) => ({
         ...item,
         empenhoId: item.empenhoId || requisicaoEmpenhoIds[0],
@@ -420,6 +423,7 @@ export default function RequisicaoCompraPage() {
     setIsEditing(false);
     setEditingRequisicaoId(undefined);
     setEmptyQuantityInputKeys(new Set());
+    setEmptyUnitPriceInputKeys(new Set());
   };
 
   // Save Requisição
@@ -882,6 +886,7 @@ export default function RequisicaoCompraPage() {
                                 const itemSubtotal = item.quantity * item.unitPrice;
                                 const hasItemBalanceViolation = itemAvailableBalance !== null && itemSubtotal > itemAvailableBalance;
                                 const quantityInputKey = item.sourceItemKey || `${item.empenhoId ?? empenho.id}-${index}`;
+                                const unitPriceInputKey = item.sourceItemKey ? `${item.sourceItemKey}|price` : `${item.empenhoId ?? empenho.id}-${index}-price`;
 
                                 return (
                                   <TableRow key={`${empenho.id}-${index}`} className={hasItemBalanceViolation ? 'bg-status-error/5' : undefined}>
@@ -926,10 +931,22 @@ export default function RequisicaoCompraPage() {
                                         type="number"
                                         min="0"
                                         step="any"
-                                        value={item.unitPrice}
-                                        onChange={(e) => handleUpdateItem(index, { unitPrice: Number(e.target.value) })}
+                                        value={emptyUnitPriceInputKeys.has(unitPriceInputKey) ? '' : item.unitPrice}
+                                        onFocus={() => {
+                                          if (item.unitPrice !== 0) return;
+                                          setEmptyUnitPriceInputKeys((current) => new Set(current).add(unitPriceInputKey));
+                                        }}
+                                        onChange={(e) => {
+                                          const rawValue = e.target.value;
+                                          setEmptyUnitPriceInputKeys((current) => {
+                                            const next = new Set(current);
+                                            if (rawValue === '') next.add(unitPriceInputKey);
+                                            else next.delete(unitPriceInputKey);
+                                            return next;
+                                          });
+                                          handleUpdateItem(index, { unitPrice: rawValue === '' ? 0 : Number(rawValue) });
+                                        }}
                                         className="h-9 text-right"
-                                        disabled={isGeneratedItem}
                                       />
                                     </TableCell>
                                     <TableCell className={`text-right font-mono text-xs font-bold leading-9 ${hasItemBalanceViolation ? 'text-status-error' : 'text-status-success'}`}>

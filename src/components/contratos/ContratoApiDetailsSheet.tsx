@@ -13,6 +13,7 @@ import {
   History,
   Loader2,
   Package,
+  Receipt,
   ReceiptText,
   RefreshCw,
 } from 'lucide-react';
@@ -62,6 +63,11 @@ import {
   type PncpDocumentoContrato,
   type PncpContratoRef,
 } from '@/services/pncpContratos';
+import {
+  buscarInstrumentosCobrancaPncp,
+  type PncpInstrumentoCobranca,
+} from '@/services/pncpInstrumentosCobranca';
+import { ContratoNfeRastreabilidade } from '@/components/contratos/ContratoNfeRastreabilidade';
 
 interface ContratoApiDetailsSheetProps {
   open: boolean;
@@ -365,27 +371,64 @@ export function ContratoApiDetailsSheet({
 
   const [pncpDocs, setPncpDocs] = useState<PncpDocumentoContrato[]>([]);
   const [pncpRef, setPncpRef] = useState<PncpContratoRef | null>(null);
+  const [pncpInstrumentos, setPncpInstrumentos] = useState<PncpInstrumentoCobranca[]>([]);
   const [isLoadingPncpDocs, setIsLoadingPncpDocs] = useState(false);
+  const [isLoadingPncpInstrumentos, setIsLoadingPncpInstrumentos] = useState(false);
   const [pncpError, setPncpError] = useState<string | null>(null);
 
   const fetchPncpDocs = useCallback((forceLive = false) => {
     if (!contrato) return;
 
-    // Se já existem documentos sincronizados no banco de dados e não é refresh forçado, usa direto do banco
+    // Se já existem documentos e instrumentos sincronizados no banco de dados e não é refresh forçado, usa direto do banco
     const dbDocs = details?.documentos;
-    if (!forceLive && dbDocs && dbDocs.length > 0) {
-      setPncpDocs(
-        dbDocs.map((d) => ({
-          sequencialDocumento: d.sequencial_documento,
-          titulo: d.titulo,
-          tipoDocumentoId: d.tipo_documento_id,
-          tipoDocumentoNome: d.tipo_documento_nome,
-          url: d.url,
-          uri: d.uri ?? undefined,
-          dataPublicacaoPncp: d.data_publicacao_pncp,
-          tamanho: d.tamanho,
-        }))
-      );
+    const dbInsts = details?.instrumentosCobranca;
+
+    if (!forceLive && ((dbDocs && dbDocs.length > 0) || (dbInsts && dbInsts.length > 0))) {
+      if (dbDocs && dbDocs.length > 0) {
+        setPncpDocs(
+          dbDocs.map((d) => ({
+            sequencialDocumento: d.sequencial_documento,
+            titulo: d.titulo,
+            tipoDocumentoId: d.tipo_documento_id,
+            tipoDocumentoNome: d.tipo_documento_nome,
+            url: d.url,
+            uri: d.uri ?? undefined,
+            dataPublicacaoPncp: d.data_publicacao_pncp,
+            tamanho: d.tamanho,
+          }))
+        );
+      }
+
+      if (dbInsts && dbInsts.length > 0) {
+        setPncpInstrumentos(
+          dbInsts.map((inst) => ({
+            sequencialInstrumentoCobranca: inst.sequencial_instrumento_cobranca,
+            tipoNome: inst.tipo_nome,
+            tipoDescricao: inst.tipo_descricao,
+            numeroInstrumentoCobranca: inst.numero_instrumento_cobranca,
+            dataEmissaoDocumento: inst.data_emissao ?? '',
+            chaveNFe: inst.chave_nfe,
+            dataConsultaNFe: inst.data_consulta_nfe,
+            statusResponseNFe: inst.status_response_nfe,
+            notaFiscal: inst.chave_nfe
+              ? {
+                  chaveNotaFiscal: inst.chave_nfe,
+                  valorNotaFiscal: inst.valor_nota_fiscal ?? 0,
+                  serie: inst.serie ?? undefined,
+                  tipoEventoMaisRecente: inst.tipo_evento_mais_recente ?? undefined,
+                  dataTipoEventoMaisRecente: inst.data_tipo_evento_mais_recente ?? undefined,
+                  nomeFornecedor: inst.nome_fornecedor ?? undefined,
+                  cnpjFornecedor: inst.cnpj_fornecedor ?? undefined,
+                  municipioFornecedor: inst.municipio_fornecedor ?? undefined,
+                }
+              : null,
+            itens: (inst.itens as any[]) || [],
+            eventos: (inst.eventos as any[]) || [],
+            raw: (inst.raw_data as Record<string, unknown>) || {},
+          }))
+        );
+        setIsLoadingPncpInstrumentos(false);
+      }
 
       let resolvedRef: PncpContratoRef | null = null;
       if (contrato.pncp_control_number && contrato.pncp_sequencial) {
@@ -396,7 +439,7 @@ export function ContratoApiDetailsSheet({
           numeroControlePNCP: contrato.pncp_control_number,
           hasPncpRecord: true,
         };
-      } else if (dbDocs.length > 0) {
+      } else if (dbDocs && dbDocs.length > 0) {
         const firstUrl = dbDocs[0].url || dbDocs[0].uri || '';
         const match = firstUrl.match(/orgaos\/(\d{14})\/contratos\/(\d{4})\/(\d+)\/arquivos/);
         if (match) {
@@ -411,6 +454,14 @@ export function ContratoApiDetailsSheet({
       }
       setPncpRef(resolvedRef);
       setIsLoadingPncpDocs(false);
+
+      if ((!dbInsts || dbInsts.length === 0) && resolvedRef && resolvedRef.ano && resolvedRef.sequencial) {
+        setIsLoadingPncpInstrumentos(true);
+        buscarInstrumentosCobrancaPncp(resolvedRef, { contratoApiId: contrato.id })
+          .then((res) => setPncpInstrumentos(res.instrumentos))
+          .catch((err) => console.warn('Erro ao consultar instrumentos de cobrança:', err))
+          .finally(() => setIsLoadingPncpInstrumentos(false));
+      }
       return;
     }
 
@@ -418,12 +469,15 @@ export function ContratoApiDetailsSheet({
     if (!forceLive && contrato.pncp_has_record === false && contrato.pncp_documentos_checked_at) {
       setPncpDocs([]);
       setPncpRef(null);
+      setPncpInstrumentos([]);
       setIsLoadingPncpDocs(false);
+      setIsLoadingPncpInstrumentos(false);
       return;
     }
 
     const abortController = new AbortController();
     setIsLoadingPncpDocs(true);
+    setIsLoadingPncpInstrumentos(true);
     setPncpError(null);
 
     buscarDocumentosContratoPncp(contrato, { signal: abortController.signal })
@@ -433,12 +487,25 @@ export function ContratoApiDetailsSheet({
         if (res.error && res.documentos.length === 0) {
           setPncpError(res.error);
         }
+        if (res.ref && res.ref.ano && res.ref.sequencial) {
+          buscarInstrumentosCobrancaPncp(res.ref, { signal: abortController.signal })
+            .then((resInst) => setPncpInstrumentos(resInst.instrumentos))
+            .catch((err) => {
+              if ((err as Error)?.name !== 'AbortError') {
+                console.warn('Erro ao consultar instrumentos de cobrança:', err);
+              }
+            })
+            .finally(() => setIsLoadingPncpInstrumentos(false));
+        } else {
+          setIsLoadingPncpInstrumentos(false);
+        }
       })
       .catch((err) => {
         if ((err as Error)?.name !== 'AbortError') {
           console.warn('ContratoApiDetailsSheet: erro ao consultar documentos PNCP', err);
           setPncpError('Não foi possível carregar os documentos do PNCP.');
         }
+        setIsLoadingPncpInstrumentos(false);
       })
       .finally(() => {
         setIsLoadingPncpDocs(false);
@@ -453,7 +520,9 @@ export function ContratoApiDetailsSheet({
     if (!open || !contrato) {
       setPncpDocs([]);
       setPncpRef(null);
+      setPncpInstrumentos([]);
       setIsLoadingPncpDocs(false);
+      setIsLoadingPncpInstrumentos(false);
       setPncpError(null);
       return;
     }
@@ -974,6 +1043,34 @@ export function ContratoApiDetailsSheet({
                       </Button>
                     </div>
                   )}
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="nfe-rastreabilidade" className="border border-border/80 rounded-xl px-4 py-1 bg-card shadow-xs">
+                <AccordionTrigger className="hover:no-underline py-3">
+                  <div className="flex items-center gap-2 text-left">
+                    <Receipt className="h-4 w-4 text-action-primary shrink-0" />
+                    <span className="font-semibold text-sm text-foreground">
+                      Notas Fiscais e Instrumentos de Cobrança (NF-e)
+                    </span>
+                    {pncpInstrumentos.length > 0 ? (
+                      <Badge variant="secondary" className="text-xs font-semibold">
+                        {pncpInstrumentos.length} {pncpInstrumentos.length === 1 ? 'NF-e identificada' : 'NF-e\'s identificadas'}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px] text-muted-foreground border-dashed">
+                        Protótipo SEFAZ + PNCP
+                      </Badge>
+                    )}
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-2 pb-4">
+                  <ContratoNfeRastreabilidade
+                    instrumentos={pncpInstrumentos}
+                    faturasApi={faturas}
+                    isLoading={isLoadingPncpInstrumentos}
+                    onRefresh={() => fetchPncpDocs(true)}
+                  />
                 </AccordionContent>
               </AccordionItem>
             </Accordion>

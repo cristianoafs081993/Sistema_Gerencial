@@ -34,8 +34,11 @@ describe('portal itens cache discovery helpers', () => {
     expect(DEFAULT_UASG).toBe('158366');
     expect(extractUasgFromProcesso('23035001276.2026-51')).toBe('158366');
     expect(extractUasgFromProcesso('23035.001276.2026-51')).toBe('158366');
+    expect(extractUasgFromProcesso('2335.001995.2026-71')).toBe('158366');
     expect(extractUasgFromProcesso('23421.000123.2026-00')).toBe('158155');
+    expect(extractUasgFromProcesso('23422.000123.2026-00')).toBe('158155');
     expect(extractUasgFromProcesso('23134.009999.2025-11')).toBe('158369');
+    expect(extractUasgFromProcesso('23057.000123.2026-00')).toBe('158368');
     expect(extractUasgFromProcesso('99999.000000.2026-00')).toBeNull();
     expect(extractUasgFromProcesso('')).toBeNull();
     expect(extractUasgFromProcesso(null)).toBeNull();
@@ -45,6 +48,9 @@ describe('portal itens cache discovery helpers', () => {
     expect(extractUasgFromDescricao('EMPENHO PARA ATENDER DEMANDA DA UASG: 158366 DO CAMPUS')).toBe('158366');
     expect(extractUasgFromDescricao('CONFORME UG 158155')).toBe('158155');
     expect(extractUasgFromDescricao('UASG MINUTA 158369')).toBe('158369');
+    expect(extractUasgFromDescricao('RECURSO PARA AQUISICAO DE GENEROS ALIMENTICIOS DA AGRICULTURA FAMILIAR PARA A MERENDA DOS ALUNOS DO CAMPUS CURRAIS NOVOS DO IFRN')).toBe('158366');
+    expect(extractUasgFromDescricao('ATENDIMENTO AO CAMPUS ZONA NORTE')).toBe('158368');
+    expect(extractUasgFromDescricao('DEMANDAS DA REITORIA')).toBe('158155');
     expect(extractUasgFromDescricao('SEM INFORMACAO DE UNIDADE')).toBeNull();
     expect(extractUasgFromDescricao(null)).toBeNull();
   });

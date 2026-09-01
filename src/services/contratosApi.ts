@@ -244,6 +244,47 @@ export interface ContratoApiDocumentoRow {
   updated_at?: string;
 }
 
+export interface ContratoApiInstrumentoCobrancaRow {
+  id: string;
+  contrato_api_id: string;
+  sequencial_instrumento_cobranca: number;
+  tipo_id?: number | null;
+  tipo_nome: string;
+  tipo_descricao?: string | null;
+  numero_instrumento_cobranca: string;
+  data_emissao?: string | null;
+  chave_nfe?: string | null;
+  data_consulta_nfe?: string | null;
+  status_response_nfe?: string | null;
+  valor_nota_fiscal?: number | null;
+  serie?: string | null;
+  tipo_evento_mais_recente?: string | null;
+  data_tipo_evento_mais_recente?: string | null;
+  nome_fornecedor?: string | null;
+  cnpj_fornecedor?: string | null;
+  municipio_fornecedor?: string | null;
+  itens?: Array<{
+    numeroProduto: string;
+    descricaoProdutoServico: string;
+    codigoNcmSh?: string | null;
+    ncmSh?: string | null;
+    cfop?: string | null;
+    quantidade: string | number;
+    unidade: string;
+    valorUnitario: string | number;
+    valor: string | number;
+  }>;
+  eventos?: Array<{
+    codigoEvento?: string;
+    descricaoEvento?: string;
+    dataEvento?: string;
+    sequencialEvento?: number;
+  }>;
+  raw_data?: Record<string, unknown> | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface ContratoApiDetails {
   historico: ContratoApiHistoricoRow[];
   empenhos: ContratoApiEmpenhoRow[];
@@ -252,6 +293,7 @@ export interface ContratoApiDetails {
   faturaItens: ContratoApiFaturaItemRow[];
   faturaEmpenhos: ContratoApiFaturaEmpenhoRow[];
   documentos?: ContratoApiDocumentoRow[];
+  instrumentosCobranca?: ContratoApiInstrumentoCobrancaRow[];
 }
 
 export interface ContratoApiSyncRun {
@@ -817,6 +859,11 @@ export const contratosApiService = {
         .select('id, contrato_api_id, sequencial_documento, titulo, tipo_documento_id, tipo_documento_nome, url, uri, data_publicacao_pncp, tamanho, raw_data, created_at, updated_at')
         .eq('contrato_api_id', contratoApiId)
         .order('sequencial_documento', { ascending: true }),
+      supabase
+        .from('contratos_api_instrumentos_cobranca')
+        .select('id, contrato_api_id, sequencial_instrumento_cobranca, tipo_id, tipo_nome, tipo_descricao, numero_instrumento_cobranca, data_emissao, chave_nfe, data_consulta_nfe, status_response_nfe, valor_nota_fiscal, serie, tipo_evento_mais_recente, data_tipo_evento_mais_recente, nome_fornecedor, cnpj_fornecedor, municipio_fornecedor, itens, eventos, raw_data, created_at, updated_at')
+        .eq('contrato_api_id', contratoApiId)
+        .order('sequencial_instrumento_cobranca', { ascending: true }),
     ]);
 
     const firstError =
@@ -826,7 +873,8 @@ export const contratosApiService = {
       faturasResult.error ||
       faturaItensResult.error ||
       faturaEmpenhosResult.error ||
-      documentosResult.error;
+      documentosResult.error ||
+      instrumentosResult.error;
     const empenhos = (empenhosResult.data ?? []) as ContratoApiEmpenhoRow[];
     const empenhoIds = new Set(empenhos.map((empenho) => empenho.id));
     const apiEmpenhoIds = new Set(empenhos.map((empenho) => Number(empenho.api_empenho_id)));
@@ -853,6 +901,7 @@ export const contratosApiService = {
       faturaItens,
       faturaEmpenhos,
       documentos: (documentosResult.data ?? []) as ContratoApiDocumentoRow[],
+      instrumentosCobranca: (instrumentosResult.data ?? []) as ContratoApiInstrumentoCobrancaRow[],
     };
   },
 

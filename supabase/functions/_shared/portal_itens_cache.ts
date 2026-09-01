@@ -48,7 +48,9 @@ export const DEFAULT_UASG = '158366';
 
 export const PROCESSO_PREFIX_TO_UASG: Record<string, string> = {
   '23035': '158366', // Currais Novos
+  '2335': '158366', // Currais Novos (prefixo sem zero)
   '23421': '158155', // Reitoria
+  '23422': '158155', // Reitoria
   '23134': '158369', // Natal Central
   '23057': '158368', // Natal Zona Norte
   '23133': '152711', // Natal Cidade Alta
@@ -68,16 +70,67 @@ export const PROCESSO_PREFIX_TO_UASG: Record<string, string> = {
   '23046': '154582', // São Gonçalo do Amarante
 };
 
+export const CAMPUS_NAME_TO_UASG: Record<string, string> = {
+  'CURRAIS NOVOS': '158366',
+  'REITORIA': '158155',
+  'NATAL CENTRAL': '158369',
+  'NATAL-CENTRAL': '158369',
+  'ZONA NORTE': '158368',
+  'CIDADE ALTA': '152711',
+  'MOSSORO': '158365',
+  'APODI': '158371',
+  'IPANGUACU': '158367',
+  'JOAO CAMARA': '158373',
+  'PAU DOS FERROS': '158374',
+  'MACAU': '158375',
+  'CAICO': '158370',
+  'PARNAMIRIM': '152756',
+  'SAO PAULO DO POTENGI': '154840',
+  'NOVA CRUZ': '152757',
+  'SANTA CRUZ': '158372',
+  'CANGUARETAMA': '154839',
+  'CEARA-MIRIM': '154838',
+  'CEARA MIRIM': '154838',
+  'SAO GONCALO DO AMARANTE': '154582',
+};
+
 export const extractUasgFromProcesso = (processo?: string | null): string | null => {
   if (!processo) return null;
   const digits = String(processo).replace(/\D/g, '');
-  const prefix = digits.slice(0, 5);
-  return PROCESSO_PREFIX_TO_UASG[prefix] || null;
+  if (!digits) return null;
+  const prefix5 = digits.slice(0, 5);
+  if (PROCESSO_PREFIX_TO_UASG[prefix5]) return PROCESSO_PREFIX_TO_UASG[prefix5];
+  const prefix4 = digits.slice(0, 4);
+  if (PROCESSO_PREFIX_TO_UASG[prefix4]) return PROCESSO_PREFIX_TO_UASG[prefix4];
+  return null;
 };
+
+const normalizeTextForUasg = (value: unknown) =>
+  String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
 
 export const extractUasgFromDescricao = (descricao?: string | null): string | null => {
   if (!descricao) return null;
-  const match = String(descricao).match(/\b(?:UASG\s*(?:MINUTA)?|UG)\s*:?\s*(15\d{4})\b/i);
-  return match?.[1] || null;
+  const normalized = normalizeTextForUasg(descricao);
+
+  // 1. Explicit UASG / UG code (ex: UASG: 158366 ou UG 158155)
+  const match = normalized.match(/\b(?:UASG\s*(?:MINUTA)?|UG)\s*:?\s*(15\d{4})\b/i);
+  if (match?.[1]) return match[1];
+
+  // 2. Direct 6-digit UG match in formatted context like 15836605000282023
+  const directMatch = normalized.match(/\b(15\d{4})\d{11}\b/);
+  if (directMatch?.[1]) return directMatch[1];
+
+  // 3. Match campus name in description
+  for (const [campusName, uasg] of Object.entries(CAMPUS_NAME_TO_UASG)) {
+    if (normalized.includes(campusName)) {
+      return uasg;
+    }
+  }
+
+  return null;
 };
+
 

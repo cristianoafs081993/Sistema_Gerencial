@@ -586,4 +586,82 @@ describe('transparenciaService.getItensEmpenhoPortal', () => {
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
   });
+
+  it('retorna os subitens corretos de Currais Novos para 2026NE000076 sem poluição de outros campi', async () => {
+    const { transparenciaService } = await import('@/services/transparencia');
+
+    supabaseFromMock.mockImplementation((table: string) => {
+      if (table === 'portal_transparencia_empenho_itens_cache_status') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({
+                data: {
+                  status: 'found',
+                  rows_count: 4,
+                  expires_at: new Date(Date.now() + 60_000).toISOString(),
+                },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+
+      return {
+        select: () => ({
+          eq: () => ({
+            order: async () => ({
+              data: [
+                {
+                  codigo_item_empenho: '158366264352026NE000076',
+                  sequencial: 1,
+                  descricao: 'Item compra: 00035 - Bolo Alimenticio',
+                  codigo_subelemento: '05',
+                  descricao_subelemento: 'MERCADORIAS PARA DOACAO',
+                  valor_atual: 3808.0,
+                  historico: [],
+                },
+                {
+                  codigo_item_empenho: '158366264352026NE000076',
+                  sequencial: 2,
+                  descricao: 'Item compra: 00036 - Bolo Alimenticio',
+                  codigo_subelemento: '05',
+                  descricao_subelemento: 'MERCADORIAS PARA DOACAO',
+                  valor_atual: 4258.0,
+                  historico: [],
+                },
+                {
+                  codigo_item_empenho: '158366264352026NE000076',
+                  sequencial: 3,
+                  descricao: 'Item compra: 00037 - Bolo Alimenticio',
+                  codigo_subelemento: '05',
+                  descricao_subelemento: 'MERCADORIAS PARA DOACAO',
+                  valor_atual: 10246.5,
+                  historico: [],
+                },
+                {
+                  codigo_item_empenho: '158366264352026NE000076',
+                  sequencial: 4,
+                  descricao: 'Item compra: 00040 - Pao',
+                  codigo_subelemento: '05',
+                  descricao_subelemento: 'MERCADORIAS PARA DOACAO',
+                  valor_atual: 5167.8,
+                  historico: [],
+                },
+              ],
+              error: null,
+            }),
+          }),
+        }),
+      };
+    });
+
+    const result = await transparenciaService.getItensEmpenhoPortal('2026NE000076');
+
+    expect(result).toHaveLength(4);
+    expect(result[0].codigoItemEmpenho).toBe('158366264352026NE000076');
+    const total = result.reduce((acc, it) => acc + it.valorAtual, 0);
+    expect(total).toBeCloseTo(23480.3, 2);
+  });
 });

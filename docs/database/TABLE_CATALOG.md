@@ -453,6 +453,23 @@ Observacoes operacionais:
   - `tamanho`: tamanho em bytes do documento
 - consumido em tempo real pelo modal de detalhes do contrato ([`ContratoApiDetailsSheet.tsx`](file:///c:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/components/contratos/ContratoApiDetailsSheet.tsx)) e sincronizado pelo job diário `sync-contratos-pncp-documentos`
 
+### `contratos_api_instrumentos_cobranca`
+
+- instrumentos de cobrança (Notas Fiscais Eletrônicas - NF-e, Faturas, Recibos) consultados e sincronizados a partir da API do PNCP (`GET /orgaos/{cnpj}/contratos/{ano}/{seq}/instrumentocobranca`)
+- campos principais:
+  - `contrato_api_id`: chave estrangeira referenciando `contratos_api(id)`
+  - `sequencial_instrumento_cobranca`: sequencial do instrumento de cobrança no PNCP
+  - `tipo_nome`: tipo documental (ex: `Nota Fiscal Eletrônica (NF-e)`)
+  - `numero_instrumento_cobranca`: número da nota fiscal emitida pelo fornecedor
+  - `data_emissao`: data de emissão do documento fiscal
+  - `chave_nfe`: chave de acesso de 44 dígitos da SEFAZ
+  - `data_consulta_nfe`: timestamp da consulta realizada junto à SEFAZ/Receita Federal
+  - `valor_nota_fiscal`: valor total da NF-e
+  - `tipo_evento_mais_recente`: status fiscal oficial da SEFAZ (ex: `Autorização de Uso`, `Cancelamento`)
+  - `itens`: lista discriminada de produtos/serviços faturados com NCM/SH, CFOP, quantidade, unidade e valor unitário
+  - `eventos`: eventos registrados no Fisco
+- consumido em tempo real pelo modal de detalhes do contrato ([`ContratoNfeRastreabilidade.tsx`](file:///c:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/components/contratos/ContratoNfeRastreabilidade.tsx)) e sincronizado pelo job diário `sync-contratos-pncp-documentos`
+
 ### `contratos_api_sync_runs`
 
 Consumido por:

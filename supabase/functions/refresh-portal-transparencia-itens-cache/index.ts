@@ -151,9 +151,13 @@ async function resolveEmpenhoUasg(
 
     const uasgFromDesc = extractUasgFromDescricao(emp.descricao);
     if (uasgFromDesc) return uasgFromDesc;
+
+    // Se o empenho existe na tabela local do campus e não indicou outra unidade,
+    // ele pertence à UASG padrão do campus (158366 - Currais Novos).
+    return UNIDADE_GESTORA;
   }
 
-  // 2. Consulta complementar em contratos_api_empenhos (apenas se não encontrado em empenhos)
+  // 2. Consulta complementar em contratos_api_empenhos (apenas se não cadastrado na tabela empenhos local)
   const { data: ceRows } = await supabase
     .from('contratos_api_empenhos')
     .select('unidade_gestora, raw_data')
@@ -168,7 +172,6 @@ async function resolveEmpenhoUasg(
     if (reitoriaRow) return '158155';
 
     for (const ce of ceRows as any[]) {
-      if (ce.unidade_gestora && ce.unidade_gestora.length === 6) return ce.unidade_gestora;
       const info = ce.raw_data?.informacao_complementar || '';
       const uasgFromInfo = extractUasgFromDescricao(info);
       if (uasgFromInfo) return uasgFromInfo;
@@ -275,14 +278,22 @@ async function replaceCacheRows(
   explicitUasg?: string | null,
 ) {
   const lookupKey = normalizeEmpenhoNumero(empenhoNumero);
-  const uasg = await resolveEmpenhoUasg(supabase, empenhoNumero, explicitUasg);
-  const codigoDocumento = buildCodigoDocumento(empenhoNumero, uasg);
+  let uasg = await resolveEmpenhoUasg(supabase, empenhoNumero, explicitUasg);
+  let codigoDocumento = buildCodigoDocumento(empenhoNumero, uasg);
   if (!lookupKey || !codigoDocumento) {
     return { empenhoNumero, lookupKey, status: 'not_found', rowsCount: 0 };
   }
 
   try {
-    const rows = await discoverItens(empenhoNumero, uasg);
+    let rows = await discoverItens(empenhoNumero, uasg);
+    if (rows.length === 0 && uasg !== UNIDADE_GESTORA && !explicitUasg) {
+      const fallbackRows = await discoverItens(empenhoNumero, UNIDADE_GESTORA);
+      if (fallbackRows.length > 0) {
+        uasg = UNIDADE_GESTORA;
+        codigoDocumento = buildCodigoDocumento(empenhoNumero, uasg);
+        rows = fallbackRows;
+      }
+    }
     const now = new Date();
     const status = rows.length > 0 ? 'found' : 'not_found';
 

@@ -99,49 +99,71 @@ async function resolvePncpContract(
 
   if (ano < MIN_PNCP_YEAR) return null;
 
-  const targetNumeroClean = normalizeNumero(numeroStr);
-  const targetProcessoClean = normalizeProcesso(contrato.processo);
+  const targetNumeroNorm = normalizeNumero(contrato.numero);
+  const targetProcessoNorm = normalizeProcesso(contrato.processo);
 
-  const primaryUasg = contrato.unidade_origem_codigo || contrato.unidade_codigo || DEFAULT_UASG;
-  const candidateUasgs = [primaryUasg];
+  const uasgsToTry = Array.from(
+    new Set([
+      contrato.unidade_origem_codigo,
+      contrato.unidade_codigo,
+      DEFAULT_UASG,
+    ].filter((u): u is string => Boolean(u && u.trim()))),
+  );
 
-  if (primaryUasg === DEFAULT_UASG && contrato.unidade_origem_codigo === '158155') {
-    candidateUasgs.push('158155');
-  } else if (primaryUasg === '158155' && contrato.unidade_codigo === DEFAULT_UASG) {
-    candidateUasgs.push(DEFAULT_UASG);
-  }
+  for (const uasg of uasgsToTry) {
+    const list = await getUasgYearContracts(cnpj, ano, uasg);
+    if (!list || list.length === 0) continue;
 
-  for (const uasg of candidateUasgs) {
-    const items = await getUasgYearContracts(cnpj, ano, uasg);
-    if (items.length === 0) continue;
-
-    const matchByNum = items.find((item) => {
-      const itemNumClean = normalizeNumero(item.numeroContratoEmpenho);
-      return itemNumClean && itemNumClean === targetNumeroClean;
+    // 1. Tenta match exato por número do contrato
+    const exactNumMatch = list.find((item) => {
+      const itemNumNorm = normalizeNumero(item.numeroContratoEmpenho);
+      return itemNumNorm && itemNumNorm === targetNumeroNorm;
     });
 
-    if (matchByNum) {
+    if (exactNumMatch && exactNumMatch.sequencialContrato) {
       return {
-        ano: Number(matchByNum.anoContrato),
-        sequencial: String(matchByNum.sequencialContrato),
-        numeroControlePNCP: String(matchByNum.numeroControlePNCP || ''),
-        fornecedorNome: String(matchByNum.nomeRazaoSocialFornecedor || ''),
+        cnpj,
+        ano: Number(exactNumMatch.anoContrato || ano),
+        sequencial: String(exactNumMatch.sequencialContrato),
+        numeroControlePNCP: String(exactNumMatch.numeroControlePNCP || ''),
       };
     }
 
-    if (targetProcessoClean && targetProcessoClean.length >= 8) {
-      const matchByProc = items.find((item) => {
-        const itemProcClean = normalizeProcesso(item.processo);
-        return itemProcClean && itemProcClean === targetProcessoClean;
+    // 2. Tenta match por número do processo
+    if (targetProcessoNorm) {
+      const procMatch = list.find((item) => {
+        const itemProcNorm = normalizeProcesso(item.numeroProcesso);
+        return itemProcNorm && itemProcNorm === targetProcessoNorm;
       });
 
-      if (matchByProc) {
+      if (procMatch && procMatch.sequencialContrato) {
         return {
-          ano: Number(matchByProc.anoContrato),
-          sequencial: String(matchByProc.sequencialContrato),
-          numeroControlePNCP: String(matchByProc.numeroControlePNCP || ''),
-          fornecedorNome: String(matchByProc.nomeRazaoSocialFornecedor || ''),
+          cnpj,
+          ano: Number(procMatch.anoContrato || ano),
+          sequencial: String(procMatch.sequencialContrato),
+          numeroControlePNCP: String(procMatch.numeroControlePNCP || ''),
         };
+      }
+    }
+  }
+
+  // Fallback: tenta buscar diretamente pelo sequencial numérico caso número do contrato seja compatível
+  const numInt = parseInt(targetNumeroNorm, 10);
+  if (!Number.isNaN(numInt) && numInt > 0) {
+    const directUrl = `${PNCP_API_BASE}/orgaos/${cnpj}/contratos/${ano}/${numInt}`;
+    const directRes = await fetchWithTimeout(directUrl, 10000).catch(() => null);
+    if (directRes && directRes.ok && directRes.status !== 204) {
+      const directData = await directRes.json().catch(() => null);
+      if (directData && directData.sequencialContrato) {
+        const directNumNorm = normalizeNumero(directData.numeroContratoEmpenho);
+        if (directNumNorm === targetNumeroNorm) {
+          return {
+            cnpj,
+            ano,
+            sequencial: String(directData.sequencialContrato),
+            numeroControlePNCP: String(directData.numeroControlePNCP || ''),
+          };
+        }
       }
     }
   }
@@ -151,33 +173,36 @@ async function resolvePncpContract(
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders });
   }
 
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return jsonResponse({ error: 'Configuração do Supabase ausente' }, 500);
+  }
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      return jsonResponse({ error: 'Configuração do Supabase ausente.' }, 500);
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
     let payload: SyncRequest = {};
-    try {
-      payload = await req.json();
-    } catch {
-      payload = {};
+    if (req.method === 'POST') {
+      try {
+        payload = await req.json();
+      } catch {
+        payload = {};
+      }
     }
 
     const uasg = payload.unidadeCodigo || DEFAULT_UASG;
     const limit = Math.min(payload.limit || 50, 100);
     const forceRefresh = payload.forceRefresh ?? false;
 
-    // Busca contratos no banco para sincronizar documentos
+    // Busca contratos do campus que precisam de checagem do PNCP
     let query = supabase
       .from('contratos_api')
-      .select('id, numero, processo, vigencia_inicio, unidade_codigo, unidade_origem_codigo, raw_data, pncp_sequencial, pncp_ano, pncp_control_number, pncp_has_record, pncp_documentos_checked_at')
+      .select('id, numero, processo, vigencia_inicio, unidade_codigo, unidade_origem_codigo, raw_data, pncp_sequencial, pncp_ano, pncp_control_number, pncp_has_record, pncp_documentos_checked_at, pncp_instrumentos_checked_at')
       .or(`unidade_codigo.eq.${uasg},unidade_origem_codigo.eq.${uasg}`)
       .order('vigencia_inicio', { ascending: false, nullsFirst: false })
       .limit(limit);
@@ -195,6 +220,7 @@ Deno.serve(async (req) => {
     let contratosProcessados = 0;
     let contratosComPncp = 0;
     let totalDocumentosUpserted = 0;
+    let totalInstrumentosUpserted = 0;
     const resultados: Array<Record<string, unknown>> = [];
 
     for (const c of contratos || []) {
@@ -217,9 +243,12 @@ Deno.serve(async (req) => {
       }
 
       let docsCount = 0;
+      let instCount = 0;
 
       if (hasRecord && pncpSeq && pncpAno) {
         contratosComPncp++;
+
+        // 1. Sincronização de Documentos e PDFs
         const filesUrl = `${PNCP_API_BASE}/orgaos/${IFRN_CNPJ}/contratos/${pncpAno}/${pncpSeq}/arquivos`;
         const filesRes = await fetchWithTimeout(filesUrl).catch(() => null);
 
@@ -250,6 +279,79 @@ Deno.serve(async (req) => {
             }
           }
         }
+
+        // 2. Sincronização de Instrumentos de Cobrança / NF-e
+        const instUrl = `${PNCP_API_BASE}/orgaos/${IFRN_CNPJ}/contratos/${pncpAno}/${pncpSeq}/instrumentocobranca`;
+        const instRes = await fetchWithTimeout(instUrl).catch(() => null);
+
+        if (instRes && instRes.ok && instRes.status !== 204) {
+          const instData = await instRes.json().catch(() => []);
+          if (Array.isArray(instData) && instData.length > 0) {
+            instCount = instData.length;
+            const instRowsToUpsert = instData.map((raw: Record<string, unknown>) => {
+              let notaFiscal: Record<string, unknown> | null = null;
+              let itens: Array<Record<string, unknown>> = [];
+              let eventos: Array<Record<string, unknown>> = [];
+              let valorNota: number | null = null;
+
+              if (raw.jsonResponseNFe && typeof raw.jsonResponseNFe === 'string') {
+                try {
+                  const parsed = JSON.parse(raw.jsonResponseNFe);
+                  if (parsed && typeof parsed === 'object') {
+                    if (parsed.notaFiscalDTO) {
+                      notaFiscal = parsed.notaFiscalDTO;
+                      if (notaFiscal?.valorNotaFiscal) {
+                        const valNum =
+                          typeof notaFiscal.valorNotaFiscal === 'number'
+                            ? notaFiscal.valorNotaFiscal
+                            : Number(String(notaFiscal.valorNotaFiscal).replace(/\./g, '').replace(',', '.'));
+                        if (!Number.isNaN(valNum)) valorNota = valNum;
+                      }
+                    }
+                    if (Array.isArray(parsed.itensNotaFiscal)) itens = parsed.itensNotaFiscal;
+                    if (Array.isArray(parsed.eventosNotaFiscal)) eventos = parsed.eventosNotaFiscal;
+                  }
+                } catch {
+                  // ignore JSON parse fallback
+                }
+              }
+
+              const tipoObj = raw.tipoInstrumentoCobranca as Record<string, unknown> | undefined;
+
+              return {
+                contrato_api_id: c.id,
+                sequencial_instrumento_cobranca: Number(raw.sequencialInstrumentoCobranca ?? 0),
+                tipo_id: tipoObj?.id != null ? Number(tipoObj.id) : null,
+                tipo_nome: String(tipoObj?.nome ?? raw.tipoInstrumentoCobrancaNome ?? 'Nota Fiscal Eletrônica (NF-e)'),
+                tipo_descricao: tipoObj?.descricao ? String(tipoObj.descricao) : null,
+                numero_instrumento_cobranca: String(raw.numeroInstrumentoCobranca ?? ''),
+                data_emissao: raw.dataEmissaoDocumento ? String(raw.dataEmissaoDocumento).slice(0, 10) : null,
+                chave_nfe: raw.chaveNFe ? String(raw.chaveNFe) : (notaFiscal?.chaveNotaFiscal ? String(notaFiscal.chaveNotaFiscal) : null),
+                data_consulta_nfe: raw.dataConsultaNFe ? String(raw.dataConsultaNFe) : null,
+                status_response_nfe: raw.statusResponseNFe ? String(raw.statusResponseNFe) : null,
+                valor_nota_fiscal: valorNota,
+                serie: notaFiscal?.serie ? String(notaFiscal.serie) : null,
+                tipo_evento_mais_recente: notaFiscal?.tipoEventoMaisRecente ? String(notaFiscal.tipoEventoMaisRecente) : null,
+                data_tipo_evento_mais_recente: notaFiscal?.dataTipoEventoMaisRecente ? String(notaFiscal.dataTipoEventoMaisRecente) : null,
+                nome_fornecedor: notaFiscal?.nomeFornecedor ? String(notaFiscal.nomeFornecedor) : null,
+                cnpj_fornecedor: notaFiscal?.cnpjFornecedor ? String(notaFiscal.cnpjFornecedor) : null,
+                municipio_fornecedor: notaFiscal?.municipioFornecedor ? String(notaFiscal.municipioFornecedor) : null,
+                itens,
+                eventos,
+                raw_data: raw,
+                updated_at: new Date().toISOString(),
+              };
+            });
+
+            const { error: upsertInstError } = await supabase
+              .from('contratos_api_instrumentos_cobranca')
+              .upsert(instRowsToUpsert, { onConflict: 'contrato_api_id,sequencial_instrumento_cobranca,numero_instrumento_cobranca' });
+
+            if (!upsertInstError) {
+              totalInstrumentosUpserted += instRowsToUpsert.length;
+            }
+          }
+        }
       }
 
       // Atualiza status do contrato
@@ -262,6 +364,8 @@ Deno.serve(async (req) => {
           pncp_has_record: hasRecord,
           pncp_documentos_checked_at: new Date().toISOString(),
           pncp_documentos_count: docsCount,
+          pncp_instrumentos_checked_at: new Date().toISOString(),
+          pncp_instrumentos_count: instCount,
         })
         .eq('id', c.id);
 
@@ -270,6 +374,7 @@ Deno.serve(async (req) => {
         pncpControl,
         hasRecord,
         docsCount,
+        instCount,
       });
     }
 
@@ -280,6 +385,7 @@ Deno.serve(async (req) => {
       contratosProcessados,
       contratosComPncp,
       totalDocumentosUpserted,
+      totalInstrumentosUpserted,
       resultados,
     });
   } catch (err) {

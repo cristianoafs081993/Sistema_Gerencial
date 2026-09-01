@@ -487,9 +487,9 @@ Local:
 
 Uso:
 
-- sincroniza periodicamente os documentos oficiais (PDFs de contratos, aditivos, apostilamentos) a partir da API pública do PNCP (`GET /orgaos/{cnpj}/contratos/{ano}/{seq}/arquivos`)
+- sincroniza periodicamente os documentos oficiais (PDFs de contratos, aditivos, apostilamentos) e instrumentos de cobrança (NF-e com chaves SEFAZ de 44 dígitos e itens) a partir da API pública do PNCP (`GET /orgaos/{cnpj}/contratos/{ano}/{seq}/arquivos` e `GET /orgaos/{cnpj}/contratos/{ano}/{seq}/instrumentocobranca`)
 - resolve o `sequencialContrato` exato no PNCP via API de Consulta por UASG/Ano, com cache em memória durante a execução para evitar limites de taxa (503)
-- faz upsert direto na tabela `contratos_api_documentos` e atualiza as colunas de controle em `contratos_api` (`pncp_control_number`, `pncp_sequencial`, `pncp_ano`, `pncp_has_record`, `pncp_documentos_checked_at`, `pncp_documentos_count`)
+- faz upsert direto nas tabelas `contratos_api_documentos` e `contratos_api_instrumentos_cobranca`, atualizando as colunas de controle em `contratos_api` (`pncp_control_number`, `pncp_sequencial`, `pncp_ano`, `pncp_has_record`, `pncp_documentos_checked_at`, `pncp_documentos_count`, `pncp_instrumentos_checked_at`, `pncp_instrumentos_count`)
 
 Dependencias:
 
@@ -636,13 +636,13 @@ Local:
 
 Uso:
 
-- atualiza o cache de subitens do Portal da Transparencia por empenho para o modal de detalhes do empenho
+- atualiza o cache de subitens do Portal da Transparencia por empenho para o modal de detalhes do empenho e requisições de compra
 - aceita empenhos especificos enviados pelo frontend
 - em modo `refreshDue`, reprocessa entradas vencidas do cache
 - em modo `refreshLinkedRequisicaoEmpenhos`, descobre empenhos vinculados diretamente a terceirizados e empenhos de requisicoes recentes em `draft`/`review`; para requisicoes usa `requisicao_compra_empenhos` e mantem fallback pelos campos legados `requisicoes_compra.empenho_id/empenho_numero`, pre-aquecendo o cache para `/requisicao-compra`
 - em modo `refreshPositiveEmpenhos`, percorre em paginas todas as NEs com saldo positivo em `empenhos`; `empenhoTipo = rap` processa RAP e `empenhoTipo = exercicio` processa empenhos do exercicio, usando a mesma regra de saldo da RPC `fn_empenho_saldo_disponivel`
 - em modo `readCacheOnly` com `returnRows`, devolve as linhas ja materializadas no cache sem consultar novamente o Portal
-- consulta `/api-de-dados/despesas/itens-de-empenho` resolvendo dinamicamente a UASG de emissão do empenho a partir da tabela local `empenhos` (prefixo institucional do processo e descrição), com fallback complementar em `contratos_api_empenhos` e valor padrão `158366` (`codigoDocumento = <uasg> + 26435 + numero do empenho`), garantindo que empenhos do campus não sejam contaminados com subitens de outros campi que compartilham o mesmo número serial de NE
+- consulta `/api-de-dados/despesas/itens-de-empenho` resolvendo dinamicamente a UASG de emissão do empenho a partir da tabela local `empenhos` (prefixos de processo de 4 e 5 dígitos e nome/código do campus na descrição); quando a NE existe localmente e não indica explicitamente outra unidade, assume a UASG padrão `158366` (Currais Novos) sem poluição por registros de outros campi em `contratos_api_empenhos`, garantindo que empenhos do campus não sejam contaminados com subitens de outros campi que compartilham o mesmo número serial de NE
 - salva dados em `portal_transparencia_empenho_itens_cache_status` e `portal_transparencia_empenho_itens_cache`
 
 Dependencias:
