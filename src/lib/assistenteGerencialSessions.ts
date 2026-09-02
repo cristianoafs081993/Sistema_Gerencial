@@ -15,6 +15,71 @@ export type AssistenteGerencialSource = {
   warning?: string;
 };
 
+export type AssistenteGerencialPriceResearchCandidate = {
+  id: string;
+  sourceType?: string;
+  supplierName: string;
+  supplierDocument: string;
+  agencyName: string;
+  agencyCode?: string;
+  purchaseId: string;
+  purchaseItemId?: string;
+  purchaseDate: string | null;
+  resultDate?: string | null;
+  unitPrice: number;
+  comparableUnitPrice: number;
+  originalUnitLabel?: string;
+  unitCompatible: boolean;
+  selected: boolean;
+  exclusionReason?: string;
+  pncpUrl?: string;
+  editalAudited: boolean;
+  editalExcerpt?: string;
+  editalPage?: string;
+  editalScore?: number;
+  compatibility?: 'COMPATIVEL' | 'COMPATIVEL_COM_RESSALVA' | 'INCOMPATIVEL' | 'NAO_IDENTIFICADO';
+  technicalJustification?: string;
+  documentTitle?: string;
+  documentType?: string;
+  documentUrl?: string;
+};
+
+export type AssistenteGerencialPriceResearchItem = {
+  itemNumber: string;
+  description: string;
+  detailedSpecification?: string;
+  catalogType: 'material' | 'service';
+  catalogCode: string;
+  quantity: number;
+  unit: string;
+  estimatedUnitPrice: number;
+  estimatedTotal: number;
+  method: 'median' | 'mean' | 'minimum';
+  coefficientOfVariation: number;
+  standardDeviation: number;
+  minimumPrice: number;
+  maximumPrice: number;
+  meanPrice: number;
+  medianPrice: number;
+  candidatesCount: number;
+  selectedCount: number;
+  candidates: AssistenteGerencialPriceResearchCandidate[];
+};
+
+export type AssistenteGerencialPriceResearchData = {
+  title: string;
+  demandSummary: string;
+  responsibleName?: string;
+  processNumber?: string;
+  researchDate: string;
+  calculationMethod: 'median' | 'mean' | 'minimum';
+  methodologyJustification?: string;
+  overallEstimatedTotal: number;
+  items: AssistenteGerencialPriceResearchItem[];
+  complianceValid: boolean;
+  complianceNotes: string[];
+};
+
 export type AssistenteGerencialMessage = {
   id: string;
   role: AssistenteGerencialRole;
@@ -23,6 +88,7 @@ export type AssistenteGerencialMessage = {
   artifacts?: AssistenteGerencialArtifact[];
   warnings?: string[];
   sources?: AssistenteGerencialSource[];
+  priceResearchData?: AssistenteGerencialPriceResearchData;
 };
 
 export type AssistenteGerencialSession = {

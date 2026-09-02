@@ -1,5 +1,9 @@
 import { supabase } from '@/lib/supabase';
-import type { AssistenteGerencialMessage, AssistenteGerencialSource } from '@/lib/assistenteGerencialSessions';
+import type {
+  AssistenteGerencialMessage,
+  AssistenteGerencialPriceResearchData,
+  AssistenteGerencialSource,
+} from '@/lib/assistenteGerencialSessions';
 
 export type AssistenteGerencialHistoryMessage = {
   role: 'user' | 'assistant';
@@ -24,6 +28,7 @@ export type AssistenteGerencialResponse = {
   avisos: string[];
   sources: AssistenteGerencialSource[];
   fontes: AssistenteGerencialSource[];
+  priceResearchResult?: AssistenteGerencialPriceResearchData;
 };
 
 const MAX_HISTORY_MESSAGES = 8;
@@ -160,6 +165,10 @@ export const assistenteGerencialService = {
       ? responseData.modelo
       : null;
 
+    const priceResearchResult = responseData?.priceResearchResult as
+      | AssistenteGerencialPriceResearchData
+      | undefined;
+
     return {
       response: parsed.response,
       resposta: parsed.response,
@@ -171,6 +180,7 @@ export const assistenteGerencialService = {
       avisos: warnings,
       sources,
       fontes: sources,
+      priceResearchResult,
     };
   },
 

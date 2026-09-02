@@ -1,4 +1,5 @@
 export type AssistantIntent =
+  | 'pesquisa_precos'
   | 'descentralizacoes'
   | 'contratos'
   | 'empenhos_execucao'
@@ -153,6 +154,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function detectAssistantIntent(message: string): AssistantIntent {
   const text = normalizeText(message);
 
+  if (
+    /pesquis(a|ar|e|ando)\s+(de\s+)?preco|cotac(ao|oes)|cotar|cesta\s+de\s+preco|pesquisa\s+mercadol|catmat|catser|pesquisar\s+item|pesquise\s+o(s)?\s+preco|pesquisar\s+os\s+precos|preco\s+de\s+referencia|mapa\s+comparativo|despacho\s+conclusivo\s+de\s+preco|in\s*65\b/.test(text) ||
+    ((/pesquis(ar|e|a)/.test(text) || /cot(ar|e|acao)/.test(text)) && (/item|itens|monitor|cadeira|mesa|computador|notebook|servico|aquisicao|compra|edital|termo de referencia|\btr\b/.test(text)))
+  ) {
+    return 'pesquisa_precos';
+  }
+
   if (/descentraliz|reitoria|ptres|plano interno|\bpi\b|nota de credito|\bnc\b/.test(text)) {
     return 'descentralizacoes';
   }
@@ -174,6 +182,140 @@ export function detectAssistantIntent(message: string): AssistantIntent {
   }
 
   return 'geral';
+}
+
+export type ExtractedDemandItem = {
+  itemNumber: string;
+  description: string;
+  detailedSpecification?: string;
+  quantity: number;
+  unit: string;
+  catalogType: 'material' | 'service';
+  suggestedCatalogCode?: string;
+};
+
+export function extractDemandItems(message: string): ExtractedDemandItem[] {
+  const cleanMsg = message.trim();
+  const items: ExtractedDemandItem[] = [];
+
+  // Check for numbered list (e.g. "1) ... 2) ..." or "1. ... 2. ..." or "Item 1: ...")
+  const numberedPattern = /(?:(?:^|\n|\s*)(?:item\s*)?(\d+)[\.\)\:\-]\s*)([^\n\d\.\)\:\-]+(?:(?!\n\s*(?:item\s*)?\d+[\.\)\:\-]).)*)/gis;
+  const matches = [...cleanMsg.matchAll(numberedPattern)];
+
+  if (matches.length >= 2) {
+    matches.forEach((m, idx) => {
+      const rawText = m[2].trim();
+      if (!rawText || rawText.length < 3) return;
+      const parsed = parseSingleDemandText(rawText, String(idx + 1));
+      if (parsed) items.push(parsed);
+    });
+  }
+
+  if (items.length > 0) return items;
+
+  // Single item parsing
+  const singleParsed = parseSingleDemandText(cleanMsg, '1');
+  return singleParsed ? [singleParsed] : [{
+    itemNumber: '1',
+    description: cleanMsg.slice(0, 300),
+    quantity: 1,
+    unit: 'UN',
+    catalogType: isServiceDescription(cleanMsg) ? 'service' : 'material',
+  }];
+}
+
+function isServiceDescription(text: string): boolean {
+  const norm = normalizeText(text);
+  return /servico|manutencao|limpeza|vigilancia|consultoria|locacao|instalacao|treinamento|desenvolvimento/.test(norm);
+}
+
+function parseSingleDemandText(text: string, defaultNumber = '1'): ExtractedDemandItem | null {
+  let cleaned = text
+    .replace(/^pesquis(ar|e|ando)?\s+(os?\s+)?pre[çc]os?\s+(para|de|do|da)?\s*/i, '')
+    .replace(/^cota[çc][ãa]o\s+(para|de|do|da)?\s*/i, '')
+    .replace(/^aquisi[çc][ãa]o\s+(de|do|da)?\s*/i, '')
+    .trim();
+
+  // Extract quantity and unit: e.g. "50 unidades de monitores..." or "20 cadeiras..." or "qtd: 10..."
+  let quantity = 1;
+  let unit = 'UN';
+
+  const qtyMatch = cleaned.match(/(?:(?:quantidade|qtd|quant\.?)\s*[:=]?\s*(\d+))|^(?:(\d+)\s*(unidades?|und?|un|caixas?|cx|pct|pacotes?|servi[çc]os?|meses|horas?|h)?\s*(?:de\s+)?)/i);
+  if (qtyMatch) {
+    const matchedQty = parseInt(qtyMatch[1] || qtyMatch[2] || '1', 10);
+    if (!isNaN(matchedQty) && matchedQty > 0) {
+      quantity = matchedQty;
+    }
+    const matchedUnit = qtyMatch[3]?.toUpperCase();
+    if (matchedUnit) {
+      if (matchedUnit.startsWith('UN')) unit = 'UN';
+      else if (matchedUnit.startsWith('CX') || matchedUnit.startsWith('CAIXA')) unit = 'CX';
+      else if (matchedUnit.startsWith('PCT') || matchedUnit.startsWith('PACOTE')) unit = 'PCT';
+      else if (matchedUnit.startsWith('SERV')) unit = 'SERVIÇO';
+      else if (matchedUnit.startsWith('H')) unit = 'HORA';
+    }
+    cleaned = cleaned.replace(qtyMatch[0], '').trim();
+  }
+
+  // Remove leading connectives
+  cleaned = cleaned.replace(/^(de|do|da|para)\s+/i, '').trim();
+  if (!cleaned) return null;
+
+  return {
+    itemNumber: defaultNumber,
+    description: cleaned,
+    quantity,
+    unit,
+    catalogType: isServiceDescription(cleaned) ? 'service' : 'material',
+  };
+}
+
+export function calculateStatisticalSummary(
+  prices: number[],
+  method: 'median' | 'mean' | 'minimum' = 'median',
+) {
+  const valid = prices.filter((p) => typeof p === 'number' && Number.isFinite(p) && p > 0);
+  if (valid.length === 0) {
+    return {
+      count: 0,
+      mean: 0,
+      median: 0,
+      minimum: 0,
+      maximum: 0,
+      standardDeviation: 0,
+      coefficientOfVariation: 0,
+      estimatedUnitPrice: 0,
+      method,
+    };
+  }
+
+  const sorted = [...valid].sort((a, b) => a - b);
+  const min = sorted[0];
+  const max = sorted[sorted.length - 1];
+  const meanVal = sorted.reduce((acc, p) => acc + p, 0) / sorted.length;
+  
+  const mid = Math.floor(sorted.length / 2);
+  const medianVal = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+
+  const variance = sorted.reduce((acc, p) => acc + Math.pow(p - meanVal, 2), 0) / sorted.length;
+  const stdDev = Math.sqrt(variance);
+  const cv = meanVal > 0 ? (stdDev / meanVal) * 100 : 0;
+
+  let estimated = medianVal;
+  if (method === 'mean') estimated = meanVal;
+  if (method === 'minimum') estimated = min;
+
+  return {
+    count: sorted.length,
+    mean: Number(meanVal.toFixed(2)),
+    median: Number(medianVal.toFixed(2)),
+    minimum: Number(min.toFixed(2)),
+    maximum: Number(max.toFixed(2)),
+    standardDeviation: Number(stdDev.toFixed(2)),
+    coefficientOfVariation: Number(cv.toFixed(2)),
+    estimatedUnitPrice: Number(estimated.toFixed(2)),
+    method,
+  };
 }
 
 export function summarizeDescentralizacoes(rows: DescentralizacaoRow[]) {

@@ -7,6 +7,7 @@ import {
   Loader2,
   Maximize2,
   Minimize2,
+  Scale,
   Send,
   Sparkles,
   Trash2,
@@ -16,6 +17,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { toast } from 'sonner';
 
+import { PriceResearchChatCard } from '@/components/ai/PriceResearchChatCard';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -33,12 +35,18 @@ import { assistenteGerencialService } from '@/services/assistenteGerencial';
 
 const loadingTexts = [
   'Consultando dados do sistema...',
-  'Resumindo execução e saldos...',
-  'Conferindo contratos e empenhos...',
+  'Varrendo editais e cotações no PNCP...',
+  'Auditando Termos de Referência com IA...',
+  'Calculando cesta e conformidade IN 65/2021...',
   'Preparando resposta gerencial...',
 ];
 
 const startSuggestions = [
+  {
+    icon: Scale,
+    label: 'Pesquisa de preços com Edital',
+    prompt: 'Pesquise preços para 50 monitores 27 polegadas 4K e 20 cadeiras ergonômicas com auditoria de editais no PNCP',
+  },
   {
     icon: Database,
     label: 'Resumo da execução',
@@ -143,6 +151,7 @@ export function AIAssistantWidget() {
         sources: response.fontes || response.sources || [],
         suggestions: response.sugestoes || response.suggestions || [],
         warnings: response.avisos || response.warnings || [],
+        priceResearchData: response.priceResearchResult,
       };
 
       setSession((current) => replaceAssistenteGerencialMessages(current, [...updatedMessages, assistantMessage]));
@@ -273,6 +282,9 @@ export function AIAssistantWidget() {
                           <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-800 dark:text-amber-300">
                             {message.warnings[0]}
                           </div>
+                        ) : null}
+                        {message.priceResearchData ? (
+                          <PriceResearchChatCard data={message.priceResearchData} />
                         ) : null}
                         {message.sources?.length ? (
                           <p className="mt-3 border-t border-border pt-2 text-[11px] font-medium text-muted-foreground">

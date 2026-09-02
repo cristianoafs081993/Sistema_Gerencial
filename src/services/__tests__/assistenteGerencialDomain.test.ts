@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildGerencialAnalysis,
+  calculateStatisticalSummary,
   detectAssistantIntent,
+  extractDemandItems,
   summarizeContratos,
   summarizeDescentralizacoes,
 } from '../../../supabase/functions/assistente-gerencial/domain';
@@ -129,5 +131,48 @@ describe('assistente-gerencial domain helpers', () => {
 
     expect(analysis.intent).toBe('contratos');
     expect(analysis.summary.maioresSaldos[0]).toMatchObject({ numero: '00001/2026', saldoAtual: 80 });
+  });
+
+  it('detecta intencao de pesquisa de precos e extrai itens da demanda', () => {
+    const prompt = 'Pesquise precos para 50 monitores 27 polegadas 4K com porta HDMI e ajuste de altura';
+    expect(detectAssistantIntent(prompt)).toBe('pesquisa_precos');
+
+    const items = extractDemandItems(prompt);
+    expect(items.length).toBe(1);
+    expect(items[0].quantity).toBe(50);
+    expect(items[0].unit).toBe('UN');
+    expect(items[0].description).toContain('monitores 27 polegadas 4K');
+    expect(items[0].catalogType).toBe('material');
+  });
+
+  it('extrai multiplos itens numerados de demanda complexa', () => {
+    const complexPrompt = `
+      Cotacao de precos para os seguintes itens:
+      1) 20 cadeiras ergonomicas padrao NR17
+      2) 10 mesas em L 140x140cm
+      3) 5 servicos de manutencao preventiva em ar-condicionado
+    `;
+    expect(detectAssistantIntent(complexPrompt)).toBe('pesquisa_precos');
+
+    const items = extractDemandItems(complexPrompt);
+    expect(items.length).toBe(3);
+    expect(items[0].quantity).toBe(20);
+    expect(items[0].description).toContain('cadeiras ergonomicas');
+    expect(items[1].quantity).toBe(10);
+    expect(items[1].description).toContain('mesas em L');
+    expect(items[2].quantity).toBe(5);
+    expect(items[2].catalogType).toBe('service');
+  });
+
+  it('calcula estatisticas da IN 65/2021 (Mediana, Media, Desvio Padrao e CV)', () => {
+    const prices = [1000, 1050, 1100, 1150, 1200];
+    const stats = calculateStatisticalSummary(prices, 'median');
+
+    expect(stats.count).toBe(5);
+    expect(stats.median).toBe(1100);
+    expect(stats.mean).toBe(1100);
+    expect(stats.minimum).toBe(1000);
+    expect(stats.maximum).toBe(1200);
+    expect(stats.coefficientOfVariation).toBeLessThan(25);
   });
 });

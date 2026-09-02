@@ -11,6 +11,7 @@ vi.mock('xlsx', async () => {
 
 import {
   analyzePriceResearchCompliance,
+  buildDespachoConclusivoSuapText,
   buildPriceResearchAbcCurve,
   buildPriceResearchAuthenticationPayload,
   buildPriceResearchComparisonMap,
@@ -526,5 +527,32 @@ describe('priceResearch', () => {
       if (originalRevokeObjectUrl) Object.defineProperty(URL, 'revokeObjectURL', originalRevokeObjectUrl);
       else delete (URL as { revokeObjectURL?: typeof URL.revokeObjectURL }).revokeObjectURL;
     }
+  });
+
+  it('gera texto formatado do Despacho Conclusivo de Pesquisa de Precos para o SUAP', () => {
+    const despacho = buildDespachoConclusivoSuapText({
+      processNumber: '23001.000123/2026-01',
+      responsibleName: 'Servidor Responsavel',
+      calculationMethod: 'median',
+      overallEstimatedTotal: 55000,
+      items: [
+        {
+          itemNumber: '1',
+          description: 'Monitor 27 pol 4K',
+          quantity: 50,
+          unit: 'UN',
+          estimatedUnitPrice: 1100,
+          estimatedTotal: 55000,
+          coefficientOfVariation: 8.5,
+        },
+      ],
+    });
+
+    expect(despacho).toContain('DESPACHO CONCLUSIVO - PESQUISA DE PREÇOS');
+    expect(despacho).toContain('23001.000123/2026-01');
+    expect(despacho).toContain('Mediana');
+    expect(despacho).toContain('55.000,00');
+    expect(despacho).toContain('Instrução Normativa SEGES/ME nº 65');
+    expect(despacho).toContain('Lei nº 14.133');
   });
 });

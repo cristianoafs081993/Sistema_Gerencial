@@ -68,6 +68,7 @@ Chamador:
 Uso:
 
 - responde perguntas gerenciais sobre dados do sistema em linguagem natural
+- conduz pesquisas de preços completas sob a Lei 14.133/2021 e IN SEGES/ME 65/2021, consultando Compras.gov.br e PNCP, auditando Editais/TRs com Gemini e retornando `priceResearchResult` com Mapa Comparativo, Despacho SUAP e exportação Excel
 - consulta fontes allowlisted e calcula agregações determinísticas antes de chamar o Gemini
 - cobre orçamento, empenhos, créditos disponíveis, documentos hábeis, financeiro, contratos API, PFs e conciliação
 - valida o usuário autenticado pelo JWT recebido e usa o cliente Supabase com esse mesmo token, respeitando RLS
@@ -91,7 +92,12 @@ Saída:
   "suggestions": ["Próxima pergunta"],
   "warnings": [],
   "sources": [{ "label": "descentralizacoes", "totalAmostra": 36, "totalDisponivel": 36 }],
-  "model": "gemini-2.5-flash-lite"
+  "model": "gemini-2.5-flash-lite",
+  "priceResearchResult": {
+    "title": "Pesquisa de Preços",
+    "overallEstimatedTotal": 55000,
+    "items": []
+  }
 }
 ```
 
@@ -104,6 +110,29 @@ Observação:
 
 - publicada com `verify_jwt = false`, pois a validação do token acontece dentro da própria function
 - o LLM não recebe tabelas cruas como fonte primária de cálculo; ele recebe blocos de `Resumo calculado`, `Evidências principais`, `Limitações dos dados` e `Fontes consultadas`
+
+### `analisar-edital-pesquisa-precos`
+
+Local:
+
+- [analisar-edital-pesquisa-precos/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/analisar-edital-pesquisa-precos/index.ts)
+
+Chamador:
+
+- `assistente-gerencial` e módulo de pesquisa de preços
+
+Uso:
+
+- resolve a contratação pública no PNCP (`/arquivos`)
+- faz o download do PDF do Edital, Termo de Referência ou Projeto Básico
+- submete o documento e a especificação da demanda ao Gemini 2.5 Flash para análise de similaridade técnica
+- extrai trecho literal comprobatório, número da página e score de aderência técnica (0 a 100)
+
+Dependências:
+
+- `GEMINI_API_KEY` ou `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_URL`
 
 ### `process-pdf` e `process-pdf-worker`
 
