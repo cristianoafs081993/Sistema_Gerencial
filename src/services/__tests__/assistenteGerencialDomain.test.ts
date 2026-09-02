@@ -175,4 +175,17 @@ describe('assistente-gerencial domain helpers', () => {
     expect(stats.maximum).toBe(1200);
     expect(stats.coefficientOfVariation).toBeLessThan(25);
   });
+
+  it('detecta pesquisa de precos mesmo em perguntas informais e indiretas', () => {
+    expect(detectAssistantIntent('quanto custa um monitor 27 polegadas?')).toBe('pesquisa_precos');
+    expect(detectAssistantIntent('gostaria de pesquisar precos para cadeira escritorio')).toBe('pesquisa_precos');
+    expect(detectAssistantIntent('qual o valor estimado de 15 computadores?')).toBe('pesquisa_precos');
+
+    const item1 = extractDemandItems('quanto custa 50 monitores 27 pol');
+    expect(item1[0].quantity).toBe(50);
+    expect(item1[0].description).toContain('monitores 27 pol');
+
+    const item2 = extractDemandItems('gostaria de pesquisar o preco de cadeira escritorio giratoria');
+    expect(item2[0].description).toContain('cadeira escritorio giratoria');
+  });
 });

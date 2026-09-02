@@ -155,7 +155,8 @@ export function detectAssistantIntent(message: string): AssistantIntent {
   const text = normalizeText(message);
 
   if (
-    /pesquis(a|ar|e|ando)\s+(de\s+)?preco|cotac(ao|oes)|cotar|cesta\s+de\s+preco|pesquisa\s+mercadol|catmat|catser|pesquisar\s+item|pesquise\s+o(s)?\s+preco|pesquisar\s+os\s+precos|preco\s+de\s+referencia|mapa\s+comparativo|despacho\s+conclusivo\s+de\s+preco|in\s*65\b/.test(text) ||
+    /pesquis(a|ar|e|ando)\s+(de\s+)?pre[çc]o|cota[çc](ao|oes)|cotar|cesta\s+de\s+pre[çc]o|pesquisa\s+mercadol|catmat|catser|pesquisar\s+item|pesquise\s+o(s)?\s+pre[çc]o|pesquisar\s+os\s+pre[çc]os|pre[çc]o\s+de\s+referencia|mapa\s+comparativo|despacho\s+conclusivo\s+de\s+pre[çc]o|in\s*65\b/.test(text) ||
+    /estim(ar|ativa)\s+(de\s+)?pre[çc]o|quanto\s+custa|qual\s+(o\s+)?valor\s+estimado|fazer\s+cota[çc]ao|mapa\s+de\s+pre[çc]o|pre[çc]o\s+de\s+mercado/.test(text) ||
     ((/pesquis(ar|e|a)/.test(text) || /cot(ar|e|acao)/.test(text)) && (/item|itens|monitor|cadeira|mesa|computador|notebook|servico|aquisicao|compra|edital|termo de referencia|\btr\b/.test(text)))
   ) {
     return 'pesquisa_precos';
@@ -231,7 +232,8 @@ function isServiceDescription(text: string): boolean {
 
 function parseSingleDemandText(text: string, defaultNumber = '1'): ExtractedDemandItem | null {
   let cleaned = text
-    .replace(/^pesquis(ar|e|ando)?\s+(os?\s+)?pre[çc]os?\s+(para|de|do|da)?\s*/i, '')
+    .replace(/^(por\s+favor\s+)?(gostaria\s+de\s+)?(fazer\s+)?(uma\s+)?pesquis(ar|e|ando|a)?\s+(de\s+|os?\s+)?pre[çc]os?\s+(para|de|do|da)?\s*/i, '')
+    .replace(/^(quanto\s+custa|qual\s+(o\s+)?valor\s+estimado\s+(de|para|do|da)?)\s*/i, '')
     .replace(/^cota[çc][ãa]o\s+(para|de|do|da)?\s*/i, '')
     .replace(/^aquisi[çc][ãa]o\s+(de|do|da)?\s*/i, '')
     .trim();

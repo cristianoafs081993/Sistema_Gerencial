@@ -450,8 +450,10 @@ function buildPriceApiUrl(item: SearchItem, pageSize = 100, filters: SearchFilte
 
   const params = new URLSearchParams({
     pagina: '1',
-    tamanhoPagina: String(pageSize),
-    codigoItemCatalogo: item.catalogCode,
+    tamanhoPagina: String(Math.max(10, Math.min(500, pageSize))),
+    ...(item.catalogType === 'service'
+      ? { codigoItemCatalogo: item.catalogCode }
+      : { tipo: 'codigoItemCatalogo', codigo: item.catalogCode }),
     dataCompraInicio: filters.startDate || start.toISOString().slice(0, 10),
     dataCompraFim: filters.endDate || end.toISOString().slice(0, 10),
   });
