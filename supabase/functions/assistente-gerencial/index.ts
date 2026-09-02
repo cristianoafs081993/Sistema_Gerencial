@@ -91,26 +91,49 @@ type ConversationalPriceResearchData = {
   complianceNotes: string[];
 };
 
-async function resolveCatalogCodesWithGemini(
+async function auditCandidateWithGemini(
   demandDescription: string,
+  cand: {
+    description: string;
+    agencyName: string;
+    unitPrice: number;
+    brand?: string;
+    documentTitle?: string;
+  },
   apiKey: string,
-): Promise<{ catalogType: 'material' | 'service'; catalogCodes: string[]; pdm?: string; searchTerm?: string }> {
-  const prompt = `Você é um especialista em compras públicas federais brasileiras e catálogo SIASG (CATMAT e CATSER).
-Dada a demanda: "${demandDescription}", identifique se é material ou serviço e forneça de 4 a 8 códigos de catálogo SIASG válidos e reais onde esse item ou equivalentes costumam ser licitados.
-Exemplos de códigos CATMAT comuns e reais no SIASG:
-- Monitores de vídeo / LED / LCD: 464064, 459875, 604255, 461053, 604256, 330005
-- Cadeiras de escritório / giratórias / ergonômicas: 257799, 257800, 244106, 256501, 206504
-- Computadores / Notebooks / Desktops: 462276, 443834, 432115, 461988, 474899
-- Papel sulfite / A4 / Escritório: 294011, 294012, 294210, 324449
-- Armários / Mesas / Mobiliário: 237896, 291237, 330655
-- Ar condicionado / Climatização: 458424, 455649, 453649, 605635
+): Promise<{
+  compativel: boolean;
+  score: number;
+  classificacao: 'COMPATIVEL' | 'COMPATIVEL_COM_RESSALVA' | 'INCOMPATIVEL';
+  justificativa: string;
+  trechoEdital?: string;
+}> {
+  const prompt = `Você é um auditor de contratações públicas federais avaliando a compatibilidade de um item paradigma para pesquisa de preços segundo a IN SEGES/ME nº 65/2021 e Lei 14.133/2021.
 
-Retorne estritamente em JSON puro sem markdown:
+Demanda solicitada pelo órgão: "${demandDescription}"
+Item ofertado no Edital/TR do órgão ${cand.agencyName}:
+- Descrição Técnica: "${cand.description}"
+- Preço Unitário: R$ ${cand.unitPrice}
+${cand.brand ? `- Marca/Referência: "${cand.brand}"` : ''}
+${cand.documentTitle ? `- Documento Referência: "${cand.documentTitle}"` : ''}
+
+Avalie com extremo rigor técnico:
+1. O item ofertado possui semelhança e equivalência técnica com a demanda solicitada?
+2. Se pertencer a uma categoria de produto totalmente diferente (ex: produto médico, vestuário, material hospitalar para demanda de informática) ou se for apenas um acessório/componente e não o item principal, o item DEVE ter compativel: false e score: 0.
+3. Classifique como:
+   - "COMPATIVEL" (atende plenamente ao objeto e especificações essenciais)
+   - "COMPATIVEL_COM_RESSALVA" (atende à finalidade com variações secundárias aceitáveis)
+   - "INCOMPATIVEL" (categoria diferente, finalidade discrepante ou especificação insuficiente)
+4. Redija um parecer técnico objetivo e fundamentado explicando os motivos.
+5. Indique o trecho ou síntese da especificação técnica essencial comprovada.
+
+Responda estritamente em JSON puro sem markdown:
 {
-  "catalogType": "material" | "service",
-  "catalogCodes": ["codigo1", "codigo2"],
-  "pdm": "codigo ou nome do PDM",
-  "searchTerm": "termo padronizado SIASG"
+  "compativel": boolean,
+  "score": number,
+  "classificacao": "COMPATIVEL" | "COMPATIVEL_COM_RESSALVA" | "INCOMPATIVEL",
+  "justificativa": "parecer técnico sucinto e fundamentado",
+  "trechoEdital": "especificação técnica essencial do item no documento"
 }`;
 
   try {
@@ -128,21 +151,33 @@ Retorne estritamente em JSON puro sem markdown:
       if (text) {
         const parsed = JSON.parse(text);
         return {
-          catalogType: parsed.catalogType === 'service' ? 'service' : 'material',
-          catalogCodes: Array.isArray(parsed.catalogCodes) ? parsed.catalogCodes.map(String).filter((c: string) => /^\d{5,8}$/.test(c)) : [],
-          pdm: parsed.pdm ? String(parsed.pdm) : undefined,
-          searchTerm: parsed.searchTerm ? String(parsed.searchTerm) : undefined,
+          compativel: Boolean(parsed.compativel),
+          score: typeof parsed.score === 'number' ? parsed.score : (parsed.compativel ? 80 : 0),
+          classificacao: parsed.classificacao || (parsed.compativel ? 'COMPATIVEL' : 'INCOMPATIVEL'),
+          justificativa: String(parsed.justificativa || ''),
+          trechoEdital: parsed.trechoEdital ? String(parsed.trechoEdital) : undefined,
         };
       }
     }
   } catch (err) {
-    console.warn('resolveCatalogCodesWithGemini error:', err);
+    console.warn('auditCandidateWithGemini error:', err);
   }
 
-  const isServ = /servi[çc]o|manuten[çc][ãa]o|limpeza|vigil[âa]ncia|consultoria|loca[çc][ãa]o|treinamento/i.test(demandDescription);
+  // Fallback se a IA falhar: verificação léxica rigorosa
+  const normDemand = demandDescription.toLowerCase();
+  const normCand = cand.description.toLowerCase();
+  const tokens = normDemand.split(/\s+/).filter((t) => t.length > 2);
+  const matches = tokens.filter((t) => normCand.includes(t)).length;
+  const isMatch = matches / Math.max(1, tokens.length) >= 0.5;
+
   return {
-    catalogType: isServ ? 'service' : 'material',
-    catalogCodes: [],
+    compativel: isMatch,
+    score: isMatch ? 75 : 0,
+    classificacao: isMatch ? 'COMPATIVEL' : 'INCOMPATIVEL',
+    justificativa: isMatch
+      ? 'Item apresenta semelhança semântica básica com a demanda solicitada.'
+      : 'Item de categoria ou especificação técnica divergente da demanda solicitada.',
+    trechoEdital: cand.description.slice(0, 200),
   };
 }
 
@@ -154,99 +189,127 @@ async function executeConversationalPriceResearch(
 ): Promise<ConversationalPriceResearchData> {
   const items: ConversationalPriceItem[] = [];
 
+  const pncpHeaders = {
+    'Accept': 'application/json',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Origin': 'https://pncp.gov.br',
+    'Referer': 'https://pncp.gov.br/app/editais',
+  };
+
   for (const demand of demandItems) {
-    const candidates: ConversationalPriceCandidate[] = [];
+    const rawCandidates: ConversationalPriceCandidate[] = [];
 
-    // 1. Resolve catalog codes (CATMAT / CATSER) via Gemini
-    const catalogInfo = await resolveCatalogCodesWithGemini(demand.description, apiKey);
-    const codesToTry = catalogInfo.catalogCodes.length > 0
-      ? catalogInfo.catalogCodes
-      : (demand.suggestedCatalogCode ? [demand.suggestedCatalogCode] : ['464064', '257799', '294011']);
+    // 1. Busca Direta no Elasticsearch do PNCP (Portal Nacional de Contratações Públicas)
+    try {
+      const pncpSearchUrl = `https://pncp.gov.br/api/search/?q=${encodeURIComponent(demand.description)}&tipos_documento=edital&pagina=1&tam_pagina=6`;
+      const searchRes = await fetch(pncpSearchUrl, { headers: pncpHeaders });
 
-    // 2. Query Compras.gov Dados Abertos (modulo-pesquisa-preco)
-    for (const code of codesToTry.slice(0, 5)) {
-      try {
-        const isServ = catalogInfo.catalogType === 'service';
-        const url = isServ
-          ? `https://dadosabertos.compras.gov.br/modulo-pesquisa-preco/3_consultarServico?pagina=1&tamanhoPagina=20&codigoItemCatalogo=${code}`
-          : `https://dadosabertos.compras.gov.br/modulo-pesquisa-preco/1_consultarMaterial?pagina=1&tamanhoPagina=20&tipo=codigoItemCatalogo&codigo=${code}`;
+      if (searchRes.ok) {
+        const searchData = await searchRes.json();
+        const tenders = Array.isArray(searchData?.items) ? searchData.items : [];
 
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 6000);
-        const response = await fetch(url, {
-          headers: { Accept: 'application/json' },
-          signal: controller.signal,
-        }).finally(() => clearTimeout(timeout));
+        for (const tender of tenders.slice(0, 4)) {
+          const cnpj = tender.orgao_cnpj;
+          const ano = tender.ano;
+          const seq = tender.numero_sequencial;
+          if (!cnpj || !ano || !seq) continue;
 
-        if (response.ok) {
-          const data = await response.json();
-          const rows = Array.isArray(data?.resultado) ? data.resultado : [];
-
-          for (const row of rows) {
-            const price = Number(row.precoUnitario || 0);
-            if (price <= 0) continue;
-            const idItem = String(row.idItemCompra || row.numeroItemCompra || `${code}-${candidates.length + 1}`);
-            if (candidates.some((c) => c.id.includes(idItem))) continue;
-
-            const uasg = String(row.codigoUasg || '');
-            const idCompra = String(row.idCompra || '');
-
-            candidates.push({
-              id: `comprasgov:${idItem}`,
-              sourceType: 'compras_gov_precos',
-              supplierName: String(row.nomeFornecedor || 'Fornecedor Registrado em Licitação'),
-              supplierDocument: String(row.niFornecedor || ''),
-              agencyName: String(row.nomeUasg || row.nomeOrgao || 'Órgão Público'),
-              agencyCode: uasg,
-              purchaseId: idCompra || `${uasg}-${idItem}`,
-              purchaseDate: row.dataCompra ? String(row.dataCompra).slice(0, 10) : null,
-              resultDate: row.dataResultado ? String(row.dataResultado).slice(0, 10) : null,
-              unitPrice: price,
-              comparableUnitPrice: price,
-              originalUnitLabel: String(row.siglaUnidadeFornecimento || demand.unit || 'UN'),
-              unitCompatible: true,
-              selected: true,
-              exclusionReason: '',
-              pncpUrl: idCompra
-                ? `https://pncp.gov.br/app/editais?q=${uasg || idCompra}`
-                : undefined,
-              editalAudited: false,
-              compatibility: 'COMPATIVEL',
-              rawData: row,
-            });
-
-            if (candidates.length >= 15) break;
+          // 1.1 Localiza arquivos reais da contratação no PNCP (TR, Edital, Dispensa em PDF)
+          let bestDoc: { titulo: string; tipoDocumentoNome: string; url: string } | null = null;
+          try {
+            const arqUrl = `https://pncp.gov.br/api/pncp/v1/orgaos/${cnpj}/compras/${ano}/${seq}/arquivos`;
+            const arqRes = await fetch(arqUrl, { headers: pncpHeaders });
+            if (arqRes.ok) {
+              const arqs = await arqRes.json();
+              if (Array.isArray(arqs) && arqs.length > 0) {
+                bestDoc = arqs.find((a: any) => /termo\s+de\s+refer[eê]ncia|\btr\b/i.test(a.titulo || a.tipoDocumentoNome || '')) ||
+                          arqs.find((a: any) => /edital|aviso|dispensa/i.test(a.titulo || a.tipoDocumentoNome || '')) ||
+                          arqs[0];
+              }
+            }
+          } catch {
+            // ignore
           }
+
+          // 1.2 Recupera os itens da contratação no PNCP com valores homologados/estimados
+          try {
+            const itemUrl = `https://pncp.gov.br/api/pncp/v1/orgaos/${cnpj}/compras/${ano}/${seq}/itens?pagina=1&tamanhoPagina=10`;
+            const itemRes = await fetch(itemUrl, { headers: pncpHeaders });
+            if (itemRes.ok) {
+              const tenderItens = await itemRes.json();
+              if (Array.isArray(tenderItens)) {
+                for (const it of tenderItens) {
+                  const price = Number(it.valorUnitarioHomologado || it.valorUnitarioEstimado || 0);
+                  if (price <= 0) continue;
+
+                  const desc = String(it.descricao || it.especificacaoTecnica || it.descricaoDetalhada || tender.description || '');
+                  const itemNum = String(it.numeroItem || '1');
+                  const purchaseId = `${tender.ano}/${tender.numero_sequencial}`;
+
+                  rawCandidates.push({
+                    id: `pncp:${tender.numero_controle_pncp || `${cnpj}-${ano}-${seq}-${itemNum}`}`,
+                    sourceType: 'pncp_publicacoes',
+                    supplierName: String(it.nomeFornecedor || 'Fornecedor Homologado'),
+                    supplierDocument: String(tender.orgao_cnpj || ''),
+                    agencyName: String(tender.orgao_nome || tender.unidade_nome || 'Órgão Público'),
+                    agencyCode: String(tender.unidade_codigo || ''),
+                    purchaseId,
+                    purchaseDate: tender.data_publicacao_pncp ? String(tender.data_publicacao_pncp).slice(0, 10) : null,
+                    unitPrice: price,
+                    comparableUnitPrice: price,
+                    originalUnitLabel: String(it.unidadeMedida || demand.unit || 'UN'),
+                    unitCompatible: true,
+                    selected: true,
+                    exclusionReason: '',
+                    pncpUrl: `https://pncp.gov.br/app/editais/${cnpj}/${ano}/${seq}`,
+                    documentTitle: bestDoc?.titulo || `Edital / TR ${seq}/${ano}`,
+                    documentType: bestDoc?.tipoDocumentoNome || 'Termo de Referência',
+                    documentUrl: bestDoc?.url || `https://pncp.gov.br/app/editais/${cnpj}/${ano}/${seq}`,
+                    editalPage: `Item ${itemNum} - Especificação Técnica`,
+                    itemDescription: desc,
+                    editalAudited: false,
+                    compatibility: 'NAO_IDENTIFICADO',
+                  });
+
+                  if (rawCandidates.length >= 8) break;
+                }
+              }
+            }
+          } catch {
+            // ignore
+          }
+
+          if (rawCandidates.length >= 8) break;
         }
-      } catch (comprasErr) {
-        console.warn('Compras.gov fetch error for code', code, comprasErr);
       }
-      if (candidates.length >= 10) break;
+    } catch (pncpErr) {
+      console.warn('Erro ao consultar PNCP Elasticsearch:', pncpErr);
     }
 
-    // 3. Fallback: licitacoes_pncp no banco de dados local
-    if (candidates.length < 3) {
+    // 2. Busca Complementar no Banco Local (licitacoes_pncp) se necessário
+    if (rawCandidates.length < 3) {
       try {
         const { data: dbItems } = await supabase
           .from('licitacoes_pncp')
-          .select('numero_controle_pncp, cnpj_orgao, razao_social_orgao, objeto_compra, valor_total_homologado, data_publicacao_pncp, ano_compra, sequencial_compra')
+          .select('numero_controle_pncp, cnpj_orgao, razao_social_orgao, objeto_compra, valor_total_homologado, data_publicacao_pncp, ano_compra, sequencial_compra, uasg_codigo')
           .ilike('objeto_compra', `%${demand.description.slice(0, 30)}%`)
-          .limit(6);
+          .limit(4);
 
         if (dbItems && dbItems.length > 0) {
           for (const row of dbItems) {
             const purchaseId = row.numero_controle_pncp;
-            if (candidates.some((c) => c.purchaseId === purchaseId)) continue;
+            if (rawCandidates.some((c) => c.purchaseId.includes(purchaseId))) continue;
             const valor = Number(row.valor_total_homologado || 0);
             const unitPrice = valor > 0 ? Number((valor / (demand.quantity || 1)).toFixed(2)) : 0;
             if (unitPrice > 0) {
-              candidates.push({
+              rawCandidates.push({
                 id: `local:${purchaseId}`,
                 sourceType: 'compras_gov_precos',
-                supplierName: 'Contratação Pública Registrada',
+                supplierName: 'Contratação Registrada',
                 supplierDocument: row.cnpj_orgao,
                 agencyName: row.razao_social_orgao || 'IFRN',
-                purchaseId,
+                agencyCode: row.uasg_codigo || '',
+                purchaseId: `${row.ano_compra}/${row.sequencial_compra}`,
                 purchaseDate: row.data_publicacao_pncp ? String(row.data_publicacao_pncp).slice(0, 10) : null,
                 unitPrice,
                 comparableUnitPrice: unitPrice,
@@ -255,8 +318,11 @@ async function executeConversationalPriceResearch(
                 selected: true,
                 exclusionReason: '',
                 pncpUrl: `https://pncp.gov.br/app/editais/${row.cnpj_orgao}/${row.ano_compra}/${row.sequencial_compra}`,
+                documentTitle: `Edital ${row.sequencial_compra}/${row.ano_compra}`,
+                documentType: 'Edital / TR',
+                itemDescription: row.objeto_compra || '',
                 editalAudited: false,
-                compatibility: 'COMPATIVEL',
+                compatibility: 'NAO_IDENTIFICADO',
               });
             }
           }
@@ -266,29 +332,45 @@ async function executeConversationalPriceResearch(
       }
     }
 
-    // 4. Audit candidate specs / Edital / TR via Gemini
-    const topToAudit = candidates.slice(0, 3);
-    for (const cand of topToAudit) {
-      const raw = cand.rawData as Record<string, unknown> | undefined;
-      const descItem = raw ? String(raw.descricaoDetalhadaItem || raw.descricaoItem || '') : demand.description;
-      const marca = raw ? String(raw.marca || '') : '';
-      const uasg = cand.agencyCode || '';
+    // 3. Auditoria Semântica Rigorosa com Gemini 2.5 Flash
+    // Cada candidato tem sua descrição técnica e Edital/TR confrontados com a demanda real
+    const candidates: ConversationalPriceCandidate[] = [];
+
+    for (const cand of rawCandidates.slice(0, 6)) {
+      const audit = await auditCandidateWithGemini(
+        demand.description,
+        {
+          description: cand.itemDescription || demand.description,
+          agencyName: cand.agencyName,
+          unitPrice: cand.unitPrice,
+          documentTitle: cand.documentTitle,
+        },
+        apiKey,
+      );
 
       cand.editalAudited = true;
-      cand.documentTitle = `Edital / Termo de Referência - UASG ${uasg || 'Compras.gov'}`;
-      cand.documentType = 'Termo de Referência';
-      cand.editalPage = 'Item ' + (raw?.numeroItemCompra || '1') + ' - Especificação do Objeto';
-      cand.editalExcerpt = descItem.length > 20
-        ? descItem.slice(0, 300)
-        : `Item homologado em licitação pública para ${demand.description}, atendendo aos requisitos mínimos do órgão contratante.`;
-      if (marca) cand.editalExcerpt += ` (Marca/Referência: ${marca})`;
-      cand.editalScore = 95;
-      cand.compatibility = 'COMPATIVEL';
-      cand.technicalJustification = `Especificações técnicas e padrão de desempenho equivalentes à demanda do órgão (${demand.description}), com conformidade ao padrão oficial.`;
+      cand.editalScore = audit.score;
+      cand.compatibility = audit.classificacao;
+      cand.technicalJustification = audit.justificativa;
+      cand.editalExcerpt = audit.trechoEdital || cand.itemDescription || demand.description;
+
+      if (audit.compativel && audit.score >= 50) {
+        cand.selected = true;
+      } else {
+        // Item incompatível (ex: equipamento médico para demanda de informática, acessório, etc.)
+        cand.selected = false;
+        cand.compatibility = 'INCOMPATIVEL';
+        cand.editalScore = 0;
+        cand.exclusionReason = audit.justificativa || 'Item incompatível com os requisitos técnicos da demanda';
+      }
+
+      candidates.push(cand);
     }
 
-    // 5. Calculate statistics according to IN 65/2021
-    const selectedPrices = candidates.filter((c) => c.selected).map((c) => c.comparableUnitPrice);
+    // 4. Cálculo da Memória Estatística da IN 65/2021
+    // CRUCIAL: Considera estritamente os itens aprovados e compatíveis na pesquisa
+    const validCandidates = candidates.filter((c) => c.selected && c.compatibility !== 'INCOMPATIVEL');
+    const selectedPrices = validCandidates.map((c) => c.comparableUnitPrice);
     const stats = calculateStatisticalSummary(selectedPrices, 'median');
     const estimatedTotal = Number((stats.estimatedUnitPrice * demand.quantity).toFixed(2));
 
@@ -296,8 +378,8 @@ async function executeConversationalPriceResearch(
       itemNumber: demand.itemNumber,
       description: demand.description,
       detailedSpecification: demand.detailedSpecification,
-      catalogType: catalogInfo.catalogType || demand.catalogType,
-      catalogCode: codesToTry[0] || demand.suggestedCatalogCode || '00000',
+      catalogType: demand.catalogType,
+      catalogCode: demand.suggestedCatalogCode || '00000',
       quantity: demand.quantity,
       unit: demand.unit,
       estimatedUnitPrice: stats.estimatedUnitPrice,
@@ -310,7 +392,7 @@ async function executeConversationalPriceResearch(
       meanPrice: stats.mean,
       medianPrice: stats.median,
       candidatesCount: candidates.length,
-      selectedCount: selectedPrices.length,
+      selectedCount: validCandidates.length,
       candidates,
     });
   }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  AlertCircle,
   AlertTriangle,
   CheckCircle2,
   ChevronDown,
@@ -342,75 +343,108 @@ export function PriceResearchChatCard({ data, className }: PriceResearchChatCard
                   <p className="text-[11px] font-semibold text-foreground">Cotações Públicas & Auditoria de Editais:</p>
                   
                   <div className="space-y-1.5">
-                    {item.candidates.map((cand) => (
-                      <div
-                        key={cand.id}
-                        className="flex flex-col gap-1 rounded-lg border border-border/70 bg-background/80 p-2.5 text-xs transition-colors hover:border-primary/40"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-1">
-                          <span className="font-semibold text-foreground">
-                            {cand.agencyName || 'Órgão Público'} ({cand.supplierDocument || 'CNPJ'})
-                          </span>
-                          <span className="font-extrabold text-primary">
-                            {formatCurrency(cand.comparableUnitPrice)} / {cand.originalUnitLabel || item.unit}
-                          </span>
-                        </div>
+                    {item.candidates.map((cand) => {
+                      const isExcluded = !cand.selected || cand.compatibility === 'INCOMPATIVEL';
 
-                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-                          <span>PNCP: {cand.purchaseId}</span>
-                          {cand.purchaseDate ? <span>• Data: {cand.purchaseDate}</span> : null}
-                        </div>
-
-                        {/* Edital Audit Status */}
-                        <div className="mt-1 flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-1.5">
-                          <div className="flex items-center gap-1.5">
-                            {cand.editalAudited ? (
-                              <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20 text-[10px] font-medium flex items-center gap-1">
-                                <CheckCircle2 className="h-3 w-3" />
-                                {cand.editalPage ? `Edital Auditado (${cand.editalPage})` : 'Edital Auditado'}
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                                PNCP Registrado
-                              </Badge>
-                            )}
-
-                            {cand.editalScore ? (
-                              <span className="text-[10px] font-semibold text-muted-foreground">
-                                Similaridade: {cand.editalScore}%
+                      return (
+                        <div
+                          key={cand.id}
+                          className={cn(
+                            'flex flex-col gap-1 rounded-lg border p-2.5 text-xs transition-colors',
+                            isExcluded
+                              ? 'border-destructive/20 bg-destructive/[0.03] opacity-80'
+                              : 'border-border/70 bg-background/80 hover:border-primary/40'
+                          )}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-semibold text-foreground">
+                                {cand.agencyName || 'Órgão Público'}
                               </span>
+                              {cand.supplierDocument ? (
+                                <span className="text-[10px] text-muted-foreground">({cand.supplierDocument})</span>
+                              ) : null}
+                            </div>
+                            <span className={cn('font-extrabold', isExcluded ? 'text-muted-foreground line-through' : 'text-primary')}>
+                              {formatCurrency(cand.comparableUnitPrice)} / {cand.originalUnitLabel || item.unit}
+                            </span>
+                          </div>
+
+                          {cand.itemDescription ? (
+                            <p className="text-[11px] text-foreground/80 line-clamp-1">
+                              <strong>Objeto:</strong> {cand.itemDescription}
+                            </p>
+                          ) : null}
+
+                          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                            <span>PNCP: {cand.purchaseId}</span>
+                            {cand.purchaseDate ? <span>• Data: {cand.purchaseDate}</span> : null}
+                            {isExcluded ? (
+                              <span className="font-medium text-destructive">• Desconsiderado do cálculo</span>
                             ) : null}
                           </div>
 
-                          <div className="flex items-center gap-1">
-                            {cand.editalExcerpt || cand.technicalJustification ? (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 px-2 text-[10px] text-primary hover:bg-primary/10"
-                                onClick={() => setSelectedCandidateForModal(cand)}
-                              >
-                                <Sparkles className="mr-1 h-3 w-3" />
-                                Ver Parecer TR
-                              </Button>
-                            ) : null}
+                          {/* Edital Audit Status */}
+                          <div className="mt-1 flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-1.5">
+                            <div className="flex items-center gap-1.5">
+                              {cand.compatibility === 'INCOMPATIVEL' ? (
+                                <Badge variant="destructive" className="bg-destructive/10 text-destructive border-destructive/20 text-[10px] font-medium flex items-center gap-1">
+                                  <AlertCircle className="h-3 w-3" />
+                                  Incompatível (0%)
+                                </Badge>
+                              ) : cand.compatibility === 'COMPATIVEL_COM_RESSALVA' ? (
+                                <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20 text-[10px] font-medium flex items-center gap-1">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  {cand.editalPage ? `Auditado (${cand.editalPage})` : 'Auditado c/ Ressalva'}
+                                </Badge>
+                              ) : cand.editalAudited ? (
+                                <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20 text-[10px] font-medium flex items-center gap-1">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  {cand.editalPage ? `Auditado (${cand.editalPage})` : 'Edital Auditado'}
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                                  PNCP Registrado
+                                </Badge>
+                              )}
 
-                            {cand.pncpUrl ? (
-                              <a
-                                href={cand.pncpUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex h-6 items-center gap-1 rounded-md px-2 text-[10px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-                              >
-                                <ExternalLink className="h-3 w-3" />
-                                Edital PNCP
-                              </a>
-                            ) : null}
+                              {cand.editalScore && cand.compatibility !== 'INCOMPATIVEL' ? (
+                                <span className="text-[10px] font-semibold text-muted-foreground">
+                                  Similaridade: {cand.editalScore}%
+                                </span>
+                              ) : null}
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              {cand.editalExcerpt || cand.technicalJustification ? (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 text-[10px] text-primary hover:bg-primary/10"
+                                  onClick={() => setSelectedCandidateForModal(cand)}
+                                >
+                                  <Sparkles className="mr-1 h-3 w-3" />
+                                  Ver Parecer TR
+                                </Button>
+                              ) : null}
+
+                              {cand.documentUrl || cand.pncpUrl ? (
+                                <a
+                                  href={cand.documentUrl || cand.pncpUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex h-6 items-center gap-1 rounded-md px-2 text-[10px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                  {cand.documentUrl ? 'Edital PDF' : 'PNCP'}
+                                </a>
+                              ) : null}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ) : null}
@@ -488,6 +522,13 @@ export function PriceResearchChatCard({ data, className }: PriceResearchChatCard
             </DialogHeader>
 
             <div className="space-y-3 pt-2 text-xs">
+              {selectedCandidateForModal.itemDescription ? (
+                <div className="rounded-lg bg-muted/40 p-2.5">
+                  <p className="font-semibold text-foreground">Item Registrado na Licitação:</p>
+                  <p className="mt-0.5 text-muted-foreground">{selectedCandidateForModal.itemDescription}</p>
+                </div>
+              ) : null}
+
               {selectedCandidateForModal.editalPage ? (
                 <div className="rounded-lg bg-muted/50 p-2.5">
                   <p className="font-semibold text-foreground">Localização no Documento:</p>
@@ -505,25 +546,63 @@ export function PriceResearchChatCard({ data, className }: PriceResearchChatCard
               ) : null}
 
               {selectedCandidateForModal.technicalJustification ? (
-                <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-2.5 text-emerald-950 dark:text-emerald-200">
-                  <p className="font-bold">Parecer de Similaridade Técnica:</p>
+                <div
+                  className={cn(
+                    'rounded-lg border p-2.5',
+                    selectedCandidateForModal.compatibility === 'INCOMPATIVEL'
+                      ? 'bg-destructive/10 border-destructive/20 text-destructive'
+                      : selectedCandidateForModal.compatibility === 'COMPATIVEL_COM_RESSALVA'
+                      ? 'bg-amber-500/10 border-amber-500/20 text-amber-950 dark:text-amber-200'
+                      : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-950 dark:text-emerald-200'
+                  )}
+                >
+                  <p className="font-bold flex items-center gap-1.5">
+                    {selectedCandidateForModal.compatibility === 'INCOMPATIVEL' ? (
+                      <AlertCircle className="h-4 w-4" />
+                    ) : (
+                      <Sparkles className="h-4 w-4" />
+                    )}
+                    {selectedCandidateForModal.compatibility === 'INCOMPATIVEL'
+                      ? 'Parecer de Incompatibilidade Técnica (Item Excluído):'
+                      : 'Parecer de Similaridade Técnica:'}
+                  </p>
                   <p className="mt-0.5 leading-relaxed">{selectedCandidateForModal.technicalJustification}</p>
                 </div>
               ) : null}
 
-              {selectedCandidateForModal.pncpUrl ? (
-                <div className="pt-1 text-right">
-                  <a
-                    href={selectedCandidateForModal.pncpUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    Abrir Edital Completo no PNCP
-                  </a>
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                {selectedCandidateForModal.documentTitle ? (
+                  <span className="text-[11px] text-muted-foreground truncate max-w-[260px]" title={selectedCandidateForModal.documentTitle}>
+                    📄 {selectedCandidateForModal.documentTitle}
+                  </span>
+                ) : <span />}
+
+                <div className="flex items-center gap-2">
+                  {selectedCandidateForModal.documentUrl ? (
+                    <a
+                      href={selectedCandidateForModal.documentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Abrir PDF do Edital / TR
+                    </a>
+                  ) : null}
+
+                  {selectedCandidateForModal.pncpUrl ? (
+                    <a
+                      href={selectedCandidateForModal.pncpUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:underline"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Ver no PNCP
+                    </a>
+                  ) : null}
                 </div>
-              ) : null}
+              </div>
             </div>
           </DialogContent>
         </Dialog>

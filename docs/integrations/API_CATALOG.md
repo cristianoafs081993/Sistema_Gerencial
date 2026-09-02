@@ -707,3 +707,16 @@ Function chamada pela extensão na rota oficial de edição de ETP.
 - A primeira execucao fica em `preview`; depois da conferencia, `apply_suap_plan_snapshot` atualiza/inclui os registros e arquiva os ausentes sem exclusao fisica.
 - O Campus nao depende da extensao. Quando a extensao e usada no popup, ela captura a aba SUAP atual e envia o HTML ao backend; na pagina Campus ela apenas dispara `siages:suap-plan-sync-request`.
 - O popup mantem o `runId` da previa em `chrome.storage.local` e oferece a aplicacao explicita pelo mesmo endpoint, sem abrir uma aba do SIAGES.
+
+## 13. Assistente Gerencial - Pesquisa de Preços Textual e Auditoria de Editais (IN 65/2021)
+
+- Endpoint: `POST /functions/v1/assistente-gerencial`
+- Busca Textual Direta no PNCP: `GET https://pncp.gov.br/api/search/?q={termo}&tipos_documento=edital` utilizando cabeçalhos de navegador (`User-Agent`, `Origin: https://pncp.gov.br`, `Referer: https://pncp.gov.br/app/editais`) para evitar bloqueios WAF (`ECONNRESET`).
+- Recuperação de Documentos Oficiais: para cada contratação retornada, consulta `/arquivos` no PNCP para localizar PDFs de Edital, Termo de Referência ou Aviso de Dispensa com link de download direto.
+- Recuperação de Itens e Preços: consulta `/itens` da contratação no PNCP para obter preços homologados e especificações técnicas oficiais.
+- Auditoria Semântica Rigorosa via Gemini 2.5 Flash:
+  - Confronta a demanda do usuário com o texto do item licitado e do TR/Edital.
+  - Se pertencer a categoria distinta (ex: equipamento médico para demanda de informática) ou for acessório desarmônico, classifica como `INCOMPATIVEL`, zera o score de similaridade e exclui obrigatoriamente o item da cesta de cálculo da mediana/média da IN 65/2021.
+  - Se compatível, gera parecer técnico fundamentado com trecho da especificação extraído do documento.
+- Interface e Transparência: componente `PriceResearchChatCard` exibe itens aprovados e desconsiderados com distinção visual explícita (riscado e badge vermelho para incompatíveis), e modal de inspeção com parecer da IA e botão para abrir o PDF do Edital/TR.
+

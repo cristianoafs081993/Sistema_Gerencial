@@ -42,6 +42,8 @@ export type AssistenteGerencialPriceResearchCandidate = {
   documentTitle?: string;
   documentType?: string;
   documentUrl?: string;
+  itemDescription?: string;
+  brand?: string;
 };
 
 export type AssistenteGerencialPriceResearchItem = {
