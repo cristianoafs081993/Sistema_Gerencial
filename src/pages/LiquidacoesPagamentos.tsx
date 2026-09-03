@@ -1,16 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { transparenciaService } from '@/services/transparencia';
-import { DocumentoDespesa, DocumentoSituacao } from '@/types';
-import { calculateDocumentoValorPago, formatCurrency, formatarDocumento, formatDocumentoId, parseCurrency } from '@/lib/utils';
+import { DocumentoDespesa } from '@/types';
+import { calculateDocumentoValorPago, formatCurrency, formatarDocumento, formatDocumentoId } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatCard } from '@/components/StatCard';
-import { JsonImportDialog } from '@/components/JsonImportDialog';
-import { useAuth } from '@/contexts/AuthContext';
-import { retencoesService } from '@/services/retencoes';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { ActiveFilterChips, type ActiveFilterItem } from '@/components/design-system/ActiveFilterChips';
 
@@ -22,25 +19,11 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
     Search as SearchIcon, 
-    ChevronLeft as ChevronLeftIcon, 
-    ChevronRight as ChevronRightIcon, 
-    ChevronsLeft as ChevronsLeftIcon, 
-    ChevronsRight as ChevronsRightIcon, 
-    X, 
     Eye, 
-    FileSpreadsheet,
-    FileSpreadsheet as FileSpreadsheetIcon,
     FileWarning as FileBadge,
     RefreshCcw as RefreshCcwIcon,
     ArrowUpDown,
@@ -51,10 +34,8 @@ import { toast } from 'sonner';
 import { DocumentoDetalhesDialog } from '@/components/DocumentoDetalhesDialog';
 import { HeaderActions } from '@/components/HeaderParts';
 import { TablePagination } from '@/components/design-system/TablePagination';
-import { FilterPanel } from '@/components/design-system/FilterPanel';
 
 export default function LiquidacoesPagamentos() {
-    const { isSuperAdmin } = useAuth();
     const queryClient = useQueryClient();
 
     // Filtros
@@ -123,6 +104,11 @@ export default function LiquidacoesPagamentos() {
         setIsDetailsOpen(true);
     };
 
+    const handleRefresh = () => {
+        queryClient.invalidateQueries({ queryKey: ['transparencia'] });
+        toast.success('Dados atualizados!');
+    };
+
     const activeFilterList = useMemo<ActiveFilterItem[]>(() => {
         const list: ActiveFilterItem[] = [];
 
@@ -156,12 +142,6 @@ export default function LiquidacoesPagamentos() {
 
     return (
         <div className="space-y-6 pb-10">
-            <DocumentoDetalhesDialog
-                open={isDetailsOpen}
-                onOpenChange={setIsDetailsOpen}
-                documento={selectedDoc}
-            />
-
             <HeaderActions>
                 <div className="flex items-center gap-3">
                     <Button 
@@ -206,18 +186,6 @@ export default function LiquidacoesPagamentos() {
                     isLoading={isLoading}
                 />
             </div>
-
-            {isSuperAdmin ? (
-            <JsonImportDialog 
-                open={isImportDialogOpen}
-                onOpenChange={setIsImportDialogOpen}
-                onImport={handleRetencoesImport}
-                title="Importar Situações (Despesas/Retenções)"
-                expectedFields={retencoesFields}
-                acceptCsv={true}
-                csvSeparator="\t"
-            />
-            ) : null}
 
             {/* Standard Filter Card */}
             <FilterPanel className="shadow-sm">

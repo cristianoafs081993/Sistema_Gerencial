@@ -127,6 +127,7 @@ const App = () => (
                   <Route path="/requisicao-compra" element={<RequisicaoCompra />} />
                   <Route path="/cadastro-terceirizados" element={<CadastroTerceirizados />} />
                   <Route path="/liquidacoes-pagamentos" element={<LiquidacoesPagamentos />} />
+                  <Route path="/liquidacoes-pagamento" element={<Navigate replace to="/liquidacoes-pagamentos" />} />
                   <Route path="/financeiro" element={<Financeiro />} />
                   <Route path="/lc" element={<LCPage />} />
                   <Route path="/retencoes-efd-reinf" element={<RetencoesEfdReinfPage />} />
