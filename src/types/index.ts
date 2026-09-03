@@ -518,8 +518,10 @@ export interface RequisicaoCompra {
   empenhoId?: string;
   empenhoNumero?: string;
   empenhos?: RequisicaoCompraEmpenho[];
+  items?: RequisicaoCompraItem[];
+  totalValue?: number;
   notes?: string;
-  status: 'draft' | 'review' | 'approved' | 'rejected';
+  status: 'draft' | 'enviada_fornecedor' | 'liquidada' | 'review' | 'approved' | 'rejected';
   createdBy: string;
   createdByEmail: string;
   createdAt: Date;

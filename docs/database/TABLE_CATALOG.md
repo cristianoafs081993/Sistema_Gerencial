@@ -485,15 +485,17 @@ Finalidade:
 Campos-chave:
 - `id`
 - `number`
-- `status` ('draft', 'review', 'approved', 'rejected')
+- `status` ('draft', 'enviada_fornecedor', 'liquidada')
 - `contrato_id` (FK para contratos)
 - `empenho_id` (FK para empenhos; compatibilidade com a primeira NE selecionada)
 - `created_by` (FK para auth.users)
 
 Regras:
-- `save_requisicao_compra` salva cabecalho, empenhos vinculados e itens na mesma transacao.
-- Requisicoes em `review` ou `approved` exigem ao menos uma NE e exigem que cada item tenha `empenho_id`. O saldo oficial e validado separadamente por NE para a propria requisicao; requisicoes abertas da mesma NE nao entram como reserva. Para terceirizados, a RPC exige permissao explicita para cada `empenho_id`; permissao de contrato nao autoriza automaticamente as NEs vinculadas ao contrato.
-- `fn_empenho_saldo_disponivel` calcula saldo de exercicio com dados SIAFI locais e prioriza `saldo_rap_oficial` para RAP.
+- `save_requisicao_compra` salva cabeçalho, empenhos vinculados e itens na mesma transação.
+- O fluxo utiliza 3 status: `draft` (Rascunho), `enviada_fornecedor` (Enviada ao Fornecedor) e `liquidada` (Liquidada).
+- Requisições em `enviada_fornecedor` exigem ao menos uma NE, itens com `empenho_id` e permissão explícita para terceirizados. O saldo disponível valida e abate concorrentemente outras requisições já enviadas ao fornecedor da mesma NE.
+- Requisições com status `liquidada` não acumulam desconto no módulo para evitar duplicidade com as liquidações oficiais registradas no SIAFI.
+- `fn_empenho_saldo_disponivel` calcula saldo de exercício com dados SIAFI locais e prioriza `saldo_rap_oficial` para RAP.
 
 ### `requisicao_compra_empenhos`
 
@@ -1286,7 +1288,7 @@ Consumido por src/services/inventory.ts e src/pages/Almoxarifado.tsx.
 - `quantity` aceita zero para rascunhos e impressao; valores negativos continuam invalidos na RPC `save_requisicao_compra`.
 - A RLS de `terceirizados` e `terceirizado_permissions` tambem reconhece o grupo `assistencia`, que possui acesso explicito ao cadastro e a gestao de vinculos em `/cadastro-terceirizados`.
 
-- A politica de exclusao de requisicoes_compra permite ao criador remover registros em draft ou rejected, mantendo a exclusao por gestores e superadministradores.
+- A política de exclusão de `requisicoes_compra` permite ao criador remover registros em `draft`, mantendo a exclusão irrestrita por gestores e superadministradores.
 
 ## Sincronização do Plano SUAP
 

@@ -8,24 +8,6 @@ import type {
   Terceirizado,
 } from '@/types';
 
-type DbRequisicaoCompraRow = {
-  id: string;
-  title: string;
-  number: string;
-  process_number: string | null;
-  contrato_id: string | null;
-  contrato_numero: string | null;
-  empenho_id: string | null;
-  empenho_numero: string | null;
-  requisicao_compra_empenhos?: DbRequisicaoCompraEmpenhoRow[] | null;
-  notes: string | null;
-  status: RequisicaoCompra['status'];
-  created_by: string;
-  created_by_email: string;
-  created_at: string;
-  updated_at: string;
-};
-
 type DbRequisicaoCompraItemRow = {
   id: string;
   requisicao_compra_id: string;
@@ -52,6 +34,25 @@ type DbRequisicaoCompraEmpenhoRow = {
   sort_order: number;
 };
 
+type DbRequisicaoCompraRow = {
+  id: string;
+  title: string;
+  number: string;
+  process_number: string | null;
+  contrato_id: string | null;
+  contrato_numero: string | null;
+  empenho_id: string | null;
+  empenho_numero: string | null;
+  requisicao_compra_empenhos?: DbRequisicaoCompraEmpenhoRow[] | null;
+  requisicao_compra_itens?: DbRequisicaoCompraItemRow[] | null;
+  notes: string | null;
+  status: RequisicaoCompra['status'];
+  created_by: string;
+  created_by_email: string;
+  created_at: string;
+  updated_at: string;
+};
+
 type DbPermissionRow = {
   id: string;
   user_id: string | null;
@@ -73,6 +74,7 @@ const REQUISICAO_SELECT = [
   'empenho_id',
   'empenho_numero',
   'requisicao_compra_empenhos(id,requisicao_compra_id,empenho_id,empenho_numero,sort_order)',
+  'requisicao_compra_itens(id,requisicao_compra_id,description,quantity,unit,unit_price,empenho_id,empenho_numero,source_type,source_item_key,source_reference,sort_order,created_at,updated_at)',
   'notes',
   'status',
   'created_by',
@@ -91,37 +93,6 @@ function mapRequisicaoEmpenhoRow(row: DbRequisicaoCompraEmpenhoRow): RequisicaoC
   };
 }
 
-function mapRequisicaoRow(row: DbRequisicaoCompraRow): RequisicaoCompra {
-  const linkedEmpenhos = (row.requisicao_compra_empenhos || []).map((item) => mapRequisicaoEmpenhoRow(item));
-  const empenhos = linkedEmpenhos.length > 0
-    ? linkedEmpenhos.sort((a, b) => a.sortOrder - b.sortOrder)
-    : row.empenho_id
-      ? [{
-          empenhoId: row.empenho_id,
-          empenhoNumero: row.empenho_numero || '',
-          sortOrder: 0,
-        }]
-      : [];
-
-  return {
-    id: row.id,
-    title: row.title,
-    number: row.number,
-    processNumber: row.process_number || undefined,
-    contratoId: row.contrato_id || undefined,
-    contratoNumero: row.contrato_numero || undefined,
-    empenhoId: row.empenho_id || undefined,
-    empenhoNumero: row.empenho_numero || undefined,
-    empenhos,
-    notes: row.notes || undefined,
-    status: row.status,
-    createdBy: row.created_by,
-    createdByEmail: row.created_by_email,
-    createdAt: new Date(row.created_at),
-    updatedAt: new Date(row.updated_at),
-  };
-}
-
 function mapItemRow(row: DbRequisicaoCompraItemRow): RequisicaoCompraItem {
   return {
     id: row.id,
@@ -137,6 +108,49 @@ function mapItemRow(row: DbRequisicaoCompraItemRow): RequisicaoCompraItem {
     sourceReference: row.source_reference || undefined,
     sourceSnapshot: row.source_snapshot || undefined,
     sortOrder: row.sort_order,
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
+  };
+}
+
+function mapRequisicaoRow(row: DbRequisicaoCompraRow): RequisicaoCompra {
+  const linkedEmpenhos = (row.requisicao_compra_empenhos || []).map((item) => mapRequisicaoEmpenhoRow(item));
+  const empenhos = linkedEmpenhos.length > 0
+    ? linkedEmpenhos.sort((a, b) => a.sortOrder - b.sortOrder)
+    : row.empenho_id
+      ? [{
+          empenhoId: row.empenho_id,
+          empenhoNumero: row.empenho_numero || '',
+          sortOrder: 0,
+        }]
+      : [];
+
+  const items = (row.requisicao_compra_itens || []).map((item) => mapItemRow(item)).sort((a, b) => a.sortOrder - b.sortOrder);
+  const totalValue = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+
+  let status = row.status;
+  if (status === 'review' || status === 'approved') {
+    status = 'enviada_fornecedor';
+  } else if (status === 'rejected') {
+    status = 'draft';
+  }
+
+  return {
+    id: row.id,
+    title: row.title,
+    number: row.number,
+    processNumber: row.process_number || undefined,
+    contratoId: row.contrato_id || undefined,
+    contratoNumero: row.contrato_numero || undefined,
+    empenhoId: row.empenho_id || undefined,
+    empenhoNumero: row.empenho_numero || undefined,
+    empenhos,
+    items,
+    totalValue,
+    notes: row.notes || undefined,
+    status,
+    createdBy: row.created_by,
+    createdByEmail: row.created_by_email,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };

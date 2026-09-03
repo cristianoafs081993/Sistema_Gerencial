@@ -2,15 +2,20 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Check,
+  CheckCircle2,
   ClipboardList,
   Coins,
   FileText,
+  Info,
   Loader2,
   Plus,
   Pencil,
   Printer,
+  RotateCcw,
+  Send,
   ShieldCheck,
   Trash2,
+  TrendingDown,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -42,11 +47,13 @@ import {
 import { filterAndRankRequisicaoEmpenhos } from '@/utils/requisicaoEmpenhoSelector';
 
 // Helper to translate status labels
-const STATUS_META = {
-  draft: { label: 'Rascunho', className: 'border-slate-300 bg-slate-50 text-slate-700' },
-  review: { label: 'Em Revisão', className: 'border-amber-300 bg-amber-50 text-amber-800' },
-  approved: { label: 'Aprovada', className: 'border-emerald-300 bg-emerald-50 text-emerald-800' },
-  rejected: { label: 'Rejeitada', className: 'border-rose-300 bg-rose-50 text-rose-800' },
+const STATUS_META: Record<string, { label: string; className: string }> = {
+  draft: { label: 'Rascunho', className: 'border-slate-300 bg-slate-100 text-slate-700' },
+  enviada_fornecedor: { label: 'Enviada ao Fornecedor', className: 'border-amber-300 bg-amber-50 text-amber-800' },
+  liquidada: { label: 'Liquidada', className: 'border-emerald-300 bg-emerald-50 text-emerald-800' },
+  review: { label: 'Enviada ao Fornecedor', className: 'border-amber-300 bg-amber-50 text-amber-800' },
+  approved: { label: 'Enviada ao Fornecedor', className: 'border-amber-300 bg-amber-50 text-amber-800' },
+  rejected: { label: 'Rascunho', className: 'border-slate-300 bg-slate-100 text-slate-700' },
 };
 
 
@@ -140,6 +147,32 @@ export default function RequisicaoCompraPage() {
   }, [allowedEmpenhos, editingRequisicaoId]);
 
 
+  // Total retido / comprometido por empenho em requisições com status 'enviada_fornecedor' (excluindo requisição em edição)
+  const enviadoFornecedorTotalByEmpenhoId = useMemo(() => {
+    const map = new Map<string, number>();
+
+    requisicoes.forEach((req) => {
+      const isEnviada = req.status === 'enviada_fornecedor' || req.status === 'review' || req.status === 'approved';
+      if (!isEnviada) return;
+      if (editingRequisicaoId && req.id === editingRequisicaoId) return;
+
+      if (req.items && req.items.length > 0) {
+        req.items.forEach((item) => {
+          const empId = item.empenhoId || req.empenhoId;
+          if (empId) {
+            const current = map.get(empId) ?? 0;
+            map.set(empId, current + (item.quantity * item.unitPrice));
+          }
+        });
+      } else if (req.empenhoId && req.totalValue) {
+        const current = map.get(req.empenhoId) ?? 0;
+        map.set(req.empenhoId, current + req.totalValue);
+      }
+    });
+
+    return map;
+  }, [requisicoes, editingRequisicaoId]);
+
   const selectedEmpenhos = useMemo(
     () => selectedEmpenhoIds
       .map((id) => empenhos.find((empenho) => empenho.id === id))
@@ -149,15 +182,36 @@ export default function RequisicaoCompraPage() {
 
   const primaryEmpenho = selectedEmpenhos[0];
 
+  // Saldo Oficial SIAFI
+  const officialBalanceByEmpenhoId = useMemo(() => {
+    return new Map(selectedEmpenhos.map((empenho) => [empenho.id, getEmpenhoAvailableBalance(empenho)]));
+  }, [selectedEmpenhos]);
+
+  // Saldo Disponível Efetivo (Oficial - Enviadas ao Fornecedor)
+  const empenhoBalanceById = useMemo(() => {
+    return new Map(
+      selectedEmpenhos.map((empenho) => {
+        const official = officialBalanceByEmpenhoId.get(empenho.id) ?? 0;
+        const enviado = enviadoFornecedorTotalByEmpenhoId.get(empenho.id) ?? 0;
+        return [empenho.id, Math.max(0, official - enviado)];
+      }),
+    );
+  }, [officialBalanceByEmpenhoId, enviadoFornecedorTotalByEmpenhoId, selectedEmpenhos]);
+
   const selectedEmpenhoOptions = useMemo(() => {
     const selectedIds = new Set(selectedEmpenhoIds);
     return selectedEmpenhos
       .filter((empenho) => selectedIds.has(empenho.id))
-      .map((empenho) => ({
-        id: empenho.id,
-        label: `${empenho.numero} - saldo ${formatCurrency(getEmpenhoAvailableBalance(empenho))}`,
-      }));
-  }, [selectedEmpenhos, selectedEmpenhoIds]);
+      .map((empenho) => {
+        const effective = empenhoBalanceById.get(empenho.id) ?? getEmpenhoAvailableBalance(empenho);
+        const enviado = enviadoFornecedorTotalByEmpenhoId.get(empenho.id) ?? 0;
+        const extra = enviado > 0 ? ` (disp. c/ desconto de enviadas)` : '';
+        return {
+          id: empenho.id,
+          label: `${empenho.numero} - saldo ${formatCurrency(effective)}${extra}`,
+        };
+      });
+  }, [selectedEmpenhos, selectedEmpenhoIds, empenhoBalanceById, enviadoFornecedorTotalByEmpenhoId]);
 
 
   const filteredEmpenhos = useMemo(
@@ -213,10 +267,6 @@ export default function RequisicaoCompraPage() {
   }, [liquidacoesEmpenhoQueries, selectedEmpenhos]);
 
 
-
-  const empenhoBalanceById = useMemo(() => {
-    return new Map(selectedEmpenhos.map((empenho) => [empenho.id, getEmpenhoAvailableBalance(empenho)]));
-  }, [selectedEmpenhos]);
 
   const empenhoItemBalancesById = useMemo(() => {
     const map = new Map<string, ReturnType<typeof buildEmpenhoItemBalances>>();
@@ -441,22 +491,23 @@ export default function RequisicaoCompraPage() {
       return null;
     }
 
-    if (status === 'review' && selectedEmpenhos.length === 0) {
-      toast.error('Selecione um empenho antes de enviar a requisição para o fiscal.');
+    const isEnviando = status === 'enviada_fornecedor' || status === 'review' || status === 'approved' || status === 'liquidada';
+    if (isEnviando && selectedEmpenhos.length === 0) {
+      toast.error('Selecione ao menos um empenho antes de salvar a requisição.');
       return null;
     }
-    if (status === 'review' && items.some((item) => !item.empenhoId || !selectedEmpenhoIds.includes(item.empenhoId))) {
+    if (isEnviando && items.some((item) => !item.empenhoId || !selectedEmpenhoIds.includes(item.empenhoId))) {
       toast.error('Cada item deve estar vinculado a um empenho selecionado.');
       return null;
     }
 
-    if (status === 'review' && empenhoBalanceViolations.length > 0) {
+    if ((status === 'enviada_fornecedor' || status === 'review') && empenhoBalanceViolations.length > 0) {
       const firstViolation = empenhoBalanceViolations[0];
-      toast.error(`Saldo insuficiente no empenho ${firstViolation.empenho.numero}. Saldo atual: ${formatCurrency(firstViolation.available)}.`);
+      toast.error(`Saldo insuficiente no empenho ${firstViolation.empenho.numero}. Saldo disponível: ${formatCurrency(firstViolation.available)}.`);
       return null;
     }
 
-    if (status === 'review' && itemBalanceViolations.length > 0) {
+    if ((status === 'enviada_fornecedor' || status === 'review') && itemBalanceViolations.length > 0) {
       const firstViolation = itemBalanceViolations[0];
       toast.error(`Saldo insuficiente no item ${firstViolation.index + 1}. Saldo do item: ${formatCurrency(firstViolation.available)}.`);
       return null;
@@ -479,7 +530,13 @@ export default function RequisicaoCompraPage() {
     const loadingToast = toast.loading('Salvando requisição de compra...');
     try {
       const savedId = await requisicoesCompraService.saveRequisicao(payload, items, { id: editingRequisicaoId, status });
-      toast.success(status === 'review' ? 'Requisição enviada para revisão.' : 'Requisição salva com sucesso.', { id: loadingToast });
+      let successMessage = 'Requisição salva com sucesso.';
+      if (status === 'enviada_fornecedor' || status === 'review') {
+        successMessage = 'Requisição enviada ao fornecedor com sucesso.';
+      } else if (status === 'liquidada') {
+        successMessage = 'Requisição marcada como liquidada com sucesso.';
+      }
+      toast.success(successMessage, { id: loadingToast });
       setIsEditing(false);
       void queryClient.invalidateQueries({ queryKey: ['requisicoes-compra'] });
       return savedId;
@@ -494,12 +551,36 @@ export default function RequisicaoCompraPage() {
     }
   };
 
-  // Change Status (Fiscal approved / rejected)
+  // Change Status (Rascunho <-> Enviada ao Fornecedor <-> Liquidada)
   const handleChangeStatus = async (requisicaoId: string, status: RequisicaoCompra['status']) => {
     const loadingToast = toast.loading('Atualizando situação da requisição...');
     try {
       const fullRequisicao = await requisicoesCompraService.getRequisicaoById(requisicaoId);
       if (!fullRequisicao) throw new Error('Requisição não localizada.');
+
+      // Ao enviar ao fornecedor, valida saldo disponível
+      if (status === 'enviada_fornecedor' || status === 'review') {
+        const empenhosToCheck = fullRequisicao.empenhos?.length
+          ? fullRequisicao.empenhos
+          : fullRequisicao.empenhoId
+            ? [{ empenhoId: fullRequisicao.empenhoId, empenhoNumero: fullRequisicao.empenhoNumero || '', sortOrder: 0 }]
+            : [];
+
+        for (const emp of empenhosToCheck) {
+          const empenhoObj = empenhos.find((e) => e.id === emp.empenhoId);
+          if (empenhoObj) {
+            const official = getEmpenhoAvailableBalance(empenhoObj);
+            const otherEnviado = enviadoFornecedorTotalByEmpenhoId.get(emp.empenhoId) ?? 0;
+            const available = Math.max(0, official - otherEnviado);
+            const reqTotalOnEmpenho = fullRequisicao.items
+              .filter((i) => (i.empenhoId || fullRequisicao.empenhoId) === emp.empenhoId)
+              .reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0);
+            if (reqTotalOnEmpenho > available) {
+              throw new Error(`Saldo insuficiente no empenho ${emp.empenhoNumero}. Saldo disponível: ${formatCurrency(available)} (Saldo oficial: ${formatCurrency(official)}, Comprometido em enviadas: ${formatCurrency(otherEnviado)}).`);
+            }
+          }
+        }
+      }
 
       // Save with new status
       await requisicoesCompraService.saveRequisicao(
@@ -519,10 +600,12 @@ export default function RequisicaoCompraPage() {
         { id: requisicaoId, status }
       );
 
-      toast.success(`Situação atualizada para: ${STATUS_META[status].label}`, { id: loadingToast });
+      const statusLabel = STATUS_META[status]?.label || status;
+      toast.success(`Situação atualizada para: ${statusLabel}`, { id: loadingToast });
       void queryClient.invalidateQueries({ queryKey: ['requisicoes-compra'] });
     } catch (err) {
-      toast.error('Não foi possível alterar a situação.', { id: loadingToast });
+      const message = err instanceof Error ? err.message : 'Não foi possível alterar a situação.';
+      toast.error(message, { id: loadingToast });
     }
   };
 
@@ -769,7 +852,11 @@ export default function RequisicaoCompraPage() {
                           <CommandGroup heading="Empenhos disponíveis">
                             {filteredEmpenhos.map((empenho) => {
                               const checked = selectedEmpenhoIds.includes(empenho.id);
-                              const label = `${empenho.numero} - saldo ${formatCurrency(getEmpenhoAvailableBalance(empenho))} - ${empenho.favorecidoNome || 'Sem favorecido'} - ${empenho.descricao || ''}`;
+                              const official = getEmpenhoAvailableBalance(empenho);
+                              const enviado = enviadoFornecedorTotalByEmpenhoId.get(empenho.id) ?? 0;
+                              const effective = Math.max(0, official - enviado);
+                              const extraLabel = enviado > 0 ? ` (Oficial: ${formatCurrency(official)} | (-) Enviado: ${formatCurrency(enviado)})` : '';
+                              const label = `${empenho.numero} - saldo ${formatCurrency(effective)}${extraLabel} - ${empenho.favorecidoNome || 'Sem favorecido'} - ${empenho.descricao || ''}`;
                               return (
                                 <CommandItem
                                   key={empenho.id}
@@ -819,6 +906,8 @@ export default function RequisicaoCompraPage() {
                     .map((item, index) => ({ item, index }))
                     .filter(({ item }) => item.empenhoId === empenho.id);
                   const groupTotal = requisicaoTotalByEmpenhoId.get(empenho.id) ?? 0;
+                  const officialBalance = officialBalanceByEmpenhoId.get(empenho.id) ?? getEmpenhoAvailableBalance(empenho);
+                  const enviadoFornecedorTotal = enviadoFornecedorTotalByEmpenhoId.get(empenho.id) ?? 0;
                   const availableBalance = empenhoBalanceById.get(empenho.id) ?? 0;
                   const afterRequisicao = Math.max(0, availableBalance - groupTotal);
                   const empenhoItemBalances = empenhoItemBalancesById.get(empenho.id) ?? [];
@@ -828,18 +917,31 @@ export default function RequisicaoCompraPage() {
 
                   return (
                     <div key={empenho.id} className="space-y-3 rounded-radius-lg border border-border-default bg-surface-base p-3">
-                      <div className={`flex flex-wrap items-center justify-between gap-3 border-l-4 px-4 py-3 ${
+                      <div className={`flex flex-wrap items-center justify-between gap-3 border-l-4 px-4 py-3 rounded-radius-md ${
                         hasBalanceViolation
                           ? 'border-status-error bg-status-error/5'
                           : 'border-status-success bg-status-success/5'
                       }`}>
                         <div>
-                          <p className="mt-1 font-mono text-sm font-bold text-text-primary">{empenho.numero}</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-mono text-sm font-bold text-text-primary">{empenho.numero}</p>
+                            {enviadoFornecedorTotal > 0 && (
+                              <Badge variant="outline" className="border-amber-300 bg-amber-50 text-[11px] font-semibold text-amber-800" title="Possui saldo retido em requisições já enviadas ao fornecedor">
+                                (-) {formatCurrency(enviadoFornecedorTotal)} em requisições enviadas
+                              </Badge>
+                            )}
+                          </div>
                           {empenho.favorecidoNome ? (
-                            <p className="text-xs text-text-muted">{empenho.favorecidoNome}</p>
+                            <p className="text-xs text-text-muted mt-0.5">{empenho.favorecidoNome}</p>
                           ) : null}
                         </div>
-                        <div className="grid grid-cols-1 gap-3 text-right text-sm sm:grid-cols-3">
+                        <div className={`grid gap-3 text-right text-sm ${enviadoFornecedorTotal > 0 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
+                          {enviadoFornecedorTotal > 0 && (
+                            <div>
+                              <p className="text-text-muted text-xs">Saldo oficial (SIAFI)</p>
+                              <p className="font-mono text-xs font-semibold text-text-muted">{formatCurrency(officialBalance)}</p>
+                            </div>
+                          )}
                           <div>
                             <p className="text-text-muted">Saldo disponível</p>
                             <p className="font-mono font-bold text-text-primary">{formatCurrency(availableBalance)}</p>
@@ -987,14 +1089,32 @@ export default function RequisicaoCompraPage() {
               <Textarea id="requisicao-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Descreva observações, justificativas ou detalhes complementares..." />
             </div>
 
-            <div className="flex justify-between items-center border-t border-border-default/50 pt-4">
+            <div className="flex flex-wrap justify-between items-center gap-3 border-t border-border-default/50 pt-4">
               <Button type="button" variant="outline" onClick={handleCancelForm}>
                 Voltar
               </Button>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="secondary" onClick={() => handleSaveRequisicao('draft')}>
                   Salvar Rascunho
                 </Button>
+                <Button
+                  type="button"
+                  className="bg-amber-600 hover:bg-amber-700 text-white gap-1.5"
+                  onClick={() => handleSaveRequisicao('enviada_fornecedor')}
+                >
+                  <Send className="h-4 w-4" />
+                  Enviar ao Fornecedor
+                </Button>
+                {isFiscalOrManager && editingRequisicaoId && (
+                  <Button
+                    type="button"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+                    onClick={() => handleSaveRequisicao('liquidada')}
+                  >
+                    <Check className="h-4 w-4" />
+                    Marcar como Liquidada
+                  </Button>
+                )}
                 <Button
                   type="button"
                   className="bg-primary hover:bg-primary/95 text-primary-foreground"
@@ -1025,6 +1145,65 @@ export default function RequisicaoCompraPage() {
             )}
           </div>
 
+          {/* Stat Cards */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Card className="border border-border-default bg-surface-card p-4 shadow-soft">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium uppercase tracking-wider text-text-muted">Total de Requisições</p>
+                <ClipboardList className="h-4 w-4 text-primary" />
+              </div>
+              <p className="mt-2 font-mono text-2xl font-bold text-text-primary">{requisicoes.length}</p>
+            </Card>
+
+            <Card className="border border-border-default bg-surface-card p-4 shadow-soft">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium uppercase tracking-wider text-text-muted">Rascunhos</p>
+                <Badge variant="outline" className="border-slate-300 bg-slate-100 text-slate-700">Rascunho</Badge>
+              </div>
+              <p className="mt-2 font-mono text-2xl font-bold text-text-primary">
+                {requisicoes.filter((r) => r.status === 'draft' || r.status === 'rejected').length}
+              </p>
+            </Card>
+
+            <Card className="border border-amber-200 bg-amber-50/40 p-4 shadow-soft">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium uppercase tracking-wider text-amber-900">Enviadas ao Fornecedor</p>
+                <Badge variant="outline" className="border-amber-300 bg-amber-100 text-amber-800">Comprometido</Badge>
+              </div>
+              <div className="mt-2 flex items-baseline justify-between">
+                <p className="font-mono text-2xl font-bold text-amber-950">
+                  {requisicoes.filter((r) => r.status === 'enviada_fornecedor' || r.status === 'review' || r.status === 'approved').length}
+                </p>
+                <p className="font-mono text-xs font-bold text-amber-800">
+                  {formatCurrency(
+                    requisicoes
+                      .filter((r) => r.status === 'enviada_fornecedor' || r.status === 'review' || r.status === 'approved')
+                      .reduce((sum, r) => sum + (r.totalValue ?? 0), 0),
+                  )}
+                </p>
+              </div>
+            </Card>
+
+            <Card className="border border-emerald-200 bg-emerald-50/40 p-4 shadow-soft">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium uppercase tracking-wider text-emerald-900">Liquidadas</p>
+                <Badge variant="outline" className="border-emerald-300 bg-emerald-100 text-emerald-800">Liquidada</Badge>
+              </div>
+              <div className="mt-2 flex items-baseline justify-between">
+                <p className="font-mono text-2xl font-bold text-emerald-950">
+                  {requisicoes.filter((r) => r.status === 'liquidada').length}
+                </p>
+                <p className="font-mono text-xs font-bold text-emerald-800">
+                  {formatCurrency(
+                    requisicoes
+                      .filter((r) => r.status === 'liquidada')
+                      .reduce((sum, r) => sum + (r.totalValue ?? 0), 0),
+                  )}
+                </p>
+              </div>
+            </Card>
+          </div>
+
           {isLoadingRequisicoes ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3 border rounded-radius-lg border-border-default">
               <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -1037,7 +1216,7 @@ export default function RequisicaoCompraPage() {
               <p className="font-ui text-sm text-text-secondary max-w-sm text-center">
                 {isTerceirizado || isSuperAdmin
                   ? 'Você ainda não criou requisições de compra. Clique no botão acima para registrar a sua primeira requisição.'
-                  : 'Nenhum prestador terceirizado submeteu requisições de compra para revisão ainda.'}
+                  : 'Nenhum prestador terceirizado submeteu requisições de compra ainda.'}
               </p>
               {(isTerceirizado || isSuperAdmin) && (
                 <Button type="button" className="bg-primary text-primary-foreground mt-2" onClick={handleNewRequisicao}>
@@ -1052,6 +1231,7 @@ export default function RequisicaoCompraPage() {
                   <TableRow className="bg-surface-subtle/50">
                     <TableHead>Situação</TableHead>
                     <TableHead>Requisição</TableHead>
+                    <TableHead className="text-right">Valor Total</TableHead>
                     <TableHead>Criado por</TableHead>
                     <TableHead>Referências</TableHead>
                     <TableHead>Atualização</TableHead>
@@ -1063,6 +1243,10 @@ export default function RequisicaoCompraPage() {
                   {requisicoes.map((requisicao) => {
                     const statusInfo = STATUS_META[requisicao.status] || { label: requisicao.status, className: '' };
                     const isCreator = requisicao.createdBy === user?.id;
+                    const isDraft = requisicao.status === 'draft' || requisicao.status === 'rejected';
+                    const isEnviada = requisicao.status === 'enviada_fornecedor' || requisicao.status === 'review' || requisicao.status === 'approved';
+                    const isLiquidada = requisicao.status === 'liquidada';
+
                     const requisicaoEmpenhoLabels = requisicao.empenhos?.length
                       ? requisicao.empenhos.map((empenho) => empenho.empenhoNumero).filter(Boolean)
                       : requisicao.empenhoNumero
@@ -1083,6 +1267,9 @@ export default function RequisicaoCompraPage() {
                               {requisicao.title}
                             </div>
                           )}
+                        </TableCell>
+                        <TableCell className="align-top text-right font-mono text-sm font-bold text-text-primary">
+                          {formatCurrency(requisicao.totalValue ?? 0)}
                         </TableCell>
                         <TableCell className="align-top text-xs text-text-secondary">
                           <span className="font-semibold text-text-primary">{requisicao.createdByEmail}</span>
@@ -1138,7 +1325,51 @@ export default function RequisicaoCompraPage() {
                             >
                               <Printer className="h-4 w-4" />
                             </Button>
-                            {isCreator && (requisicao.status === 'draft' || requisicao.status === 'rejected') && (
+
+                            {/* Ações para Rascunho */}
+                            {isDraft && (
+                              <>
+                                {(isCreator || isFiscalOrManager) && (
+                                  <>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      title="Editar Requisição"
+                                      aria-label={`Editar requisição ${requisicao.number}`}
+                                      onClick={() => handleEditRequisicao(requisicao)}
+                                      className="h-8 px-2"
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      aria-label={`Excluir requisição ${requisicao.number}`}
+                                      onClick={() => handleDeleteRequisicao(requisicao.id)}
+                                      className="h-8 px-2 text-destructive hover:bg-destructive/10"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </>
+                                )}
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="bg-amber-600 hover:bg-amber-700 text-white h-8 px-2 gap-1 text-xs"
+                                  title="Enviar ao Fornecedor"
+                                  aria-label={`Enviar requisição ${requisicao.number} ao fornecedor`}
+                                  onClick={() => handleChangeStatus(requisicao.id, 'enviada_fornecedor')}
+                                >
+                                  <Send className="h-3.5 w-3.5" />
+                                  <span>Enviar</span>
+                                </Button>
+                              </>
+                            )}
+
+                            {/* Ações para Enviada ao Fornecedor */}
+                            {isEnviada && (
                               <>
                                 <Button
                                   type="button"
@@ -1151,54 +1382,46 @@ export default function RequisicaoCompraPage() {
                                 >
                                   <Pencil className="h-4 w-4" />
                                 </Button>
+                                {isFiscalOrManager && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-2 gap-1 text-xs"
+                                    title="Marcar como Liquidada"
+                                    aria-label={`Marcar requisição ${requisicao.number} como liquidada`}
+                                    onClick={() => handleChangeStatus(requisicao.id, 'liquidada')}
+                                  >
+                                    <Check className="h-3.5 w-3.5" />
+                                    <span>Liquidar</span>
+                                  </Button>
+                                )}
                                 <Button
                                   type="button"
-                                  variant="ghost"
+                                  variant="outline"
                                   size="sm"
-                                  aria-label={`Excluir requisição ${requisicao.number}`}
-                                  onClick={() => handleDeleteRequisicao(requisicao.id)}
-                                  className="h-8 px-2 text-destructive hover:bg-destructive/10"
+                                  title="Retornar para Rascunho"
+                                  aria-label={`Retornar requisição ${requisicao.number} para rascunho`}
+                                  onClick={() => handleChangeStatus(requisicao.id, 'draft')}
+                                  className="h-8 px-2 text-text-muted hover:text-text-primary"
                                 >
-                                  <Trash2 className="h-4 w-4" />
+                                  <RotateCcw className="h-3.5 w-3.5" />
                                 </Button>
                               </>
                             )}
-                            {!isCreator && isFiscalOrManager && requisicao.status === 'review' && (
+
+                            {/* Ações para Liquidada */}
+                            {isLiquidada && (
                               <Button
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                title="Visualizar e Editar"
-                                aria-label={`Visualizar e editar requisição ${requisicao.number}`}
+                                title="Visualizar Requisição"
+                                aria-label={`Visualizar requisição ${requisicao.number}`}
                                 onClick={() => handleEditRequisicao(requisicao)}
                                 className="h-8 px-2"
                               >
                                 <Pencil className="h-4 w-4" />
                               </Button>
-                            )}
-                            {isFiscalOrManager && requisicao.status === 'review' && (
-                              <>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-2"
-                                  title="Aprovar Requisição"
-                                  aria-label={`Aprovar requisição ${requisicao.number}`}
-                                  onClick={() => handleChangeStatus(requisicao.id, 'approved')}
-                                >
-                                  <Check className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  className="bg-rose-600 hover:bg-rose-700 text-white h-8 px-2"
-                                  title="Rejeitar Requisição"
-                                  aria-label={`Rejeitar requisição ${requisicao.number}`}
-                                  onClick={() => handleChangeStatus(requisicao.id, 'rejected')}
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </>
                             )}
                           </div>
                         </TableCell>

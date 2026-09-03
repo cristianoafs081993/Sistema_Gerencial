@@ -145,7 +145,7 @@ describe('RequisicaoCompraPage', () => {
         id: 'req-1',
         title: 'Compra de insumos',
         number: 'REQ-2026-0001',
-        status: 'review',
+        status: 'enviada_fornecedor',
         createdBy: 'terceirizado-1',
         createdByEmail: 'terceirizado@ifrn.edu.br',
         empenhoId: 'emp-83',
@@ -158,6 +158,7 @@ describe('RequisicaoCompraPage', () => {
         contratoNumero: '00329/2025',
         processNumber: '23035.000001/2026-01',
         notes: 'Pedido de teste',
+        totalValue: 500,
         createdAt: new Date('2026-07-28T10:00:00Z'),
         updatedAt: new Date('2026-07-28T10:00:00Z'),
       },
@@ -168,14 +169,15 @@ describe('RequisicaoCompraPage', () => {
     const table = await screen.findByRole('table');
     expect(within(table).getByRole('columnheader', { name: /Situação/i })).toBeInTheDocument();
     expect(within(table).getByRole('columnheader', { name: /Requisição/i })).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: /Valor Total/i })).toBeInTheDocument();
     expect(within(table).getByRole('columnheader', { name: /Referências/i })).toBeInTheDocument();
     expect(within(table).getByText('REQ-2026-0001')).toBeInTheDocument();
-    expect(within(table).getByText('Em Revisão')).toBeInTheDocument();
+    expect(within(table).getByText('Enviada ao Fornecedor')).toBeInTheDocument();
     expect(within(table).getByText(/2025NE000083/)).toBeInTheDocument();
     expect(within(table).getByText(/2025NE000084/)).toBeInTheDocument();
     expect(within(table).getByText('00329/2025')).toBeInTheDocument();
-    expect(within(table).getByRole('button', { name: /Visualizar e editar requisição REQ-2026-0001/i })).toBeInTheDocument();
-    expect(within(table).getByRole('button', { name: /Aprovar requisição REQ-2026-0001/i })).toBeInTheDocument();
+    expect(within(table).getByRole('button', { name: /Editar requisição REQ-2026-0001/i })).toBeInTheDocument();
+    expect(within(table).getByRole('button', { name: /Marcar requisição REQ-2026-0001 como liquidada/i })).toBeInTheDocument();
     expect(within(table).queryAllByRole('row')).toHaveLength(2);
   });
 
@@ -548,5 +550,192 @@ describe('RequisicaoCompraPage', () => {
 
     // New subtotal: 2 * 75 = 150
     expect(screen.getAllByText(/R\$\s*150,00/).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('exibe os 3 status e seus respectivos stat cards na listagem', async () => {
+    mockedService.listRecentRequisicoes.mockResolvedValue([
+      {
+        id: 'req-draft',
+        title: 'Requisição Rascunho',
+        number: 'REQ-2026-0001',
+        status: 'draft',
+        createdBy: 'admin-1',
+        createdByEmail: 'admin@ifrn.edu.br',
+        totalValue: 100,
+        createdAt: new Date('2026-07-01T12:00:00Z'),
+        updatedAt: new Date('2026-07-01T12:00:00Z'),
+      },
+      {
+        id: 'req-enviada',
+        title: 'Requisição Enviada',
+        number: 'REQ-2026-0002',
+        status: 'enviada_fornecedor',
+        createdBy: 'admin-1',
+        createdByEmail: 'admin@ifrn.edu.br',
+        totalValue: 300,
+        createdAt: new Date('2026-07-01T12:00:00Z'),
+        updatedAt: new Date('2026-07-01T12:00:00Z'),
+      },
+      {
+        id: 'req-liquidada',
+        title: 'Requisição Liquidada',
+        number: 'REQ-2026-0003',
+        status: 'liquidada',
+        createdBy: 'admin-1',
+        createdByEmail: 'admin@ifrn.edu.br',
+        totalValue: 400,
+        createdAt: new Date('2026-07-01T12:00:00Z'),
+        updatedAt: new Date('2026-07-01T12:00:00Z'),
+      },
+    ] as never);
+
+    renderPage();
+
+    expect(await screen.findByText('REQ-2026-0001')).toBeInTheDocument();
+    expect(screen.getByText('REQ-2026-0002')).toBeInTheDocument();
+    expect(screen.getByText('REQ-2026-0003')).toBeInTheDocument();
+
+    // Badges
+    expect(screen.getAllByText('Rascunho').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Enviada ao Fornecedor').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Liquidada').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('desconta do saldo do empenho o valor de requisicoes enviadas ao fornecedor e exibe detalhamento visual', async () => {
+    mockedUseData.mockReturnValue({
+      empenhos: [
+        {
+          id: 'emp-100',
+          numero: '2026NE000100',
+          descricao: 'Material Hospitalar',
+          valor: 10000,
+          pago: 0,
+          liquidado: 0,
+          tipo: 'exercicio',
+          status: 'pendente',
+          dataEmpenho: new Date('2026-07-01T12:00:00Z'),
+          createdAt: new Date('2026-07-01T12:00:00Z'),
+          updatedAt: new Date('2026-07-01T12:00:00Z'),
+        },
+      ],
+      contratos: [],
+      contratosEmpenhos: [],
+    } as never);
+
+    // Requisicao anterior já enviada ao fornecedor no valor de 2.500
+    mockedService.listRecentRequisicoes.mockResolvedValue([
+      {
+        id: 'req-enviada-anterior',
+        title: 'Primeira entrega enviada',
+        number: 'REQ-2026-0001',
+        status: 'enviada_fornecedor',
+        createdBy: 'admin-1',
+        createdByEmail: 'admin@ifrn.edu.br',
+        empenhoId: 'emp-100',
+        empenhoNumero: '2026NE000100',
+        totalValue: 2500,
+        items: [
+          {
+            id: 'item-prev',
+            requisicaoCompraId: 'req-enviada-anterior',
+            description: 'Item A',
+            quantity: 25,
+            unit: 'UN',
+            unitPrice: 100,
+            empenhoId: 'emp-100',
+            sortOrder: 0,
+            createdAt: new Date('2026-07-01T12:00:00Z'),
+            updatedAt: new Date('2026-07-01T12:00:00Z'),
+          },
+        ],
+        createdAt: new Date('2026-07-01T12:00:00Z'),
+        updatedAt: new Date('2026-07-01T12:00:00Z'),
+      },
+    ] as never);
+
+    renderPage();
+
+    // Criar nova requisição
+    fireEvent.click(await screen.findByRole('button', { name: /Nova Requisição de Compra/i }));
+    fireEvent.click(screen.getByRole('combobox', { name: /Buscar e selecionar empenhos/i }));
+
+    // No seletor, deve mostrar o saldo disponível com desconto (10.000 - 2.500 = 7.500)
+    const empenhoOption = await screen.findByText(/2026NE000100/);
+    expect(empenhoOption).toBeInTheDocument();
+    expect(empenhoOption.textContent).toContain('7.500,00');
+    expect(empenhoOption.textContent).toContain('2.500,00');
+
+    // Seleciona o empenho
+    fireEvent.click(empenhoOption);
+
+    // No card do empenho, deve exibir o detalhamento com saldo oficial e dedução de enviadas
+    expect(await screen.findByText(/10\.000,00/)).toBeInTheDocument(); // Saldo Oficial
+    expect(screen.getByText(/2\.500,00/)).toBeInTheDocument(); // (-) Retenção
+    expect(screen.getAllByText(/7\.500,00/).length).toBeGreaterThanOrEqual(1); // Saldo Disponível
+  });
+
+  it('nao desconta do saldo do modulo quando a requisicao muda para status liquidada', async () => {
+    mockedUseData.mockReturnValue({
+      empenhos: [
+        {
+          id: 'emp-200',
+          numero: '2026NE000200',
+          descricao: 'Serviços de TI',
+          valor: 5000,
+          valorPagoOficial: 2000, // Débito oficial via SIAFI/liquidações
+          tipo: 'exercicio',
+          status: 'pendente',
+          dataEmpenho: new Date('2026-07-01T12:00:00Z'),
+          createdAt: new Date('2026-07-01T12:00:00Z'),
+          updatedAt: new Date('2026-07-01T12:00:00Z'),
+        },
+      ],
+      contratos: [],
+      contratosEmpenhos: [],
+    } as never);
+
+    // Requisição com status liquidada
+    mockedService.listRecentRequisicoes.mockResolvedValue([
+      {
+        id: 'req-liquidada-1',
+        title: 'Serviço liquidado',
+        number: 'REQ-2026-0099',
+        status: 'liquidada',
+        createdBy: 'admin-1',
+        createdByEmail: 'admin@ifrn.edu.br',
+        empenhoId: 'emp-200',
+        empenhoNumero: '2026NE000200',
+        totalValue: 2000,
+        items: [
+          {
+            id: 'item-liq',
+            requisicaoCompraId: 'req-liquidada-1',
+            description: 'Serviço executado',
+            quantity: 1,
+            unit: 'UN',
+            unitPrice: 2000,
+            empenhoId: 'emp-200',
+            sortOrder: 0,
+            createdAt: new Date('2026-07-01T12:00:00Z'),
+            updatedAt: new Date('2026-07-01T12:00:00Z'),
+          },
+        ],
+        createdAt: new Date('2026-07-01T12:00:00Z'),
+        updatedAt: new Date('2026-07-01T12:00:00Z'),
+      },
+    ] as never);
+
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: /Nova Requisição de Compra/i }));
+    fireEvent.click(screen.getByRole('combobox', { name: /Buscar e selecionar empenhos/i }));
+
+    // Saldo do empenho oficial é 5000 - 2000 = 3000.
+    // Como a requisição está 'liquidada', NÃO deve descontar mais 2000 novamente (o saldo continua 3000)!
+    const empenhoOption = await screen.findByText(/2026NE000200/);
+    expect(empenhoOption).toBeInTheDocument();
+    expect(empenhoOption.textContent).toContain('3.000,00');
+    expect(empenhoOption.textContent).not.toContain('Enviado:');
+    expect(screen.queryByText(/2\.000,00.*enviadas/i)).not.toBeInTheDocument();
   });
 });

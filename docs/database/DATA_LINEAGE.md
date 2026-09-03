@@ -96,7 +96,7 @@ Mostrar a linhagem operacional dos dados de forma curta:
     - `requisicao_compra_empenhos`
     - `requisicao_compra_itens`
     - `terceirizado_permissions`
-  - observacao: a requisicao pode vincular multiplas NEs em `requisicao_compra_empenhos`; cada item carrega seu proprio `empenho_id`. Os campos legados `requisicoes_compra.empenho_id/empenho_numero` continuam preenchidos com a primeira NE para compatibilidade. Em `review`/`approved`, a RPC valida permissao de terceirizado e saldo oficial separadamente por NE, sem abater outras requisicoes abertas.
+  - observacao: a requisicao pode vincular multiplas NEs em `requisicao_compra_empenhos`; cada item carrega seu proprio `empenho_id`. Os campos legados `requisicoes_compra.empenho_id/empenho_numero` continuam preenchidos com a primeira NE para compatibilidade. O fluxo opera com 3 status (`draft`, `enviada_fornecedor`, `liquidada`). Em `enviada_fornecedor`, a RPC valida permissao de terceirizado e deduz do saldo concorrente outras requisições enviadas ao fornecedor da mesma NE. Em `liquidada`, o desconto temporário cessa para evitar duplicidade com as liquidações do SIAFI.
 
 ### Contratos API Comprasnet
 
