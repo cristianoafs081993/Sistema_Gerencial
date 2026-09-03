@@ -3,11 +3,13 @@ import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Check,
   CheckCircle2,
+  ChevronDown,
   ClipboardList,
   Coins,
   FileText,
   Info,
   Loader2,
+  MoreHorizontal,
   Plus,
   Pencil,
   Printer,
@@ -25,6 +27,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -71,19 +81,20 @@ export default function RequisicaoCompraPage() {
     [user?.id, user?.email, userMatricula],
   );
 
-  // Roles verification
+  // Roles verification: terceirizados são prestadores externos; todos os demais são servidores/gestores/superadmin
   const isTerceirizado = useMemo(() => userGroups.some((g) => g.slug === 'terceirizado'), [userGroups]);
   const isFiscalOrManager = useMemo(() => {
     return (
       isSuperAdmin ||
-      userGroups.some((g) => g.slug === 'fiscal-contratos' || g.slug === 'diretores' || g.slug === 'teste')
+      !isTerceirizado ||
+      userGroups.some((g) => g.slug !== 'terceirizado')
     );
-  }, [userGroups, isSuperAdmin]);
-
+  }, [userGroups, isSuperAdmin, isTerceirizado]);
 
   // Form & Edit State
   const [isEditing, setIsEditing] = useState(false);
   const [editingRequisicaoId, setEditingRequisicaoId] = useState<string | undefined>();
+  const [editingStatus, setEditingStatus] = useState<RequisicaoCompra['status']>('draft');
   const [requisicaoNumber, setRequisicaoNumber] = useState('');
   const [selectedEmpenhoIds, setSelectedEmpenhoIds] = useState<string[]>([]);
   const [isEmpenhoPickerOpen, setIsEmpenhoPickerOpen] = useState(false);
@@ -422,6 +433,7 @@ export default function RequisicaoCompraPage() {
   // Start creating new Requisição
   const handleNewRequisicao = () => {
     setEditingRequisicaoId(undefined);
+    setEditingStatus('draft');
     setRequisicaoNumber(`REQ-${new Date().getFullYear()}-${String(requisicoes.length + 1).padStart(4, '0')}`);
     setSelectedEmpenhoIds([]);
     setIsEmpenhoPickerOpen(false);
@@ -442,9 +454,10 @@ export default function RequisicaoCompraPage() {
       if (!fullRequisicao) throw new Error('Requisição de compra não encontrada.');
 
       setEditingRequisicaoId(fullRequisicao.id);
+      setEditingStatus(fullRequisicao.status);
       setRequisicaoNumber(fullRequisicao.number);
       setEmpenhoSearch('');
-        const requisicaoEmpenhoIds = (fullRequisicao.empenhos?.length
+      const requisicaoEmpenhoIds = (fullRequisicao.empenhos?.length
         ? fullRequisicao.empenhos.map((empenho) => empenho.empenhoId)
         : fullRequisicao.empenhoId
           ? [fullRequisicao.empenhoId]
@@ -472,6 +485,7 @@ export default function RequisicaoCompraPage() {
   const handleCancelForm = () => {
     setIsEditing(false);
     setEditingRequisicaoId(undefined);
+    setEditingStatus('draft');
     setEmptyQuantityInputKeys(new Set());
     setEmptyUnitPriceInputKeys(new Set());
   };
@@ -553,7 +567,8 @@ export default function RequisicaoCompraPage() {
 
   // Change Status (Rascunho <-> Enviada ao Fornecedor <-> Liquidada)
   const handleChangeStatus = async (requisicaoId: string, status: RequisicaoCompra['status']) => {
-    const loadingToast = toast.loading('Atualizando situação da requisição...');
+    const targetStatusLabel = STATUS_META[status]?.label || status;
+    const loadingToast = toast.loading(`Alterando situação para "${targetStatusLabel}"...`);
     try {
       const fullRequisicao = await requisicoesCompraService.getRequisicaoById(requisicaoId);
       if (!fullRequisicao) throw new Error('Requisição não localizada.');
@@ -570,7 +585,13 @@ export default function RequisicaoCompraPage() {
           const empenhoObj = empenhos.find((e) => e.id === emp.empenhoId);
           if (empenhoObj) {
             const official = getEmpenhoAvailableBalance(empenhoObj);
-            const otherEnviado = enviadoFornecedorTotalByEmpenhoId.get(emp.empenhoId) ?? 0;
+            const totalEnviadoOnEmp = enviadoFornecedorTotalByEmpenhoId.get(emp.empenhoId) ?? 0;
+            const currentReqOnEmp = (fullRequisicao.status === 'enviada_fornecedor' || fullRequisicao.status === 'review' || fullRequisicao.status === 'approved')
+              ? fullRequisicao.items
+                  .filter((i) => (i.empenhoId || fullRequisicao.empenhoId) === emp.empenhoId)
+                  .reduce((sum, i) => sum + (i.quantity * i.unitPrice), 0)
+              : 0;
+            const otherEnviado = Math.max(0, totalEnviadoOnEmp - currentReqOnEmp);
             const available = Math.max(0, official - otherEnviado);
             const reqTotalOnEmpenho = fullRequisicao.items
               .filter((i) => (i.empenhoId || fullRequisicao.empenhoId) === emp.empenhoId)
@@ -600,8 +621,10 @@ export default function RequisicaoCompraPage() {
         { id: requisicaoId, status }
       );
 
-      const statusLabel = STATUS_META[status]?.label || status;
-      toast.success(`Situação atualizada para: ${statusLabel}`, { id: loadingToast });
+      toast.success(`Situação atualizada para: ${targetStatusLabel}`, { id: loadingToast });
+      if (editingRequisicaoId === requisicaoId) {
+        setEditingStatus(status);
+      }
       void queryClient.invalidateQueries({ queryKey: ['requisicoes-compra'] });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Não foi possível alterar a situação.';
@@ -813,8 +836,20 @@ export default function RequisicaoCompraPage() {
       {isEditing && (
         <Card className="border-primary/20 shadow-lg animate-in fade-in zoom-in-95 duration-200">
           <CardHeader className="bg-primary/[0.02] border-b border-border-default/50">
-            <CardTitle>{editingRequisicaoId ? 'Editar Requisição de Compra' : 'Nova Requisição de Compra'}</CardTitle>
-            <CardDescription>Preencha os dados e associe os empenhos que fundamentam a requisição.</CardDescription>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle>{editingRequisicaoId ? `Editar Requisição de Compra (${requisicaoNumber})` : 'Nova Requisição de Compra'}</CardTitle>
+                <CardDescription>Preencha os dados e associe os empenhos que fundamentam a requisição.</CardDescription>
+              </div>
+              {editingRequisicaoId && (
+                <div className="flex items-center gap-2 bg-surface-base px-3 py-1.5 rounded-radius-md border border-border-default shrink-0">
+                  <span className="text-xs font-medium text-text-muted">Situação atual:</span>
+                  <Badge variant="outline" className={`font-ui text-xs font-bold ${STATUS_META[editingStatus || 'draft']?.className}`}>
+                    {STATUS_META[editingStatus || 'draft']?.label}
+                  </Badge>
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-6 pt-6">
             <div className="space-y-2">
@@ -1256,9 +1291,54 @@ export default function RequisicaoCompraPage() {
                     return (
                       <TableRow key={requisicao.id} className="hover:bg-surface-hover/20">
                         <TableCell className="align-top">
-                          <Badge variant="outline" className={`font-ui text-xs font-bold ${statusInfo.className}`}>
-                            {statusInfo.label}
-                          </Badge>
+                          {isFiscalOrManager ? (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className={`h-7 px-2.5 font-ui text-xs font-bold gap-1.5 cursor-pointer hover:shadow-xs transition-all ${statusInfo.className}`}
+                                  title="Clique para alterar a situação desta requisição"
+                                >
+                                  <span>{statusInfo.label}</span>
+                                  <ChevronDown className="h-3 w-3 opacity-70" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start" className="w-56">
+                                <DropdownMenuLabel className="text-xs text-text-muted">Alterar situação para:</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => handleChangeStatus(requisicao.id, 'draft')}
+                                  className="gap-2 text-xs font-medium cursor-pointer"
+                                >
+                                  <div className="h-2 w-2 rounded-full bg-slate-400" />
+                                  <span>Rascunho</span>
+                                  {isDraft && <Check className="ml-auto h-3.5 w-3.5 text-primary" />}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleChangeStatus(requisicao.id, 'enviada_fornecedor')}
+                                  className="gap-2 text-xs font-medium cursor-pointer text-amber-900 focus:text-amber-950 focus:bg-amber-50"
+                                >
+                                  <div className="h-2 w-2 rounded-full bg-amber-500" />
+                                  <span>Enviada ao Fornecedor</span>
+                                  {isEnviada && <Check className="ml-auto h-3.5 w-3.5 text-amber-600" />}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleChangeStatus(requisicao.id, 'liquidada')}
+                                  className="gap-2 text-xs font-medium cursor-pointer text-emerald-900 focus:text-emerald-950 focus:bg-emerald-50"
+                                >
+                                  <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                                  <span>Liquidada</span>
+                                  {isLiquidada && <Check className="ml-auto h-3.5 w-3.5 text-emerald-600" />}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          ) : (
+                            <Badge variant="outline" className={`font-ui text-xs font-bold ${statusInfo.className}`}>
+                              {statusInfo.label}
+                            </Badge>
+                          )}
                         </TableCell>
                         <TableCell className="align-top">
                           <div className="font-ui font-bold text-text-primary">{requisicao.number}</div>
@@ -1313,7 +1393,7 @@ export default function RequisicaoCompraPage() {
                           )}
                         </TableCell>
                         <TableCell className="align-top text-right pr-6">
-                          <div className="flex flex-wrap justify-end gap-1.5">
+                          <div className="flex flex-wrap justify-end gap-1.5 items-center">
                             <Button
                               type="button"
                               variant="outline"
@@ -1326,67 +1406,55 @@ export default function RequisicaoCompraPage() {
                               <Printer className="h-4 w-4" />
                             </Button>
 
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              title="Editar Requisição"
+                              aria-label={`Editar requisição ${requisicao.number}`}
+                              onClick={() => handleEditRequisicao(requisicao)}
+                              className="h-8 px-2"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+
                             {/* Ações para Rascunho */}
                             {isDraft && (
                               <>
-                                {(isCreator || isFiscalOrManager) && (
-                                  <>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      title="Editar Requisição"
-                                      aria-label={`Editar requisição ${requisicao.number}`}
-                                      onClick={() => handleEditRequisicao(requisicao)}
-                                      className="h-8 px-2"
-                                    >
-                                      <Pencil className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      aria-label={`Excluir requisição ${requisicao.number}`}
-                                      onClick={() => handleDeleteRequisicao(requisicao.id)}
-                                      className="h-8 px-2 text-destructive hover:bg-destructive/10"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </>
-                                )}
                                 <Button
                                   type="button"
                                   size="sm"
-                                  className="bg-amber-600 hover:bg-amber-700 text-white h-8 px-2 gap-1 text-xs"
+                                  className="bg-amber-600 hover:bg-amber-700 text-white h-8 px-2.5 gap-1 text-xs font-semibold"
                                   title="Enviar ao Fornecedor"
                                   aria-label={`Enviar requisição ${requisicao.number} ao fornecedor`}
                                   onClick={() => handleChangeStatus(requisicao.id, 'enviada_fornecedor')}
                                 >
                                   <Send className="h-3.5 w-3.5" />
-                                  <span>Enviar</span>
+                                  <span>Enviar ao Fornecedor</span>
                                 </Button>
+                                {(isCreator || isFiscalOrManager) && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    aria-label={`Excluir requisição ${requisicao.number}`}
+                                    onClick={() => handleDeleteRequisicao(requisicao.id)}
+                                    className="h-8 px-2 text-destructive hover:bg-destructive/10"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
                               </>
                             )}
 
                             {/* Ações para Enviada ao Fornecedor */}
                             {isEnviada && (
                               <>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  title="Editar Requisição"
-                                  aria-label={`Editar requisição ${requisicao.number}`}
-                                  onClick={() => handleEditRequisicao(requisicao)}
-                                  className="h-8 px-2"
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
                                 {isFiscalOrManager && (
                                   <Button
                                     type="button"
                                     size="sm"
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-2 gap-1 text-xs"
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-2.5 gap-1 text-xs font-semibold"
                                     title="Marcar como Liquidada"
                                     aria-label={`Marcar requisição ${requisicao.number} como liquidada`}
                                     onClick={() => handleChangeStatus(requisicao.id, 'liquidada')}
@@ -1411,17 +1479,33 @@ export default function RequisicaoCompraPage() {
 
                             {/* Ações para Liquidada */}
                             {isLiquidada && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                title="Visualizar Requisição"
-                                aria-label={`Visualizar requisição ${requisicao.number}`}
-                                onClick={() => handleEditRequisicao(requisicao)}
-                                className="h-8 px-2"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
+                              <>
+                                {isFiscalOrManager && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 h-8 px-2.5 gap-1 text-xs font-medium"
+                                    title="Reabrir para Enviada ao Fornecedor"
+                                    aria-label={`Reabrir requisição ${requisicao.number} para enviada ao fornecedor`}
+                                    onClick={() => handleChangeStatus(requisicao.id, 'enviada_fornecedor')}
+                                  >
+                                    <Send className="h-3.5 w-3.5" />
+                                    <span>Reabrir</span>
+                                  </Button>
+                                )}
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  title="Retornar para Rascunho"
+                                  aria-label={`Retornar requisição ${requisicao.number} para rascunho`}
+                                  onClick={() => handleChangeStatus(requisicao.id, 'draft')}
+                                  className="h-8 px-2 text-text-muted hover:text-text-primary"
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5" />
+                                </Button>
+                              </>
                             )}
                           </div>
                         </TableCell>
