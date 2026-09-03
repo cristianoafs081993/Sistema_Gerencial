@@ -715,6 +715,7 @@ Function chamada pela extensão na rota oficial de edição de ETP.
 - Recuperação de Documentos Oficiais: para cada contratação retornada, consulta `/arquivos` no PNCP para localizar PDFs de Edital, Termo de Referência ou Aviso de Dispensa com link de download direto.
 - Recuperação de Itens e Preços: consulta `/itens` da contratação no PNCP para obter preços homologados e especificações técnicas oficiais.
 - Auditoria Semântica Rigorosa via Gemini (com fallback entre `gemini-2.5-flash`, `gemini-2.5-flash-lite` e `gemini-1.5-flash`):
+  - Auditoria em Lote (Batch Auditing): todos os candidatos coletados para um item são submetidos e auditados conjuntamente em uma única chamada de IA (`auditCandidatesBatchWithGemini`), reduzindo em mais de 75% as chamadas externas, imunizando o sistema contra limites de RPM/rate-limiting e acelerando a resposta multi-item.
   - Fusão Contextual Item + Objeto do Edital: para evitar falsos negativos decorrentes de cadastros sucintos na linha da tabela de itens (ex: "NOTEBOOK DELL"), o sistema funde a denominação do item com o objeto detalhado da contratação e do edital antes de submeter ao auditor de IA.
   - Confronta a demanda do usuário com o texto do item licitado e do TR/Edital.
   - Se pertencer a categoria distinta (ex: equipamento médico para demanda de informática) ou for acessório desarmônico, classifica como `INCOMPATIVEL`, zera o score de similaridade e exclui obrigatoriamente o item da cesta de cálculo da mediana/média da IN 65/2021.

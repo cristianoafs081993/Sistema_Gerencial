@@ -169,11 +169,19 @@ Responda estritamente em JSON puro no formato de array de avaliações:
       if (res.ok) {
         const data = await res.json();
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
           const parsed = JSON.parse(text);
-          if (Array.isArray(parsed)) {
-            for (const item of parsed) {
-              const cand = candidates[item.indice] || candidates.find((c) => c.id === item.id);
+          const list = Array.isArray(parsed)
+            ? parsed
+            : (Array.isArray(parsed?.avaliacoes) ? parsed.avaliacoes :
+               Array.isArray(parsed?.candidates) ? parsed.candidates :
+               Array.isArray(parsed?.itens) ? parsed.itens :
+               Array.isArray(parsed?.items) ? parsed.items : []);
+
+          if (list.length > 0) {
+            for (const item of list) {
+              const cand = candidates.find((c) => c.id === item.id) ||
+                           candidates[item.indice] ||
+                           candidates[Number(item.indice) - 1];
               if (cand) {
                 let parsedScore = typeof item.score === 'number' ? item.score : (item.compativel ? 85 : 0);
                 if (parsedScore <= 1.0 && parsedScore > 0) {
@@ -191,7 +199,6 @@ Responda estritamente em JSON puro no formato de array de avaliações:
             }
             if (results.size > 0) return results;
           }
-        }
       }
     } catch (err) {
       console.warn(`auditCandidatesBatchWithGemini error with model ${model}:`, err);
