@@ -111,21 +111,19 @@ async function auditCandidateWithGemini(
   const prompt = `Você é um auditor de contratações públicas federais avaliando a compatibilidade de um item paradigma para pesquisa de preços segundo a IN SEGES/ME nº 65/2021 e Lei 14.133/2021.
 
 Demanda solicitada pelo órgão: "${demandDescription}"
-Item ofertado no Edital/TR do órgão ${cand.agencyName}:
-- Descrição Técnica: "${cand.description}"
+Item e Documentação da Contratação Pública (${cand.agencyName}):
+- Descrição Técnica e Objeto do Edital: "${cand.description}"
 - Preço Unitário: R$ ${cand.unitPrice}
 ${cand.brand ? `- Marca/Referência: "${cand.brand}"` : ''}
 ${cand.documentTitle ? `- Documento Referência: "${cand.documentTitle}"` : ''}
 
-Avalie com extremo rigor técnico:
-1. O item ofertado possui semelhança e equivalência técnica com a demanda solicitada?
-2. Se pertencer a uma categoria de produto totalmente diferente (ex: produto médico, vestuário, material hospitalar para demanda de informática) ou se for apenas um acessório/componente e não o item principal, o item DEVE ter compativel: false e score: 0.
-3. Classifique como:
-   - "COMPATIVEL" (atende plenamente ao objeto e especificações essenciais)
-   - "COMPATIVEL_COM_RESSALVA" (atende à finalidade com variações secundárias aceitáveis)
-   - "INCOMPATIVEL" (categoria diferente, finalidade discrepante ou especificação insuficiente)
-4. Redija um parecer técnico objetivo e fundamentado explicando os motivos.
-5. Indique o trecho ou síntese da especificação técnica essencial comprovada.
+Diretrizes mandatórias de avaliação técnica:
+1. Em contratações públicas, é comum a linha do item ter uma denominação sucinta (ex: "NOTEBOOK DELL") enquanto os requisitos técnicos detalhados (ex: memória RAM de 16 GB, processador, armazenamento SSD) constam no Objeto da Licitação, Termo de Referência ou Edital. Analise o CONJUNTO das informações técnicas fornecidas.
+2. Se a demanda solicita uma configuração específica (ex: "notebook 16 gb") e a descrição ou o objeto da licitação comprovar que o item possui essa configuração (ex: "16 GB RAM", "16GB"), considere o item plenamente COMPATÍVEL.
+3. Se o item atender ao propósito com variações secundárias aceitáveis, classifique como "COMPATIVEL_COM_RESSALVA".
+4. Apenas classifique como "INCOMPATIVEL" se o item pertencer a categoria flagrantemente distinta (ex: produto médico, vestuário, obra civil para demanda de informática), se for mero acessório (ex: pendrive, capa, base para demanda de computador), ou se a especificação for comprovadamente insuficiente ou antieconômica.
+5. Redija um parecer técnico sucinto e fundamentado para instruir o processo eletrônico, indicando os requisitos atendidos.
+6. Indique o trecho literal da especificação técnica essencial comprovada.
 
 Responda estritamente em JSON puro sem markdown:
 {
@@ -136,31 +134,39 @@ Responda estritamente em JSON puro sem markdown:
   "trechoEdital": "especificação técnica essencial do item no documento"
 }`;
 
-  try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: 'application/json', temperature: 0.1 },
-      }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text) {
-        const parsed = JSON.parse(text);
-        return {
-          compativel: Boolean(parsed.compativel),
-          score: typeof parsed.score === 'number' ? parsed.score : (parsed.compativel ? 80 : 0),
-          classificacao: parsed.classificacao || (parsed.compativel ? 'COMPATIVEL' : 'INCOMPATIVEL'),
-          justificativa: String(parsed.justificativa || ''),
-          trechoEdital: parsed.trechoEdital ? String(parsed.trechoEdital) : undefined,
-        };
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash'];
+  for (const model of modelsToTry) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json', temperature: 0.1 },
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) {
+          const parsed = JSON.parse(text);
+          let parsedScore = typeof parsed.score === 'number' ? parsed.score : (parsed.compativel ? 85 : 0);
+          if (parsedScore <= 1.0 && parsedScore > 0) {
+            parsedScore = Math.round(parsedScore * 100);
+          }
+
+          return {
+            compativel: Boolean(parsed.compativel),
+            score: parsedScore,
+            classificacao: parsed.classificacao || (parsed.compativel ? 'COMPATIVEL' : 'INCOMPATIVEL'),
+            justificativa: String(parsed.justificativa || ''),
+            trechoEdital: parsed.trechoEdital ? String(parsed.trechoEdital) : undefined,
+          };
+        }
       }
+    } catch (err) {
+      console.warn(`auditCandidateWithGemini error with model ${model}:`, err);
     }
-  } catch (err) {
-    console.warn('auditCandidateWithGemini error:', err);
   }
 
   // Fallback se a IA falhar: verificação léxica rigorosa
@@ -172,12 +178,12 @@ Responda estritamente em JSON puro sem markdown:
 
   return {
     compativel: isMatch,
-    score: isMatch ? 75 : 0,
+    score: isMatch ? 80 : 0,
     classificacao: isMatch ? 'COMPATIVEL' : 'INCOMPATIVEL',
     justificativa: isMatch
-      ? 'Item apresenta semelhança semântica básica com a demanda solicitada.'
+      ? 'Item apresenta semelhança semântica com a demanda solicitada no conjunto das especificações da contratação.'
       : 'Item de categoria ou especificação técnica divergente da demanda solicitada.',
-    trechoEdital: cand.description.slice(0, 200),
+    trechoEdital: cand.description.slice(0, 250),
   };
 }
 
@@ -242,7 +248,19 @@ async function executeConversationalPriceResearch(
                   const price = Number(it.valorUnitarioHomologado || it.valorUnitarioEstimado || 0);
                   if (price <= 0) continue;
 
-                  const desc = String(it.descricao || it.especificacaoTecnica || it.descricaoDetalhada || tender.description || '');
+                  const itemDesc = String(it.descricao || it.especificacaoTecnica || it.descricaoDetalhada || '').trim();
+                  const tenderDesc = String(tender.description || tender.title || '').trim();
+
+                  // Fusão contextual: se a linha for sucinta (ex: "NOTEBOOK DELL"), enriquece com o objeto do Edital/Contratação
+                  let combinedDesc = itemDesc;
+                  if (tenderDesc) {
+                    if (!itemDesc) {
+                      combinedDesc = tenderDesc;
+                    } else if (!itemDesc.toLowerCase().includes(tenderDesc.toLowerCase().slice(0, 30))) {
+                      combinedDesc = `${itemDesc} — Objeto do Edital: ${tenderDesc}`;
+                    }
+                  }
+
                   const itemNum = String(it.numeroItem || '1');
                   const purchaseId = `${tender.ano}/${tender.numero_sequencial}`;
 
@@ -262,11 +280,12 @@ async function executeConversationalPriceResearch(
                     selected: true,
                     exclusionReason: '',
                     pncpUrl: `https://pncp.gov.br/app/editais/${cnpj}/${ano}/${seq}`,
-                    documentTitle: bestDoc?.titulo || `Edital / TR ${seq}/${ano}`,
-                    documentType: bestDoc?.tipoDocumentoNome || 'Termo de Referência',
+                    documentTitle: bestDoc?.titulo || tender.title || `Edital / TR ${seq}/${ano}`,
+                    documentType: bestDoc?.tipoDocumentoNome || tender.modalidade_licitacao_nome || 'Termo de Referência',
                     documentUrl: bestDoc?.url || `https://pncp.gov.br/app/editais/${cnpj}/${ano}/${seq}`,
                     editalPage: `Item ${itemNum} - Especificação Técnica`,
-                    itemDescription: desc,
+                    itemDescription: combinedDesc,
+                    editalExcerpt: tenderDesc || itemDesc,
                     editalAudited: false,
                     compatibility: 'NAO_IDENTIFICADO',
                   });
