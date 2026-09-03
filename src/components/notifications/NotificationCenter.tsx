@@ -1,21 +1,24 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   Bell,
   CheckCheck,
   Landmark,
   Receipt,
   Calendar,
+  Send,
   Sparkles,
 } from 'lucide-react';
 
-import type { Empenho, Descentralizacao, Atividade } from '@/types';
+import type { Empenho, Descentralizacao, Atividade, RequisicaoCompra, RequisicaoCompraRecord } from '@/types';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { EmpenhoDialog } from '@/components/modals/EmpenhoDialog';
+import { requisicoesCompraService } from '@/services/requisicoesCompra';
 
 const STORAGE_KEY = 'siages-notifications-last-read';
 const MAX_EVENTS = 20;
@@ -24,6 +27,7 @@ export interface NotificationCenterProps {
   empenhos?: Empenho[];
   descentralizacoes?: Descentralizacao[];
   atividades?: Atividade[];
+  requisicoesCompra?: (RequisicaoCompraRecord | RequisicaoCompra)[];
   onSaveEmpenho?: (id: string, data: Partial<Empenho>) => void;
   className?: string;
 }
@@ -56,6 +60,20 @@ export type NotificationItem =
       dimensao?: string;
       origem?: string;
       raw: Descentralizacao;
+    }
+  | {
+      id: string;
+      type: 'requisicao';
+      date: Date;
+      createdAt: Date;
+      documentDate: Date;
+      title: string;
+      subtitle: string;
+      description: string;
+      valor: number;
+      dimensao?: string;
+      status?: string;
+      raw: RequisicaoCompraRecord | RequisicaoCompra;
     };
 
 function parseDate(value: Date | string | number | undefined | null): Date {
@@ -106,12 +124,16 @@ function extractDocNumber(numero?: string | null): number {
 function interleaveEvents(
   empenhos: NotificationItem[],
   descentralizacoes: NotificationItem[],
+  requisicoes: NotificationItem[] = [],
   maxTotal = 20,
 ): NotificationItem[] {
   const result: NotificationItem[] = [];
-  const maxLen = Math.max(empenhos.length, descentralizacoes.length);
+  const maxLen = Math.max(empenhos.length, descentralizacoes.length, requisicoes.length);
 
   for (let i = 0; i < maxLen && result.length < maxTotal; i++) {
+    if (requisicoes[i] && result.length < maxTotal) {
+      result.push(requisicoes[i]);
+    }
     if (descentralizacoes[i] && result.length < maxTotal) {
       result.push(descentralizacoes[i]);
     }
@@ -133,6 +155,9 @@ const statusBadgeVariantMap: Record<string, 'warning' | 'info' | 'success' | 'de
   liquidado: 'info',
   pago: 'success',
   cancelado: 'destructive',
+  enviada_fornecedor: 'warning',
+  review: 'warning',
+  approved: 'warning',
 };
 
 const statusLabelMap: Record<string, string> = {
@@ -140,12 +165,16 @@ const statusLabelMap: Record<string, string> = {
   liquidado: 'Liquidado',
   pago: 'Pago',
   cancelado: 'Cancelado',
+  enviada_fornecedor: 'Enviada ao Fornecedor',
+  review: 'Enviada ao Fornecedor',
+  approved: 'Enviada ao Fornecedor',
 };
 
 export function NotificationCenter({
   empenhos = [],
   descentralizacoes = [],
   atividades = [],
+  requisicoesCompra: propsRequisicoesCompra,
   onSaveEmpenho,
   className,
 }: NotificationCenterProps) {
@@ -153,6 +182,16 @@ export function NotificationCenter({
   const [isOpen, setIsOpen] = useState(false);
   const [selectedEmpenho, setSelectedEmpenho] = useState<Empenho | null>(null);
   const [isEmpenhoDialogOpen, setIsEmpenhoDialogOpen] = useState(false);
+
+  // Busca requisições recentes via React Query se não fornecidas por prop
+  const { data: queriedRequisicoes = [] } = useQuery({
+    queryKey: ['requisicoes-compra'],
+    queryFn: () => requisicoesCompraService.listRecentRequisicoes(),
+    enabled: propsRequisicoesCompra === undefined,
+    staleTime: 1000 * 60 * 2,
+  });
+
+  const requisicoes = propsRequisicoesCompra ?? queriedRequisicoes;
 
   const [lastReadTimestamp, setLastReadTimestamp] = useState<number>(() => {
     try {
@@ -163,7 +202,7 @@ export function NotificationCenter({
     }
   });
 
-  // Consolidar os últimos empenhos emitidos e as últimas descentralizações de forma intercalada (máx 20 eventos)
+  // Consolidar empenhos, descentralizações e requisições enviadas ao fornecedor (máx 20 eventos)
   const allNotifications = useMemo<NotificationItem[]>(() => {
     // 1. Mapear e ordenar descentralizações decrescentemente pela data oficial de emissão (as mais recentes primeiro)
     const sortedDescentralizacoes: NotificationItem[] = descentralizacoes
@@ -231,9 +270,41 @@ export function NotificationCenter({
         return b.createdAt.getTime() - a.createdAt.getTime();
       });
 
-    // 3. Intercalar os últimos empenhos e as últimas descentralizações para exibição balanceada dos 20 eventos mais recentes
-    return interleaveEvents(sortedEmpenhos, sortedDescentralizacoes, MAX_EVENTS);
-  }, [empenhos, descentralizacoes]);
+    // 3. Mapear e ordenar requisições de compra com status 'enviada_fornecedor' (ou review/approved)
+    const sortedRequisicoes: NotificationItem[] = requisicoes
+      .filter((r) => r.status === 'enviada_fornecedor' || r.status === 'review' || r.status === 'approved')
+      .map((r) => {
+        const docDate = parseDate(r.updatedAt || r.createdAt);
+        const createdDate = parseDate(r.createdAt || r.updatedAt);
+        const effectiveDate = docDate.getTime() > 0 ? docDate : createdDate;
+
+        const empenhoLabels = r.empenhos?.length
+          ? r.empenhos.map((e) => e.empenhoNumero).filter(Boolean).join(', ')
+          : r.empenhoNumero || '';
+
+        return {
+          id: `req-${r.id || r.number}`,
+          type: 'requisicao' as const,
+          date: effectiveDate,
+          createdAt: createdDate,
+          documentDate: docDate,
+          title: r.number ? `Requisição ${r.number}` : 'Requisição de Compra',
+          subtitle: r.createdByEmail ? `Criador: ${r.createdByEmail}` : 'Enviada ao Fornecedor',
+          description: r.title || (empenhoLabels ? `Empenho(s): ${empenhoLabels}` : (r.contratoNumero ? `Contrato: ${r.contratoNumero}` : '')),
+          valor: Number(r.totalValue) || 0,
+          status: r.status,
+          raw: r,
+        };
+      })
+      .sort((a, b) => {
+        const dateDiff = b.date.getTime() - a.date.getTime();
+        if (dateDiff !== 0) return dateDiff;
+        return b.createdAt.getTime() - a.createdAt.getTime();
+      });
+
+    // 4. Intercalar os últimos eventos (requisições, descentralizações e empenhos)
+    return interleaveEvents(sortedEmpenhos, sortedDescentralizacoes, sortedRequisicoes, MAX_EVENTS);
+  }, [empenhos, descentralizacoes, requisicoes]);
 
   // Contagem de itens não lidos dentre os últimos eventos
   const unreadCount = useMemo(() => {
@@ -262,6 +333,11 @@ export function NotificationCenter({
   const handleDescentralizacaoClick = () => {
     setIsOpen(false);
     navigate('/descentralizacoes');
+  };
+
+  const handleRequisicaoClick = () => {
+    setIsOpen(false);
+    navigate('/requisicao-compra');
   };
 
   return (
@@ -312,7 +388,7 @@ export function NotificationCenter({
                     </Badge>
                   )}
                 </div>
-                <p className="text-[11px] text-muted-foreground truncate">Últimos {MAX_EVENTS} eventos orçamentários</p>
+                <p className="text-[11px] text-muted-foreground truncate">Últimos {MAX_EVENTS} eventos e requisições</p>
               </div>
             </div>
 
@@ -339,7 +415,7 @@ export function NotificationCenter({
                 </div>
                 <p className="text-xs font-semibold text-foreground">Nenhum evento encontrado</p>
                 <p className="text-[11px] text-muted-foreground">
-                  Não há movimentações orçamentárias recentes para exibir.
+                  Não há movimentações orçamentárias ou requisições recentes para exibir.
                 </p>
               </div>
             ) : (
@@ -352,7 +428,9 @@ export function NotificationCenter({
                       key={item.id}
                       onClick={() => {
                         if (item.type === 'empenho') {
-                          handleEmpenhoClick(item.raw);
+                          handleEmpenhoClick(item.raw as Empenho);
+                        } else if (item.type === 'requisicao') {
+                          handleRequisicaoClick();
                         } else {
                           handleDescentralizacaoClick();
                         }
@@ -363,7 +441,9 @@ export function NotificationCenter({
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
                           if (item.type === 'empenho') {
-                            handleEmpenhoClick(item.raw);
+                            handleEmpenhoClick(item.raw as Empenho);
+                          } else if (item.type === 'requisicao') {
+                            handleRequisicaoClick();
                           } else {
                             handleDescentralizacaoClick();
                           }
@@ -380,11 +460,15 @@ export function NotificationCenter({
                           'p-2 rounded-lg shrink-0 mt-0.5 transition-colors',
                           item.type === 'empenho'
                             ? 'bg-blue-500/10 text-blue-600 group-hover:bg-blue-500/20'
-                            : 'bg-emerald-500/10 text-emerald-600 group-hover:bg-emerald-500/20',
+                            : item.type === 'requisicao'
+                              ? 'bg-amber-500/10 text-amber-600 group-hover:bg-amber-500/20'
+                              : 'bg-emerald-500/10 text-emerald-600 group-hover:bg-emerald-500/20',
                         )}
                       >
                         {item.type === 'empenho' ? (
                           <Receipt className="w-4 h-4" />
+                        ) : item.type === 'requisicao' ? (
+                          <Send className="w-4 h-4" />
                         ) : (
                           <Landmark className="w-4 h-4" />
                         )}
@@ -409,6 +493,14 @@ export function NotificationCenter({
                             {item.type === 'descentralizacao' && (
                               <Badge variant="success" className="text-[9px] px-1.5 py-0 h-4 font-semibold shrink-0 whitespace-nowrap">
                                 NC
+                              </Badge>
+                            )}
+                            {item.type === 'requisicao' && (
+                              <Badge
+                                variant="warning"
+                                className="text-[9px] px-1.5 py-0 h-4 uppercase tracking-wider font-semibold shrink-0 whitespace-nowrap bg-amber-100 text-amber-900 border-amber-300"
+                              >
+                                Enviada
                               </Badge>
                             )}
                           </div>

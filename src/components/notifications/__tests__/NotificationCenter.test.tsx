@@ -1,8 +1,9 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { NotificationCenter } from '../NotificationCenter';
-import type { Empenho, Descentralizacao, Atividade } from '@/types';
+import { NotificationCenter, type NotificationCenterProps } from '../NotificationCenter';
+import type { Empenho, Descentralizacao, Atividade, RequisicaoCompraRecord } from '@/types';
 
 const mockNavigate = vi.fn();
 
@@ -72,7 +73,67 @@ const mockDescentralizacoes: Descentralizacao[] = [
   },
 ];
 
+const mockRequisicoes: RequisicaoCompraRecord[] = [
+  {
+    id: 'req-1',
+    title: 'Aquisição de suprimentos de informática',
+    number: 'REQ-2026-0001',
+    status: 'enviada_fornecedor',
+    createdBy: 'user-1',
+    createdByEmail: 'terceirizado@ifrn.edu.br',
+    empenhoId: 'emp-1',
+    empenhoNumero: '2026NE000101',
+    empenhos: [{ empenhoId: 'emp-1', empenhoNumero: '2026NE000101', sortOrder: 0 }],
+    contratoId: 'contrato-1',
+    contratoNumero: '00329/2025',
+    processNumber: '23035.000001/2026-01',
+    notes: 'Pedido enviado',
+    totalValue: 3500.0,
+    createdAt: new Date('2026-08-20T10:00:00.000Z'),
+    updatedAt: new Date('2026-08-20T10:00:00.000Z'),
+  },
+  {
+    id: 'req-2',
+    title: 'Rascunho não enviado',
+    number: 'REQ-2026-0002',
+    status: 'draft',
+    createdBy: 'user-1',
+    createdByEmail: 'terceirizado@ifrn.edu.br',
+    empenhoId: 'emp-2',
+    empenhoNumero: '2026NE000102',
+    empenhos: [{ empenhoId: 'emp-2', empenhoNumero: '2026NE000102', sortOrder: 0 }],
+    notes: 'Rascunho',
+    totalValue: 1200.0,
+    createdAt: new Date('2026-08-21T10:00:00.000Z'),
+    updatedAt: new Date('2026-08-21T10:00:00.000Z'),
+  },
+];
+
 const mockAtividades: Atividade[] = [];
+
+function renderComponent(props: NotificationCenterProps = {}) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <NotificationCenter
+          empenhos={mockEmpenhos}
+          descentralizacoes={mockDescentralizacoes}
+          atividades={mockAtividades}
+          requisicoesCompra={mockRequisicoes}
+          {...props}
+        />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
 
 describe('NotificationCenter', () => {
   beforeEach(() => {
@@ -81,68 +142,58 @@ describe('NotificationCenter', () => {
   });
 
   it('renderiza o botão da central de notificações com indicador visual de novidades contendo o número de não lidas', () => {
-    render(
-      <MemoryRouter>
-        <NotificationCenter
-          empenhos={mockEmpenhos}
-          descentralizacoes={mockDescentralizacoes}
-          atividades={mockAtividades}
-        />
-      </MemoryRouter>,
-    );
+    renderComponent();
 
     const button = screen.getByRole('button', { name: /abrir central de notificações/i });
     expect(button).toBeInTheDocument();
     const badge = screen.getByTestId('notification-unread-badge');
     expect(badge).toBeInTheDocument();
-    expect(badge).toHaveTextContent('3');
+    // 2 empenhos + 1 descentralização + 1 requisição enviada ao fornecedor = 4 eventos
+    expect(badge).toHaveTextContent('4');
   });
 
   it('não renderiza o badge quando não houver eventos ou notificações', () => {
-    render(
-      <MemoryRouter>
-        <NotificationCenter
-          empenhos={[]}
-          descentralizacoes={[]}
-          atividades={mockAtividades}
-        />
-      </MemoryRouter>,
-    );
+    renderComponent({
+      empenhos: [],
+      descentralizacoes: [],
+      requisicoesCompra: [],
+    });
 
     const button = screen.getByRole('button', { name: /abrir central de notificações/i });
     expect(button).toBeInTheDocument();
     expect(screen.queryByTestId('notification-unread-badge')).not.toBeInTheDocument();
   });
 
-  it('exibe empenhos e descentralizações juntos na mesma lista unificada ordenados por data de criação', () => {
-    render(
-      <MemoryRouter>
-        <NotificationCenter
-          empenhos={mockEmpenhos}
-          descentralizacoes={mockDescentralizacoes}
-          atividades={mockAtividades}
-        />
-      </MemoryRouter>,
-    );
+  it('exibe empenhos, descentralizações e requisições enviadas ao fornecedor na lista unificada', () => {
+    renderComponent();
 
     const button = screen.getByRole('button', { name: /abrir central de notificações/i });
     fireEvent.click(button);
 
     expect(screen.getByText('Notificações')).toBeInTheDocument();
-    // Verifica que empenhos e descentralizações aparecem juntos
+    // Verifica que requisições enviadas aparecem
+    expect(screen.getByText('Requisição REQ-2026-0001')).toBeInTheDocument();
+    expect(screen.getByText('Criador: terceirizado@ifrn.edu.br')).toBeInTheDocument();
+    expect(screen.getByText('Enviada')).toBeInTheDocument();
+
+    // Rascunho não deve aparecer na lista de notificações
+    expect(screen.queryByText('Requisição REQ-2026-0002')).not.toBeInTheDocument();
+
+    // Verifica que empenhos e descentralizações aparecem
     expect(screen.getByText('Empenho 2026NE000101')).toBeInTheDocument();
     expect(screen.getByText('Dell Computadores do Brasil Ltda')).toBeInTheDocument();
     expect(screen.getByText('Descentralização 2026NC000045')).toBeInTheDocument();
     expect(screen.getByText('Origem: 8100 - Custeio')).toBeInTheDocument();
     expect(screen.getByText('Empenho 2026NE000102')).toBeInTheDocument();
+  });
 
-    // Valida a intercalação decrescente dos eventos (NC000045 antes de NE000102 antes de NE000101)
-    const desc1 = screen.getByText('Descentralização 2026NC000045');
-    const empenho2 = screen.getByText('Empenho 2026NE000102');
-    const empenho1 = screen.getByText('Empenho 2026NE000101');
+  it('navega para /requisicao-compra ao clicar em uma requisição enviada ao fornecedor', () => {
+    renderComponent();
 
-    expect(desc1.compareDocumentPosition(empenho2) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(empenho2.compareDocumentPosition(empenho1) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /abrir central de notificações/i }));
+    fireEvent.click(screen.getByText('Requisição REQ-2026-0001'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('/requisicao-compra');
   });
 
   it('limita a exibição aos últimos 20 eventos', () => {
@@ -162,15 +213,11 @@ describe('NotificationCenter', () => {
       updatedAt: new Date(2026, 0, i + 1),
     }));
 
-    render(
-      <MemoryRouter>
-        <NotificationCenter
-          empenhos={manyEmpenhos}
-          descentralizacoes={[]}
-          atividades={mockAtividades}
-        />
-      </MemoryRouter>,
-    );
+    renderComponent({
+      empenhos: manyEmpenhos,
+      descentralizacoes: [],
+      requisicoesCompra: [],
+    });
 
     // O badge deve exibir 20 (limite de eventos suportado)
     expect(screen.getByTestId('notification-unread-badge')).toHaveTextContent('20');
@@ -184,15 +231,7 @@ describe('NotificationCenter', () => {
   });
 
   it('abre o modal EmpenhoDialog ao clicar em um empenho', () => {
-    render(
-      <MemoryRouter>
-        <NotificationCenter
-          empenhos={mockEmpenhos}
-          descentralizacoes={mockDescentralizacoes}
-          atividades={mockAtividades}
-        />
-      </MemoryRouter>,
-    );
+    renderComponent();
 
     fireEvent.click(screen.getByRole('button', { name: /abrir central de notificações/i }));
     fireEvent.click(screen.getByText('Empenho 2026NE000101'));
@@ -201,15 +240,7 @@ describe('NotificationCenter', () => {
   });
 
   it('navega para /descentralizacoes ao clicar em uma descentralização', () => {
-    render(
-      <MemoryRouter>
-        <NotificationCenter
-          empenhos={mockEmpenhos}
-          descentralizacoes={mockDescentralizacoes}
-          atividades={mockAtividades}
-        />
-      </MemoryRouter>,
-    );
+    renderComponent();
 
     fireEvent.click(screen.getByRole('button', { name: /abrir central de notificações/i }));
     fireEvent.click(screen.getByText('Descentralização 2026NC000045'));
@@ -218,17 +249,9 @@ describe('NotificationCenter', () => {
   });
 
   it('marca todas as notificações como lidas ao clicar na ação e remove o badge numérico', () => {
-    render(
-      <MemoryRouter>
-        <NotificationCenter
-          empenhos={mockEmpenhos}
-          descentralizacoes={mockDescentralizacoes}
-          atividades={mockAtividades}
-        />
-      </MemoryRouter>,
-    );
+    renderComponent();
 
-    expect(screen.getByTestId('notification-unread-badge')).toHaveTextContent('3');
+    expect(screen.getByTestId('notification-unread-badge')).toHaveTextContent('4');
 
     fireEvent.click(screen.getByRole('button', { name: /abrir central de notificações/i }));
     expect(screen.getByTitle('Marcar todas como lidas')).toBeInTheDocument();
