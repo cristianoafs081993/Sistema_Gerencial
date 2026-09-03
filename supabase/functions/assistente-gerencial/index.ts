@@ -91,31 +91,49 @@ type ConversationalPriceResearchData = {
   complianceNotes: string[];
 };
 
-async function auditCandidateWithGemini(
+async function auditCandidatesBatchWithGemini(
   demandDescription: string,
-  cand: {
+  candidates: Array<{
+    id: string;
     description: string;
     agencyName: string;
     unitPrice: number;
     brand?: string;
     documentTitle?: string;
-  },
+  }>,
   apiKey: string,
-): Promise<{
+): Promise<Map<string, {
   compativel: boolean;
   score: number;
   classificacao: 'COMPATIVEL' | 'COMPATIVEL_COM_RESSALVA' | 'INCOMPATIVEL';
   justificativa: string;
   trechoEdital?: string;
-}> {
-  const prompt = `Você é um auditor de contratações públicas federais avaliando a compatibilidade de um item paradigma para pesquisa de preços segundo a IN SEGES/ME nº 65/2021 e Lei 14.133/2021.
+}>> {
+  const results = new Map<string, {
+    compativel: boolean;
+    score: number;
+    classificacao: 'COMPATIVEL' | 'COMPATIVEL_COM_RESSALVA' | 'INCOMPATIVEL';
+    justificativa: string;
+    trechoEdital?: string;
+  }>();
 
-Demanda solicitada pelo órgão: "${demandDescription}"
-Item e Documentação da Contratação Pública (${cand.agencyName}):
-- Descrição Técnica e Objeto do Edital: "${cand.description}"
-- Preço Unitário: R$ ${cand.unitPrice}
-${cand.brand ? `- Marca/Referência: "${cand.brand}"` : ''}
-${cand.documentTitle ? `- Documento Referência: "${cand.documentTitle}"` : ''}
+  if (!candidates || candidates.length === 0) return results;
+
+  const candidatePayload = candidates.map((c, idx) => ({
+    indice: idx,
+    id: c.id,
+    orgao: c.agencyName,
+    descricaoObjetoEdital: c.description,
+    precoUnitario: c.unitPrice,
+    documentoReferencia: c.documentTitle || 'Edital / TR',
+  }));
+
+  const prompt = `Você é um auditor de contratações públicas federais avaliando a conformidade técnica de itens paradigma para pesquisa de preços segundo a IN SEGES/ME nº 65/2021 e Lei 14.133/2021.
+
+Demanda solicitada pelo órgão contratante: "${demandDescription}"
+
+Avalie simultaneamente os ${candidates.length} candidatos coletados no PNCP:
+${JSON.stringify(candidatePayload, null, 2)}
 
 Diretrizes mandatórias de avaliação técnica:
 1. Em contratações públicas, é comum a linha do item ter uma denominação sucinta (ex: "NOTEBOOK DELL") enquanto os requisitos técnicos detalhados (ex: memória RAM de 16 GB, processador, armazenamento SSD) constam no Objeto da Licitação, Termo de Referência ou Edital. Analise o CONJUNTO das informações técnicas fornecidas.
@@ -125,14 +143,17 @@ Diretrizes mandatórias de avaliação técnica:
 5. Redija um parecer técnico sucinto e fundamentado para instruir o processo eletrônico, indicando os requisitos atendidos.
 6. Indique o trecho literal da especificação técnica essencial comprovada.
 
-Responda estritamente em JSON puro sem markdown:
-{
-  "compativel": boolean,
-  "score": number,
-  "classificacao": "COMPATIVEL" | "COMPATIVEL_COM_RESSALVA" | "INCOMPATIVEL",
-  "justificativa": "parecer técnico sucinto e fundamentado",
-  "trechoEdital": "especificação técnica essencial do item no documento"
-}`;
+Responda estritamente em JSON puro no formato de array de avaliações:
+[
+  {
+    "indice": number,
+    "compativel": boolean,
+    "score": number,
+    "classificacao": "COMPATIVEL" | "COMPATIVEL_COM_RESSALVA" | "INCOMPATIVEL",
+    "justificativa": "parecer técnico sucinto e fundamentado",
+    "trechoEdital": "especificação técnica essencial do item no documento"
+  }
+]`;
 
   const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash'];
   for (const model of modelsToTry) {
@@ -150,41 +171,53 @@ Responda estritamente em JSON puro sem markdown:
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text) {
           const parsed = JSON.parse(text);
-          let parsedScore = typeof parsed.score === 'number' ? parsed.score : (parsed.compativel ? 85 : 0);
-          if (parsedScore <= 1.0 && parsedScore > 0) {
-            parsedScore = Math.round(parsedScore * 100);
-          }
+          if (Array.isArray(parsed)) {
+            for (const item of parsed) {
+              const cand = candidates[item.indice] || candidates.find((c) => c.id === item.id);
+              if (cand) {
+                let parsedScore = typeof item.score === 'number' ? item.score : (item.compativel ? 85 : 0);
+                if (parsedScore <= 1.0 && parsedScore > 0) {
+                  parsedScore = Math.round(parsedScore * 100);
+                }
 
-          return {
-            compativel: Boolean(parsed.compativel),
-            score: parsedScore,
-            classificacao: parsed.classificacao || (parsed.compativel ? 'COMPATIVEL' : 'INCOMPATIVEL'),
-            justificativa: String(parsed.justificativa || ''),
-            trechoEdital: parsed.trechoEdital ? String(parsed.trechoEdital) : undefined,
-          };
+                results.set(cand.id, {
+                  compativel: Boolean(item.compativel),
+                  score: parsedScore,
+                  classificacao: item.classificacao || (item.compativel ? 'COMPATIVEL' : 'INCOMPATIVEL'),
+                  justificativa: String(item.justificativa || ''),
+                  trechoEdital: item.trechoEdital ? String(item.trechoEdital) : undefined,
+                });
+              }
+            }
+            if (results.size > 0) return results;
+          }
         }
       }
     } catch (err) {
-      console.warn(`auditCandidateWithGemini error with model ${model}:`, err);
+      console.warn(`auditCandidatesBatchWithGemini error with model ${model}:`, err);
     }
   }
 
-  // Fallback se a IA falhar: verificação léxica rigorosa
+  // Fallback se a IA falhar: verificação léxica rigorosa determinística
   const normDemand = demandDescription.toLowerCase();
-  const normCand = cand.description.toLowerCase();
   const tokens = normDemand.split(/\s+/).filter((t) => t.length > 2);
-  const matches = tokens.filter((t) => normCand.includes(t)).length;
-  const isMatch = matches / Math.max(1, tokens.length) >= 0.5;
+  for (const c of candidates) {
+    const normCand = c.description.toLowerCase();
+    const matches = tokens.filter((t) => normCand.includes(t)).length;
+    const isMatch = matches / Math.max(1, tokens.length) >= 0.5;
 
-  return {
-    compativel: isMatch,
-    score: isMatch ? 80 : 0,
-    classificacao: isMatch ? 'COMPATIVEL' : 'INCOMPATIVEL',
-    justificativa: isMatch
-      ? 'Item apresenta semelhança semântica com a demanda solicitada no conjunto das especificações da contratação.'
-      : 'Item de categoria ou especificação técnica divergente da demanda solicitada.',
-    trechoEdital: cand.description.slice(0, 250),
-  };
+    results.set(c.id, {
+      compativel: isMatch,
+      score: isMatch ? 80 : 0,
+      classificacao: isMatch ? 'COMPATIVEL' : 'INCOMPATIVEL',
+      justificativa: isMatch
+        ? 'Item apresenta semelhança semântica com a demanda solicitada no conjunto das especificações da contratação.'
+        : 'Item de categoria ou especificação técnica divergente da demanda solicitada.',
+      trechoEdital: c.description.slice(0, 250),
+    });
+  }
+
+  return results;
 }
 
 async function executeConversationalPriceResearch(
@@ -351,27 +384,38 @@ async function executeConversationalPriceResearch(
       }
     }
 
-    // 3. Auditoria Semântica Rigorosa com Gemini 2.5 Flash
-    // Cada candidato tem sua descrição técnica e Edital/TR confrontados com a demanda real
+    // 3. Auditoria Semântica Rigorosa em Lote com Gemini
+    // Todos os candidatos do item têm sua descrição e Edital confrontados em uma única chamada de IA
+    const candidatesToAudit = rawCandidates.slice(0, 6);
+    const auditMap = await auditCandidatesBatchWithGemini(
+      demand.description,
+      candidatesToAudit.map((cand) => ({
+        id: cand.id,
+        description: cand.itemDescription || demand.description,
+        agencyName: cand.agencyName,
+        unitPrice: cand.unitPrice,
+        brand: cand.brand,
+        documentTitle: cand.documentTitle,
+      })),
+      apiKey,
+    );
+
     const candidates: ConversationalPriceCandidate[] = [];
 
-    for (const cand of rawCandidates.slice(0, 6)) {
-      const audit = await auditCandidateWithGemini(
-        demand.description,
-        {
-          description: cand.itemDescription || demand.description,
-          agencyName: cand.agencyName,
-          unitPrice: cand.unitPrice,
-          documentTitle: cand.documentTitle,
-        },
-        apiKey,
-      );
+    for (const cand of candidatesToAudit) {
+      const audit = auditMap.get(cand.id) || {
+        compativel: false,
+        score: 0,
+        classificacao: 'INCOMPATIVEL' as const,
+        justificativa: 'Não foi possível concluir a auditoria técnica do item.',
+        trechoEdital: cand.itemDescription || demand.description,
+      };
 
       cand.editalAudited = true;
       cand.editalScore = audit.score;
       cand.compatibility = audit.classificacao;
       cand.technicalJustification = audit.justificativa;
-      cand.editalExcerpt = audit.trechoEdital || cand.itemDescription || demand.description;
+      cand.editalExcerpt = audit.trechoEdital || cand.editalExcerpt || cand.itemDescription || demand.description;
 
       if (audit.compativel && audit.score >= 50) {
         cand.selected = true;
