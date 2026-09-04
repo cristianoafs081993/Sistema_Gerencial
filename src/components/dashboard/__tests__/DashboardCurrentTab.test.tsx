@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import { DashboardCurrentTab } from '../DashboardCurrentTab';
@@ -169,5 +169,20 @@ describe('DashboardCurrentTab', () => {
 
     fireEvent.click(screen.getByText('Fechar Modal'));
     expect(screen.queryByTestId('origem-atividades-modal')).not.toBeInTheDocument();
+  });
+
+  it('renderiza os valores de Liquidado e Pago no card de resumo', () => {
+    renderDashboardCurrentTab({
+      totalLiquidado: 1215470.5,
+      totalPago: 1207245.19,
+    });
+
+    const cardTitle = screen.getByText('Liquidado / Pago');
+    const card = cardTitle.closest('div');
+    expect(card).toBeInTheDocument();
+    expect(within(card!).getByText('Liquidado')).toBeInTheDocument();
+    expect(within(card!).getByText('Pago')).toBeInTheDocument();
+    expect(within(card!).getByText('R$ 1.215.470,50')).toBeInTheDocument();
+    expect(within(card!).getByText('R$ 1.207.245,19')).toBeInTheDocument();
   });
 });

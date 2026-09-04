@@ -54,6 +54,7 @@ O sistema suporta alternância dinâmica de temas via atributo `data-suap-theme`
 - `--warning`: amarelo/âmbar de atenção (`#989301` no claro, `#FBBF24` no Luna).
 - `--info`: azul/ciano informativo (`#008DCC` no claro, `#38BDF8` no Luna).
 - `--destructive`: vermelho de erro/perigo (`#C20A0A` no claro, `#EF4444` no Luna).
+- Cores utilitárias legadas (`amber`, `purple`) preservam toda a escala numérica oficial do Tailwind (`50` a `950`) associada a `DEFAULT`, prevenindo a quebra de gradientes e variações de tons.
 
 ## Diretrizes para Gráficos e Recharts no Tema Dark
 

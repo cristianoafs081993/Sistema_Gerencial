@@ -1,6 +1,6 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import ManutencaoAdmin from '@/pages/ManutencaoAdmin';
+import ManutencaoAdmin, { formatMaterialDisplayName } from '@/pages/ManutencaoAdmin';
 import { manutencaoService } from '@/services/manutencao';
 
 vi.mock('sonner', () => ({
@@ -34,7 +34,11 @@ vi.mock('@/services/manutencao', () => ({
 
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  BarChart: ({ children, layout, data }: { children: React.ReactNode; layout?: string; data?: any[] }) => (
+    <div data-testid="bar-chart" data-layout={layout} data-items-count={data?.length}>
+      {children}
+    </div>
+  ),
   AreaChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   PieChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   XAxis: () => null,
@@ -372,5 +376,89 @@ describe('ManutencaoAdmin', () => {
       expect(screen.getByText('Detalhamento de Limpezas Realizadas')).toBeInTheDocument();
       expect(screen.getByPlaceholderText('Buscar por ambiente, responsável, material...')).toBeInTheDocument();
     });
+  });
+
+  it('formata nomes longos e técnicos de insumos com formatMaterialDisplayName', () => {
+    expect(formatMaterialDisplayName('papel_higienico')).toBe('Papel Higiênico (rolos)');
+    expect(formatMaterialDisplayName('sabonete_liquido')).toBe('Sabonete Líquido (L)');
+    expect(
+      formatMaterialDisplayName('00020 - Fruta - apresentacao: natural, tipo: laranja pera')
+    ).toBe('Fruta: Laranja pera');
+    expect(
+      formatMaterialDisplayName('00037 - Polpa De Fruta - sabor: maracuja')
+    ).toBe('Polpa: Maracuja');
+    expect(
+      formatMaterialDisplayName('00010 - Legume In Natura - variedade: batata inglesa')
+    ).toBe('Legume: Batata inglesa');
+    expect(
+      formatMaterialDisplayName('00015 - Desinfetante hospitalar')
+    ).toBe('Desinfetante hospitalar');
+    expect(formatMaterialDisplayName('')).toBe('Insumo');
+  });
+
+  it('exibe gráfico de insumos com layout vertical e suporte a alternância Top 8 / Todos quando há mais de 8 materiais', async () => {
+    // 10 materiais diferentes distribuídos
+    const mockConsumos10 = [
+      { material: '00020 - Fruta - tipo: laranja pera', quantidade: 25 },
+      { material: '00037 - Polpa De Fruta - sabor: maracuja', quantidade: 20 },
+      { material: '00010 - Legume In Natura - variedade: batata', quantidade: 18 },
+      { material: 'papel_higienico', quantidade: 15 },
+      { material: 'sabonete_liquido', quantidade: 12 },
+      { material: 'papel_toalha', quantidade: 10 },
+      { material: 'saco_lixo', quantidade: 8 },
+      { material: '00045 - Detergente neutro', quantidade: 7 },
+      { material: '00050 - Esponja multiuso', quantidade: 5 },
+      { material: '00060 - Álcool em gel 70%', quantidade: 3 },
+    ].map((item, idx) => ({
+      id: `consumo-${idx}`,
+      origem: 'checkin' as const,
+      consumo_em: new Date().toISOString(),
+      ambiente_id: 'amb-1',
+      ambiente_nome: 'Sala 101 - Informática',
+      ambiente_codigo: 'SALA-101',
+      ambiente_bloco: 'Bloco Acadêmico Central',
+      material: item.material,
+      quantidade: item.quantidade,
+      unidade: 'UN',
+    }));
+
+    vi.mocked(manutencaoService.getConsumosInsumos).mockResolvedValue(mockConsumos10);
+
+    render(
+      <MemoryRouter>
+        <ManutencaoAdmin />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('insumos')).toBeInTheDocument();
+    });
+
+    const insumosRadio = screen.getByDisplayValue('insumos');
+    fireEvent.change(insumosRadio, { target: { checked: true } });
+    fireEvent.click(insumosRadio);
+
+    await waitFor(() => {
+      expect(screen.getByText('Consumo Geral de Insumos')).toBeInTheDocument();
+    });
+
+    // O gráfico de barras deve ter layout vertical
+    const barChart = screen.getByTestId('bar-chart');
+    expect(barChart).toHaveAttribute('data-layout', 'vertical');
+
+    // Com 10 materiais, deve exibir os botões de alternância Top 8 e Todos (10)
+    expect(screen.getByRole('button', { name: 'Top 8' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Todos \(10\)/i })).toBeInTheDocument();
+
+    // No modo padrão Top 8, exibe 8 itens no gráfico
+    expect(barChart).toHaveAttribute('data-items-count', '8');
+
+    // Alterna para 'Todos (10)'
+    fireEvent.click(screen.getByRole('button', { name: /Todos \(10\)/i }));
+    expect(barChart).toHaveAttribute('data-items-count', '10');
+
+    // Retorna para 'Top 8'
+    fireEvent.click(screen.getByRole('button', { name: 'Top 8' }));
+    expect(barChart).toHaveAttribute('data-items-count', '8');
   });
 });

@@ -123,6 +123,35 @@ const materialLabels: Record<string, string> = {
   outros: 'Outros',
 };
 
+export function formatMaterialDisplayName(raw: string): string {
+  if (!raw) return 'Insumo';
+  if (materialLabels[raw]) return materialLabels[raw];
+
+  // Remove leading catalog/CATMAT codes (e.g. "00020 - ")
+  const cleaned = raw.replace(/^\d{3,7}\s*-\s*/, '').trim();
+  const parts = cleaned.split(/\s*-\s*/);
+  let category = parts[0]?.trim() || '';
+  const details = parts.slice(1).join(' - ');
+
+  const variedadeMatch = details.match(/\bvariedade:\s*([^,;]+)/i);
+  const saborMatch = details.match(/\bsabor:\s*([^,;]+)/i);
+  const tipoMatch = details.match(/\btipo:\s*([^,;]+)/i);
+  const specific = (variedadeMatch?.[1] || saborMatch?.[1] || tipoMatch?.[1] || '').trim();
+
+  // Shorten common verbose prefix categories
+  category = category
+    .replace(/^Polpa De Fruta/i, 'Polpa')
+    .replace(/^Legume In Natura/i, 'Legume')
+    .replace(/^Bolo Alimenticio/i, 'Bolo');
+
+  if (specific && specific.length > 2 && !/^(sem|com|padrao|b|a|c)\b/i.test(specific)) {
+    const formattedSpecific = specific.charAt(0).toUpperCase() + specific.slice(1);
+    return `${category}: ${formattedSpecific}`;
+  }
+
+  return category || raw;
+}
+
 const materialEmojis: Record<string, string> = {
   papel_higienico: '🧻',
   sabonete_liquido: '🧼',
@@ -172,6 +201,7 @@ export default function ManutencaoAdmin() {
   const [dashBlocoFilter, setDashBlocoFilter] = useState<string>('todos');
   const [dashTipoFilter, setDashTipoFilter] = useState<string>('todos');
   const [dashMaterialFilter, setDashMaterialFilter] = useState<string>('todos');
+  const [dashMaterialsLimit, setDashMaterialsLimit] = useState<'top8' | 'todos'>('top8');
 
   // Modals
   const [isAddRoomOpen, setIsAddRoomOpen] = useState(false);
@@ -1146,18 +1176,36 @@ export default function ManutencaoAdmin() {
   }, [dashFilteredConsumos]);
 
   const dashMaterialsChartData = useMemo(() => {
-    return Object.entries(dashMaterialsMap).map(([key, val]) => ({
-      key,
-      name: materialLabels[key] || key,
-      quantidade: val,
-    }));
+    return Object.entries(dashMaterialsMap)
+      .filter(([, val]) => val > 0)
+      .map(([key, val]) => {
+        const fullDisplay = formatMaterialDisplayName(key);
+        const axisLabel = fullDisplay.length > 20 ? `${fullDisplay.slice(0, 19)}…` : fullDisplay;
+        return {
+          key,
+          name: axisLabel,
+          displayTitle: fullDisplay,
+          fullName: materialLabels[key] || key,
+          quantidade: val,
+        };
+      })
+      .sort((a, b) => b.quantidade - a.quantidade);
   }, [dashMaterialsMap]);
 
   const materialOptions = useMemo(
-    () => Array.from(new Set(consumosInsumos.map((consumo) => consumo.material))).sort((left, right) =>
-      (materialLabels[left] || left).localeCompare(materialLabels[right] || right, 'pt-BR')),
+    () =>
+      Array.from(new Set(consumosInsumos.map((consumo) => consumo.material))).sort((left, right) =>
+        formatMaterialDisplayName(left).localeCompare(formatMaterialDisplayName(right), 'pt-BR')
+      ),
     [consumosInsumos],
   );
+
+  const displayedMaterialsData = useMemo(() => {
+    if (dashMaterialsLimit === 'top8') {
+      return dashMaterialsChartData.slice(0, 8);
+    }
+    return dashMaterialsChartData;
+  }, [dashMaterialsChartData, dashMaterialsLimit]);
 
   const dashTotalMateriais = useMemo(() => {
     return Object.values(dashMaterialsMap).reduce((a, b) => a + b, 0);
@@ -1520,7 +1568,7 @@ export default function ManutencaoAdmin() {
 
                 {/* Tipo de Insumo (visível no modo Insumos) */}
                 {dashViewMode === 'insumos' && (
-                  <div className="w-48">
+                  <div className="w-48 sm:w-56">
                     <Select value={dashMaterialFilter} onValueChange={setDashMaterialFilter}>
                       <SelectTrigger className="h-8 text-xs bg-white input-system">
                         <SelectValue placeholder="Tipo de Insumo" />
@@ -1528,8 +1576,8 @@ export default function ManutencaoAdmin() {
                       <SelectContent>
                         <SelectItem value="todos">Todos os Insumos</SelectItem>
                         {materialOptions.map((material) => (
-                          <SelectItem key={material} value={material}>
-                            {materialEmojis[material] || '📦'} {materialLabels[material] || material}
+                          <SelectItem key={material} value={material} title={material}>
+                            {materialEmojis[material] || '🔹'} {formatMaterialDisplayName(material)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1953,7 +2001,7 @@ export default function ManutencaoAdmin() {
 
                   {/* Chart 3: Material Consumption by Category */}
                   <div className="bg-surface-card rounded-xl p-4 border border-border-default/70 shadow-sm space-y-3 md:col-span-2">
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="space-y-0.5">
                         <h4 className="font-extrabold text-text-primary text-sm uppercase tracking-wide flex items-center gap-2">
                           <span className="w-2 h-2 rounded-full bg-teal-500"></span>
@@ -1961,32 +2009,66 @@ export default function ManutencaoAdmin() {
                         </h4>
                         <p className="text-xs text-text-muted">Distribuição acumulada de reposição por tipo de material no período.</p>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="xs"
-                        onClick={() => {
-                          setConsumoDrilldownFilterDate(null);
-                          setConsumoDrilldownFilterMaterial(dashMaterialFilter !== 'todos' ? dashMaterialFilter : null);
-                          setConsumoDrilldownSearch('');
-                          setIsConsumoDrilldownOpen(true);
-                        }}
-                        className="h-7 text-xs gap-1.5 text-teal-700 border-teal-200 hover:bg-teal-50 shrink-0 font-semibold"
-                        title="Abrir detalhamento de consumo"
-                      >
-                        <Maximize2 className="h-3.5 w-3.5" />
-                        Detalhar
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        {dashMaterialsChartData.length > 8 && (
+                          <div className="flex items-center rounded-lg border border-border-default/70 bg-surface-base p-0.5 text-xs">
+                            <button
+                              type="button"
+                              onClick={() => setDashMaterialsLimit('top8')}
+                              className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
+                                dashMaterialsLimit === 'top8'
+                                  ? 'bg-white shadow-xs text-teal-700 font-semibold dark:bg-neutral-800 dark:text-teal-400'
+                                  : 'text-text-muted hover:text-text-primary'
+                              }`}
+                            >
+                              Top 8
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDashMaterialsLimit('all')}
+                              className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
+                                dashMaterialsLimit === 'all'
+                                  ? 'bg-white shadow-xs text-teal-700 font-semibold dark:bg-neutral-800 dark:text-teal-400'
+                                  : 'text-text-muted hover:text-text-primary'
+                              }`}
+                            >
+                              Todos ({dashMaterialsChartData.length})
+                            </button>
+                          </div>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          onClick={() => {
+                            setConsumoDrilldownFilterDate(null);
+                            setConsumoDrilldownFilterMaterial(dashMaterialFilter !== 'todos' ? dashMaterialFilter : null);
+                            setConsumoDrilldownSearch('');
+                            setIsConsumoDrilldownOpen(true);
+                          }}
+                          className="h-7 text-xs gap-1.5 text-teal-700 border-teal-200 hover:bg-teal-50 shrink-0 font-semibold"
+                          title="Abrir detalhamento de consumo"
+                        >
+                          <Maximize2 className="h-3.5 w-3.5" />
+                          Detalhar
+                        </Button>
+                      </div>
                     </div>
-                    <div className="h-72 w-full pt-2">
-                      {dashMaterialsChartData.every((d) => d.quantidade === 0) ? (
+                    <div
+                      className="w-full pt-2 transition-all duration-200"
+                      style={{
+                        height: `${Math.min(650, Math.max(288, displayedMaterialsData.length * 38 + 40))}px`,
+                      }}
+                    >
+                      {displayedMaterialsData.length === 0 || displayedMaterialsData.every((d) => d.quantidade === 0) ? (
                         <div className="h-full flex items-center justify-center text-text-muted italic text-xs">
                           Nenhum consumo de material registrado com os filtros selecionados.
                         </div>
                       ) : (
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart
-                            data={dashMaterialsChartData}
-                            margin={{ top: 10, right: 20, left: 15, bottom: 40 }}
+                            layout="vertical"
+                            data={displayedMaterialsData}
+                            margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
                             onClick={(data: any) => {
                               if (data && data.activePayload && data.activePayload.length > 0) {
                                 const clickedItem = data.activePayload[0].payload;
@@ -1999,18 +2081,50 @@ export default function ManutencaoAdmin() {
                             }}
                             className="cursor-pointer"
                           >
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={true} stroke="#f1f5f9" />
                             <XAxis
-                              dataKey="name"
+                              type="number"
                               tick={{ fontSize: 10, fill: '#64748b' }}
+                              allowDecimals={false}
+                            />
+                            <YAxis
+                              type="category"
+                              dataKey="name"
+                              width={135}
+                              tick={{ fontSize: 11, fill: '#475569' }}
                               interval={0}
-                              height={45}
                             />
-                            <YAxis tick={{ fontSize: 10, fill: '#64748b' }} allowDecimals={false} />
                             <RechartsTooltip
-                              formatter={(val: number) => [`${val} un (clique para detalhar)`, 'Quantidade']}
-                              contentStyle={{ borderRadius: '8px', fontSize: '12px', border: '1px solid #e2e8f0' }}
+                              content={({ active, payload }) => {
+                                if (!active || !payload || !payload.length) return null;
+                                const item = payload[0].payload;
+                                return (
+                                  <div className="bg-white dark:bg-neutral-800 p-2.5 rounded-lg shadow-md border border-slate-200 dark:border-neutral-700 text-xs max-w-xs space-y-1">
+                                    <p className="font-semibold text-slate-800 dark:text-neutral-100 leading-snug break-words">
+                                      {item.displayTitle || item.name}
+                                    </p>
+                                    {item.fullName && item.fullName !== item.displayTitle && (
+                                      <p className="text-[11px] text-slate-500 dark:text-neutral-400 line-clamp-2">
+                                        {item.fullName}
+                                      </p>
+                                    )}
+                                    <div className="flex items-center justify-between text-slate-600 dark:text-neutral-300 pt-1 border-t border-slate-100 dark:border-neutral-700/60">
+                                      <span>Quantidade:</span>
+                                      <span className="font-bold text-teal-700 dark:text-teal-400">{item.quantidade} un</span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 dark:text-neutral-400 italic pt-0.5">
+                                      Clique na barra para detalhar
+                                    </p>
+                                  </div>
+                                );
+                              }}
                             />
-                            <Bar dataKey="quantidade" fill="#0d9488" radius={[4, 4, 0, 0]} />
+                            <Bar
+                              dataKey="quantidade"
+                              fill="#0d9488"
+                              radius={[0, 4, 4, 0]}
+                              maxBarSize={28}
+                            />
                           </BarChart>
                         </ResponsiveContainer>
                       )}

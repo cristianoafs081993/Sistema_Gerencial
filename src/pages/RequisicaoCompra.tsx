@@ -1270,8 +1270,7 @@ export default function RequisicaoCompraPage() {
                     <TableHead>Criado por</TableHead>
                     <TableHead>Referências</TableHead>
                     <TableHead>Atualização</TableHead>
-                    <TableHead>Observações</TableHead>
-                    <TableHead className="text-right pr-6">Ações</TableHead>
+                    <TableHead className="text-right pr-4">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1385,15 +1384,8 @@ export default function RequisicaoCompraPage() {
                         <TableCell className="align-top text-xs text-text-muted">
                           {new Date(requisicao.updatedAt).toLocaleDateString('pt-BR')}
                         </TableCell>
-                        <TableCell className="align-top text-xs text-text-secondary">
-                          {requisicao.notes ? (
-                            <span className="line-clamp-2 block max-w-[18rem]" title={requisicao.notes}>{requisicao.notes}</span>
-                          ) : (
-                            <span className="text-text-muted">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="align-top text-right pr-6">
-                          <div className="flex flex-wrap justify-end gap-1.5 items-center">
+                        <TableCell className="align-top text-right pr-4 whitespace-nowrap">
+                          <div className="inline-flex items-center justify-end gap-1 flex-nowrap shrink-0">
                             <Button
                               type="button"
                               variant="outline"
@@ -1401,7 +1393,7 @@ export default function RequisicaoCompraPage() {
                               title="Imprimir Requisição em PDF"
                               aria-label={`Imprimir requisição ${requisicao.number}`}
                               onClick={() => void handlePrintPDF(requisicao)}
-                              className="h-8 px-2"
+                              className="h-8 w-8 p-0 shrink-0"
                             >
                               <Printer className="h-4 w-4" />
                             </Button>
@@ -1413,7 +1405,7 @@ export default function RequisicaoCompraPage() {
                               title="Editar Requisição"
                               aria-label={`Editar requisição ${requisicao.number}`}
                               onClick={() => handleEditRequisicao(requisicao)}
-                              className="h-8 px-2"
+                              className="h-8 w-8 p-0 shrink-0"
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -1424,13 +1416,13 @@ export default function RequisicaoCompraPage() {
                                 <Button
                                   type="button"
                                   size="sm"
-                                  className="bg-amber-600 hover:bg-amber-700 text-white h-8 px-2.5 gap-1 text-xs font-semibold"
+                                  className="bg-amber-600 hover:bg-amber-700 text-white h-8 px-2.5 gap-1 text-xs font-semibold shrink-0"
                                   title="Enviar ao Fornecedor"
                                   aria-label={`Enviar requisição ${requisicao.number} ao fornecedor`}
                                   onClick={() => handleChangeStatus(requisicao.id, 'enviada_fornecedor')}
                                 >
                                   <Send className="h-3.5 w-3.5" />
-                                  <span>Enviar ao Fornecedor</span>
+                                  <span>Enviar</span>
                                 </Button>
                                 {(isCreator || isFiscalOrManager) && (
                                   <Button
@@ -1438,8 +1430,9 @@ export default function RequisicaoCompraPage() {
                                     variant="ghost"
                                     size="sm"
                                     aria-label={`Excluir requisição ${requisicao.number}`}
+                                    title="Excluir requisição"
                                     onClick={() => handleDeleteRequisicao(requisicao.id)}
-                                    className="h-8 px-2 text-destructive hover:bg-destructive/10"
+                                    className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10 shrink-0"
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
@@ -1454,7 +1447,7 @@ export default function RequisicaoCompraPage() {
                                   <Button
                                     type="button"
                                     size="sm"
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-2.5 gap-1 text-xs font-semibold"
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-2.5 gap-1 text-xs font-semibold shrink-0"
                                     title="Marcar como Liquidada"
                                     aria-label={`Marcar requisição ${requisicao.number} como liquidada`}
                                     onClick={() => handleChangeStatus(requisicao.id, 'liquidada')}
@@ -1470,7 +1463,7 @@ export default function RequisicaoCompraPage() {
                                   title="Retornar para Rascunho"
                                   aria-label={`Retornar requisição ${requisicao.number} para rascunho`}
                                   onClick={() => handleChangeStatus(requisicao.id, 'draft')}
-                                  className="h-8 px-2 text-text-muted hover:text-text-primary"
+                                  className="h-8 w-8 p-0 text-text-muted hover:text-text-primary shrink-0"
                                 >
                                   <RotateCcw className="h-3.5 w-3.5" />
                                 </Button>
@@ -1485,7 +1478,7 @@ export default function RequisicaoCompraPage() {
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    className="border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 h-8 px-2.5 gap-1 text-xs font-medium"
+                                    className="border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 h-8 px-2.5 gap-1 text-xs font-medium shrink-0"
                                     title="Reabrir para Enviada ao Fornecedor"
                                     aria-label={`Reabrir requisição ${requisicao.number} para enviada ao fornecedor`}
                                     onClick={() => handleChangeStatus(requisicao.id, 'enviada_fornecedor')}
@@ -1501,7 +1494,7 @@ export default function RequisicaoCompraPage() {
                                   title="Retornar para Rascunho"
                                   aria-label={`Retornar requisição ${requisicao.number} para rascunho`}
                                   onClick={() => handleChangeStatus(requisicao.id, 'draft')}
-                                  className="h-8 px-2 text-text-muted hover:text-text-primary"
+                                  className="h-8 w-8 p-0 text-text-muted hover:text-text-primary shrink-0"
                                 >
                                   <RotateCcw className="h-3.5 w-3.5" />
                                 </Button>
