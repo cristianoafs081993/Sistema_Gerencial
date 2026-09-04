@@ -52,6 +52,7 @@ import { cn } from '@/lib/utils';
 import {
   type Ambiente,
   type Checkin,
+  type ConsumoInsumo,
   manutencaoService,
   type Ocorrencia,
   type BlocoMapa,
@@ -150,6 +151,7 @@ export default function ManutencaoAdmin() {
   const [ambientes, setAmbientes] = useState<Ambiente[]>([]);
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([]);
   const [checkins, setCheckins] = useState<Checkin[]>([]);
+  const [consumosInsumos, setConsumosInsumos] = useState<ConsumoInsumo[]>([]);
   const [blocosMapa, setBlocosMapa] = useState<BlocoMapa[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -158,7 +160,6 @@ export default function ManutencaoAdmin() {
   const [statusFilter, setStatusFilter] = useState('pendente');
   const [chFilterAcao, setChFilterAcao] = useState('todos');
   const [ocFilterNota, setOcFilterNota] = useState('todos');
-  const [consumoGrouping, setConsumoGrouping] = useState<'ambiente' | 'dia' | 'amb_dia'>('amb_dia');
 
   // Mapa Table Filters
   const [mapaSearchQuery, setMapaSearchQuery] = useState('');
@@ -209,14 +210,16 @@ export default function ManutencaoAdmin() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [ambList, ocList, chList] = await Promise.all([
+      const [ambList, ocList, chList, consumosList] = await Promise.all([
         manutencaoService.getAmbientes(),
         manutencaoService.getOcorrencias(),
         manutencaoService.getCheckins(),
+        manutencaoService.getConsumosInsumos(),
       ]);
       setAmbientes(ambList);
       setOcorrencias(ocList);
       setCheckins(chList);
+      setConsumosInsumos(consumosList);
 
       let blocosList = await manutencaoService.getBlocosMapa();
       const hasSeeded = localStorage.getItem('manutencao:map_seeded') === 'true';
@@ -1108,13 +1111,20 @@ export default function ManutencaoAdmin() {
       const amb = ambienteMap.get(ch.ambiente_id) || ch.ambiente;
       if (dashBlocoFilter !== 'todos' && amb?.bloco !== dashBlocoFilter) return false;
       if (dashTipoFilter !== 'todos' && amb?.tipo !== dashTipoFilter) return false;
-      if (dashMaterialFilter !== 'todos') {
-        const hasMat = ch.materiais?.some((m) => m.material === dashMaterialFilter && m.quantidade > 0);
-        if (!hasMat) return false;
-      }
       return true;
     });
-  }, [checkins, dashPeriodFilter, dashBlocoFilter, dashTipoFilter, dashMaterialFilter, ambienteMap]);
+  }, [checkins, dashPeriodFilter, dashBlocoFilter, dashTipoFilter, ambienteMap]);
+
+  const dashFilteredConsumos = useMemo(() => {
+    return consumosInsumos.filter((consumo) => {
+      if (!isWithinPeriod(consumo.consumo_em, dashPeriodFilter)) return false;
+      if (dashBlocoFilter !== 'todos' && consumo.ambiente_bloco !== dashBlocoFilter) return false;
+      const ambiente = ambienteMap.get(consumo.ambiente_id);
+      if (dashTipoFilter !== 'todos' && ambiente?.tipo !== dashTipoFilter) return false;
+      if (dashMaterialFilter !== 'todos' && consumo.material !== dashMaterialFilter) return false;
+      return consumo.quantidade > 0;
+    });
+  }, [consumosInsumos, dashPeriodFilter, dashBlocoFilter, dashTipoFilter, dashMaterialFilter, ambienteMap]);
 
   const dashFilteredOcorrencias = useMemo(() => {
     return ocorrencias.filter((oc) => {
@@ -1128,24 +1138,12 @@ export default function ManutencaoAdmin() {
 
   // Material consumption aggregation
   const dashMaterialsMap = useMemo(() => {
-    const map: Record<string, number> = {
-      papel_higienico: 0,
-      sabonete_liquido: 0,
-      papel_toalha: 0,
-      saco_lixo: 0,
-      outros: 0,
-    };
-    dashFilteredCheckins.forEach((ch) => {
-      ch.materiais?.forEach((mat) => {
-        if (dashMaterialFilter === 'todos' || mat.material === dashMaterialFilter) {
-          if (map[mat.material] !== undefined) {
-            map[mat.material] += mat.quantidade;
-          }
-        }
-      });
+    const map: Record<string, number> = {};
+    dashFilteredConsumos.forEach((consumo) => {
+      map[consumo.material] = (map[consumo.material] || 0) + consumo.quantidade;
     });
     return map;
-  }, [dashFilteredCheckins, dashMaterialFilter]);
+  }, [dashFilteredConsumos]);
 
   const dashMaterialsChartData = useMemo(() => {
     return Object.entries(dashMaterialsMap).map(([key, val]) => ({
@@ -1154,6 +1152,12 @@ export default function ManutencaoAdmin() {
       quantidade: val,
     }));
   }, [dashMaterialsMap]);
+
+  const materialOptions = useMemo(
+    () => Array.from(new Set(consumosInsumos.map((consumo) => consumo.material))).sort((left, right) =>
+      (materialLabels[left] || left).localeCompare(materialLabels[right] || right, 'pt-BR')),
+    [consumosInsumos],
+  );
 
   const dashTotalMateriais = useMemo(() => {
     return Object.values(dashMaterialsMap).reduce((a, b) => a + b, 0);
@@ -1212,23 +1216,23 @@ export default function ManutencaoAdmin() {
   // Timeline series (Limpezas e Insumos dia a dia)
   const dashTimelineData = useMemo(() => {
     const dayMap = new Map<string, { dateStr: string; timestamp: number; limpezas: number; insumos: number }>();
-    dashFilteredCheckins.forEach((ch) => {
-      const d = new Date(ch.created_at);
+    const ensureDay = (dateValue: string) => {
+      const d = new Date(dateValue);
       const key = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
       const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
       if (!dayMap.has(key)) {
         dayMap.set(key, { dateStr: key, timestamp: dayStart, limpezas: 0, insumos: 0 });
       }
-      const item = dayMap.get(key)!;
-      item.limpezas += 1;
-      ch.materiais?.forEach((m) => {
-        if (dashMaterialFilter === 'todos' || m.material === dashMaterialFilter) {
-          item.insumos += m.quantidade;
-        }
-      });
+      return dayMap.get(key)!;
+    };
+    dashFilteredCheckins.forEach((checkin) => {
+      ensureDay(checkin.created_at).limpezas += 1;
+    });
+    dashFilteredConsumos.forEach((consumo) => {
+      ensureDay(consumo.consumo_em).insumos += consumo.quantidade;
     });
     return Array.from(dayMap.values()).sort((a, b) => a.timestamp - b.timestamp);
-  }, [dashFilteredCheckins, dashMaterialFilter]);
+  }, [dashFilteredCheckins, dashFilteredConsumos]);
 
   // Top Problems reported
   const dashProblemsData = useMemo(() => {
@@ -1250,27 +1254,23 @@ export default function ManutencaoAdmin() {
   // Top 5 consuming rooms
   const dashTopConsumoAmbientes = useMemo(() => {
     const map = new Map<string, { nome: string; bloco: string; codigo: string; total: number }>();
-    dashFilteredCheckins.forEach((ch) => {
-      const amb = ambienteMap.get(ch.ambiente_id) || ch.ambiente;
-      const ambNome = amb?.nome || 'Ambiente';
-      const ambBloco = amb?.bloco || 'Geral';
-      const ambCodigo = amb?.codigo || '—';
-      const key = ch.ambiente_id;
+    dashFilteredConsumos.forEach((consumo) => {
+      const key = consumo.ambiente_id;
       if (!map.has(key)) {
-        map.set(key, { nome: ambNome, bloco: ambBloco, codigo: ambCodigo, total: 0 });
+        map.set(key, {
+          nome: consumo.ambiente_nome || 'Ambiente',
+          bloco: consumo.ambiente_bloco || 'Geral',
+          codigo: consumo.ambiente_codigo || '—',
+          total: 0,
+        });
       }
-      const item = map.get(key)!;
-      ch.materiais?.forEach((m) => {
-        if (dashMaterialFilter === 'todos' || m.material === dashMaterialFilter) {
-          item.total += m.quantidade;
-        }
-      });
+      map.get(key)!.total += consumo.quantidade;
     });
     return Array.from(map.values())
       .filter((a) => a.total > 0)
       .sort((a, b) => b.total - a.total)
       .slice(0, 5);
-  }, [dashFilteredCheckins, dashMaterialFilter, ambienteMap]);
+  }, [dashFilteredConsumos]);
 
   const maxConsumo = dashTopConsumoAmbientes.length > 0 ? dashTopConsumoAmbientes[0].total : 1;
 
@@ -1308,106 +1308,30 @@ export default function ManutencaoAdmin() {
     return list.sort((a, b) => b.pendentes - a.pendentes || (Number(a.media || 5) - Number(b.media || 5))).slice(0, 5);
   }, [ambientes, dashFilteredOcorrencias]);
 
-  // Aggregated consumption data calculations
-  // Consumo Drilldown Aggregations
-  const consumoData = useMemo(() => {
-    const map = new Map<string, {
-      ambienteNome?: string;
-      ambienteCodigo?: string;
-      ambienteBloco?: string;
-      data?: string;
-      papel_higienico: number;
-      sabonete_liquido: number;
-      papel_toalha: number;
-      saco_lixo: number;
-      outros: number;
-    }>();
-
-    dashFilteredCheckins.forEach((ch) => {
-      const dateKey = ch.created_at ? new Date(ch.created_at).toLocaleDateString('pt-BR') : 'Sem data';
-      const ambId = ch.ambiente_id;
-      const ambNome = ch.ambiente?.nome || 'Ambiente Desconhecido';
-      const ambCodigo = ch.ambiente?.codigo || 'S/C';
-      const ambBloco = ch.ambiente?.bloco || '-';
-
-      let groupKey = '';
-      if (consumoGrouping === 'ambiente') {
-        groupKey = ambId;
-      } else if (consumoGrouping === 'dia') {
-        groupKey = dateKey;
-      } else {
-        groupKey = `${ambId}_${dateKey}`;
-      }
-
-      if (!map.has(groupKey)) {
-        map.set(groupKey, {
-          ambienteNome: consumoGrouping !== 'dia' ? ambNome : undefined,
-          ambienteCodigo: consumoGrouping !== 'dia' ? ambCodigo : undefined,
-          ambienteBloco: consumoGrouping !== 'dia' ? ambBloco : undefined,
-          data: consumoGrouping !== 'ambiente' ? dateKey : undefined,
-          papel_higienico: 0,
-          sabonete_liquido: 0,
-          papel_toalha: 0,
-          saco_lixo: 0,
-          outros: 0,
-        });
-      }
-
-      const current = map.get(groupKey)!;
-      ch.materiais?.forEach((mat) => {
-        if (mat.material === 'papel_higienico') current.papel_higienico += mat.quantidade;
-        else if (mat.material === 'sabonete_liquido') current.sabonete_liquido += mat.quantidade;
-        else if (mat.material === 'papel_toalha') current.papel_toalha += mat.quantidade;
-        else if (mat.material === 'saco_lixo') current.saco_lixo += mat.quantidade;
-        else if (mat.material === 'outros') current.outros += mat.quantidade;
-      });
-    });
-
-    return Array.from(map.values()).map((item) => {
-      const total = item.papel_higienico + item.sabonete_liquido + item.papel_toalha + item.saco_lixo + item.outros;
-      return { ...item, total };
-    }).filter(item => item.total > 0);
-  }, [dashFilteredCheckins, consumoGrouping]);
-
   const filteredConsumoData = useMemo(() => {
-    return consumoData.filter((item) => {
-      if (consumoDrilldownFilterDate) {
-        if (item.data && !item.data.includes(consumoDrilldownFilterDate)) return false;
-      }
-      if (consumoDrilldownFilterMaterial) {
-        const matKey = consumoDrilldownFilterMaterial as 'papel_higienico' | 'sabonete_liquido' | 'papel_toalha' | 'saco_lixo' | 'outros';
-        if ((item[matKey] || 0) === 0) return false;
-      }
+    return dashFilteredConsumos.filter((consumo) => {
+      const date = new Date(consumo.consumo_em).toLocaleDateString('pt-BR');
+      if (consumoDrilldownFilterDate && !date.includes(consumoDrilldownFilterDate)) return false;
+      if (consumoDrilldownFilterMaterial && consumo.material !== consumoDrilldownFilterMaterial) return false;
       if (!consumoDrilldownSearch) return true;
-      const q = consumoDrilldownSearch.toLowerCase();
-      const matchNome = item.ambienteNome?.toLowerCase().includes(q) || false;
-      const matchCodigo = item.ambienteCodigo?.toLowerCase().includes(q) || false;
-      const matchBloco = item.ambienteBloco?.toLowerCase().includes(q) || false;
-      const matchData = item.data?.includes(q) || false;
-      return matchNome || matchCodigo || matchBloco || matchData;
+      const query = consumoDrilldownSearch.toLowerCase();
+      return [
+        consumo.ambiente_nome,
+        consumo.ambiente_codigo,
+        consumo.ambiente_bloco,
+        consumo.material,
+        consumo.requisicao_numero,
+        consumo.requisicao_status,
+        date,
+      ].some((value) => value?.toLowerCase().includes(query));
     });
-  }, [consumoData, consumoDrilldownSearch, consumoDrilldownFilterDate, consumoDrilldownFilterMaterial]);
+  }, [dashFilteredConsumos, consumoDrilldownSearch, consumoDrilldownFilterDate, consumoDrilldownFilterMaterial]);
 
-  const sortedConsumoData = useMemo(() => {
-    return [...filteredConsumoData].sort((left, right) => {
-      if (consumoGrouping === 'dia') {
-        const [dL, mL, yL] = (left.data || '').split('/').map(Number);
-        const [dR, mR, yR] = (right.data || '').split('/').map(Number);
-        const dateL = new Date(yL || 2026, (mL || 1) - 1, dL || 1).getTime();
-        const dateR = new Date(yR || 2026, (mR || 1) - 1, dR || 1).getTime();
-        return dateR - dateL;
-      }
-      if (consumoGrouping === 'ambiente') {
-        return right.total - left.total;
-      }
-      const [dL, mL, yL] = (left.data || '').split('/').map(Number);
-      const [dR, mR, yR] = (right.data || '').split('/').map(Number);
-      const dateL = new Date(yL || 2026, (mL || 1) - 1, dL || 1).getTime();
-      const dateR = new Date(yR || 2026, (mR || 1) - 1, dR || 1).getTime();
-      if (dateR !== dateL) return dateR - dateL;
-      return right.total - left.total;
-    });
-  }, [filteredConsumoData, consumoGrouping]);
+  const sortedConsumoData = useMemo(
+    () => [...filteredConsumoData].sort((left, right) =>
+      new Date(right.consumo_em).getTime() - new Date(left.consumo_em).getTime()),
+    [filteredConsumoData],
+  );
 
   // Limpezas Drilldown Aggregation
   const filteredLimpezasDrilldown = useMemo(() => {
@@ -1603,11 +1527,11 @@ export default function ManutencaoAdmin() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="todos">Todos os Insumos</SelectItem>
-                        <SelectItem value="papel_higienico">🧻 Papel Higiênico</SelectItem>
-                        <SelectItem value="sabonete_liquido">🧼 Sabonete Líquido</SelectItem>
-                        <SelectItem value="papel_toalha">🧻 Papel Toalha</SelectItem>
-                        <SelectItem value="saco_lixo">🗑️ Saco de Lixo</SelectItem>
-                        <SelectItem value="outros">📦 Outros</SelectItem>
+                        {materialOptions.map((material) => (
+                          <SelectItem key={material} value={material}>
+                            {materialEmojis[material] || '📦'} {materialLabels[material] || material}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1870,21 +1794,21 @@ export default function ManutencaoAdmin() {
                       {dashTotalMateriais}
                     </div>
                     <div className="text-[10px] text-text-muted truncate">
-                      unidades / rolos repostos
+                      itens consumidos no período
                     </div>
                   </div>
 
                   <div className="p-3.5 bg-surface-card rounded-xl border border-border-default/70 shadow-xs space-y-1 col-span-2 md:col-span-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-semibold text-text-muted">Média por Intervenção</span>
+                      <span className="text-[11px] font-semibold text-text-muted">Média por Registro</span>
                       <Boxes className="h-4 w-4 text-blue-600 opacity-70" />
                     </div>
                     <div className="text-2xl font-black text-blue-700">
-                      {(dashTotalMateriais / (dashFilteredCheckins.length || 1)).toFixed(1)}
+                      {(dashTotalMateriais / (dashFilteredConsumos.length || 1)).toFixed(1)}
                       <span className="text-xs font-normal text-text-muted"> un</span>
                     </div>
                     <div className="text-[10px] text-text-muted truncate">
-                      insumos por passagem de limpeza
+                      insumos por registro de consumo
                     </div>
                   </div>
                 </div>
@@ -3214,18 +3138,6 @@ export default function ManutencaoAdmin() {
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-500">Agrupar por:</span>
-              <Select value={consumoGrouping} onValueChange={(val: any) => setConsumoGrouping(val)}>
-                <SelectTrigger className="h-8 text-xs w-48 bg-white input-system">
-                  <SelectValue placeholder="Agrupamento" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="amb_dia">Por Ambiente e Dia</SelectItem>
-                  <SelectItem value="ambiente">Por Ambiente</SelectItem>
-                  <SelectItem value="dia">Por Dia</SelectItem>
-                </SelectContent>
-              </Select>
-
               {(consumoDrilldownSearch || consumoDrilldownFilterDate || consumoDrilldownFilterMaterial) && (
                 <Button
                   variant="ghost"
@@ -3248,57 +3160,48 @@ export default function ManutencaoAdmin() {
             <Table className="table-system">
               <TableHeader className="sticky top-0 bg-slate-50/95 backdrop-blur z-10 shadow-xs">
                 <TableRow>
-                  {consumoGrouping !== 'dia' && <TableHead className="w-1/3">Ambiente</TableHead>}
-                  {consumoGrouping !== 'ambiente' && <TableHead className="w-32">Data</TableHead>}
-                  <TableHead className="text-right">🧻 Papel Higiênico</TableHead>
-                  <TableHead className="text-right">🧴 Sabonete Líquido</TableHead>
-                  <TableHead className="text-right">🧻 Papel Toalha</TableHead>
-                  <TableHead className="text-right">🗑️ Saco de Lixo</TableHead>
-                  <TableHead className="text-right">📦 Outros</TableHead>
-                  <TableHead className="text-right font-bold">Total Geral</TableHead>
+                  <TableHead>Ambiente</TableHead>
+                  <TableHead>Material</TableHead>
+                  <TableHead>Origem</TableHead>
+                  <TableHead className="w-32">Data</TableHead>
+                  <TableHead className="text-right font-bold">Quantidade</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sortedConsumoData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={consumoGrouping === 'amb_dia' ? 8 : 7} className="h-36 text-center italic text-muted-foreground">
+                    <TableCell colSpan={5} className="h-36 text-center italic text-muted-foreground">
                       Nenhum registro de consumo localizado com os filtros aplicados.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  sortedConsumoData.map((row, idx) => (
-                    <TableRow key={idx} className="hover:bg-slate-50/60">
-                      {consumoGrouping !== 'dia' && (
-                        <TableCell>
-                          <div className="font-semibold text-slate-900">{row.ambienteNome}</div>
-                          <div className="text-xs font-mono text-slate-500 flex items-center gap-1.5">
-                            {row.ambienteCodigo && <span>{row.ambienteCodigo}</span>}
-                            {row.ambienteBloco && <span>• {row.ambienteBloco}</span>}
+                  sortedConsumoData.map((row) => (
+                    <TableRow key={`${row.origem}-${row.id}`} className="hover:bg-slate-50/60">
+                      <TableCell>
+                        <div className="font-semibold text-slate-900">{row.ambiente_nome}</div>
+                        <div className="text-xs font-mono text-slate-500 flex items-center gap-1.5">
+                          <span>{row.ambiente_codigo}</span>
+                          {row.ambiente_bloco && <span>• {row.ambiente_bloco}</span>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-medium text-slate-800">
+                        {materialLabels[row.material] || row.material}
+                      </TableCell>
+                      <TableCell>
+                        {row.origem === 'requisicao_compra' ? (
+                          <div className="space-y-0.5">
+                            <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">Requisição de compra</Badge>
+                            <div className="text-xs text-slate-500">{row.requisicao_numero} • {row.requisicao_status === 'liquidada' ? 'Encaminhada para pagamento' : 'Enviada ao fornecedor'}</div>
                           </div>
-                        </TableCell>
-                      )}
-                      {consumoGrouping !== 'ambiente' && (
-                        <TableCell className="font-medium text-slate-700">
-                          {row.data}
-                        </TableCell>
-                      )}
-                      <TableCell className="text-right text-slate-700 font-mono">
-                        {row.papel_higienico || '-'}
+                        ) : (
+                          <Badge variant="outline" className="border-blue-300 bg-blue-50 text-blue-800">Check-in</Badge>
+                        )}
                       </TableCell>
-                      <TableCell className="text-right text-slate-700 font-mono">
-                        {row.sabonete_liquido || '-'}
-                      </TableCell>
-                      <TableCell className="text-right text-slate-700 font-mono">
-                        {row.papel_toalha || '-'}
-                      </TableCell>
-                      <TableCell className="text-right text-slate-700 font-mono">
-                        {row.saco_lixo || '-'}
-                      </TableCell>
-                      <TableCell className="text-right text-slate-700 font-mono">
-                        {row.outros || '-'}
+                      <TableCell className="font-medium text-slate-700">
+                        {new Date(row.consumo_em).toLocaleDateString('pt-BR')}
                       </TableCell>
                       <TableCell className="text-right font-extrabold text-emerald-800 font-mono bg-emerald-50/40">
-                        {row.total}
+                        {row.quantidade} {row.unidade}
                       </TableCell>
                     </TableRow>
                   ))
@@ -3311,7 +3214,7 @@ export default function ManutencaoAdmin() {
             <div className="text-xs text-slate-500">
               Total consolidado:{' '}
               <strong className="text-slate-800">
-                {sortedConsumoData.reduce((acc, r) => acc + r.total, 0)} unidades
+                {sortedConsumoData.reduce((acc, r) => acc + r.quantidade, 0)} unidades
               </strong>
             </div>
             <Button

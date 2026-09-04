@@ -312,6 +312,7 @@ Mostrar a linhagem operacional dos dados de forma curta:
   - visualizacao da foto: URL assinada temporaria gerada pelo service
   - alerta do mapa: ocorrencias pendentes -> `ambiente_id` -> `manutencao_ambientes.bloco` -> `manutencao_blocos_mapa.nome`
   - observacao: o alerta pertence ao bloco exato do ambiente e nao depende de zona funcional
+  - consumo de insumos: `manutencao_checkin_materiais` e itens de `requisicao_compra_itens` de requisições não-rascunho -> view `manutencao_consumo_insumos` -> Dashboard de Insumos; requisições são posicionadas no ambiente `REFEITORIO` pela data `requisicoes_compra.consumo_iniciado_em`
 
 ### Retencoes FD-Reinf
 

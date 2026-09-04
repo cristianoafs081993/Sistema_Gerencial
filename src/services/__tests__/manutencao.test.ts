@@ -17,6 +17,8 @@ const mocks = vi.hoisted(() => {
   const occurrenceOrderMock = vi.fn();
   const occurrenceInsertMock = vi.fn();
   const occurrenceSingleMock = vi.fn();
+  const consumoSelectMock = vi.fn();
+  const consumoOrderMock = vi.fn();
   const storageFromMock = vi.fn();
   const uploadMock = vi.fn();
   const createSignedUrlMock = vi.fn();
@@ -38,6 +40,10 @@ const mocks = vi.hoisted(() => {
       };
     }
 
+    if (table === 'manutencao_consumo_insumos') {
+      return { select: consumoSelectMock };
+    }
+
     throw new Error(`Table not mocked: ${table}`);
   });
 
@@ -53,6 +59,8 @@ const mocks = vi.hoisted(() => {
     occurrenceOrderMock,
     occurrenceInsertMock,
     occurrenceSingleMock,
+    consumoSelectMock,
+    consumoOrderMock,
     storageFromMock,
     uploadMock,
     createSignedUrlMock,
@@ -80,6 +88,7 @@ describe('manutencaoService', () => {
     mocks.occurrenceInsertMock.mockReturnValue({
       select: vi.fn().mockReturnValue({ single: mocks.occurrenceSingleMock }),
     });
+    mocks.consumoSelectMock.mockReturnValue({ order: mocks.consumoOrderMock });
     mocks.storageFromMock.mockReturnValue({
       upload: mocks.uploadMock,
       createSignedUrl: mocks.createSignedUrlMock,
@@ -166,5 +175,37 @@ describe('manutencaoService', () => {
 
   it('rejeita formatos de foto não suportados', () => {
     expect(validateOcorrenciaFoto({ type: 'image/gif', size: 1024 })).toContain('JPEG');
+  });
+
+  it('normaliza consumos da view, incluindo quantidade decimal de requisição', async () => {
+    mocks.consumoOrderMock.mockResolvedValueOnce({
+      data: [{
+        id: 'item-1',
+        origem: 'requisicao_compra',
+        consumo_em: '2026-09-03T10:00:00.000Z',
+        ambiente_id: 'amb-refeitorio',
+        ambiente_nome: 'Refeitório',
+        ambiente_codigo: 'REFEITORIO',
+        ambiente_bloco: 'Refeitório',
+        material: 'Arroz',
+        quantidade: '12.5',
+        unidade: 'KG',
+        requisicao_compra_id: 'req-1',
+        requisicao_numero: 'REQ-2026-0001',
+        requisicao_status: 'enviada_fornecedor',
+      }],
+      error: null,
+    });
+
+    const result = await manutencaoService.getConsumosInsumos();
+
+    expect(mocks.fromMock).toHaveBeenCalledWith('manutencao_consumo_insumos');
+    expect(mocks.consumoOrderMock).toHaveBeenCalledWith('consumo_em', { ascending: false });
+    expect(result[0]).toMatchObject({
+      origem: 'requisicao_compra',
+      ambiente_codigo: 'REFEITORIO',
+      quantidade: 12.5,
+      unidade: 'KG',
+    });
   });
 });

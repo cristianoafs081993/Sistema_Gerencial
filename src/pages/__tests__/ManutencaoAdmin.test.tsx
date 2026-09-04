@@ -22,6 +22,7 @@ vi.mock('@/services/manutencao', () => ({
     getAmbientes: vi.fn(),
     getOcorrencias: vi.fn(),
     getCheckins: vi.fn(),
+    getConsumosInsumos: vi.fn(),
     getBlocosMapa: vi.fn(),
     saveBlocoMapa: vi.fn(),
     deleteBlocoMapa: vi.fn(),
@@ -142,11 +143,30 @@ const mockCheckins = [
   },
 ];
 
+const mockConsumosInsumos = [
+  {
+    id: 'consumo-req-1',
+    origem: 'requisicao_compra' as const,
+    consumo_em: '2026-09-03T10:00:00.000Z',
+    ambiente_id: 'amb-refeitorio',
+    ambiente_nome: 'Refeitório',
+    ambiente_codigo: 'REFEITORIO',
+    ambiente_bloco: 'Refeitório',
+    material: 'Arroz parboilizado',
+    quantidade: 12.5,
+    unidade: 'KG',
+    requisicao_compra_id: 'req-1',
+    requisicao_numero: 'REQ-2026-0001',
+    requisicao_status: 'enviada_fornecedor' as const,
+  },
+];
+
 describe('ManutencaoAdmin', () => {
   beforeEach(() => {
     vi.mocked(manutencaoService.getAmbientes).mockResolvedValue(mockAmbientes);
     vi.mocked(manutencaoService.getOcorrencias).mockResolvedValue(mockOcorrencias);
     vi.mocked(manutencaoService.getCheckins).mockResolvedValue(mockCheckins);
+    vi.mocked(manutencaoService.getConsumosInsumos).mockResolvedValue(mockConsumosInsumos);
     vi.mocked(manutencaoService.getBlocosMapa).mockResolvedValue([]);
   });
 
@@ -185,7 +205,7 @@ describe('ManutencaoAdmin', () => {
     // KPIs do modo Insumos
     expect(screen.getByText('Limpezas Registradas')).toBeInTheDocument();
     expect(screen.getByText('Consumo Total de Insumos')).toBeInTheDocument();
-    expect(screen.getByText('Média por Intervenção')).toBeInTheDocument();
+    expect(screen.getByText('Média por Registro')).toBeInTheDocument();
 
     // Gráficos e Rankings de Insumos
     expect(screen.getByText('Evolução Temporal de Limpezas')).toBeInTheDocument();
@@ -300,6 +320,29 @@ describe('ManutencaoAdmin', () => {
     await waitFor(() => {
       expect(screen.getByText('Detalhamento de Consumo de Insumos')).toBeInTheDocument();
       expect(screen.getByPlaceholderText('Buscar por ambiente, código, bloco...')).toBeInTheDocument();
+    });
+  });
+
+  it('inclui itens de requisição como consumo no Refeitório com origem, unidade e situação', async () => {
+    render(
+      <MemoryRouter>
+        <ManutencaoAdmin />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(manutencaoService.getConsumosInsumos).toHaveBeenCalled();
+    });
+
+    fireEvent.click(screen.getByText('Insumos'));
+    fireEvent.click(screen.getAllByRole('button', { name: /Detalhar/i })[1]);
+
+    await waitFor(() => {
+      expect(screen.getByText('Arroz parboilizado')).toBeInTheDocument();
+      expect(screen.getAllByText('Refeitório').length).toBeGreaterThan(0);
+      expect(screen.getByText('Requisição de compra')).toBeInTheDocument();
+      expect(screen.getByText(/12\.5 KG/)).toBeInTheDocument();
+      expect(screen.getByText(/REQ-2026-0001/)).toBeInTheDocument();
     });
   });
 

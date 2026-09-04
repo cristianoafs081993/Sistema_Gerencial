@@ -69,6 +69,22 @@ export interface Checkin {
   }[];
 }
 
+export interface ConsumoInsumo {
+  id: string;
+  origem: 'checkin' | 'requisicao_compra';
+  consumo_em: string;
+  ambiente_id: string;
+  ambiente_nome: string;
+  ambiente_codigo: string;
+  ambiente_bloco: string | null;
+  material: string;
+  quantidade: number;
+  unidade: string;
+  requisicao_compra_id: string | null;
+  requisicao_numero: string | null;
+  requisicao_status: 'draft' | 'enviada_fornecedor' | 'liquidada' | null;
+}
+
 export interface BlocoMapa {
   id: string;
   nome: string;
@@ -222,6 +238,19 @@ export const manutencaoService = {
 
     if (error) throw error;
     return (data || []) as Checkin[];
+  },
+
+  async getConsumosInsumos(): Promise<ConsumoInsumo[]> {
+    const { data, error } = await supabase
+      .from('manutencao_consumo_insumos')
+      .select('*')
+      .order('consumo_em', { ascending: false });
+
+    if (error) throw error;
+    return (data || []).map((row) => ({
+      ...(row as Omit<ConsumoInsumo, 'quantidade'>),
+      quantidade: Number(row.quantidade),
+    }));
   },
 
   async createCheckin(payload: Omit<Checkin, 'id' | 'created_at'>): Promise<Checkin> {

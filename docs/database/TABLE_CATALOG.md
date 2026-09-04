@@ -486,6 +486,7 @@ Campos-chave:
 - `id`
 - `number`
 - `status` ('draft', 'enviada_fornecedor', 'liquidada')
+- `consumo_iniciado_em` (data em que a requisição deixou de ser rascunho; nulo enquanto `draft`)
 - `contrato_id` (FK para contratos)
 - `empenho_id` (FK para empenhos; compatibilidade com a primeira NE selecionada)
 - `created_by` (FK para auth.users)
@@ -495,6 +496,7 @@ Regras:
 - O fluxo utiliza 3 status: `draft` (Rascunho), `enviada_fornecedor` (Enviada ao Fornecedor) e `liquidada` (Liquidada).
 - Requisições em `enviada_fornecedor` exigem ao menos uma NE, itens com `empenho_id` e permissão explícita para terceirizados. O saldo disponível valida e abate concorrentemente outras requisições já enviadas ao fornecedor da mesma NE.
 - Requisições com status `liquidada` não acumulam desconto no módulo para evitar duplicidade com as liquidações oficiais registradas no SIAFI.
+- Itens de requisições com status diferente de `draft` compõem o consumo automático de insumos no ambiente canônico `REFEITORIO` / Refeitório. A data analítica é `consumo_iniciado_em`.
 - `fn_empenho_saldo_disponivel` calcula saldo de exercício com dados SIAFI locais e prioriza `saldo_rap_oficial` para RAP.
 
 ### `requisicao_compra_empenhos`
@@ -1156,6 +1158,23 @@ Campos-chave:
 Observações operacionais:
 
 - Inserção anônima pública liberada (validação de PIN); leitura restrita a usuários autenticados.
+
+### `manutencao_consumo_insumos`
+
+Finalidade:
+
+- View analítica que unifica os materiais de check-ins e os itens de requisições de compra não-rascunho.
+
+Campos-chave:
+
+- `origem` (`checkin` ou `requisicao_compra`)
+- `consumo_em`, `ambiente_*`, `material`, `quantidade`, `unidade`
+- `requisicao_compra_id`, `requisicao_numero`, `requisicao_status` (quando a origem é requisição)
+
+Observações operacionais:
+
+- A view usa `security_invoker`; portanto, a leitura respeita as permissões das tabelas de origem.
+- Requisições sempre são associadas ao Refeitório e não geram linhas físicas de check-in.
 
 ## Módulo do SUAP (Processos Eletrônicos)
 
