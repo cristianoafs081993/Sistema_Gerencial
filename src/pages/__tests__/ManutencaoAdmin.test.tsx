@@ -1,6 +1,6 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import ManutencaoAdmin, { formatMaterialDisplayName } from '@/pages/ManutencaoAdmin';
+import ManutencaoAdmin, { formatMaterialDisplayName, getMaterialCategory } from '@/pages/ManutencaoAdmin';
 import { manutencaoService } from '@/services/manutencao';
 
 vi.mock('sonner', () => ({
@@ -215,12 +215,12 @@ describe('ManutencaoAdmin', () => {
     fireEvent.click(insumosRadio);
 
     // KPIs do modo Insumos
-    expect(screen.getByText('Limpezas Registradas')).toBeInTheDocument();
+    expect(screen.getByText('Total de Requisições')).toBeInTheDocument();
     expect(screen.getByText('Valor Total Gasto')).toBeInTheDocument();
-    expect(screen.getByText('Média por Registro')).toBeInTheDocument();
+    expect(screen.queryByText('Média por Registro')).not.toBeInTheDocument();
 
     // Gráficos e Rankings de Insumos
-    expect(screen.getByText('Evolução Temporal de Limpezas')).toBeInTheDocument();
+    expect(screen.getByText('Distribuição por Categoria')).toBeInTheDocument();
     expect(screen.getByText('Evolução Temporal de Insumos')).toBeInTheDocument();
     expect(screen.getByText('Consumo Geral de Insumos')).toBeInTheDocument();
     expect(screen.getByText('Top 5 Ambientes em Consumo de Insumos')).toBeInTheDocument();
@@ -358,7 +358,7 @@ describe('ManutencaoAdmin', () => {
     });
   });
 
-  it('não exibe o histórico de limpezas como aba primária e abre o modal ao clicar em Detalhar no gráfico de limpezas', async () => {
+  it('não exibe o histórico de limpezas como aba primária e abre o modal de detalhamento de insumos ao clicar em Detalhar', async () => {
     render(
       <MemoryRouter>
         <ManutencaoAdmin />
@@ -373,17 +373,34 @@ describe('ManutencaoAdmin', () => {
     expect(screen.queryByRole('button', { name: /Histórico de Limpezas/ })).not.toBeInTheDocument();
 
     // Alterna para a visão de Insumos onde estão os gráficos operacionais
-    fireEvent.click(screen.getByText('Insumos'));
+    const insumosRadio = screen.getByDisplayValue('insumos');
+    fireEvent.change(insumosRadio, { target: { checked: true } });
+    fireEvent.click(insumosRadio);
 
-    // Clica no primeiro botão de Detalhar (Gráfico de Limpezas)
+    await waitFor(() => {
+      expect(screen.getByText('Distribuição por Categoria')).toBeInTheDocument();
+    });
+
+    // Clica no primeiro botão de Detalhar (Gráfico de Distribuição por Categoria)
     const detalharBtns = screen.getAllByRole('button', { name: /Detalhar/i });
     fireEvent.click(detalharBtns[0]);
 
-    // Deve abrir o modal de Detalhamento de Limpezas Realizadas
+    // Deve abrir o modal de Detalhamento de Consumo de Insumos
     await waitFor(() => {
-      expect(screen.getByText('Detalhamento de Limpezas Realizadas')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('Buscar por ambiente, responsável, material...')).toBeInTheDocument();
+      expect(screen.getByText('Detalhamento de Consumo de Insumos')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Buscar por ambiente, código, bloco...')).toBeInTheDocument();
     });
+  });
+
+  it('classifica corretamente materiais em categorias com getMaterialCategory', () => {
+    expect(getMaterialCategory('papel_higienico')).toBe('Higiene e Limpeza');
+    expect(getMaterialCategory('saco_lixo')).toBe('Higiene e Limpeza');
+    expect(getMaterialCategory('00020 - Fruta - apresentacao: natural, tipo: laranja pera')).toBe('Frutas');
+    expect(getMaterialCategory('00035 - Polpa De Fruta - apresentacao: congelada, tipo: goiaba vermelha')).toBe('Polpas de Frutas');
+    expect(getMaterialCategory('00007 - Legume In Natura - tipo: batata doce')).toBe('Legumes e Verduras');
+    expect(getMaterialCategory('00021 - Leite Fluido - integral')).toBe('Laticínios');
+    expect(getMaterialCategory('00046 - Queijo - manteiga')).toBe('Laticínios');
+    expect(getMaterialCategory('00038 - Bolo Alimenticio - sabor: trigo')).toBe('Panificação e Confeitaria');
   });
 
   it('formata nomes longos e técnicos de insumos com formatMaterialDisplayName', () => {
@@ -511,8 +528,17 @@ describe('ManutencaoAdmin', () => {
       expect(screen.getByText('Valor Total Gasto')).toBeInTheDocument();
     });
 
-    // Valida que o card exibe o valor formatado em R$
-    expect(screen.getByText(/R\$\s*55,00/)).toBeInTheDocument();
+    // Valida o card de Total de Requisições e a remoção de Média por Registro
+    expect(screen.getByText('Total de Requisições')).toBeInTheDocument();
+    expect(screen.queryByText('Média por Registro')).not.toBeInTheDocument();
+
+    // Valida que o valor formatado em R$ é exibido no card e na legenda
+    const currencyMatches = screen.getAllByText(/R\$\s*55,00/);
+    expect(currencyMatches.length).toBeGreaterThanOrEqual(1);
+
+    // Valida a presença de Distribuição por Categoria e ausência de Evolução de Limpezas
+    expect(screen.getByText('Distribuição por Categoria')).toBeInTheDocument();
+    expect(screen.queryByText('Evolução Temporal de Limpezas')).not.toBeInTheDocument();
 
     // Valida o subtítulo da evolução temporal de insumos
     expect(screen.getByText('Valor diário gasto com materiais e insumos repostos.')).toBeInTheDocument();

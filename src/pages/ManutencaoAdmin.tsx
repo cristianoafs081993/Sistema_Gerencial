@@ -152,6 +152,43 @@ export function formatMaterialDisplayName(raw: string): string {
   return category || raw;
 }
 
+export function getMaterialCategory(raw: string): string {
+  if (!raw) return 'Outros';
+  const lower = raw.toLowerCase();
+
+  if (/papel_|sabonete_|saco_lixo|desinfetante|limpeza/i.test(lower)) {
+    return 'Higiene e Limpeza';
+  }
+  if (/polpa/i.test(lower)) {
+    return 'Polpas de Frutas';
+  }
+  if (/fruta/i.test(lower)) {
+    return 'Frutas';
+  }
+  if (/legume|verdura|hortali/i.test(lower)) {
+    return 'Legumes e Verduras';
+  }
+  if (/leite|queijo|iogurte|lactea|láctea|manteiga/i.test(lower)) {
+    return 'Laticínios';
+  }
+  if (/bolo|p[aã]o|biscoito|farinha|trigo/i.test(lower)) {
+    return 'Panificação e Confeitaria';
+  }
+  if (/carne|frango|peixe|ovo|proteina|proteína/i.test(lower)) {
+    return 'Proteínas e Carnes';
+  }
+  if (/arroz|feij[aã]o|macarr[aã]o|[oó]leo|azeite|a[cç]ucar/i.test(lower)) {
+    return 'Mercearia e Grãos';
+  }
+
+  const cleaned = raw.replace(/^\d{3,7}\s*-\s*/, '').trim();
+  const parts = cleaned.split(/\s*-\s*/);
+  if (parts[0] && parts[0].length > 1) {
+    return parts[0].trim();
+  }
+  return 'Outros';
+}
+
 const materialEmojis: Record<string, string> = {
   papel_higienico: '🧻',
   sabonete_liquido: '🧼',
@@ -1215,6 +1252,43 @@ export default function ManutencaoAdmin() {
     return dashFilteredConsumos.reduce((acc, consumo) => acc + Number(consumo.valor_total || 0), 0);
   }, [dashFilteredConsumos]);
 
+  const dashTotalRequisicoes = useMemo(() => {
+    const reqIds = new Set<string>();
+    dashFilteredConsumos.forEach((consumo) => {
+      if (consumo.requisicao_compra_id) {
+        reqIds.add(consumo.requisicao_compra_id);
+      }
+    });
+    if (reqIds.size > 0) {
+      return reqIds.size;
+    }
+    return dashFilteredCheckins.length;
+  }, [dashFilteredConsumos, dashFilteredCheckins]);
+
+  const categoryChartColors = ['#0d9488', '#0284c7', '#16a34a', '#f59e0b', '#8b5cf6', '#ec4899', '#f97316', '#64748b'];
+
+  const dashCategoryChartData = useMemo(() => {
+    const map: Record<string, { name: string; valor: number; quantidade: number }> = {};
+    dashFilteredConsumos.forEach((c) => {
+      const cat = getMaterialCategory(c.material);
+      if (!map[cat]) {
+        map[cat] = { name: cat, valor: 0, quantidade: 0 };
+      }
+      map[cat].valor += Number(c.valor_total || 0);
+      map[cat].quantidade += Number(c.quantidade || 0);
+    });
+
+    const list = Object.values(map);
+    const hasValor = list.some((item) => item.valor > 0);
+    list.sort((a, b) => (hasValor ? b.valor - a.valor : b.quantidade - a.quantidade));
+    return {
+      items: list,
+      hasValor,
+      totalValor: list.reduce((acc, curr) => acc + curr.valor, 0),
+      totalQuantidade: list.reduce((acc, curr) => acc + curr.quantidade, 0),
+    };
+  }, [dashFilteredConsumos]);
+
   // Ratings aggregation
   const dashValidRatings = useMemo(() => {
     return dashFilteredOcorrencias.filter((o) => typeof o.avaliacao === 'number' && o.avaliacao > 0);
@@ -1824,18 +1898,18 @@ export default function ManutencaoAdmin() {
             {/* SEÇÃO 2: MODO INSUMOS & LIMPEZA */}
             {dashViewMode === 'insumos' && (
               <div className="space-y-6">
-                {/* Executive KPIs: Limpezas e Insumos */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {/* Executive KPIs: Insumos e Requisições */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="p-3.5 bg-surface-card rounded-xl border border-border-default/70 shadow-xs space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-semibold text-text-muted">Limpezas Registradas</span>
-                      <CheckCircle2 className="h-4 w-4 text-emerald-600 opacity-70" />
+                      <span className="text-[11px] font-semibold text-text-muted">Total de Requisições</span>
+                      <ClipboardList className="h-4 w-4 text-emerald-600 opacity-70" />
                     </div>
                     <div className="text-2xl font-black text-emerald-700">
-                      {dashFilteredCheckins.length}
+                      {dashTotalRequisicoes}
                     </div>
                     <div className="text-[10px] text-text-muted truncate">
-                      intervenções de conservação
+                      {dashTotalRequisicoes === 1 ? 'requisição atendida no período' : 'requisições atendidas no período'}
                     </div>
                   </div>
 
@@ -1851,88 +1925,114 @@ export default function ManutencaoAdmin() {
                       {dashTotalMateriais.toLocaleString('pt-BR')} itens consumidos no período
                     </div>
                   </div>
-
-                  <div className="p-3.5 bg-surface-card rounded-xl border border-border-default/70 shadow-xs space-y-1 col-span-2 md:col-span-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-semibold text-text-muted">Média por Registro</span>
-                      <Boxes className="h-4 w-4 text-blue-600 opacity-70" />
-                    </div>
-                    <div className="text-2xl font-black text-blue-700">
-                      {(dashTotalMateriais / (dashFilteredConsumos.length || 1)).toFixed(1)}
-                      <span className="text-xs font-normal text-text-muted"> un</span>
-                    </div>
-                    <div className="text-[10px] text-text-muted truncate">
-                      insumos por registro de consumo
-                    </div>
-                  </div>
                 </div>
 
-                {/* Charts Section: 3 Insumos & Limpezas Visualizations */}
+                {/* Charts Section: 3 Insumos Visualizations */}
                 <div className="grid gap-6 md:grid-cols-2">
-                  {/* Chart 1: Temporal Evolution of Cleanings */}
+                  {/* Chart 1: Distribution by Category */}
                   <div className="bg-surface-card rounded-xl p-4 border border-border-default/70 shadow-sm space-y-3">
                     <div className="flex items-center justify-between gap-2">
                       <div className="space-y-0.5">
                         <h4 className="font-extrabold text-text-primary text-sm uppercase tracking-wide flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                          Evolução Temporal de Limpezas
+                          <span className="w-2 h-2 rounded-full bg-teal-500"></span>
+                          Distribuição por Categoria
                         </h4>
-                        <p className="text-xs text-text-muted">Volume diário de passagens e intervenções de conservação.</p>
+                        <p className="text-xs text-text-muted">
+                          {dashCategoryChartData.hasValor
+                            ? 'Participação financeira por grupo de insumos.'
+                            : 'Distribuição da quantidade por grupo de insumos.'}
+                        </p>
                       </div>
                       <Button
                         variant="outline"
                         size="xs"
                         onClick={() => {
-                          setLimpezasDrilldownFilterDate(null);
-                          setLimpezasDrilldownFilterAcao('todos');
-                          setLimpezasDrilldownSearch('');
-                          setIsLimpezasDrilldownOpen(true);
+                          setConsumoDrilldownFilterMaterial('todos');
+                          setConsumoDrilldownSearch('');
+                          setIsConsumoDrilldownOpen(true);
                         }}
-                        className="h-7 text-xs gap-1.5 text-blue-700 border-blue-200 hover:bg-blue-50 shrink-0 font-semibold"
-                        title="Abrir detalhamento de limpezas"
+                        className="h-7 text-xs gap-1.5 text-teal-700 border-teal-200 hover:bg-teal-50 shrink-0 font-semibold"
+                        title="Abrir detalhamento de insumos"
                       >
                         <Maximize2 className="h-3.5 w-3.5" />
                         Detalhar
                       </Button>
                     </div>
-                    <div className="h-72 w-full pt-2">
-                      {dashTimelineData.length === 0 ? (
+                    <div className="min-h-72 w-full pt-2 flex items-center justify-center">
+                      {dashCategoryChartData.items.length === 0 ? (
                         <div className="h-full flex items-center justify-center text-text-muted italic text-xs">
-                          Sem registros de limpezas para o período selecionado.
+                          Sem dados de categorias para o período selecionado.
                         </div>
                       ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart
-                            data={dashTimelineData}
-                            margin={{ top: 10, right: 15, left: -10, bottom: 20 }}
-                            onClick={(data: any) => {
-                              if (data && data.activePayload && data.activePayload.length > 0) {
-                                const clickedItem = data.activePayload[0].payload;
-                                if (clickedItem && clickedItem.dateStr) {
-                                  setLimpezasDrilldownFilterDate(clickedItem.dateStr);
-                                  setLimpezasDrilldownFilterAcao('todos');
-                                  setIsLimpezasDrilldownOpen(true);
-                                }
-                              }
-                            }}
-                            className="cursor-pointer"
-                          >
-                            <defs>
-                              <linearGradient id="colorLimpezas" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
-                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0}/>
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                            <XAxis dataKey="dateStr" tick={{ fontSize: 10, fill: '#64748b' }} />
-                            <YAxis tick={{ fontSize: 10, fill: '#64748b' }} allowDecimals={false} />
-                            <RechartsTooltip
-                              formatter={(val: number) => [`${val} passagem(ns) (clique para detalhar)`, 'Limpezas Realizadas']}
-                              contentStyle={{ borderRadius: '8px', fontSize: '12px', border: '1px solid #e2e8f0' }}
-                            />
-                            <Area type="monotone" dataKey="limpezas" name="Limpezas" stroke="#3b82f6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorLimpezas)" />
-                          </AreaChart>
-                        </ResponsiveContainer>
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-6 w-full py-2">
+                          <div className="h-48 w-48 shrink-0">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie
+                                  data={dashCategoryChartData.items}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={50}
+                                  outerRadius={80}
+                                  paddingAngle={3}
+                                  dataKey={dashCategoryChartData.hasValor ? 'valor' : 'quantidade'}
+                                  nameKey="name"
+                                >
+                                  {dashCategoryChartData.items.map((entry, index) => (
+                                    <Cell
+                                      key={`cell-cat-${index}`}
+                                      fill={categoryChartColors[index % categoryChartColors.length]}
+                                    />
+                                  ))}
+                                </Pie>
+                                <RechartsTooltip
+                                  formatter={(val: number, name: string) => {
+                                    const total = dashCategoryChartData.hasValor
+                                      ? dashCategoryChartData.totalValor
+                                      : dashCategoryChartData.totalQuantidade;
+                                    const pct = total > 0 ? ((val / total) * 100).toFixed(1) : '0';
+                                    const formattedVal = dashCategoryChartData.hasValor
+                                      ? formatCurrency(val)
+                                      : `${val} un`;
+                                    return [`${formattedVal} (${pct}%)`, name];
+                                  }}
+                                  contentStyle={{ borderRadius: '8px', fontSize: '12px', border: '1px solid #e2e8f0' }}
+                                />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </div>
+                          <div className="space-y-2 w-full sm:max-w-[220px]">
+                            {dashCategoryChartData.items.map((item, index) => {
+                              const total = dashCategoryChartData.hasValor
+                                ? dashCategoryChartData.totalValor
+                                : dashCategoryChartData.totalQuantidade;
+                              const currentVal = dashCategoryChartData.hasValor ? item.valor : item.quantidade;
+                              const pct = total > 0 ? ((currentVal / total) * 100).toFixed(1) : '0';
+                              return (
+                                <div
+                                  key={item.name}
+                                  className="flex items-center justify-between gap-2 text-xs bg-surface-subtle/40 px-2.5 py-1.5 rounded-lg border border-border-default/40"
+                                >
+                                  <div className="flex items-center gap-2 truncate min-w-0">
+                                    <div
+                                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                                      style={{ backgroundColor: categoryChartColors[index % categoryChartColors.length] }}
+                                    />
+                                    <span className="font-medium text-text-secondary truncate" title={item.name}>
+                                      {item.name}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <span className="font-bold text-text-primary text-[11px]">
+                                      {dashCategoryChartData.hasValor ? formatCurrency(item.valor) : `${item.quantidade} un`}
+                                    </span>
+                                    <span className="text-[10px] font-semibold text-text-muted">({pct}%)</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
