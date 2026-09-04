@@ -300,6 +300,18 @@ Observações:
 - O superadministrador também possui permissão para criar e gerenciar requisições de compra diretamente na mesma tela, com acesso irrestrito a todos os contratos e empenhos.
 - A geração de PDF é feita de forma estritamente local (no cliente), carregando os dados da requisição e dos itens em um template timbrado institucional em um iframe para impressão direta via `window.print()`. O PDF lista todas as NEs vinculadas e mostra a NE de cada item.
 
+### Refeitório
+
+`App.tsx` -> `RefeitorioInsumos.tsx` (`/refeitorio/insumos`) & `RequisicaoCompra.tsx` (`/requisicao-compra`) -> `InsumosDashboardView.tsx` / `requisicoesCompra.ts` -> `manutencaoService` / `requisicoesCompraService`
+
+- O módulo **Refeitório** foi incorporado ao grupo **Operações** na sidebar (`appScreens.ts`), estruturado com dois subitens hierárquicos:
+  1. **Requisição de Compra**: aponta para `/requisicao-compra` (com redirecionamento automático de `/refeitorio` e `/refeitorio/requisicoes`).
+  2. **Insumos**: aponta para `/refeitorio/insumos`, renderizando o componente autônomo e reutilizável `<InsumosDashboardView defaultBloco="refeitorio" />`.
+- Apresenta os mesmos indicadores e gráficos especializados de consumo e requisições do refeitório (KPIs de Total de Requisições e Valor Total Gasto, gráficos de Distribuição por Categoria, Evolução Temporal do Valor Gasto, Consumo Geral com alternância Top 8/Todos e Top 5 Ambientes, além do modal de Detalhamento Analítico com busca e filtros).
+- **Acesso e Perfis**:
+  - Usuários terceirizados atuantes no refeitório (`tipo === 'refeitorio'`) recebem automaticamente permissões para o grupo `operacoes` e telas `refeitorio`, `refeitorio-insumos`, `contratos` e `requisicao-compra`, visualizando este menu dedicado na sidebar.
+  - No catálogo central de telas (`appScreens.ts`), `refeitorio` e `requisicao-compra` possuem resolução cruzada em `impliedScreenAccess`, garantindo sincronismo entre autorizações e rotas.
+
 ### Limpeza e Manutenção
 
 `App.tsx` -> `ManutencaoAdmin.tsx` -> `manutencao.ts` -> `manutencao_ambientes` / `manutencao_ocorrencias` / `manutencao_checkins` / `manutencao_blocos_mapa`

@@ -189,9 +189,14 @@ export async function fetchUserAccess(user: User, isSuperAdmin: boolean): Promis
       groups.push({ id: 'terceirizado', name: 'Terceirizado', slug: 'terceirizado' });
     }
 
+    const isRefeitorio = !terceirizadoAccess?.tipo || terceirizadoAccess.tipo === 'refeitorio';
+    const allowedScreens = isRefeitorio
+      ? ['operacoes', 'refeitorio', 'refeitorio-insumos', 'contratos', 'requisicao-compra']
+      : ['contratos', 'requisicao-compra'];
+
     return {
       groups: groups.filter((group) => group.slug === 'terceirizado'),
-      screenIds: expandScreenAccessIds(['contratos', 'requisicao-compra']),
+      screenIds: expandScreenAccessIds(allowedScreens),
       org: orgResult,
     };
   }

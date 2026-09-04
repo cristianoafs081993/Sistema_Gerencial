@@ -99,6 +99,10 @@ const nestedNavigation: Record<string, NavigationLeaf[]> = {
     { name: 'Cadastro de Fornecedores', href: '/cadastro-fornecedores', screenId: 'cadastro-fornecedores' },
     { name: 'Capacitação EAD', href: '/pesquisa-precos/ead', screenId: 'pesquisa-precos-ead' },
   ],
+  refeitorio: [
+    { name: 'Requisição de Compra', href: '/requisicao-compra', screenId: 'requisicao-compra' },
+    { name: 'Insumos', href: '/refeitorio/insumos', screenId: 'refeitorio-insumos' },
+  ],
 };
 
 function buildNavigationSections(canAccessScreen: (screenId: string) => boolean): NavigationSection[] {
@@ -114,7 +118,7 @@ function buildNavigationSections(canAccessScreen: (screenId: string) => boolean)
           href: screen.path,
           screenId: screen.id,
           icon: screen.icon,
-          children: nestedNavigation[screen.id],
+          children: nestedNavigation[screen.id]?.filter((child) => canAccessScreen(child.screenId)),
         }));
 
       return { title: group.name, icon: groupIcons[group.id], items };
@@ -126,10 +130,12 @@ function isPathActive(pathname: string, href: string) {
   if (href === '/') return pathname === '/';
   if (href === '/planejamento') return pathname.startsWith('/planejamento') || pathname.startsWith('/atividades');
   if (href === '/editor-documentos') return pathname === '/editor-documentos';
+  if (href === '/refeitorio') return pathname.startsWith('/refeitorio') || pathname.startsWith('/requisicao-compra');
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 function isChildPathActive(pathname: string, href: string) {
+  if (href === '/requisicao-compra') return pathname.startsWith('/requisicao-compra');
   return pathname === href;
 }
 

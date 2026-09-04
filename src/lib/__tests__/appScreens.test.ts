@@ -14,6 +14,8 @@ describe('app screen registry', () => {
     expect(getScreenForPath('/pesquisa-precos/ead')?.id).toBe('pesquisa-precos-ead');
     expect(getScreenForPath('/energia')?.id).toBe('energia-visao-geral');
     expect(getScreenForPath('/energia/esg')?.id).toBe('energia-esg');
+    expect(getScreenForPath('/refeitorio')?.id).toBe('refeitorio');
+    expect(getScreenForPath('/refeitorio/insumos')?.id).toBe('refeitorio-insumos');
   });
 
   it('expande subpaginas funcionais de modulos autorizados', () => {
@@ -21,6 +23,16 @@ describe('app screen registry', () => {
       'pesquisa-precos',
       'cadastro-fornecedores',
       'pesquisa-precos-ead',
+    ]);
+    expect(expandScreenAccessIds(['refeitorio'])).toEqual([
+      'refeitorio',
+      'refeitorio-insumos',
+      'requisicao-compra',
+    ]);
+    expect(expandScreenAccessIds(['requisicao-compra'])).toEqual([
+      'requisicao-compra',
+      'refeitorio',
+      'refeitorio-insumos',
     ]);
   });
 
@@ -36,6 +48,9 @@ describe('app screen registry', () => {
     expect(directorScreenIds).toContain('energia-visao-geral');
     expect(directorScreenIds).toContain('energia-esg');
     expect(directorScreenIds).toContain('economia-tempo');
+    expect(directorScreenIds).toContain('refeitorio');
+    expect(directorScreenIds).not.toContain('refeitorio-insumos');
+    expect(directorScreenIds).not.toContain('requisicao-compra');
     expect(directorScreenIds).not.toContain(ADMIN_USERS_SCREEN_ID);
     expect(directorScreenIds).not.toContain('modelos-documentos');
   });

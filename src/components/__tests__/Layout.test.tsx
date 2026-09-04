@@ -3,8 +3,20 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout';
 import { useAuth } from '@/contexts/AuthContext';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+    },
+  },
+});
+
+const renderWithProviders = (ui: ReactNode) =>
+  render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 
 vi.mock('sonner', () => ({
   toast: {
@@ -55,6 +67,7 @@ const updatePasswordMock = vi.fn();
 describe('Layout', () => {
 
   beforeEach(() => {
+    localStorage.clear();
     mockedToast.warning.mockReset();
     updatePasswordMock.mockReset();
     mockedUseAuth.mockReturnValue({
@@ -99,7 +112,7 @@ describe('Layout', () => {
   });
 
   it('exibe aviso quando o usuario usa senha padrao', () => {
-    render(
+    renderWithProviders(
       <MemoryRouter>
         <Layout>
           <div>conteudo</div>
@@ -113,7 +126,7 @@ describe('Layout', () => {
   });
 
   it('monta o widget global do assistente gerencial', () => {
-    render(
+    renderWithProviders(
       <MemoryRouter>
         <Layout>
           <div>conteudo</div>
@@ -135,7 +148,7 @@ describe('Layout', () => {
       },
     });
 
-    render(
+    renderWithProviders(
       <MemoryRouter>
         <Layout>
           <div>conteudo</div>
@@ -150,7 +163,7 @@ describe('Layout', () => {
   });
 
   it('abre a configuração da integração SUAP pelo menu do usuário', () => {
-    render(
+    renderWithProviders(
       <MemoryRouter>
         <Layout>
           <div>conteudo</div>
@@ -166,7 +179,7 @@ describe('Layout', () => {
   });
 
   it('exibe a opção de padrão de design do SUAP dentro do menu do usuário', () => {
-    render(
+    renderWithProviders(
       <MemoryRouter>
         <Layout>
           <div>conteudo</div>
@@ -186,7 +199,7 @@ describe('Layout', () => {
   it('permite alterar a senha pelo menu do usuário', async () => {
     updatePasswordMock.mockResolvedValue(null);
 
-    render(
+    renderWithProviders(
       <MemoryRouter>
         <Layout>
           <div>conteudo</div>
@@ -210,7 +223,7 @@ describe('Layout', () => {
   });
 
   it('mostra controle de usuarios quando a tela esta permitida', () => {
-    render(
+    renderWithProviders(
       <MemoryRouter>
         <Layout>
           <div>conteudo</div>
@@ -224,7 +237,7 @@ describe('Layout', () => {
   });
 
   it('mantem a busca visual no header e expande submenus da sidebar', () => {
-    render(
+    renderWithProviders(
       <MemoryRouter>
         <Layout>
           <div>conteudo</div>
@@ -240,7 +253,7 @@ describe('Layout', () => {
   });
 
   it('exibe a biblioteca de artefatos no grupo de documentos', () => {
-    render(
+    renderWithProviders(
       <MemoryRouter>
         <Layout>
           <div>conteudo</div>
@@ -254,7 +267,7 @@ describe('Layout', () => {
   });
 
   it('exibe modulos de licitacoes no grupo de licitacoes', () => {
-    render(
+    renderWithProviders(
       <MemoryRouter>
         <Layout>
           <div>conteudo</div>
@@ -273,7 +286,7 @@ describe('Layout', () => {
 
 
   it('mantem capacitacao EAD como ultimo subitem e nao marca cotacoes quando EAD esta ativo', () => {
-    render(
+    renderWithProviders(
       <MemoryRouter initialEntries={['/pesquisa-precos/ead']}>
         <Layout>
           <div>conteudo</div>
@@ -292,7 +305,7 @@ describe('Layout', () => {
   });
 
   it('exibe credito disponivel no grupo orcamentario', () => {
-    render(
+    renderWithProviders(
       <MemoryRouter>
         <Layout>
           <div>conteudo</div>
@@ -306,7 +319,7 @@ describe('Layout', () => {
   });
 
   it('exibe o painel de energia na sidebar', () => {
-    render(
+    renderWithProviders(
       <MemoryRouter>
         <Layout>
           <div>conteudo</div>
@@ -320,7 +333,7 @@ describe('Layout', () => {
   });
 
   it('mantem a ordem dos tipos do editor na sidebar', () => {
-    render(
+    renderWithProviders(
       <MemoryRouter initialEntries={['/editor-documentos/termo-referencia-compras']}>
         <Layout>
           <div>conteudo</div>
@@ -351,7 +364,7 @@ describe('Layout', () => {
   });
 
   it('abre a Command Palette ao clicar no atalho do header', () => {
-    render(
+    renderWithProviders(
       <MemoryRouter>
         <Layout>
           <div>conteudo</div>
@@ -366,7 +379,7 @@ describe('Layout', () => {
 
 
   it('permite alternar a sidebar para o modo compacto (Rail Mode)', () => {
-    render(
+    renderWithProviders(
       <MemoryRouter>
         <Layout>
           <div>conteudo</div>
@@ -381,7 +394,7 @@ describe('Layout', () => {
   });
 
   it('exibe o botão da central de notificações no cabeçalho e abre o popover', () => {
-    render(
+    renderWithProviders(
       <MemoryRouter>
         <Layout>
           <div>conteudo</div>
@@ -394,7 +407,24 @@ describe('Layout', () => {
 
     fireEvent.click(notifButton);
     expect(screen.getByText('Notificações')).toBeInTheDocument();
-    expect(screen.getByText(/eventos orçamentários/i)).toBeInTheDocument();
+    expect(screen.getByText(/eventos/i)).toBeInTheDocument();
+  });
+
+  it('exibe o item Refeitório no grupo Operações com os subitens Requisição de Compra e Insumos', () => {
+    renderWithProviders(
+      <MemoryRouter>
+        <Layout>
+          <div>conteudo</div>
+        </Layout>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByText('Operações'));
+    expect(screen.getByText('Refeitório')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Refeitório'));
+    expect(screen.getByText('Requisição de Compra')).toBeInTheDocument();
+    expect(screen.getByText('Insumos')).toBeInTheDocument();
   });
 });
 

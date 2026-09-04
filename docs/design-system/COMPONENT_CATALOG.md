@@ -167,6 +167,7 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 
 
 - Almoxarifado: página operacional que combina HeaderActions, StatCard, FilterPanel, DataTablePanel, Tabs e Dialog para catálogo, saldos e movimentos, com estados explícitos de estoque crítico.
+- `InsumosDashboardView`: painel analítico autônomo e reutilizável (`src/components/refeitorio/InsumosDashboardView.tsx`) para gestão de insumos e consumo de materiais. Inclui toolbar de filtros (período, bloco, tipo de ambiente e insumo), cards executivos (Total de Requisições e Valor Total Gasto em R$), gráficos analíticos (Distribuição por Categoria em rosca, Evolução Temporal do Valor Gasto em área, Consumo Geral de Insumos em barras com toggle Top 8/Todos e ranking Top 5 Ambientes), além de modal completo de Detalhamento Analítico com busca e paginação.
 O acordeao Resumo financeiro por dimensao segue a estrutura nativa do SUAP e exibe os totais das quatro colunas financeiras agrupados por dimensao.
 
 - Na revisão de documentos SUAP, o ícone de histórico fica ao lado do ícone de geração e carrega a última análise salva sem baixar novamente o PDF.
