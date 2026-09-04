@@ -80,6 +80,8 @@ export interface ConsumoInsumo {
   material: string;
   quantidade: number;
   unidade: string;
+  valor_unitario: number;
+  valor_total: number;
   requisicao_compra_id: string | null;
   requisicao_numero: string | null;
   requisicao_status: 'draft' | 'enviada_fornecedor' | 'liquidada' | null;
@@ -248,8 +250,10 @@ export const manutencaoService = {
 
     if (error) throw error;
     return (data || []).map((row) => ({
-      ...(row as Omit<ConsumoInsumo, 'quantidade'>),
-      quantidade: Number(row.quantidade),
+      ...(row as Omit<ConsumoInsumo, 'quantidade' | 'valor_unitario' | 'valor_total'>),
+      quantidade: Number(row.quantidade || 0),
+      valor_unitario: Number(row.valor_unitario || 0),
+      valor_total: Number(row.valor_total || 0),
     }));
   },
 

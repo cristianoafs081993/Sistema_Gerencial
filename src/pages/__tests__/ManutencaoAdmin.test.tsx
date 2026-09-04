@@ -39,7 +39,11 @@ vi.mock('recharts', () => ({
       {children}
     </div>
   ),
-  AreaChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AreaChart: ({ children, data }: { children: React.ReactNode; data?: any[] }) => (
+    <div data-testid="area-chart" data-items-count={data?.length}>
+      {children}
+    </div>
+  ),
   PieChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   XAxis: () => null,
   YAxis: () => null,
@@ -47,7 +51,9 @@ vi.mock('recharts', () => ({
   Tooltip: () => null,
   Legend: () => null,
   Bar: () => null,
-  Area: () => null,
+  Area: ({ dataKey, name }: { dataKey?: string; name?: string }) => (
+    <div data-testid="area-curve" data-key={dataKey} data-name={name} />
+  ),
   Pie: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   Cell: () => null,
 }));
@@ -159,6 +165,8 @@ const mockConsumosInsumos = [
     material: 'Arroz parboilizado',
     quantidade: 12.5,
     unidade: 'KG',
+    valor_unitario: 4.5,
+    valor_total: 56.25,
     requisicao_compra_id: 'req-1',
     requisicao_numero: 'REQ-2026-0001',
     requisicao_status: 'enviada_fornecedor' as const,
@@ -208,7 +216,7 @@ describe('ManutencaoAdmin', () => {
 
     // KPIs do modo Insumos
     expect(screen.getByText('Limpezas Registradas')).toBeInTheDocument();
-    expect(screen.getByText('Consumo Total de Insumos')).toBeInTheDocument();
+    expect(screen.getByText('Valor Total Gasto')).toBeInTheDocument();
     expect(screen.getByText('Média por Registro')).toBeInTheDocument();
 
     // Gráficos e Rankings de Insumos
@@ -460,5 +468,59 @@ describe('ManutencaoAdmin', () => {
     // Retorna para 'Top 8'
     fireEvent.click(screen.getByRole('button', { name: 'Top 8' }));
     expect(barChart).toHaveAttribute('data-items-count', '8');
+  });
+
+  it('exibe o card de Valor Total Gasto e o gráfico de Evolução Temporal com a métrica de valor gasto', async () => {
+    const mockConsumoValor = [
+      {
+        id: 'consumo-val-1',
+        origem: 'requisicao_compra' as const,
+        consumo_em: new Date().toISOString(),
+        ambiente_id: 'amb-1',
+        ambiente_nome: 'Refeitório',
+        ambiente_codigo: 'REFEITORIO',
+        ambiente_bloco: 'Refeitório',
+        material: 'Fruta',
+        quantidade: 10,
+        unidade: 'KG',
+        valor_unitario: 5.5,
+        valor_total: 55.0,
+        requisicao_compra_id: 'req-val',
+        requisicao_numero: 'REQ-VAL-1',
+        requisicao_status: 'enviada_fornecedor' as const,
+      },
+    ];
+
+    vi.mocked(manutencaoService.getConsumosInsumos).mockResolvedValue(mockConsumoValor);
+
+    render(
+      <MemoryRouter>
+        <ManutencaoAdmin />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('insumos')).toBeInTheDocument();
+    });
+
+    const insumosRadio = screen.getByDisplayValue('insumos');
+    fireEvent.change(insumosRadio, { target: { checked: true } });
+    fireEvent.click(insumosRadio);
+
+    await waitFor(() => {
+      expect(screen.getByText('Valor Total Gasto')).toBeInTheDocument();
+    });
+
+    // Valida que o card exibe o valor formatado em R$
+    expect(screen.getByText(/R\$\s*55,00/)).toBeInTheDocument();
+
+    // Valida o subtítulo da evolução temporal de insumos
+    expect(screen.getByText('Valor diário gasto com materiais e insumos repostos.')).toBeInTheDocument();
+
+    // Valida que a curva do gráfico de evolução de insumos consome a chave 'valor'
+    const areaCurves = screen.getAllByTestId('area-curve');
+    const valorCurve = areaCurves.find((el) => el.getAttribute('data-key') === 'valor');
+    expect(valorCurve).toBeDefined();
+    expect(valorCurve).toHaveAttribute('data-name', 'Valor Gasto');
   });
 });

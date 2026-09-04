@@ -1168,7 +1168,7 @@ Finalidade:
 Campos-chave:
 
 - `origem` (`checkin` ou `requisicao_compra`)
-- `consumo_em`, `ambiente_*`, `material`, `quantidade`, `unidade`
+- `consumo_em`, `ambiente_*`, `material`, `quantidade`, `unidade`, `valor_unitario`, `valor_total`
 - `requisicao_compra_id`, `requisicao_numero`, `requisicao_status` (quando a origem é requisição)
 
 Observações operacionais:

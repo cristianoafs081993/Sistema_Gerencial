@@ -48,7 +48,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import {
   type Ambiente,
   type Checkin,
@@ -1211,6 +1211,10 @@ export default function ManutencaoAdmin() {
     return Object.values(dashMaterialsMap).reduce((a, b) => a + b, 0);
   }, [dashMaterialsMap]);
 
+  const dashTotalValor = useMemo(() => {
+    return dashFilteredConsumos.reduce((acc, consumo) => acc + Number(consumo.valor_total || 0), 0);
+  }, [dashFilteredConsumos]);
+
   // Ratings aggregation
   const dashValidRatings = useMemo(() => {
     return dashFilteredOcorrencias.filter((o) => typeof o.avaliacao === 'number' && o.avaliacao > 0);
@@ -1263,13 +1267,13 @@ export default function ManutencaoAdmin() {
 
   // Timeline series (Limpezas e Insumos dia a dia)
   const dashTimelineData = useMemo(() => {
-    const dayMap = new Map<string, { dateStr: string; timestamp: number; limpezas: number; insumos: number }>();
+    const dayMap = new Map<string, { dateStr: string; timestamp: number; limpezas: number; insumos: number; valor: number }>();
     const ensureDay = (dateValue: string) => {
       const d = new Date(dateValue);
       const key = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
       const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
       if (!dayMap.has(key)) {
-        dayMap.set(key, { dateStr: key, timestamp: dayStart, limpezas: 0, insumos: 0 });
+        dayMap.set(key, { dateStr: key, timestamp: dayStart, limpezas: 0, insumos: 0, valor: 0 });
       }
       return dayMap.get(key)!;
     };
@@ -1277,7 +1281,9 @@ export default function ManutencaoAdmin() {
       ensureDay(checkin.created_at).limpezas += 1;
     });
     dashFilteredConsumos.forEach((consumo) => {
-      ensureDay(consumo.consumo_em).insumos += consumo.quantidade;
+      const day = ensureDay(consumo.consumo_em);
+      day.insumos += Number(consumo.quantidade || 0);
+      day.valor += Number(consumo.valor_total || 0);
     });
     return Array.from(dayMap.values()).sort((a, b) => a.timestamp - b.timestamp);
   }, [dashFilteredCheckins, dashFilteredConsumos]);
@@ -1835,14 +1841,14 @@ export default function ManutencaoAdmin() {
 
                   <div className="p-3.5 bg-surface-card rounded-xl border border-border-default/70 shadow-xs space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-semibold text-text-muted">Consumo Total de Insumos</span>
+                      <span className="text-[11px] font-semibold text-text-muted">Valor Total Gasto</span>
                       <TrendingUp className="h-4 w-4 text-teal-600 opacity-70" />
                     </div>
                     <div className="text-2xl font-black text-teal-700">
-                      {dashTotalMateriais}
+                      {formatCurrency(dashTotalValor)}
                     </div>
                     <div className="text-[10px] text-text-muted truncate">
-                      itens consumidos no período
+                      {dashTotalMateriais.toLocaleString('pt-BR')} itens consumidos no período
                     </div>
                   </div>
 
@@ -1939,7 +1945,7 @@ export default function ManutencaoAdmin() {
                           <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                           Evolução Temporal de Insumos
                         </h4>
-                        <p className="text-xs text-text-muted">Quantidade diária de materiais e insumos repostos.</p>
+                        <p className="text-xs text-text-muted">Valor diário gasto com materiais e insumos repostos.</p>
                       </div>
                       <Button
                         variant="outline"
@@ -1966,7 +1972,7 @@ export default function ManutencaoAdmin() {
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart
                             data={dashTimelineData}
-                            margin={{ top: 10, right: 15, left: -10, bottom: 20 }}
+                            margin={{ top: 10, right: 15, left: -5, bottom: 20 }}
                             onClick={(data: any) => {
                               if (data && data.activePayload && data.activePayload.length > 0) {
                                 const clickedItem = data.activePayload[0].payload;
@@ -1987,12 +1993,46 @@ export default function ManutencaoAdmin() {
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                             <XAxis dataKey="dateStr" tick={{ fontSize: 10, fill: '#64748b' }} />
-                            <YAxis tick={{ fontSize: 10, fill: '#64748b' }} allowDecimals={false} />
-                            <RechartsTooltip
-                              formatter={(val: number) => [`${val} un (clique para detalhar)`, 'Insumos Repostos']}
-                              contentStyle={{ borderRadius: '8px', fontSize: '12px', border: '1px solid #e2e8f0' }}
+                            <YAxis
+                              tick={{ fontSize: 10, fill: '#64748b' }}
+                              allowDecimals={false}
+                              tickFormatter={(val: number) =>
+                                val >= 1000 ? `R$ ${(val / 1000).toFixed(1)}k` : `R$ ${val}`
+                              }
                             />
-                            <Area type="monotone" dataKey="insumos" name="Insumos Repostos" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorInsumos)" />
+                            <RechartsTooltip
+                              content={({ active, payload }) => {
+                                if (!active || !payload || !payload.length) return null;
+                                const item = payload[0].payload;
+                                return (
+                                  <div className="bg-white dark:bg-neutral-800 p-2.5 rounded-lg shadow-md border border-slate-200 dark:border-neutral-700 text-xs space-y-1">
+                                    <p className="font-semibold text-slate-800 dark:text-neutral-100">{item.dateStr}</p>
+                                    <div className="flex items-center justify-between gap-4 text-slate-600 dark:text-neutral-300 pt-1 border-t border-slate-100 dark:border-neutral-700/60">
+                                      <span>Valor Gasto:</span>
+                                      <span className="font-bold text-emerald-700 dark:text-emerald-400">
+                                        {formatCurrency(item.valor || 0)}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-4 text-slate-500 dark:text-neutral-400 text-[11px]">
+                                      <span>Quantidade:</span>
+                                      <span className="font-semibold">{item.insumos || 0} un</span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 dark:text-neutral-400 italic pt-0.5">
+                                      Clique para detalhar
+                                    </p>
+                                  </div>
+                                );
+                              }}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="valor"
+                              name="Valor Gasto"
+                              stroke="#10b981"
+                              strokeWidth={2.5}
+                              fillOpacity={1}
+                              fill="url(#colorInsumos)"
+                            />
                           </AreaChart>
                         </ResponsiveContainer>
                       )}
@@ -3277,14 +3317,15 @@ export default function ManutencaoAdmin() {
                   <TableHead>Ambiente</TableHead>
                   <TableHead>Material</TableHead>
                   <TableHead>Origem</TableHead>
-                  <TableHead className="w-32">Data</TableHead>
+                  <TableHead className="w-28">Data</TableHead>
                   <TableHead className="text-right font-bold">Quantidade</TableHead>
+                  <TableHead className="text-right font-bold">Valor Total</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sortedConsumoData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-36 text-center italic text-muted-foreground">
+                    <TableCell colSpan={6} className="h-36 text-center italic text-muted-foreground">
                       Nenhum registro de consumo localizado com os filtros aplicados.
                     </TableCell>
                   </TableRow>
@@ -3317,6 +3358,9 @@ export default function ManutencaoAdmin() {
                       <TableCell className="text-right font-extrabold text-emerald-800 font-mono bg-emerald-50/40">
                         {row.quantidade} {row.unidade}
                       </TableCell>
+                      <TableCell className="text-right font-bold text-slate-800 font-mono">
+                        {Number(row.valor_total || 0) > 0 ? formatCurrency(Number(row.valor_total)) : '—'}
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -3325,11 +3369,20 @@ export default function ManutencaoAdmin() {
           </div>
 
           <DialogFooter className="pt-3 border-t border-border-default/60 flex items-center justify-between w-full">
-            <div className="text-xs text-slate-500">
-              Total consolidado:{' '}
-              <strong className="text-slate-800">
-                {sortedConsumoData.reduce((acc, r) => acc + r.quantidade, 0)} unidades
-              </strong>
+            <div className="text-xs text-slate-500 flex items-center gap-2">
+              <span>
+                Total consolidado:{' '}
+                <strong className="text-slate-800">
+                  {sortedConsumoData.reduce((acc, r) => acc + r.quantidade, 0).toLocaleString('pt-BR')} unidades
+                </strong>
+              </span>
+              <span>•</span>
+              <span>
+                Valor:{' '}
+                <strong className="text-emerald-700 font-bold">
+                  {formatCurrency(sortedConsumoData.reduce((acc, r) => acc + Number(r.valor_total || 0), 0))}
+                </strong>
+              </span>
             </div>
             <Button
               variant="outline"
