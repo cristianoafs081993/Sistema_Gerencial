@@ -254,6 +254,21 @@ Mostrar a linhagem operacional dos dados de forma curta:
   - rota de reabertura: `/editor-documentos/:modelId?artifactId=<id>`
   - observacao: edicoes posteriores atualizam a versao aberta; uma nova geracao cria nova versao
 
+### Pesquisa de Precos e Base Local de Referencia
+
+- coleta e sincronizacao:
+  - fonte oficial: Compras.gov.br Dados Abertos (API `/modulo-contratacoes/2_consultarItensContratacoes_PNCP_14133`) e PNCP
+  - ingestao: Edge Function [sync-precos-referencia/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-precos-referencia/index.ts)
+  - agendamento: `pg_cron` diário (`sync-precos-referencia-daily`) executando delta diário de 24h a 48h
+  - embeddings vetoriais: gerados via Google AI Studio Gemini API (`gemini-embedding-001`, dimensão 768)
+  - persistencia:
+    - `preco_referencia_itens`: cotações homologadas, metadados de órgão/fornecedor, `search_tsv` e coluna vetorial `embedding vector(768)`
+    - `preco_referencia_sync_runs`: controle de execução e métricas de sincronização
+- consulta e recuperacao híbrida:
+  - RPC SQL: `match_preco_referencia_hibrido`, combinando similaridade vetorial cosseno (50%), Full-Text Search em português (30%) e trigramas pg_trgm (20%)
+  - service frontend: [precoReferencia.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/precoReferencia.ts)
+  - consumidor conversacional: Edge Function [assistente-gerencial/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/assistente-gerencial/index.ts) consulta prioritariamente a base local antes de consultar APIs externas lentas
+
 ### Processos SUAP
 
 - entrada: HTML das caixas SUAP lido por `SuapSyncPanel` e `suapScraperService`

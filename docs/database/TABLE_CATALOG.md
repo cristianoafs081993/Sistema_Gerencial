@@ -942,6 +942,79 @@ Campos-chave:
 - `total_upserted`
 - `details`
 
+### `preco_referencia_itens`
+
+Finalidade:
+
+- base materializada de pesquisa de preços oficial (Compras.gov.br e PNCP sob Lei 14.133/2021 e IN SEGES/ME 65/2021)
+- suporte a pesquisa vetorial semântica com pgvector (`embedding vector(768)` e índice HNSW `idx_preco_ref_embedding_hnsw`)
+- suporte a busca Full-Text (`search_tsv tsvector` com dicionário português e índice GIN) e similaridade fonética/trigrama (`pg_trgm`)
+- consumida prioritariamente pelo Assistente Gerencial (`executeConversationalPriceResearch`) antes de consultar APIs externas lentas
+- alimentada pela Edge Function `sync-precos-referencia` e pelo job cron diário `sync-precos-referencia-daily`
+
+Campos-chave:
+
+- `id`
+- `numero_controle_pncp`
+- `numero_item`
+- `codigo_item_catalogo`
+- `tipo_catalogo`: `material` ou `servico`
+- `descricao_item`
+- `descricao_detalhada`
+- `unidade_medida`
+- `quantidade`
+- `valor_unitario` (preço homologado / cotação limpa)
+- `valor_total`
+- `marca`
+- `fornecedor_nome`
+- `fornecedor_cnpj`
+- `orgao_nome`
+- `orgao_cnpj`
+- `orgao_esfera`
+- `orgao_uf`
+- `uasg_codigo`
+- `modalidade_nome`
+- `ano_compra`
+- `data_publicacao_pncp`
+- `data_resultado`
+- `link_pncp`
+- `amostra_valida`
+- `embedding`: `vector(768)`
+- `search_tsv`: `tsvector` gerado automaticamente
+- `sync_run_id`: FK para `preco_referencia_sync_runs(id)`
+
+Função RPC associada:
+
+- `match_preco_referencia_hibrido(query_text, query_embedding, match_threshold, match_count, filter_uf, filter_esfera, max_lookback_days)`: calcula score ponderado (50% semântica vetorial, 30% FTS português, 20% trigrama)
+
+Consumido por:
+
+- [precoReferencia.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/precoReferencia.ts)
+- [assistente-gerencial/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/assistente-gerencial/index.ts)
+
+### `preco_referencia_sync_runs`
+
+Finalidade:
+
+- trilha e controle de sincronizações da base de preços de referência (backfill mês a mês e delta diário de 24h/48h)
+
+Campos-chave:
+
+- `id`
+- `tipo_sync`: `backfill_mensal`, `daily_delta`, `manual`
+- `ano`
+- `mes`
+- `data_inicial`
+- `data_final`
+- `status`: `running`, `completed`, `partial_success`, `error`
+- `escopo`
+- `total_compras_consultadas`
+- `total_itens_ingeridos`
+- `total_embeddings_gerados`
+- `cursor_data`: JSONB com paginação e progresso
+- `started_at`
+- `finished_at`
+
 ## Energia Campus
 
 ### `energia_import_runs`

@@ -229,6 +229,92 @@ Responda estritamente em JSON puro no formato de array de avaliações:
   return results;
 }
 
+async function generateQueryEmbedding(query: string, apiKey: string): Promise<number[] | null> {
+  if (!apiKey || !query.trim()) return null;
+  const models = ['gemini-embedding-001', 'gemini-embedding-2', 'embedding-001'];
+  for (const model of models) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: `models/${model}`,
+          content: { parts: [{ text: query.slice(0, 800) }] },
+          outputDimensionality: 768,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data?.embedding?.values)) {
+          return data.embedding.values;
+        }
+      }
+    } catch {
+      // fallback to next model
+    }
+  }
+  return null;
+}
+
+async function fetchLocalHybridCandidates(
+  supabase: any,
+  queryText: string,
+  queryEmbedding: number[] | null,
+  demand: ExtractedDemandItem,
+  existingIds: Set<string>,
+  matchCount = 8,
+): Promise<ConversationalPriceCandidate[]> {
+  const candidates: ConversationalPriceCandidate[] = [];
+  try {
+    const { data: matchedRows, error } = await supabase.rpc('match_preco_referencia_hibrido', {
+      query_text: queryText,
+      query_embedding: queryEmbedding,
+      match_threshold: 0.20,
+      match_count: matchCount,
+      max_lookback_days: 365,
+    });
+
+    if (!error && Array.isArray(matchedRows)) {
+      for (const row of matchedRows) {
+        const candId = `local_ref:${row.numero_controle_pncp}-${row.numero_item}`;
+        if (existingIds.has(candId)) continue;
+        const price = Number(row.valor_unitario || 0);
+        if (price <= 0) continue;
+
+        existingIds.add(candId);
+        candidates.push({
+          id: candId,
+          sourceType: 'painel_de_precos',
+          supplierName: row.fornecedor_nome || 'Fornecedor Homologado',
+          supplierDocument: row.fornecedor_cnpj || '',
+          agencyName: row.orgao_nome || 'Órgão Público',
+          agencyCode: row.uasg_codigo || '',
+          purchaseId: row.numero_controle_pncp,
+          purchaseDate: row.data_publicacao_pncp ? String(row.data_publicacao_pncp).slice(0, 10) : null,
+          unitPrice: price,
+          comparableUnitPrice: price,
+          originalUnitLabel: row.unidade_medida || demand.unit || 'UN',
+          unitCompatible: true,
+          selected: true,
+          exclusionReason: '',
+          pncpUrl: row.link_pncp || 'https://pncp.gov.br/app/editais',
+          documentTitle: `Item ${row.numero_item} - ${row.modalidade_nome || 'Pregão / Dispensa'}`,
+          documentType: row.modalidade_nome || 'Homologação PNCP',
+          documentUrl: row.link_pncp || 'https://pncp.gov.br/app/editais',
+          editalPage: `Item ${row.numero_item}`,
+          itemDescription: row.descricao_item + (row.descricao_detalhada ? ` — ${row.descricao_detalhada}` : ''),
+          editalExcerpt: row.descricao_detalhada || row.descricao_item,
+          editalAudited: false,
+          compatibility: 'NAO_IDENTIFICADO',
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('Erro ao consultar match_preco_referencia_hibrido:', err);
+  }
+  return candidates;
+}
+
 async function fetchPncpCandidates(
   searchTerm: string,
   demand: ExtractedDemandItem,
@@ -360,15 +446,50 @@ async function executeConversationalPriceResearch(
     const existingIds = new Set<string>();
     const usedSynonymsList: string[] = [];
 
-    // 1. Busca Direta no Elasticsearch do PNCP com a descrição original
-    const initialCandidates = await fetchPncpCandidates(demand.description, demand, pncpHeaders, existingIds);
-    rawCandidates.push(...initialCandidates);
+    // 0. Busca Semântica e Híbrida Prioritária na Base Local Supabase (HNSW + FTS + Trigram)
+    const queryEmbedding = await generateQueryEmbedding(demand.description, apiKey);
+    const localCandidates = await fetchLocalHybridCandidates(
+      supabase,
+      demand.description,
+      queryEmbedding,
+      demand,
+      existingIds,
+      8,
+    );
+    rawCandidates.push(...localCandidates);
 
-    // 2. Se a consulta não obteve a quantidade ideal (mínimo 3 cotações), busca por sinônimos oficiais
+    // 0.1 Se menos de 3 cotações, tenta sinônimos na base local antes de recorrer à web externa
     if (rawCandidates.length < 3) {
       const synonyms = getSynonymsForDemand(demand.description, demand.catalogType);
       for (const syn of synonyms) {
         if (rawCandidates.length >= 6) break;
+        const synLocal = await fetchLocalHybridCandidates(
+          supabase,
+          syn,
+          null, // FTS + Trigram rápido para sinônimos
+          demand,
+          existingIds,
+          6,
+        );
+        if (synLocal.length > 0) {
+          usedSynonymsList.push(syn);
+          rawCandidates.push(...synLocal);
+        }
+      }
+    }
+
+    // 1. Se ainda tiver menos de 3 cotações, recorre à busca externa no PNCP como fallback
+    if (rawCandidates.length < 3) {
+      const initialCandidates = await fetchPncpCandidates(demand.description, demand, pncpHeaders, existingIds);
+      rawCandidates.push(...initialCandidates);
+    }
+
+    // 2. Se ainda assim insuficiente, sinônimos na busca externa do PNCP
+    if (rawCandidates.length < 3) {
+      const synonyms = getSynonymsForDemand(demand.description, demand.catalogType);
+      for (const syn of synonyms) {
+        if (rawCandidates.length >= 6) break;
+        if (usedSynonymsList.includes(syn)) continue;
         const synCandidates = await fetchPncpCandidates(syn, demand, pncpHeaders, existingIds);
         if (synCandidates.length > 0) {
           usedSynonymsList.push(syn);

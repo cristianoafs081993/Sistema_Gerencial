@@ -69,9 +69,10 @@ Uso:
 
 - responde perguntas gerenciais sobre dados do sistema em linguagem natural
 - conduz pesquisas de preços completas sob a Lei 14.133/2021 e IN SEGES/ME 65/2021, consultando Compras.gov.br e PNCP, auditando Editais/TRs com Gemini e retornando `priceResearchResult` com Mapa Comparativo, Despacho SUAP e exportação Excel
+- **Busca Semântica e Híbrida Prioritária no Banco Local (pgvector + FTS + Trigram)**: consulta em primeiro lugar a base própria `preco_referencia_itens` através da RPC `match_preco_referencia_hibrido`, gerando embeddings via Gemini (`gemini-embedding-001`, dimensão 768) e ponderando similaridade vetorial cosseno (50%), FTS português (30%) e trigramas (20%); caso atinja a amostra homogênea necessária (≥ 3 cotações), utiliza a base local ultrarrápida dispensando chamadas web externas instáveis
 - **Avaliação de Clareza da Demanda (IN 65/2021)**: quando o usuário solicita cotação com termos vagos ou genéricos (ex.: "computador" sem CPU/RAM/SSD, "cadeira" sem especificação ergonômica NR-17, "ar-condicionado" sem BTUs), o agente formula perguntas de esclarecimento pontuais e fornece opções rápidas de especificação (`||SUGESTOES||`) em vez de realizar consultas cegas
 - **Resolução Contextual por Histórico**: quando o usuário responde à pergunta de esclarecimento, a especificação técnica fornecida é mesclada com a demanda anterior e a pesquisa prossegue automaticamente
-- **Expansão Automática por Sinônimos Oficiais**: quando a consulta direta no PNCP retornar menos de 3 cotações (mínimo exigido pelo Art. 6º da IN 65/2021), o agente consulta termos sinônimos oficiais homologados (ex.: "notebook" ⇄ "computador portátil", "laptop"; "projetor" ⇄ "projetor multimídia", "datashow") para ampliar a amostra até atingir o patamar ideal (≥ 3), reportando os sinônimos utilizados e alertando a autoridade caso persista amostra reduzida
+- **Expansão Automática por Sinônimos Oficiais**: quando a consulta direta retornar menos de 3 cotações (mínimo exigido pelo Art. 6º da IN 65/2021), o agente consulta termos sinônimos oficiais homologados (ex.: "notebook" ⇄ "computador portátil", "laptop"; "projetor" ⇄ "projetor multimídia", "datashow") na base local e em seguida na busca externa para ampliar a amostra até atingir o patamar ideal (≥ 3), reportando os sinônimos utilizados e alertando a autoridade caso persista amostra reduzida
 - consulta fontes allowlisted e calcula agregações determinísticas antes de chamar o Gemini
 - cobre orçamento, empenhos, créditos disponíveis, documentos hábeis, financeiro, contratos API, PFs e conciliação
 - valida o usuário autenticado pelo JWT recebido e usa o cliente Supabase com esse mesmo token, respeitando RLS
@@ -852,3 +853,36 @@ Function versionada para revisão temporária de Termo de Referência e Estudo T
 - A dimensao de cada atividade e resolvida pela secao estrutural (accordion) que contem a tabela; o parser nao depende da ordem global de headings, que varia entre runtimes DOM.
 - A primeira execucao fica em `preview`; depois da conferencia, `apply_suap_plan_snapshot` atualiza/inclui os registros e arquiva os ausentes sem exclusao fisica.
 - O proxy continua aceitando exclusivamente `/plan_estrategico/plano_concluido/8/` sem parametros adicionais.
+
+## sync-precos-referencia
+
+Local:
+
+- [sync-precos-referencia/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-precos-referencia/index.ts)
+
+Finalidade:
+
+- sincronização da base local de preços de referência oficiais (Compras.gov.br e PNCP sob Lei 14.133/2021)
+- suporta 3 modos operacionais:
+  - `backfill_mensal`: ingere compras homologadas mês a mês a partir de janeiro, paginando com segurança de timeout
+  - `daily_delta`: sincronização incremental diária das últimas 24h a 48h a partir da data máxima sincronizada
+  - `generate_embeddings`: gera vetores de 768 dimensões com Gemini (`gemini-embedding-001`, `outputDimensionality: 768`) para registros pendentes
+- grava os itens em `preco_referencia_itens` com proteção de duplicatas `(numero_controle_pncp, numero_item)`
+- atualiza métricas e rastreabilidade na tabela `preco_referencia_sync_runs`
+
+Deploy e Permissões:
+
+- configurada com `--no-verify-jwt` para chamadas de background pelo `pg_net` / `pg_cron`
+- deploy remoto realizado com: `npx supabase functions deploy sync-precos-referencia --no-verify-jwt`
+
+Dependências de Ambiente:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `GEMINI_API_KEY` (Google AI Studio)
+
+Agendamento Automático:
+
+- agendada no `pg_cron` via migration `20260905110000_schedule_daily_sync_precos_referencia.sql`
+- job `sync-precos-referencia-daily` roda diariamente às 04:00 UTC via extensão `pg_net`
+
