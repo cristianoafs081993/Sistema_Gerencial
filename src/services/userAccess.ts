@@ -191,7 +191,7 @@ export async function fetchUserAccess(user: User, isSuperAdmin: boolean): Promis
 
     const isRefeitorio = !terceirizadoAccess?.tipo || terceirizadoAccess.tipo === 'refeitorio';
     const allowedScreens = isRefeitorio
-      ? ['operacoes', 'refeitorio', 'refeitorio-insumos', 'contratos', 'requisicao-compra']
+      ? ['refeitorio', 'refeitorio-insumos', 'requisicao-compra']
       : ['contratos', 'requisicao-compra'];
 
     return {

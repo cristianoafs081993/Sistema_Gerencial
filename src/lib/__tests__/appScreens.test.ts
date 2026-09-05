@@ -47,10 +47,9 @@ describe('app screen registry', () => {
     expect(directorScreenIds).toContain('atas-registro-precos');
     expect(directorScreenIds).toContain('energia-visao-geral');
     expect(directorScreenIds).toContain('energia-esg');
-    expect(directorScreenIds).toContain('economia-tempo');
-    expect(directorScreenIds).toContain('refeitorio');
-    expect(directorScreenIds).not.toContain('refeitorio-insumos');
-    expect(directorScreenIds).not.toContain('requisicao-compra');
+    expect(directorScreenIds).toContain('requisicao-compra');
+    expect(directorScreenIds).toContain('refeitorio-insumos');
+    expect(directorScreenIds).not.toContain('refeitorio');
     expect(directorScreenIds).not.toContain(ADMIN_USERS_SCREEN_ID);
     expect(directorScreenIds).not.toContain('modelos-documentos');
   });

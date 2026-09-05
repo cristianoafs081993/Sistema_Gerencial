@@ -306,13 +306,13 @@ Observações:
 
 `App.tsx` -> `RefeitorioInsumos.tsx` (`/refeitorio/insumos`) & `RequisicaoCompra.tsx` (`/requisicao-compra`) -> `InsumosDashboardView.tsx` / `requisicoesCompra.ts` -> `manutencaoService` / `requisicoesCompraService`
 
-- O módulo **Refeitório** foi incorporado ao grupo **Operações** na sidebar (`appScreens.ts`), estruturado com dois subitens hierárquicos:
+- O módulo **Refeitório** foi promovido a um grupo dedicado de primeiro nível na sidebar (`appScreens.ts`), exibido com destaque e expandido por padrão (`Layout.tsx`), contendo dois itens de acesso imediato:
   1. **Requisição de Compra**: aponta para `/requisicao-compra` (com redirecionamento automático de `/refeitorio` e `/refeitorio/requisicoes`).
   2. **Insumos**: aponta para `/refeitorio/insumos`, renderizando o componente autônomo e reutilizável `<InsumosDashboardView defaultBloco="refeitorio" />`.
 - Apresenta os mesmos indicadores e gráficos especializados de consumo e requisições do refeitório (KPIs de Total de Requisições e Valor Total Gasto, gráficos de Distribuição por Categoria, Evolução Temporal do Valor Gasto, Consumo Geral com alternância Top 8/Todos e Top 5 Ambientes, além do modal de Detalhamento Analítico com busca e filtros).
 - **Acesso e Perfis**:
-  - Usuários terceirizados atuantes no refeitório (`tipo === 'refeitorio'`) recebem automaticamente permissões para o grupo `operacoes` e telas `refeitorio`, `refeitorio-insumos`, `contratos` e `requisicao-compra`, visualizando este menu dedicado na sidebar.
-  - No catálogo central de telas (`appScreens.ts`), `refeitorio` e `requisicao-compra` possuem resolução cruzada em `impliedScreenAccess`, garantindo sincronismo entre autorizações e rotas.
+  - Usuários terceirizados atuantes no refeitório (`tipo === 'refeitorio'`) recebem automaticamente permissões para as telas `refeitorio`, `refeitorio-insumos` e `requisicao-compra`, visualizando o grupo **Refeitório** expandido com ambos os itens.
+  - No catálogo central de telas (`appScreens.ts`), `refeitorio`, `refeitorio-insumos` e `requisicao-compra` possuem resolução cruzada em `impliedScreenAccess`, garantindo sincronismo entre autorizações e rotas.
 
 ### Limpeza e Manutenção
 

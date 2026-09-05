@@ -149,7 +149,7 @@ describe('fetchUserAccess', () => {
     const access = await fetchUserAccess(makeUser(), false);
 
     expect(access.groups.map((group) => group.slug)).toEqual(['terceirizado']);
-    expect(access.screenIds).toEqual(['contratos', 'requisicao-compra']);
+    expect(access.screenIds).toEqual(['refeitorio', 'refeitorio-insumos', 'requisicao-compra']);
   });
 
   it('libera cadastro de fornecedores quando o orgao tem acesso ao modulo pesquisa de precos', async () => {
@@ -235,7 +235,7 @@ describe('fetchUserAccess', () => {
     const access = await fetchUserAccess(makeUser(), false);
 
     expect(access.groups.map((group) => group.slug)).toEqual(['terceirizado']);
-    expect(access.screenIds).toEqual(['contratos', 'requisicao-compra']);
+    expect(access.screenIds).toEqual(['refeitorio', 'refeitorio-insumos', 'requisicao-compra']);
   });
 
   it('ignora permissoes antigas de outros grupos para terceirizado do refeitorio', async () => {
@@ -253,7 +253,7 @@ describe('fetchUserAccess', () => {
     const access = await fetchUserAccess(makeUser(), false);
 
     expect(access.groups.map((group) => group.slug)).toEqual(['terceirizado']);
-    expect(access.screenIds).toEqual(['contratos', 'requisicao-compra']);
+    expect(access.screenIds).toEqual(['refeitorio', 'refeitorio-insumos', 'requisicao-compra']);
   });
 
   it('libera requisicao de compra para terceirizado com outro tipo de servico', async () => {

@@ -19,6 +19,7 @@ import {
   ScrollText,
   Search,
   Settings2,
+  UtensilsCrossed,
   Warehouse,
   Zap,
   X,
@@ -75,9 +76,10 @@ const groupIcons: Record<AppScreenGroupId, React.ComponentType<{ className?: str
   contratos: FileStack,
   licitacoes: ScrollText,
   energia: Zap,
+  operacoes: Warehouse,
+  refeitorio: UtensilsCrossed,
   documentos: FileText,
   automacoes: Clock3,
-  operacoes: Warehouse,
   administracao: Settings2,
 };
 
@@ -98,10 +100,6 @@ const nestedNavigation: Record<string, NavigationLeaf[]> = {
     { name: 'Cotações', href: '/pesquisa-precos', screenId: 'pesquisa-precos' },
     { name: 'Cadastro de Fornecedores', href: '/cadastro-fornecedores', screenId: 'cadastro-fornecedores' },
     { name: 'Capacitação EAD', href: '/pesquisa-precos/ead', screenId: 'pesquisa-precos-ead' },
-  ],
-  refeitorio: [
-    { name: 'Requisição de Compra', href: '/requisicao-compra', screenId: 'requisicao-compra' },
-    { name: 'Insumos', href: '/refeitorio/insumos', screenId: 'refeitorio-insumos' },
   ],
 };
 
@@ -130,6 +128,7 @@ function isPathActive(pathname: string, href: string) {
   if (href === '/') return pathname === '/';
   if (href === '/planejamento') return pathname.startsWith('/planejamento') || pathname.startsWith('/atividades');
   if (href === '/editor-documentos') return pathname === '/editor-documentos';
+  if (href === '/requisicao-compra') return pathname.startsWith('/requisicao-compra') || pathname === '/refeitorio';
   if (href === '/refeitorio') return pathname.startsWith('/refeitorio') || pathname.startsWith('/requisicao-compra');
   return pathname === href || pathname.startsWith(`${href}/`);
 }
@@ -197,7 +196,7 @@ export function Layout({ children }: LayoutProps) {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     navigationSections.forEach((section) => {
-      initial[section.title] = section.items.some((item) => isItemActive(location.pathname, item));
+      initial[section.title] = section.title === 'Refeitório' || section.items.some((item) => isItemActive(location.pathname, item));
     });
     return initial;
   });

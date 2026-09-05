@@ -410,7 +410,7 @@ describe('Layout', () => {
     expect(screen.getByText(/eventos/i)).toBeInTheDocument();
   });
 
-  it('exibe o item Refeitório no grupo Operações com os subitens Requisição de Compra e Insumos', () => {
+  it('exibe o grupo Refeitório na barra lateral aberto por padrão com Requisição de Compra e Insumos', () => {
     renderWithProviders(
       <MemoryRouter>
         <Layout>
@@ -419,10 +419,7 @@ describe('Layout', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByText('Operações'));
     expect(screen.getByText('Refeitório')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByText('Refeitório'));
     expect(screen.getByText('Requisição de Compra')).toBeInTheDocument();
     expect(screen.getByText('Insumos')).toBeInTheDocument();
   });
