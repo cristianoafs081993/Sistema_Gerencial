@@ -132,14 +132,16 @@ describe('Empenhos', () => {
     expect(screen.queryByText('2026NE000002')).not.toBeInTheDocument();
   });
 
-  it('separa as quatro colunas financeiras e preserva a busca no retorno do detalhe', () => {
+  it('exibe as colunas financeiras simplificadas e preserva a busca no retorno do detalhe', () => {
     const current = mockedUseData();
     mockedUseData.mockReturnValue({ ...current, empenhos: [createEmpenho({ processo: '23035.123/2026', planoInterno: 'PI-UNICO', valor: 1000, valorLiquidado: 400, valorPago: 250 })] });
     renderEmpenhos();
-    for (const name of ['Empenhado', 'Liquidado', 'Pago', 'A liquidar']) expect(screen.getByRole('columnheader', { name })).toBeVisible();
+    for (const name of ['Empenhado', 'A liquidar']) expect(screen.getByRole('columnheader', { name })).toBeVisible();
+    expect(screen.queryByRole('columnheader', { name: 'Liquidado' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Pago' })).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole('textbox', { name: 'Buscar empenhos' }), { target: { value: '23035.123/2026' } });
     const row = screen.getByRole('button', { name: '2026NE000001' }).closest('tr')!;
-    expect(within(row).getAllByRole('cell').slice(3, 7).map(cell => cell.textContent?.replace(/\s/g, ' '))).toEqual(['R$ 1.000,00', 'R$ 400,00', 'R$ 250,00', 'R$ 600,00']);
+    expect(within(row).getAllByRole('cell').slice(3, 5).map(cell => cell.textContent?.replace(/\s/g, ' '))).toEqual(['R$ 1.000,00', 'R$ 600,00']);
     fireEvent.click(screen.getByRole('button', { name: '2026NE000001' }));
     expect(screen.queryByRole('textbox', { name: 'Buscar empenhos' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Voltar aos empenhos' }));

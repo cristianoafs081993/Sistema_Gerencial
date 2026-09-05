@@ -494,7 +494,6 @@ function EmpenhoRow({
 }) {
   const rapBase = type === 'restos' ? getRapBase(empenho, rapReferenceYear) : 0;
   const rapSaldoAtual = type === 'restos' ? getRapSaldo(empenho, rapReferenceYear) : 0;
-  const rapLiquidadoNoAno = type === 'restos' ? getRapLiquidado(empenho) : 0;
   const rapBaseLabel = isRapReinscrito(empenho, rapReferenceYear) ? 'Reinscrito' : 'Inscrito';
   const favorite = isFavorite('empenho', empenho.id);
 
@@ -540,10 +539,6 @@ function EmpenhoRow({
       <TableCell className="py-3 px-4 text-right align-top whitespace-nowrap font-data text-sm">
         {formatCurrency(type === 'restos' ? rapBase : empenho.valor)}
       </TableCell>
-      <TableCell className="py-3 px-4 text-right align-top whitespace-nowrap font-data text-sm">
-        {formatCurrency(type === 'restos' ? rapLiquidadoNoAno : empenho.valorLiquidado || 0)}
-      </TableCell>
-      {type === 'execucao' && <TableCell className="py-3 px-4 text-right align-top whitespace-nowrap font-data text-sm">{formatCurrency(empenho.valorPago || 0)}</TableCell>}
       <TableCell className="py-3 px-4 text-right align-top whitespace-nowrap">
         {(() => {
           if (type === 'restos') {
@@ -731,7 +726,7 @@ function EmpenhosTable({
   return (
     <DataTablePanel
       title={type === 'execucao' ? 'Empenhos do exercício' : 'Restos a pagar'}
-      description={type === 'execucao' ? 'Valores acumulados por empenho, em reais.' : 'Base vigente, liquidação no ano e saldo atual de RAP.'}
+      description={type === 'execucao' ? 'Valores acumulados por empenho, em reais.' : 'Base vigente e saldo atual de RAP.'}
       actions={
         <Button
           variant={groupBy === 'favorecido' ? 'default' : 'outline'}
@@ -746,13 +741,11 @@ function EmpenhosTable({
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow className="hover:bg-transparent border-b border-border-default/50">
-              <SortHeader label="Número" colKey="numero" className="w-[14%] px-4 sm:px-6" />
-              <SortHeader label="Favorecido" colKey="favorecido" className="w-[28%] px-4" />
+              <SortHeader label="Número" colKey="numero" className="w-[12%] px-4 sm:px-6" />
+              <SortHeader label="Favorecido" colKey="favorecido" className="w-[30%] px-4" />
               <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">Descrição</TableHead>
-              <SortHeader label={type === 'execucao' ? 'Empenhado' : 'Inscrito / Reinscrito'} colKey="valor" align="right" className="w-[18%] px-4" />
-              <TableHead className="px-4 text-right whitespace-nowrap">{type === 'execucao' ? 'Liquidado' : 'Liquidado no ano'}</TableHead>
-              {type === 'execucao' && <TableHead className="px-4 text-right">Pago</TableHead>}
-              <SortHeader label={type === 'execucao' ? 'A liquidar' : 'Saldo Atual'} colKey="saldo" align="right" className="w-[12%] px-4" />
+              <SortHeader label={type === 'execucao' ? 'Empenhado' : 'Inscrito / Reinscrito'} colKey="valor" align="right" className="w-[14%] px-4" />
+              <SortHeader label={type === 'execucao' ? 'A liquidar' : 'Saldo Atual'} colKey="saldo" align="right" className="w-[14%] px-4" />
               <TableHead className="h-11 px-4 pr-6 text-center text-xs font-semibold uppercase tracking-wider min-w-[80px]">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -764,15 +757,13 @@ function EmpenhosTable({
                   <TableCell className="px-4"><Skeleton className="h-8 w-32" /></TableCell>
                   <TableCell className="px-4"><Skeleton className="h-8 w-24" /></TableCell>
                   <TableCell className="px-4"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
-                  <TableCell className="px-4"><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
-                  <TableCell className="px-4"><Skeleton className="h-8 w-24" /></TableCell>
-                  {type === 'execucao' && <TableCell className="px-4"><Skeleton className="h-8 w-24" /></TableCell>}
+                  <TableCell className="px-4"><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
                   <TableCell className="px-4 pr-6"><Skeleton className="h-8 w-16 mx-auto" /></TableCell>
                 </TableRow>
               ))
             ) : paginatedData.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={type === 'execucao' ? 8 : 7} className="h-32 text-center text-muted-foreground italic">Nenhum empenho encontrado.</TableCell>
+                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">Nenhum empenho encontrado.</TableCell>
               </TableRow>
             ) : (
               paginatedData.map((row, idx) => {
@@ -795,8 +786,6 @@ function EmpenhosTable({
                           -
                         </TableCell>
                         <TableCell className="py-3 px-4 text-right font-data text-sm whitespace-nowrap">{formatCurrency(row.valorTotal)}</TableCell>
-                        <TableCell className="py-3 px-4 text-right font-data text-sm whitespace-nowrap">{formatCurrency(row.liquidadoTotal)}</TableCell>
-                        {type === 'execucao' && <TableCell className="py-3 px-4 text-right font-data text-sm whitespace-nowrap">{formatCurrency(row.pagoTotal)}</TableCell>}
                         <TableCell className="py-3 px-4 text-right">
                           {(() => {
                             if (type === 'restos') {
