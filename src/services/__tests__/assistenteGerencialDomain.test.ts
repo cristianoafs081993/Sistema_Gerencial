@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  assessDemandClarity,
   buildGerencialAnalysis,
   calculateStatisticalSummary,
   detectAssistantIntent,
   extractDemandItems,
+  getSynonymsForDemand,
+  isPriceResearchClarification,
+  mergeClarificationWithDemand,
   summarizeContratos,
   summarizeDescentralizacoes,
+  type HistoryMessage,
 } from '../../../supabase/functions/assistente-gerencial/domain';
 
 describe('assistente-gerencial domain helpers', () => {
@@ -188,4 +193,92 @@ describe('assistente-gerencial domain helpers', () => {
     const item2 = extractDemandItems('gostaria de pesquisar o preco de cadeira escritorio giratoria');
     expect(item2[0].description).toContain('cadeira escritorio giratoria');
   });
+
+  it('avalia a clareza da demanda identificando itens vagos e formulando perguntas de esclarecimento', () => {
+    // 1. Demanda genérica de computadores sem CPU/RAM/armazenamento
+    const vaguePc = extractDemandItems('preciso cotar 10 computadores')[0];
+    const clarityPc = assessDemandClarity(vaguePc);
+    expect(clarityPc.isClear).toBe(false);
+    expect(clarityPc.category).toBe('computadores');
+    expect(clarityPc.missingAttributes).toBeDefined();
+    expect(clarityPc.suggestedQuestions?.length).toBeGreaterThan(0);
+    expect(clarityPc.quickOptions?.length).toBeGreaterThan(0);
+
+    // 2. Demanda genérica de cadeiras sem especificação ergonômica
+    const vagueChair = extractDemandItems('pesquisa de preco de 20 cadeiras')[0];
+    const clarityChair = assessDemandClarity(vagueChair);
+    expect(clarityChair.isClear).toBe(false);
+    expect(clarityChair.category).toBe('mobiliario');
+    expect(clarityChair.suggestedQuestions?.length).toBeGreaterThan(0);
+
+    // 3. Demanda de ar-condicionado sem BTUs
+    const vagueAc = extractDemandItems('cotar 4 aparelhos de ar-condicionado')[0];
+    const clarityAc = assessDemandClarity(vagueAc);
+    expect(clarityAc.isClear).toBe(false);
+    expect(clarityAc.category).toBe('climatizacao');
+
+    // 4. Demanda de projetor sem luminosidade (lúmens)
+    const vagueProj = extractDemandItems('pesquisa de 2 projetores datashow')[0];
+    const clarityProj = assessDemandClarity(vagueProj);
+    expect(clarityProj.isClear).toBe(false);
+    expect(clarityProj.category).toBe('audiovisual');
+
+    // 5. Demanda clara com especificação técnica completa
+    const clearPc = extractDemandItems('cotar 15 notebooks Intel Core i7 16GB SSD 512GB tela 15.6')[0];
+    const clarityClearPc = assessDemandClarity(clearPc);
+    expect(clarityClearPc.isClear).toBe(true);
+
+    const clearChair = extractDemandItems('cotar 30 cadeiras giratorias ergonomicas padrao NR-17 com bracos regulaveis')[0];
+    const clarityClearChair = assessDemandClarity(clearChair);
+    expect(clarityClearChair.isClear).toBe(true);
+  });
+
+  it('expande termos de busca por sinonimos oficiais para ampliar a amostra no PNCP', () => {
+    const synNotebook = getSynonymsForDemand('notebook');
+    expect(synNotebook).toEqual(expect.arrayContaining(['computador portátil', 'laptop']));
+
+    const synDesktop = getSynonymsForDemand('computador desktop');
+    expect(synDesktop.some((s) => s.includes('microcomputador') || s.includes('estação de trabalho'))).toBe(true);
+
+    const synCadeira = getSynonymsForDemand('cadeiras de escritorio');
+    expect(synCadeira.some((s) => s.includes('giratória') || s.includes('poltrona'))).toBe(true);
+
+    const synProjetor = getSynonymsForDemand('projetor');
+    expect(synProjetor.some((s) => s.includes('multimídia') || s.includes('datashow'))).toBe(true);
+
+    const synCabo = getSynonymsForDemand('cabos de rede');
+    expect(synCabo.some((s) => s.includes('patch cord') || s.includes('utp'))).toBe(true);
+  });
+
+  it('detecta intencao de pesquisa_precos ao receber resposta a pergunta de esclarecimento', () => {
+    const history: HistoryMessage[] = [
+      { role: 'user', content: 'pesquisa de preco de 10 computadores' },
+      {
+        role: 'assistant',
+        content: 'Para uma pesquisa de preco conforme a IN 65/2021, esclareca a configuracao: qual o processador e memoria RAM? ||SUGESTOES|| - Notebook i5 16GB SSD 512GB',
+      },
+    ];
+
+    expect(isPriceResearchClarification(history[1].content)).toBe(true);
+
+    // Resposta curta do usuário que normalmente seria classificada como 'geral'
+    const userClarification = 'Processador Core i5 16GB de RAM e SSD 512GB';
+    const detected = detectAssistantIntent(userClarification, history);
+    expect(detected).toBe('pesquisa_precos');
+  });
+
+  it('funde a resposta de esclarecimento com a demanda original', () => {
+    const originalDemand = extractDemandItems('pesquisar 10 computadores')[0];
+    expect(originalDemand.quantity).toBe(10);
+
+    const merged = mergeClarificationWithDemand(
+      originalDemand,
+      'Notebook Intel Core i5 16GB RAM SSD 512GB',
+    );
+
+    expect(merged.quantity).toBe(10);
+    expect(merged.description.toLowerCase()).toContain('intel core i5');
+    expect(merged.description.toLowerCase()).toContain('16gb');
+  });
 });
+

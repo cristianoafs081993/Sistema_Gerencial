@@ -66,6 +66,7 @@ export type AssistenteGerencialPriceResearchItem = {
   candidatesCount: number;
   selectedCount: number;
   candidates: AssistenteGerencialPriceResearchCandidate[];
+  usedSynonyms?: string[];
 };
 
 export type AssistenteGerencialPriceResearchData = {
@@ -80,6 +81,7 @@ export type AssistenteGerencialPriceResearchData = {
   items: AssistenteGerencialPriceResearchItem[];
   complianceValid: boolean;
   complianceNotes: string[];
+  usedSynonyms?: string[];
 };
 
 export type AssistenteGerencialMessage = {

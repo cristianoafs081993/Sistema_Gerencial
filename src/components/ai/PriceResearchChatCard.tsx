@@ -328,6 +328,22 @@ export function PriceResearchChatCard({ data, className }: PriceResearchChatCard
                   <p className="mt-0.5 text-[11px] text-muted-foreground">
                     Qtd: {item.quantity} {item.unit} • Unitário Estimado: <strong>{formatCurrency(item.estimatedUnitPrice)}</strong> • Total: <strong>{formatCurrency(item.estimatedTotal)}</strong>
                   </p>
+                  {item.usedSynonyms && item.usedSynonyms.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1 mt-1">
+                      <span className="text-[10px] text-muted-foreground">Sinônimos:</span>
+                      {item.usedSynonyms.map((syn) => (
+                        <Badge key={syn} variant="secondary" className="text-[9px] py-0 px-1 font-normal bg-primary/10 text-primary">
+                          {syn}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  {item.selectedCount < 3 && (
+                    <p className="mt-1 flex items-center gap-1 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                      <AlertTriangle className="h-3 w-3 inline" />
+                      Amostra com {item.selectedCount} {item.selectedCount === 1 ? 'cotação válida' : 'cotações válidas'} (mínimo de 3 pela IN 65/2021)
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2">

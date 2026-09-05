@@ -69,6 +69,9 @@ Uso:
 
 - responde perguntas gerenciais sobre dados do sistema em linguagem natural
 - conduz pesquisas de preços completas sob a Lei 14.133/2021 e IN SEGES/ME 65/2021, consultando Compras.gov.br e PNCP, auditando Editais/TRs com Gemini e retornando `priceResearchResult` com Mapa Comparativo, Despacho SUAP e exportação Excel
+- **Avaliação de Clareza da Demanda (IN 65/2021)**: quando o usuário solicita cotação com termos vagos ou genéricos (ex.: "computador" sem CPU/RAM/SSD, "cadeira" sem especificação ergonômica NR-17, "ar-condicionado" sem BTUs), o agente formula perguntas de esclarecimento pontuais e fornece opções rápidas de especificação (`||SUGESTOES||`) em vez de realizar consultas cegas
+- **Resolução Contextual por Histórico**: quando o usuário responde à pergunta de esclarecimento, a especificação técnica fornecida é mesclada com a demanda anterior e a pesquisa prossegue automaticamente
+- **Expansão Automática por Sinônimos Oficiais**: quando a consulta direta no PNCP retornar menos de 3 cotações (mínimo exigido pelo Art. 6º da IN 65/2021), o agente consulta termos sinônimos oficiais homologados (ex.: "notebook" ⇄ "computador portátil", "laptop"; "projetor" ⇄ "projetor multimídia", "datashow") para ampliar a amostra até atingir o patamar ideal (≥ 3), reportando os sinônimos utilizados e alertando a autoridade caso persista amostra reduzida
 - consulta fontes allowlisted e calcula agregações determinísticas antes de chamar o Gemini
 - cobre orçamento, empenhos, créditos disponíveis, documentos hábeis, financeiro, contratos API, PFs e conciliação
 - valida o usuário autenticado pelo JWT recebido e usa o cliente Supabase com esse mesmo token, respeitando RLS

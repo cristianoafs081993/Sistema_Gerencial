@@ -151,7 +151,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }
 
-export function detectAssistantIntent(message: string): AssistantIntent {
+export type HistoryMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
+export function isPriceResearchClarification(text: string): boolean {
+  const norm = normalizeText(text);
+  return (
+    /pesquisa de pre[çc]o|cota[çc][ãa]o|in\s*65/.test(norm) &&
+    (/esclare[çc]a|especifica[çc][ãa]o|detalh|muito gen[eé]ric|quais os requisitos|qual o formato|qual a configura[çc][ãa]o|qual o modelo|qual o tamanho|qual a capacidade/.test(norm) ||
+     /\|\|\s*sugestoes\s*\|\|/i.test(text))
+  );
+}
+
+export function detectAssistantIntent(message: string, history?: HistoryMessage[]): AssistantIntent {
   const text = normalizeText(message);
 
   if (
@@ -160,6 +174,14 @@ export function detectAssistantIntent(message: string): AssistantIntent {
     ((/pesquis(ar|e|a)/.test(text) || /cot(ar|e|acao)/.test(text)) && (/item|itens|monitor|cadeira|mesa|computador|notebook|servico|aquisicao|compra|edital|termo de referencia|\btr\b/.test(text)))
   ) {
     return 'pesquisa_precos';
+  }
+
+  // Se houver histórico e o assistente solicitou esclarecimento de pesquisa de preços, mantém a intenção
+  if (history && history.length > 0) {
+    const lastAssistant = [...history].reverse().find((h) => h.role === 'assistant');
+    if (lastAssistant && isPriceResearchClarification(lastAssistant.content)) {
+      return 'pesquisa_precos';
+    }
   }
 
   if (/descentraliz|reitoria|ptres|plano interno|\bpi\b|nota de credito|\bnc\b/.test(text)) {
@@ -193,7 +215,292 @@ export type ExtractedDemandItem = {
   unit: string;
   catalogType: 'material' | 'service';
   suggestedCatalogCode?: string;
+  usedSynonyms?: string[];
 };
+
+export type DemandClarityResult = {
+  isClear: boolean;
+  reason?: string;
+  category?: string;
+  missingAttributes?: string[];
+  suggestedQuestions?: string[];
+  quickOptions?: string[];
+};
+
+export function assessDemandClarity(demand: ExtractedDemandItem): DemandClarityResult {
+  const desc = normalizeText(demand.description);
+  const tokens = desc.split(/\s+/).filter((t) => t.length > 1);
+
+  // Stop words comuns de compras públicas que não qualificam tecnicamente o item
+  const genericWords = new Set([
+    'de', 'do', 'da', 'para', 'com', 'sem', 'em', 'um', 'uma', 'uns', 'umas',
+    'item', 'itens', 'material', 'materiais', 'equipamento', 'equipamentos', 'aparelho', 'aparelhos',
+    'produto', 'produtos', 'aquisicao', 'compra', 'cotacao', 'preco', 'precos',
+    'unidade', 'unidades', 'modelo', 'tipo', 'padrao', 'novo', 'novos',
+    'fornecimento', 'servico', 'servicos', 'campus', 'ifrn', 'solicitacao',
+  ]);
+  const meaningfulTokens = tokens.filter((t) => !genericWords.has(t));
+  const isVeryShort = meaningfulTokens.length <= 2;
+
+  // 1. Informática / Computadores / Notebooks
+  if (/computador|notebook|laptop|desktop|microcomputador|pc\b|servidor/.test(desc)) {
+    const hasProcessor = /i[3579]|core|ryzen|xeon|intel|amd|m[1234]|ghz|octa|processador/.test(desc);
+    const hasRam = /\b\d+\s*(gb|gigas?)\b|memoria|ram/.test(desc);
+    const hasStorage = /ssd|nvme|hd|disco|armazenamento|512\s*gb|256\s*gb|1\s*tb/.test(desc);
+
+    if (!hasProcessor && !hasRam && !hasStorage) {
+      return {
+        isClear: false,
+        category: 'computadores',
+        reason: `A demanda "${demand.description}" não informa processador, memória RAM ou armazenamento mínimo para compor cesta de preços homogênea conforme a IN 65/2021.`,
+        missingAttributes: [
+          'Formato (Notebook portátil, Desktop padrão, All-in-One ou Servidor)',
+          'Processador (ex.: Intel Core i5/i7 ou AMD Ryzen)',
+          'Memória RAM (ex.: 8GB, 16GB, 32GB)',
+          'Armazenamento (ex.: SSD 256GB, 512GB)',
+        ],
+        suggestedQuestions: [
+          'Qual o formato do equipamento: Computador Desktop, Notebook portátil ou Servidor?',
+          'Qual a configuração mínima exigida (Processador i5/i7/Ryzen, Memória RAM de 8GB/16GB e SSD de 256GB/512GB)?',
+          'Há necessidade de periféricos inclusos (Monitor com HDMI, teclado e mouse)?',
+        ],
+        quickOptions: [
+          'Notebook Intel Core i5, 16GB RAM, SSD 512GB, tela 15.6" Full HD',
+          'Desktop Intel Core i7, 16GB RAM, SSD 512GB com Monitor 24" Full HD',
+          'Notebook básico Intel Core i3, 8GB RAM, SSD 256GB',
+        ],
+      };
+    }
+  }
+
+  // 2. Monitores / Displays (excluindo notebooks e laptops cujo display é componente interno)
+  if (!/notebook|laptop/.test(desc) && (/monitor|display\b/.test(desc) || /\btela\s*(led|lcd|interativa|gamer|de\s+v[ií]deo|para\s+pc)\b/.test(desc))) {
+    const hasSize = /\b(19|21|22|23|24|27|29|32|34)\s*(pol|polegadas?|"|')\b/.test(desc);
+    const hasResolution = /full\s*hd|4k|2k|qhd|1080p|resolucao|ips|hdmi|displayport/.test(desc);
+
+    if (!hasSize && !hasResolution) {
+      return {
+        isClear: false,
+        category: 'monitores',
+        reason: `A descrição "${demand.description}" não informa o tamanho da tela ou resolução necessária.`,
+        missingAttributes: ['Tamanho da tela em polegadas', 'Resolução (Full HD, 4K)', 'Conexões (HDMI, DisplayPort)'],
+        suggestedQuestions: [
+          'Qual o tamanho da tela desejado (ex.: 24 polegadas, 27 polegadas ou ultrawide)?',
+          'Qual a resolução e portas de conexão exigidas (Full HD 1080p ou 4K, portas HDMI e DisplayPort)?',
+          'É necessário suporte com ajuste ergonômico de altura?',
+        ],
+        quickOptions: [
+          'Monitor 24 polegadas Full HD com porta HDMI e ajuste de altura',
+          'Monitor 27 polegadas 4K IPS com portas HDMI e DisplayPort',
+        ],
+      };
+    }
+  }
+
+  // 3. Cadeiras / Mobiliário
+  if (/cadeira|poltrona|assento|longarina/.test(desc)) {
+    const hasErgo = /ergonomica|nr\s*17|giratoria|bracos?|ajust|regul|operativa|presidente|diretor|fixa|espuma\s*injetada/.test(desc);
+
+    if (!hasErgo && isVeryShort) {
+      return {
+        isClear: false,
+        category: 'mobiliario',
+        reason: `A descrição "${demand.description}" não indica o modelo ou requisitos ergonômicos da cadeira.`,
+        missingAttributes: ['Modelo (operativa giratória, presidente, secretária ou fixa)', 'Padrão ergonômico NR-17 e braços reguláveis'],
+        suggestedQuestions: [
+          'Qual o modelo da cadeira: operativa giratória para escritório, presidente ou fixa para reunião/auditório?',
+          'Exige conformidade ergonômica com a Norma Regulamentadora NR-17 (com ajuste a gás e braços reguláveis)?',
+        ],
+        quickOptions: [
+          'Cadeira giratória operativa ergonômica padrão NR-17 com braços reguláveis e encosto em tela',
+          'Cadeira presidente giratória ergonômica em couro sintético com braços',
+          'Cadeira fixa interlocutor para reunião com estrutura metálica',
+        ],
+      };
+    }
+  }
+
+  // 4. Climatização / Ar-Condicionado
+  if (/ar[\s\-]*condicionad|climatizador|split|arcondicionado/.test(desc)) {
+    const hasBtu = /\b(9000|12000|18000|24000|30000|36000|48000|60000)\s*(btus?|btu)?\b|\b\d+\s*mil\s*btus?\b/.test(desc);
+    const hasTech = /inverter|hi\s*wall|piso\s*teto|cassete|220v/.test(desc);
+
+    if (!hasBtu && !hasTech) {
+      return {
+        isClear: false,
+        category: 'climatizacao',
+        reason: `A descrição "${demand.description}" não informa a capacidade térmica (BTUs) do equipamento.`,
+        missingAttributes: ['Capacidade térmica (BTUs)', 'Tecnologia Inverter ou Convencional', 'Voltagem (220V)'],
+        suggestedQuestions: [
+          'Qual a capacidade térmica em BTUs desejada (ex.: 9.000, 12.000, 18.000 ou 24.000 BTUs)?',
+          'Requer tecnologia Inverter para maior eficiência energética?',
+        ],
+        quickOptions: [
+          'Ar-condicionado Split Inverter 12.000 BTUs 220V ciclo frio',
+          'Ar-condicionado Split Inverter 18.000 BTUs 220V ciclo frio',
+          'Ar-condicionado Split Inverter 24.000 BTUs 220V ciclo frio',
+        ],
+      };
+    }
+  }
+
+  // 5. Projetores / Datashow
+  if (/projetor|datashow/.test(desc)) {
+    const hasLumens = /lumens?|ansi|\b\d{4}\s*(lm|lumens?)\b/.test(desc);
+    const hasRes = /full\s*hd|wxga|xga|laser|hdmi/.test(desc);
+
+    if (!hasLumens && !hasRes) {
+      return {
+        isClear: false,
+        category: 'audiovisual',
+        reason: `A descrição "${demand.description}" não especifica a luminosidade (lúmens) ou resolução do projetor.`,
+        missingAttributes: ['Luminosidade em lúmens ANSI', 'Resolução (Full HD, WXGA)'],
+        suggestedQuestions: [
+          'Qual a luminosidade necessária em lúmens ANSI (ex.: 3.500, 4.000 ou 5.000 lúmens)?',
+          'Qual a resolução exigida (Full HD 1080p ou WXGA)?',
+        ],
+        quickOptions: [
+          'Projetor multimídia 4.000 ANSI lúmens Full HD com conexões HDMI',
+          'Projetor multimídia 3.600 ANSI lúmens WXGA com HDMI',
+        ],
+      };
+    }
+  }
+
+  // 6. Termos genéricos de material ou serviço com 1 ou 2 palavras sem especificadores técnicos
+  const genericSingulars = [
+    'papel', 'caneta', 'cabo', 'tinta', 'toner', 'mesa', 'impressora', 'reforma',
+    'manutencao', 'limpeza', 'software', 'licenca', 'teclado', 'mouse', 'nobreak',
+    'veiculo', 'carro', 'pneu', 'combustivel', 'uniforme', 'remedio', 'medicamento',
+  ];
+
+  if (isVeryShort && genericSingulars.some((g) => desc.includes(g))) {
+    return {
+      isClear: false,
+      reason: `A descrição "${demand.description}" é muito resumida e requer especificações técnicas (dimensões, modelo, capacidade ou padrões normativos) para localização precisa no PNCP.`,
+      missingAttributes: ['Modelo ou dimensões', 'Capacidade ou material', 'Padrão ou finalidade de uso'],
+      suggestedQuestions: [
+        `Poderia detalhar o modelo, medidas, capacidade ou marca de referência para "${demand.description}"?`,
+        'Há alguma especificação técnica ou norma regulamentadora obrigatória para o item?',
+      ],
+      quickOptions: [
+        `Especificar detalhes de ${demand.description}`,
+        'Consultar opções mais comuns do catálogo CATMAT',
+      ],
+    };
+  }
+
+  return { isClear: true };
+}
+
+const OFFICIAL_SYNONYM_PATTERNS: Array<{ pattern: RegExp; synonyms: string[] }> = [
+  {
+    pattern: /\bnotebooks?\b/i,
+    synonyms: ['computador portátil', 'laptop', 'microcomputador portátil'],
+  },
+  {
+    pattern: /\bcomputador(es)?\b|\bdesktops?\b|\bmicrocomputador(es)?\b/i,
+    synonyms: ['microcomputador desktop', 'estação de trabalho', 'computador all in one'],
+  },
+  {
+    pattern: /\bmonitores?\b|\btelas?\b/i,
+    synonyms: ['monitor de vídeo', 'display led', 'monitor para computador'],
+  },
+  {
+    pattern: /\bprojetor(es)?\b|\bdatashow\b/i,
+    synonyms: ['projetor multimídia', 'projetor de vídeo', 'datashow', 'aparelho de projeção'],
+  },
+  {
+    pattern: /\bcadeiras?\b/i,
+    synonyms: ['cadeira operativa giratória', 'poltrona giratória para escritório', 'cadeira ergonômica com braços'],
+  },
+  {
+    pattern: /\bmesas?\b/i,
+    synonyms: ['estação de trabalho', 'mesa de escritório', 'mesa operativa'],
+  },
+  {
+    pattern: /\bar[\s\-]*condicionad(o|os)?\b|\bclimatizador(es)?\b/i,
+    synonyms: ['condicionador de ar split', 'aparelho de climatização', 'condicionador de ar'],
+  },
+  {
+    pattern: /\bcabos?\s+de\s+rede\b|\bcabos?\s+utp\b/i,
+    synonyms: ['patch cord rj45', 'cabo utp cat6', 'cabo de rede par trançado'],
+  },
+  {
+    pattern: /\bimpressoras?\b/i,
+    synonyms: ['aparelho multifuncional laser', 'multifuncional laser', 'impressora laser'],
+  },
+  {
+    pattern: /\bpapel\s+a4\b|\bsulfite\b/i,
+    synonyms: ['papel sulfite a4 alcalino 75g', 'resma papel sulfite a4', 'papel a4 75g'],
+  },
+  {
+    pattern: /\bcanetas?\b/i,
+    synonyms: ['caneta esferográfica', 'caneta escrita média'],
+  },
+  {
+    pattern: /\bteclados?\b/i,
+    synonyms: ['teclado usb abnt2', 'teclado para microcomputador'],
+  },
+  {
+    pattern: /\bmouses?\b/i,
+    synonyms: ['dispositivo apontador óptico', 'mouse óptico usb'],
+  },
+  {
+    pattern: /\bnobreaks?\b/i,
+    synonyms: ['fonte de alimentação ininterrupta', 'ups'],
+  },
+  {
+    pattern: /\bdisco\s+r[ií]gido\b|\bhd\s+externo\b/i,
+    synonyms: ['unidade de estado sólido ssd', 'unidade de armazenamento externa', 'ssd'],
+  },
+];
+
+export function getSynonymsForDemand(description: string, _catalogType: 'material' | 'service' = 'material'): string[] {
+  const clean = description.trim();
+  const synonyms: string[] = [];
+
+  for (const entry of OFFICIAL_SYNONYM_PATTERNS) {
+    if (entry.pattern.test(clean)) {
+      for (const syn of entry.synonyms) {
+        // Substitui o termo base na descrição original para manter qualificadores técnicos (ex.: "notebook i7 16gb" -> "computador portátil i7 16gb")
+        const substituted = clean.replace(entry.pattern, syn).trim();
+        if (substituted && substituted.toLowerCase() !== clean.toLowerCase() && !synonyms.includes(substituted)) {
+          synonyms.push(substituted);
+        }
+        // Adiciona também a forma canônica do sinônimo
+        if (!synonyms.includes(syn) && syn.toLowerCase() !== clean.toLowerCase()) {
+          synonyms.push(syn);
+        }
+      }
+    }
+  }
+
+  return synonyms.slice(0, 4);
+}
+
+export function mergeClarificationWithDemand(
+  originalDemand: ExtractedDemandItem,
+  clarificationText: string,
+): ExtractedDemandItem {
+  const cleanClarification = clarificationText.trim();
+  const parsedClarification = parseSingleDemandText(cleanClarification, originalDemand.itemNumber);
+
+  const baseDesc = normalizeText(originalDemand.description);
+  const newDesc = normalizeText(cleanClarification);
+
+  let mergedDesc = cleanClarification;
+  if (!newDesc.includes(baseDesc) && !baseDesc.includes(newDesc)) {
+    mergedDesc = `${originalDemand.description} ${cleanClarification}`;
+  }
+
+  return {
+    ...originalDemand,
+    description: mergedDesc.trim(),
+    quantity: parsedClarification?.quantity && parsedClarification.quantity > 1 ? parsedClarification.quantity : originalDemand.quantity,
+    unit: parsedClarification?.unit && parsedClarification.unit !== 'UN' ? parsedClarification.unit : originalDemand.unit,
+  };
+}
 
 export function extractDemandItems(message: string): ExtractedDemandItem[] {
   const cleanMsg = message.trim();
@@ -232,10 +539,10 @@ function isServiceDescription(text: string): boolean {
 
 function parseSingleDemandText(text: string, defaultNumber = '1'): ExtractedDemandItem | null {
   let cleaned = text
-    .replace(/^(por\s+favor\s+)?(gostaria\s+de\s+)?(fazer\s+)?(uma\s+)?pesquis(ar|e|ando|a)?\s+(de\s+|os?\s+)?pre[çc]os?\s+(para|de|do|da)?\s*/i, '')
+    .replace(/^(por\s+favor\s+)?(gostaria\s+de\s+)?(fazer\s+)?(uma\s+)?(pesquis(ar|e|ando|a)|cot(ar|e|ando|a[çc][ãa]o))\s+(de\s+|os?\s+)?(pre[çc]os?\s+)?(para|de|do|da)?\s*/i, '')
     .replace(/^(quanto\s+custa|qual\s+(o\s+)?valor\s+estimado\s+(de|para|do|da)?)\s*/i, '')
-    .replace(/^cota[çc][ãa]o\s+(para|de|do|da)?\s*/i, '')
     .replace(/^aquisi[çc][ãa]o\s+(de|do|da)?\s*/i, '')
+    .replace(/^preciso\s+(cotar|pesquisar|comprar|adquirir)\s+/i, '')
     .trim();
 
   // Extract quantity and unit: e.g. "50 unidades de monitores..." or "20 cadeiras..." or "qtd: 10..."
