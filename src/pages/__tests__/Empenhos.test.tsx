@@ -167,7 +167,11 @@ describe('Empenhos', () => {
 
     expect(screen.getAllByText('Descrição')[0]).toBeInTheDocument();
     expect(screen.getAllByText('Empenho teste')[0]).toBeInTheDocument();
-    expect(screen.getAllByText('Tesouro • PI: PI-AD')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Tesouro • PI-AD')[0]).toBeInTheDocument();
+    expect(screen.queryByText(/Empenhos do exercício/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Valores acumulados por empenho/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Proc:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^PI:/i)).not.toBeInTheDocument();
   });
 
   it('alterna entre as abas de execucao e restos a pagar usando o layout folder tab', () => {

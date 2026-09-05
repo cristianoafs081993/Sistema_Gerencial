@@ -28,11 +28,13 @@ export function SectionPanel({
       {hasHeader && (
         <CardHeader className="pb-3 px-0 pt-0">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-1">
-              {title ? <CardTitle className="table-title">{title}</CardTitle> : null}
-              {description ? <CardDescription className="table-description">{description}</CardDescription> : null}
-            </div>
-            {actions ? <div className="shrink-0">{actions}</div> : null}
+            {(title || description) ? (
+              <div className="space-y-1">
+                {title ? <CardTitle className="table-title">{title}</CardTitle> : null}
+                {description ? <CardDescription className="table-description">{description}</CardDescription> : null}
+              </div>
+            ) : null}
+            {actions ? <div className="shrink-0 ml-auto">{actions}</div> : null}
           </div>
         </CardHeader>
       )}

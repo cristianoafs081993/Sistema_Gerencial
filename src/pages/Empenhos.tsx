@@ -504,7 +504,7 @@ function EmpenhoRow({
           <button type="button" className="w-fit font-mono text-sm font-semibold whitespace-nowrap text-primary underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary" onClick={() => handleOpenDialog(empenho)}>{empenho.numero}</button>
           {empenho.processo && (
             <span className="text-xs text-muted-foreground whitespace-nowrap" title="Processo">
-              Proc: {empenho.processo}
+              {empenho.processo}
             </span>
           )}
           {empenho.historicoOperacoes && empenho.historicoOperacoes.length > 1 && (
@@ -529,9 +529,9 @@ function EmpenhoRow({
           {type === 'execucao' && (empenho.origemRecurso || empenho.planoInterno) && (
             <span
               className="text-xs text-muted-foreground truncate"
-              title={[empenho.origemRecurso, empenho.planoInterno ? `PI: ${empenho.planoInterno}` : ''].filter(Boolean).join(' • ')}
+              title={[empenho.origemRecurso, empenho.planoInterno].filter(Boolean).join(' • ')}
             >
-              {[empenho.origemRecurso, empenho.planoInterno ? `PI: ${empenho.planoInterno}` : ''].filter(Boolean).join(' • ')}
+              {[empenho.origemRecurso, empenho.planoInterno].filter(Boolean).join(' • ')}
             </span>
           )}
         </div>
@@ -725,8 +725,6 @@ function EmpenhosTable({
 
   return (
     <DataTablePanel
-      title={type === 'execucao' ? 'Empenhos do exercício' : 'Restos a pagar'}
-      description={type === 'execucao' ? 'Valores acumulados por empenho, em reais.' : 'Base vigente e saldo atual de RAP.'}
       actions={
         <Button
           variant={groupBy === 'favorecido' ? 'default' : 'outline'}
