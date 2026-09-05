@@ -825,7 +825,7 @@ export const contratosApiService = {
   },
 
   async getContratoApiDetails(contratoApiId: string): Promise<ContratoApiDetails> {
-    const [historicoResult, empenhosResult, itensResult, faturasResult, faturaItensResult, faturaEmpenhosResult, documentosResult] = await Promise.all([
+    const [historicoResult, empenhosResult, itensResult, faturasResult, faturaItensResult, faturaEmpenhosResult, documentosResult, instrumentosResult] = await Promise.all([
       supabase
         .from('contratos_api_historico')
         .select(CONTRATOS_API_HISTORICO_SELECT)
