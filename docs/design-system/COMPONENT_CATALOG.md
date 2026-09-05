@@ -171,3 +171,12 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 O acordeao Resumo financeiro por dimensao segue a estrutura nativa do SUAP e exibe os totais das quatro colunas financeiras agrupados por dimensao.
 
 - Na revisão de documentos SUAP, o ícone de histórico fica ao lado do ícone de geração e carrega a última análise salva sem baixar novamente o PDF.
+
+### Consulta de contratos e empenhos (setembro de 2026)
+
+`RecordDetailsPage` apresenta detalhes dentro do shell com retorno e gestão de foco.
+`EmpenhoDialog` e `ContratoApiDetailsSheet` aceitam `presentation="page"` para os
+módulos de consulta; o padrão continua sendo modal nos demais consumidores.
+Empenhos adota `DataTablePanel`, colunas financeiras separadas e edição explícita.
+Contratos adota lista compacta, filtros de prazo/faturas e abas de detalhes.
+Consulte [o fluxo completo](../frontend/CONTRATOS_EMPENHOS_UI.md).

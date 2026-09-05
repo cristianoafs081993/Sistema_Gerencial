@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import Empenhos from '@/pages/Empenhos';
@@ -30,7 +30,7 @@ vi.mock('@/components/JsonImportDialog', () => ({
 }));
 
 vi.mock('@/components/modals/EmpenhoDialog', () => ({
-  EmpenhoDialog: () => null,
+  EmpenhoDialog: ({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) => open ? <button onClick={() => onOpenChange(false)}>Voltar aos empenhos</button> : null,
 }));
 
 const mockedUseData = vi.mocked(useData);
@@ -130,6 +130,22 @@ describe('Empenhos', () => {
 
     expect(screen.getByText('2026NE000001')).toBeInTheDocument();
     expect(screen.queryByText('2026NE000002')).not.toBeInTheDocument();
+  });
+
+  it('separa as quatro colunas financeiras e preserva a busca no retorno do detalhe', () => {
+    const current = mockedUseData();
+    mockedUseData.mockReturnValue({ ...current, empenhos: [createEmpenho({ processo: '23035.123/2026', planoInterno: 'PI-UNICO', valor: 1000, valorLiquidado: 400, valorPago: 250 })] });
+    renderEmpenhos();
+    for (const name of ['Empenhado', 'Liquidado', 'Pago', 'A liquidar']) expect(screen.getByRole('columnheader', { name })).toBeVisible();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Buscar empenhos' }), { target: { value: '23035.123/2026' } });
+    const row = screen.getByRole('button', { name: '2026NE000001' }).closest('tr')!;
+    expect(within(row).getAllByRole('cell').slice(3, 7).map(cell => cell.textContent?.replace(/\s/g, ' '))).toEqual(['R$ 1.000,00', 'R$ 400,00', 'R$ 250,00', 'R$ 600,00']);
+    fireEvent.click(screen.getByRole('button', { name: '2026NE000001' }));
+    expect(screen.queryByRole('textbox', { name: 'Buscar empenhos' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Voltar aos empenhos' }));
+    expect(screen.getByRole('textbox', { name: 'Buscar empenhos' })).toHaveValue('23035.123/2026');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Buscar empenhos' }), { target: { value: 'PI-UNICO' } });
+    expect(screen.getByRole('button', { name: '2026NE000001' })).toBeVisible();
   });
 
   it('nao exibe credito disponivel nem botoes de upload legados no header da tela de empenhos', () => {

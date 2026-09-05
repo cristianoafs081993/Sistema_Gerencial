@@ -1,3 +1,4 @@
+import { DataTablePanel } from '@/components/design-system/DataTablePanel';
 import { Fragment, useEffect, useMemo, useState } from 'react';
 
 import { Plus, Pencil, Search, Filter, Calendar, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, Layers, X, Star, History } from 'lucide-react';
@@ -227,6 +228,7 @@ export default function Empenhos() {
 
   return (
     <div className="space-y-space-6 pb-space-10">
+      <div hidden={isDialogOpen} className="space-y-6">
       <FilterPanel className="shadow-sm">
         <CardContent className="p-0">
           {/* Linha 1: Busca e Filtros Básicos */}
@@ -235,7 +237,8 @@ export default function Empenhos() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar empenhos..."
+                aria-label="Buscar empenhos"
+                placeholder="Buscar por NE, favorecido, processo ou PI..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9 h-10 text-sm input-system"
@@ -270,7 +273,7 @@ export default function Empenhos() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="inline-flex h-10 overflow-hidden rounded-xl border border-border-default bg-white shadow-sm">
+            <div className="inline-flex h-10 overflow-hidden rounded-xl border border-border-default bg-card shadow-sm">
               <Button
                 type="button"
                 variant={favoritesFilter === 'all' ? 'default' : 'ghost'}
@@ -301,7 +304,7 @@ export default function Empenhos() {
 
           {/* Linha 2: Filtros Avançados (Colapsável) */}
           {showAdvancedFilters && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 mt-4 bg-slate-50/50 rounded-lg border border-border-default/50">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 mt-4 bg-muted/50 rounded-lg border border-border-default/50">
               <div className="space-y-1">
                 <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Componente Funcional</label>
                 <Select value={filterComponente} onValueChange={setFilterComponente}>
@@ -457,7 +460,9 @@ export default function Empenhos() {
         )}
       </div>
 
+      </div>
       <EmpenhoDialog
+        presentation="page"
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         empenho={selectedEmpenho}
@@ -494,10 +499,10 @@ function EmpenhoRow({
   const favorite = isFavorite('empenho', empenho.id);
 
   return (
-    <TableRow className={`hover:bg-slate-50/80 transition-colors border-b border-border-default/50 ${isChild ? 'bg-slate-50/30' : ''}`}>
-      <TableCell className={`py-4 px-4 sm:px-6 align-top ${isChild ? 'pl-10' : ''} w-[14%]`}>
+    <TableRow className={`hover:bg-muted/60 transition-colors border-b border-border-default/50 ${isChild ? 'bg-muted/30' : ''}`}>
+      <TableCell className={`py-3 px-4 sm:px-6 align-top ${isChild ? 'pl-10' : ''}`}>
         <div className="flex flex-col gap-1">
-          <span className="font-mono text-sm font-semibold whitespace-nowrap">{empenho.numero}</span>
+          <button type="button" className="w-fit font-mono text-sm font-semibold whitespace-nowrap text-primary underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary" onClick={() => handleOpenDialog(empenho)}>{empenho.numero}</button>
           {empenho.processo && (
             <span className="text-xs text-muted-foreground whitespace-nowrap" title="Processo">
               Proc: {empenho.processo}
@@ -511,7 +516,7 @@ function EmpenhoRow({
           )}
         </div>
       </TableCell>
-      <TableCell className="py-4 px-4 align-top w-[28%]">
+      <TableCell className="py-3 px-4 align-top">
         <div className="flex flex-col">
           <span className="text-sm font-medium line-clamp-2" title={empenho.favorecidoNome}>{empenho.favorecidoNome || '-'}</span>
           <span className="text-xs text-muted-foreground">
@@ -519,7 +524,7 @@ function EmpenhoRow({
           </span>
         </div>
       </TableCell>
-      <TableCell className="py-4 px-4 align-top w-[22%]">
+      <TableCell className="py-3 px-4 align-top">
         <div className="flex flex-col gap-1">
           <span className="text-sm line-clamp-2" title={empenho.descricao}>{empenho.descricao || '-'}</span>
           {type === 'execucao' && (empenho.origemRecurso || empenho.planoInterno) && (
@@ -532,43 +537,14 @@ function EmpenhoRow({
           )}
         </div>
       </TableCell>
-      <TableCell className="py-4 px-4 text-right align-top whitespace-nowrap w-[18%]">
-        <div className="flex flex-col gap-1 items-end">
-          {type === 'restos' && empenho.rapInscrito != null ? (
-            <>
-              <span className="font-semibold text-sm" title={`${rapBaseLabel} (base vigente do RAP)`}>
-                {rapBaseLabel}: {formatCurrency(rapBase)}
-              </span>
-              <span className={`text-xs ${rapLiquidadoNoAno > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado no Ano">
-                Liq Ano: {formatCurrency(rapLiquidadoNoAno)}
-              </span>
-            </>
-          ) : (
-            <>
-              <span className="font-semibold text-sm" title={type === 'execucao' ? 'Empenhado' : 'Inscrito'}>
-                {formatCurrency(empenho.valor)}
-              </span>
-              {type === 'execucao' ? (
-                <>
-                  <span className={`text-xs ${(empenho.valorLiquidado || 0) > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado">
-                    Liq: {formatCurrency(empenho.valorLiquidado || 0)}
-                  </span>
-                  {(empenho.valorPago || 0) > 0 && (
-                    <span className="text-[10px] text-status-success" title="Pago">
-                      Pg: {formatCurrency(empenho.valorPago || 0)}
-                    </span>
-                  )}
-                </>
-              ) : (
-                <span className={`text-xs ${(empenho.valorPago || 0) > 0 ? 'text-status-success' : 'text-muted-foreground'}`} title="Pago">
-                  Pg: {formatCurrency(empenho.valorPago || 0)}
-                </span>
-              )}
-            </>
-          )}
-        </div>
+      <TableCell className="py-3 px-4 text-right align-top whitespace-nowrap font-data text-sm">
+        {formatCurrency(type === 'restos' ? rapBase : empenho.valor)}
       </TableCell>
-      <TableCell className="py-4 px-4 text-right align-top whitespace-nowrap w-[12%]">
+      <TableCell className="py-3 px-4 text-right align-top whitespace-nowrap font-data text-sm">
+        {formatCurrency(type === 'restos' ? rapLiquidadoNoAno : empenho.valorLiquidado || 0)}
+      </TableCell>
+      {type === 'execucao' && <TableCell className="py-3 px-4 text-right align-top whitespace-nowrap font-data text-sm">{formatCurrency(empenho.valorPago || 0)}</TableCell>}
+      <TableCell className="py-3 px-4 text-right align-top whitespace-nowrap">
         {(() => {
           if (type === 'restos') {
             return (
@@ -586,7 +562,7 @@ function EmpenhoRow({
         })()}
       </TableCell>
 
-      <TableCell className="py-4 px-4 pr-6 align-top whitespace-nowrap w-[6%] min-w-[80px]">
+      <TableCell className="py-3 px-4 pr-6 align-top whitespace-nowrap min-w-[80px]">
         <div className="flex items-center justify-center gap-1.5">
           <Tooltip>
             <TooltipTrigger asChild>
@@ -611,8 +587,9 @@ function EmpenhoRow({
             size="icon"
             className="h-8 w-8 text-muted-foreground hover:text-action-primary hover:bg-action-primary/10"
             onClick={() => handleOpenDialog(empenho)}
+            aria-label={`Ver detalhes do empenho ${empenho.numero}`}
           >
-            <Pencil className="h-4 w-4" />
+            <Search className="h-4 w-4" />
           </Button>
         </div>
       </TableCell>
@@ -739,23 +716,23 @@ function EmpenhosTable({
 
   const SortHeader = ({ label, colKey, align = 'left', className = '' }: { label: string; colKey: string; align?: 'left' | 'right' | 'center'; className?: string }) => (
     <TableHead
-      className={`h-11 px-4 text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-slate-100/80 transition-colors select-none ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : ''} ${className}`}
-      onClick={() => handleSort(colKey)}
+      className={`h-11 px-4 text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-muted/80 transition-colors select-none ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : ''} ${className}`}
+      aria-sort={sortKey === colKey ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
     >
-      <span className={`inline-flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
+      <button type="button" onClick={() => handleSort(colKey)} className={`inline-flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
         {label}
         {sortKey === colKey && (
           <span className="text-action-primary text-xs transition-transform duration-200">{sortDir === 'asc' ? '▲' : '▼'}</span>
         )}
-      </span>
+      </button>
     </TableHead>
   );
 
   return (
-    <Card className={`border border-border-default/80 bg-surface-card rounded-b-radius-xl rounded-tr-radius-xl shadow-soft relative z-0 p-0 overflow-hidden ${
-      isFirstTabActive ? 'rounded-tl-none' : 'rounded-tl-radius-xl'
-    }`}>
-      <CardHeader className="px-6 py-3 border-b border-border-default/50 flex flex-row items-center justify-end">
+    <DataTablePanel
+      title={type === 'execucao' ? 'Empenhos do exercício' : 'Restos a pagar'}
+      description={type === 'execucao' ? 'Valores acumulados por empenho, em reais.' : 'Base vigente, liquidação no ano e saldo atual de RAP.'}
+      actions={
         <Button
           variant={groupBy === 'favorecido' ? 'default' : 'outline'}
           size="sm"
@@ -765,17 +742,18 @@ function EmpenhosTable({
           <Layers className="h-4 w-4" />
           {groupBy === 'favorecido' ? 'Desagrupar' : 'Agrupar por Favorecido'}
         </Button>
-      </CardHeader>
-      <CardContent className="p-0">
+      }>
         <Table>
-          <TableHeader className="bg-slate-50/50">
+          <TableHeader className="bg-muted/50">
             <TableRow className="hover:bg-transparent border-b border-border-default/50">
               <SortHeader label="Número" colKey="numero" className="w-[14%] px-4 sm:px-6" />
               <SortHeader label="Favorecido" colKey="favorecido" className="w-[28%] px-4" />
-              <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider w-[22%]">Descrição</TableHead>
-              <SortHeader label={type === 'execucao' ? 'Empenhado / Liquidado' : 'Inscrito / Reinscrito / Liq Ano'} colKey="valor" align="right" className="w-[18%] px-4" />
-              <SortHeader label={type === 'execucao' ? 'Saldo' : 'Saldo Atual'} colKey="saldo" align="right" className="w-[12%] px-4" />
-              <TableHead className="h-11 px-4 pr-6 text-center text-xs font-semibold uppercase tracking-wider w-[6%] min-w-[80px]">Ações</TableHead>
+              <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">Descrição</TableHead>
+              <SortHeader label={type === 'execucao' ? 'Empenhado' : 'Inscrito / Reinscrito'} colKey="valor" align="right" className="w-[18%] px-4" />
+              <TableHead className="px-4 text-right whitespace-nowrap">{type === 'execucao' ? 'Liquidado' : 'Liquidado no ano'}</TableHead>
+              {type === 'execucao' && <TableHead className="px-4 text-right">Pago</TableHead>}
+              <SortHeader label={type === 'execucao' ? 'A liquidar' : 'Saldo Atual'} colKey="saldo" align="right" className="w-[12%] px-4" />
+              <TableHead className="h-11 px-4 pr-6 text-center text-xs font-semibold uppercase tracking-wider min-w-[80px]">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -787,12 +765,14 @@ function EmpenhosTable({
                   <TableCell className="px-4"><Skeleton className="h-8 w-24" /></TableCell>
                   <TableCell className="px-4"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
                   <TableCell className="px-4"><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
+                  <TableCell className="px-4"><Skeleton className="h-8 w-24" /></TableCell>
+                  {type === 'execucao' && <TableCell className="px-4"><Skeleton className="h-8 w-24" /></TableCell>}
                   <TableCell className="px-4 pr-6"><Skeleton className="h-8 w-16 mx-auto" /></TableCell>
                 </TableRow>
               ))
             ) : paginatedData.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">Nenhum empenho encontrado.</TableCell>
+                <TableCell colSpan={type === 'execucao' ? 8 : 7} className="h-32 text-center text-muted-foreground italic">Nenhum empenho encontrado.</TableCell>
               </TableRow>
             ) : (
               paginatedData.map((row, idx) => {
@@ -801,43 +781,23 @@ function EmpenhosTable({
                   return (
                     <Fragment key={`group-${idx}`}>
                       <TableRow
-                        className="bg-slate-50/50 hover:bg-slate-100/80 transition-colors cursor-pointer border-b border-border-default/50"
+                        className="bg-muted/50 hover:bg-muted/80 transition-colors cursor-pointer border-b border-border-default/50"
                         onClick={() => toggleGroup(row.name)}
                       >
-                        <TableCell className="py-4 px-4 sm:px-6 font-medium w-[42%]" colSpan={2}>
+                        <TableCell className="py-3 px-4 sm:px-6 font-medium" colSpan={2}>
                           <div className="flex items-center gap-2">
                             <ChevronRight className={`h-4 w-4 text-slate-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                             <span>{row.name}</span>
-                            <Badge variant="secondary" className="ml-2 bg-white text-xs">{row.items.length}</Badge>
+                            <Badge variant="secondary" className="ml-2 bg-card text-xs">{row.items.length}</Badge>
                           </div>
                         </TableCell>
-                        <TableCell className="py-4 px-4 text-sm text-muted-foreground w-[22%]">
+                        <TableCell className="py-3 px-4 text-sm text-muted-foreground">
                           -
                         </TableCell>
-                        <TableCell className="py-4 px-4 text-right w-[18%]">
-                          <div className="flex flex-col gap-1 items-end">
-                            <span className="font-bold text-sm">{formatCurrency(row.valorTotal)}</span>
-                            {type === 'execucao' ? (
-                              <>
-                                <span className={`text-[11px] ${(row.liquidadoTotal || 0) > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado">
-                                  Liq: {formatCurrency(row.liquidadoTotal)}
-                                </span>
-                                {(row.pagoTotal || 0) > 0 && (
-                                  <span className="text-[11px] text-status-success" title="Pago">
-                                    Pg: {formatCurrency(row.pagoTotal)}
-                                  </span>
-                                )}
-                              </>
-                            ) : (
-                              <>
-                                <span className={`text-[11px] ${(row.liquidadoTotal || 0) > 0 ? 'text-status-info' : 'text-muted-foreground'}`} title="Liquidado no Ano">
-                                  Liq Ano: {formatCurrency(row.liquidadoTotal)}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-4 px-4 text-right w-[12%]">
+                        <TableCell className="py-3 px-4 text-right font-data text-sm whitespace-nowrap">{formatCurrency(row.valorTotal)}</TableCell>
+                        <TableCell className="py-3 px-4 text-right font-data text-sm whitespace-nowrap">{formatCurrency(row.liquidadoTotal)}</TableCell>
+                        {type === 'execucao' && <TableCell className="py-3 px-4 text-right font-data text-sm whitespace-nowrap">{formatCurrency(row.pagoTotal)}</TableCell>}
+                        <TableCell className="py-3 px-4 text-right">
                           {(() => {
                             if (type === 'restos') {
                               return (
@@ -853,7 +813,7 @@ function EmpenhosTable({
                             );
                           })()}
                         </TableCell>
-                        <TableCell className="py-4 px-4 pr-6 text-center w-[6%] min-w-[80px]"></TableCell>
+                        <TableCell className="py-3 px-4 pr-6 text-center min-w-[80px]"></TableCell>
                       </TableRow>
                         {isExpanded && row.items.map(empenho => (
                           <EmpenhoRow
@@ -900,8 +860,7 @@ function EmpenhosTable({
             setPage(1);
           }}
         />
-      </CardContent>
-    </Card>
+    </DataTablePanel>
   );
 }
 

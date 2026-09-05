@@ -2,6 +2,10 @@
 
 Este indice organiza a documentacao operacional do repositorio por dominio.
 
+## Interface operacional
+
+- [Consulta de contratos e empenhos](frontend/CONTRATOS_EMPENHOS_UI.md)
+
 ## Guias de entrada
 
 - [REPOSITORY_GUIDE.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/REPOSITORY_GUIDE.md)

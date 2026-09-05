@@ -462,94 +462,102 @@ describe('Contratos regressions', () => {
     expect((await screen.findAllByText('R$ 1.528.056,00')).length).toBeGreaterThan(0);
     expect(screen.queryByText('R$ 250.000,00')).not.toBeInTheDocument();
     expect((await screen.findAllByText('R$ 67.514,04')).length).toBeGreaterThan(0);
-    expect(screen.getByText('4.4%')).toBeInTheDocument();
-    expect(screen.getAllByText('Saldo dos empenhos').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('2023NE000777').length).toBeGreaterThan(0);
-    expect(screen.getByText('2023NE000050')).toBeInTheDocument();
-    expect(screen.getByText('2024NE000319')).toBeInTheDocument();
-    expect(screen.getByText('2024NE000999')).toBeInTheDocument();
-    expect(screen.getByText('2026NE000027')).toBeInTheDocument();
-    expect(screen.getByText('158366264352024NE000118')).toBeInTheDocument();
-    expect(screen.queryByText('2026NE999999')).not.toBeInTheDocument();
-    expect(screen.getByText('2026NE000027')).toHaveClass('bg-emerald-green/[0.06]');
-    expect(screen.getByText('2024NE000999')).not.toHaveClass('bg-emerald-green/[0.06]');
-    const contratoApiRow = screen.getByText('Fornecedor Teste').closest('tr');
-    expect(contratoApiRow).not.toBeNull();
-    expect(within(contratoApiRow as HTMLTableRowElement).getAllByText(/NE/).map((badge) => badge.textContent)).toEqual([
-      '2023NE000050',
-      '2023NE000777',
-      '158366264352024NE000118',
-      '2024NE000319',
-      '2024NE000999',
-      '2026NE000027',
+    expect(screen.queryByText('4.4%')).not.toBeInTheDocument();
+    expect(screen.getByText('A liquidar campus')).toBeInTheDocument();
+    expect(screen.queryByText('2023NE000050')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Ver detalhes do contrato/i }));
+    const table = await screen.findByRole('table', { name: 'Empenhos vinculados ao campus' });
+    expect(within(table).getAllByRole('row').slice(1).map(row => within(row).getAllByRole('cell')[0].textContent)).toEqual([
+      '2023NE000050', '2023NE000777', '158366264352024NE000118', '2024NE000319', '2024NE000999', '2026NE000027',
     ]);
+    expect(within(table).queryByText('2026NE999999')).not.toBeInTheDocument();
+    expect(within(table).getByText('R$ 40,00')).toBeInTheDocument();
     expect(screen.getAllByText('R$ 24.269,00').length).toBeGreaterThan(0);
-    fireEvent.click(screen.getAllByText('2023NE000777')[0]);
-    expect(screen.getAllByText('R$ 40,00').length).toBeGreaterThan(0);
-    expect(screen.getByText('Origem Reitoria')).toBeInTheDocument();
   });
 
   it('faz o saldo SIAFI local prevalecer quando a API traz o mesmo empenho com prefixo completo', async () => {
     renderContratos();
-
-    fireEvent.click(await screen.findByText('158366264352024NE000118'));
-
-    expect(await screen.findByText('Fonte: SIAFI local + vínculo API Comprasnet')).toBeInTheDocument();
-    expect(screen.getByText('Saldo Atual:')).toBeInTheDocument();
-    expect(screen.getAllByText('R$ 0,00').length).toBeGreaterThan(0);
-    expect(screen.queryByText('Saldo a Liquidar:')).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: /Ver detalhes do contrato/i }));
+    const row = (await screen.findByText('158366264352024NE000118')).closest('tr')!;
+    expect(within(row).getByText('SIAFI local + vínculo API Comprasnet')).toBeInTheDocument();
+    expect(within(row).getAllByRole('cell').slice(-1)[0]).toHaveTextContent('R$ 0,00');
+    expect(within(row).getAllByRole('cell')[2]).toHaveTextContent('R$ 7.330,25');
   });
 
   it('mostra RAP antigo da API com saldo e liquidado de restos em vez de saldo de exercicio', async () => {
     renderContratos();
-
-    fireEvent.click(await screen.findByText('2023NE000050'));
-
-    expect(await screen.findByText('RP reinscrito:')).toBeInTheDocument();
-    expect(screen.getByText('Saldo Atual:')).toBeInTheDocument();
-    expect(screen.getByText('Liquidado/Pago RAP:')).toBeInTheDocument();
-    expect(screen.getAllByText('R$ 21.360,64').length).toBeGreaterThan(0);
-    expect(screen.getByText('R$ 0,00')).toBeInTheDocument();
-    expect(screen.queryByText('RP a pagar:')).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: /Ver detalhes do contrato/i }));
+    const row = (await screen.findByText('2023NE000050')).closest('tr')!;
+    const cells = within(row).getAllByRole('cell');
+    expect(cells[1]).toHaveTextContent('RAP');
+    expect(cells[2]).toHaveTextContent('R$ 21.360,64');
+    expect(cells[3]).toHaveTextContent('R$ 21.360,64');
+    expect(cells[4]).toHaveTextContent('R$ 0,00');
   });
 
   it('nao usa valor a liquidar da API como saldo quando empenho antigo tem rp a pagar zero', async () => {
     renderContratos();
-
-    fireEvent.click(await screen.findByText('2024NE000999'));
-
-    expect(await screen.findByText('RP reinscrito:')).toBeInTheDocument();
-    expect(screen.getByText('Saldo Atual:')).toBeInTheDocument();
-    expect(screen.getAllByText('R$ 0,00').length).toBeGreaterThan(0);
+    fireEvent.click(await screen.findByRole('button', { name: /Ver detalhes do contrato/i }));
+    const row = (await screen.findByText('2024NE000999')).closest('tr')!;
+    expect(within(row).getAllByRole('cell').slice(-1)[0]).toHaveTextContent('R$ 0,00');
+    expect(within(row).queryByText('R$ 999,00')).not.toBeInTheDocument();
     expect(screen.getAllByText('R$ 24.269,00').length).toBeGreaterThan(0);
-    expect(screen.queryByText('Saldo a Liquidar:')).not.toBeInTheDocument();
   });
 
-  it('abre drawer com historico, itens e faturas mantendo grupo sem item', async () => {
+  it('abre página com abas de histórico, itens e faturas mantendo grupo sem item', async () => {
     renderContratos();
-
-    fireEvent.click(await screen.findByRole('button', { name: /Detalhes/i }));
-
-    await waitFor(() => {
-      expect(mockedContratosApiService.getContratoApiDetails).toHaveBeenCalledWith('contrato-api-1');
-    });
-
-    expect(await screen.findByText('Contrato 00062/2018')).toBeInTheDocument();
-    expect(screen.getByText('Histórico do contrato')).toBeInTheDocument();
-
-    const historicoSection = screen.getByRole('button', { name: /Histórico do contrato/i });
-    const itensSection = screen.getByRole('button', { name: /Itens/i });
-    const faturasSection = screen.getByRole('button', { name: /Faturas associadas/i });
-
-    fireEvent.click(historicoSection);
-    fireEvent.click(itensSection);
-    fireEvent.click(faturasSection);
-
-    expect(screen.getByText(/Assinatura - 00158\/2021/i)).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: /Ver detalhes do contrato/i }));
+    await waitFor(() => expect(mockedContratosApiService.getContratoApiDetails).toHaveBeenCalledWith('contrato-api-1'));
+    expect(await screen.findByRole('heading', { name: /Contrato 00062\/2018/ })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getAllByText('PRESTACAO DE SERVICOS DE APOIO ADMINISTRATIVO').length).toBeGreaterThan(0);
-    expect(screen.getByText(/Sem item vinculado/i)).toBeInTheDocument();
-    expect(screen.getByText('48162')).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Vigência e documentos' }), { button: 0, ctrlKey: false });
+    expect(screen.getByRole('button', { name: /Histórico do contrato/i })).toBeVisible();
+    expect(screen.getByText(/Assinatura - 00158\/2021/i)).toBeVisible();
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Faturas e pagamentos' }), { button: 0, ctrlKey: false });
+    expect(screen.getByText(/Sem item vinculado/i)).toBeVisible();
+    expect(screen.getByText('48162')).toBeVisible();
   });
+
+  it('preserva busca e favoritos ao retornar do detalhe', async () => {
+    mockedUseUserFavorites().favoriteIdsByType.contrato.add('contrato-local-1');
+    renderContratos();
+    await screen.findByText('Fornecedor Teste');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Buscar contratos' }), { target: { value: 'Fornecedor Teste' } });
+    fireEvent.click(screen.getByRole('button', { name: /Favoritos/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Ver detalhes do contrato/i }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Voltar aos contratos' }));
+    expect(screen.getByRole('textbox', { name: 'Buscar contratos' })).toHaveValue('Fornecedor Teste');
+    expect(screen.getByText('Apenas Favoritos')).toBeVisible();
+  });
+
+  it('distingue falha de consulta de um contrato sem itens e permite tentar novamente', async () => {
+    mockedContratosApiService.getContratoApiDetails.mockRejectedValueOnce(new Error('offline'));
+    renderContratos();
+    fireEvent.click(await screen.findByRole('button', { name: /Ver detalhes do contrato/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível carregar');
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }));
+    expect(await screen.findByRole('table', { name: 'Empenhos vinculados ao campus' })).toBeVisible();
+  });
+
+  it('busca pelo objeto do contrato e aplica os novos filtros operacionais', async () => {
+    const contratos = await mockedContratosApiService.getContratosApi();
+    const details = await mockedContratosApiService.getContratoApiDetails('contrato-api-1');
+    mockedContratosApiService.getFaturasApi.mockResolvedValueOnce(details.faturas.map(f => ({ ...f, situacao: 'Em ateste' })));
+    const date = new Date();
+    date.setDate(date.getDate() + 45);
+    mockedContratosApiService.getContratosApi.mockResolvedValueOnce(contratos.map(c => ({ ...c, objeto: 'Manutenção dos elevadores', vigencia_fim_derivada: date.toISOString().slice(0, 10), situacao_derivada: true })));
+    renderContratos();
+    await screen.findByText('Fornecedor Teste');
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'elevadores' } });
+    expect(screen.getByText('Fornecedor Teste')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'A vencer em 90 dias' }));
+    expect(screen.getByText('Fornecedor Teste')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Com faturas pendentes' }));
+    expect(screen.getByText('Fornecedor Teste')).toBeVisible();
+    expect(screen.queryByText('Invoice Aberta')).not.toBeInTheDocument();
+  });
+
   it('permite favoritar contrato sincronizado sem registro local', async () => {
     const toggleFavorite = vi.fn();
     mockedContratosApiService.getContratosApi.mockResolvedValueOnce([

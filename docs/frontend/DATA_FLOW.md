@@ -431,3 +431,13 @@ O parser le todas as tabelas de atividades do Plano 8, inclusive linhas com `hid
 
 
 - Apos a conclusao, `suapDocumentReview` grava o resultado em `suap_document_reviews`. O segundo icone do card envia `reviewMode = latest` e a rota consulta a ultima analise salva sem solicitar o PDF novamente.
+
+## Consulta visual de contratos e empenhos
+
+A apresentação em página reutiliza `EmpenhoDialog` e `ContratoApiDetailsSheet`
+com `presentation="page"`. Lista e detalhe de contratos compartilham agregações
+financeiras e datas derivadas. Nenhum novo endpoint ou escrita automática foi
+introduzido. A inspeção de empenhos pelo contrato usa o registro local existente
+em modo somente leitura; dados exclusivos da API continuam na tabela com a
+fonte identificada. O detalhamento da revisão está em
+[CONTRATOS_EMPENHOS_UI.md](CONTRATOS_EMPENHOS_UI.md).

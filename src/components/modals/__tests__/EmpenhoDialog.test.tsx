@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
@@ -88,7 +88,7 @@ const empenhoBase: Empenho = {
   updatedAt: new Date('2026-02-03T12:00:00'),
 };
 
-const renderDialog = (liquidacoesApi: unknown[] = [], itensPortal: unknown[] = []) => {
+const renderDialog = (liquidacoesApi: unknown[] = [], itensPortal: unknown[] = [], presentation: 'dialog' | 'page' = 'dialog', readOnly = false) => {
   mockedContratosApiService.getLiquidacoesPublicasPorEmpenho.mockResolvedValue(liquidacoesApi);
   mockedTransparenciaService.getItensEmpenhoPortal.mockResolvedValue(itensPortal);
   const queryClient = new QueryClient({
@@ -102,6 +102,8 @@ const renderDialog = (liquidacoesApi: unknown[] = [], itensPortal: unknown[] = [
   render(
     <QueryClientProvider client={queryClient}>
       <EmpenhoDialog
+        presentation={presentation}
+        readOnly={readOnly}
         open
         onOpenChange={vi.fn()}
         empenho={empenhoBase}
@@ -116,6 +118,31 @@ describe('EmpenhoDialog', () => {
   beforeEach(() => {
     mockedContratosApiService.getLiquidacoesPublicasPorEmpenho.mockReset();
     mockedTransparenciaService.getItensEmpenhoPortal.mockReset();
+  });
+
+  it('abre leitura em página com resumo, movimentos e edição explícita', async () => {
+    renderDialog([], [], 'page');
+    expect(screen.queryByTestId('dialog-content')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: empenhoBase.numero })).toBeVisible();
+    expect(screen.getByText('Saldo a liquidar')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Salvar Alterações' })).not.toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Itens e histórico' }), { button: 0, ctrlKey: false });
+    expect(screen.getByText('Histórico de Operações')).toBeVisible();
+    expect(screen.getByText('Saldo a liquidar')).not.toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Editar dados estratégicos' }));
+    expect(screen.getByRole('button', { name: 'Salvar Alterações' })).toBeVisible();
+    fireEvent.change(screen.getByLabelText('Plano Interno (PI)'), { target: { value: 'TEMPORARIO' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Editar dados estratégicos' }));
+    expect(screen.getByLabelText('Plano Interno (PI)')).toHaveValue('');
+    await waitFor(() => expect(mockedTransparenciaService.getItensEmpenhoPortal).toHaveBeenCalled());
+  });
+
+  it('mantém o detalhe de contrato em somente leitura', async () => {
+    renderDialog([], [], 'page', true);
+    expect(screen.queryByRole('button', { name: 'Editar dados estratégicos' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Salvar Alterações' })).not.toBeInTheDocument();
+    await waitFor(() => expect(mockedTransparenciaService.getItensEmpenhoPortal).toHaveBeenCalled());
   });
 
   it('renderiza historico de operacoes e liquidacoes da API de contratos', async () => {

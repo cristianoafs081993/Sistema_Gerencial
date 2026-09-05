@@ -1,3 +1,7 @@
+import { RecordDetailsPage } from '@/components/records/RecordDetailsPage';
+import { DataTablePanel } from '@/components/design-system/DataTablePanel';
+import { formatContractDate } from '@/utils/contractPresentation';
+import type { Empenho } from '@/types';
 import { useState, useEffect, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -70,6 +74,11 @@ import {
 import { ContratoNfeRastreabilidade } from '@/components/contratos/ContratoNfeRastreabilidade';
 
 interface ContratoApiDetailsSheetProps {
+  presentation?: 'dialog' | 'page';
+  error?: string | null;
+  onRetry?: () => void;
+  execution?: { valorGlobal: number; empenhado: number; rows: { id: string; numero: string; valor: number; saldo: number; liquidado: number; fonte: string; tipo: string; local?: Empenho }[] };
+  onOpenEmpenho?: (empenho: Empenho) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   contrato: ContratoApiRow | null;
@@ -219,21 +228,23 @@ function SummaryMetric({
   label,
   value,
   helper,
+  fullValue = false,
 }: {
   icon: JSX.Element;
   label: string;
   value: string | number;
   helper?: string;
+  fullValue?: boolean;
 }) {
   return (
     <div className="rounded-md border border-border/70 bg-card p-3 shadow-sm">
-      <div className="flex items-start gap-3">
+      <div className={fullValue ? "space-y-2" : "flex items-start gap-3"}>
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-action-primary/10 text-action-primary">
           {icon}
         </span>
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase text-muted-foreground">{label}</p>
-          <p className="mt-1 truncate text-sm font-bold text-foreground">{value}</p>
+          <p className={fullValue ? "mt-1 font-data text-lg font-semibold text-foreground" : "mt-1 truncate text-sm font-bold text-foreground"}>{value}</p>
           {helper ? <p className="mt-1 text-xs text-muted-foreground">{helper}</p> : null}
         </div>
       </div>
@@ -315,7 +326,15 @@ export function ContratoApiDetailsSheet({
   details,
   lastSyncRun,
   loading = false,
+  presentation = 'dialog',
+  error, onRetry, execution, onOpenEmpenho,
 }: ContratoApiDetailsSheetProps) {
+  const [detailTab, setDetailTab] = useState('resumo');
+  const pageMode = presentation === 'page';
+  const Header = pageMode ? 'div' : DialogHeader;
+  const Title = pageMode ? 'h1' : DialogTitle;
+  const Description = pageMode ? 'p' : DialogDescription;
+  useEffect(() => { if (open) setDetailTab('resumo'); }, [open, contrato?.id]);
   const rawFaturas = details?.faturas ?? [];
   const empenhoLinkedFaturaIds = new Set(
     (details?.faturaEmpenhos ?? []).map((fe) => fe.contrato_api_fatura_id)
@@ -530,11 +549,9 @@ export function ContratoApiDetailsSheet({
     return fetchPncpDocs(false);
   }, [open, contrato, fetchPncpDocs]);
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(90vh,880px)] w-[calc(100vw-2rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0 bg-background sm:rounded-2xl border border-border shadow-2xl">
-        <DialogHeader className="border-b border-border px-6 py-4 bg-card shrink-0">
-          <DialogTitle className="flex flex-wrap items-center gap-2">
+  const content = (<>
+        <Header className="border-b border-border px-6 py-4 bg-card shrink-0">
+          <Title className="flex flex-wrap items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <FileText className="h-5 w-5" />
             </span>
@@ -552,11 +569,11 @@ export function ContratoApiDetailsSheet({
                 <span>Portal PNCP</span>
               </a>
             ) : null}
-          </DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground mt-1">
-            {contrato?.fornecedor_nome || 'Fornecedor não informado'} | Vigência {formatDate(contrato?.vigencia_inicio)} a {formatDate(contrato?.vigencia_fim)}
-          </DialogDescription>
-        </DialogHeader>
+          </Title>
+          <Description className="text-xs text-muted-foreground mt-1">
+            {contrato?.fornecedor_nome || 'Fornecedor não informado'} | Vigência {(pageMode ? formatContractDate : formatDate)(contrato?.vigencia_inicio)} a {(pageMode ? formatContractDate : formatDate)(contrato?.vigencia_fim)}
+          </Description>
+        </Header>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5 scrollbar-thin">
           {loading ? (
@@ -564,6 +581,8 @@ export function ContratoApiDetailsSheet({
               <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               Carregando itens, faturas e histórico do contrato...
             </div>
+          ) : pageMode && error ? (
+            <div role="alert" className="rounded-lg border border-destructive/30 p-6 space-y-3"><p>{error}</p><Button variant="outline" onClick={onRetry}>Tentar novamente</Button></div>
           ) : !details ? (
             <div className="py-16 text-center text-sm font-medium text-muted-foreground">Nenhum detalhe da API carregado.</div>
           ) : (
@@ -590,28 +609,28 @@ export function ContratoApiDetailsSheet({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <SummaryMetric
+            <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${pageMode ? '2xl:grid-cols-4' : 'xl:grid-cols-4'}`}>
+              <SummaryMetric fullValue={pageMode}
                 icon={<CircleDollarSign className="h-4 w-4" />}
-                label={valorTotalLabel}
-                value={formatCurrency(valorTotalApi)}
+                label={pageMode ? 'Valor global do contrato' : valorTotalLabel}
+                value={formatCurrency(pageMode && execution ? execution.valorGlobal : valorTotalApi)}
               />
-              <SummaryMetric
+              <SummaryMetric fullValue={pageMode}
                 icon={<Package className="h-4 w-4" />}
-                label="Itens"
-                value={details.itens.length}
-                helper={`${formatCurrency(valorExecutadoItens)} executado`}
+                label={pageMode ? 'Empenhado campus' : 'Itens'}
+                value={pageMode && execution ? formatCurrency(execution.empenhado) : details.itens.length}
+                helper={pageMode ? 'Empenhos vinculados à unidade' : `${formatCurrency(valorExecutadoItens)} executado`}
               />
-              <SummaryMetric
+              <SummaryMetric fullValue={pageMode}
                 icon={<ReceiptText className="h-4 w-4" />}
-                label="Faturas"
-                value={faturas.length}
-                helper={`${faturasExecutadas} executadas`}
+                label={pageMode ? 'A liquidar campus / saldo RAP' : 'Faturas'}
+                value={pageMode && execution ? formatCurrency(execution.rows.reduce((sum, row) => sum + row.saldo, 0)) : faturas.length}
+                helper={pageMode ? 'Saldos atuais dos empenhos vinculados' : `${faturasExecutadas} executadas`}
               />
-              <SummaryMetric
+              <SummaryMetric fullValue={pageMode}
                 icon={<CalendarClock className="h-4 w-4" />}
-                label="Última sincronização"
-                value={lastSyncLabel}
+                label={pageMode ? 'Faturas pendentes' : 'Última sincronização'}
+                value={pageMode ? faturas.length - faturasExecutadas : lastSyncLabel}
               />
             </div>
 
@@ -629,8 +648,23 @@ export function ContratoApiDetailsSheet({
               </div>
             ) : null}
 
-            <Accordion key={contrato?.id ?? 'sem-contrato'} type="multiple" className="space-y-3">
-              <AccordionItem value="historico" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+            {pageMode && <p className="text-xs text-muted-foreground">Última sincronização: {lastSyncLabel}</p>}
+            <Tabs value={detailTab} onValueChange={setDetailTab}>
+            {pageMode && <TabsList aria-label="Detalhes do contrato" className="h-auto flex-wrap justify-start">
+              <TabsTrigger value="resumo">Resumo e empenhos</TabsTrigger>
+              <TabsTrigger value="faturas">Faturas e pagamentos</TabsTrigger>
+              <TabsTrigger value="documentos">Vigência e documentos</TabsTrigger>
+            </TabsList>}
+            <TabsContent value={detailTab} forceMount className="space-y-4">
+            {pageMode && detailTab === 'resumo' && execution && <DataTablePanel title="Empenhos vinculados ao campus" className="mt-4">
+              <Table aria-label="Empenhos vinculados ao campus"><TableHeader><TableRow><TableHead>Empenho</TableHead><TableHead>Tipo</TableHead><TableHead className="text-right">Empenhado / base RAP</TableHead><TableHead className="text-right">Liquidado / liquidado-pago RAP</TableHead><TableHead className="text-right">A liquidar / saldo RAP</TableHead></TableRow></TableHeader>
+              <TableBody>{execution.rows.length ? execution.rows.map(row => <TableRow key={row.id}>
+                <TableCell>{row.local && onOpenEmpenho ? <button type="button" className="font-data text-primary hover:underline" onClick={() => onOpenEmpenho(row.local!)}>{row.numero}</button> : <span className="font-data">{row.numero}</span>}</TableCell>
+                <TableCell><p>{row.tipo}</p><p className="mt-1 text-xs text-muted-foreground">{row.fonte}</p></TableCell><TableCell className="font-data text-right whitespace-nowrap">{formatCurrency(row.valor)}</TableCell><TableCell className="font-data text-right whitespace-nowrap">{formatCurrency(row.liquidado)}</TableCell><TableCell className="font-data text-right whitespace-nowrap">{formatCurrency(row.saldo)}</TableCell>
+              </TableRow>) : <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Nenhum empenho vinculado ao campus.</TableCell></TableRow>}</TableBody></Table>
+            </DataTablePanel>}
+            <Accordion defaultValue={pageMode ? ['historico', 'itens', 'faturas', 'documentos', 'nfe-rastreabilidade'] : undefined} key={contrato?.id ?? 'sem-contrato'} type="multiple" className="space-y-3">
+              <AccordionItem hidden={pageMode && detailTab !== 'documentos'} value="historico" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
                 <AccordionTrigger className="gap-3 py-4 hover:no-underline">
                   <AccordionSectionTitle
                     icon={<History className="h-4 w-4" />}
@@ -690,7 +724,7 @@ export function ContratoApiDetailsSheet({
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem value="itens" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+              <AccordionItem hidden={pageMode && detailTab !== 'resumo'} value="itens" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
                 <AccordionTrigger className="gap-3 py-4 hover:no-underline">
                   <AccordionSectionTitle
                     icon={<Package className="h-4 w-4" />}
@@ -773,7 +807,7 @@ export function ContratoApiDetailsSheet({
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem value="faturas" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+              <AccordionItem hidden={pageMode && detailTab !== 'faturas'} value="faturas" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
                 <AccordionTrigger className="gap-3 py-4 hover:no-underline">
                   <AccordionSectionTitle
                     icon={<ReceiptText className="h-4 w-4" />}
@@ -890,7 +924,7 @@ export function ContratoApiDetailsSheet({
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem value="documentos" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+              <AccordionItem hidden={pageMode && detailTab !== 'documentos'} value="documentos" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
                 <AccordionTrigger className="gap-3 py-4 hover:no-underline">
                   <AccordionSectionTitle
                     icon={<FileDown className="h-4 w-4" />}
@@ -1046,7 +1080,7 @@ export function ContratoApiDetailsSheet({
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem value="nfe-rastreabilidade" className="border border-border/80 rounded-xl px-4 py-1 bg-card shadow-xs">
+              <AccordionItem hidden={pageMode && detailTab !== 'faturas'} value="nfe-rastreabilidade" className="border border-border/80 rounded-xl px-4 py-1 bg-card shadow-xs">
                 <AccordionTrigger className="hover:no-underline py-3">
                   <div className="flex items-center gap-2 text-left">
                     <Receipt className="h-4 w-4 text-action-primary shrink-0" />
@@ -1074,11 +1108,14 @@ export function ContratoApiDetailsSheet({
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
+            </TabsContent>
+            </Tabs>
           </div>
         )}
         </div>
-      </DialogContent>
-    </Dialog>
-  );
+    </>);
+  if (pageMode) return open ? <RecordDetailsPage backLabel="Voltar aos contratos" onBack={() => onOpenChange(false)}>{content}</RecordDetailsPage> : null;
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="flex h-[min(90vh,880px)] w-[calc(100vw-2rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0 bg-background sm:rounded-2xl border border-border shadow-2xl">{content}</DialogContent></Dialog>;
+
 }
 

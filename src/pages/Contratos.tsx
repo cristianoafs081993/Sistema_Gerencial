@@ -1,4 +1,7 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { formatContractDate, contractDaysRemaining, contractDeadlineLabel } from '@/utils/contractPresentation';
+import { EmpenhoDialog } from '@/components/modals/EmpenhoDialog';
+import type { Empenho } from '@/types';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Search, Calendar, ArrowUpDown, ChevronUp, ChevronDown, RefreshCw, Eye, Star } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { Input } from '@/components/ui/input';
@@ -8,7 +11,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 import { formatCurrency, formatarDocumento, cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { HeaderActions } from '@/components/HeaderParts';
 import { ContratosSyncDialog } from '@/components/modals/ContratosSyncDialog';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
@@ -18,7 +20,7 @@ import { DataTablePanel } from '@/components/design-system/DataTablePanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAuthUserMatricula, permissionMatchesAuthUser } from '@/lib/terceirizadoIdentity';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { getRapBaseVigente, getRapReferenceYear, getRapSaldoAtual } from '@/utils/rapMetrics';
+import { getRapBaseVigente, getRapLiquidadoNoAno, getRapReferenceYear, getRapSaldoAtual } from '@/utils/rapMetrics';
 import { buildEmpenhoLookupKeys, normalizeContratoNumero, shouldIgnoreContratoNumero } from '@/utils/contratosSync';
 import { getValorTotalFromHistorico } from '@/utils/contratosApiHistorico';
 import { isContratoApiCampusEmpenho } from '@/utils/contratosApiStatus';
@@ -130,14 +132,6 @@ const getSaldoEmpenhoApi = (empenho: ContratoApiEmpenhoRow) => {
   return getApiEmpenhoNumber(empenho, 'valor_a_liquidar', 'valoraliquidar') ?? 0;
 };
 
-const getEmpenhoSaldoBadgeClass = (saldo: number) =>
-  cn(
-    'text-[10px] font-mono py-0 h-5 cursor-pointer transition-colors',
-    saldo > 0
-      ? 'border-emerald-green/25 bg-emerald-green/[0.06] text-emerald-green shadow-[0_0_0_1px_rgba(34,197,94,0.08)] hover:bg-emerald-green/10'
-      : 'hover:bg-muted-foreground/20',
-  );
-
 const createEmptyContratoApiDetails = (): ContratoApiDetails => ({
   historico: [],
   empenhos: [],
@@ -149,7 +143,7 @@ const createEmptyContratoApiDetails = (): ContratoApiDetails => ({
 
 export default function Contratos() {
   const { isSuperAdmin, user = null, userGroups = [] } = useAuth();
-  const { contratos, empenhos, contratosEmpenhos, isLoading, refreshData } = useData();
+  const { contratos, empenhos, atividades, contratosEmpenhos, isLoading, refreshData } = useData();
   const isTerceirizado = userGroups.some((group) => group.slug === 'terceirizado');
   const userMatricula = getAuthUserMatricula(user);
   const userIdentity = useMemo(
@@ -162,8 +156,11 @@ export default function Contratos() {
   );
   const [terceirizadoPermissions, setTerceirizadoPermissions] = useState<TerceirizadoPermission[]>([]);
   const [isPermissionsLoading, setIsPermissionsLoading] = useState(false);
+  const [inspectedEmpenho, setInspectedEmpenho] = useState<Empenho | null>(null);
+  const detailRequest = useRef(0);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewFilter, setViewFilter] = useState<'all' | 'favorites' | 'expired120'>('all');
+  const [viewFilter, setViewFilter] = useState<'all' | 'favorites' | 'expired120' | 'expiring90' | 'pending'>('all');
   const { favoriteIdsByType, isFavorite, toggleFavorite, isPending: isFavoritePending } = useUserFavorites();
   const [sortConfig, setSortConfig] = useState<{
     key: string;
@@ -392,12 +389,15 @@ export default function Contratos() {
   }, [empenhos]);
 
   const openApiDetails = useCallback(async (contrato: ContratoApiRow) => {
+    const requestId = ++detailRequest.current;
     setSelectedApiContrato(contrato);
     setSelectedApiDetails(null);
     setIsDetailsOpen(true);
     setIsDetailsLoading(true);
+    setDetailsError(null);
     try {
       const details = await contratosApiService.getContratoApiDetails(contrato.id);
+      if (requestId !== detailRequest.current) return;
       const campusEmpenhos = details.empenhos.filter((empenho) => isContratoApiCampusEmpenho(empenho));
       const campusEmpenhoIds = new Set(campusEmpenhos.map((empenho) => empenho.id));
       const campusApiEmpenhoIds = new Set(campusEmpenhos.map((empenho) => Number(empenho.api_empenho_id)));
@@ -410,7 +410,9 @@ export default function Contratos() {
         ),
       });
     } catch (error) {
+      if (requestId !== detailRequest.current) return;
       console.error('Contratos: erro ao carregar detalhes do contrato da API', error);
+      setDetailsError('Não foi possível carregar os detalhes do contrato. Tente novamente.');
       setSelectedApiDetails({
         historico: [],
         empenhos: [],
@@ -420,11 +422,12 @@ export default function Contratos() {
         faturaEmpenhos: [],
       });
     } finally {
-      setIsDetailsLoading(false);
+      if (requestId === detailRequest.current) setIsDetailsLoading(false);
     }
   }, []);
 
   const openContractDetails = useCallback(async (contract: ContratoDisplay) => {
+    setDetailsError(null);
     let apiContract = contract.apiContrato;
 
     // Terceirizados não carregam a listagem global da API. Quando solicitam
@@ -497,8 +500,17 @@ export default function Contratos() {
       });
     }
 
+    if (viewFilter === 'expiring90') {
+      baseContratos = visibleContratos.filter(c => {
+        const days = contractDaysRemaining(c.data_termino);
+        return days !== null && days >= 0 && days <= 90 && (!c.apiContrato || c.apiContrato.situacao_derivada === true);
+      });
+    } else if (viewFilter === 'pending') {
+      baseContratos = visibleContratos.filter(c => apiFaturas.some(f => f.contrato_api_id === c.apiContrato?.id && !['pago', 'siafi apropriado'].includes((f.situacao || '').toLowerCase())));
+    }
+
     let result = baseContratos.filter((c) => {
-      return normalizeString(c.numero).includes(searchNormalized) || normalizeString(c.contratada).includes(searchNormalized) || normalizeString(c.cnpj || '').includes(searchNormalized);
+      return normalizeString(c.numero).includes(searchNormalized) || normalizeString(c.contratada).includes(searchNormalized) || normalizeString(c.cnpj || '').includes(searchNormalized) || normalizeString(c.apiContrato?.objeto || '').includes(searchNormalized);
     });
 
     if (sortConfig) {
@@ -545,18 +557,9 @@ export default function Contratos() {
     }
 
     return result;
-  }, [visibleContratos, viewFilter, favoriteIdsByType, searchTerm, normalizeString, sortConfig]);
+  }, [visibleContratos, viewFilter, favoriteIdsByType, searchTerm, normalizeString, sortConfig, apiFaturas]);
 
-  const safeFormatDate = (dateVal: Date | string | null | undefined) => {
-    if (!dateVal) return '-';
-    try {
-      const d = new Date(dateVal);
-      if (isNaN(d.getTime())) return '-';
-      return format(d, 'dd/MM/yyyy');
-    } catch (e) {
-      return '-';
-    }
-  };
+  const safeFormatDate = formatContractDate;
 
   const rapReferenceYear = useMemo(() => getRapReferenceYear(empenhos), [empenhos]);
 
@@ -652,10 +655,10 @@ export default function Contratos() {
   }, []);
 
   const getEmpenhosApiSomente = useCallback(
-    (empenhosVinculados: Array<{ numero: string }>, apiContrato?: ContratoApiRow) => {
+    (empenhosVinculados: Array<{ numero: string }>, apiContrato?: ContratoApiRow, detailEmpenhos?: ContratoApiEmpenhoRow[]) => {
       if (!apiContrato) return [];
       const localEmpenhosKeys = new Set(empenhosVinculados.flatMap((e) => Array.from(buildEmpenhoRefKeys(e.numero))));
-      const empenhosApiVinculados = apiEmpenhosByContratoApiId.get(apiContrato.id) ?? [];
+      const empenhosApiVinculados = apiEmpenhosByContratoApiId.get(apiContrato.id) ?? detailEmpenhos ?? [];
       return empenhosApiVinculados.filter((empenhoApi) => {
         const apiKeys = Array.from(buildEmpenhoRefKeys(empenhoApi.numero));
         return apiKeys.length > 0 && !apiKeys.some((key) => localEmpenhosKeys.has(key));
@@ -693,6 +696,34 @@ export default function Contratos() {
     setViewFilter('all');
   };
 
+  const selectedPageContrato = useMemo(() => selectedApiContrato ? {
+    ...selectedApiContrato,
+    vigencia_inicio: selectedApiContrato.vigencia_inicio_derivada ?? selectedApiContrato.vigencia_inicio,
+    vigencia_fim: selectedApiContrato.vigencia_fim_derivada ?? selectedApiContrato.vigencia_fim,
+  } : null, [selectedApiContrato]);
+
+  const selectedDisplay = selectedApiContrato ? visibleContratos.find(c => normalizeContratoNumero(c.numero) === normalizeContratoNumero(selectedApiContrato.numero)) : undefined;
+  const selectedLocalEmpenhos = getEmpenhosDoContrato(selectedDisplay?.localId);
+  const selectedApiEmpenhos = getEmpenhosApiSomente(selectedLocalEmpenhos, selectedApiContrato ?? undefined, selectedApiDetails?.empenhos);
+  const selectedExecution = {
+    valorGlobal: getValorTotalContrato(selectedDisplay ?? {}, selectedApiContrato ?? undefined, selectedApiContrato ? apiHistoricosByContratoApiId.get(selectedApiContrato.id) ?? [] : []),
+    empenhado: getValorEmpenhadoContrato(selectedDisplay?.localId, selectedApiContrato ?? undefined) || selectedApiEmpenhos.reduce((sum, e) => sum + (Number(e.valor_empenhado) || 0), 0),
+    rows: [
+      ...selectedLocalEmpenhos.map(e => ({ id: e.id, numero: e.numero, valor: e.tipo === 'rap' ? getRapBaseVigente(e, rapReferenceYear) : e.valor, saldo: getSaldoEmpenhoLocal(e), liquidado: e.tipo === 'rap' ? getRapLiquidadoNoAno(e) : e.valorLiquidado || 0, fonte: 'SIAFI local', tipo: e.tipo === 'rap' ? 'RAP' : 'Exercício', local: e })),
+      ...selectedApiEmpenhos.map(e => {
+        const local = getLocalEmpenhoForApi(e);
+        const rap = local ? local.tipo === 'rap' : isApiRapEmpenho(e);
+        return {
+          id: e.id, numero: e.numero,
+          valor: rap ? (local ? getRapBaseVigente(local, rapReferenceYear) : getApiRapBase(e)) : Number(e.valor_empenhado) || 0,
+          liquidado: rap ? (local ? getRapLiquidadoNoAno(local) : getApiRapLiquidadoPago(e)) : local?.valorLiquidado ?? (Number(e.valor_liquidado) || 0),
+          saldo: getSaldoEmpenhoApiPreferLocal(e), tipo: rap ? 'RAP' : 'Exercício', local,
+          fonte: local ? 'SIAFI local + vínculo API Comprasnet' : 'API Comprasnet',
+        };
+      }),
+    ].sort((a, b) => compareEmpenhoRefs(a.numero, b.numero)),
+  };
+
   const activeFilterList = useMemo<ActiveFilterItem[]>(() => {
     const list: ActiveFilterItem[] = [];
 
@@ -721,6 +752,9 @@ export default function Contratos() {
       });
     }
 
+    if (viewFilter === 'expiring90' || viewFilter === 'pending') list.push({
+      id: 'view', label: 'Visualização', value: viewFilter === 'expiring90' ? 'A vencer em 90 dias' : 'Com faturas pendentes', onRemove: () => setViewFilter('all'),
+    });
     return list;
   }, [searchTerm, viewFilter]);
 
@@ -741,21 +775,22 @@ export default function Contratos() {
         ) : null}
       </HeaderActions>
 
+      <div hidden={isDetailsOpen} className="space-y-6">
       {/* Standard Filter Card */}
       <FilterPanel className="shadow-sm">
-        <div className="flex flex-col gap-4 sm:flex-row">
+        <div className="flex flex-col gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
-            <Input placeholder="Buscar por número ou contratada..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-system h-10 pl-9 text-sm" />
+            <Input aria-label="Buscar contratos" placeholder="Buscar por número, contratada ou objeto..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-system h-10 pl-9 text-sm" />
           </div>
-          <div className="inline-flex h-10 overflow-hidden rounded-xl border border-border-default bg-white shadow-sm">
+          <div className="inline-flex flex-wrap h-auto overflow-hidden rounded-xl border border-border-default bg-card shadow-sm">
             <Button
               type="button"
               variant={viewFilter === 'all' ? 'default' : 'ghost'}
               className="h-10 rounded-none px-4 text-xs font-semibold"
               onClick={() => setViewFilter('all')}
             >
-              Todos
+              Vigentes
             </Button>
             <Button
               type="button"
@@ -775,6 +810,8 @@ export default function Contratos() {
               <Calendar className="h-3.5 w-3.5 mr-1" />
               Vencidos (120d)
             </Button>
+            <Button type="button" variant={viewFilter === 'expiring90' ? 'default' : 'ghost'} className="h-10 rounded-none px-4 text-xs" onClick={() => setViewFilter('expiring90')}>A vencer em 90 dias</Button>
+            <Button type="button" variant={viewFilter === 'pending' ? 'default' : 'ghost'} className="h-10 rounded-none px-4 text-xs" onClick={() => setViewFilter('pending')}>Com faturas pendentes</Button>
           </div>
         </div>
 
@@ -789,7 +826,7 @@ export default function Contratos() {
 
 
 
-      <DataTablePanel className="mt-6">
+      <DataTablePanel title="Contratos" description="Valor global do instrumento; execução e saldos dos empenhos vinculados ao campus. Os saldos incluem RAP." className="mt-6">
         <Table>
           <TableHeader className="bg-surface-subtle/70">
             <TableRow className="hover:bg-transparent border-b border-border-default/50">
@@ -806,9 +843,9 @@ export default function Contratos() {
                   <SortIcon columnKey="data_inicio" />
                 </div>
               </TableHead>
-              <TableHead className="h-11 px-4 text-right">Valor Total</TableHead>
-              <TableHead className="h-11 px-6">Empenhado</TableHead>
-              <TableHead className="h-11 px-4 text-right">Saldo dos empenhos</TableHead>
+              <TableHead className="h-11 px-4 text-right">Valor global</TableHead>
+              <TableHead className="h-11 px-6">Empenhado campus</TableHead>
+              <TableHead className="h-11 px-4 text-right">A liquidar campus</TableHead>
               <TableHead className="h-11 w-12 px-4 text-center">
                 <span className="sr-only">Ações</span>
               </TableHead>
@@ -842,7 +879,6 @@ export default function Contratos() {
                 const historicoApi = apiContrato ? (apiHistoricosByContratoApiId.get(apiContrato.id) ?? []) : [];
                 const valorTotalContrato = getValorTotalContrato(c, apiContrato, historicoApi);
                 const totalEmpenhado = getValorEmpenhadoContrato(c.localId, apiContrato);
-                const percentualEmpenhado = valorTotalContrato > 0 ? Math.min(100, (totalEmpenhado / valorTotalContrato) * 100) : 0;
 
                 const totalALiquidar =
                   empenhosVinculados.reduce((sum, e) => sum + getSaldoEmpenhoLocal(e), 0) +
@@ -871,7 +907,7 @@ export default function Contratos() {
                         : 'hover:bg-surface-subtle/60'
                     )}
                   >
-                    <TableCell className="py-4 px-6">
+                    <TableCell className="py-3 px-6">
                       <div className="flex items-center gap-2">
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -898,21 +934,17 @@ export default function Contratos() {
                             {favoriteEntity ? (contratoFavorite ? 'Remover dos favoritos' : 'Favoritar contrato') : 'Favorito indisponivel para este contrato'}
                           </TooltipContent>
                         </Tooltip>
-                        <span className="font-data text-sm font-medium text-text-primary">{c.numero}</span>
+                        <button type="button" className="font-data text-sm font-semibold text-primary hover:underline underline-offset-4" onClick={() => void openContractDetails(c)}>{c.numero}</button>
                         {hasOpenInvoice ? (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Badge className="ml-1 px-1.5 py-0.5 text-[10px] font-semibold bg-amber-500 hover:bg-amber-600 text-white animate-pulse shadow-sm flex items-center gap-1 border-none cursor-help">
-                                <span className="relative flex h-1.5 w-1.5">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
-                                </span>
-                                Invoice Aberta
+                              <Badge variant="outline" className="border-status-warning/40 bg-status-warning/10 text-status-warning text-xs whitespace-nowrap">
+                                {openFaturas.length} {openFaturas.length === 1 ? 'fatura pendente' : 'faturas pendentes'}
                               </Badge>
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs p-3 space-y-2 border-border-default/60 shadow-lifted">
                               <div className="space-y-1">
-                                <span className="font-bold text-xs text-status-warning block">Invoices (Faturas) Pendentes:</span>
+                                <span className="font-bold text-xs text-status-warning block">Faturas pendentes:</span>
                                 <div className="text-[11px] space-y-1 font-mono">
                                   {openFaturas.map((f) => (
                                     <div key={f.id} className="flex justify-between gap-4 border-b border-border-default/40 pb-0.5 last:border-0 last:pb-0">
@@ -926,200 +958,41 @@ export default function Contratos() {
                           </Tooltip>
                         ) : null}
                       </div>
+                      <p className="mt-2 max-w-sm line-clamp-2 text-xs text-muted-foreground" title={apiContrato?.objeto || ''}>{apiContrato?.objeto || 'Objeto não informado'}</p>
                       {hasReitoriaOrigin ? (
                         <Badge variant="secondary" className="ml-2 rounded-md text-[10px]" title="Contrato com unidade de origem 158155. O contrato global pode ser da Reitoria; leia a execução pelos empenhos/faturas da UG 158366.">
                           Origem Reitoria
                         </Badge>
                       ) : null}
                     </TableCell>
-                    <TableCell className="py-4 px-4">
+                    <TableCell className="py-3 px-4">
                       <div className="flex flex-col gap-1">
                         <span className="text-sm font-medium text-text-primary">{c.contratada}</span>
                         {c.cnpj && <span className="font-data text-xs text-text-secondary">{formatarDocumento(c.cnpj)}</span>}
                       </div>
                     </TableCell>
-                    <TableCell className="py-4 px-4 text-right">
+                    <TableCell className="py-3 px-4 text-right">
                       <div className="flex flex-col text-xs space-y-0.5">
-                        <span className="text-text-secondary">+ {safeFormatDate(c.data_inicio)}</span>
-                        <span className="font-medium text-text-secondary">- {safeFormatDate(c.data_termino)}</span>
+                        <span className="text-text-secondary">Início: {safeFormatDate(c.data_inicio)}</span>
+                        <span className="font-medium text-text-secondary">Fim: {safeFormatDate(c.data_termino)}</span>
+                        <span className="font-medium text-foreground">{contractDeadlineLabel(c.data_termino)}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="py-4 px-4 text-right">
+                    <TableCell className="py-3 px-4 text-right">
                       <div className="flex flex-col items-end gap-1.5">
                         <span className="text-sm font-semibold text-action-primary">{formatCurrency(valorTotalContrato)}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="py-4 px-6">
-                      <div className="space-y-2">
-                        {totalEmpenhado > 0 && (
-                          <div className="rounded-radius-md border border-border-default/60 bg-surface-subtle/80 p-space-3 shadow-soft">
-                            <div className="flex items-center justify-between gap-3 text-xs">
-                              <span className="font-semibold text-text-primary">{formatCurrency(totalEmpenhado)}</span>
-                              <span className="font-medium text-text-secondary">{percentualEmpenhado.toFixed(1)}%</span>
-                            </div>
-                            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-border-default/80">
-                              <div className="h-full rounded-full bg-action-primary transition-all" style={{ width: `${percentualEmpenhado}%` }} />
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="flex flex-wrap gap-1">
-                          {empenhosVinculados.length > 0 || empenhosApiSomente.length > 0 ? (
-                            <>
-                            {empenhoBadgeItems.map((item) => {
-                              if (item.type === 'local') {
-                                const e = item.empenho;
-                                const balance = getSaldoEmpenhoLocal(e);
-                                const rapBase = e.tipo === 'rap' ? getRapBaseVigente(e, rapReferenceYear) : 0;
-
-                              return (
-                                <Popover key={e.id}>
-                                  <PopoverTrigger asChild>
-                                    <Badge variant="secondary" className={getEmpenhoSaldoBadgeClass(balance)}>
-                                      {e.numero}
-                                    </Badge>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-64 border-border-default/60 p-3 shadow-lifted">
-                                    <div className="space-y-2">
-                                      <div className="mr-1 flex items-center justify-between border-b border-border-default/50 pb-1">
-                                        <span className="font-data text-xs font-bold text-action-primary">{e.numero}</span>
-                                        <Badge variant="outline" className="text-[9px] uppercase px-1 h-4">
-                                          {e.tipo === 'rap' ? 'RAP' : 'Exercício'}
-                                        </Badge>
-                                      </div>
-                                      <div className="grid grid-cols-2 gap-y-1.5 text-xs py-1">
-                                        <span className="text-text-secondary">{e.tipo === 'rap' ? 'Empenhado:' : 'Valor Total:'}</span>
-                                        <span className="text-right font-medium">{formatCurrency(e.tipo === 'rap' ? rapBase : e.valor || 0)}</span>
-                                        <span className="font-semibold text-text-secondary">{e.tipo === 'rap' ? 'Saldo Atual:' : 'Saldo a Liquidar:'}</span>
-                                        <span className={cn('text-right font-bold underline decoration-dotted', balance > 0 ? 'text-status-warning' : 'text-status-success')}>{formatCurrency(balance)}</span>
-                                      </div>
-                                      {e.tipo !== 'rap' && (
-                                        <div className="mt-1 border-t border-dashed border-border-default/50 pt-1.5">
-                                          <div className="flex justify-between text-[10px]">
-                                            <span className="text-text-secondary">Total Liquidado:</span>
-                                            <span className="font-medium text-status-success">{formatCurrency((e.valorLiquidadoAPagar || 0) + (e.valorPagoOficial || 0))}</span>
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </PopoverContent>
-                                </Popover>
-                                );
-                              }
-
-                              const e = item.empenho;
-                              const localOverride = getLocalEmpenhoForApi(e);
-                              if (localOverride) {
-                                const balance = getSaldoEmpenhoLocal(localOverride);
-                                const isRapLocal = localOverride.tipo === 'rap';
-                                const baseValue = isRapLocal ? getRapBaseVigente(localOverride, rapReferenceYear) : localOverride.valor || 0;
-
-                                return (
-                                  <Popover key={`api-${e.id}`}>
-                                    <PopoverTrigger asChild>
-                                      <Badge variant="secondary" className={getEmpenhoSaldoBadgeClass(balance)}>
-                                        {e.numero}
-                                      </Badge>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-64 border-border-default/60 p-3 shadow-lifted">
-                                      <div className="space-y-2">
-                                        <div className="mr-1 flex items-center justify-between border-b border-border-default/50 pb-1">
-                                          <span className="font-data text-xs font-bold text-action-primary">{e.numero}</span>
-                                          <Badge variant="outline" className="text-[9px] uppercase px-1 h-4">
-                                            SIAFI
-                                          </Badge>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-y-1.5 text-xs py-1">
-                                          <span className="text-text-secondary">{isRapLocal ? 'Base RAP:' : 'Valor Total:'}</span>
-                                          <span className="text-right font-medium">{formatCurrency(baseValue)}</span>
-                                          <span className="font-semibold text-text-secondary">{isRapLocal ? 'Saldo Atual:' : 'Saldo a Liquidar:'}</span>
-                                          <span className={cn('text-right font-bold underline decoration-dotted', balance > 0 ? 'text-status-warning' : 'text-status-success')}>
-                                            {formatCurrency(balance)}
-                                          </span>
-                                        </div>
-                                        <div className="border-t border-border-default/40 pt-1.5 text-[9px] font-medium text-text-secondary">
-                                          Fonte: SIAFI local + vínculo API Comprasnet
-                                        </div>
-                                      </div>
-                                    </PopoverContent>
-                                  </Popover>
-                                );
-                              }
-
-                              const valorEmpenhadoApi = Number(e.valor_empenhado) || 0;
-                              const valorLiquidadoApi = Number(e.valor_liquidado) || 0;
-                              const valorPagoApi = Number(e.valor_pago) || 0;
-                              const rpBaseApi = getApiRapBase(e);
-                              const rpLiquidadoPagoApi = getApiRapLiquidadoPago(e);
-                              const rpAPagarApi = getApiRapSaldoAtual(e);
-                              const totalLiquidadoApi = valorLiquidadoApi + valorPagoApi;
-                              const isRapApi = isApiRapEmpenho(e);
-                              const saldoApi = getSaldoEmpenhoApi(e);
-                              const apiEmpenhoYear = getApiEmpenhoYear(e);
-                              const rapBaseLabel = apiEmpenhoYear <= new Date().getFullYear() - 2 ? 'RP reinscrito:' : 'RP inscrito:';
-
-                              return (
-                                <Popover key={`api-${e.id}`}>
-                                  <PopoverTrigger asChild>
-                                    <Badge variant="secondary" className={getEmpenhoSaldoBadgeClass(saldoApi)}>
-                                      {e.numero}
-                                    </Badge>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-64 border-border-default/60 p-3 shadow-lifted">
-                                    <div className="space-y-2">
-                                      <div className="mr-1 flex items-center justify-between border-b border-border-default/50 pb-1">
-                                        <span className="font-data text-xs font-bold text-action-primary">{e.numero}</span>
-                                        <Badge variant="outline" className="text-[9px] uppercase px-1 h-4">
-                                          {isRapApi ? 'RAP' : 'Exercício'}
-                                        </Badge>
-                                      </div>
-                                      <div className="grid grid-cols-2 gap-y-1.5 text-xs py-1">
-                                        <span className="text-text-secondary">{isRapApi ? rapBaseLabel : 'Valor Total:'}</span>
-                                        <span className="text-right font-medium">{formatCurrency(isRapApi ? rpBaseApi : valorEmpenhadoApi)}</span>
-                                        <span className="font-semibold text-text-secondary">{isRapApi ? 'Saldo Atual:' : 'Saldo a Liquidar:'}</span>
-                                        <span className={cn('text-right font-bold underline decoration-dotted', saldoApi > 0 ? 'text-status-warning' : 'text-status-success')}>
-                                          {formatCurrency(saldoApi)}
-                                        </span>
-                                      </div>
-                                      <div className="mt-1 border-t border-dashed border-border-default/50 pt-1.5">
-                                        <div className="flex justify-between text-[10px]">
-                                          <span className="text-text-secondary">{isRapApi ? 'Liquidado/Pago RAP:' : 'Total Liquidado:'}</span>
-                                          <span className="font-medium text-status-success">{formatCurrency(isRapApi ? rpLiquidadoPagoApi : totalLiquidadoApi)}</span>
-                                        </div>
-                                      </div>
-                                      {isRapApi ? (
-                                        <div className="mt-1 border-t border-dashed border-border-default/50 pt-1.5">
-                                          <div className="flex justify-between text-[10px]">
-                                            <span className="text-text-secondary">Empenhado original:</span>
-                                            <span className="font-medium">{formatCurrency(valorEmpenhadoApi)}</span>
-                                          </div>
-                                          <div className="flex justify-between text-[10px]">
-                                            <span className="text-text-secondary">Pago no exercicio:</span>
-                                            <span className="font-medium">{formatCurrency(totalLiquidadoApi)}</span>
-                                          </div>
-                                        </div>
-                                      ) : null}
-                                      <div className="border-t border-border-default/40 pt-1.5 text-[9px] font-medium text-text-secondary">
-                                        Fonte: API Comprasnet
-                                      </div>
-                                    </div>
-                                  </PopoverContent>
-                                </Popover>
-                              );
-                            })}
-                            </>
-                          ) : (
-                            <span className="text-xs italic text-text-secondary">Sem empenhos</span>
-                          )}
-                        </div>
-                      </div>
+                    <TableCell className="py-3 px-6 text-right whitespace-nowrap">
+                      <p className="font-data text-sm font-semibold">{formatCurrency(totalEmpenhado)}</p>
+                      <button type="button" className="mt-1 text-xs text-primary hover:underline" onClick={() => void openContractDetails(c)}>{empenhoBadgeItems.length} empenho(s)</button>
                     </TableCell>
-                    <TableCell className="py-4 px-4 text-right">
+                    <TableCell className="py-3 px-4 text-right">
                       <div className="flex flex-col">
                         <span className={cn('font-semibold text-sm', totalALiquidar > 0 ? 'text-status-warning' : 'text-status-success')}>{formatCurrency(totalALiquidar)}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="py-4 px-4 text-center">
+                    <TableCell className="py-3 px-4 text-center">
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -1146,8 +1019,12 @@ export default function Contratos() {
         </Table>
       </DataTablePanel>
 
+      </div>
       {isSuperAdmin ? <ContratosSyncDialog open={isSyncDialogOpen} onOpenChange={setIsSyncDialogOpen} onSyncComplete={handleSyncComplete} /> : null}
-      <ContratoApiDetailsSheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen} contrato={selectedApiContrato} details={selectedApiDetails} lastSyncRun={lastApiSyncRun} loading={isDetailsLoading} />
+      <div hidden={!!inspectedEmpenho}>
+      <ContratoApiDetailsSheet presentation="page" error={detailsError} onRetry={() => selectedApiContrato && void openApiDetails(selectedApiContrato)} execution={selectedExecution} onOpenEmpenho={setInspectedEmpenho} open={isDetailsOpen} onOpenChange={open => { if (!open) detailRequest.current++; setIsDetailsOpen(open); }} contrato={selectedPageContrato} details={selectedApiDetails} lastSyncRun={lastApiSyncRun} loading={isDetailsLoading} />
+      </div>
+      {inspectedEmpenho && <EmpenhoDialog presentation="page" backLabel="Voltar ao contrato" readOnly open={!!inspectedEmpenho} onOpenChange={open => { if (!open) setInspectedEmpenho(null); }} empenho={inspectedEmpenho} atividades={atividades} onSave={() => {}} />}
     </div>
   );
 }
