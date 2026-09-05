@@ -498,10 +498,22 @@ function EmpenhoRow({
   const favorite = isFavorite('empenho', empenho.id);
 
   return (
-    <TableRow className={`hover:bg-muted/60 transition-colors border-b border-border-default/50 ${isChild ? 'bg-muted/30' : ''}`}>
-      <TableCell className={`py-3 px-4 sm:px-6 align-top ${isChild ? 'pl-10' : ''}`}>
+    <TableRow
+      className={`hover:bg-muted/60 transition-colors border-b border-border-default/50 cursor-pointer ${isChild ? 'bg-muted/30' : ''}`}
+      onClick={() => handleOpenDialog(empenho)}
+    >
+      <TableCell className={`py-3 pl-3 pr-2 sm:pl-4 sm:pr-2.5 align-top ${isChild ? 'pl-8' : ''}`}>
         <div className="flex flex-col gap-1">
-          <button type="button" className="w-fit font-mono text-sm font-semibold whitespace-nowrap text-primary underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary" onClick={() => handleOpenDialog(empenho)}>{empenho.numero}</button>
+          <button
+            type="button"
+            className="w-fit font-mono text-sm font-semibold whitespace-nowrap text-primary underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenDialog(empenho);
+            }}
+          >
+            {empenho.numero}
+          </button>
           {empenho.processo && (
             <span className="text-xs text-muted-foreground whitespace-nowrap" title="Processo">
               {empenho.processo}
@@ -515,7 +527,7 @@ function EmpenhoRow({
           )}
         </div>
       </TableCell>
-      <TableCell className="py-3 px-4 align-top">
+      <TableCell className="py-3 px-2 sm:px-2.5 align-top">
         <div className="flex flex-col">
           <span className="text-sm font-medium line-clamp-2" title={empenho.favorecidoNome}>{empenho.favorecidoNome || '-'}</span>
           <span className="text-xs text-muted-foreground">
@@ -523,7 +535,7 @@ function EmpenhoRow({
           </span>
         </div>
       </TableCell>
-      <TableCell className="py-3 px-4 align-top">
+      <TableCell className="py-3 px-2 sm:px-2.5 align-top">
         <div className="flex flex-col gap-1">
           <span className="text-sm line-clamp-2" title={empenho.descricao}>{empenho.descricao || '-'}</span>
           {type === 'execucao' && (empenho.origemRecurso || empenho.planoInterno) && (
@@ -536,10 +548,10 @@ function EmpenhoRow({
           )}
         </div>
       </TableCell>
-      <TableCell className="py-3 px-4 text-right align-top whitespace-nowrap font-data text-sm">
+      <TableCell className="py-3 px-2 sm:px-2.5 text-right align-top whitespace-nowrap font-data text-sm">
         {formatCurrency(type === 'restos' ? rapBase : empenho.valor)}
       </TableCell>
-      <TableCell className="py-3 px-4 text-right align-top whitespace-nowrap">
+      <TableCell className="py-3 px-2 sm:px-2.5 text-right align-top whitespace-nowrap">
         {(() => {
           if (type === 'restos') {
             return (
@@ -557,8 +569,8 @@ function EmpenhoRow({
         })()}
       </TableCell>
 
-      <TableCell className="py-3 px-4 pr-6 align-top whitespace-nowrap min-w-[80px]">
-        <div className="flex items-center justify-center gap-1.5">
+      <TableCell className="py-3 px-1 sm:px-1.5 align-top whitespace-nowrap w-[48px] min-w-[44px]">
+        <div className="flex items-center justify-center">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -568,7 +580,8 @@ function EmpenhoRow({
                 aria-label={favorite ? `Remover empenho ${empenho.numero} dos favoritos` : `Favoritar empenho ${empenho.numero}`}
                 className={`h-8 w-8 ${favorite ? 'text-amber-500 hover:text-amber-600' : 'text-muted-foreground hover:text-amber-500'} hover:bg-amber-50`}
                 disabled={isFavoritePending}
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   void toggleFavorite('empenho', empenho.id);
                 }}
               >
@@ -577,15 +590,6 @@ function EmpenhoRow({
             </TooltipTrigger>
             <TooltipContent>{favorite ? 'Remover dos favoritos' : 'Favoritar empenho'}</TooltipContent>
           </Tooltip>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-action-primary hover:bg-action-primary/10"
-            onClick={() => handleOpenDialog(empenho)}
-            aria-label={`Ver detalhes do empenho ${empenho.numero}`}
-          >
-            <Search className="h-4 w-4" />
-          </Button>
         </div>
       </TableCell>
     </TableRow>
@@ -711,7 +715,7 @@ function EmpenhosTable({
 
   const SortHeader = ({ label, colKey, align = 'left', className = '' }: { label: string; colKey: string; align?: 'left' | 'right' | 'center'; className?: string }) => (
     <TableHead
-      className={`h-11 px-4 text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-muted/80 transition-colors select-none ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : ''} ${className}`}
+      className={`h-11 px-2 sm:px-2.5 text-xs font-semibold cursor-pointer hover:bg-muted/80 transition-colors select-none ${align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : ''} ${className}`}
       aria-sort={sortKey === colKey ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
     >
       <button type="button" onClick={() => handleSort(colKey)} className={`inline-flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
@@ -739,24 +743,24 @@ function EmpenhosTable({
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow className="hover:bg-transparent border-b border-border-default/50">
-              <SortHeader label="Número" colKey="numero" className="w-[12%] px-4 sm:px-6" />
-              <SortHeader label="Favorecido" colKey="favorecido" className="w-[30%] px-4" />
-              <TableHead className="h-11 px-4 text-xs font-semibold uppercase tracking-wider">Descrição</TableHead>
-              <SortHeader label={type === 'execucao' ? 'Empenhado' : 'Inscrito / Reinscrito'} colKey="valor" align="right" className="w-[14%] px-4" />
-              <SortHeader label={type === 'execucao' ? 'A liquidar' : 'Saldo Atual'} colKey="saldo" align="right" className="w-[14%] px-4" />
-              <TableHead className="h-11 px-4 pr-6 text-center text-xs font-semibold uppercase tracking-wider min-w-[80px]">Ações</TableHead>
+              <SortHeader label="Número" colKey="numero" className="w-[12%] pl-3 pr-2 sm:pl-4 sm:pr-2.5" />
+              <SortHeader label="Favorecido" colKey="favorecido" className="w-[28%] px-2 sm:px-2.5" />
+              <TableHead className="h-11 px-2 sm:px-2.5 text-xs font-semibold">Descrição</TableHead>
+              <SortHeader label={type === 'execucao' ? 'Empenhado' : 'Inscrito / reinscrito'} colKey="valor" align="right" className="w-[13%] px-2 sm:px-2.5" />
+              <SortHeader label={type === 'execucao' ? 'A liquidar' : 'Saldo atual'} colKey="saldo" align="right" className="w-[13%] px-2 sm:px-2.5" />
+              <TableHead className="h-11 px-1 sm:px-1.5 text-center text-xs font-semibold w-[48px] min-w-[44px]">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell className="px-4 sm:px-6"><Skeleton className="h-8 w-24" /></TableCell>
-                  <TableCell className="px-4"><Skeleton className="h-8 w-32" /></TableCell>
-                  <TableCell className="px-4"><Skeleton className="h-8 w-24" /></TableCell>
-                  <TableCell className="px-4"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
-                  <TableCell className="px-4"><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
-                  <TableCell className="px-4 pr-6"><Skeleton className="h-8 w-16 mx-auto" /></TableCell>
+                  <TableCell className="pl-3 pr-2 sm:pl-4 sm:pr-2.5"><Skeleton className="h-8 w-20" /></TableCell>
+                  <TableCell className="px-2 sm:px-2.5"><Skeleton className="h-8 w-28" /></TableCell>
+                  <TableCell className="px-2 sm:px-2.5"><Skeleton className="h-8 w-32" /></TableCell>
+                  <TableCell className="px-2 sm:px-2.5"><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
+                  <TableCell className="px-2 sm:px-2.5"><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
+                  <TableCell className="px-1 sm:px-1.5"><Skeleton className="h-8 w-8 mx-auto" /></TableCell>
                 </TableRow>
               ))
             ) : paginatedData.length === 0 ? (
@@ -773,18 +777,18 @@ function EmpenhosTable({
                         className="bg-muted/50 hover:bg-muted/80 transition-colors cursor-pointer border-b border-border-default/50"
                         onClick={() => toggleGroup(row.name)}
                       >
-                        <TableCell className="py-3 px-4 sm:px-6 font-medium" colSpan={2}>
+                        <TableCell className="py-3 pl-3 pr-2 sm:pl-4 sm:pr-2.5 font-medium" colSpan={2}>
                           <div className="flex items-center gap-2">
                             <ChevronRight className={`h-4 w-4 text-slate-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                             <span>{row.name}</span>
                             <Badge variant="secondary" className="ml-2 bg-card text-xs">{row.items.length}</Badge>
                           </div>
                         </TableCell>
-                        <TableCell className="py-3 px-4 text-sm text-muted-foreground">
+                        <TableCell className="py-3 px-2 sm:px-2.5 text-sm text-muted-foreground">
                           -
                         </TableCell>
-                        <TableCell className="py-3 px-4 text-right font-data text-sm whitespace-nowrap">{formatCurrency(row.valorTotal)}</TableCell>
-                        <TableCell className="py-3 px-4 text-right">
+                        <TableCell className="py-3 px-2 sm:px-2.5 text-right font-data text-sm whitespace-nowrap">{formatCurrency(row.valorTotal)}</TableCell>
+                        <TableCell className="py-3 px-2 sm:px-2.5 text-right">
                           {(() => {
                             if (type === 'restos') {
                               return (
@@ -800,7 +804,7 @@ function EmpenhosTable({
                             );
                           })()}
                         </TableCell>
-                        <TableCell className="py-3 px-4 pr-6 text-center min-w-[80px]"></TableCell>
+                        <TableCell className="py-3 px-1 sm:px-1.5 text-center w-[48px] min-w-[44px]"></TableCell>
                       </TableRow>
                         {isExpanded && row.items.map(empenho => (
                           <EmpenhoRow

@@ -142,7 +142,8 @@ describe('Empenhos', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Buscar empenhos' }), { target: { value: '23035.123/2026' } });
     const row = screen.getByRole('button', { name: '2026NE000001' }).closest('tr')!;
     expect(within(row).getAllByRole('cell').slice(3, 5).map(cell => cell.textContent?.replace(/\s/g, ' '))).toEqual(['R$ 1.000,00', 'R$ 600,00']);
-    fireEvent.click(screen.getByRole('button', { name: '2026NE000001' }));
+    expect(screen.queryByRole('button', { name: /Ver detalhes do empenho/i })).not.toBeInTheDocument();
+    fireEvent.click(row);
     expect(screen.queryByRole('textbox', { name: 'Buscar empenhos' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Voltar aos empenhos' }));
     expect(screen.getByRole('textbox', { name: 'Buscar empenhos' })).toHaveValue('23035.123/2026');
