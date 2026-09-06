@@ -243,20 +243,6 @@ export default function RequisicaoCompraPage() {
     );
   }, [officialBalanceByEmpenhoId, enviadoFornecedorTotalByEmpenhoId, selectedEmpenhos]);
 
-  const selectedEmpenhoOptions = useMemo(() => {
-    const selectedIds = new Set(selectedEmpenhoIds);
-    return selectedEmpenhos
-      .filter((empenho) => selectedIds.has(empenho.id))
-      .map((empenho) => {
-        const effective = empenhoBalanceById.get(empenho.id) ?? getEmpenhoAvailableBalance(empenho);
-        const enviado = enviadoFornecedorTotalByEmpenhoId.get(empenho.id) ?? 0;
-        const extra = enviado > 0 ? ` (disp. c/ desconto de enviadas)` : '';
-        return {
-          id: empenho.id,
-          label: `${empenho.numero} - saldo ${formatCurrency(effective)}${extra}`,
-        };
-      });
-  }, [selectedEmpenhos, selectedEmpenhoIds, empenhoBalanceById, enviadoFornecedorTotalByEmpenhoId]);
 
 
   const filteredEmpenhos = useMemo(
@@ -951,23 +937,6 @@ export default function RequisicaoCompraPage() {
                     </Command>
                   </PopoverContent>
                 </Popover>
-                {selectedEmpenhoOptions.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5" aria-label="Empenhos selecionados">
-                    {selectedEmpenhoOptions.map((option) => (
-                      <Badge key={option.id} variant="secondary" className="max-w-full gap-1 pr-1">
-                        <span className="max-w-[22rem] truncate" title={option.label}>{option.label}</span>
-                        <button
-                          type="button"
-                          className="rounded-full p-0.5 hover:bg-surface-hover"
-                          aria-label={`Remover ${option.label}`}
-                          onClick={() => handleRemoveSelectedEmpenho(option.id)}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                ) : null}
               </div>
             </div>
 
@@ -1011,25 +980,37 @@ export default function RequisicaoCompraPage() {
                             <p className="text-xs text-text-muted mt-0.5">{empenho.favorecidoNome}</p>
                           ) : null}
                         </div>
-                        <div className={`grid gap-3 text-right text-sm ${enviadoFornecedorTotal > 0 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
-                          {enviadoFornecedorTotal > 0 && (
+                        <div className="flex items-center gap-3">
+                          <div className={`grid gap-3 text-right text-sm ${enviadoFornecedorTotal > 0 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
+                            {enviadoFornecedorTotal > 0 && (
+                              <div>
+                                <p className="text-text-muted text-xs">Saldo oficial (SIAFI)</p>
+                                <p className="font-mono text-xs font-semibold text-text-muted">{formatCurrency(officialBalance)}</p>
+                              </div>
+                            )}
                             <div>
-                              <p className="text-text-muted text-xs">Saldo oficial (SIAFI)</p>
-                              <p className="font-mono text-xs font-semibold text-text-muted">{formatCurrency(officialBalance)}</p>
+                              <p className="text-text-muted">Saldo disponível</p>
+                              <p className="font-mono font-bold text-text-primary">{formatCurrency(availableBalance)}</p>
                             </div>
-                          )}
-                          <div>
-                            <p className="text-text-muted">Saldo disponível</p>
-                            <p className="font-mono font-bold text-text-primary">{formatCurrency(availableBalance)}</p>
+                            <div>
+                              <p className={hasBalanceViolation ? 'text-status-error' : 'text-text-muted'}>Requisição</p>
+                              <p className={`font-mono font-bold ${hasBalanceViolation ? 'text-status-error' : 'text-text-primary'}`}>{formatCurrency(groupTotal)}</p>
+                            </div>
+                            <div>
+                              <p className="text-text-muted">Após requisição</p>
+                              <p className="font-mono font-bold text-text-primary">{formatCurrency(afterRequisicao)}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className={hasBalanceViolation ? 'text-status-error' : 'text-text-muted'}>Requisição</p>
-                            <p className={`font-mono font-bold ${hasBalanceViolation ? 'text-status-error' : 'text-text-primary'}`}>{formatCurrency(groupTotal)}</p>
-                          </div>
-                          <div>
-                            <p className="text-text-muted">Após requisição</p>
-                            <p className="font-mono font-bold text-text-primary">{formatCurrency(afterRequisicao)}</p>
-                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-text-muted hover:text-destructive hover:bg-destructive/10 shrink-0"
+                            title={`Remover empenho ${empenho.numero}`}
+                            onClick={() => handleRemoveSelectedEmpenho(empenho.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
 

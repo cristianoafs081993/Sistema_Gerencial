@@ -669,10 +669,10 @@ describe('RequisicaoCompraPage', () => {
     // Seleciona o empenho
     fireEvent.click(empenhoOption);
 
-    // No card do empenho, deve exibir o detalhamento com saldo oficial e dedução de enviadas
+    // No card do empenho, deve exibir o detalhamento com saldo oficial, retenção e saldo disponível efetivo
     expect(await screen.findByText(/10\.000,00/)).toBeInTheDocument(); // Saldo Oficial
     expect(screen.getByText(/2\.500,00/)).toBeInTheDocument(); // (-) Retenção
-    expect(screen.getAllByText(/7\.500,00/).length).toBeGreaterThanOrEqual(1); // Saldo Disponível
+    expect(screen.getAllByText(/7\.500,00/).length).toBeGreaterThanOrEqual(1); // Saldo Disponível efetivo
   });
 
   it('nao desconta do saldo do modulo quando a requisicao muda para status liquidada', async () => {
