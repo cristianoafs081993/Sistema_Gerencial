@@ -599,7 +599,7 @@ describe('RequisicaoCompraPage', () => {
     // Badges
     expect(screen.getAllByText('Rascunho').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Enviada ao Fornecedor').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('Liquidada').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Enviada para Pagamento').length).toBeGreaterThanOrEqual(1);
   });
 
   it('desconta do saldo do empenho o valor de requisicoes enviadas ao fornecedor e exibe detalhamento visual', async () => {

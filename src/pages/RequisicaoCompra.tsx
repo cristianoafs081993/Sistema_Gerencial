@@ -60,7 +60,7 @@ import { filterAndRankRequisicaoEmpenhos } from '@/utils/requisicaoEmpenhoSelect
 const STATUS_META: Record<string, { label: string; className: string }> = {
   draft: { label: 'Rascunho', className: 'border-slate-300 bg-slate-100 text-slate-700' },
   enviada_fornecedor: { label: 'Enviada ao Fornecedor', className: 'border-amber-300 bg-amber-50 text-amber-800' },
-  liquidada: { label: 'Liquidada', className: 'border-emerald-300 bg-emerald-50 text-emerald-800' },
+  liquidada: { label: 'Enviada para Pagamento', className: 'border-emerald-300 bg-emerald-50 text-emerald-800' },
   review: { label: 'Enviada ao Fornecedor', className: 'border-amber-300 bg-amber-50 text-amber-800' },
   approved: { label: 'Enviada ao Fornecedor', className: 'border-amber-300 bg-amber-50 text-amber-800' },
   rejected: { label: 'Rascunho', className: 'border-slate-300 bg-slate-100 text-slate-700' },
@@ -548,7 +548,7 @@ export default function RequisicaoCompraPage() {
       if (status === 'enviada_fornecedor' || status === 'review') {
         successMessage = 'Requisição enviada ao fornecedor com sucesso.';
       } else if (status === 'liquidada') {
-        successMessage = 'Requisição marcada como liquidada com sucesso.';
+        successMessage = 'Requisição enviada para pagamento com sucesso.';
       }
       toast.success(successMessage, { id: loadingToast });
       setIsEditing(false);
@@ -565,7 +565,7 @@ export default function RequisicaoCompraPage() {
     }
   };
 
-  // Change Status (Rascunho <-> Enviada ao Fornecedor <-> Liquidada)
+  // Change Status (Rascunho <-> Enviada ao Fornecedor <-> Enviada para Pagamento)
   const handleChangeStatus = async (requisicaoId: string, status: RequisicaoCompra['status']) => {
     const targetStatusLabel = STATUS_META[status]?.label || status;
     const loadingToast = toast.loading(`Alterando situação para "${targetStatusLabel}"...`);
@@ -1147,7 +1147,7 @@ export default function RequisicaoCompraPage() {
                     onClick={() => handleSaveRequisicao('liquidada')}
                   >
                     <Check className="h-4 w-4" />
-                    Marcar como Liquidada
+                    Enviar para Pagamento
                   </Button>
                 )}
                 <Button
@@ -1221,8 +1221,8 @@ export default function RequisicaoCompraPage() {
 
             <Card className="border border-emerald-200 bg-emerald-50/40 p-4 shadow-soft">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-medium uppercase tracking-wider text-emerald-900">Liquidadas</p>
-                <Badge variant="outline" className="border-emerald-300 bg-emerald-100 text-emerald-800">Liquidada</Badge>
+                <p className="text-xs font-medium uppercase tracking-wider text-emerald-900">Enviadas para Pagamento</p>
+                <Badge variant="outline" className="border-emerald-300 bg-emerald-100 text-emerald-800">Enviada para Pagamento</Badge>
               </div>
               <div className="mt-2 flex items-baseline justify-between">
                 <p className="font-mono text-2xl font-bold text-emerald-950">
@@ -1288,10 +1288,13 @@ export default function RequisicaoCompraPage() {
 
                     return (
                       <TableRow key={requisicao.id} className="hover:bg-surface-hover/20">
-                        <TableCell className="align-top">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-ui font-bold text-text-primary">{requisicao.number}</span>
-                            <Badge variant="outline" className={`font-ui text-[11px] font-bold ${statusInfo.className}`}>
+                        <TableCell className="align-top whitespace-nowrap">
+                          <div className="flex items-center gap-2 whitespace-nowrap">
+                            <span className="font-ui font-bold text-text-primary text-xs sm:text-sm whitespace-nowrap">{requisicao.number}</span>
+                            <Badge
+                              variant="outline"
+                              className={`font-ui text-[10px] font-semibold px-1.5 py-0 leading-4 whitespace-nowrap shrink-0 ${statusInfo.className}`}
+                            >
                               {statusInfo.label}
                             </Badge>
                           </div>
@@ -1399,7 +1402,7 @@ export default function RequisicaoCompraPage() {
                                     className="gap-2 text-xs font-medium cursor-pointer text-emerald-900 focus:text-emerald-950 focus:bg-emerald-50"
                                   >
                                     <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                                    <span>Liquidada</span>
+                                    <span>Enviada para Pagamento</span>
                                     {isLiquidada && <Check className="ml-auto h-3.5 w-3.5 text-emerald-600" />}
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
