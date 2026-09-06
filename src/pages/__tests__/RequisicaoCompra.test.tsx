@@ -167,7 +167,7 @@ describe('RequisicaoCompraPage', () => {
     renderPage();
 
     const table = await screen.findByRole('table');
-    expect(within(table).getByRole('columnheader', { name: /Situação/i })).toBeInTheDocument();
+    expect(within(table).queryByRole('columnheader', { name: /Situação/i })).not.toBeInTheDocument();
     expect(within(table).getByRole('columnheader', { name: /Requisição/i })).toBeInTheDocument();
     expect(within(table).getByRole('columnheader', { name: /Valor Total/i })).toBeInTheDocument();
     expect(within(table).getByRole('columnheader', { name: /Referências/i })).toBeInTheDocument();

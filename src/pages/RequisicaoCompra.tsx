@@ -1264,7 +1264,6 @@ export default function RequisicaoCompraPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-surface-subtle/50">
-                    <TableHead>Situação</TableHead>
                     <TableHead>Requisição</TableHead>
                     <TableHead className="text-right">Valor Total</TableHead>
                     <TableHead>Criado por</TableHead>
@@ -1290,57 +1289,12 @@ export default function RequisicaoCompraPage() {
                     return (
                       <TableRow key={requisicao.id} className="hover:bg-surface-hover/20">
                         <TableCell className="align-top">
-                          {isFiscalOrManager ? (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className={`h-7 px-2.5 font-ui text-xs font-bold gap-1.5 cursor-pointer hover:shadow-xs transition-all ${statusInfo.className}`}
-                                  title="Clique para alterar a situação desta requisição"
-                                >
-                                  <span>{statusInfo.label}</span>
-                                  <ChevronDown className="h-3 w-3 opacity-70" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="start" className="w-56">
-                                <DropdownMenuLabel className="text-xs text-text-muted">Alterar situação para:</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={() => handleChangeStatus(requisicao.id, 'draft')}
-                                  className="gap-2 text-xs font-medium cursor-pointer"
-                                >
-                                  <div className="h-2 w-2 rounded-full bg-slate-400" />
-                                  <span>Rascunho</span>
-                                  {isDraft && <Check className="ml-auto h-3.5 w-3.5 text-primary" />}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => handleChangeStatus(requisicao.id, 'enviada_fornecedor')}
-                                  className="gap-2 text-xs font-medium cursor-pointer text-amber-900 focus:text-amber-950 focus:bg-amber-50"
-                                >
-                                  <div className="h-2 w-2 rounded-full bg-amber-500" />
-                                  <span>Enviada ao Fornecedor</span>
-                                  {isEnviada && <Check className="ml-auto h-3.5 w-3.5 text-amber-600" />}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => handleChangeStatus(requisicao.id, 'liquidada')}
-                                  className="gap-2 text-xs font-medium cursor-pointer text-emerald-900 focus:text-emerald-950 focus:bg-emerald-50"
-                                >
-                                  <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                                  <span>Liquidada</span>
-                                  {isLiquidada && <Check className="ml-auto h-3.5 w-3.5 text-emerald-600" />}
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          ) : (
-                            <Badge variant="outline" className={`font-ui text-xs font-bold ${statusInfo.className}`}>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-ui font-bold text-text-primary">{requisicao.number}</span>
+                            <Badge variant="outline" className={`font-ui text-[11px] font-bold ${statusInfo.className}`}>
                               {statusInfo.label}
                             </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="align-top">
-                          <div className="font-ui font-bold text-text-primary">{requisicao.number}</div>
+                          </div>
                           {requisicao.title && (
                             <div className="mt-1 max-w-[18rem] truncate text-xs text-text-muted" title={requisicao.title}>
                               {requisicao.title}
@@ -1409,6 +1363,53 @@ export default function RequisicaoCompraPage() {
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
+
+                            {/* Mudança de Situação */}
+                            {isFiscalOrManager && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 px-2.5 font-ui text-xs font-medium gap-1 shrink-0"
+                                    title="Alterar situação"
+                                    aria-label={`Alterar situação da requisição ${requisicao.number}`}
+                                  >
+                                    <span>Situação</span>
+                                    <ChevronDown className="h-3 w-3 opacity-70" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
+                                  <DropdownMenuLabel className="text-xs text-text-muted">Alterar situação para:</DropdownMenuLabel>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => handleChangeStatus(requisicao.id, 'draft')}
+                                    className="gap-2 text-xs font-medium cursor-pointer"
+                                  >
+                                    <div className="h-2 w-2 rounded-full bg-slate-400" />
+                                    <span>Rascunho</span>
+                                    {isDraft && <Check className="ml-auto h-3.5 w-3.5 text-primary" />}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleChangeStatus(requisicao.id, 'enviada_fornecedor')}
+                                    className="gap-2 text-xs font-medium cursor-pointer text-amber-900 focus:text-amber-950 focus:bg-amber-50"
+                                  >
+                                    <div className="h-2 w-2 rounded-full bg-amber-500" />
+                                    <span>Enviada ao Fornecedor</span>
+                                    {isEnviada && <Check className="ml-auto h-3.5 w-3.5 text-amber-600" />}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleChangeStatus(requisicao.id, 'liquidada')}
+                                    className="gap-2 text-xs font-medium cursor-pointer text-emerald-900 focus:text-emerald-950 focus:bg-emerald-50"
+                                  >
+                                    <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                                    <span>Liquidada</span>
+                                    {isLiquidada && <Check className="ml-auto h-3.5 w-3.5 text-emerald-600" />}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
 
                             {/* Ações para Rascunho */}
                             {isDraft && (
