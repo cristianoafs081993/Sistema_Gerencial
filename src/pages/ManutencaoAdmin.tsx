@@ -2043,7 +2043,7 @@ export default function ManutencaoAdmin() {
                       <div className="space-y-0.5">
                         <h4 className="font-extrabold text-text-primary text-sm uppercase tracking-wide flex items-center gap-2">
                           <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                          Evolução Temporal de Insumos
+                          Valor Gasto com Insumos
                         </h4>
                         <p className="text-xs text-text-muted">Valor diário gasto com materiais e insumos repostos.</p>
                       </div>
@@ -2070,7 +2070,7 @@ export default function ManutencaoAdmin() {
                         </div>
                       ) : (
                         <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart
+                          <BarChart
                             data={dashTimelineData}
                             margin={{ top: 10, right: 15, left: -5, bottom: 20 }}
                             onClick={(data: any) => {
@@ -2085,12 +2085,6 @@ export default function ManutencaoAdmin() {
                             }}
                             className="cursor-pointer"
                           >
-                            <defs>
-                              <linearGradient id="colorInsumos" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
-                                <stop offset="95%" stopColor="#10b981" stopOpacity={0.0}/>
-                              </linearGradient>
-                            </defs>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                             <XAxis dataKey="dateStr" tick={{ fontSize: 10, fill: '#64748b' }} />
                             <YAxis
@@ -2124,16 +2118,14 @@ export default function ManutencaoAdmin() {
                                 );
                               }}
                             />
-                            <Area
-                              type="monotone"
+                            <Bar
                               dataKey="valor"
                               name="Valor Gasto"
-                              stroke="#10b981"
-                              strokeWidth={2.5}
-                              fillOpacity={1}
-                              fill="url(#colorInsumos)"
+                              fill="#10b981"
+                              radius={[4, 4, 0, 0]}
+                              maxBarSize={48}
                             />
-                          </AreaChart>
+                          </BarChart>
                         </ResponsiveContainer>
                       )}
                     </div>

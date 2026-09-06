@@ -113,7 +113,7 @@ describe('RefeitorioInsumos Page', () => {
 
     // Gráficos
     expect(screen.getByText('Distribuição por Categoria')).toBeInTheDocument();
-    expect(screen.getByText('Evolução Temporal de Insumos')).toBeInTheDocument();
+    expect(screen.getByText('Valor Gasto com Insumos')).toBeInTheDocument();
     expect(screen.getByText('Consumo Geral de Insumos')).toBeInTheDocument();
     expect(screen.getByText('Top 5 Ambientes em Consumo de Insumos')).toBeInTheDocument();
   });

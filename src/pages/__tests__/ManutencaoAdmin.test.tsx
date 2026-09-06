@@ -49,8 +49,9 @@ vi.mock('recharts', () => ({
   YAxis: () => null,
   CartesianGrid: () => null,
   Tooltip: () => null,
-  Legend: () => null,
-  Bar: () => null,
+  Bar: ({ dataKey, name }: { dataKey?: string; name?: string }) => (
+    <div data-testid="bar-curve" data-key={dataKey} data-name={name} />
+  ),
   Area: ({ dataKey, name }: { dataKey?: string; name?: string }) => (
     <div data-testid="area-curve" data-key={dataKey} data-name={name} />
   ),
@@ -221,7 +222,7 @@ describe('ManutencaoAdmin', () => {
 
     // Gráficos e Rankings de Insumos
     expect(screen.getByText('Distribuição por Categoria')).toBeInTheDocument();
-    expect(screen.getByText('Evolução Temporal de Insumos')).toBeInTheDocument();
+    expect(screen.getByText('Valor Gasto com Insumos')).toBeInTheDocument();
     expect(screen.getByText('Consumo Geral de Insumos')).toBeInTheDocument();
     expect(screen.getByText('Top 5 Ambientes em Consumo de Insumos')).toBeInTheDocument();
 
@@ -467,8 +468,10 @@ describe('ManutencaoAdmin', () => {
       expect(screen.getByText('Consumo Geral de Insumos')).toBeInTheDocument();
     });
 
-    // O gráfico de barras deve ter layout vertical
-    const barChart = screen.getByTestId('bar-chart');
+    // O gráfico de barras de consumo geral deve ter layout vertical
+    const barCharts = screen.getAllByTestId('bar-chart');
+    const barChart = barCharts.find((el) => el.getAttribute('data-layout') === 'vertical')!;
+    expect(barChart).toBeDefined();
     expect(barChart).toHaveAttribute('data-layout', 'vertical');
 
     // Com 10 materiais, deve exibir os botões de alternância Top 8 e Todos (10)
@@ -487,7 +490,7 @@ describe('ManutencaoAdmin', () => {
     expect(barChart).toHaveAttribute('data-items-count', '8');
   });
 
-  it('exibe o card de Valor Total Gasto e o gráfico de Evolução Temporal com a métrica de valor gasto', async () => {
+  it('exibe o card de Valor Total Gasto e o gráfico de Valor Gasto com Insumos com a métrica de valor gasto', async () => {
     const mockConsumoValor = [
       {
         id: 'consumo-val-1',
@@ -543,9 +546,9 @@ describe('ManutencaoAdmin', () => {
     // Valida o subtítulo da evolução temporal de insumos
     expect(screen.getByText('Valor diário gasto com materiais e insumos repostos.')).toBeInTheDocument();
 
-    // Valida que a curva do gráfico de evolução de insumos consome a chave 'valor'
-    const areaCurves = screen.getAllByTestId('area-curve');
-    const valorCurve = areaCurves.find((el) => el.getAttribute('data-key') === 'valor');
+    // Valida que a barra do gráfico de evolução de insumos consome a chave 'valor'
+    const barCurves = screen.getAllByTestId('bar-curve');
+    const valorCurve = barCurves.find((el) => el.getAttribute('data-key') === 'valor');
     expect(valorCurve).toBeDefined();
     expect(valorCurve).toHaveAttribute('data-name', 'Valor Gasto');
   });
