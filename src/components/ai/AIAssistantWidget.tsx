@@ -36,31 +36,31 @@ import { assistenteGerencialService } from '@/services/assistenteGerencial';
 const loadingTexts = [
   'Consultando dados do sistema...',
   'Varrendo editais e cotações no PNCP...',
-  'Auditando Termos de Referência com IA...',
+  'Cruzando dados do SUAP, SIAFI e Contratos...',
   'Calculando cesta e conformidade IN 65/2021...',
-  'Preparando resposta gerencial...',
+  'Preparando resposta gerencial com conciliação...',
 ];
 
 const startSuggestions = [
+  {
+    icon: Database,
+    label: 'Conciliação PTRES 231798',
+    prompt: 'Por que a origem de recurso (PTRES) 231798 está com saldo negativo no painel? Faça um relatório detalhado.',
+  },
+  {
+    icon: Sparkles,
+    label: 'Auditoria SUAP x SIAFI',
+    prompt: 'Faça uma auditoria de inconsistências entre o planejamento do SUAP e os empenhos do SIAFI.',
+  },
   {
     icon: Scale,
     label: 'Pesquisa de preços com Edital',
     prompt: 'Pesquise preços para 50 monitores 27 polegadas 4K e 20 cadeiras ergonômicas com auditoria de editais no PNCP',
   },
   {
-    icon: Database,
-    label: 'Resumo da execução',
-    prompt: 'Qual o resumo da execução orçamentária?',
-  },
-  {
     icon: FileText,
-    label: 'Maiores empenhos',
-    prompt: 'Quais empenhos têm maior saldo?',
-  },
-  {
-    icon: Sparkles,
-    label: 'Alertas gerenciais',
-    prompt: 'Quais pontos dos dados exigem atenção agora?',
+    label: 'Contratos e projeção de gastos',
+    prompt: 'Quais contratos do campus precisam de reforço de empenho até o fim do exercício?',
   },
 ];
 
