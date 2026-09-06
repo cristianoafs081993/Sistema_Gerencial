@@ -177,7 +177,8 @@ describe('RequisicaoCompraPage', () => {
     expect(within(table).getByText(/2025NE000084/)).toBeInTheDocument();
     expect(within(table).getByText('00329/2025')).toBeInTheDocument();
     expect(within(table).getByRole('button', { name: /Editar requisição REQ-2026-0001/i })).toBeInTheDocument();
-    expect(within(table).getByRole('button', { name: /Marcar requisição REQ-2026-0001 como liquidada/i })).toBeInTheDocument();
+    expect(within(table).getByRole('button', { name: /Alterar situação da requisição REQ-2026-0001/i })).toBeInTheDocument();
+    expect(within(table).queryByRole('button', { name: /Marcar requisição REQ-2026-0001 como liquidada/i })).not.toBeInTheDocument();
     expect(within(table).queryAllByRole('row')).toHaveLength(2);
   });
 

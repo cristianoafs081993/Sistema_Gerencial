@@ -13,7 +13,7 @@ import {
   Plus,
   Pencil,
   Printer,
-  RotateCcw,
+  Search,
   Send,
   ShieldCheck,
   Trash2,
@@ -1295,11 +1295,6 @@ export default function RequisicaoCompraPage() {
                               {statusInfo.label}
                             </Badge>
                           </div>
-                          {requisicao.title && (
-                            <div className="mt-1 max-w-[18rem] truncate text-xs text-text-muted" title={requisicao.title}>
-                              {requisicao.title}
-                            </div>
-                          )}
                         </TableCell>
                         <TableCell className="align-top text-right font-mono text-sm font-bold text-text-primary">
                           {formatCurrency(requisicao.totalValue ?? 0)}
@@ -1414,17 +1409,19 @@ export default function RequisicaoCompraPage() {
                             {/* Ações para Rascunho */}
                             {isDraft && (
                               <>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  className="bg-amber-600 hover:bg-amber-700 text-white h-8 px-2.5 gap-1 text-xs font-semibold shrink-0"
-                                  title="Enviar ao Fornecedor"
-                                  aria-label={`Enviar requisição ${requisicao.number} ao fornecedor`}
-                                  onClick={() => handleChangeStatus(requisicao.id, 'enviada_fornecedor')}
-                                >
-                                  <Send className="h-3.5 w-3.5" />
-                                  <span>Enviar</span>
-                                </Button>
+                                {!isFiscalOrManager && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    className="bg-amber-600 hover:bg-amber-700 text-white h-8 px-2.5 gap-1 text-xs font-semibold shrink-0"
+                                    title="Enviar ao Fornecedor"
+                                    aria-label={`Enviar requisição ${requisicao.number} ao fornecedor`}
+                                    onClick={() => handleChangeStatus(requisicao.id, 'enviada_fornecedor')}
+                                  >
+                                    <Send className="h-3.5 w-3.5" />
+                                    <span>Enviar</span>
+                                  </Button>
+                                )}
                                 {(isCreator || isFiscalOrManager) && (
                                   <Button
                                     type="button"
@@ -1438,67 +1435,6 @@ export default function RequisicaoCompraPage() {
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
                                 )}
-                              </>
-                            )}
-
-                            {/* Ações para Enviada ao Fornecedor */}
-                            {isEnviada && (
-                              <>
-                                {isFiscalOrManager && (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-2.5 gap-1 text-xs font-semibold shrink-0"
-                                    title="Marcar como Liquidada"
-                                    aria-label={`Marcar requisição ${requisicao.number} como liquidada`}
-                                    onClick={() => handleChangeStatus(requisicao.id, 'liquidada')}
-                                  >
-                                    <Check className="h-3.5 w-3.5" />
-                                    <span>Liquidar</span>
-                                  </Button>
-                                )}
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  title="Retornar para Rascunho"
-                                  aria-label={`Retornar requisição ${requisicao.number} para rascunho`}
-                                  onClick={() => handleChangeStatus(requisicao.id, 'draft')}
-                                  className="h-8 w-8 p-0 text-text-muted hover:text-text-primary shrink-0"
-                                >
-                                  <RotateCcw className="h-3.5 w-3.5" />
-                                </Button>
-                              </>
-                            )}
-
-                            {/* Ações para Liquidada */}
-                            {isLiquidada && (
-                              <>
-                                {isFiscalOrManager && (
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 h-8 px-2.5 gap-1 text-xs font-medium shrink-0"
-                                    title="Reabrir para Enviada ao Fornecedor"
-                                    aria-label={`Reabrir requisição ${requisicao.number} para enviada ao fornecedor`}
-                                    onClick={() => handleChangeStatus(requisicao.id, 'enviada_fornecedor')}
-                                  >
-                                    <Send className="h-3.5 w-3.5" />
-                                    <span>Reabrir</span>
-                                  </Button>
-                                )}
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  title="Retornar para Rascunho"
-                                  aria-label={`Retornar requisição ${requisicao.number} para rascunho`}
-                                  onClick={() => handleChangeStatus(requisicao.id, 'draft')}
-                                  className="h-8 w-8 p-0 text-text-muted hover:text-text-primary shrink-0"
-                                >
-                                  <RotateCcw className="h-3.5 w-3.5" />
-                                </Button>
                               </>
                             )}
                           </div>
