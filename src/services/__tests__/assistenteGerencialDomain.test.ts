@@ -6,9 +6,11 @@ import {
   calculateStatisticalSummary,
   detectAssistantIntent,
   extractDemandItems,
+  extractPtresTarget,
   getSynonymsForDemand,
   isPriceResearchClarification,
   mergeClarificationWithDemand,
+  reconcilePtresData,
   summarizeContratos,
   summarizeDescentralizacoes,
   type HistoryMessage,
@@ -279,6 +281,73 @@ describe('assistente-gerencial domain helpers', () => {
     expect(merged.quantity).toBe(10);
     expect(merged.description.toLowerCase()).toContain('intel core i5');
     expect(merged.description.toLowerCase()).toContain('16gb');
+  });
+
+  it('extrai codigo de PTRES da mensagem do usuario', () => {
+    expect(extractPtresTarget('me ajude a entender pq o ptres 231798 esta negativo')).toBe('231798');
+    expect(extractPtresTarget('verificar saldo da origem 198307')).toBe('198307');
+    expect(extractPtresTarget('quanto foi gasto com limpeza?')).toBeNull();
+  });
+
+  it('reconcilia com exatidao o caso do PTRES 231798 separando SUAP e SIAFI', () => {
+    const atividades = [
+      { origem_recurso: '231798', plano_interno: 'CAPACITA', valor_total: 15000 },
+      { origem_recurso: '231798', plano_interno: 'LABS', valor_total: 41226.53 },
+      { origem_recurso: '231798', plano_interno: 'INTERSEC', valor_total: 837.50 },
+    ];
+    const descentralizacoes = [
+      { origem_recurso: '231798', plano_interno: 'L21B3P19ENN', valor: 1000, operacao_tipo: 'DESCENTRALIZACAO DE CREDITO' },
+      { origem_recurso: '231798', plano_interno: 'LABS', valor: 41226.53, operacao_tipo: 'DESCENTRALIZACAO DE CREDITO' },
+      { origem_recurso: '231798', plano_interno: 'CAPACITA', valor: 15000, operacao_tipo: 'DESCENTRALIZACAO DE CREDITO' },
+      { origem_recurso: '231798', plano_interno: 'INTERSEC', valor: 837.50, operacao_tipo: 'DESCENTRALIZACAO DE CREDITO' },
+    ];
+    const empenhos = [
+      { origem_recurso: '231798', plano_interno: 'L21B3P19ENN', numero: '2026NE000072', valor: 1000, tipo: 'exercicio' },
+      { origem_recurso: '231798', plano_interno: 'LABS', numero: '2026NE000010', valor: 41226.53, tipo: 'exercicio' },
+      { origem_recurso: '231798', plano_interno: 'CAPACITA', numero: '2026NE000020', valor: 15000, tipo: 'exercicio' },
+    ];
+
+    const result = reconcilePtresData('231798', atividades, descentralizacoes, empenhos);
+
+    expect(result.ptres).toBe('231798');
+    expect(result.planejadoSuap).toBe(57064.03);
+    expect(result.descentralizadoSiafi).toBe(58064.03);
+    expect(result.empenhadoSiafi).toBe(57226.53);
+    expect(result.saldoPlanejamentoSuap).toBe(-162.50);
+    expect(result.saldoRealSiafi).toBe(837.50);
+    expect(result.situacaoGeral).toBe('DESCOMPASSO_COM_SUAP');
+    expect(result.empenhosSemAtividadePlanejada[0].numero).toBe('2026NE000072');
+    expect(result.diagnostico).toContain('NÃO possui déficit contábil no SIAFI');
+    expect(result.diagnostico).toContain('POSITIVO em R$ 837.50');
+  });
+
+  it('integra conciliacaoPtres dentro de buildGerencialAnalysis quando mensagem contem PTRES', () => {
+    const analysis = buildGerencialAnalysis('por que o ptres 231798 esta negativo?', [
+      {
+        label: 'atividades',
+        count: 1,
+        rows: [{ origem_recurso: '231798', plano_interno: 'TESTE', valor_total: 100 }],
+      },
+      {
+        label: 'descentralizacoes',
+        count: 1,
+        rows: [{ origem_recurso: '231798', plano_interno: 'TESTE', valor: 200, operacao_tipo: 'DESCENTRALIZACAO' }],
+      },
+      {
+        label: 'empenhos',
+        count: 1,
+        rows: [{ origem_recurso: '231798', plano_interno: 'TESTE', valor: 150, tipo: 'exercicio' }],
+      },
+    ]);
+
+    expect(analysis.summary.conciliacaoPtres).toBeDefined();
+    const conc = analysis.summary.conciliacaoPtres as any;
+    expect(conc.ptres).toBe('231798');
+    expect(conc.planejadoSuap).toBe(100);
+    expect(conc.descentralizadoSiafi).toBe(200);
+    expect(conc.empenhadoSiafi).toBe(150);
+    expect(conc.saldoRealSiafi).toBe(50);
+    expect(conc.saldoPlanejamentoSuap).toBe(-50);
   });
 });
 

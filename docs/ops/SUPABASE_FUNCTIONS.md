@@ -78,6 +78,7 @@ Uso:
 - valida o usuário autenticado pelo JWT recebido e usa o cliente Supabase com esse mesmo token, respeitando RLS
 - para descentralizações, detalha total líquido por PTRES e PI e trata Campus Currais Novos como o escopo natural dos dados do sistema
 - para contratos, usa `contratos_api.situacao_derivada = true`, separa Campus `158366` e Reitoria `158155` com evidência operacional do campus, e calcula rankings por empenhado/saldo
+- **Conciliação Orçamentária Trilateral (SUAP x SIAFI)**: quando a mensagem do usuário referencia um código de PTRES (ex: `231798`), o backend busca integralmente todas as atividades, descentralizações e empenhos daquela origem de recurso sem limite arbitrário de paginação. Realiza a conciliação trilateral (`reconcilePtresData`), separando o saldo gerencial do SUAP (`Planejado - Empenhado`) do saldo contábil real do SIAFI (`Descentralizado - Empenhado`), explicando a nível de Plano Interno (PI) que divergências negativas no painel decorrem de empenhos emitidos com respaldo financeiro real da Reitoria que não foram cadastrados como atividades no Plano 8 do SUAP.
 
 Entrada esperada:
 

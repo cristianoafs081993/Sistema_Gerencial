@@ -722,3 +722,16 @@ Function chamada pela extensão na rota oficial de edição de ETP.
   - Se compatível, gera parecer técnico fundamentado com trecho da especificação extraído do documento.
 - Interface e Transparência: componente `PriceResearchChatCard` exibe itens aprovados e desconsiderados com distinção visual explícita (riscado e badge vermelho para incompatíveis), e modal de inspeção com parecer da IA e botão para abrir o PDF do Edital/TR.
 
+## 14. GovFlow Core SDK & MCP Tools (Inteligência Orçamentária e Contratual)
+
+Camada determinística de domínio e ferramentas agênticas baseadas no Model Context Protocol (MCP) para conciliação trilateral e auditoria de despesas:
+
+- **Localização dos Módulos**: `src/sdk/`
+  - `orcamento.ts`: KPIs consolidados de execução (`getPainelExecucao`), raio-X do PTRES (`getPtresResumo`), detalhamento de atividades e agrupamento por dimensões/naturezas de despesa.
+  - `empenhos.ts`: ficha cadastral/financeira de NEs (`getEmpenhoDetalhado`), pesquisa multifacetada de empenhos, consolidação de Restos a Pagar (`getRapPosicaoConsolidada`) e detecção de empenhos paralisados.
+  - `descentralizacoes.ts`: extrato analítico de Notas de Crédito (`getExtratoNotasCredito`), confronto com saldos contábeis oficiais do SIAFI e identificação de créditos livres não empenhados.
+  - `contratos.ts`: ficha do contrato com situações derivadas e aditivos (`getFichaContrato`), histórico de termos aditivos, empenhos vinculados, faturas e projeção financeira até o fim do exercício com detecção de insuficiência de saldo.
+  - `conciliacao.ts`: conciliação trilateral forense (`conciliarPtresCompleto`), cruzamento contrato x orçamento (`conciliarContratoComOrcamento`), rastreabilidade da despesa ponta a ponta (`rastrearTrilhaDespesa`) e varredura preventiva (`auditarSaudeOrcamentariaCampus`).
+  - `mcp/tools.ts`: definições com JSON Schema das ferramentas agênticas (`conciliar_saldo_ptres`, `consultar_painel_orcamentario`, `consultar_ficha_empenho`, `pesquisar_empenhos`, `consultar_extrato_descentralizacoes`, `consultar_ficha_contrato`, `projetar_necessidade_contrato`, `conciliar_contrato_orcamento`, `rastrear_trilha_despesa`, `auditar_inconsistencias_orcamentarias`) e despachante universal `dispatchMcpTool`.
+- **Integração com Assistente Gerencial**: a Edge Function `assistente-gerencial` identifica menções a códigos de PTRES (ex: `231798`), executa a conciliação trilateral direta de dados do banco e fundamenta o diagnóstico do Gemini, eliminando alucinações sobre supostos déficits orçamentários quando se trata de mero descompasso com o cadastro de atividades no SUAP.
+

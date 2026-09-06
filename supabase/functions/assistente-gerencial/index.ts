@@ -6,6 +6,7 @@ import {
   calculateStatisticalSummary,
   detectAssistantIntent,
   extractDemandItems,
+  extractPtresTarget,
   getSynonymsForDemand,
   isPriceResearchClarification,
   mergeClarificationWithDemand,
@@ -1016,23 +1017,46 @@ Deno.serve(async (req) => {
       });
     }
 
-    const sections = await Promise.all([
-      readSection(
-        'atividades',
-        supabase
+    const ptresTarget = extractPtresTarget(message);
+
+    const queryAtividades = ptresTarget
+      ? supabase
           .from('atividades')
-          .select('tipo_atividade,dimensao,componente_funcional,atividade,descricao,valor_total,origem_recurso,natureza_despesa,plano_interno', { count: 'exact' })
+          .select('tipo_atividade,dimensao,componente_funcional,atividade,descricao,valor_total,origem_recurso,natureza_despesa,plano_interno,saldo_disponivel', { count: 'exact' })
+          .eq('origem_recurso', ptresTarget)
+      : supabase
+          .from('atividades')
+          .select('tipo_atividade,dimensao,componente_funcional,atividade,descricao,valor_total,origem_recurso,natureza_despesa,plano_interno,saldo_disponivel', { count: 'exact' })
           .order('created_at', { ascending: false })
-          .limit(250),
-      ),
-      readSection(
-        'descentralizacoes',
-        supabase
+          .limit(250);
+
+    const queryDescentralizacoes = ptresTarget
+      ? supabase
+          .from('descentralizacoes')
+          .select('dimensao,nota_credito,operacao_tipo,origem_recurso,natureza_despesa,plano_interno,data_emissao,descricao,valor', { count: 'exact' })
+          .eq('origem_recurso', ptresTarget)
+          .order('data_emissao', { ascending: false, nullsFirst: false })
+      : supabase
           .from('descentralizacoes')
           .select('dimensao,nota_credito,operacao_tipo,origem_recurso,natureza_despesa,plano_interno,data_emissao,descricao,valor', { count: 'exact' })
           .order('data_emissao', { ascending: false, nullsFirst: false })
-          .limit(1500),
-      ),
+          .limit(1500);
+
+    const queryEmpenhos = ptresTarget
+      ? supabase
+          .from('empenhos')
+          .select('numero,descricao,valor,status,tipo,plano_interno,origem_recurso,natureza_despesa,favorecido_nome,valor_liquidado,valor_liquidado_oficial,valor_pago_oficial,saldo_rap_oficial,valor_liquidado_a_pagar,rap_inscrito,rap_a_liquidar,rap_liquidado,rap_pago,data_empenho,processo', { count: 'exact' })
+          .eq('origem_recurso', ptresTarget)
+          .order('created_at', { ascending: false })
+      : supabase
+          .from('empenhos')
+          .select('numero,descricao,valor,status,tipo,plano_interno,origem_recurso,natureza_despesa,favorecido_nome,valor_liquidado,valor_liquidado_oficial,valor_pago_oficial,saldo_rap_oficial,valor_liquidado_a_pagar,rap_inscrito,rap_a_liquidar,rap_liquidado,rap_pago,data_empenho,processo', { count: 'exact' })
+          .order('created_at', { ascending: false })
+          .limit(1000);
+
+    const sections = await Promise.all([
+      readSection('atividades', queryAtividades),
+      readSection('descentralizacoes', queryDescentralizacoes),
       readSection(
         'creditos_disponiveis',
         supabase
@@ -1041,14 +1065,7 @@ Deno.serve(async (req) => {
           .order('updated_at', { ascending: false })
           .limit(800),
       ),
-      readSection(
-        'empenhos',
-        supabase
-          .from('empenhos')
-          .select('numero,descricao,valor,status,tipo,plano_interno,origem_recurso,natureza_despesa,favorecido_nome,valor_liquidado,valor_liquidado_oficial,valor_pago_oficial,saldo_rap_oficial,valor_liquidado_a_pagar,rap_inscrito,rap_a_liquidar,rap_liquidado,rap_pago,data_empenho,processo', { count: 'exact' })
-          .order('created_at', { ascending: false })
-          .limit(1000),
-      ),
+      readSection('empenhos', queryEmpenhos),
       readSection(
         'documentos_habeis',
         supabase

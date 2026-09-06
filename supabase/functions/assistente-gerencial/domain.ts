@@ -98,6 +98,19 @@ type CreditoDisponivelRow = {
   updated_at?: string | null;
 };
 
+type AtividadeRow = {
+  id?: string | null;
+  atividade?: string | null;
+  descricao?: string | null;
+  valor_total?: number | string | null;
+  saldo_disponivel?: number | string | null;
+  dimensao?: string | null;
+  componente_funcional?: string | null;
+  origem_recurso?: string | null;
+  natureza_despesa?: string | null;
+  plano_interno?: string | null;
+};
+
 const CAMPUS_UG = '158366';
 const REITORIA_UG = '158155';
 
@@ -989,6 +1002,161 @@ export function summarizePfs(sections: ContextSection[]) {
   };
 }
 
+export function extractPtresTarget(message: string): string | null {
+  const match = message.match(/\b(1\d{5}|2\d{5})\b/);
+  return match ? match[1] : null;
+}
+
+export type PtresReconciliationAnalysis = {
+  ptres: string;
+  planejadoSuap: number;
+  descentralizadoSiafi: number;
+  empenhadoSiafi: number;
+  saldoPlanejamentoSuap: number;
+  saldoRealSiafi: number;
+  situacaoGeral: 'REGULAR' | 'DESCOMPASSO_COM_SUAP' | 'DEFICIT_ORCAMENTARIO' | 'SUPERAVIT_SEM_EMPENHO';
+  divergenciasPi: Array<{
+    planoInterno: string;
+    planejado: number;
+    descentralizado: number;
+    empenhado: number;
+    saldoSuap: number;
+    saldoSiafi: number;
+    status: string;
+    observacao: string;
+  }>;
+  empenhosSemAtividadePlanejada: Array<{
+    numero: string;
+    descricao?: string;
+    planoInterno: string;
+    valor: number;
+  }>;
+  diagnostico: string;
+};
+
+export function reconcilePtresData(
+  ptres: string,
+  atividades: AtividadeRow[],
+  descentralizacoes: DescentralizacaoRow[],
+  empenhos: EmpenhoRow[]
+): PtresReconciliationAnalysis {
+  const cleanPtres = ptres.trim();
+  const ativs = atividades.filter((a) => String(a.origem_recurso || '').trim() === cleanPtres);
+  const descs = descentralizacoes.filter((d) => String(d.origem_recurso || '').trim() === cleanPtres);
+  const emps = empenhos.filter(
+    (e) => String(e.origem_recurso || '').trim() === cleanPtres && e.tipo !== 'rap'
+  );
+
+  const piSet = new Set<string>();
+  ativs.forEach((a) => piSet.add(String(a.plano_interno || 'SEM_PI').trim()));
+  descs.forEach((d) => piSet.add(String(d.plano_interno || 'SEM_PI').trim()));
+  emps.forEach((e) => piSet.add(String(e.plano_interno || 'SEM_PI').trim()));
+
+  let totalPlanejado = 0;
+  let totalDescentralizado = 0;
+  let totalEmpenhado = 0;
+
+  const divergenciasPi: PtresReconciliationAnalysis['divergenciasPi'] = [];
+  const empenhosSemAtividadePlanejada: PtresReconciliationAnalysis['empenhosSemAtividadePlanejada'] = [];
+
+  for (const pi of Array.from(piSet).sort()) {
+    const ativPi = ativs.filter((a) => String(a.plano_interno || 'SEM_PI').trim() === pi);
+    const descPi = descs.filter((d) => String(d.plano_interno || 'SEM_PI').trim() === pi);
+    const empPi = emps.filter((e) => String(e.plano_interno || 'SEM_PI').trim() === pi);
+
+    const planVal = ativPi.reduce((acc, a) => acc + toNumber(a.valor_total), 0);
+    const descVal = descPi.reduce((acc, d) => {
+      const v = toNumber(d.valor);
+      const op = String(d.operacao_tipo || '').toUpperCase();
+      const isEstorno = op.includes('ANULACAO') || op.includes('ESTORNO') || op.includes('DEVOLUCAO');
+      return isEstorno ? acc - v : acc + v;
+    }, 0);
+    const empVal = empPi.reduce((acc, e) => acc + toNumber(e.valor), 0);
+
+    totalPlanejado += planVal;
+    totalDescentralizado += descVal;
+    totalEmpenhado += empVal;
+
+    const saldoSuap = Number((planVal - empVal).toFixed(2));
+    const saldoSiafi = Number((descVal - empVal).toFixed(2));
+
+    let status = 'equilibrado';
+    let obs = '';
+
+    if (planVal === 0 && empVal > 0) {
+      status = 'sem_planejamento';
+      obs = `Empenho emitido (R$ ${empVal.toFixed(2)}) sem atividade planejada cadastrada no SUAP.`;
+      empPi.forEach((e) => {
+        empenhosSemAtividadePlanejada.push({
+          numero: String(e.numero || 'N/A'),
+          descricao: e.descricao || undefined,
+          planoInterno: pi,
+          valor: toNumber(e.valor),
+        });
+      });
+    } else if (saldoSuap < -0.01 && saldoSiafi >= 0) {
+      status = 'descompasso_planejamento_insuficiente';
+      obs = `Empenhado supera Planejado em R$ ${Math.abs(saldoSuap).toFixed(2)}, mas saldo real SIAFI está regular em R$ ${saldoSiafi.toFixed(2)}.`;
+      empPi.forEach((e) => {
+        empenhosSemAtividadePlanejada.push({
+          numero: String(e.numero || 'N/A'),
+          descricao: e.descricao || undefined,
+          planoInterno: pi,
+          valor: toNumber(e.valor),
+        });
+      });
+    } else if (saldoSiafi > 0.05) {
+      status = 'saldo_positivo_a_empenhar';
+      obs = `Saldo livre disponível para empenho no SIAFI: R$ ${saldoSiafi.toFixed(2)}.`;
+    }
+
+    divergenciasPi.push({
+      planoInterno: pi,
+      planejado: Number(planVal.toFixed(2)),
+      descentralizado: Number(descVal.toFixed(2)),
+      empenhado: Number(empVal.toFixed(2)),
+      saldoSuap,
+      saldoSiafi,
+      status,
+      observacao: obs,
+    });
+  }
+
+  const saldoPlanejamentoSuap = Number((totalPlanejado - totalEmpenhado).toFixed(2));
+  const saldoRealSiafi = Number((totalDescentralizado - totalEmpenhado).toFixed(2));
+
+  let situacaoGeral: PtresReconciliationAnalysis['situacaoGeral'] = 'REGULAR';
+  if (saldoRealSiafi < -0.01) {
+    situacaoGeral = 'DEFICIT_ORCAMENTARIO';
+  } else if (saldoPlanejamentoSuap < -0.01 && saldoRealSiafi >= 0) {
+    situacaoGeral = 'DESCOMPASSO_COM_SUAP';
+  } else if (saldoRealSiafi > 0.05) {
+    situacaoGeral = 'SUPERAVIT_SEM_EMPENHO';
+  }
+
+  let diagnostico = '';
+  if (situacaoGeral === 'DESCOMPASSO_COM_SUAP') {
+    diagnostico = `O PTRES ${cleanPtres} NÃO possui déficit contábil no SIAFI. O saldo real em conta é POSITIVO em R$ ${saldoRealSiafi.toFixed(2)}. O saldo negativo de R$ ${saldoPlanejamentoSuap.toFixed(2)} exibido no painel decorre exclusivamente da fórmula gerencial [Planejado SUAP - Empenhado SIAFI], pois foram emitidos empenhos com respaldo em Notas de Crédito reais da Reitoria que não constam com dotação suficiente nas atividades do Plano 8 do SUAP.`;
+  } else if (situacaoGeral === 'DEFICIT_ORCAMENTARIO') {
+    diagnostico = `Déficit orçamentário real no SIAFI: O total empenhado supera os créditos descentralizados líquidos recebidos no PTRES ${cleanPtres} em R$ ${Math.abs(saldoRealSiafi).toFixed(2)}.`;
+  } else {
+    diagnostico = `Situação regular para o PTRES ${cleanPtres}: Saldo real SIAFI de R$ ${saldoRealSiafi.toFixed(2)} e saldo SUAP de R$ ${saldoPlanejamentoSuap.toFixed(2)}.`;
+  }
+
+  return {
+    ptres: cleanPtres,
+    planejadoSuap: Number(totalPlanejado.toFixed(2)),
+    descentralizadoSiafi: Number(totalDescentralizado.toFixed(2)),
+    empenhadoSiafi: Number(totalEmpenhado.toFixed(2)),
+    saldoPlanejamentoSuap,
+    saldoRealSiafi,
+    situacaoGeral,
+    divergenciasPi,
+    empenhosSemAtividadePlanejada,
+    diagnostico,
+  };
+}
+
 export function buildGerencialAnalysis(message: string, sections: ContextSection[]): GerencialAnalysis {
   const intent = detectAssistantIntent(message);
   const descentralizacoes = summarizeDescentralizacoes(asRows<DescentralizacaoRow>(sections, 'descentralizacoes'));
@@ -1000,6 +1168,34 @@ export function buildGerencialAnalysis(message: string, sections: ContextSection
   const empenhos = summarizeEmpenhos(asRows<EmpenhoRow>(sections, 'empenhos'));
   const creditos = summarizeCreditos(asRows<CreditoDisponivelRow>(sections, 'creditos_disponiveis'));
   const pfs = summarizePfs(sections);
+  const atividades = asRows<AtividadeRow>(sections, 'atividades');
+
+  const ptresTarget = extractPtresTarget(message);
+  const conciliacaoPtres = ptresTarget
+    ? reconcilePtresData(
+        ptresTarget,
+        atividades,
+        asRows<DescentralizacaoRow>(sections, 'descentralizacoes'),
+        asRows<EmpenhoRow>(sections, 'empenhos')
+      )
+    : undefined;
+
+  if (conciliacaoPtres) {
+    return {
+      intent: intent === 'geral' ? 'descentralizacoes' : intent,
+      summary: {
+        conciliacaoPtres,
+        descentralizacoes: descentralizacoes.summary,
+        empenhos: empenhos.summary,
+      },
+      evidence: {
+        conciliacaoPtres,
+        principaisDescentralizacoes: descentralizacoes.evidence.principaisLancamentos,
+        principaisEmpenhos: empenhos.evidence.principaisEmpenhos,
+      },
+      limitations: descentralizacoes.limitations,
+    };
+  }
 
   if (intent === 'descentralizacoes') {
     return { intent, ...descentralizacoes };
