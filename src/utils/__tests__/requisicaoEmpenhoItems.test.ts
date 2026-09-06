@@ -119,4 +119,44 @@ describe('requisicaoEmpenhoItems', () => {
       ),
     ).toBe(750);
   });
+
+  it('abate valores de requisicoes enviadas ao fornecedor do saldo do item', () => {
+    const item = buildPortalItem({ valorAtual: 3374.4 });
+    const sourceKey = buildEmpenhoItemSourceKey('2026NE000078', item);
+    const enviadoMap = new Map<string, number>([
+      [sourceKey.toLowerCase(), 843.6],
+    ]);
+
+    const [balance] = buildEmpenhoItemBalances('2026NE000078', [item], [], enviadoMap);
+
+    expect(balance).toMatchObject({
+      sourceItemKey: sourceKey,
+      valorAtual: 3374.4,
+      liquidadoCalculado: 0,
+      enviadoCalculado: 843.6,
+      saldoItem: 2530.8,
+    });
+
+    const available = getRequisicaoItemAvailableBalance(
+      { sourceItemKey: sourceKey },
+      [balance],
+      enviadoMap,
+    );
+    expect(available).toBe(2530.8);
+  });
+
+  it('abate valores de requisicoes enviadas ao fornecedor usando fallback por descricao', () => {
+    const item = buildPortalItem({
+      descricao: 'Item Compra: Queijo tipo minas artesanal',
+      valorAtual: 1000,
+    });
+    const fallbackKey = '2026NE000078|queijo tipo minas artesanal';
+    const enviadoMap = new Map<string, number>([[fallbackKey, 200]]);
+
+    const [balance] = buildEmpenhoItemBalances('2026NE000078', [item], [], enviadoMap);
+
+    expect(balance.enviadoCalculado).toBe(200);
+    expect(balance.saldoItem).toBe(800);
+  });
 });
+

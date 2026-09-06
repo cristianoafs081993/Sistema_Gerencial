@@ -45,7 +45,7 @@ import { useData } from '@/contexts/DataContext';
 import { getAuthUserMatricula, permissionMatchesAuthUser } from '@/lib/terceirizadoIdentity';
 import { formatCurrency, formatarDocumento } from '@/lib/utils';
 import { contratosApiService, LIQUIDACOES_CACHE_UPDATED_EVENT } from '@/services/contratosApi';
-import { transparenciaService, type PortalTransparenciaItemEmpenho } from '@/services/transparencia';
+import { transparenciaService, normalizeEmpenhoNumero, type PortalTransparenciaItemEmpenho } from '@/services/transparencia';
 import { requisicoesCompraService } from '@/services/requisicoesCompra';
 import type { RequisicaoCompra, RequisicaoCompraItem, RequisicaoCompraRecord } from '@/types';
 import { getEmpenhoAvailableBalance } from '@/utils/empenhoBalance';
@@ -184,6 +184,40 @@ export default function RequisicaoCompraPage() {
     return map;
   }, [requisicoes, editingRequisicaoId]);
 
+  // Total retido / comprometido por item da NE em requisições com status 'enviada_fornecedor' (excluindo requisição em edição)
+  const enviadoFornecedorTotalByItemKey = useMemo(() => {
+    const map = new Map<string, number>();
+
+    requisicoes.forEach((req) => {
+      const isEnviada = req.status === 'enviada_fornecedor' || req.status === 'review' || req.status === 'approved';
+      if (!isEnviada) return;
+      if (editingRequisicaoId && req.id === editingRequisicaoId) return;
+
+      if (req.items && req.items.length > 0) {
+        req.items.forEach((item) => {
+          const itemValue = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
+          if (itemValue <= 0) return;
+
+          if (item.sourceItemKey) {
+            const key = item.sourceItemKey.trim().toLowerCase();
+            map.set(key, (map.get(key) ?? 0) + itemValue);
+          }
+
+          const empNumero = item.empenhoNumero || req.empenhoNumero;
+          if (empNumero && item.description) {
+            const cleanDesc = item.description.replace(/^item\s+compra\s*:\s*/i, '').trim().toLowerCase();
+            const descKey = `${normalizeEmpenhoNumero(empNumero)}|${cleanDesc}`;
+            if (!item.sourceItemKey) {
+              map.set(descKey, (map.get(descKey) ?? 0) + itemValue);
+            }
+          }
+        });
+      }
+    });
+
+    return map;
+  }, [requisicoes, editingRequisicaoId]);
+
   const selectedEmpenhos = useMemo(
     () => selectedEmpenhoIds
       .map((id) => empenhos.find((empenho) => empenho.id === id))
@@ -288,11 +322,12 @@ export default function RequisicaoCompraPage() {
           empenho.numero,
           (portalEmpenhoItemQueries[index]?.data ?? []) as PortalTransparenciaItemEmpenho[],
           liquidacoesEmpenhoQueries[index]?.data ?? [],
+          enviadoFornecedorTotalByItemKey,
         ),
       );
     });
     return map;
-  }, [liquidacoesEmpenhoQueries, portalEmpenhoItemQueries, selectedEmpenhos]);
+  }, [liquidacoesEmpenhoQueries, portalEmpenhoItemQueries, selectedEmpenhos, enviadoFornecedorTotalByItemKey]);
 
   useEffect(() => {
     if (!isEditing || editingRequisicaoId || pendingAutoFillEmpenhoIds.length === 0) return;
@@ -402,14 +437,20 @@ export default function RequisicaoCompraPage() {
     return items
       .map((item, index) => {
         const isBalanceReady = item.empenhoId ? empenhoItemBalanceReadyById.get(item.empenhoId) === true : false;
-        const available = isBalanceReady ? getRequisicaoItemAvailableBalance(item, item.empenhoId ? empenhoItemBalancesById.get(item.empenhoId) ?? [] : []) : null;
+        const available = isBalanceReady
+          ? getRequisicaoItemAvailableBalance(
+              item,
+              item.empenhoId ? empenhoItemBalancesById.get(item.empenhoId) ?? [] : [],
+              enviadoFornecedorTotalByItemKey,
+            )
+          : null;
         const requested = item.quantity * item.unitPrice;
         return available !== null && requested > available
           ? { index, description: item.description, requested, available }
           : null;
       })
       .filter((item): item is { index: number; description: string; requested: number; available: number } => Boolean(item));
-  }, [empenhoItemBalanceReadyById, empenhoItemBalancesById, items]);
+  }, [empenhoItemBalanceReadyById, empenhoItemBalancesById, items, enviadoFornecedorTotalByItemKey]);
 
   const requisicaoTotalByEmpenhoId = useMemo(() => {
     const totals = new Map<string, number>();
@@ -1016,10 +1057,17 @@ export default function RequisicaoCompraPage() {
                             ) : (
                               groupItems.map(({ item, index }, groupIndex) => {
                                 const isGeneratedItem = item.sourceType === 'portal_transparencia_empenho_item';
+                                const freshBalance = item.sourceItemKey
+                                  ? empenhoItemBalances.find((b) => b.sourceItemKey === item.sourceItemKey)
+                                  : null;
                                 const itemAvailableBalance = isGeneratedItem
-                                  ? getRequisicaoItemAvailableBalance(item, empenhoItemBalances)
+                                  ? getRequisicaoItemAvailableBalance(item, empenhoItemBalances, enviadoFornecedorTotalByItemKey)
                                   : null;
                                 const isProvisionalItemBalance = isGeneratedItem && !isItemBalanceReady;
+                                const enviadoForItem = freshBalance?.enviadoCalculado ?? 0;
+                                const saldoOficial = freshBalance
+                                  ? Math.max(0, freshBalance.valorAtual - freshBalance.liquidadoCalculado)
+                                  : (itemAvailableBalance ?? 0) + enviadoForItem;
                                 const itemSubtotal = item.quantity * item.unitPrice;
                                 const hasItemBalanceViolation = itemAvailableBalance !== null && itemSubtotal > itemAvailableBalance;
                                 const quantityInputKey = item.sourceItemKey || `${item.empenhoId ?? empenho.id}-${index}`;
@@ -1088,9 +1136,19 @@ export default function RequisicaoCompraPage() {
                                     </TableCell>
                                     <TableCell className={`text-right font-mono text-xs font-bold leading-9 ${hasItemBalanceViolation ? 'text-status-error' : 'text-status-success'}`}>
                                       {itemAvailableBalance !== null
-                                        ? <span title={isProvisionalItemBalance ? 'Saldo base do subitem; as liquidações oficiais serão aplicadas quando o cache terminar.' : undefined}>
+                                        ? (
+                                          <span
+                                            title={
+                                              isProvisionalItemBalance
+                                                ? 'Saldo base do subitem; as liquidações oficiais serão aplicadas quando o cache terminar.'
+                                                : enviadoForItem > 0
+                                                  ? `Saldo oficial: ${formatCurrency(saldoOficial)} | (-) ${formatCurrency(enviadoForItem)} em requisições enviadas`
+                                                  : undefined
+                                            }
+                                          >
                                             {formatCurrency(itemAvailableBalance)}
                                           </span>
+                                        )
                                         : isGeneratedItem ? <span title={isItemBalanceError ? 'Não foi possível consultar as liquidações deste empenho' : 'O saldo detalhado será carregado após as liquidações'}>{isItemBalanceError ? 'Indisponível' : 'Carregando...'}</span> : '-'}
                                     </TableCell>
                                     <TableCell className="text-right font-mono font-bold text-text-primary leading-9">
