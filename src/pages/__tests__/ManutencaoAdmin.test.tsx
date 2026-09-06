@@ -353,7 +353,8 @@ describe('ManutencaoAdmin', () => {
     await waitFor(() => {
       expect(screen.getByText('Arroz parboilizado')).toBeInTheDocument();
       expect(screen.getAllByText('Refeitório').length).toBeGreaterThan(0);
-      expect(screen.getByText('Requisição de compra')).toBeInTheDocument();
+      expect(screen.getByText('Enviada ao fornecedor')).toBeInTheDocument();
+      expect(screen.queryByText('Requisição de compra')).not.toBeInTheDocument();
       expect(screen.getByText(/12\.5 KG/)).toBeInTheDocument();
       expect(screen.getByText(/REQ-2026-0001/)).toBeInTheDocument();
     });

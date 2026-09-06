@@ -123,6 +123,10 @@ const materialLabels: Record<string, string> = {
   outros: 'Outros',
 };
 
+const normalizeStr = (s?: string | null) =>
+  (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+
 export function formatMaterialDisplayName(raw: string): string {
   if (!raw) return 'Insumo';
   if (materialLabels[raw]) return materialLabels[raw];
@@ -3422,39 +3426,54 @@ export default function ManutencaoAdmin() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  sortedConsumoData.map((row) => (
-                    <TableRow key={`${row.origem}-${row.id}`} className="hover:bg-slate-50/60">
-                      <TableCell>
-                        <div className="font-semibold text-slate-900">{row.ambiente_nome}</div>
-                        <div className="text-xs font-mono text-slate-500 flex items-center gap-1.5">
-                          <span>{row.ambiente_codigo}</span>
-                          {row.ambiente_bloco && <span>• {row.ambiente_bloco}</span>}
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium text-slate-800">
-                        {materialLabels[row.material] || row.material}
-                      </TableCell>
-                      <TableCell>
-                        {row.origem === 'requisicao_compra' ? (
-                          <div className="space-y-0.5">
-                            <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">Requisição de compra</Badge>
-                            <div className="text-xs text-slate-500">{row.requisicao_numero} • {row.requisicao_status === 'liquidada' ? 'Encaminhada para pagamento' : 'Enviada ao fornecedor'}</div>
-                          </div>
-                        ) : (
-                          <Badge variant="outline" className="border-blue-300 bg-blue-50 text-blue-800">Check-in</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-medium text-slate-700">
-                        {new Date(row.consumo_em).toLocaleDateString('pt-BR')}
-                      </TableCell>
-                      <TableCell className="text-right font-extrabold text-emerald-800 font-mono bg-emerald-50/40">
-                        {row.quantidade} {row.unidade}
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-slate-800 font-mono">
-                        {Number(row.valor_total || 0) > 0 ? formatCurrency(Number(row.valor_total)) : '—'}
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  sortedConsumoData.map((row) => {
+                    const nomeNorm = normalizeStr(row.ambiente_nome);
+                    const showCodigo = Boolean(row.ambiente_codigo && normalizeStr(row.ambiente_codigo) !== nomeNorm);
+                    const showBloco = Boolean(
+                      row.ambiente_bloco &&
+                      normalizeStr(row.ambiente_bloco) !== nomeNorm &&
+                      (!showCodigo || normalizeStr(row.ambiente_bloco) !== normalizeStr(row.ambiente_codigo))
+                    );
+
+                    return (
+                      <TableRow key={`${row.origem}-${row.id}`} className="hover:bg-slate-50/60">
+                        <TableCell>
+                          <div className="font-semibold text-slate-900">{row.ambiente_nome}</div>
+                          {(showCodigo || showBloco) && (
+                            <div className="text-xs font-mono text-slate-500 flex items-center gap-1.5">
+                              {showCodigo && <span>{row.ambiente_codigo}</span>}
+                              {showCodigo && showBloco && <span>•</span>}
+                              {showBloco && <span>{row.ambiente_bloco}</span>}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-medium text-slate-800">
+                          {materialLabels[row.material] || row.material}
+                        </TableCell>
+                        <TableCell>
+                          {row.origem === 'requisicao_compra' ? (
+                            <div className="space-y-0.5">
+                              <div className="font-semibold text-slate-900">{row.requisicao_numero}</div>
+                              <div className="text-xs text-slate-500">
+                                {row.requisicao_status === 'liquidada' ? 'Enviada para pagamento' : 'Enviada ao fornecedor'}
+                              </div>
+                            </div>
+                          ) : (
+                            <Badge variant="outline" className="border-blue-300 bg-blue-50 text-blue-800">Check-in</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-medium text-slate-700">
+                          {new Date(row.consumo_em).toLocaleDateString('pt-BR')}
+                        </TableCell>
+                        <TableCell className="text-right font-extrabold text-emerald-800 font-mono bg-emerald-50/40">
+                          {row.quantidade} {row.unidade}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-slate-800 font-mono">
+                          {Number(row.valor_total || 0) > 0 ? formatCurrency(Number(row.valor_total)) : '—'}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
