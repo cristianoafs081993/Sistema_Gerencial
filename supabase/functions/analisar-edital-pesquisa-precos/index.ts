@@ -257,7 +257,7 @@ async function analyzeWithGemini(
     throw new Error("Chave GEMINI_API_KEY nao configurada no backend.");
   }
 
-  const model = Deno.env.get("GEMINI_PRICE_RESEARCH_MODEL") || "gemini-2.5-flash";
+  const model = Deno.env.get("GEMINI_PRICE_RESEARCH_MODEL") || "gemini-3.8-flash";
 
   const prompt = `Voce e um especialista auditor de compras publicas e pesquisa de precos (Lei 14.133/2021 e IN SEGES/ME 65/2021).
 Sua missao e examinar o documento anexo (Edital / Termo de Referencia / Projeto Basico de uma contratacao publica) e confrontar com a Demanda do orgao contratante para verificar se o item cotado atende com precisao as especificacoes exigidas.
@@ -318,21 +318,33 @@ Retorne EXCLUSIVAMENTE um JSON valido no seguinte formato:
     },
   };
 
-  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-  const response = await fetch(geminiUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(requestPayload),
-  });
+  const candidateModels = [...new Set([model, "gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite"].filter(Boolean))];
+  let rawText = "";
+  let lastError = "";
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Gemini API error (${response.status}): ${errText.slice(0, 300)}`);
+  for (const m of candidateModels) {
+    try {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`;
+      const response = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestPayload),
+      });
+
+      if (!response.ok) {
+        lastError = await response.text();
+        continue;
+      }
+
+      const json = await response.json();
+      rawText = json?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      if (rawText) break;
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+    }
   }
 
-  const json = await response.json();
-  const rawText = json?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!rawText) throw new Error("Gemini nao retornou texto na resposta.");
+  if (!rawText) throw new Error(`Gemini nao retornou texto na resposta. Ultimo erro: ${lastError.slice(0, 300)}`);
 
   const parsed = JSON.parse(rawText);
   return {

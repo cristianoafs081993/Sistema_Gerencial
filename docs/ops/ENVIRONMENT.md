@@ -427,7 +427,7 @@ Opcionais:
 
 - `GEMINI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
 - `GEMINI_PRICE_RESEARCH_MODEL`
-  - default no código: `gemini-2.5-flash-lite`
+  - default no código: `gemini-3.8-flash` (com fallback automático para `gemini-2.5-flash` e `gemini-2.5-flash-lite`)
 
 Observações operacionais:
 

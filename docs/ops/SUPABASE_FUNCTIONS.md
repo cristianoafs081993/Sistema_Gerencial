@@ -704,7 +704,7 @@ Dependências:
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - opcional `GEMINI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
-- opcional `GEMINI_PRICE_RESEARCH_MODEL`
+- opcional `GEMINI_PRICE_RESEARCH_MODEL`, com default `gemini-3.8-flash` e fallback automático para `gemini-2.5-flash` e `gemini-2.5-flash-lite`
 
 Observações:
 

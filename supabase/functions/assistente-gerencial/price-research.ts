@@ -113,7 +113,7 @@ function mapLocal(row: Row, demand: ExtractedDemandItem, allowUnknownPrice = fal
 export async function executeConversationalPriceResearch(db: PriceDatabase, demands: ExtractedDemandItem[], apiKey: string, userEmail: string, options: Options = {}) {
   const request = options.fetch || fetch, now = options.now || Date.now;
   const deadline = now() + (options.budgetMs ?? 110000);
-  const model = options.model || 'gemini-2.5-flash';
+  const model = options.model || 'gemini-3.8-flash';
   const embeddingModel = options.embeddingModel || 'gemini-embedding-001';
   const warnings = new Set<string>();
   const documents = new Map<string, Uint8Array>();
@@ -135,11 +135,20 @@ export async function executeConversationalPriceResearch(db: PriceDatabase, dema
       for (let i = 0; i < pdf.length; i += 8192) binary += String.fromCharCode(...pdf.subarray(i, i + 8192));
       parts.push({ inlineData: { mimeType: 'application/pdf', data: btoa(binary) } });
     }
-    const data = await json(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig: { responseMimeType: 'application/json', temperature: 0 } }),
-    });
-    return JSON.parse(data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}');
+    const candidateModels = [...new Set([model, 'gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'].filter(Boolean))];
+    let lastError: unknown;
+    for (const m of candidateModels) {
+      try {
+        const data = await json(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig: { responseMimeType: 'application/json', temperature: 0 } }),
+        });
+        return JSON.parse(data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}');
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    throw lastError;
   }
   async function embedding(query: string) {
     try {

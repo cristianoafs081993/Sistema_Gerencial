@@ -355,7 +355,7 @@ Deno.serve(async (req) => {
         demandItems,
         apiKey,
         user.email || 'Agente Responsavel',
-        { model: Deno.env.get('GEMINI_PRICE_RESEARCH_MODEL') || 'gemini-2.5-flash', embeddingModel: Deno.env.get('PRICE_EMBEDDING_MODEL') || 'gemini-embedding-001' },
+        { model: Deno.env.get('GEMINI_PRICE_RESEARCH_MODEL') || 'gemini-3.8-flash', embeddingModel: Deno.env.get('PRICE_EMBEDDING_MODEL') || 'gemini-embedding-001' },
       );
 
       const prompt = buildPriceResearchPrompt({
