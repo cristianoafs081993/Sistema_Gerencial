@@ -165,3 +165,10 @@ Os testes do parser cobrem acentos, moeda brasileira, IDs de atividades e linhas
 - Verificar que a Edge Function consegue interpretar o HTML no runtime Deno sem depender de DOMParser global.
 
 - A revisão de documentos SUAP também testa persistência em suap_document_reviews, carregamento pelo modo latest e presença dos dois ícones no card: gerar e consultar a última análise salva.
+
+## Sincronização de contratos PNCP
+
+As regressões pncpSync, pncpContratos, pncpInstrumentosCobranca e
+ContratoApiDetailsSheet cobrem paginação, renovação, identidade, erro HTTP/banco,
+sucesso parcial, persistência no servidor e respostas atrasadas na UI.
+Ver [cenários e validação remota](ops/PNCP_CONTRACT_SYNC.md).

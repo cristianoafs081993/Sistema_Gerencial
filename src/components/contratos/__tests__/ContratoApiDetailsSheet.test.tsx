@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { ContratoApiDetailsSheet } from '@/components/contratos/ContratoApiDetailsSheet';
@@ -304,6 +304,10 @@ const details: ContratoApiDetails = {
 };
 
 describe('ContratoApiDetailsSheet', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(pncpService, 'sincronizarContratoPncp').mockResolvedValue({ ref: null, errors: [] });
+  });
   it('mostra execução por item e soma histórico contratado em contratos com mais de um item', () => {
     render(
       <ContratoApiDetailsSheet
@@ -388,13 +392,14 @@ describe('ContratoApiDetailsSheet', () => {
       },
     ];
 
-    vi.spyOn(pncpService, 'buscarDocumentosContratoPncp').mockResolvedValue({
+    vi.spyOn(pncpService, 'sincronizarContratoPncp').mockResolvedValue({
       ref: {
         cnpj: '10877412000168',
         ano: 2018,
         sequencial: '62',
       },
       documentos: mockDocumentos,
+      instrumentos: [], errors: [],
     });
 
     const windowOpenSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
@@ -452,6 +457,8 @@ describe('ContratoApiDetailsSheet', () => {
       pncp_sequencial: 293,
       pncp_ano: 2026,
       pncp_has_record: true,
+      pncp_documentos_checked_at: new Date().toISOString(),
+      pncp_instrumentos_checked_at: new Date().toISOString(),
     };
 
     const details: ContratoApiDetails = {
@@ -475,7 +482,7 @@ describe('ContratoApiDetailsSheet', () => {
       ],
     };
 
-    const buscarSpy = vi.spyOn(pncpService, 'buscarDocumentosContratoPncp');
+    const buscarSpy = vi.spyOn(pncpService, 'sincronizarContratoPncp');
 
     render(
       <ContratoApiDetailsSheet
@@ -483,6 +490,7 @@ describe('ContratoApiDetailsSheet', () => {
         onOpenChange={vi.fn()}
         contrato={contrato}
         details={details}
+        lastSyncRun={null}
       />,
     );
 
@@ -497,6 +505,50 @@ describe('ContratoApiDetailsSheet', () => {
     // Como já constava em details.documentos, não precisa fazer requisição externa
     expect(buscarSpy).not.toHaveBeenCalled();
   });
+  it('preserva documentos quando a atualização manual falha e mostra o erro', async () => {
+    const cached = { ...details, documentos: [{ id: 'doc', contrato_api_id: contrato.id,
+      sequencial_documento: 1, titulo: 'PDF já salvo', tipo_documento_nome: 'Contrato',
+      url: 'https://pncp.gov.br/arquivo.pdf' }] };
+    const current = { ...contrato, pncp_control_number: '10877412000168-2-000209/2024',
+      pncp_sequencial: 209, pncp_ano: 2024,
+      pncp_documentos_checked_at: new Date().toISOString(), pncp_instrumentos_checked_at: new Date().toISOString() };
+    const sync = vi.mocked(pncpService.sincronizarContratoPncp).mockRejectedValue(new Error('PNCP respondeu com status 503'));
+    render(<ContratoApiDetailsSheet open onOpenChange={vi.fn()} contrato={current} details={cached} lastSyncRun={null} />);
+    fireEvent.click(screen.getByRole('button', { name: /Documentos e Anexos Oficiais/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Atualizar' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('503'));
+    expect(screen.getByText('PDF já salvo')).toBeInTheDocument();
+    expect(sync).toHaveBeenCalledWith(contrato.id);
+  });
+
+  it('reconsulta resultado negativo vencido e carrega notas sem depender de PDFs', async () => {
+    const sync = vi.mocked(pncpService.sincronizarContratoPncp).mockResolvedValue({
+      ref: { cnpj: '10877412000168', ano: 2024, sequencial: '209', hasPncpRecord: true },
+      documentos: [], instrumentos: [{ sequencialInstrumentoCobranca: 1, numeroInstrumentoCobranca: '1184',
+        tipoNome: 'Nota Fiscal', dataEmissaoDocumento: '2025-01-31', itens: [], eventos: [], raw: {} }], errors: [],
+    });
+    render(<ContratoApiDetailsSheet open onOpenChange={vi.fn()}
+      contrato={{ ...contrato, pncp_has_record: false, pncp_documentos_checked_at: '2024-01-01' }}
+      details={details} lastSyncRun={null} />);
+    await waitFor(() => expect(sync).toHaveBeenCalledWith(contrato.id));
+    fireEvent.click(screen.getByRole('button', { name: /Notas Fiscais e Instrumentos de Cobrança/i }));
+    expect(await screen.findByText('Nota Fiscal Nº 1184')).toBeInTheDocument();
+  });
+
+  it('ignora resposta atrasada depois de trocar de contrato', async () => {
+    let finish: (value: pncpService.PncpSyncResult) => void;
+    vi.mocked(pncpService.sincronizarContratoPncp)
+      .mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }))
+      .mockResolvedValue({ ref: null, errors: [] });
+    const props = { open: true, onOpenChange: vi.fn(), details, lastSyncRun: null };
+    const { rerender } = render(<ContratoApiDetailsSheet {...props} contrato={contrato} />);
+    rerender(<ContratoApiDetailsSheet {...props} contrato={{ ...contrato, id: 'other', numero: '2/2024' }} />);
+    await act(async () => finish!({ documentos: [{ sequencialDocumento: 1, titulo: 'PDF do contrato anterior',
+      tipoDocumentoNome: 'Contrato', url: 'https://pncp.gov.br/old.pdf' }], errors: [] }));
+    fireEvent.click(screen.getByRole('button', { name: /Documentos e Anexos Oficiais/i }));
+    expect(screen.queryByText('PDF do contrato anterior')).not.toBeInTheDocument();
+  });
+
 });
 
 

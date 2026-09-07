@@ -1443,3 +1443,10 @@ Consumido por:
 - [dataImportLogsService.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/dataImportLogsService.ts)
 - [ImportacaoDados.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/ImportacaoDados.tsx)
 - [ObservabilityCenter.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/observabilidade/ObservabilityCenter.tsx)
+
+## Controle de sincronização PNCP em contratos_api
+
+A migration 20260905173000 adiciona pncp_sync_attempted_at e pncp_sync_error.
+Tentativas são independentes dos marcos de sucesso por documentos/instrumentos.
+A função enqueue_pncp_contract_sync é restrita a service_role e ao proprietário;
+usa credencial do Vault, sem segredo no texto do cron. Ver [operação](../ops/PNCP_CONTRACT_SYNC.md).

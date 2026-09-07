@@ -396,3 +396,10 @@ Cadastros seguem inventoryService  operational_entities / measurement_units / ca
 - persistencia: resultado normalizado em `suap_document_reviews`, associado ao usuario, `suap_id` e `document_id`;
 - consulta: o icone de historico envia `reviewMode = latest` e carrega a ultima linha salva, sem solicitar o PDF novamente;
 - exportacao: o resultado exibido pode ser baixado em HTML ou impresso no navegador.
+
+## Documentos e instrumentos PNCP
+
+PNCP → sync-contratos-pncp-documentos → contratos_api_documentos e
+contratos_api_instrumentos_cobranca → ContratoApiDetailsSheet.
+O navegador solicita a atualização autenticada; não persiste respostas públicas
+diretamente. Falhas não avançam as datas de sucesso. Ver [operação](../ops/PNCP_CONTRACT_SYNC.md).

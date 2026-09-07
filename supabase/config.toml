@@ -70,3 +70,6 @@ verify_jwt = false
 
 [functions.analisar-documento-licitacao]
 verify_jwt = false
+
+[functions.sync-contratos-pncp-documentos]
+verify_jwt = true

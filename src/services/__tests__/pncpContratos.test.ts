@@ -157,6 +157,7 @@ describe('pncpContratos', () => {
           status: 200,
           json: async () => mockConsultaData,
         })
+        .mockResolvedValueOnce({ ok: true, status: 204 })
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
@@ -196,6 +197,7 @@ describe('pncpContratos', () => {
           status: 200,
           json: async () => mockConsultaData,
         })
+        .mockResolvedValueOnce({ ok: true, status: 204 })
         .mockResolvedValueOnce({
           ok: true,
           status: 204,

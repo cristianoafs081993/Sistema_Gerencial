@@ -483,3 +483,9 @@ Separar conceitualmente:
 - variaveis necessarias para publicar Edge Functions
 - variaveis de ferramentas externas que nao sao essenciais ao sistema
 - propriedades do Apps Script usadas para integracoes Gmail
+
+## Sincronização de contratos PNCP
+
+A função usa SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no servidor. O cron requer
+a chave service_role no Vault, com nome pncp_sync_service_role_key (ou service_role_key).
+Nenhuma chave privilegiada é enviada ao frontend. Ver [ativação](PNCP_CONTRACT_SYNC.md).

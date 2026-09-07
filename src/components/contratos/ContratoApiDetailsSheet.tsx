@@ -2,7 +2,7 @@ import { RecordDetailsPage } from '@/components/records/RecordDetailsPage';
 import { DataTablePanel } from '@/components/design-system/DataTablePanel';
 import { formatContractDate } from '@/utils/contractPresentation';
 import type { Empenho } from '@/types';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -62,13 +62,12 @@ import type {
   ContratoApiSyncRun,
 } from '@/services/contratosApi';
 import {
-  buscarDocumentosContratoPncp,
+  sincronizarContratoPncp,
   buildPncpContratoWebUrl,
   type PncpDocumentoContrato,
   type PncpContratoRef,
 } from '@/services/pncpContratos';
 import {
-  buscarInstrumentosCobrancaPncp,
   type PncpInstrumentoCobranca,
 } from '@/services/pncpInstrumentosCobranca';
 import { ContratoNfeRastreabilidade } from '@/components/contratos/ContratoNfeRastreabilidade';
@@ -395,161 +394,112 @@ export function ContratoApiDetailsSheet({
   const [isLoadingPncpInstrumentos, setIsLoadingPncpInstrumentos] = useState(false);
   const [pncpError, setPncpError] = useState<string | null>(null);
 
-  const fetchPncpDocs = useCallback((forceLive = false) => {
-    if (!contrato) return;
-
-    // Se já existem documentos e instrumentos sincronizados no banco de dados e não é refresh forçado, usa direto do banco
-    const dbDocs = details?.documentos;
-    const dbInsts = details?.instrumentosCobranca;
-
-    if (!forceLive && ((dbDocs && dbDocs.length > 0) || (dbInsts && dbInsts.length > 0))) {
-      if (dbDocs && dbDocs.length > 0) {
-        setPncpDocs(
-          dbDocs.map((d) => ({
-            sequencialDocumento: d.sequencial_documento,
-            titulo: d.titulo,
-            tipoDocumentoId: d.tipo_documento_id,
-            tipoDocumentoNome: d.tipo_documento_nome,
-            url: d.url,
-            uri: d.uri ?? undefined,
-            dataPublicacaoPncp: d.data_publicacao_pncp,
-            tamanho: d.tamanho,
-          }))
-        );
-      }
-
-      if (dbInsts && dbInsts.length > 0) {
-        setPncpInstrumentos(
-          dbInsts.map((inst) => ({
-            sequencialInstrumentoCobranca: inst.sequencial_instrumento_cobranca,
-            tipoNome: inst.tipo_nome,
-            tipoDescricao: inst.tipo_descricao,
-            numeroInstrumentoCobranca: inst.numero_instrumento_cobranca,
-            dataEmissaoDocumento: inst.data_emissao ?? '',
-            chaveNFe: inst.chave_nfe,
-            dataConsultaNFe: inst.data_consulta_nfe,
-            statusResponseNFe: inst.status_response_nfe,
-            notaFiscal: inst.chave_nfe
-              ? {
-                  chaveNotaFiscal: inst.chave_nfe,
-                  valorNotaFiscal: inst.valor_nota_fiscal ?? 0,
-                  serie: inst.serie ?? undefined,
-                  tipoEventoMaisRecente: inst.tipo_evento_mais_recente ?? undefined,
-                  dataTipoEventoMaisRecente: inst.data_tipo_evento_mais_recente ?? undefined,
-                  nomeFornecedor: inst.nome_fornecedor ?? undefined,
-                  cnpjFornecedor: inst.cnpj_fornecedor ?? undefined,
-                  municipioFornecedor: inst.municipio_fornecedor ?? undefined,
-                }
-              : null,
-            itens: (inst.itens as any[]) || [],
-            eventos: (inst.eventos as any[]) || [],
-            raw: (inst.raw_data as Record<string, unknown>) || {},
-          }))
-        );
-        setIsLoadingPncpInstrumentos(false);
-      }
-
-      let resolvedRef: PncpContratoRef | null = null;
-      if (contrato.pncp_control_number && contrato.pncp_sequencial) {
-        resolvedRef = {
-          cnpj: '10877412000168',
-          ano: contrato.pncp_ano || (contrato.vigencia_inicio ? new Date(contrato.vigencia_inicio).getFullYear() : new Date().getFullYear()),
-          sequencial: String(contrato.pncp_sequencial),
-          numeroControlePNCP: contrato.pncp_control_number,
-          hasPncpRecord: true,
-        };
-      } else if (dbDocs && dbDocs.length > 0) {
-        const firstUrl = dbDocs[0].url || dbDocs[0].uri || '';
-        const match = firstUrl.match(/orgaos\/(\d{14})\/contratos\/(\d{4})\/(\d+)\/arquivos/);
-        if (match) {
-          resolvedRef = {
-            cnpj: match[1],
-            ano: Number(match[2]),
-            sequencial: match[3],
-            numeroControlePNCP: contrato.pncp_control_number || `${match[1]}-2-${match[3].padStart(6, '0')}/${match[2]}`,
-            hasPncpRecord: true,
-          };
-        }
-      }
-      setPncpRef(resolvedRef);
-      setIsLoadingPncpDocs(false);
-
-      if ((!dbInsts || dbInsts.length === 0) && resolvedRef && resolvedRef.ano && resolvedRef.sequencial) {
-        setIsLoadingPncpInstrumentos(true);
-        buscarInstrumentosCobrancaPncp(resolvedRef, { contratoApiId: contrato.id })
-          .then((res) => setPncpInstrumentos(res.instrumentos))
-          .catch((err) => console.warn('Erro ao consultar instrumentos de cobrança:', err))
-          .finally(() => setIsLoadingPncpInstrumentos(false));
-      }
-      return;
-    }
-
-    // Se o banco já registrou que não possui registro no PNCP e foi checado recentemente, evita requisição
-    if (!forceLive && contrato.pncp_has_record === false && contrato.pncp_documentos_checked_at) {
-      setPncpDocs([]);
-      setPncpRef(null);
-      setPncpInstrumentos([]);
-      setIsLoadingPncpDocs(false);
-      setIsLoadingPncpInstrumentos(false);
-      return;
-    }
-
-    const abortController = new AbortController();
+  const pncpRequest = useRef(0);
+  const contratoId = contrato?.id;
+  const cachedDocuments = details?.documentos;
+  const cachedInstruments = details?.instrumentosCobranca;
+  const detailsLoaded = Boolean(details);
+  const fetchPncpDocs = useCallback(async (_forceLive = true) => {
+    if (!contratoId) return;
+    const request = ++pncpRequest.current;
     setIsLoadingPncpDocs(true);
     setIsLoadingPncpInstrumentos(true);
     setPncpError(null);
-
-    buscarDocumentosContratoPncp(contrato, { signal: abortController.signal })
-      .then((res) => {
-        setPncpDocs(res.documentos);
-        setPncpRef(res.ref);
-        if (res.error && res.documentos.length === 0) {
-          setPncpError(res.error);
-        }
-        if (res.ref && res.ref.ano && res.ref.sequencial) {
-          buscarInstrumentosCobrancaPncp(res.ref, { signal: abortController.signal })
-            .then((resInst) => setPncpInstrumentos(resInst.instrumentos))
-            .catch((err) => {
-              if ((err as Error)?.name !== 'AbortError') {
-                console.warn('Erro ao consultar instrumentos de cobrança:', err);
-              }
-            })
-            .finally(() => setIsLoadingPncpInstrumentos(false));
-        } else {
-          setIsLoadingPncpInstrumentos(false);
-        }
-      })
-      .catch((err) => {
-        if ((err as Error)?.name !== 'AbortError') {
-          console.warn('ContratoApiDetailsSheet: erro ao consultar documentos PNCP', err);
-          setPncpError('Não foi possível carregar os documentos do PNCP.');
-        }
-        setIsLoadingPncpInstrumentos(false);
-      })
-      .finally(() => {
+    try {
+      const result = await sincronizarContratoPncp(contratoId);
+      if (request !== pncpRequest.current) return;
+      if (result.ref !== undefined) setPncpRef(result.ref);
+      // Missing resource means failure: preserve the previous data on screen.
+      if (result.documentos !== undefined) setPncpDocs(result.documentos);
+      if (result.instrumentos !== undefined) setPncpInstrumentos(result.instrumentos);
+      if (result.errors.length) setPncpError(result.errors.join('; '));
+    } catch (error) {
+      if (request === pncpRequest.current) {
+        setPncpError(error instanceof Error ? error.message : 'Não foi possível sincronizar com o PNCP.');
+      }
+    } finally {
+      if (request === pncpRequest.current) {
         setIsLoadingPncpDocs(false);
-      });
-
-    return () => {
-      abortController.abort();
-    };
-  }, [contrato, details?.documentos]);
+        setIsLoadingPncpInstrumentos(false);
+      }
+    }
+  }, [contratoId]);
 
   useEffect(() => {
-    if (!open || !contrato) {
-      setPncpDocs([]);
-      setPncpRef(null);
-      setPncpInstrumentos([]);
-      setIsLoadingPncpDocs(false);
-      setIsLoadingPncpInstrumentos(false);
-      setPncpError(null);
-      return;
+    ++pncpRequest.current;
+    setPncpDocs([]);
+    setPncpInstrumentos([]);
+    setPncpRef(null);
+    setPncpError(null);
+    setIsLoadingPncpDocs(false);
+    setIsLoadingPncpInstrumentos(false);
+    if (!open || !contrato || !detailsLoaded) return;
+    const dbDocs = cachedDocuments || [];
+    const dbInsts = cachedInstruments || [];
+    setPncpDocs(
+      dbDocs.map((d) => ({
+        sequencialDocumento: d.sequencial_documento,
+        titulo: d.titulo,
+        tipoDocumentoId: d.tipo_documento_id,
+        tipoDocumentoNome: d.tipo_documento_nome,
+        url: d.url,
+        uri: d.uri ?? undefined,
+        dataPublicacaoPncp: d.data_publicacao_pncp,
+        tamanho: d.tamanho,
+      }))
+    );
+    setPncpInstrumentos(
+      dbInsts.map((inst) => ({
+        sequencialInstrumentoCobranca: inst.sequencial_instrumento_cobranca,
+        tipoNome: inst.tipo_nome,
+        tipoDescricao: inst.tipo_descricao,
+        numeroInstrumentoCobranca: inst.numero_instrumento_cobranca,
+        dataEmissaoDocumento: inst.data_emissao ?? '',
+        chaveNFe: inst.chave_nfe,
+        dataConsultaNFe: inst.data_consulta_nfe,
+        statusResponseNFe: inst.status_response_nfe,
+        notaFiscal: inst.chave_nfe
+          ? {
+              chaveNotaFiscal: inst.chave_nfe,
+              valorNotaFiscal: inst.valor_nota_fiscal ?? 0,
+              serie: inst.serie ?? undefined,
+              tipoEventoMaisRecente: inst.tipo_evento_mais_recente ?? undefined,
+              dataTipoEventoMaisRecente: inst.data_tipo_evento_mais_recente ?? undefined,
+              nomeFornecedor: inst.nome_fornecedor ?? undefined,
+              cnpjFornecedor: inst.cnpj_fornecedor ?? undefined,
+              municipioFornecedor: inst.municipio_fornecedor ?? undefined,
+            }
+          : null,
+        itens: (inst.itens as PncpInstrumentoCobranca['itens']) || [],
+        eventos: (inst.eventos as PncpInstrumentoCobranca['eventos']) || [],
+        raw: (inst.raw_data as Record<string, unknown>) || {},
+      }))
+    );
+    if (contrato.pncp_control_number && contrato.pncp_sequencial && contrato.pncp_ano) {
+      setPncpRef({
+        cnpj: contrato.pncp_control_number.split('-')[0],
+        ano: contrato.pncp_ano, sequencial: String(contrato.pncp_sequencial),
+        numeroControlePNCP: contrato.pncp_control_number, hasPncpRecord: true,
+      });
     }
-
-    return fetchPncpDocs(false);
-  }, [open, contrato, fetchPncpDocs]);
+    setPncpError(contrato.pncp_sync_error || null);
+    const fresh = (date?: string | null) => Boolean(date && Date.now() - new Date(date).getTime() < 86400000);
+    // Negative cache expires as well. An old false flag must not block new queries forever.
+    if (!fresh(contrato.pncp_documentos_checked_at) || !fresh(contrato.pncp_instrumentos_checked_at)) {
+      void fetchPncpDocs();
+    }
+    // This ref is a request generation counter, not a DOM ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => { ++pncpRequest.current; };
+  }, [open, contrato, cachedDocuments, cachedInstruments, detailsLoaded, fetchPncpDocs]);
 
   const content = (<>
+        {pncpError ? (
+          <div role="alert" className="mx-6 my-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+            <strong>Sincronização PNCP incompleta.</strong> {pncpError}
+            <p>Os dados já carregados foram preservados. Tente atualizar novamente.</p>
+          </div>
+        ) : null}
         <Header className="border-b border-border px-6 py-4 bg-card shrink-0">
           <Title className="flex flex-wrap items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -937,7 +887,7 @@ export function ContratoApiDetailsSheet({
                           ? `${pncpDocs.length} ${pncpDocs.length === 1 ? 'documento' : 'documentos'}`
                           : pncpRef?.hasPncpRecord
                             ? 'Publicado (sem PDF)'
-                            : 'Não localizado'
+                            : pncpError ? 'Falha na consulta' : 'Sem registro sincronizado'
                     }
                   />
                 </AccordionTrigger>
@@ -1033,7 +983,7 @@ export function ContratoApiDetailsSheet({
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground max-w-xl mx-auto">
-                        O registro deste contrato está publicado no PNCP para a UG {pncpRef.unidadeCodigo || 'do campus'}, porém o órgão ainda não disponibilizou arquivos PDF para download nesta contratação.
+                        O registro deste contrato está publicado no PNCP para a UG {pncpRef.unidadeCodigo || 'do campus'}, porém não há arquivos PDF sincronizados para esta contratação.
                       </p>
                       <div className="flex items-center justify-center gap-3 pt-1">
                         <Button
@@ -1063,7 +1013,7 @@ export function ContratoApiDetailsSheet({
                         Nenhum documento do PNCP sincronizado no banco de dados.
                       </p>
                       <p className="text-xs text-muted-foreground max-w-lg mx-auto">
-                        Contratos anteriores à Lei 14.133/2021 ou pendentes de envio pelo órgão ao PNCP não constam no portal nacional.
+                        A ausência de arquivos sincronizados não confirma ausência de publicação no PNCP. Use a consulta para verificar.
                       </p>
                       <Button
                         size="sm"

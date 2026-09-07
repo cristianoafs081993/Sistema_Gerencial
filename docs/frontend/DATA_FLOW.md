@@ -442,3 +442,11 @@ introduzido. A inspeção de empenhos pelo contrato usa o registro local existen
 em modo somente leitura; dados exclusivos da API continuam na tabela com a
 fonte identificada. O detalhamento da revisão está em
 [CONTRATOS_EMPENHOS_UI.md](CONTRATOS_EMPENHOS_UI.md).
+
+## Documentos e notas de contratos PNCP
+
+ContratoApiDetailsSheet → sincronizarContratoPncp → Edge Function autenticada
+sync-contratos-pncp-documentos → contratos_api_documentos / contratos_api_instrumentos_cobranca.
+Atualizações retornam somente recursos persistidos; falhas preservam a tela e são
+exibidas. Checagens negativas expiram e respostas de outro contrato são ignoradas.
+Ver [operação](../ops/PNCP_CONTRACT_SYNC.md).

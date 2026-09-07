@@ -1,3 +1,4 @@
+import { parseMoney } from '../../../supabase/functions/_shared/pncpContracts';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -73,15 +74,8 @@ export function ContratoNfeRastreabilidade({
     }
   }
 
-  const totalNfeValor = instrumentos.reduce((acc, inst) => {
-    const val = inst.notaFiscal?.valorNotaFiscal;
-    if (typeof val === 'number') return acc + val;
-    if (typeof val === 'string') {
-      const num = Number(val.replace(/\./g, '').replace(',', '.'));
-      return acc + (Number.isNaN(num) ? 0 : num);
-    }
-    return acc;
-  }, 0);
+  const totalNfeValor = instrumentos.reduce((sum, inst) =>
+    sum + (parseMoney(inst.notaFiscal?.valorNotaFiscal) || 0), 0);
 
   return (
     <div className="space-y-4">
@@ -177,7 +171,7 @@ export function ContratoNfeRastreabilidade({
             const valorNfe = inst.notaFiscal?.valorNotaFiscal
               ? (typeof inst.notaFiscal.valorNotaFiscal === 'number'
                   ? inst.notaFiscal.valorNotaFiscal
-                  : Number(String(inst.notaFiscal.valorNotaFiscal).replace(/\./g, '').replace(',', '.')))
+                  : parseMoney(inst.notaFiscal.valorNotaFiscal))
               : (faturaConciliada?.valor_bruto || 0);
 
             return (
@@ -308,10 +302,10 @@ export function ContratoNfeRastreabilidade({
                               {inst.itens.map((item, idx) => {
                                 const valUnit = typeof item.valorUnitario === 'number'
                                   ? item.valorUnitario
-                                  : Number(String(item.valorUnitario).replace(/\./g, '').replace(',', '.'));
+                                  : parseMoney(item.valorUnitario);
                                 const valTot = typeof item.valor === 'number'
                                   ? item.valor
-                                  : Number(String(item.valor).replace(/\./g, '').replace(',', '.'));
+                                  : parseMoney(item.valor);
 
                                 return (
                                   <TableRow key={idx} className="text-xs">

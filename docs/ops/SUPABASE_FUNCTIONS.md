@@ -515,24 +515,15 @@ Observacao:
 
 ### `sync-contratos-pncp-documentos`
 
-Local:
+Sincroniza PDFs e instrumentos PNCP com paginação completa, validação de identidade
+e persistência no servidor. Aceita atualização manual autenticada por `contratoApiId`
+e lotes do cron com service role. `verify_jwt = true`; o handler também valida o
+usuário. Documentos e notas têm marcos de sucesso separados; falhas são registradas
+em `pncp_sync_error` sem zerar os dados já salvos. O cron roda a cada cinco minutos,
+com até cinco contratos por lote e TTL de 24 horas. Exige a migration de reparo e
+uma chave service role no Vault para o cron.
 
-- [sync-contratos-pncp-documentos/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-contratos-pncp-documentos/index.ts)
-
-Uso:
-
-- sincroniza periodicamente os documentos oficiais (PDFs de contratos, aditivos, apostilamentos) e instrumentos de cobrança (NF-e com chaves SEFAZ de 44 dígitos e itens) a partir da API pública do PNCP (`GET /orgaos/{cnpj}/contratos/{ano}/{seq}/arquivos` e `GET /orgaos/{cnpj}/contratos/{ano}/{seq}/instrumentocobranca`)
-- resolve o `sequencialContrato` exato no PNCP via API de Consulta por UASG/Ano, com cache em memória durante a execução para evitar limites de taxa (503)
-- faz upsert direto nas tabelas `contratos_api_documentos` e `contratos_api_instrumentos_cobranca`, atualizando as colunas de controle em `contratos_api` (`pncp_control_number`, `pncp_sequencial`, `pncp_ano`, `pncp_has_record`, `pncp_documentos_checked_at`, `pncp_documentos_count`, `pncp_instrumentos_checked_at`, `pncp_instrumentos_count`)
-
-Dependencias:
-
-- `SUPABASE_SERVICE_ROLE_KEY`
-
-Observacao:
-
-- publicada com `verify_jwt = false`, pois é chamada pelo cron do banco e pelo backend
-- agendada via `pg_cron` / `pg_net` para executar diariamente às **`05:00` no horário de Brasília (`08:00 UTC`)**, horário dedicado e posterior às sincronizações da madrugada (03:00 Comprasnet, 03:30 Licitações, 04:00/04:30 Transparência), garantindo zero contenção de recursos no servidor
+Detalhes: [PNCP_CONTRACT_SYNC.md](PNCP_CONTRACT_SYNC.md).
 
 ### `sync-licitacoes-pncp`
 

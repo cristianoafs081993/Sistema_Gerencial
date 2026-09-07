@@ -124,6 +124,9 @@ export interface ContratoApiRow {
   pncp_has_record?: boolean | null;
   pncp_documentos_checked_at?: string | null;
   pncp_documentos_count?: number | null;
+  pncp_instrumentos_checked_at?: string | null;
+  pncp_instrumentos_count?: number | null;
+  pncp_sync_error?: string | null;
 }
 
 export interface ContratoApiEmpenhoRow {
@@ -696,7 +699,7 @@ export const contratosApiService = {
     const today = new Date().toISOString().slice(0, 10);
     let query = supabase
       .from('contratos_api')
-      .select('id, api_contrato_id, numero, fornecedor_nome, fornecedor_documento, unidade_codigo, unidade_nome, unidade_origem_codigo, unidade_origem_nome, objeto, processo, vigencia_inicio, vigencia_fim, vigencia_inicio_derivada, vigencia_fim_derivada, valor_global, valor_acumulado, situacao, situacao_derivada, situacao_derivada_motivo, campus_scope_reason, updated_at, categoria, prorrogavel:raw_data->>prorrogavel, pncp_sequencial, pncp_ano, pncp_control_number, pncp_has_record, pncp_documentos_checked_at, pncp_documentos_count')
+      .select('id, api_contrato_id, numero, fornecedor_nome, fornecedor_documento, unidade_codigo, unidade_nome, unidade_origem_codigo, unidade_origem_nome, objeto, processo, vigencia_inicio, vigencia_fim, vigencia_inicio_derivada, vigencia_fim_derivada, valor_global, valor_acumulado, situacao, situacao_derivada, situacao_derivada_motivo, campus_scope_reason, updated_at, categoria, prorrogavel:raw_data->>prorrogavel, pncp_sequencial, pncp_ano, pncp_control_number, pncp_has_record, pncp_documentos_checked_at, pncp_documentos_count, pncp_instrumentos_checked_at, pncp_instrumentos_count, pncp_sync_error')
       .in('campus_scope_reason', ['ug_campus', 'reitoria_com_empenho_campus', 'reitoria_com_fatura_campus'])
       .order('numero', { ascending: true });
 
