@@ -88,6 +88,8 @@ export const precoReferenciaService = {
     maxPages?: number;
     tamanhoPagina?: number;
     generateEmbeddings?: boolean;
+    resumeRunId?: string;
+    batchSize?: number;
   }) {
     const { data, error } = await supabase.functions.invoke('sync-precos-referencia', {
       body: payload,

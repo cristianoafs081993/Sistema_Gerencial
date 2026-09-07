@@ -411,7 +411,7 @@ function comparablePrice(item: SearchItem, row: PriceApiRow) {
   // If the units are exactly the same, they are compatible and can be converted via capacity.
   if (sourceMeasure && targetMeasure && sourceMeasure === targetMeasure) {
     if (sourceCapacity <= 0 || targetCapacity <= 0) {
-      return { price: originalPrice, compatible: true };
+      return { price: originalPrice, compatible: false };
     }
     return {
       price: originalPrice * (targetCapacity / sourceCapacity),
@@ -425,7 +425,7 @@ function comparablePrice(item: SearchItem, row: PriceApiRow) {
   // If they are convertible via physical scales
   if (source && target && source.dimension === target.dimension) {
     if (sourceCapacity <= 0 || targetCapacity <= 0) {
-      return { price: originalPrice, compatible: true };
+      return { price: originalPrice, compatible: false };
     }
     const sourceBaseAmount = sourceCapacity * source.scale;
     const targetBaseAmount = targetCapacity * target.scale;
@@ -435,8 +435,8 @@ function comparablePrice(item: SearchItem, row: PriceApiRow) {
     };
   }
 
-  // Otherwise, we do not perform automatic conversion, but we STILL treat them as compatible.
-  return { price: originalPrice, compatible: true };
+  // Unknown or non-convertible units must be reviewed before entering the basket.
+  return { price: originalPrice, compatible: false };
 }
 
 function buildPriceApiUrl(item: SearchItem, pageSize = 100, filters: SearchFilters = {}) {

@@ -174,7 +174,7 @@ export function isPriceResearchClarification(text: string): boolean {
   return (
     /pesquisa de pre[çc]o|cota[çc][ãa]o|in\s*65/.test(norm) &&
     (/esclare[çc]a|especifica[çc][ãa]o|detalh|muito gen[eé]ric|quais os requisitos|qual o formato|qual a configura[çc][ãa]o|qual o modelo|qual o tamanho|qual a capacidade/.test(norm) ||
-     /\|\|\s*sugestoes\s*\|\|/i.test(text))
+     /responda.*especifica|responder detalhando/.test(norm))
   );
 }
 
@@ -261,11 +261,11 @@ export function assessDemandClarity(demand: ExtractedDemandItem): DemandClarityR
     const hasRam = /\b\d+\s*(gb|gigas?)\b|memoria|ram/.test(desc);
     const hasStorage = /ssd|nvme|hd|disco|armazenamento|512\s*gb|256\s*gb|1\s*tb/.test(desc);
 
-    if (!hasProcessor && !hasRam && !hasStorage) {
+    if (!hasProcessor || !hasRam || !hasStorage) {
       return {
         isClear: false,
         category: 'computadores',
-        reason: `A demanda "${demand.description}" não informa processador, memória RAM ou armazenamento mínimo para compor cesta de preços homogênea conforme a IN 65/2021.`,
+        reason: `Complete os requisitos de "${demand.description}": ${[!hasProcessor && 'processador', !hasRam && 'memória RAM', !hasStorage && 'armazenamento'].filter(Boolean).join(', ')}.`,
         missingAttributes: [
           'Formato (Notebook portátil, Desktop padrão, All-in-One ou Servidor)',
           'Processador (ex.: Intel Core i5/i7 ou AMD Ryzen)',
@@ -498,6 +498,7 @@ export function mergeClarificationWithDemand(
 ): ExtractedDemandItem {
   const cleanClarification = clarificationText.trim();
   const parsedClarification = parseSingleDemandText(cleanClarification, originalDemand.itemNumber);
+  const explicitQuantity = cleanClarification.match(/(?:quantidade|qtd|quant\.?)\s*[:=]?\s*(\d+)|\b(\d+)\s*(?:unidades?|und|caixas?|pacotes?)\b/i);
 
   const baseDesc = normalizeText(originalDemand.description);
   const newDesc = normalizeText(cleanClarification);
@@ -510,8 +511,11 @@ export function mergeClarificationWithDemand(
   return {
     ...originalDemand,
     description: mergedDesc.trim(),
-    quantity: parsedClarification?.quantity && parsedClarification.quantity > 1 ? parsedClarification.quantity : originalDemand.quantity,
-    unit: parsedClarification?.unit && parsedClarification.unit !== 'UN' ? parsedClarification.unit : originalDemand.unit,
+    // Technical numbers (16 GB, 220 V, 12.000 BTU) never change the order quantity.
+    quantity: explicitQuantity && Number(explicitQuantity[1] || explicitQuantity[2]) > 0
+      ? Number(explicitQuantity[1] || explicitQuantity[2]) : originalDemand.quantity,
+    unit: /\b\d+\s*(?:unidades?|und|caixas?|pacotes?)\b/i.test(cleanClarification)
+      ? parsedClarification?.unit ?? originalDemand.unit : originalDemand.unit,
   };
 }
 
@@ -551,6 +555,7 @@ function isServiceDescription(text: string): boolean {
 }
 
 function parseSingleDemandText(text: string, defaultNumber = '1'): ExtractedDemandItem | null {
+  const catalogMatch = text.match(/\b(CATMAT|CATSER)\s*[:#-]?\s*(\d{4,9})\b/i);
   let cleaned = text
     .replace(/^(por\s+favor\s+)?(gostaria\s+de\s+)?(fazer\s+)?(uma\s+)?(pesquis(ar|e|ando|a)|cot(ar|e|ando|a[çc][ãa]o))\s+(de\s+|os?\s+)?(pre[çc]os?\s+)?(para|de|do|da)?\s*/i, '')
     .replace(/^(quanto\s+custa|qual\s+(o\s+)?valor\s+estimado\s+(de|para|do|da)?)\s*/i, '')
@@ -563,7 +568,8 @@ function parseSingleDemandText(text: string, defaultNumber = '1'): ExtractedDema
   let unit = 'UN';
 
   const qtyMatch = cleaned.match(/(?:(?:quantidade|qtd|quant\.?)\s*[:=]?\s*(\d+))|^(?:(\d+)\s*(unidades?|und?|un|caixas?|cx|pct|pacotes?|servi[çc]os?|meses|horas?|h)?\s*(?:de\s+)?)/i);
-  if (qtyMatch) {
+  const startsWithTechnicalMeasure = /^\d+(?:[.,]\d+)?\s*(?:gb|tb|mb|btus?|v|w|kw|pol|polegadas?|cm|mm|kg|ml|g|l)\b/i.test(cleaned);
+  if (qtyMatch && !startsWithTechnicalMeasure) {
     const matchedQty = parseInt(qtyMatch[1] || qtyMatch[2] || '1', 10);
     if (!isNaN(matchedQty) && matchedQty > 0) {
       quantity = matchedQty;
@@ -588,7 +594,8 @@ function parseSingleDemandText(text: string, defaultNumber = '1'): ExtractedDema
     description: cleaned,
     quantity,
     unit,
-    catalogType: isServiceDescription(cleaned) ? 'service' : 'material',
+    catalogType: catalogMatch ? (catalogMatch[1].toUpperCase() === 'CATSER' ? 'service' : 'material') : isServiceDescription(cleaned) ? 'service' : 'material',
+    suggestedCatalogCode: catalogMatch?.[2],
   };
 }
 

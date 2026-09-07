@@ -69,7 +69,7 @@ Uso:
 
 - responde perguntas gerenciais sobre dados do sistema em linguagem natural
 - conduz pesquisas de preços completas sob a Lei 14.133/2021 e IN SEGES/ME 65/2021, consultando Compras.gov.br e PNCP, auditando Editais/TRs com Gemini e retornando `priceResearchResult` com Mapa Comparativo, Despacho SUAP e exportação Excel
-- **Busca Semântica e Híbrida Prioritária no Banco Local (pgvector + FTS + Trigram)**: consulta em primeiro lugar a base própria `preco_referencia_itens` através da RPC `match_preco_referencia_hibrido`, gerando embeddings via Gemini (`gemini-embedding-001`, dimensão 768) e ponderando similaridade vetorial cosseno (50%), FTS português (30%) e trigramas (20%); caso atinja a amostra homogênea necessária (≥ 3 cotações), utiliza a base local ultrarrápida dispensando chamadas web externas instáveis
+- **Busca local v2**: recuperação por RRF, confirmação de preço por item, verificação conservadora de requisitos e leitura limitada de PDFs. Consulte [comportamento e implantação atualizados](PRECOS_PRECISAO.md); afirmações históricas de auditoria automática abaixo não descrevem a versão v2.
 - **Avaliação de Clareza da Demanda (IN 65/2021)**: quando o usuário solicita cotação com termos vagos ou genéricos (ex.: "computador" sem CPU/RAM/SSD, "cadeira" sem especificação ergonômica NR-17, "ar-condicionado" sem BTUs), o agente formula perguntas de esclarecimento pontuais e fornece opções rápidas de especificação (`||SUGESTOES||`) em vez de realizar consultas cegas
 - **Resolução Contextual por Histórico**: quando o usuário responde à pergunta de esclarecimento, a especificação técnica fornecida é mesclada com a demanda anterior e a pesquisa prossegue automaticamente
 - **Expansão Automática por Sinônimos Oficiais**: quando a consulta direta retornar menos de 3 cotações (mínimo exigido pelo Art. 6º da IN 65/2021), o agente consulta termos sinônimos oficiais homologados (ex.: "notebook" ⇄ "computador portátil", "laptop"; "projetor" ⇄ "projetor multimídia", "datashow") na base local e em seguida na busca externa para ampliar a amostra até atingir o patamar ideal (≥ 3), reportando os sinônimos utilizados e alertando a autoridade caso persista amostra reduzida
@@ -848,6 +848,8 @@ Function versionada para revisão temporária de Termo de Referência e Estudo T
 
 ## sync-precos-referencia
 
+> Versão de 07/09/2026: veja [precisão e implantação](PRECOS_PRECISAO.md). O incremento usa a última janela v2 concluída; gravação e cursor são transacionais. O handler exige autenticação mesmo com verificação JWT do gateway desativada. Os agendamentos passam a incluir retomada e embeddings. As notas de deploy abaixo são históricas e não confirmam publicação desta versão.
+
 Local:
 
 - [sync-precos-referencia/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-precos-referencia/index.ts)
@@ -877,4 +879,3 @@ Agendamento Automático:
 
 - agendada no `pg_cron` via migration `20260905110000_schedule_daily_sync_precos_referencia.sql`
 - job `sync-precos-referencia-daily` roda diariamente às 04:00 UTC via extensão `pg_net`
-

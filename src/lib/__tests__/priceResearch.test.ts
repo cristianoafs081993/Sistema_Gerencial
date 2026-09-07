@@ -548,11 +548,13 @@ describe('priceResearch', () => {
       ],
     });
 
-    expect(despacho).toContain('DESPACHO CONCLUSIVO - PESQUISA DE PREÇOS');
+    expect(despacho).toContain('MINUTA PARA REVISÃO - PESQUISA DE PREÇOS');
+    expect(despacho).not.toContain('Certifica-se');
+    expect(despacho).not.toContain('manifestação favorável');
     expect(despacho).toContain('23001.000123/2026-01');
     expect(despacho).toContain('Mediana');
     expect(despacho).toContain('55.000,00');
-    expect(despacho).toContain('Instrução Normativa SEGES/ME nº 65');
-    expect(despacho).toContain('Lei nº 14.133');
+    expect(despacho).toContain('enquadramento normativo');
+    expect(despacho).toContain('não certifica conformidade jurídica');
   });
 });

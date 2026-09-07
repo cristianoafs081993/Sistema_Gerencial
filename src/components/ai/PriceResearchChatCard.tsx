@@ -77,7 +77,7 @@ export function PriceResearchChatCard({ data, className }: PriceResearchChatCard
         method: data.calculationMethod,
         institutionName: 'Instituto Federal do Rio Grande do Norte - Campus Currais Novos',
         institutionUnit: 'Diretoria de Administração e Planejamento',
-        institutionDetails: 'Pesquisa de Preços automatizada com validação de Editais e TRs no PNCP',
+        institutionDetails: 'Pesquisa preliminar; evidências e limitações sujeitas à revisão do responsável',
         overallEstimatedTotal: data.overallEstimatedTotal,
         methodologyJustification: data.methodologyJustification || '',
         items: data.items.map((i) => ({
@@ -197,9 +197,12 @@ export function PriceResearchChatCard({ data, className }: PriceResearchChatCard
       const { data: insertedResearch, error: resError } = await supabase
         .from('price_researches')
         .insert({
-          user_id: userId,
+          created_by: userId,
           title: data.title,
-          status: 'completed',
+          object_description: data.demandSummary,
+          responsible_name: data.responsibleName || userResp.user?.email || 'Responsável não informado',
+          research_date: data.researchDate,
+          status: 'draft',
           calculation_method: data.calculationMethod,
           institution_name: 'IFRN Campus Currais Novos',
           institution_unit: 'Diretoria de Administração e Planejamento',
@@ -217,24 +220,28 @@ export function PriceResearchChatCard({ data, className }: PriceResearchChatCard
 
       // Insert items
       for (const item of data.items) {
-        await supabase.from('price_research_items').insert({
+        const { error: itemError } = await supabase.from('price_research_items').insert({
           research_id: researchId,
-          item_number: parseInt(item.itemNumber, 10) || 1,
+          local_id: `chat-${item.itemNumber}`,
+          item_number: item.itemNumber,
           description: item.description,
-          detailed_specification: item.detailedSpecification,
           catalog_type: item.catalogType,
           catalog_code: item.catalogCode,
           quantity: item.quantity,
           unit: item.unit,
-          candidates_count: item.candidatesCount,
-          raw_candidates: item.candidates,
+          candidates: item.candidates.map(c => ({ ...c,
+            sourceLabel: c.sourceType === 'painel_de_precos' ? 'Base local PNCP' : 'PNCP',
+            sourceUrl: c.pncpUrl, pncpSearchUrl: c.pncpUrl,
+            originalUnitPrice: c.unitPrice, aiReason: c.technicalJustification,
+          })),
         });
+        if (itemError) throw new Error(`Pesquisa ${researchId} salva parcialmente: ${itemError.message}`);
       }
 
       toast.success('Pesquisa salva com sucesso no módulo de Pesquisas de Preços!');
     } catch (err) {
       console.error(err);
-      toast.error('Não foi possível persistir a pesquisa no banco de dados.');
+      toast.error(err instanceof Error ? err.message : 'Não foi possível persistir a pesquisa no banco de dados.');
     } finally {
       setIsSaving(false);
     }
@@ -261,10 +268,10 @@ export function PriceResearchChatCard({ data, className }: PriceResearchChatCard
             </span>
             <div>
               <h4 className="text-xs font-bold text-foreground">
-                Pesquisa de Preços Normativa (IN 65/2021)
+                Pesquisa de Preços — Prévia para revisão
               </h4>
               <p className="text-[11px] text-muted-foreground">
-                {data.items.length} {data.items.length === 1 ? 'item pesquisado' : 'itens pesquisados'} • {totalAuditedEditais} editais/TRs auditados no PNCP
+                {data.items.length} {data.items.length === 1 ? 'item pesquisado' : 'itens pesquisados'} • {totalAuditedEditais} itens com PDF analisado por IA
               </p>
             </div>
           </div>
@@ -274,7 +281,7 @@ export function PriceResearchChatCard({ data, className }: PriceResearchChatCard
               variant={data.complianceValid ? 'default' : 'secondary'}
               className="text-[10px] uppercase font-semibold tracking-wide"
             >
-              {data.complianceValid ? 'Cesta Válida' : 'Atenção Normativa'}
+              Revisão necessária
             </Badge>
           </div>
         </div>
@@ -406,29 +413,24 @@ export function PriceResearchChatCard({ data, className }: PriceResearchChatCard
                               {cand.compatibility === 'INCOMPATIVEL' ? (
                                 <Badge variant="destructive" className="bg-destructive/10 text-destructive border-destructive/20 text-[10px] font-medium flex items-center gap-1">
                                   <AlertCircle className="h-3 w-3" />
-                                  Incompatível (0%)
+                                  Incompatível
                                 </Badge>
                               ) : cand.compatibility === 'COMPATIVEL_COM_RESSALVA' ? (
                                 <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20 text-[10px] font-medium flex items-center gap-1">
                                   <CheckCircle2 className="h-3 w-3" />
-                                  {cand.editalPage ? `Auditado (${cand.editalPage})` : 'Auditado c/ Ressalva'}
+                                  Requer revisão
                                 </Badge>
                               ) : cand.editalAudited ? (
                                 <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20 text-[10px] font-medium flex items-center gap-1">
                                   <CheckCircle2 className="h-3 w-3" />
-                                  {cand.editalPage ? `Auditado (${cand.editalPage})` : 'Edital Auditado'}
+                                  {cand.editalPage ? `PDF analisado (${cand.editalPage})` : 'PDF analisado por IA'}
                                 </Badge>
                               ) : (
                                 <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                                  PNCP Registrado
+                                  {cand.selected ? 'Descrição compatível' : 'Pendente de avaliação'}
                                 </Badge>
                               )}
 
-                              {cand.editalScore && cand.compatibility !== 'INCOMPATIVEL' ? (
-                                <span className="text-[10px] font-semibold text-muted-foreground">
-                                  Similaridade: {cand.editalScore}%
-                                </span>
-                              ) : null}
                             </div>
 
                             <div className="flex items-center gap-1">
@@ -530,7 +532,7 @@ export function PriceResearchChatCard({ data, className }: PriceResearchChatCard
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-sm font-bold">
                 <Sparkles className="h-4 w-4 text-primary" />
-                Auditoria de Edital / TR (IA Gemini)
+                Evidências e avaliação técnica
               </DialogTitle>
               <DialogDescription className="text-xs">
                 {selectedCandidateForModal.agencyName} • {selectedCandidateForModal.purchaseId}
@@ -538,6 +540,14 @@ export function PriceResearchChatCard({ data, className }: PriceResearchChatCard
             </DialogHeader>
 
             <div className="space-y-3 pt-2 text-xs">
+              {selectedCandidateForModal.requirements?.length ? (
+                <div className="space-y-1 rounded-lg border p-2.5">
+                  <p className="font-semibold">Conferência dos requisitos</p>
+                  {selectedCandidateForModal.requirements.map(r => (
+                    <p key={r.attribute}>{r.attribute}: solicitado {r.expected}; encontrado {r.observed || 'não informado'} — {r.status === 'atende' ? 'Atende' : r.status === 'nao_atende' ? 'Não atende' : 'Não informado'}</p>
+                  ))}
+                </div>
+              ) : null}
               {selectedCandidateForModal.itemDescription ? (
                 <div className="rounded-lg bg-muted/40 p-2.5">
                   <p className="font-semibold text-foreground">Item Registrado na Licitação:</p>
@@ -554,7 +564,7 @@ export function PriceResearchChatCard({ data, className }: PriceResearchChatCard
 
               {selectedCandidateForModal.editalExcerpt ? (
                 <div className="rounded-lg border border-border bg-background p-2.5">
-                  <p className="font-semibold text-foreground">Trecho Literal Extraído do Edital/TR:</p>
+                  <p className="font-semibold text-foreground">Trecho localizado no PDF por IA (conferir no original):</p>
                   <p className="mt-1 font-mono text-[11px] leading-relaxed text-muted-foreground whitespace-pre-wrap">
                     "{selectedCandidateForModal.editalExcerpt}"
                   </p>

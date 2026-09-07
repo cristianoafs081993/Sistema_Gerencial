@@ -44,6 +44,9 @@ export type AssistenteGerencialPriceResearchCandidate = {
   documentUrl?: string;
   itemDescription?: string;
   brand?: string;
+  priceKind?: 'homologado' | 'estimado' | 'nao_verificado';
+  documentSha256?: string;
+  requirements?: Array<{ attribute: string; expected: string; observed: string; status: 'atende' | 'nao_atende' | 'nao_informado' }>;
 };
 
 export type AssistenteGerencialPriceResearchItem = {

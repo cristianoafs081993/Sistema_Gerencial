@@ -38,7 +38,7 @@ const MAX_NETWORK_ATTEMPTS = 2;
 const NETWORK_RETRY_DELAY_MS = 650;
 
 function cleanContent(value: string, maxLength: number) {
-  return value.replace(/\s+/g, ' ').trim().slice(0, maxLength);
+  return value.replace(/[^\S\n]+/g, ' ').trim().slice(0, maxLength);
 }
 
 export function parseAssistenteGerencialSuggestions(text: string) {

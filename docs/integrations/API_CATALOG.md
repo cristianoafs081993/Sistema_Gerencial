@@ -714,6 +714,8 @@ Function chamada pela extensão na rota oficial de edição de ETP.
 
 ## 13. Assistente Gerencial - Pesquisa de Preços Textual e Auditoria de Editais (IN 65/2021)
 
+> Atualização v2 de 07/09/2026: a especificação vigente está em [Pesquisa de preços: precisão e recuperação](../ops/PRECOS_PRECISAO.md). A recuperação usa RRF local e resultados homologados por item no PNCP. A análise de descrições é distinguida da leitura efetiva de PDFs. Não há fallback entre modelos de embedding, aprovação automática por falha da IA nem certificação de conformidade. As descrições de auditoria e desempenho abaixo documentam o fluxo anterior.
+
 - Endpoint: `POST /functions/v1/assistente-gerencial`
 - Busca Textual Direta no PNCP: `GET https://pncp.gov.br/api/search/?q={termo}&tipos_documento=edital` utilizando cabeçalhos de navegador (`User-Agent`, `Origin: https://pncp.gov.br`, `Referer: https://pncp.gov.br/app/editais`) para evitar bloqueios WAF (`ECONNRESET`).
 - Recuperação de Documentos Oficiais: para cada contratação retornada, consulta `/arquivos` no PNCP para localizar PDFs de Edital, Termo de Referência ou Aviso de Dispensa com link de download direto.
@@ -738,4 +740,3 @@ Camada determinística de domínio e ferramentas agênticas baseadas no Model Co
   - `conciliacao.ts`: conciliação trilateral forense (`conciliarPtresCompleto`), cruzamento contrato x orçamento (`conciliarContratoComOrcamento`), rastreabilidade da despesa ponta a ponta (`rastrearTrilhaDespesa`) e varredura preventiva (`auditarSaudeOrcamentariaCampus`).
   - `mcp/tools.ts`: definições com JSON Schema das ferramentas agênticas (`conciliar_saldo_ptres`, `consultar_painel_orcamentario`, `consultar_ficha_empenho`, `pesquisar_empenhos`, `consultar_extrato_descentralizacoes`, `consultar_ficha_contrato`, `projetar_necessidade_contrato`, `conciliar_contrato_orcamento`, `rastrear_trilha_despesa`, `auditar_inconsistencias_orcamentarias`) e despachante universal `dispatchMcpTool`.
 - **Integração com Assistente Gerencial**: a Edge Function `assistente-gerencial` identifica menções a códigos de PTRES (ex: `231798`), executa a conciliação trilateral direta de dados do banco e fundamenta o diagnóstico do Gemini, eliminando alucinações sobre supostos déficits orçamentários quando se trata de mero descompasso com o cadastro de atividades no SUAP.
-

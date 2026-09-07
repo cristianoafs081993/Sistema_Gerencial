@@ -55,6 +55,10 @@ verify_jwt = false
 [functions.pesquisar-precos]
 verify_jwt = true
 
+# JWT or PRICE_SYNC_SECRET is validated by the handler (cron uses the secret).
+[functions.sync-precos-referencia]
+verify_jwt = false
+
 [functions.disparar-cotacao-email]
 verify_jwt = true
 
