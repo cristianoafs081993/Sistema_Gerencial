@@ -138,7 +138,9 @@ Observacao:
 
 Uso:
 
-- sincronizacao de contratos ativos e inativos, historico, empenhos, faturas, itens e vinculos fatura-item/fatura-empenho
+- sincronizacao de contratos ativos e inativos, historico, empenhos, faturas, itens, arquivos e vinculos fatura-item/fatura-empenho
+- recursos complementares: cronograma, garantias, responsaveis, prepostos, ocorrencias, despesas acessorias e terceirizados
+- as falhas dos recursos complementares são isoladas e não removem o último conteúdo válido
 
 Proxy local:
 
@@ -171,6 +173,14 @@ Endpoints observados:
 - `/contrato/{api_contrato_id}/faturas`
 - `/contrato/{api_contrato_id}/itens`
 - `/contrato/{api_contrato_id}/historico`
+- `/contrato/{api_contrato_id}/arquivos`
+- `/contrato/{api_contrato_id}/cronograma`
+- `/contrato/{api_contrato_id}/garantias`
+- `/contrato/{api_contrato_id}/responsaveis`
+- `/contrato/{api_contrato_id}/prepostos`
+- `/contrato/{api_contrato_id}/ocorrencias`
+- `/contrato/{api_contrato_id}/despesas_acessorias`
+- `/contrato/{api_contrato_id}/terceirizados`
 
 Descoberta publica em tempo real no modal de empenho:
 
@@ -725,9 +735,8 @@ Function chamada pela extensão na rota oficial de edição de ETP.
   - Fusão Contextual Item + Objeto do Edital: para evitar falsos negativos decorrentes de cadastros sucintos na linha da tabela de itens (ex: "NOTEBOOK DELL"), o sistema funde a denominação do item com o objeto detalhado da contratação e do edital antes de submeter ao auditor de IA.
   - Confronta a demanda do usuário com o texto do item licitado e do TR/Edital.
   - Se pertencer a categoria distinta (ex: equipamento médico para demanda de informática) ou for acessório desarmônico, classifica como `INCOMPATIVEL`, zera o score de similaridade e exclui obrigatoriamente o item da cesta de cálculo da mediana/média da IN 65/2021.
-  - Se compatível, gera parecer técnico fundamentado com trecho da especificação extraído do documento.
+- Se compatível, gera parecer técnico fundamentado com trecho da especificação extraído do documento.
 - Interface e Transparência: componente `PriceResearchChatCard` exibe itens aprovados e desconsiderados com distinção visual explícita (riscado e badge vermelho para incompatíveis), e modal de inspeção com parecer da IA e botão para abrir o PDF do Edital/TR.
-
 ## 14. GovFlow Core SDK & MCP Tools (Inteligência Orçamentária e Contratual)
 
 Camada determinística de domínio e ferramentas agênticas baseadas no Model Context Protocol (MCP) para conciliação trilateral e auditoria de despesas:

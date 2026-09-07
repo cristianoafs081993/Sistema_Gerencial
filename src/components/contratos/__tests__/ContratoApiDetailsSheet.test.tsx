@@ -44,6 +44,18 @@ const lastSyncRun: ContratoApiSyncRun = {
 };
 
 const details: ContratoApiDetails = {
+  recursos: [
+    {
+      id: 'recurso-garantia-1', contrato_api_id: 'contrato-api-1', tipo_recurso: 'garantias',
+      api_registro_id: 1, titulo: 'Seguro-garantia', descricao: 'Apólice vigente', situacao: 'Ativa',
+      data_inicio: null, data_fim: null, vencimento: '2026-11-30', valor: 70200.25, raw_data: {},
+    },
+    {
+      id: 'recurso-responsavel-1', contrato_api_id: 'contrato-api-1', tipo_recurso: 'responsaveis',
+      api_registro_id: 2, titulo: 'Fiscal Técnico — Servidor Teste', descricao: 'Portaria nº 80', situacao: 'Ativo',
+      data_inicio: '2026-01-01', data_fim: null, vencimento: null, valor: null, raw_data: { email: 'fiscal@ifrn.edu.br' },
+    },
+  ],
   historico: [
     {
       id: 'historico-1',
@@ -324,12 +336,18 @@ describe('ContratoApiDetailsSheet', () => {
     const historicoSection = screen.getByRole('button', { name: /Histórico do contrato/i });
     const itensSection = screen.getByRole('button', { name: /Itens/i });
     const faturasSection = screen.getByRole('button', { name: /Faturas associadas/i });
+    const gestaoSection = screen.getByRole('button', { name: /Gestão contratual/i });
     expect(historicoSection).toHaveAttribute('aria-expanded', 'false');
     expect(itensSection).toHaveAttribute('aria-expanded', 'false');
     expect(faturasSection).toHaveAttribute('aria-expanded', 'false');
+    expect(gestaoSection).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(historicoSection);
     fireEvent.click(itensSection);
     fireEvent.click(faturasSection);
+    fireEvent.click(gestaoSection);
+    expect(screen.getByText('Seguro-garantia')).toBeInTheDocument();
+    expect(screen.getByText('Fiscal Técnico — Servidor Teste')).toBeInTheDocument();
+    expect(screen.getByText('Vence 30/11/2026')).toBeInTheDocument();
     expect(screen.getAllByText('Origem Reitoria').length).toBeGreaterThan(0);
     expect(screen.getByText('Histórico do contrato')).toBeInTheDocument();
     expect(screen.getByText(/Assinatura - 00158\/2021/i)).toBeInTheDocument();
@@ -414,7 +432,7 @@ describe('ContratoApiDetailsSheet', () => {
       />,
     );
 
-    const docsSection = screen.getByRole('button', { name: /Documentos e Anexos Oficiais \(PNCP\)/i });
+    const docsSection = screen.getByRole('button', { name: /Documentos e Anexos Oficiais/i });
     expect(docsSection).toBeInTheDocument();
     fireEvent.click(docsSection);
 
@@ -494,7 +512,7 @@ describe('ContratoApiDetailsSheet', () => {
       />,
     );
 
-    const docsSection = screen.getByRole('button', { name: /Documentos e Anexos Oficiais \(PNCP\)/i });
+    const docsSection = screen.getByRole('button', { name: /Documentos e Anexos Oficiais/i });
     fireEvent.click(docsSection);
 
     await waitFor(() => {
@@ -550,7 +568,5 @@ describe('ContratoApiDetailsSheet', () => {
   });
 
 });
-
-
 
 

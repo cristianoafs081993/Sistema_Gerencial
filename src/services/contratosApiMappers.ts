@@ -157,9 +157,21 @@ export function mapFatura(contratoApiId: string, raw: ApiFatura) {
     data_emissao: toDate(raw.data_emissao ?? raw.emissao),
     data_vencimento: toDate(raw.data_vencimento ?? raw.vencimento ?? raw.prazo),
     data_pagamento: toDate(raw.data_pagamento),
+    data_ateste: toDate(raw.data_ateste ?? raw.ateste),
+    data_protocolo: toDate(raw.data_protocolo ?? raw.protocolo),
+    processo: raw.processo == null ? null : String(raw.processo),
+    chave_nfe: raw.chave_nfe == null ? null : String(raw.chave_nfe),
+    justificativa: raw.justificativa == null && raw.justificativafatura_id == null
+      ? null : String(raw.justificativa ?? raw.justificativafatura_id),
+    informacao_complementar: raw.informacao_complementar == null && raw.infcomplementar == null
+      ? null : String(raw.informacao_complementar ?? raw.infcomplementar),
+    repactuacao: raw.repactuacao == null ? null : String(raw.repactuacao),
     situacao: String(raw.situacao ?? ''),
     valor_bruto: toNumber(raw.valor_bruto ?? raw.valor),
     valor_liquido: toNumber(raw.valor_liquido ?? raw.valorliquido),
+    juros: toNumber(raw.juros),
+    multa: toNumber(raw.multa),
+    glosa: toNumber(raw.glosa),
     raw_data: raw,
   };
 }

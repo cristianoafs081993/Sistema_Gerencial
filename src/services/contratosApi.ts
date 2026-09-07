@@ -17,8 +17,9 @@ const CONTRATOS_API_BASE = '/api-contratos/api';
 const DEFAULT_UASG = '158366';
 const DEFAULT_PUBLIC_LIQUIDACOES_UASGS = [DEFAULT_UASG, '158155'];
 const DEFAULT_DISPLAY_UNIDADE_CODIGO = DEFAULT_UASG;
-const CONTRATOS_API_SYNC_RUNS_SELECT = 'id,unidade_codigo,started_at,finished_at,status,contratos_ativos,contratos_inativos,contratos_upserted,empenhos_upserted,faturas_upserted,itens_upserted,historicos_upserted,fatura_itens_upserted,fatura_empenhos_upserted,error_message,details';
+const CONTRATOS_API_SYNC_RUNS_SELECT = 'id,unidade_codigo,started_at,finished_at,status,contratos_ativos,contratos_inativos,contratos_upserted,empenhos_upserted,faturas_upserted,itens_upserted,historicos_upserted,fatura_itens_upserted,fatura_empenhos_upserted,arquivos_compras_upserted,recursos_complementares_upserted,error_message,details';
 const CONTRATOS_API_HISTORICO_SELECT = 'id, contrato_api_id, api_historico_id, numero, tipo, qualificacao_termo, observacao, ug, codigo_unidade_origem, nome_unidade_origem, data_assinatura, data_publicacao, vigencia_inicio, vigencia_fim, valor_inicial, valor_global, num_parcelas, valor_parcela, novo_valor_global, novo_num_parcelas, novo_valor_parcela, data_inicio_novo_valor, retroativo, retroativo_valor, situacao_contrato';
+const CONTRATOS_API_FATURA_SELECT = 'id, contrato_api_id, api_fatura_id, numero_instrumento_cobranca, mes_referencia, ano_referencia, situacao, valor_bruto, valor_liquido, data_emissao, data_vencimento, data_pagamento, data_ateste, data_protocolo, processo, chave_nfe, justificativa, informacao_complementar, repactuacao, juros, multa, glosa, raw_data';
 const MIGRATION_REQUIRED_MESSAGE =
   'MIGRATION_REQUIRED: tabelas do módulo de contratos API ainda não existem no banco. Aplique as migrations do Supabase.';
 
@@ -164,7 +165,18 @@ export interface ContratoApiFaturaRow {
   valor_bruto: number | null;
   valor_liquido: number | null;
   data_emissao: string | null;
+  data_vencimento?: string | null;
   data_pagamento: string | null;
+  data_ateste?: string | null;
+  data_protocolo?: string | null;
+  processo?: string | null;
+  chave_nfe?: string | null;
+  justificativa?: string | null;
+  informacao_complementar?: string | null;
+  repactuacao?: string | null;
+  juros?: number | null;
+  multa?: number | null;
+  glosa?: number | null;
   raw_data?: Record<string, unknown> | null;
 }
 
@@ -247,6 +259,42 @@ export interface ContratoApiDocumentoRow {
   updated_at?: string;
 }
 
+export interface ContratoApiComprasDocumentoRow {
+  id: string;
+  contrato_api_id: string;
+  api_arquivo_id: number;
+  tipo?: string | null;
+  processo?: string | null;
+  descricao?: string | null;
+  url: string;
+  origem?: string | null;
+  link_sei?: string | null;
+  raw_data?: Record<string, unknown> | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type ContratoApiRecursoTipo =
+  | 'cronograma' | 'garantias' | 'responsaveis' | 'prepostos'
+  | 'ocorrencias' | 'despesas_acessorias' | 'terceirizados';
+
+export interface ContratoApiRecursoRow {
+  id: string;
+  contrato_api_id: string;
+  tipo_recurso: ContratoApiRecursoTipo;
+  api_registro_id: number;
+  titulo?: string | null;
+  descricao?: string | null;
+  situacao?: string | null;
+  data_inicio?: string | null;
+  data_fim?: string | null;
+  vencimento?: string | null;
+  valor?: number | null;
+  raw_data?: Record<string, unknown> | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface ContratoApiInstrumentoCobrancaRow {
   id: string;
   contrato_api_id: string;
@@ -296,6 +344,8 @@ export interface ContratoApiDetails {
   faturaItens: ContratoApiFaturaItemRow[];
   faturaEmpenhos: ContratoApiFaturaEmpenhoRow[];
   documentos?: ContratoApiDocumentoRow[];
+  documentosCompras?: ContratoApiComprasDocumentoRow[];
+  recursos?: ContratoApiRecursoRow[];
   instrumentosCobranca?: ContratoApiInstrumentoCobrancaRow[];
 }
 
@@ -314,6 +364,8 @@ export interface ContratoApiSyncRun {
   historicos_upserted?: number;
   fatura_itens_upserted?: number;
   fatura_empenhos_upserted?: number;
+  arquivos_compras_upserted?: number;
+  recursos_complementares_upserted?: number;
   error_message: string | null;
   details: Record<string, unknown> | null;
 }
@@ -785,7 +837,7 @@ export const contratosApiService = {
   async getFaturasApi(contratoApiIds?: string[], period?: ContratoApiFaturasPeriod): Promise<ContratoApiFaturaRow[]> {
     let query = supabase
       .from('contratos_api_faturas')
-      .select('id, contrato_api_id, api_fatura_id, numero_instrumento_cobranca, mes_referencia, ano_referencia, situacao, valor_bruto, valor_liquido, data_emissao, data_pagamento, raw_data');
+      .select(CONTRATOS_API_FATURA_SELECT);
 
     if (contratoApiIds && contratoApiIds.length > 0 && contratoApiIds.length <= 100) {
       query = query.in('contrato_api_id', contratoApiIds);
@@ -828,7 +880,7 @@ export const contratosApiService = {
   },
 
   async getContratoApiDetails(contratoApiId: string): Promise<ContratoApiDetails> {
-    const [historicoResult, empenhosResult, itensResult, faturasResult, faturaItensResult, faturaEmpenhosResult, documentosResult, instrumentosResult] = await Promise.all([
+    const [historicoResult, empenhosResult, itensResult, faturasResult, faturaItensResult, faturaEmpenhosResult, documentosResult, documentosComprasResult, recursosResult, instrumentosResult] = await Promise.all([
       supabase
         .from('contratos_api_historico')
         .select(CONTRATOS_API_HISTORICO_SELECT)
@@ -846,7 +898,7 @@ export const contratosApiService = {
         .order('numero_item_compra', { ascending: true }),
       supabase
         .from('contratos_api_faturas')
-        .select('id, contrato_api_id, api_fatura_id, numero_instrumento_cobranca, mes_referencia, ano_referencia, situacao, valor_bruto, valor_liquido, data_emissao, data_pagamento, raw_data')
+        .select(CONTRATOS_API_FATURA_SELECT)
         .eq('contrato_api_id', contratoApiId)
         .order('data_emissao', { ascending: false }),
       supabase
@@ -863,6 +915,16 @@ export const contratosApiService = {
         .eq('contrato_api_id', contratoApiId)
         .order('sequencial_documento', { ascending: true }),
       supabase
+        .from('contratos_api_compras_documentos')
+        .select('id, contrato_api_id, api_arquivo_id, tipo, processo, descricao, url, origem, link_sei, raw_data, created_at, updated_at')
+        .eq('contrato_api_id', contratoApiId)
+        .order('api_arquivo_id', { ascending: true }),
+      supabase
+        .from('contratos_api_recursos')
+        .select('id, contrato_api_id, tipo_recurso, api_registro_id, titulo, descricao, situacao, data_inicio, data_fim, vencimento, valor, raw_data, created_at, updated_at')
+        .eq('contrato_api_id', contratoApiId)
+        .order('tipo_recurso', { ascending: true }),
+      supabase
         .from('contratos_api_instrumentos_cobranca')
         .select('id, contrato_api_id, sequencial_instrumento_cobranca, tipo_id, tipo_nome, tipo_descricao, numero_instrumento_cobranca, data_emissao, chave_nfe, data_consulta_nfe, status_response_nfe, valor_nota_fiscal, serie, tipo_evento_mais_recente, data_tipo_evento_mais_recente, nome_fornecedor, cnpj_fornecedor, municipio_fornecedor, itens, eventos, raw_data, created_at, updated_at')
         .eq('contrato_api_id', contratoApiId)
@@ -877,7 +939,10 @@ export const contratosApiService = {
       faturaItensResult.error ||
       faturaEmpenhosResult.error ||
       documentosResult.error ||
+      documentosComprasResult.error ||
+      recursosResult.error ||
       instrumentosResult.error;
+    if (firstError) throwMigrationRequired(firstError);
     const empenhos = (empenhosResult.data ?? []) as ContratoApiEmpenhoRow[];
     const empenhoIds = new Set(empenhos.map((empenho) => empenho.id));
     const apiEmpenhoIds = new Set(empenhos.map((empenho) => Number(empenho.api_empenho_id)));
@@ -904,6 +969,8 @@ export const contratosApiService = {
       faturaItens,
       faturaEmpenhos,
       documentos: (documentosResult.data ?? []) as ContratoApiDocumentoRow[],
+      documentosCompras: (documentosComprasResult.data ?? []) as ContratoApiComprasDocumentoRow[],
+      recursos: (recursosResult.data ?? []) as ContratoApiRecursoRow[],
       instrumentosCobranca: (instrumentosResult.data ?? []) as ContratoApiInstrumentoCobrancaRow[],
     };
   },

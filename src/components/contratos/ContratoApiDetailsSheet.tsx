@@ -53,11 +53,13 @@ import { cn, formatCurrency } from '@/lib/utils';
 import { getValorTotalFromHistorico } from '@/utils/contratosApiHistorico';
 import type {
   ContratoApiDetails,
+  ContratoApiComprasDocumentoRow,
   ContratoApiFaturaEmpenhoRow,
   ContratoApiFaturaItemRow,
   ContratoApiFaturaRow,
   ContratoApiHistoricoRow,
   ContratoApiItemRow,
+  ContratoApiRecursoRow,
   ContratoApiRow,
   ContratoApiSyncRun,
 } from '@/services/contratosApi';
@@ -118,6 +120,42 @@ const formatDate = (value: string | null | undefined) => {
   if (Number.isNaN(date.getTime())) return '-';
   return new Intl.DateTimeFormat('pt-BR').format(date);
 };
+
+function DocumentosComprasTable({ documentos }: { documentos: ContratoApiComprasDocumentoRow[] }) {
+  return (
+    <div className="overflow-x-auto rounded-md border border-border/70">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Documento</TableHead>
+            <TableHead>Tipo</TableHead>
+            <TableHead>Origem</TableHead>
+            <TableHead className="text-right">Ação</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {documentos.map((doc) => (
+            <TableRow key={doc.id}>
+              <TableCell>
+                <div className="font-medium text-foreground max-w-md truncate" title={doc.descricao ?? undefined}>
+                  {doc.descricao || `Arquivo ${doc.api_arquivo_id}`}
+                </div>
+                {doc.processo ? <div className="text-xs text-muted-foreground">Processo {doc.processo}</div> : null}
+              </TableCell>
+              <TableCell><Badge variant="secondary" className="text-[10px] font-normal">{doc.tipo || 'Documento'}</Badge></TableCell>
+              <TableCell className="text-xs text-muted-foreground">{doc.origem || 'Compras.gov.br'}</TableCell>
+              <TableCell className="text-right">
+                <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs text-action-primary border-action-primary/30 hover:bg-action-primary/10" onClick={() => window.open(doc.url, '_blank', 'noopener,noreferrer')} title="Abrir arquivo oficial">
+                  <Download className="h-3.5 w-3.5" /><span>Abrir arquivo</span>
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
 
 const normalizeDateValue = (value: unknown) => {
   if (!value) return null;
@@ -299,8 +337,18 @@ function FaturaLine({
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             Emissão {formatDate(fatura.data_emissao)}
+            {fatura.data_ateste ? ` | Ateste ${formatDate(fatura.data_ateste)}` : ''}
+            {fatura.data_vencimento ? ` | Vencimento ${formatDate(fatura.data_vencimento)}` : ''}
             {empenhos.length > 0 ? ` | Empenho ${empenhos.map((item) => item.numero_empenho).filter(Boolean).join(', ')}` : ''}
           </p>
+          {(Number(fatura.glosa) > 0 || Number(fatura.juros) > 0 || Number(fatura.multa) > 0 || fatura.repactuacao) ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {Number(fatura.glosa) > 0 ? `Glosa ${formatCurrency(Number(fatura.glosa))}` : ''}
+              {Number(fatura.juros) > 0 ? `${Number(fatura.glosa) > 0 ? ' | ' : ''}Juros ${formatCurrency(Number(fatura.juros))}` : ''}
+              {Number(fatura.multa) > 0 ? `${Number(fatura.glosa) > 0 || Number(fatura.juros) > 0 ? ' | ' : ''}Multa ${formatCurrency(Number(fatura.multa))}` : ''}
+              {fatura.repactuacao ? ` | Repactuação: ${fatura.repactuacao}` : ''}
+            </p>
+          ) : null}
           {faturaItem ? (
             <p className="mt-1 text-xs text-muted-foreground">
               Qtd. {formatNumber(faturaItem.quantidade_faturado)} | Unitário {formatCurrency(faturaItem.valor_unitario_faturado ?? 0)}
@@ -316,6 +364,68 @@ function FaturaLine({
       </div>
     </div>
   );
+}
+
+const RECURSO_LABELS: Record<ContratoApiRecursoRow['tipo_recurso'], string> = {
+  cronograma: 'Cronograma',
+  garantias: 'Garantias',
+  responsaveis: 'Responsáveis',
+  prepostos: 'Prepostos',
+  ocorrencias: 'Ocorrências',
+  despesas_acessorias: 'Despesas acessórias',
+  terceirizados: 'Terceirizados',
+};
+
+function getRecursoDetails(recurso: ContratoApiRecursoRow) {
+  const raw = recurso.raw_data ?? {};
+  return [
+    raw.email ? String(raw.email) : null,
+    raw.celular ? String(raw.celular) : raw.telefonefixo ? String(raw.telefonefixo) : null,
+    raw.recorrencia_id ? `Recorrência: ${String(raw.recorrencia_id)}` : null,
+    raw.unidade ? `Unidade: ${String(raw.unidade)}` : null,
+    raw.jornada ? `Jornada: ${String(raw.jornada)}h` : null,
+    raw.notificapreposto ? `Notifica preposto: ${String(raw.notificapreposto)}` : null,
+  ].filter(Boolean).join(' | ');
+}
+
+function ContratoGestaoRecursos({ recursos }: { recursos: ContratoApiRecursoRow[] }) {
+  const grouped = Object.entries(RECURSO_LABELS).map(([tipo, label]) => ({
+    tipo: tipo as ContratoApiRecursoRow['tipo_recurso'],
+    label,
+    rows: recursos.filter((row) => row.tipo_recurso === tipo),
+  })).filter((group) => group.rows.length > 0);
+
+  if (grouped.length === 0) {
+    return <div className="rounded-md border border-dashed border-border/70 p-6 text-center text-sm text-muted-foreground">Nenhum recurso complementar sincronizado para este contrato.</div>;
+  }
+
+  return <div className="space-y-4">{grouped.map((group) => (
+    <div key={group.tipo} className="space-y-2">
+      <div className="flex items-center gap-2">
+        <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{group.label}</p>
+        <Badge variant="secondary" className="text-[10px]">{group.rows.length}</Badge>
+      </div>
+      <div className="overflow-x-auto rounded-md border border-border/70">
+        <Table>
+          <TableHeader><TableRow><TableHead>Registro</TableHead><TableHead>Período</TableHead><TableHead>Situação</TableHead><TableHead className="text-right">Valor</TableHead></TableRow></TableHeader>
+          <TableBody>{group.rows.map((row) => (
+            <TableRow key={row.id}>
+              <TableCell>
+                <p className="font-medium">{row.titulo || `${group.label} ${row.api_registro_id}`}</p>
+                {row.descricao ? <p className="mt-1 max-w-xl text-xs text-muted-foreground">{row.descricao}</p> : null}
+                {getRecursoDetails(row) ? <p className="mt-1 text-xs text-muted-foreground">{getRecursoDetails(row)}</p> : null}
+              </TableCell>
+              <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                {row.vencimento ? `Vence ${formatDate(row.vencimento)}` : row.data_inicio || row.data_fim ? `${formatDate(row.data_inicio)} a ${formatDate(row.data_fim)}` : '-'}
+              </TableCell>
+              <TableCell>{row.situacao ? <Badge variant="outline" className="text-[10px]">{row.situacao}</Badge> : '-'}</TableCell>
+              <TableCell className="whitespace-nowrap text-right">{row.valor == null ? '-' : formatCurrency(Number(row.valor))}</TableCell>
+            </TableRow>
+          ))}</TableBody>
+        </Table>
+      </div>
+    </div>
+  ))}</div>;
 }
 
 export function ContratoApiDetailsSheet({
@@ -345,6 +455,7 @@ export function ContratoApiDetailsSheet({
   const faturaItens = (details?.faturaItens ?? []).filter((item) => visibleFaturaIds.has(item.contrato_api_fatura_id));
   const faturaEmpenhos = (details?.faturaEmpenhos ?? []).filter((item) => visibleFaturaIds.has(item.contrato_api_fatura_id));
   const historico = details?.historico ?? [];
+  const recursos = details?.recursos ?? [];
   const itemById = new Map((details?.itens ?? []).map((item) => [item.id, item]));
   const faturaById = new Map(faturas.map((fatura) => [fatura.id, fatura]));
   const empenhosByFatura = buildFaturaEmpenhosMap(faturaEmpenhos);
@@ -397,6 +508,7 @@ export function ContratoApiDetailsSheet({
   const pncpRequest = useRef(0);
   const contratoId = contrato?.id;
   const cachedDocuments = details?.documentos;
+  const comprasDocuments = details?.documentosCompras ?? [];
   const cachedInstruments = details?.instrumentosCobranca;
   const detailsLoaded = Boolean(details);
   const fetchPncpDocs = useCallback(async (_forceLive = true) => {
@@ -613,7 +725,7 @@ export function ContratoApiDetailsSheet({
                 <TableCell><p>{row.tipo}</p><p className="mt-1 text-xs text-muted-foreground">{row.fonte}</p></TableCell><TableCell className="font-data text-right whitespace-nowrap">{formatCurrency(row.valor)}</TableCell><TableCell className="font-data text-right whitespace-nowrap">{formatCurrency(row.liquidado)}</TableCell><TableCell className="font-data text-right whitespace-nowrap">{formatCurrency(row.saldo)}</TableCell>
               </TableRow>) : <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Nenhum empenho vinculado ao campus.</TableCell></TableRow>}</TableBody></Table>
             </DataTablePanel>}
-            <Accordion defaultValue={pageMode ? ['historico', 'itens', 'faturas', 'documentos', 'nfe-rastreabilidade'] : undefined} key={contrato?.id ?? 'sem-contrato'} type="multiple" className="space-y-3">
+            <Accordion defaultValue={pageMode ? ['historico', 'itens', 'faturas', 'gestao-contratual', 'documentos', 'nfe-rastreabilidade'] : undefined} key={contrato?.id ?? 'sem-contrato'} type="multiple" className="space-y-3">
               <AccordionItem hidden={pageMode && detailTab !== 'documentos'} value="historico" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
                 <AccordionTrigger className="gap-3 py-4 hover:no-underline">
                   <AccordionSectionTitle
@@ -874,17 +986,31 @@ export function ContratoApiDetailsSheet({
                 </AccordionContent>
               </AccordionItem>
 
+              <AccordionItem hidden={pageMode && detailTab !== 'documentos'} value="gestao-contratual" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+                <AccordionTrigger className="gap-3 py-4 hover:no-underline">
+                  <AccordionSectionTitle
+                    icon={<CalendarClock className="h-4 w-4" />}
+                    title="Gestão contratual"
+                    description="Cronograma, garantias, responsáveis, prepostos, ocorrências, despesas e terceirizados."
+                    count={`${recursos.length} registros`}
+                  />
+                </AccordionTrigger>
+                <AccordionContent className="pb-4 pt-0">
+                  <ContratoGestaoRecursos recursos={recursos} />
+                </AccordionContent>
+              </AccordionItem>
+
               <AccordionItem hidden={pageMode && detailTab !== 'documentos'} value="documentos" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
                 <AccordionTrigger className="gap-3 py-4 hover:no-underline">
                   <AccordionSectionTitle
                     icon={<FileDown className="h-4 w-4" />}
-                    title="Documentos e Anexos Oficiais (PNCP)"
-                    description="Contrato assinado, termos aditivos e publicações em PDF disponibilizados no PNCP."
+                    title="Documentos e Anexos Oficiais"
+                    description="Arquivos do PNCP e do Compras.gov.br, com a fonte identificada."
                     count={
                       isLoadingPncpDocs
                         ? 'Carregando...'
-                        : pncpDocs.length > 0
-                          ? `${pncpDocs.length} ${pncpDocs.length === 1 ? 'documento' : 'documentos'}`
+                        : pncpDocs.length + comprasDocuments.length > 0
+                          ? `${pncpDocs.length + comprasDocuments.length} ${(pncpDocs.length + comprasDocuments.length) === 1 ? 'documento' : 'documentos'}`
                           : pncpRef?.hasPncpRecord
                             ? 'Publicado (sem PDF)'
                             : pncpError ? 'Falha na consulta' : 'Sem registro sincronizado'
@@ -892,6 +1018,15 @@ export function ContratoApiDetailsSheet({
                   />
                 </AccordionTrigger>
                 <AccordionContent className="pb-4 pt-0 space-y-3">
+                  {comprasDocuments.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="outline" className="text-[10px]">Compras.gov.br</Badge>
+                        <span>{comprasDocuments.length} {comprasDocuments.length === 1 ? 'arquivo encontrado' : 'arquivos encontrados'}</span>
+                      </div>
+                      <DocumentosComprasTable documentos={comprasDocuments} />
+                    </div>
+                  ) : null}
                   {isLoadingPncpDocs ? (
                     <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin text-primary" />
@@ -901,7 +1036,8 @@ export function ContratoApiDetailsSheet({
                     <div className="space-y-3">
                       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                         <span>
-                          {pncpDocs.length} {pncpDocs.length === 1 ? 'arquivo oficial encontrado' : 'arquivos oficiais encontrados'} no PNCP
+                          <Badge variant="outline" className="mr-2 text-[10px]">PNCP</Badge>
+                          {pncpDocs.length} {pncpDocs.length === 1 ? 'arquivo oficial encontrado' : 'arquivos oficiais encontrados'}
                           {pncpRef?.numeroControlePNCP ? ` (${pncpRef.numeroControlePNCP})` : ''}
                         </span>
                         <div className="flex items-center gap-3">
@@ -1007,7 +1143,7 @@ export function ContratoApiDetailsSheet({
                         </a>
                       </div>
                     </div>
-                  ) : (
+                  ) : comprasDocuments.length > 0 ? null : (
                     <div className="rounded-md border border-dashed border-border/70 p-6 text-center space-y-3">
                       <p className="text-sm font-medium text-foreground">
                         Nenhum documento do PNCP sincronizado no banco de dados.
@@ -1068,4 +1204,3 @@ export function ContratoApiDetailsSheet({
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="flex h-[min(90vh,880px)] w-[calc(100vw-2rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0 bg-background sm:rounded-2xl border border-border shadow-2xl">{content}</DialogContent></Dialog>;
 
 }
-

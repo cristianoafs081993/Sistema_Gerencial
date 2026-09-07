@@ -491,7 +491,10 @@ Local:
 Uso:
 
 - sincroniza contratos e empenhos de todas as 19 Unidades Gestoras (UASGs) do catálogo institucional do IFRN (`DEFAULT_PNCP_UASGS`) a partir de `https://contratos.comprasnet.gov.br/api`
-- busca contratos ativos, inativos, historico, empenhos, faturas e itens
+- busca contratos ativos, inativos, historico, empenhos, faturas, itens e arquivos
+- sincroniza recursos complementares por contrato: cronograma, garantias, responsáveis, prepostos, ocorrências, despesas acessórias e terceirizados
+- recursos complementares são atualizados de forma independente; falha isolada preserva o último dado válido e é registrada em `details.resource_errors`
+- normaliza ateste, protocolo, vencimento, processo, chave NF-e, glosa, juros, multa e repactuação das faturas
 - deriva `situacao_derivada`, `vigencia_inicio_derivada`, `vigencia_fim_derivada`, `situacao_derivada_motivo` e `campus_scope_reason` em `contratos_api`
 - considera ativo somente contrato com vigencia derivada pelo historico ainda vigente; termos de rescisao/cancelamento tornam o contrato inativo; sem historico, usa `vigencia_fim` da listagem como fallback com motivo registrado. Se o historico estiver vencido mas o contrato for ativo na API com faturas nos ultimos 120 dias, e reativado com motivo `historico_vencido_com_fatura_recente`
 - contratos da UG `158155` entram no escopo do campus somente com evidencia operacional estruturada do campus `158366`, como empenho ou fatura com UG/contratante do campus
@@ -505,6 +508,11 @@ Dependencias:
 
 - `SUPABASE_SERVICE_ROLE_KEY`
 - opcional `CONTRATOS_SYNC_SECRET` para exigir o header `x-contratos-sync-secret`
+
+Migrations necessárias para os recursos adicionais:
+
+- `20260907090000_create_contratos_api_compras_documentos.sql`
+- `20260907103000_add_contratos_api_gestao_recursos.sql`
 
 Observacao:
 
