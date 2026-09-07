@@ -14,13 +14,34 @@ export type ContratoApiFaturaEmpenhoPayload = ReturnType<typeof mapFaturaEmpenho
 
 export function toNumber(value: unknown): number {
   if (value == null) return 0;
-  if (typeof value === 'number') return value;
-  const cleaned = String(value)
-    .trim()
-    .replace(/\./g, '')
-    .replace(',', '.')
-    .replace(/[^\d.-]/g, '');
-  return Number(cleaned) || 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+
+  const raw = String(value).trim().replace(/[^\d,.-]/g, '');
+  if (!raw || raw === '-' || raw === '.' || raw === ',') return 0;
+
+  const sign = raw.startsWith('-') ? '-' : '';
+  const unsigned = raw.replace(/-/g, '');
+  const lastComma = unsigned.lastIndexOf(',');
+  const lastDot = unsigned.lastIndexOf('.');
+  let decimalIndex = -1;
+
+  if (lastComma >= 0 && lastDot >= 0) {
+    // A API mistura formatos brasileiro (1.234,56) e decimal (0.6376).
+    // Quando os dois separadores existem, o último é o decimal.
+    decimalIndex = Math.max(lastComma, lastDot);
+  } else if (lastComma >= 0) {
+    decimalIndex = lastComma;
+  } else if (lastDot >= 0) {
+    const dotGroups = unsigned.split('.');
+    const isThousandsOnly = dotGroups.length > 2 && dotGroups.slice(1).every((group) => group.length === 3);
+    decimalIndex = isThousandsOnly ? -1 : lastDot;
+  }
+
+  const normalized = decimalIndex >= 0
+    ? `${sign}${unsigned.slice(0, decimalIndex).replace(/[.,]/g, '') || '0'}.${unsigned.slice(decimalIndex + 1).replace(/[.,]/g, '')}`
+    : `${sign}${unsigned.replace(/[.,]/g, '')}`;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 export function toDate(value: unknown): string | null {

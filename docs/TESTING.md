@@ -34,6 +34,7 @@ Contratos via Comprasnet:
 - a sincronizacao deve ter regressao garantindo que contratos retornados pelo endpoint de "ativos" nao aparecem como ativos quando o historico esta vencido
 - contratos da UG `158155` devem ter teste de escopo: entram somente com evidencia operacional estruturada do campus `158366`
 - a UI de contratos deve testar que o upload manual XLSX nao aparece, que o status da ultima sincronizacao e exibido ao superadmin e que a lista usa `situacao_derivada`
+- `contratosApiMappers.test.ts` deve cobrir numeros brasileiros e decimais com ponto retornados pela API, incluindo `quantidade` e `quantidade_faturado`, para impedir que a normalizacao infle valores e interrompa a sincronizacao
 
 Pregoes via PNCP:
 

@@ -8,9 +8,17 @@ import {
   mapFatura,
   mapHistorico,
   mapItem,
+  mapFaturaItem,
+  toNumber,
 } from '@/services/contratosApiMappers';
 
 describe('contratosApiMappers', () => {
+  it('preserva decimais quando a API retorna ponto como separador decimal', () => {
+    expect(toNumber('0.6376')).toBe(0.6376);
+    expect(toNumber('1.00000')).toBe(1);
+    expect(toNumber('4.629.457,80')).toBe(4629457.8);
+  });
+
   it('mapeia contrato com unidade gestora aninhada no contratante', () => {
     expect(
       mapContrato(
@@ -276,6 +284,21 @@ describe('contratosApiMappers', () => {
           valor_total: '201.994,80',
         },
       ],
+    });
+  });
+
+  it('preserva a quantidade decimal faturada retornada pela API', () => {
+    expect(
+      mapFaturaItem('contrato-api-1', 'fatura-api-1', 'item-api-1', {
+        id_item_contrato: 325154,
+        quantidade_faturado: '1.00000',
+        valorunitario_faturado: '0.6376',
+        valortotal_faturado: '0.6376',
+      }),
+    ).toMatchObject({
+      quantidade_faturado: 1,
+      valor_unitario_faturado: 0.6376,
+      valor_total_faturado: 0.6376,
     });
   });
 

@@ -18,8 +18,10 @@ const DEFAULT_UASG = '158366';
 const DEFAULT_PUBLIC_LIQUIDACOES_UASGS = [DEFAULT_UASG, '158155'];
 const DEFAULT_DISPLAY_UNIDADE_CODIGO = DEFAULT_UASG;
 const CONTRATOS_API_SYNC_RUNS_SELECT = 'id,unidade_codigo,started_at,finished_at,status,contratos_ativos,contratos_inativos,contratos_upserted,empenhos_upserted,faturas_upserted,itens_upserted,historicos_upserted,fatura_itens_upserted,fatura_empenhos_upserted,arquivos_compras_upserted,recursos_complementares_upserted,error_message,details';
+const CONTRATOS_API_SYNC_RUNS_LEGACY_SELECT = 'id,unidade_codigo,started_at,finished_at,status,contratos_ativos,contratos_inativos,contratos_upserted,empenhos_upserted,faturas_upserted,itens_upserted,historicos_upserted,fatura_itens_upserted,fatura_empenhos_upserted,error_message,details';
 const CONTRATOS_API_HISTORICO_SELECT = 'id, contrato_api_id, api_historico_id, numero, tipo, qualificacao_termo, observacao, ug, codigo_unidade_origem, nome_unidade_origem, data_assinatura, data_publicacao, vigencia_inicio, vigencia_fim, valor_inicial, valor_global, num_parcelas, valor_parcela, novo_valor_global, novo_num_parcelas, novo_valor_parcela, data_inicio_novo_valor, retroativo, retroativo_valor, situacao_contrato';
 const CONTRATOS_API_FATURA_SELECT = 'id, contrato_api_id, api_fatura_id, numero_instrumento_cobranca, mes_referencia, ano_referencia, situacao, valor_bruto, valor_liquido, data_emissao, data_vencimento, data_pagamento, data_ateste, data_protocolo, processo, chave_nfe, justificativa, informacao_complementar, repactuacao, juros, multa, glosa, raw_data';
+const CONTRATOS_API_FATURA_LEGACY_SELECT = 'id, contrato_api_id, api_fatura_id, numero_instrumento_cobranca, mes_referencia, ano_referencia, situacao, valor_bruto, valor_liquido, data_emissao, data_vencimento, data_pagamento, raw_data';
 const MIGRATION_REQUIRED_MESSAGE =
   'MIGRATION_REQUIRED: tabelas do módulo de contratos API ainda não existem no banco. Aplique as migrations do Supabase.';
 
@@ -739,11 +741,37 @@ function isMissingTableError(error: unknown): boolean {
   );
 }
 
+function isMissingColumnError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const e = error as { code?: string; message?: string; details?: string };
+  const message = `${e.message ?? ''} ${e.details ?? ''}`.toLowerCase();
+  return (
+    e.code === '42703' ||
+    (message.includes('column') && message.includes('does not exist'))
+  );
+}
+
 function throwMigrationRequired(error: unknown): never {
   if (isMissingTableError(error)) {
     throw new Error(MIGRATION_REQUIRED_MESSAGE);
   }
   throw error;
+}
+
+async function getFaturasForContratoDetails(contratoApiId: string) {
+  const primary = await supabase
+    .from('contratos_api_faturas')
+    .select(CONTRATOS_API_FATURA_SELECT)
+    .eq('contrato_api_id', contratoApiId)
+    .order('data_emissao', { ascending: false });
+
+  if (!isMissingColumnError(primary.error)) return primary;
+
+  return supabase
+    .from('contratos_api_faturas')
+    .select(CONTRATOS_API_FATURA_LEGACY_SELECT)
+    .eq('contrato_api_id', contratoApiId)
+    .order('data_emissao', { ascending: false });
 }
 
 export const contratosApiService = {
@@ -851,7 +879,27 @@ export const contratosApiService = {
       query = query.lte('data_emissao', period.dataEmissaoFim);
     }
 
-    const { data, error } = await query;
+    let { data, error } = await query;
+
+    if (isMissingColumnError(error)) {
+      let legacyQuery = supabase
+        .from('contratos_api_faturas')
+        .select(CONTRATOS_API_FATURA_LEGACY_SELECT);
+
+      if (contratoApiIds && contratoApiIds.length > 0 && contratoApiIds.length <= 100) {
+        legacyQuery = legacyQuery.in('contrato_api_id', contratoApiIds);
+      }
+
+      if (period?.dataEmissaoInicio) {
+        legacyQuery = legacyQuery.gte('data_emissao', period.dataEmissaoInicio);
+      }
+
+      if (period?.dataEmissaoFim) {
+        legacyQuery = legacyQuery.lte('data_emissao', period.dataEmissaoFim);
+      }
+
+      ({ data, error } = await legacyQuery);
+    }
 
     if (error) throwMigrationRequired(error);
     const all = (data ?? []) as ContratoApiFaturaRow[];
@@ -896,11 +944,7 @@ export const contratosApiService = {
         .select('id, contrato_api_id, api_item_id, catmatseritem_id, descricao_complementar, quantidade, valor_unitario, valor_total, numero_item_compra, historico_item')
         .eq('contrato_api_id', contratoApiId)
         .order('numero_item_compra', { ascending: true }),
-      supabase
-        .from('contratos_api_faturas')
-        .select(CONTRATOS_API_FATURA_SELECT)
-        .eq('contrato_api_id', contratoApiId)
-        .order('data_emissao', { ascending: false }),
+      getFaturasForContratoDetails(contratoApiId),
       supabase
         .from('contratos_api_fatura_itens')
         .select('id, contrato_api_id, contrato_api_fatura_id, contrato_api_item_id, api_item_id, quantidade_faturado, valor_unitario_faturado, valor_total_faturado')
@@ -931,7 +975,7 @@ export const contratosApiService = {
         .order('sequencial_instrumento_cobranca', { ascending: true }),
     ]);
 
-    const firstError =
+    const requiredError =
       historicoResult.error ||
       empenhosResult.error ||
       itensResult.error ||
@@ -939,10 +983,15 @@ export const contratosApiService = {
       faturaItensResult.error ||
       faturaEmpenhosResult.error ||
       documentosResult.error ||
-      documentosComprasResult.error ||
-      recursosResult.error ||
       instrumentosResult.error;
-    if (firstError) throwMigrationRequired(firstError);
+    if (requiredError) throwMigrationRequired(requiredError);
+
+    if (documentosComprasResult.error && !isMissingTableError(documentosComprasResult.error)) {
+      throwMigrationRequired(documentosComprasResult.error);
+    }
+    if (recursosResult.error && !isMissingTableError(recursosResult.error)) {
+      throwMigrationRequired(recursosResult.error);
+    }
     const empenhos = (empenhosResult.data ?? []) as ContratoApiEmpenhoRow[];
     const empenhoIds = new Set(empenhos.map((empenho) => empenho.id));
     const apiEmpenhoIds = new Set(empenhos.map((empenho) => Number(empenho.api_empenho_id)));
@@ -1145,7 +1194,21 @@ export const contratosApiService = {
       query = query.eq('unidade_codigo', unidadeCodigo);
     }
 
-    const { data, error } = await query.maybeSingle();
+    let { data, error } = await query.maybeSingle();
+
+    if (isMissingColumnError(error)) {
+      let legacyQuery = supabase
+        .from('contratos_api_sync_runs')
+        .select(CONTRATOS_API_SYNC_RUNS_LEGACY_SELECT)
+        .order('started_at', { ascending: false })
+        .limit(1);
+
+      if (unidadeCodigo) {
+        legacyQuery = legacyQuery.eq('unidade_codigo', unidadeCodigo);
+      }
+
+      ({ data, error } = await legacyQuery.maybeSingle());
+    }
 
     if (error) throwMigrationRequired(error);
     return (data as ContratoApiSyncRun | null) ?? null;

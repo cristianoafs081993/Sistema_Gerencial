@@ -214,6 +214,9 @@ Persistencia local:
 - `contratos_api_itens`
 - `contratos_api_fatura_itens`
 - `contratos_api_fatura_empenhos`
+- `contratos_api_documentos`
+- `contratos_api_compras_documentos`
+- `contratos_api_recursos`
 - `contratos_api_sync_runs`
 
 Observacao:
@@ -240,6 +243,7 @@ Observacao:
 - quando a API trouxer o `historico_item`, o drawer deve exibir tambem seus campos operacionais por termo: `tipo_historico`, `data_termo`, `quantidade`, `valor_unitario` e `valor_total`
 - no resumo de itens do drawer, `Contratado` e `Executado` tambem devem mostrar quantidade agregada: contratado pela soma de `historico_item[].quantidade` quando houver historico, e executado pela soma de `quantidade_faturado` nas faturas `Pago` ou `Siafi Apropriado`
 - quando houver `dados_item_faturado`, o drawer deve exibir tambem `quantidade_faturado` e `valor_unitario_faturado` na linha da fatura
+- quantidades recebidas com ponto ou virgula como separador decimal sao normalizadas sem remover a fracao; `contratos_api_itens.quantidade` e `contratos_api_fatura_itens.quantidade_faturado` aceitam `numeric(20,5)` para que valores elevados nao interrompam a sincronizacao da UG
 - a tela de contratos usa a lista sincronizada de `contratos_api` filtrada por `situacao_derivada`; dados locais de `contratos` e `contratos_empenhos` servem apenas como complemento para favoritos, CNPJ e saldos locais quando houver match por numero normalizado
 
 Documentos PNCP e instrumentos de cobrança são consultados e persistidos no servidor

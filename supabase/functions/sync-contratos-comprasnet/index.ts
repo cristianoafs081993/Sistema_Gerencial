@@ -110,6 +110,37 @@ function errorToMessage(error: unknown) {
   }
 }
 
+function isMissingSchemaError(error: unknown) {
+  if (!error || typeof error !== 'object') return false;
+  const value = error as { code?: string; message?: string; details?: string; status?: number };
+  const message = `${value.message ?? ''} ${value.details ?? ''}`.toLowerCase();
+  return (
+    value.status === 404 ||
+    value.code === 'PGRST204' ||
+    value.code === 'PGRST205' ||
+    value.code === '42703' ||
+    message.includes('could not find the table') ||
+    (message.includes('column') && message.includes('does not exist'))
+  );
+}
+
+function withoutFaturaComplementFields(row: Record<string, unknown>) {
+  const {
+    data_ateste: _dataAteste,
+    data_protocolo: _dataProtocolo,
+    processo: _processo,
+    chave_nfe: _chaveNfe,
+    justificativa: _justificativa,
+    informacao_complementar: _informacaoComplementar,
+    repactuacao: _repactuacao,
+    juros: _juros,
+    multa: _multa,
+    glosa: _glosa,
+    ...legacyRow
+  } = row;
+  return legacyRow;
+}
+
 function requireEnv(name: string) {
   const value = Deno.env.get(name);
   if (!value) {
@@ -196,7 +227,14 @@ async function insertInChunks(
     if (selectColumns) {
       query = query.select(selectColumns);
     }
-    const { data, error } = await query;
+    let { data, error } = await query;
+    if (error && table === 'contratos_api_faturas' && isMissingSchemaError(error)) {
+      let legacyQuery = supabase.from(table).insert(rowChunk.map(withoutFaturaComplementFields));
+      if (selectColumns) {
+        legacyQuery = legacyQuery.select(selectColumns);
+      }
+      ({ data, error } = await legacyQuery);
+    }
     if (error) throw error;
     if (Array.isArray(data)) inserted.push(...(data as Record<string, unknown>[]));
   }
@@ -345,20 +383,26 @@ async function replaceComprasDocumentos(
   supabase: SupabaseClient,
   contratoApiId: string,
   rows: NonNullable<ReturnType<typeof mapArquivoCompras>>[],
-) {
-  if (rows.length > 0) {
-    const { error } = await supabase.from('contratos_api_compras_documentos')
-      .upsert(rows, { onConflict: 'contrato_api_id,api_arquivo_id' });
-    if (error) throw error;
-  }
-  const { data: existing, error: selectError } = await supabase.from('contratos_api_compras_documentos')
-    .select('id,api_arquivo_id').eq('contrato_api_id', contratoApiId);
-  if (selectError) throw selectError;
-  const current = new Set(rows.map((row) => row.api_arquivo_id));
-  const staleIds = (existing ?? []).filter((row) => !current.has(Number(row.api_arquivo_id))).map((row) => row.id);
-  if (staleIds.length > 0) {
-    const { error } = await supabase.from('contratos_api_compras_documentos').delete().in('id', staleIds);
-    if (error) throw error;
+): Promise<boolean> {
+  try {
+    if (rows.length > 0) {
+      const { error } = await supabase.from('contratos_api_compras_documentos')
+        .upsert(rows, { onConflict: 'contrato_api_id,api_arquivo_id' });
+      if (error) throw error;
+    }
+    const { data: existing, error: selectError } = await supabase.from('contratos_api_compras_documentos')
+      .select('id,api_arquivo_id').eq('contrato_api_id', contratoApiId);
+    if (selectError) throw selectError;
+    const current = new Set(rows.map((row) => row.api_arquivo_id));
+    const staleIds = (existing ?? []).filter((row) => !current.has(Number(row.api_arquivo_id))).map((row) => row.id);
+    if (staleIds.length > 0) {
+      const { error } = await supabase.from('contratos_api_compras_documentos').delete().in('id', staleIds);
+      if (error) throw error;
+    }
+    return true;
+  } catch (error) {
+    if (isMissingSchemaError(error)) return false;
+    throw error;
   }
 }
 
@@ -367,21 +411,52 @@ async function replaceComplemento(
   contratoApiId: string,
   tipo: ComplementoTipo,
   rows: NonNullable<ReturnType<typeof mapComplemento>>[],
+): Promise<boolean> {
+  try {
+    if (rows.length > 0) {
+      const { error } = await supabase.from('contratos_api_recursos')
+        .upsert(rows, { onConflict: 'contrato_api_id,tipo_recurso,api_registro_id' });
+      if (error) throw error;
+    }
+    const { data: existing, error: selectError } = await supabase.from('contratos_api_recursos')
+      .select('id,api_registro_id').eq('contrato_api_id', contratoApiId).eq('tipo_recurso', tipo);
+    if (selectError) throw selectError;
+    const current = new Set(rows.map((row) => row.api_registro_id));
+    const staleIds = (existing ?? []).filter((row) => !current.has(Number(row.api_registro_id))).map((row) => row.id);
+    if (staleIds.length > 0) {
+      const { error } = await supabase.from('contratos_api_recursos').delete().in('id', staleIds);
+      if (error) throw error;
+    }
+    return true;
+  } catch (error) {
+    if (isMissingSchemaError(error)) return false;
+    throw error;
+  }
+}
+
+async function completeSyncRun(
+  supabase: SupabaseClient,
+  runId: string,
+  payload: Record<string, unknown>,
 ) {
-  if (rows.length > 0) {
-    const { error } = await supabase.from('contratos_api_recursos')
-      .upsert(rows, { onConflict: 'contrato_api_id,tipo_recurso,api_registro_id' });
-    if (error) throw error;
+  let { error } = await supabase
+    .from('contratos_api_sync_runs')
+    .update(payload)
+    .eq('id', runId);
+
+  if (error && isMissingSchemaError(error)) {
+    const {
+      arquivos_compras_upserted: _arquivosComprasUpserted,
+      recursos_complementares_upserted: _recursosComplementaresUpserted,
+      ...legacyPayload
+    } = payload;
+    ({ error } = await supabase
+      .from('contratos_api_sync_runs')
+      .update(legacyPayload)
+      .eq('id', runId));
   }
-  const { data: existing, error: selectError } = await supabase.from('contratos_api_recursos')
-    .select('id,api_registro_id').eq('contrato_api_id', contratoApiId).eq('tipo_recurso', tipo);
-  if (selectError) throw selectError;
-  const current = new Set(rows.map((row) => row.api_registro_id));
-  const staleIds = (existing ?? []).filter((row) => !current.has(Number(row.api_registro_id))).map((row) => row.id);
-  if (staleIds.length > 0) {
-    const { error } = await supabase.from('contratos_api_recursos').delete().in('id', staleIds);
-    if (error) throw error;
-  }
+
+  if (error) throw error;
 }
 
 async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: string) {
@@ -565,26 +640,33 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
           };
         }
 
-        const [apiEmpenhos, apiFaturas, apiItens, apiHistorico, extras] = await Promise.all([
+        const [apiEmpenhos, apiFaturas, apiItens, apiHistorico] = await Promise.all([
           fetchJson<ApiEmpenho[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/empenhos`),
           fetchJson<ApiFatura[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/faturas`),
           fetchJson<ApiContratoItem[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/itens`),
           fetchJson<ApiContratoHistorico[]>(`${CONTRATOS_API_BASE}/contrato/${contractDb.api_contrato_id}/historico`),
-          fetchContractExtras(contractDb.api_contrato_id, contractDb.id),
         ]);
+
+        const empenhos = (apiEmpenhos ?? []).map((empenho) => mapEmpenho(contractDb.id, empenho)).filter((empenho) => empenho.api_empenho_id);
+        const faturas = (apiFaturas ?? []).map((fatura) => mapFatura(contractDb.id, fatura)).filter((fatura) => fatura.api_fatura_id);
+        const historico = (apiHistorico ?? []).map((item) => mapHistorico(contractDb.id, item)).filter((item) => item.api_historico_id);
+        const derived = buildContratoApiDerivedFields(contrato, historico, empenhos, faturas);
+        const extras = derived.situacao_derivada
+          ? await fetchContractExtras(contractDb.api_contrato_id, contractDb.id)
+          : { arquivos: undefined, recursos: [], errors: [] };
 
         return {
           contratoApiId: contractDb.id,
           apiContratoId: contractDb.api_contrato_id,
           rawFaturas: apiFaturas ?? [],
-          empenhos: (apiEmpenhos ?? []).map((empenho) => mapEmpenho(contractDb.id, empenho)).filter((empenho) => empenho.api_empenho_id),
-          faturas: (apiFaturas ?? []).map((fatura) => mapFatura(contractDb.id, fatura)).filter((fatura) => fatura.api_fatura_id),
+          empenhos,
+          faturas,
           itens: (apiItens ?? []).map((item) => mapItem(contractDb.id, item)).filter((item) => item.api_item_id),
-          historico: (apiHistorico ?? []).map((historico) => mapHistorico(contractDb.id, historico)).filter((historico) => historico.api_historico_id),
+          historico,
           arquivos: extras.arquivos,
           recursos: extras.recursos,
           resourceErrors: extras.errors,
-          derived: null,
+          derived,
         };
       },
       unidadeCodigo === '158155' ? 3 : 6,
@@ -682,13 +764,15 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
     await insertInChunks(supabase, 'contratos_api_fatura_itens', faturaItensPayload);
     await insertInChunks(supabase, 'contratos_api_fatura_empenhos', faturaEmpenhosPayload);
 
+    let comprasDocumentosDisponiveis = true;
+    let recursosDisponiveis = true;
     for (const contract of contractData) {
-      if (contract.arquivos !== undefined) {
-        await replaceComprasDocumentos(supabase, contract.contratoApiId, contract.arquivos);
+      if (comprasDocumentosDisponiveis && contract.arquivos !== undefined) {
+        comprasDocumentosDisponiveis = await replaceComprasDocumentos(supabase, contract.contratoApiId, contract.arquivos);
       }
       for (const recurso of contract.recursos) {
-        if (recurso.rows !== undefined) {
-          await replaceComplemento(supabase, contract.contratoApiId, recurso.tipo, recurso.rows);
+        if (recursosDisponiveis && recurso.rows !== undefined) {
+          recursosDisponiveis = await replaceComplemento(supabase, contract.contratoApiId, recurso.tipo, recurso.rows);
         }
       }
     }
@@ -713,27 +797,28 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
       historicos_upserted: historicoPayload.length,
       fatura_itens_upserted: faturaItensPayload.length,
       fatura_empenhos_upserted: faturaEmpenhosPayload.length,
-      arquivos_compras_upserted: arquivosPayload.length,
-      recursos_complementares_upserted: recursosPayload.length,
+      arquivos_compras_upserted: comprasDocumentosDisponiveis ? arquivosPayload.length : 0,
+      recursos_complementares_upserted: recursosDisponiveis ? recursosPayload.length : 0,
     };
 
-    const { error: doneError } = await supabase
-      .from('contratos_api_sync_runs')
-      .update({
-        finished_at: new Date().toISOString(),
-        status: resourceErrors.length > 0 ? 'partial_success' : 'success',
-        ...result,
-        details: {
-          unidade_codigo: unidadeCodigo,
-          processed_contracts: contractWork.length,
-          source,
-          derived_active_contracts: derivedActiveContracts,
-          derived_inactive_contracts: derivedInactiveContracts,
-          resource_errors: resourceErrors,
-        },
-      })
-      .eq('id', runId);
-    if (doneError) throw doneError;
+    const schemaWarnings = [
+      ...(comprasDocumentosDisponiveis ? [] : ['arquivos: migration pendente']),
+      ...(recursosDisponiveis ? [] : ['recursos: migration pendente']),
+    ];
+    await completeSyncRun(supabase, runId, {
+      finished_at: new Date().toISOString(),
+      status: resourceErrors.length > 0 || schemaWarnings.length > 0 ? 'partial_success' : 'success',
+      ...result,
+      details: {
+        unidade_codigo: unidadeCodigo,
+        processed_contracts: contractWork.length,
+        source,
+        derived_active_contracts: derivedActiveContracts,
+        derived_inactive_contracts: derivedInactiveContracts,
+        resource_errors: resourceErrors,
+        schema_warnings: schemaWarnings,
+      },
+    });
 
     return {
       runId,
