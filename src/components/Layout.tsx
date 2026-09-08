@@ -31,6 +31,7 @@ import { AIAssistantWidget } from '@/components/ai/AIAssistantWidget';
 import { useOptionalData } from '@/contexts/DataContext';
 import { appScreenGroups, appScreens, type AppScreenGroupId } from '@/lib/appScreens';
 import { cn } from '@/lib/utils';
+import { DEFAULT_IFRN_CAMPUS_UASG, IFRN_CAMPUSES } from '@/lib/ifrnCampuses';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -151,6 +152,8 @@ export function Layout({ children }: LayoutProps) {
     updatePassword,
     canAccessScreen,
     userOrg,
+    userCampus,
+    updateUserCampus,
     userGroups = [],
   } = useAuth();
   const dataContext = useOptionalData();
@@ -170,8 +173,10 @@ export function Layout({ children }: LayoutProps) {
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('');
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [isUpdatingCampus, setIsUpdatingCampus] = useState(false);
   const [navigationSearch, setNavigationSearch] = useState('');
   const isTerceirizado = userGroups.some((group) => group.slug === 'terceirizado');
+  const activeCampus = userCampus ?? { codigo: DEFAULT_IFRN_CAMPUS_UASG, nome: 'Currais Novos' };
 
   const navigationSections = useMemo(() => {
     const sections = buildNavigationSections(canAccessScreen);
@@ -670,6 +675,14 @@ export function Layout({ children }: LayoutProps) {
               {/* dynamic page action buttons (eg sync) */}
               <div id="header-actions" className="flex items-center gap-2" />
 
+              <div
+                className="hidden max-w-[220px] items-center gap-1.5 rounded-md border border-border/80 bg-muted/40 px-2 py-1 text-[10px] font-semibold text-foreground sm:flex"
+                title={`Campus ativo: ${activeCampus.nome} — UASG ${activeCampus.codigo}`}
+              >
+                <Landmark className="h-3.5 w-3.5 shrink-0 text-primary" />
+                <span className="truncate">{activeCampus.nome}</span>
+              </div>
+
               {/* Notification Center */}
               <NotificationCenter
                 empenhos={dataContext?.empenhos}
@@ -708,6 +721,32 @@ export function Layout({ children }: LayoutProps) {
                       <div className="flex items-center gap-1.5 rounded-md border border-border/80 bg-muted/50 px-2 py-1 text-[11px] font-medium text-foreground">
                         <span className="h-2 w-2 shrink-0 rounded-full bg-primary animate-pulse" />
                         <span className="min-w-0 truncate" title={orgLabel}>{orgLabel}</span>
+                      </div>
+                      <div className="space-y-1 pt-1">
+                        <label htmlFor="user-campus-select" className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Campus dos dados
+                        </label>
+                        <select
+                          id="user-campus-select"
+                          aria-label="Campus dos dados"
+                          value={activeCampus.codigo}
+                          disabled={isUpdatingCampus}
+                          onChange={(event) => {
+                            const codigo = event.target.value;
+                            setIsUpdatingCampus(true);
+                            void updateUserCampus?.(codigo)?.then(() => {
+                                toast.success('Campus atualizado. Os dados serão recarregados.');
+                                void dataContext?.refreshData();
+                              })
+                              .catch((error) => toast.error(error instanceof Error ? error.message : 'Não foi possível atualizar o campus.'))
+                              .finally(() => setIsUpdatingCampus(false));
+                          }}
+                          className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs font-medium text-foreground outline-none focus:ring-2 focus:ring-primary"
+                        >
+                          {IFRN_CAMPUSES.map((campus) => (
+                            <option key={campus.codigo} value={campus.codigo}>{campus.nome}</option>
+                          ))}
+                        </select>
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
@@ -756,6 +795,7 @@ export function Layout({ children }: LayoutProps) {
           disableContractSearch={isTerceirizado}
           atividadesList={dataContext?.atividades}
           onSaveEmpenho={dataContext?.updateEmpenho}
+          campusUasg={activeCampus.codigo}
         />
 
 

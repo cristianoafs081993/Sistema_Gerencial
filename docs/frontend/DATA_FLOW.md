@@ -19,6 +19,12 @@ Antes das paginas protegidas ou autenticadas, o app passa por:
 - [Auth.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Auth.tsx)
 - [supabase.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/lib/supabase.ts)
 
+### Campus ativo do usuário
+
+`AuthContext` carrega `user_campus_preferences`, inicia em Currais Novos (`158366`) quando não há preferência e permite trocar a UASG pelo seletor das configurações. A mudança atualiza o estado, invalida as consultas em memória e inclui a UASG nas chaves de `useDataQueries`, Dashboard, Contratos, crédito disponível e histórico de RAP. O cabeçalho identifica o campus ativo.
+
+Importações administrativas gravam o campus ativo em `data_import_runs` e exibem o campus de destino antes do upload. Um campus sem lote sincronizado mostra orientação explícita de indisponibilidade, sem reutilizar valores de outro campus.
+
 Esse fluxo agora concentra:
 
 - leitura inicial de sessao via `supabase.auth.getSession`

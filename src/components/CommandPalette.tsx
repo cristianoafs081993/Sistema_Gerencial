@@ -53,6 +53,7 @@ import { EmpenhoDialog } from '@/components/modals/EmpenhoDialog';
 import { ContratoApiDetailsSheet } from '@/components/contratos/ContratoApiDetailsSheet';
 import { contratosApiService, type ContratoApiDetails, type ContratoApiRow } from '@/services/contratosApi';
 import { isContratoApiCampusEmpenho } from '@/utils/contratosApiStatus';
+import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
 import { normalizeContratoNumero, shouldIgnoreContratoNumero } from '@/utils/contratosSync';
 import type { Empenho, Contrato, Atividade } from '@/types';
 
@@ -67,6 +68,7 @@ interface CommandPaletteProps {
   disableContractSearch?: boolean;
   atividadesList?: Atividade[];
   onSaveEmpenho?: (id: string, data: Partial<Empenho>) => void;
+  campusUasg?: string;
 }
 
 type SearchScope = 'all' | 'empenhos' | 'contratos' | 'screens' | 'actions';
@@ -310,6 +312,7 @@ export function CommandPalette({
   disableContractSearch = false,
   atividadesList = [],
   onSaveEmpenho,
+  campusUasg = DEFAULT_IFRN_CAMPUS_UASG,
 }: CommandPaletteProps) {
   const navigate = useNavigate();
   const { canAccessScreen, session } = useAuth();
@@ -332,7 +335,7 @@ export function CommandPalette({
 
     let isMounted = true;
     contratosApiService
-      .getContratosApi(true)
+      .getContratosApi(true, campusUasg)
       .then((res) => {
         if (isMounted && Array.isArray(res)) setApiContratos(res);
       })
@@ -342,7 +345,7 @@ export function CommandPalette({
     return () => {
       isMounted = false;
     };
-  }, [disableContractSearch]);
+  }, [campusUasg, disableContractSearch]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -485,13 +488,13 @@ export function CommandPalette({
       let apiContrato = cont.apiContrato;
 
       if (!apiContrato) {
-        apiContrato = (await contratosApiService.getContratoApiByNumeroOrId(cont.numero || cont.id)) ?? undefined;
+        apiContrato = (await contratosApiService.getContratoApiByNumeroOrId(cont.numero || cont.id, campusUasg)) ?? undefined;
       }
 
       if (apiContrato) {
         setSelectedContratoForDialog(apiContrato);
-        const details = await contratosApiService.getContratoApiDetails(apiContrato.id);
-        const campusEmpenhos = details.empenhos.filter((empenho) => isContratoApiCampusEmpenho(empenho));
+        const details = await contratosApiService.getContratoApiDetails(apiContrato.id, campusUasg);
+        const campusEmpenhos = details.empenhos.filter((empenho) => isContratoApiCampusEmpenho(empenho, campusUasg));
         const campusEmpenhoIds = new Set(campusEmpenhos.map((empenho) => empenho.id));
         const campusApiEmpenhoIds = new Set(campusEmpenhos.map((empenho) => Number(empenho.api_empenho_id)));
         setSelectedContratoDetails({
@@ -511,8 +514,8 @@ export function CommandPalette({
           numero: cont.numero,
           fornecedor_nome: cont.fornecedorNome || null,
           fornecedor_documento: loc?.cnpj || null,
-          unidade_codigo: '158366',
-          unidade_nome: 'INST.FED. DO RN/CAMPUS CURRAIS NOVOS',
+          unidade_codigo: campusUasg,
+          unidade_nome: `INST.FED. DO RN/CAMPUS ${campusUasg}`,
           unidade_origem_codigo: null,
           unidade_origem_nome: null,
           objeto: cont.objeto || 'Contrato cadastrado localmente',
@@ -1075,6 +1078,7 @@ export function CommandPalette({
           details={selectedContratoDetails}
           lastSyncRun={null}
           loading={isContratoDetailsLoading}
+          campusUasg={campusUasg}
         />
       )}
     </>

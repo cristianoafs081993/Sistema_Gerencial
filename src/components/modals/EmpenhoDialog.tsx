@@ -29,6 +29,8 @@ import { formatCurrency } from '@/lib/utils';
 import { contratosApiService, type ContratoApiPublicLiquidacaoRow } from '@/services/contratosApi';
 import { transparenciaService, type PortalTransparenciaItemEmpenho } from '@/services/transparencia';
 import { format } from 'date-fns';
+import { useOptionalAuth } from '@/contexts/AuthContext';
+import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
 import {
   getRapBaseVigente,
   getRapLiquidadoNoAno,
@@ -75,6 +77,8 @@ const buildFormData = (empenho: Empenho | null): Partial<Empenho> => {
 };
 
 export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave, presentation = 'dialog', readOnly = false, backLabel = 'Voltar aos empenhos' }: EmpenhoDialogProps) {
+  const auth = useOptionalAuth();
+  const campusUasg = auth?.userCampus.codigo ?? DEFAULT_IFRN_CAMPUS_UASG;
   const [detailTab, setDetailTab] = useState('resumo');
   const [isEditing, setIsEditing] = useState(false);
   const pageMode = presentation === 'page';
@@ -104,10 +108,12 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave,
   }, [atividades, formData.dimensao]);
 
   const { data: liquidacoesApi = [], isLoading: isLoadingLiquidacoesApi } = useQuery({
-    queryKey: ['liquidacoes-api-contratos-empenho', empenho?.numero],
+    queryKey: ['liquidacoes-api-contratos-empenho', empenho?.numero, campusUasg],
     queryFn: () =>
       empenho?.numero
-        ? contratosApiService.getLiquidacoesPublicasPorEmpenho(empenho.numero)
+        ? campusUasg === DEFAULT_IFRN_CAMPUS_UASG
+          ? contratosApiService.getLiquidacoesPublicasPorEmpenho(empenho.numero)
+          : contratosApiService.getLiquidacoesPublicasPorEmpenho(empenho.numero, [campusUasg, '158155'])
         : Promise.resolve([] as ContratoApiPublicLiquidacaoRow[]),
     enabled: open && !!empenho?.numero,
     retry: false,
@@ -438,7 +444,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave,
                     ) : (
                       <tr>
                         <td colSpan={8} className={pageMode ? "px-5 py-6 text-center text-xs text-muted-foreground italic" : "px-5 py-6 text-center text-[10px] text-muted-foreground italic"}>
-                          O empenho não foi localizado nos contratos públicos do Comprasnet para a UG 158366.
+                          O empenho não foi localizado nos contratos públicos do Comprasnet para a UG {campusUasg}.
                         </td>
                       </tr>
                     )}
@@ -514,7 +520,7 @@ export function EmpenhoDialog({ open, onOpenChange, empenho, atividades, onSave,
                     ) : (
                       <tr>
                         <td colSpan={8} className={pageMode ? "px-5 py-6 text-center text-xs text-muted-foreground italic" : "px-5 py-6 text-center text-[10px] text-muted-foreground italic"}>
-                          {'O empenho não foi localizado nos contratos públicos do Comprasnet para as UGs 158366 e 158155.'}
+                          O empenho não foi localizado nos contratos públicos do Comprasnet para as UGs {campusUasg} e 158155.
                         </td>
                       </tr>
                     )}

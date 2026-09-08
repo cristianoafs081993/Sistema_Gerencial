@@ -6,41 +6,45 @@ import { descentralizacoesContaSaldosService } from '@/services/descentralizacoe
 import { descentralizacoesService } from '@/services/descentralizacoes';
 import { empenhosService } from '@/services/empenhos';
 import { dataQueryKeys } from '@/contexts/dataQueryKeys';
+import { useOptionalAuth } from '@/contexts/AuthContext';
+import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
 
 export function useDataQueries() {
+  const auth = useOptionalAuth();
+  const campusUasg = auth?.userCampus.codigo ?? DEFAULT_IFRN_CAMPUS_UASG;
   const { data: atividades = [], isLoading: isLoadingAtividades } = useQuery({
-    queryKey: dataQueryKeys.atividades,
-    queryFn: atividadesService.getAll,
+    queryKey: [...dataQueryKeys.atividades, campusUasg],
+    queryFn: () => atividadesService.getAll(campusUasg),
   });
 
   const { data: empenhos = [], isLoading: isLoadingEmpenhos } = useQuery({
-    queryKey: dataQueryKeys.empenhos,
-    queryFn: empenhosService.getAll,
+    queryKey: [...dataQueryKeys.empenhos, campusUasg],
+    queryFn: () => empenhosService.getAll(campusUasg),
   });
 
   const { data: descentralizacoes = [], isLoading: isLoadingDescentralizacoes } = useQuery({
-    queryKey: dataQueryKeys.descentralizacoes,
-    queryFn: descentralizacoesService.getAll,
+    queryKey: [...dataQueryKeys.descentralizacoes, campusUasg],
+    queryFn: () => descentralizacoesService.getAll(campusUasg),
   });
 
   const { data: contaDescentralizacoes = [], isLoading: isLoadingContaDescentralizacoes } = useQuery({
-    queryKey: dataQueryKeys.descentralizacoesContaSaldos,
-    queryFn: descentralizacoesContaSaldosService.getAll,
+    queryKey: [...dataQueryKeys.descentralizacoesContaSaldos, campusUasg],
+    queryFn: () => descentralizacoesContaSaldosService.getAll(campusUasg),
   });
 
   const { data: contratos = [], isLoading: isLoadingContratos } = useQuery({
-    queryKey: dataQueryKeys.contratos,
-    queryFn: contratosService.getContratos,
+    queryKey: [...dataQueryKeys.contratos, campusUasg],
+    queryFn: () => contratosService.getContratos(campusUasg),
   });
 
   const { data: contratosEmpenhos = [], isLoading: isLoadingContratosEmpenhos } = useQuery({
-    queryKey: dataQueryKeys.contratosEmpenhos,
-    queryFn: contratosService.getContratosEmpenhos,
+    queryKey: [...dataQueryKeys.contratosEmpenhos, campusUasg],
+    queryFn: () => contratosService.getContratosEmpenhos(campusUasg),
   });
 
   const { data: creditosDisponiveis = [], isLoading: isLoadingCreditos } = useQuery({
-    queryKey: dataQueryKeys.creditosDisponiveis,
-    queryFn: creditosDisponiveisService.getAll,
+    queryKey: [...dataQueryKeys.creditosDisponiveis, campusUasg],
+    queryFn: () => creditosDisponiveisService.getAll(campusUasg),
   });
 
   return {

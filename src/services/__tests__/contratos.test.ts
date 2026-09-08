@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => {
   const insertMock = vi.fn();
   const updateMock = vi.fn();
   const eqMock = vi.fn();
+  const selectCampusEqMock = vi.fn(() => ({ in: inMock }));
+  const updateCampusEqMock = vi.fn(() => ({ eq: eqMock }));
   const fromMock = vi.fn((table: string) => {
     if (table !== 'contratos') {
       throw new Error(`Tabela nao mockada: ${table}`);
@@ -27,6 +29,8 @@ const mocks = vi.hoisted(() => {
     insertMock,
     updateMock,
     eqMock,
+    selectCampusEqMock,
+    updateCampusEqMock,
     fromMock,
   };
 });
@@ -47,8 +51,8 @@ describe('contratosService.upsertBatch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mocks.selectMock.mockReturnValue({ in: mocks.inMock });
-    mocks.updateMock.mockReturnValue({ eq: mocks.eqMock });
+    mocks.selectMock.mockReturnValue({ eq: mocks.selectCampusEqMock });
+    mocks.updateMock.mockReturnValue({ eq: mocks.updateCampusEqMock });
     mocks.upsertMock.mockResolvedValue({ error: null });
     mocks.inMock.mockResolvedValue({ data: [], error: null });
     mocks.insertMock.mockResolvedValue({ error: null });
@@ -88,13 +92,14 @@ describe('contratosService.upsertBatch', () => {
       [
         {
           numero: '123/2026',
+          campus_uasg: '158366',
           contratada: 'Empresa Teste',
           valor: 1575.4,
           data_inicio: '2026-03-10',
           data_termino: '2026-12-31',
         },
       ],
-      { onConflict: 'numero' },
+      { onConflict: 'campus_uasg,numero' },
     );
     expect(mocks.selectMock).not.toHaveBeenCalled();
   });
@@ -114,11 +119,14 @@ describe('contratosService.upsertBatch', () => {
     ]);
 
     expect(mocks.selectMock).toHaveBeenCalledWith('numero');
+    expect(mocks.selectCampusEqMock).toHaveBeenCalledWith('campus_uasg', '158366');
     expect(mocks.inMock).toHaveBeenCalledWith('numero', ['001/2026', '002/2026']);
     expect(mocks.updateMock).toHaveBeenCalledWith({ valor: 9800 });
+    expect(mocks.updateCampusEqMock).toHaveBeenCalledWith('campus_uasg', '158366');
     expect(mocks.eqMock).toHaveBeenCalledWith('numero', '001/2026');
     expect(mocks.insertMock).toHaveBeenCalledWith([
       {
+        campus_uasg: '158366',
         numero: '002/2026',
         contratada: 'Nova Contratada',
         data_inicio: '2026-01-15',

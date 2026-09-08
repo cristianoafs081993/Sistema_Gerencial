@@ -18,6 +18,7 @@ vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
     isSuperAdmin: testState.isSuperAdmin,
   }),
+  useOptionalAuth: () => ({ userCampus: null }),
 }));
 
 vi.mock('@/contexts/DataContext', () => ({

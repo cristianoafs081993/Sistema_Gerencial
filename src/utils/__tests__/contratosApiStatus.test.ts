@@ -173,6 +173,29 @@ describe('contratosApiStatus', () => {
     });
   });
 
+  it('aplica a evidencia da Reitoria ao campus selecionado, sem reutilizar Currais Novos', () => {
+    expect(
+      deriveContratoApiCampusScope(
+        { unidade_codigo: '158155' },
+        [{ unidade_gestora: '158370' }],
+        [],
+        '158370',
+      ),
+    ).toEqual({
+      inScope: true,
+      campus_scope_reason: 'reitoria_com_empenho_campus',
+    });
+
+    expect(
+      deriveContratoApiCampusScope(
+        { unidade_codigo: '158155' },
+        [{ unidade_gestora: '158366' }],
+        [],
+        '158370',
+      ).inScope,
+    ).toBe(false);
+  });
+
   it('identifica apenas evidencias operacionais da UG do campus', () => {
     expect(isContratoApiCampusEmpenho({ unidade_gestora: '158366' })).toBe(true);
     expect(isContratoApiCampusEmpenho({ unidade_gestora: '158155' })).toBe(false);

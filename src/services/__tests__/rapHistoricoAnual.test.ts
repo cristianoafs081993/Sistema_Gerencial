@@ -88,7 +88,8 @@ describe('rapHistoricoAnualService', () => {
     });
     const latestLimitMock = vi.fn(() => ({ maybeSingle: latestMaybeSingleMock }));
     const latestOrderMock = vi.fn(() => ({ limit: latestLimitMock }));
-    const latestSelectMock = vi.fn(() => ({ order: latestOrderMock }));
+    const latestEqMock = vi.fn(() => ({ order: latestOrderMock }));
+    const latestSelectMock = vi.fn(() => ({ eq: latestEqMock }));
 
     const rowsOrderCodigoMock = vi.fn().mockResolvedValue({
       data: [
@@ -110,8 +111,9 @@ describe('rapHistoricoAnualService', () => {
     });
     const rowsOrderAnoMock = vi.fn(() => ({ order: rowsOrderCodigoMock }));
     const rowsOrderUgMock = vi.fn(() => ({ order: rowsOrderAnoMock }));
-    const rowsEqMock = vi.fn(() => ({ order: rowsOrderUgMock }));
-    const rowsSelectMock = vi.fn(() => ({ eq: rowsEqMock }));
+    const rowsEqCampusMock = vi.fn(() => ({ order: rowsOrderUgMock }));
+    const rowsEqBatchMock = vi.fn(() => ({ eq: rowsEqCampusMock }));
+    const rowsSelectMock = vi.fn(() => ({ eq: rowsEqBatchMock }));
 
     fromMock
       .mockReturnValueOnce({ select: latestSelectMock })
@@ -130,6 +132,6 @@ describe('rapHistoricoAnualService', () => {
         },
       ],
     });
-    expect(rowsEqMock).toHaveBeenCalledWith('import_batch_id', 'batch-latest');
+    expect(rowsEqBatchMock).toHaveBeenCalledWith('import_batch_id', 'batch-latest');
   });
 });

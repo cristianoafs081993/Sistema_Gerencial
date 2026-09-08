@@ -11,6 +11,13 @@ Mostrar a linhagem operacional dos dados de forma curta:
 
 ## Linhagens principais
 
+### Recorte por campus
+
+- preferência do usuário: `AuthContext` -> `user_campus_preferences` / RPC `set_user_campus_uasg` -> chaves de consulta do frontend
+- planejamento, empenhos, descentralizações e créditos: importação/sincronização -> `campus_uasg` -> `useDataQueries` -> Dashboard e telas orçamentárias
+- contratos Comprasnet: `sync-contratos-comprasnet` -> `contratos_api_campus_scope` por UASG, empenho ou fatura -> `contratosApiService` -> lista e detalhes de Contratos
+- ausência de lote no campus selecionado: estado de indisponibilidade orienta nova sincronização; não há cópia de dados de Currais Novos
+
 ### Orcamento base
 
 - entrada manual de atividades

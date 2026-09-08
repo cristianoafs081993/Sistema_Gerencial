@@ -516,7 +516,7 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
             arquivos: undefined,
             recursos: [],
             resourceErrors: [],
-            derived: buildContratoApiDerivedFields({}, [], [], []),
+            derived: buildContratoApiDerivedFields({}, [], [], [], new Date(), unidadeCodigo),
           };
         }
 
@@ -552,8 +552,8 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
           const empenhos = (apiEmpenhos ?? [])
             .map((empenho) => mapEmpenho(contractDb.id, empenho))
             .filter((empenho) => empenho.api_empenho_id);
-          const campusEmpenhos = empenhos.filter((empenho) => isContratoApiCampusEmpenho(empenho));
-          const directCampusScope = contrato.unidade_codigo === DEFAULT_UASG || contrato.unidade_origem_codigo === DEFAULT_UASG;
+          const campusEmpenhos = empenhos.filter((empenho) => isContratoApiCampusEmpenho(empenho, unidadeCodigo));
+          const directCampusScope = contrato.unidade_codigo === unidadeCodigo || contrato.unidade_origem_codigo === unidadeCodigo;
           if (campusEmpenhos.length === 0 && !directCampusScope) {
             return {
               contratoApiId: contractDb.id,
@@ -566,7 +566,7 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
               arquivos: undefined,
               recursos: [],
               resourceErrors: [],
-              derived: buildContratoApiDerivedFields(contrato, [], campusEmpenhos, []),
+              derived: buildContratoApiDerivedFields(contrato, [], campusEmpenhos, [], new Date(), unidadeCodigo),
             };
           }
 
@@ -577,7 +577,7 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
 
           let rawFaturas: ApiFatura[] = [];
           let faturas: ReturnType<typeof mapFatura>[] = [];
-          let derived = buildContratoApiDerivedFields(contrato, historico, empenhos, faturas);
+          let derived = buildContratoApiDerivedFields(contrato, historico, empenhos, faturas, new Date(), unidadeCodigo);
           const activeByVigencia =
             derived.situacao_derivada_motivo === 'historico_vigente' ||
             derived.situacao_derivada_motivo === 'fallback_sem_historico_vigente';
@@ -587,7 +587,7 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
             faturas = rawFaturas
               .map((fatura) => mapFatura(contractDb.id, fatura))
               .filter((fatura) => fatura.api_fatura_id);
-            derived = buildContratoApiDerivedFields(contrato, historico, empenhos, faturas);
+            derived = buildContratoApiDerivedFields(contrato, historico, empenhos, faturas, new Date(), unidadeCodigo);
           }
 
           let apiItens: ApiContratoItem[] = [];
@@ -604,7 +604,7 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
           const campusEmpenhoIds = new Set(campusEmpenhos.map((e) => Number(e.api_empenho_id)));
 
           const isCampusFatura = (fatura: ApiFatura) => {
-            if (isContratoApiCampusFatura(fatura)) return true;
+            if (isContratoApiCampusFatura(fatura, unidadeCodigo)) return true;
             const emps = Array.isArray(fatura.dados_empenho) ? fatura.dados_empenho : [];
             return emps.some((emp: Record<string, unknown>) => {
               const num = String(emp.numero_empenho || '').trim();
@@ -616,7 +616,7 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
           const campusRawFaturas = rawFaturas.filter(isCampusFatura);
           const campusFaturas = faturas.filter((f) => {
             const raw = rawFaturas.find((r) => Number(r.id) === Number(f.api_fatura_id));
-            return raw ? isCampusFatura(raw) : isContratoApiCampusFatura(f);
+            return raw ? isCampusFatura(raw) : isContratoApiCampusFatura(f, unidadeCodigo);
           });
 
           const extras = derived.situacao_derivada
@@ -650,7 +650,7 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
         const empenhos = (apiEmpenhos ?? []).map((empenho) => mapEmpenho(contractDb.id, empenho)).filter((empenho) => empenho.api_empenho_id);
         const faturas = (apiFaturas ?? []).map((fatura) => mapFatura(contractDb.id, fatura)).filter((fatura) => fatura.api_fatura_id);
         const historico = (apiHistorico ?? []).map((item) => mapHistorico(contractDb.id, item)).filter((item) => item.api_historico_id);
-        const derived = buildContratoApiDerivedFields(contrato, historico, empenhos, faturas);
+        const derived = buildContratoApiDerivedFields(contrato, historico, empenhos, faturas, new Date(), unidadeCodigo);
         const extras = derived.situacao_derivada
           ? await fetchContractExtras(contractDb.api_contrato_id, contractDb.id)
           : { arquivos: undefined, recursos: [], errors: [] };
@@ -680,6 +680,8 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
         data?.historico ?? [],
         data?.empenhos ?? [],
         data?.faturas ?? [],
+        new Date(),
+        unidadeCodigo,
       );
       const derivedFields = data?.derived ?? derived;
 
@@ -695,6 +697,28 @@ async function runSync(supabase: SupabaseClient, unidadeCodigo: string, source: 
     if (derivedUpsertError) throw derivedUpsertError;
 
     const contratoApiIds = contractWork.map((contrato) => contrato.id);
+    const campusScopePayload = contractData
+      .filter((item) => ['ug_campus', 'reitoria_com_empenho_campus', 'reitoria_com_fatura_campus'].includes(item.derived.campus_scope_reason))
+      .map((item) => ({
+        contrato_api_id: item.contratoApiId,
+        campus_uasg: unidadeCodigo,
+        scope_reason: item.derived.campus_scope_reason,
+        updated_at: new Date().toISOString(),
+      }));
+    if (contratoApiIds.length > 0) {
+      const { error: scopeDeleteError } = await supabase
+        .from('contratos_api_campus_scope')
+        .delete()
+        .eq('campus_uasg', unidadeCodigo)
+        .in('contrato_api_id', contratoApiIds);
+      if (scopeDeleteError) throw scopeDeleteError;
+    }
+    if (campusScopePayload.length > 0) {
+      const { error: scopeUpsertError } = await supabase
+        .from('contratos_api_campus_scope')
+        .upsert(campusScopePayload, { onConflict: 'contrato_api_id,campus_uasg' });
+      if (scopeUpsertError) throw scopeUpsertError;
+    }
     await deleteChildrenForContracts(supabase, contratoApiIds);
 
     const empenhosPayload = contractData.flatMap((item) => item.empenhos);

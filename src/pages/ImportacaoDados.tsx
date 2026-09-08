@@ -34,7 +34,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useData } from '@/contexts/DataContext';
+import { useOptionalAuth } from '@/contexts/AuthContext';
 import { dataQueryKeys } from '@/contexts/dataQueryKeys';
+import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
 import { parseSiafiCsv, syncSiafiDataToDb } from '@/lib/siafi-parser';
 import { creditosDisponiveisDetalhesService, parseCreditoDisponivelFile } from '@/services/creditosDisponiveisDetalhes';
 import {
@@ -114,6 +116,8 @@ const parseDateBR = (dateStr?: string): Date | undefined => {
 
 export default function ImportacaoDados() {
   const queryClient = useQueryClient();
+  const userCampus = useOptionalAuth()?.userCampus;
+  const campusUasg = userCampus?.codigo ?? DEFAULT_IFRN_CAMPUS_UASG;
   const {
     descentralizacoes,
     addDescentralizacao,
@@ -560,7 +564,7 @@ export default function ImportacaoDados() {
 
     try {
       const rows = normalizeContaDescentralizacaoImportRows(data);
-      await descentralizacoesContaSaldosService.upsertBatch(rows);
+      await descentralizacoesContaSaldosService.upsertBatch(rows, campusUasg);
       await refreshData();
       await dataImportLogsService.recordImportRunSuccess(runId, {
         rowsDetected: data.length,
@@ -594,7 +598,7 @@ export default function ImportacaoDados() {
 
     try {
       const rows = await parseCreditoDisponivelFile(file);
-      await creditosDisponiveisDetalhesService.importReport(rows, file.name);
+      await creditosDisponiveisDetalhesService.importReport(rows, file.name, campusUasg);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['creditos-disponiveis-detalhes'] }),
         queryClient.invalidateQueries({ queryKey: dataQueryKeys.creditosDisponiveis }),
@@ -717,7 +721,7 @@ export default function ImportacaoDados() {
 
     try {
       const rows = await parseRapHistoricoAnualFile(file);
-      await rapHistoricoAnualService.importReport(rows, file.name);
+      await rapHistoricoAnualService.importReport(rows, file.name, campusUasg);
       await queryClient.invalidateQueries({ queryKey: ['rap-historico-anual'] });
       await dataImportLogsService.recordImportRunSuccess(runId, {
         rowsDetected: rows.length,
@@ -1046,6 +1050,10 @@ export default function ImportacaoDados() {
             </div>
             <p className="font-ui text-sm text-text-secondary">
               Centralize o envio de bases oficiais em formatos CSV, XLSX e JSON, e monitore em tempo real todas as ingestões automáticas por e-mail e rotinas via API.
+            </p>
+            <p className="text-xs font-medium text-primary">
+              Campus de destino desta sessão: {userCampus?.nome ?? 'Currais Novos'} (UASG {campusUasg}).
+              Altere o campus nas configurações do usuário antes de iniciar uma importação.
             </p>
           </div>
           <Button

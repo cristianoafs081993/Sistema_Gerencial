@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { HeaderActions } from '@/components/HeaderParts';
 import { DashboardContractExecutionTab } from '@/components/dashboard/DashboardContractExecutionTab';
+import { CampusDataUnavailable } from '@/components/CampusDataUnavailable';
 import { DashboardCurrentTab } from '@/components/dashboard/DashboardCurrentTab';
 import { DashboardFiltersSheet } from '@/components/dashboard/DashboardFiltersSheet';
 import { DashboardRapTab } from '@/components/dashboard/DashboardRapTab';
@@ -19,6 +20,8 @@ import {
   isRapReinscrito,
 } from '@/utils/rapMetrics';
 import { useData } from '@/contexts/DataContext';
+import { useOptionalAuth } from '@/contexts/AuthContext';
+import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
 import { extractDimensionCode, getDimensionLabel, matchesDimensionFilter } from '@/utils/dimensionFilters';
 import {
   buildDescentralizacaoSummaryRows,
@@ -1014,6 +1017,9 @@ export const buildContractProjectionBullets = (
 const EMPTY_ARRAY: unknown[] = [];
 
 export default function Dashboard() {
+  const auth = useOptionalAuth();
+  const userCampus = auth?.userCampus;
+  const campusUasg = userCampus?.codigo ?? DEFAULT_IFRN_CAMPUS_UASG;
   const {
     atividades,
     empenhos,
@@ -1249,17 +1255,17 @@ export default function Dashboard() {
   );
 
   const { data: liquidacoesPorEmpenho = EMPTY_ARRAY } = useQuery({
-    queryKey: ['dashboard-liquidacoes-por-empenho', empenhoNumerosCorrente],
+    queryKey: ['dashboard-liquidacoes-por-empenho', campusUasg, empenhoNumerosCorrente],
     queryFn: () => transparenciaService.getLiquidacoesPorEmpenhos(empenhoNumerosCorrente),
     enabled: empenhoNumerosCorrente.length > 0,
     staleTime: 5 * 60 * 1000,
   });
 
   const { data: contratosApiEmpenhos = EMPTY_ARRAY } = useQuery({
-    queryKey: ['dashboard-contratos-api-empenhos'],
+    queryKey: ['dashboard-contratos-api-empenhos', campusUasg],
     queryFn: async () => {
       try {
-        return await contratosApiService.getEmpenhosApi();
+        return await contratosApiService.getEmpenhosApi(undefined, campusUasg);
       } catch {
         return EMPTY_ARRAY;
       }
@@ -1268,11 +1274,11 @@ export default function Dashboard() {
   });
 
   const { data: liquidacoesApiPorEmpenho = EMPTY_ARRAY } = useQuery({
-    queryKey: ['dashboard-contratos-api-liquidacoes', empenhoNumerosCorrente],
+    queryKey: ['dashboard-contratos-api-liquidacoes', campusUasg, empenhoNumerosCorrente],
     queryFn: async () => {
       try {
         const rows = await Promise.all(
-          empenhoNumerosCorrente.map((numero) => contratosApiService.getLiquidacoesPublicasPorEmpenho(numero)),
+          empenhoNumerosCorrente.map((numero) => contratosApiService.getLiquidacoesPublicasPorEmpenho(numero, [campusUasg, '158155'])),
         );
         return rows.flat();
       } catch {
@@ -1284,10 +1290,10 @@ export default function Dashboard() {
   });
 
   const { data: contratosApiAtivos = EMPTY_ARRAY, isLoading: isContratosApiAtivosLoading = false } = useQuery({
-    queryKey: ['dashboard-contratos-api-ativos'],
+    queryKey: ['dashboard-contratos-api-ativos', campusUasg],
     queryFn: async () => {
       try {
-        return await contratosApiService.getContratosApi(true);
+        return await contratosApiService.getContratosApi(true, campusUasg);
       } catch {
         return EMPTY_ARRAY;
       }
@@ -1323,7 +1329,7 @@ export default function Dashboard() {
   }, [contractExpensePeriod]);
 
   const { data: contratosApiHistorico = EMPTY_ARRAY } = useQuery({
-    queryKey: ['dashboard-contratos-api-historico', contratosApiAtivosIds],
+    queryKey: ['dashboard-contratos-api-historico', campusUasg, contratosApiAtivosIds],
     queryFn: async () => {
       try {
         return await contratosApiService.getHistoricosApi(contratosApiAtivosIds);
@@ -1336,10 +1342,10 @@ export default function Dashboard() {
   });
 
   const { data: contratosApiFaturasTotal = EMPTY_ARRAY } = useQuery({
-    queryKey: ['dashboard-contratos-api-faturas-total', contratosApiAtivosIds],
+    queryKey: ['dashboard-contratos-api-faturas-total', campusUasg, contratosApiAtivosIds],
     queryFn: async () => {
       try {
-        return await contratosApiService.getFaturasApi(contratosApiAtivosIds);
+        return await contratosApiService.getFaturasApi(contratosApiAtivosIds, undefined, campusUasg);
       } catch {
         return EMPTY_ARRAY;
       }
@@ -1349,13 +1355,13 @@ export default function Dashboard() {
   });
 
   const { data: contratosApiFaturas = EMPTY_ARRAY, isLoading: isContractExpenseCurrentLoading = false } = useQuery({
-    queryKey: ['dashboard-contratos-api-faturas', contratosApiAtivosIds, contractExpensePeriod.startDate, contractExpensePeriod.endDate],
+    queryKey: ['dashboard-contratos-api-faturas', campusUasg, contratosApiAtivosIds, contractExpensePeriod.startDate, contractExpensePeriod.endDate],
     queryFn: async () => {
       try {
         return await contratosApiService.getFaturasApi(contratosApiAtivosIds, {
           dataEmissaoInicio: contractExpensePeriod.startDate,
           dataEmissaoFim: contractExpensePeriod.endDate,
-        });
+        }, campusUasg);
       } catch {
         return EMPTY_ARRAY;
       }
@@ -1367,13 +1373,13 @@ export default function Dashboard() {
   const projectionHistoryPeriod = useMemo(() => getProjectionHistoryPeriod(new Date()), []);
 
   const { data: contratosApiFaturasHistorico = EMPTY_ARRAY, isLoading: isContractExpenseHistoryLoading = false } = useQuery({
-    queryKey: ['dashboard-contratos-api-faturas-historico', contratosApiAtivosIds, projectionHistoryPeriod.startDate, projectionHistoryPeriod.endDate],
+    queryKey: ['dashboard-contratos-api-faturas-historico', campusUasg, contratosApiAtivosIds, projectionHistoryPeriod.startDate, projectionHistoryPeriod.endDate],
     queryFn: async () => {
       try {
         return await contratosApiService.getFaturasApi(contratosApiAtivosIds, {
           dataEmissaoInicio: projectionHistoryPeriod.startDate,
           dataEmissaoFim: projectionHistoryPeriod.endDate,
-        });
+        }, campusUasg);
       } catch {
         return EMPTY_ARRAY;
       }
@@ -1721,9 +1727,19 @@ export default function Dashboard() {
     filterDimensao !== 'all' || filterOrigem !== 'all' || dateStart !== '' || dateEnd !== '';
   const activeFiltersCount = [filterDimensao !== 'all', filterOrigem !== 'all', dateStart !== '' || dateEnd !== ''].filter(Boolean).length;
   const activeDimensionLabel = getDimensionLabel(effectiveFilterDimensao);
+  const hasCampusDashboardData =
+    atividades.length > 0 ||
+    empenhos.length > 0 ||
+    contratos.length > 0 ||
+    contratosApiAtivos.length > 0 ||
+    descentralizacoes.length > 0 ||
+    contaDescentralizacoes.length > 0;
 
   return (
     <div className="animate-fade-in space-y-6 pb-10">
+      {!isLoading && !hasCampusDashboardData ? (
+        <CampusDataUnavailable campusUasg={campusUasg} moduleName="o Dashboard" />
+      ) : null}
       <Tabs
         value={activeTab}
         onValueChange={(value) => setActiveTab(value as 'corrente' | 'contratos' | 'rap')}

@@ -322,8 +322,8 @@ describe('Contratos', () => {
     fireEvent.click(within(row as HTMLElement).getByRole('button', { name: /Ver detalhes do contrato 62\/2018/i }));
 
     await waitFor(() => {
-      expect(mockedContratosApiService.getContratoApiByNumeroOrId).toHaveBeenCalledWith('62/2018');
-      expect(mockedContratosApiService.getContratoApiDetails).toHaveBeenCalledWith('contrato-api-1');
+      expect(mockedContratosApiService.getContratoApiByNumeroOrId).toHaveBeenCalledWith('62/2018', '158366');
+      expect(mockedContratosApiService.getContratoApiDetails).toHaveBeenCalledWith('contrato-api-1', '158366');
     });
     expect(await screen.findByText('Contrato 00062/2018')).toBeInTheDocument();
   });
@@ -337,7 +337,7 @@ describe('Contratos', () => {
     fireEvent.click(detailsButton);
 
     await waitFor(() => {
-      expect(mockedContratosApiService.getContratoApiDetails).toHaveBeenCalledWith('contrato-api-1');
+      expect(mockedContratosApiService.getContratoApiDetails).toHaveBeenCalledWith('contrato-api-1', '158366');
     });
 
     expect(await screen.findByText('Contrato 00062/2018')).toBeInTheDocument();

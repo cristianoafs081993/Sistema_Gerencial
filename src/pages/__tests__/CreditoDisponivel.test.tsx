@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, useOptionalAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import CreditoDisponivel from '@/pages/CreditoDisponivel';
 import { creditosDisponiveisDetalhesService } from '@/services/creditosDisponiveisDetalhes';
@@ -15,6 +15,7 @@ vi.mock('@/components/HeaderParts', () => ({
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: vi.fn(),
+  useOptionalAuth: vi.fn(),
 }));
 
 vi.mock('@/contexts/DataContext', () => ({
@@ -30,6 +31,7 @@ vi.mock('@/services/creditosDisponiveisDetalhes', () => ({
 }));
 
 const mockedUseAuth = vi.mocked(useAuth);
+const mockedUseOptionalAuth = vi.mocked(useOptionalAuth);
 const mockedUseData = vi.mocked(useData);
 const mockedService = vi.mocked(creditosDisponiveisDetalhesService);
 
@@ -49,6 +51,7 @@ describe('CreditoDisponivel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedUseAuth.mockReturnValue({ isSuperAdmin: true } as never);
+    mockedUseOptionalAuth.mockReturnValue({ userCampus: null } as never);
     mockedUseData.mockReturnValue({
       empenhos: [
         {

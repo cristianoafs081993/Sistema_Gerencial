@@ -50,6 +50,7 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs';
 import { cn, formatCurrency } from '@/lib/utils';
+import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
 import { getValorTotalFromHistorico } from '@/utils/contratosApiHistorico';
 import type {
   ContratoApiDetails,
@@ -80,6 +81,7 @@ interface ContratoApiDetailsSheetProps {
   onRetry?: () => void;
   execution?: { valorGlobal: number; empenhado: number; rows: { id: string; numero: string; valor: number; saldo: number; liquidado: number; fonte: string; tipo: string; local?: Empenho }[] };
   onOpenEmpenho?: (empenho: Empenho) => void;
+  campusUasg?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   contrato: ContratoApiRow | null;
@@ -97,7 +99,7 @@ const normalizeStatus = (value: string | null | undefined) =>
 
 const EXECUTED_ITEM_STATUSES = new Set(['pago', 'siafi apropriado']);
 const REITORIA_UG = '158155';
-const DISPLAY_UNIDADE_CODIGO = '158366';
+const DISPLAY_UNIDADE_CODIGO = DEFAULT_IFRN_CAMPUS_UASG;
 
 const isFaturaExecutada = (fatura?: ContratoApiFaturaRow) =>
   EXECUTED_ITEM_STATUSES.has(normalizeStatus(fatura?.situacao));
@@ -109,9 +111,9 @@ const getFaturaContratanteCodigo = (fatura: ContratoApiFaturaRow) => {
   return match?.[0] ?? null;
 };
 
-const isFaturaVisibleForDisplayUnidade = (fatura: ContratoApiFaturaRow) => {
+const isFaturaVisibleForDisplayUnidade = (fatura: ContratoApiFaturaRow, campusUasg = DISPLAY_UNIDADE_CODIGO) => {
   const codigoContratante = getFaturaContratanteCodigo(fatura);
-  return !codigoContratante || codigoContratante === DISPLAY_UNIDADE_CODIGO;
+  return !codigoContratante || codigoContratante === campusUasg;
 };
 
 const formatDate = (value: string | null | undefined) => {
@@ -436,7 +438,7 @@ export function ContratoApiDetailsSheet({
   lastSyncRun,
   loading = false,
   presentation = 'dialog',
-  error, onRetry, execution, onOpenEmpenho,
+  error, onRetry, execution, onOpenEmpenho, campusUasg = DISPLAY_UNIDADE_CODIGO,
 }: ContratoApiDetailsSheetProps) {
   const [detailTab, setDetailTab] = useState('resumo');
   const pageMode = presentation === 'page';
@@ -449,7 +451,7 @@ export function ContratoApiDetailsSheet({
     (details?.faturaEmpenhos ?? []).map((fe) => fe.contrato_api_fatura_id)
   );
   const faturas = rawFaturas.filter(
-    (fatura) => isFaturaVisibleForDisplayUnidade(fatura) || empenhoLinkedFaturaIds.has(fatura.id)
+    (fatura) => isFaturaVisibleForDisplayUnidade(fatura, campusUasg) || empenhoLinkedFaturaIds.has(fatura.id)
   );
   const visibleFaturaIds = new Set(faturas.map((fatura) => fatura.id));
   const faturaItens = (details?.faturaItens ?? []).filter((item) => visibleFaturaIds.has(item.contrato_api_fatura_id));
@@ -706,7 +708,7 @@ export function ContratoApiDetailsSheet({
             {hasReitoriaOrigin ? (
               <div className="flex gap-2 rounded-md border border-border/70 bg-muted/40 p-3 text-sm text-foreground">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>Contrato com origem na Reitoria. Valores globais do histórico podem representar o contrato central; a tela exibe somente faturas da UG {DISPLAY_UNIDADE_CODIGO} quando a API informa o contratante.</span>
+                <span>Contrato com origem na Reitoria. Valores globais do histórico podem representar o contrato central; a tela exibe somente faturas da UG {campusUasg} quando a API informa o contratante.</span>
               </div>
             ) : null}
 

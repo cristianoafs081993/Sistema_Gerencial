@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { HeaderActions } from '@/components/HeaderParts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useAuth } from '@/contexts/AuthContext';
+import { useOptionalAuth } from '@/contexts/AuthContext';
 import { cn, formatCurrency } from '@/lib/utils';
 import {
   parseRapHistoricoAnualFile,
@@ -29,7 +29,10 @@ const RAP_ANNUAL_COLORS = {
 
 export function DashboardRapAnnualEvolutionPanel() {
   const queryClient = useQueryClient();
-  const { isSuperAdmin } = useAuth();
+  const auth = useOptionalAuth();
+  const isSuperAdmin = auth?.isSuperAdmin ?? false;
+  const userCampus = auth?.userCampus;
+  const campusUasg = userCampus?.codigo ?? '158366';
   const inputRef = useRef<HTMLInputElement>(null);
   const [selectedUg, setSelectedUg] = useState('');
   const [isUploading, setIsUploading] = useState(false);
@@ -61,8 +64,8 @@ export function DashboardRapAnnualEvolutionPanel() {
   };
 
   const { data: report = { rows: [], sourceFile: '', importedAt: '' }, isLoading } = useQuery({
-    queryKey: ['rap-historico-anual', 'latest'],
-    queryFn: () => rapHistoricoAnualService.getLatestReport(),
+    queryKey: ['rap-historico-anual', 'latest', campusUasg],
+    queryFn: () => rapHistoricoAnualService.getLatestReport(campusUasg),
     staleTime: 30000,
   });
 
@@ -99,7 +102,7 @@ export function DashboardRapAnnualEvolutionPanel() {
 
     try {
       const rows = await parseRapHistoricoAnualFile(file);
-      await rapHistoricoAnualService.importReport(rows, file.name);
+      await rapHistoricoAnualService.importReport(rows, file.name, campusUasg);
       await queryClient.invalidateQueries({ queryKey: ['rap-historico-anual'] });
       setSelectedUg('');
       toast.success(`${rows.length} linha(s) importada(s) do histórico anual de RAP.`, { id: toastId });

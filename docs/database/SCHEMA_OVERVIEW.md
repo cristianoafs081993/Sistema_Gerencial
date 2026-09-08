@@ -50,6 +50,14 @@ A migration `20260716103000` adiciona `public.default_org_id()` como default de 
 `document_templates`, `dimensoes`, `componentes_funcionais`, `naturezas_despesa`,
 `origens_recurso`
 
+## Escopo IFRN por campus — migration `20260907150000`
+
+O vínculo `org_users` continua sendo o isolamento entre órgãos. Dentro do órgão IFRN, `user_campus_preferences` guarda uma UASG ativa por usuário; o padrão para usuários e registros legados é `158366` (Campus Currais Novos). A função `set_user_campus_uasg` valida a escolha contra `licitacoes_pncp_uasgs` e as políticas permitem leitura/alteração apenas da própria preferência.
+
+As tabelas orçamentárias e auxiliares (`atividades`, `empenhos`, `descentralizacoes`, saldos de conta, créditos, RAP, `contratos` e `data_import_runs`) recebem `campus_uasg`, preenchido antes de `NOT NULL`, com índice e FK para o catálogo IFRN. As políticas RLS combinam `org_id` e `current_user_campus_uasg()`.
+
+Contratos do espelho Comprasnet usam `contratos_api_campus_scope`: contratos diretos são associados pela UASG; contratos da Reitoria somente quando houver empenho ou fatura comprovadamente vinculada ao campus. A ausência de importação/sincronização não usa Currais Novos como fallback.
+
 ---
 
 ## Grupos principais

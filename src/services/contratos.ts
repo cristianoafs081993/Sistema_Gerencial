@@ -2,8 +2,9 @@ import { supabase } from '@/lib/supabase';
 import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { Contrato } from '@/types';
 import type { ContratoEmpenho } from '@/types';
-const CONTRATOS_SELECT = 'id,numero,contratada,valor,data_inicio,data_termino,created_at,updated_at';
-const CONTRATOS_EMPENHOS_SELECT = 'id,contrato_id,empenho_id,created_at';
+import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
+const CONTRATOS_SELECT = 'id,campus_uasg,numero,contratada,valor,data_inicio,data_termino,created_at,updated_at';
+const CONTRATOS_EMPENHOS_SELECT = 'id,campus_uasg,contrato_id,empenho_id,created_at';
 
 type ContratoWriteRow = {
   numero: string;
@@ -15,6 +16,7 @@ type ContratoWriteRow = {
 
 type ContratoRow = {
   id: string;
+  campus_uasg?: string | null;
   numero: string;
   contratada: string;
   valor?: number | string | null;
@@ -26,6 +28,7 @@ type ContratoRow = {
 
 type ContratoEmpenhoRow = {
   id: string;
+  campus_uasg?: string | null;
   contrato_id: string;
   empenho_id: string;
   created_at: string;
@@ -157,12 +160,13 @@ const normalizeContratoWriteRows = (data: Partial<Contrato>[]): ContratoWriteRow
   return Array.from(rowsByNumero.values());
 };
 
-const buildContratoInsertPayload = (row: ContratoWriteRow) => {
+const buildContratoInsertPayload = (row: ContratoWriteRow, campusUasg: string) => {
   if (row.contratada === undefined) {
     throw new Error(`Nao foi possivel inserir o contrato ${row.numero} sem a coluna "contratada".`);
   }
 
   return {
+    campus_uasg: campusUasg,
     numero: row.numero,
     contratada: row.contratada,
     ...(row.valor !== undefined ? { valor: row.valor } : {}),
@@ -178,11 +182,12 @@ const buildContratoUpdatePayload = (row: ContratoWriteRow) => ({
   ...(row.data_termino !== undefined ? { data_termino: row.data_termino } : {}),
 });
 
-const saveContratosBatchWithoutUpsert = async (rows: ContratoWriteRow[]) => {
+const saveContratosBatchWithoutUpsert = async (rows: ContratoWriteRow[], campusUasg: string) => {
   const numeros = Array.from(new Set(rows.map((row) => row.numero)));
   const { data: existingRows, error: existingError } = await supabase
     .from('contratos')
     .select('numero')
+    .eq('campus_uasg', campusUasg)
     .in('numero', numeros);
 
   if (existingError) throw existingError;
@@ -190,7 +195,7 @@ const saveContratosBatchWithoutUpsert = async (rows: ContratoWriteRow[]) => {
   const existingNumeros = new Set((existingRows ?? []).map((item) => item.numero as string));
   const rowsToInsert = rows
     .filter((row) => !existingNumeros.has(row.numero))
-    .map(buildContratoInsertPayload);
+    .map((row) => buildContratoInsertPayload(row, campusUasg));
   const rowsToUpdate = rows
     .filter((row) => existingNumeros.has(row.numero))
     .map((row) => ({ numero: row.numero, payload: buildContratoUpdatePayload(row) }))
@@ -208,6 +213,7 @@ const saveContratosBatchWithoutUpsert = async (rows: ContratoWriteRow[]) => {
     const { error: updateError } = await supabase
       .from('contratos')
       .update(row.payload)
+      .eq('campus_uasg', campusUasg)
       .eq('numero', row.numero);
 
     if (updateError) throw updateError;
@@ -215,10 +221,11 @@ const saveContratosBatchWithoutUpsert = async (rows: ContratoWriteRow[]) => {
 };
 
 export const contratosService = {
-  async getContratos() {
+  async getContratos(campusUasg = DEFAULT_IFRN_CAMPUS_UASG) {
     const { data, error } = await supabase
       .from('contratos')
       .select(CONTRATOS_SELECT)
+      .eq('campus_uasg', campusUasg)
       .order('numero', { ascending: true });
 
     if (error) {
@@ -226,6 +233,7 @@ export const contratosService = {
       const fallbackData = await fetchSupabaseRestRows<ContratoRow>('contratos', CONTRATOS_SELECT, {
         orderBy: 'numero',
         ascending: true,
+        filters: { campus_uasg: campusUasg },
       });
       return fallbackData.map(mapContratoRow);
     }
@@ -234,6 +242,7 @@ export const contratosService = {
       const fallbackData = await fetchSupabaseRestRows<ContratoRow>('contratos', CONTRATOS_SELECT, {
         orderBy: 'numero',
         ascending: true,
+        filters: { campus_uasg: campusUasg },
       });
       return fallbackData.map(mapContratoRow);
     }
@@ -241,33 +250,34 @@ export const contratosService = {
     return (data as ContratoRow[]).map(mapContratoRow);
   },
 
-  async getContratosEmpenhos(): Promise<ContratoEmpenho[]> {
+  async getContratosEmpenhos(campusUasg = DEFAULT_IFRN_CAMPUS_UASG): Promise<ContratoEmpenho[]> {
     const { data, error } = await supabase
       .from('contratos_empenhos')
-      .select(CONTRATOS_EMPENHOS_SELECT);
+      .select(CONTRATOS_EMPENHOS_SELECT)
+      .eq('campus_uasg', campusUasg);
 
     if (error) {
       console.warn('contratosService.getContratosEmpenhos: fallback para Supabase REST', error);
-      const fallbackData = await fetchSupabaseRestRows<ContratoEmpenhoRow>('contratos_empenhos', CONTRATOS_EMPENHOS_SELECT);
+      const fallbackData = await fetchSupabaseRestRows<ContratoEmpenhoRow>('contratos_empenhos', CONTRATOS_EMPENHOS_SELECT, { filters: { campus_uasg: campusUasg } });
       return fallbackData.map(mapContratoEmpenhoRow);
     }
 
     if (!data || data.length === 0) {
-      const fallbackData = await fetchSupabaseRestRows<ContratoEmpenhoRow>('contratos_empenhos', CONTRATOS_EMPENHOS_SELECT);
+      const fallbackData = await fetchSupabaseRestRows<ContratoEmpenhoRow>('contratos_empenhos', CONTRATOS_EMPENHOS_SELECT, { filters: { campus_uasg: campusUasg } });
       return fallbackData.map(mapContratoEmpenhoRow);
     }
 
     return (data as ContratoEmpenhoRow[]).map(mapContratoEmpenhoRow);
   },
 
-  async upsertBatch(data: Partial<Contrato>[]) {
+  async upsertBatch(data: Partial<Contrato>[], campusUasg = DEFAULT_IFRN_CAMPUS_UASG) {
     const rows = normalizeContratoWriteRows(data);
     if (rows.length === 0) return;
 
     const { error } = await supabase
       .from('contratos')
-      .upsert(rows, {
-        onConflict: 'numero' 
+      .upsert(rows.map((row) => ({ ...row, campus_uasg: campusUasg })), {
+        onConflict: 'campus_uasg,numero'
       });
 
     if (!error) return;
@@ -275,7 +285,7 @@ export const contratosService = {
     console.warn('contratosService.upsertBatch: fallback para insert/update manual', error);
 
     try {
-      await saveContratosBatchWithoutUpsert(rows);
+      await saveContratosBatchWithoutUpsert(rows, campusUasg);
     } catch (fallbackError) {
       console.error('Error in contratosService.upsertBatch:', fallbackError);
       throw fallbackError;

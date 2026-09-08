@@ -11,6 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useData } from '@/contexts/DataContext';
+import { useOptionalAuth } from '@/contexts/AuthContext';
+import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
 import { CreditoDisponivelMovimentacoesModal } from '@/components/modals/CreditoDisponivelMovimentacoesModal';
 import { creditosDisponiveisDetalhesService, type CreditoDisponivelDetalheRow } from '@/services/creditosDisponiveisDetalhes';
 
@@ -21,6 +23,8 @@ function formatCurrency(value: number) {
 }
 
 export default function CreditoDisponivel() {
+  const userCampus = useOptionalAuth()?.userCampus;
+  const campusUasg = userCampus?.codigo ?? DEFAULT_IFRN_CAMPUS_UASG;
   const { empenhos, descentralizacoes, atividades, updateEmpenho } = useData();
   const [search, setSearch] = useState('');
   const [ptresFilter, setPtresFilter] = useState('todos');
@@ -31,8 +35,8 @@ export default function CreditoDisponivel() {
   const [isMovimentacoesOpen, setIsMovimentacoesOpen] = useState(false);
 
   const { data: report = { rows: [], sourceFile: '', importedAt: '' }, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['creditos-disponiveis-detalhes', 'latest'],
-    queryFn: () => creditosDisponiveisDetalhesService.getLatestReport(),
+    queryKey: ['creditos-disponiveis-detalhes', 'latest', campusUasg],
+    queryFn: () => creditosDisponiveisDetalhesService.getLatestReport(campusUasg),
     staleTime: 30000,
   });
 

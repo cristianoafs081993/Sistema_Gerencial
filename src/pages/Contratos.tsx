@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { formatCurrency, formatarDocumento, cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { HeaderActions } from '@/components/HeaderParts';
+import { CampusDataUnavailable } from '@/components/CampusDataUnavailable';
 import { ContratosSyncDialog } from '@/components/modals/ContratosSyncDialog';
 import { FilterPanel } from '@/components/design-system/FilterPanel';
 import { ActiveFilterChips, type ActiveFilterItem } from '@/components/design-system/ActiveFilterChips';
@@ -28,6 +29,7 @@ import { contratosApiService, type ContratoApiDetails, type ContratoApiEmpenhoRo
 import { ContratoApiDetailsSheet } from '@/components/contratos/ContratoApiDetailsSheet';
 import { useUserFavorites } from '@/services/userFavorites';
 import { requisicoesCompraService } from '@/services/requisicoesCompra';
+import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
 import type { TerceirizadoPermission } from '@/types';
 
 const REITORIA_UG = '158155';
@@ -142,7 +144,8 @@ const createEmptyContratoApiDetails = (): ContratoApiDetails => ({
 });
 
 export default function Contratos() {
-  const { isSuperAdmin, user = null, userGroups = [] } = useAuth();
+  const { isSuperAdmin, user = null, userGroups = [], userCampus } = useAuth();
+  const campusUasg = userCampus?.codigo ?? DEFAULT_IFRN_CAMPUS_UASG;
   const { contratos, empenhos, atividades, contratosEmpenhos, isLoading, refreshData } = useData();
   const isTerceirizado = userGroups.some((group) => group.slug === 'terceirizado');
   const userMatricula = getAuthUserMatricula(user);
@@ -232,17 +235,17 @@ export default function Contratos() {
 
     try {
       setIsApiLoading(true);
-      const contratosApi = await contratosApiService.getContratosApi(true);
+      const contratosApi = await contratosApiService.getContratosApi(true, campusUasg);
       const contratoApiIds = contratosApi.map((contrato) => contrato.id);
       const [empenhosApi, historicosApi, faturasApi, lastSync] = await Promise.all([
-        contratosApiService.getEmpenhosApi(contratoApiIds),
+        contratosApiService.getEmpenhosApi(contratoApiIds, campusUasg),
         contratosApiService.getHistoricosApi(contratoApiIds),
-        contratosApiService.getFaturasApi(contratoApiIds),
-        contratosApiService.getLastSyncRun().catch(() => null),
+        contratosApiService.getFaturasApi(contratoApiIds, undefined, campusUasg),
+        contratosApiService.getLastSyncRun(campusUasg).catch(() => null),
       ]);
       if (isCancelled()) return;
       setApiContratos(contratosApi);
-      setApiEmpenhos(empenhosApi.filter((empenho) => isContratoApiCampusEmpenho(empenho)));
+      setApiEmpenhos(empenhosApi.filter((empenho) => isContratoApiCampusEmpenho(empenho, campusUasg)));
       setApiHistoricos(historicosApi);
       setApiFaturas(faturasApi);
       setLastApiSyncRun(lastSync);
@@ -253,7 +256,7 @@ export default function Contratos() {
         setIsApiLoading(false);
       }
     }
-  }, [isSuperAdmin, isTerceirizado]);
+  }, [isSuperAdmin, isTerceirizado, campusUasg]);
 
   useEffect(() => {
     let cancelled = false;
@@ -396,9 +399,9 @@ export default function Contratos() {
     setIsDetailsLoading(true);
     setDetailsError(null);
     try {
-      const details = await contratosApiService.getContratoApiDetails(contrato.id);
+      const details = await contratosApiService.getContratoApiDetails(contrato.id, campusUasg);
       if (requestId !== detailRequest.current) return;
-      const campusEmpenhos = details.empenhos.filter((empenho) => isContratoApiCampusEmpenho(empenho));
+      const campusEmpenhos = details.empenhos.filter((empenho) => isContratoApiCampusEmpenho(empenho, campusUasg));
       const campusEmpenhoIds = new Set(campusEmpenhos.map((empenho) => empenho.id));
       const campusApiEmpenhoIds = new Set(campusEmpenhos.map((empenho) => Number(empenho.api_empenho_id)));
       setSelectedApiDetails({
@@ -424,7 +427,7 @@ export default function Contratos() {
     } finally {
       if (requestId === detailRequest.current) setIsDetailsLoading(false);
     }
-  }, []);
+  }, [campusUasg]);
 
   const openContractDetails = useCallback(async (contract: ContratoDisplay) => {
     setDetailsError(null);
@@ -434,7 +437,7 @@ export default function Contratos() {
     // detalhes, resolvemos apenas o contrato local já autorizado, por número.
     if (!apiContract && typeof contratosApiService.getContratoApiByNumeroOrId === 'function') {
       try {
-        apiContract = await contratosApiService.getContratoApiByNumeroOrId(contract.numero);
+        apiContract = await contratosApiService.getContratoApiByNumeroOrId(contract.numero, campusUasg);
       } catch (error) {
         console.warn('Contratos: não foi possível localizar o contrato na API', error);
       }
@@ -474,7 +477,7 @@ export default function Contratos() {
     setSelectedApiDetails(createEmptyContratoApiDetails());
     setIsDetailsLoading(false);
     setIsDetailsOpen(true);
-  }, [openApiDetails]);
+  }, [campusUasg, openApiDetails]);
 
   const filteredContratos = useMemo(() => {
     const searchNormalized = normalizeString(searchTerm);
@@ -855,7 +858,11 @@ export default function Contratos() {
             {filteredContratos.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic">
-                  Nenhum contrato encontrado.
+                  {visibleContratos.length === 0 && contratos.length === 0 && apiContratos.length === 0 ? (
+                    <CampusDataUnavailable campusUasg={campusUasg} moduleName="Contratos" />
+                  ) : (
+                    'Nenhum contrato encontrado.'
+                  )}
                 </TableCell>
               </TableRow>
             ) : (
@@ -1022,7 +1029,7 @@ export default function Contratos() {
       </div>
       {isSuperAdmin ? <ContratosSyncDialog open={isSyncDialogOpen} onOpenChange={setIsSyncDialogOpen} onSyncComplete={handleSyncComplete} /> : null}
       <div hidden={!!inspectedEmpenho}>
-      <ContratoApiDetailsSheet presentation="page" error={detailsError} onRetry={() => selectedApiContrato && void openApiDetails(selectedApiContrato)} execution={selectedExecution} onOpenEmpenho={setInspectedEmpenho} open={isDetailsOpen} onOpenChange={open => { if (!open) detailRequest.current++; setIsDetailsOpen(open); }} contrato={selectedPageContrato} details={selectedApiDetails} lastSyncRun={lastApiSyncRun} loading={isDetailsLoading} />
+      <ContratoApiDetailsSheet presentation="page" campusUasg={campusUasg} error={detailsError} onRetry={() => selectedApiContrato && void openApiDetails(selectedApiContrato)} execution={selectedExecution} onOpenEmpenho={setInspectedEmpenho} open={isDetailsOpen} onOpenChange={open => { if (!open) detailRequest.current++; setIsDetailsOpen(open); }} contrato={selectedPageContrato} details={selectedApiDetails} lastSyncRun={lastApiSyncRun} loading={isDetailsLoading} />
       </div>
       {inspectedEmpenho && <EmpenhoDialog presentation="page" backLabel="Voltar ao contrato" readOnly open={!!inspectedEmpenho} onOpenChange={open => { if (!open) setInspectedEmpenho(null); }} empenho={inspectedEmpenho} atividades={atividades} onSave={() => {}} />}
     </div>

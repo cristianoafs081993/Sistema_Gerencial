@@ -496,8 +496,9 @@ Uso:
 - recursos complementares são atualizados de forma independente; falha isolada preserva o último dado válido e é registrada em `details.resource_errors`
 - normaliza ateste, protocolo, vencimento, processo, chave NF-e, glosa, juros, multa e repactuação das faturas
 - deriva `situacao_derivada`, `vigencia_inicio_derivada`, `vigencia_fim_derivada`, `situacao_derivada_motivo` e `campus_scope_reason` em `contratos_api`
+- grava `contratos_api_campus_scope` por UASG sincronizada; contratos da Reitoria só recebem vínculo quando houver empenho ou fatura comprovadamente do campus em processamento
 - considera ativo somente contrato com vigencia derivada pelo historico ainda vigente; termos de rescisao/cancelamento tornam o contrato inativo; sem historico, usa `vigencia_fim` da listagem como fallback com motivo registrado. Se o historico estiver vencido mas o contrato for ativo na API com faturas nos ultimos 120 dias, e reativado com motivo `historico_vencido_com_fatura_recente`
-- contratos da UG `158155` entram no escopo do campus somente com evidencia operacional estruturada do campus `158366`, como empenho ou fatura com UG/contratante do campus
+- contratos da UG `158155` entram no escopo do campus processado somente com evidencia operacional estruturada daquela UASG, como empenho ou fatura com UG/contratante do campus
 - contratos com UASG/origem `158366` cujo objeto indique atendimento a outro campus avancado, como Parelhas ou Jucurutu, sao marcados fora do escopo com `ug_campus_objeto_fora_currais_novos`
 - grava em `contratos_api_empenhos` os empenhos de todas as UASGs participantes do contrato, registrando sua respectiva `unidade_gestora`
 - deriva vinculos fatura-item de `dados_item_faturado`

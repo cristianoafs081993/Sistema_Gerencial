@@ -2,6 +2,12 @@
 
 Este catalogo resume as tabelas e views mais relevantes para manutencao. Nao substitui as migrations.
 
+## Escopo por campus IFRN
+
+`user_campus_preferences` mantém a UASG ativa do usuário, inicialmente `158366` (Currais Novos), validada pelo catálogo `licitacoes_pncp_uasgs`. A migration `20260907150000_add_user_campus_scope.sql` acrescenta `campus_uasg` às bases orçamentárias, RAP, contratos locais e logs de importação, preserva os registros existentes em Currais Novos e aplica RLS por órgão + campus.
+
+`contratos_api_campus_scope` materializa o vínculo de contratos Comprasnet com cada campus. A origem do vínculo (`ug_campus`, `reitoria_com_empenho_campus` ou `reitoria_com_fatura_campus`) é gravada para auditoria; contratos da Reitoria sem evidência operacional não aparecem no campus.
+
 ## Orcamento e execucao
 
 ### `atividades`

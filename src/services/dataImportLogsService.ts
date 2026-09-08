@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { DEFAULT_IFRN_CAMPUS_UASG, isIfrnCampusUasg } from '@/lib/ifrnCampuses';
 
 export type PipelineSourceType = 'manual_upload' | 'email_csv' | 'api_sync';
 export type PipelineRunStatus = 'processing' | 'success' | 'warning' | 'failed' | 'skipped';
@@ -250,11 +251,22 @@ export const dataImportLogsService = {
     sourceType?: PipelineSourceType;
     sourceName?: string;
     metadata?: Record<string, unknown>;
+    campusUasg?: string;
   }): Promise<string | null> {
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+
+      const rpc = (supabase as typeof supabase & { rpc?: (name: string) => Promise<{ data?: unknown }> }).rpc;
+      const { data: campusData } = typeof rpc === 'function'
+        ? await rpc('current_user_campus_uasg')
+        : { data: null };
+      const campusUasg = isIfrnCampusUasg(params.campusUasg)
+        ? params.campusUasg
+        : isIfrnCampusUasg(campusData)
+          ? campusData
+          : DEFAULT_IFRN_CAMPUS_UASG;
 
       const { data, error } = await supabase
         .from('data_import_runs')
@@ -266,7 +278,8 @@ export const dataImportLogsService = {
           source_type: params.sourceType || 'manual_upload',
           source_name: params.sourceName || null,
           status: 'processing',
-          metadata: params.metadata || {},
+          campus_uasg: campusUasg,
+          metadata: { ...(params.metadata || {}), campusUasg },
           started_at: new Date().toISOString(),
         })
         .select('id')

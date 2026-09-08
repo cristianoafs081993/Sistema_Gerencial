@@ -173,3 +173,11 @@ As regressões pncpSync, pncpContratos, pncpInstrumentosCobranca e
 ContratoApiDetailsSheet cobrem paginação, renovação, identidade, erro HTTP/banco,
 sucesso parcial, persistência no servidor e respostas atrasadas na UI.
 Ver [cenários e validação remota](ops/PNCP_CONTRACT_SYNC.md).
+
+## Escopo IFRN por campus
+
+- o catálogo mantém 19 UASGs e o padrão `158366`
+- a preferência do usuário persiste via RPC e rejeita UASG fora do catálogo
+- chaves de query e serviços carregam a UASG ativa, sem fallback silencioso para Currais Novos
+- contratos da Reitoria entram somente por empenho/fatura do campus selecionado; os detalhes filtram itens financeiros relacionados
+- a migration `20260907150000_add_user_campus_scope.sql` deve ser validada com métricas pré/pós de Currais Novos, ausência de nulos e teste RLS entre dois campi

@@ -160,6 +160,9 @@ Sincronizacao automatica:
 - [sync-contratos-comprasnet/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-contratos-comprasnet/index.ts)
 - cron diario `sync-contratos-comprasnet-daily`, as `03:00` no horario de Brasilia, para as UGs `158366` e `158155`
 - o botao administrativo "Atualizar Comprasnet" apenas antecipa a mesma sincronizacao automatica
+- a sincronizacao aceita uma ou mais UASGs IFRN; o frontend consulta apenas a UASG ativa do usuário
+- `contratos_api_campus_scope` registra a relação contrato-campus: UASG direta ou evidência operacional por empenho/fatura para contratos originados na Reitoria
+- listas, detalhes, empenhos, faturas e liquidações filtram a UASG ativa; campus sem sincronização retorna estado vazio orientado, não dados de Currais Novos
 
 Base usada:
 

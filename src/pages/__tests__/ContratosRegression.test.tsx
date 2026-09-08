@@ -507,7 +507,7 @@ describe('Contratos regressions', () => {
   it('abre página com abas de histórico, itens e faturas mantendo grupo sem item', async () => {
     renderContratos();
     fireEvent.click(await screen.findByRole('button', { name: /Ver detalhes do contrato/i }));
-    await waitFor(() => expect(mockedContratosApiService.getContratoApiDetails).toHaveBeenCalledWith('contrato-api-1'));
+    await waitFor(() => expect(mockedContratosApiService.getContratoApiDetails).toHaveBeenCalledWith('contrato-api-1', '158366'));
     expect(await screen.findByRole('heading', { name: /Contrato 00062\/2018/ })).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getAllByText('PRESTACAO DE SERVICOS DE APOIO ADMINISTRATIVO').length).toBeGreaterThan(0);
