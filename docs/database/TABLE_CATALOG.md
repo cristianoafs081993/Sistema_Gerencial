@@ -500,6 +500,7 @@ Campos-chave:
 Regras:
 - `save_requisicao_compra` salva cabeçalho, empenhos vinculados e itens na mesma transação.
 - O fluxo utiliza 3 status: `draft` (Rascunho), `enviada_fornecedor` (Enviada ao Fornecedor) e `liquidada` (Liquidada).
+- A RLS permite leitura ao criador, superadministrador, `diretores`, `teste` e aos fiscais de contratos. O slug canônico atual é `fiscais-de-contratos`; `fiscal-contratos` permanece aceito para compatibilidade com instalações antigas.
 - Requisições em `enviada_fornecedor` exigem ao menos uma NE, itens com `empenho_id` e permissão explícita para terceirizados. O saldo disponível valida e abate concorrentemente outras requisições já enviadas ao fornecedor da mesma NE.
 - Requisições com status `liquidada` não acumulam desconto no módulo para evitar duplicidade com as liquidações oficiais registradas no SIAFI.
 - Itens de requisições com status diferente de `draft` compõem o consumo automático de insumos no ambiente canônico `REFEITORIO` / Refeitório. A data analítica é `consumo_iniciado_em`.

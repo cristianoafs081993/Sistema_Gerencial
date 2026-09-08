@@ -28,6 +28,11 @@ Pontos mais criticos devem ter cobertura preferencial:
 - integracoes, proxies, storage e Edge Functions
 - regras de encoding em textos de UI e documentacao
 
+Requisições de Compra:
+
+- A RLS e os vínculos `requisicao_compra_itens`/`requisicao_compra_empenhos` devem permitir que usuários do grupo `fiscais-de-contratos` visualizem as requisições e seus detalhes; o slug legado `fiscal-contratos` também deve continuar funcionando.
+- Validar que a correção de autorização não altera nem remove as requisições existentes, incluindo seus itens, empenhos vinculados e status.
+
 Contratos via Comprasnet:
 
 - regras puras de vigencia derivada devem cobrir maior `vigencia_fim` do historico, aditivo vencido sem renovacao, rescisao/cancelamento e fallback sem historico
