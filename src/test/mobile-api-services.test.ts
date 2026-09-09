@@ -39,6 +39,10 @@ describe('SIAGES Mobile - Serviços de Integração ao Backend (Dados Reais)', (
     expect(metrics.empenhado).toBeGreaterThan(2000000);
     expect(metrics.descentralizado).toBeGreaterThan(2500000);
     expect(metrics.saldoDisponivel).toBe(metrics.descentralizado - metrics.empenhado);
+    // Crédito disponível oficial importado do SIAFI (tela web de crédito disponível)
+    expect(metrics.creditoDisponivel).toBe(156909);
+    expect(metrics.percentualCreditoDisponivel).toBe('6,1%');
+    expect(metrics.creditoDisponivel).toBeLessThan(metrics.descentralizado);
     expect(metrics.liquidado).toBeGreaterThan(1200000);
     expect(metrics.pago).toBeGreaterThan(1100000);
     expect(metrics.aPagar).toBe(metrics.liquidado - metrics.pago);

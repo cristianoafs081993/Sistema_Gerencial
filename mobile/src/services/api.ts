@@ -13,6 +13,8 @@ export interface DashboardMetricsResult {
   percentualExecutadoNum: number;
   percentualDescentralizadoPlanejadoNum: number;
   aDescentralizar: number;
+  creditoDisponivel: number;
+  percentualCreditoDisponivel: string;
   saldoDisponivel: number;
   percentualDescentralizado: string;
   descentralizado: number;
@@ -120,6 +122,32 @@ export async function fetchDashboardMetrics(
       .select('valor_global, situacao, vigencia_fim')
       .eq('unidade_codigo', campusUasg);
 
+    // 4. Fetch crédito disponível do lote mais recente da tela web (creditos_disponiveis_detalhes)
+    let creditoDisponivelOficial: number | null = null;
+    try {
+      const { data: latestBatch } = await supabase
+        .from('creditos_disponiveis_detalhes')
+        .select('import_batch_id')
+        .eq('campus_uasg', campusUasg)
+        .order('imported_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (latestBatch?.import_batch_id) {
+        const { data: creditoRows } = await supabase
+          .from('creditos_disponiveis_detalhes')
+          .select('valor')
+          .eq('import_batch_id', latestBatch.import_batch_id)
+          .eq('campus_uasg', campusUasg);
+
+        if (creditoRows && creditoRows.length > 0) {
+          creditoDisponivelOficial = creditoRows.reduce((acc, r) => acc + (Number(r.valor) || 0), 0);
+        }
+      }
+    } catch (err) {
+      console.warn('Não foi possível obter crédito disponível de creditos_disponiveis_detalhes:', err);
+    }
+
     if (empenhosError || !empenhosRows || empenhosRows.length === 0) {
       console.warn('Usando fallback do dashboard:', empenhosError);
       return {
@@ -191,6 +219,9 @@ export async function fetchDashboardMetrics(
     const empenhadoInt = Math.round(totalEmpenhadoParaSoma);
     const aDescentralizarInt = planejadoInt - descentralizadoInt;
     const saldoDisponivelInt = Math.max(0, descentralizadoInt - empenhadoInt);
+    const creditoDisponivelFinal =
+      creditoDisponivelOficial !== null ? creditoDisponivelOficial : saldoDisponivelInt;
+    const creditoDisponivelInt = Math.round(creditoDisponivelFinal);
     const liquidadoInt = Math.round(totalLiquidado);
     const pagoInt = Math.round(totalPago);
     const aPagarInt = Math.max(0, liquidadoInt - pagoInt);
@@ -211,6 +242,12 @@ export async function fetchDashboardMetrics(
         ? Number(((totalEmpenhadoParaSoma / totalDescentralizado) * 100).toFixed(1))
         : 0;
     const pctEmpenhado = empenhadoNum.toFixed(1).replace('.', ',') + '%';
+
+    const creditoNum =
+      totalDescentralizado > 0
+        ? Number(((creditoDisponivelFinal / totalDescentralizado) * 100).toFixed(1))
+        : 0;
+    const pctCreditoDisponivel = creditoNum.toFixed(1).replace('.', ',') + '%';
 
     const saldoNum =
       totalDescentralizado > 0
@@ -268,6 +305,8 @@ export async function fetchDashboardMetrics(
       percentualExecutadoNum,
       percentualDescentralizadoPlanejadoNum,
       aDescentralizar: aDescentralizarInt,
+      creditoDisponivel: creditoDisponivelInt,
+      percentualCreditoDisponivel: pctCreditoDisponivel,
       saldoDisponivel: saldoDisponivelInt,
       percentualDescentralizado: pctSaldo,
       descentralizado: descentralizadoInt,

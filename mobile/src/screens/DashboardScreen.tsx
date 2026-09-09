@@ -151,17 +151,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           </Text>
         </View>
 
-        {/* Metric 2: Saldo disponível */}
+        {/* Metric 2: Crédito Disponível */}
         <View style={styles.metricCard}>
           <View style={styles.metricLabelRow}>
             <IconWallet size={16} color={colors.blue} />
-            <Text style={styles.metricLabel}>Saldo disponível</Text>
+            <Text style={styles.metricLabel}>Crédito Disponível</Text>
           </View>
           <Text style={styles.metricValue}>
-            {formatBRL(current.saldoDisponivel, false)}
+            {formatBRL(current.creditoDisponivel ?? current.saldoDisponivel, false)}
           </Text>
           <Text style={styles.metricSub}>
-            {current.percentualDescentralizado} do descentralizado
+            {current.percentualCreditoDisponivel ?? current.percentualDescentralizado} do descentralizado
           </Text>
         </View>
 

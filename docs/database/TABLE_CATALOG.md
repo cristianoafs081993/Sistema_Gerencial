@@ -205,6 +205,8 @@ Consumido por:
 
 - [creditosDisponiveisDetalhes.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/creditosDisponiveisDetalhes.ts)
 - [CreditoDisponivel.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/CreditoDisponivel.tsx)
+- [mobile/src/services/api.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/mobile/src/services/api.ts) (Métrica oficial de Crédito Disponível no Mobile)
+- Leitura anônima liberada via migration `20260909140000_grant_anon_creditos_disponiveis_read.sql`
 
 ## Dominios auxiliares
 
