@@ -10,7 +10,9 @@ interface EmpenhoCardProps {
 }
 
 export const EmpenhoCard: React.FC<EmpenhoCardProps> = ({ item }) => {
-  const percentPaid = Math.round((item.paid / item.value) * 100);
+  const isRap = item.tipo === 'rap';
+  const baseValue = isRap ? (item.inscrito || item.value) : item.value;
+  const percentPaid = baseValue > 0 ? Math.min(100, Math.round((item.paid / baseValue) * 100)) : 100;
 
   // Badge colors
   let badgeBg = colors.greenBg;
@@ -24,7 +26,11 @@ export const EmpenhoCard: React.FC<EmpenhoCardProps> = ({ item }) => {
   }
 
   const progressBarColor =
-    item.status === 'pago' ? colors.greenProgress : colors.blue;
+    item.status === 'pago'
+      ? colors.greenProgress
+      : (isRap ? '#e09f3e' : colors.blue);
+
+  const displaySaldo = item.saldo ?? item.value;
 
   return (
     <View style={styles.card}>
@@ -43,10 +49,26 @@ export const EmpenhoCard: React.FC<EmpenhoCardProps> = ({ item }) => {
       <Text style={styles.desc}>{item.desc}</Text>
 
       {/* Value */}
-      <View style={styles.valueRow}>
-        <Text style={styles.valueText}>{formatBRL(item.value)}</Text>
-        <Text style={styles.valueLabel}>Empenhado</Text>
-      </View>
+      {isRap ? (
+        <View style={styles.rapContainer}>
+          <View style={styles.valueRow}>
+            <Text style={[styles.valueText, displaySaldo > 0 ? { color: '#b45309' } : {}]}>
+              {formatBRL(displaySaldo)}
+            </Text>
+            <Text style={styles.valueLabel}>Saldo atual</Text>
+          </View>
+          <View style={styles.rapSubRow}>
+            <Text style={styles.rapSubText}>
+              Inscrito: {formatBRL(baseValue)} · Pago: {formatBRL(item.paid)}
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.valueRow}>
+          <Text style={styles.valueText}>{formatBRL(item.value)}</Text>
+          <Text style={styles.valueLabel}>Empenhado</Text>
+        </View>
+      )}
 
       {/* Progress bar */}
       <View style={styles.progressBarBg}>
@@ -126,6 +148,17 @@ const styles = StyleSheet.create({
     color: colors.muted,
     lineHeight: 18,
     marginBottom: 17,
+  },
+  rapContainer: {
+    marginBottom: 12,
+  },
+  rapSubRow: {
+    marginTop: -4,
+    marginBottom: 4,
+  },
+  rapSubText: {
+    fontSize: 11,
+    color: colors.muted,
   },
   valueRow: {
     flexDirection: 'row',

@@ -350,7 +350,7 @@ export async function fetchEmpenhos(
     let query = supabase
       .from('empenhos')
       .select(
-        'id, numero, descricao, valor, valor_liquidado, valor_liquidado_oficial, valor_pago_oficial, status, data_empenho, natureza_despesa, favorecido_nome, tipo'
+        'id, numero, descricao, valor, valor_liquidado, valor_liquidado_oficial, valor_pago_oficial, saldo_rap_oficial, rap_inscrito, rap_a_liquidar, rap_liquidado, rap_pago, valor_liquidado_a_pagar, status, data_empenho, natureza_despesa, favorecido_nome, tipo'
       )
       .eq('campus_uasg', campusUasg)
       .neq('status', 'cancelado')
@@ -368,9 +368,40 @@ export async function fetchEmpenhos(
     }
 
     return data.map((row) => {
+      const isRap = row.tipo === 'rap';
+
+      if (isRap) {
+        const rapInscrito = Number(row.rap_inscrito ?? row.valor) || 0;
+        const rapPago = Number(row.rap_pago ?? row.rap_liquidado ?? 0);
+        const saldoRap = row.saldo_rap_oficial != null
+          ? Math.max(0, Number(row.saldo_rap_oficial))
+          : Math.max(0, rapInscrito - rapPago);
+
+        const status: 'liquidar' | 'pagar' | 'pago' = saldoRap > 0 ? 'pagar' : 'pago';
+        const label = saldoRap > 0 ? 'Pendente' : 'Pago';
+        const badge: 'blue' | 'amber' | '' = saldoRap > 0 ? 'amber' : '';
+
+        return {
+          id: row.numero || row.id,
+          name: row.favorecido_nome || 'Fornecedor não identificado',
+          desc: row.descricao || 'Despesa de restos a pagar',
+          value: saldoRap, // Saldo atual dos restos a pagar como valor do empenho
+          paid: rapPago,
+          saldo: saldoRap,
+          inscrito: rapInscrito,
+          status,
+          label,
+          badge,
+          date: formatDatePtBR(row.data_empenho),
+          nd: row.natureza_despesa || '339039',
+          tipo: 'rap',
+        };
+      }
+
       const valor = Number(row.valor) || 0;
       const liquidado = Number(row.valor_liquidado_oficial ?? row.valor_liquidado ?? 0);
       const pago = Number(row.valor_pago_oficial ?? (row.status === 'pago' ? valor : 0));
+      const saldo = Math.max(0, valor - liquidado);
 
       let status: 'liquidar' | 'pagar' | 'pago' = 'liquidar';
       let label = 'A liquidar';
@@ -396,12 +427,14 @@ export async function fetchEmpenhos(
         desc: row.descricao || 'Despesa empenhada',
         value: valor,
         paid: pago,
+        saldo,
+        inscrito: valor,
         status,
         label,
         badge,
         date: formatDatePtBR(row.data_empenho),
         nd: row.natureza_despesa || '339039',
-        tipo: (row.tipo as 'exercicio' | 'rap') || 'exercicio',
+        tipo: 'exercicio',
       };
     });
   } catch (err) {

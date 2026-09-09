@@ -80,6 +80,12 @@ describe('SIAGES Mobile - Serviços de Integração ao Backend (Dados Reais)', (
     const empenhosRap = await fetchEmpenhos('158366', 'rap');
     expect(empenhosRap.length).toBeGreaterThan(0);
     expect(empenhosRap.every((e) => e.tipo === 'rap')).toBe(true);
+
+    // Valida que o saldo atual oficial do RAP bate com a tela web (R$ 137.666,83) e não o valor do início do ano (R$ 1.675.953,61)
+    const totalSaldoRap = empenhosRap.reduce((acc, curr) => acc + (curr.saldo ?? curr.value), 0);
+    expect(Math.round(totalSaldoRap)).toBe(137667);
+    const totalInscritoRap = empenhosRap.reduce((acc, curr) => acc + (curr.inscrito ?? 0), 0);
+    expect(Math.round(totalInscritoRap)).toBe(1675954);
   }, 20000);
 
   it('deve buscar e mapear os contratos do campus com cálculo de vigência', async () => {

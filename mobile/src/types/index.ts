@@ -15,6 +15,8 @@ export interface EmpenhoItem {
   date: string;
   nd: string;
   tipo?: 'exercicio' | 'rap';
+  saldo?: number;
+  inscrito?: number;
 }
 
 export interface ContratoItem {

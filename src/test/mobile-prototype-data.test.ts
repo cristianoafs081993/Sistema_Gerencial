@@ -45,6 +45,9 @@ describe('SIAGES Mobile - Regras de Negócio e Dados do Protótipo', () => {
     const rap = empenhosData.filter((e) => e.tipo === 'rap');
     expect(rap).toHaveLength(1);
     expect(rap[0].id).toBe('2026NE000115');
+    expect(rap[0].saldo).toBe(6320);
+    expect(rap[0].inscrito).toBe(16320);
+    expect(rap[0].paid).toBe(10000);
 
     // Filtrar por busca textual
     const buscaInformatica = empenhosData.filter(

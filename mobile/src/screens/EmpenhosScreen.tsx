@@ -48,7 +48,7 @@ export const EmpenhosScreen: React.FC = () => {
 
   const filteredEmpenhos = useMemo(() => {
     const q = normalize(searchQuery.trim());
-    return empenhos.filter((item) => {
+    const list = empenhos.filter((item) => {
       const matchesSearch =
         !q ||
         normalize(item.id).includes(q) ||
@@ -60,15 +60,40 @@ export const EmpenhosScreen: React.FC = () => {
 
       return matchesSearch && matchesFilter;
     });
+
+    if (activeFilter === 'rap') {
+      // Ordena os pendentes (saldo > 0) no topo, como na visão de acompanhamento web
+      return [...list].sort((a, b) => {
+        const saldoA = a.saldo ?? a.value;
+        const saldoB = b.saldo ?? b.value;
+        if (saldoA > 0 && saldoB <= 0) return -1;
+        if (saldoA <= 0 && saldoB > 0) return 1;
+        return 0;
+      });
+    }
+
+    return list;
   }, [empenhos, searchQuery, activeFilter]);
 
   const summarySum = useMemo(() => {
     return filteredEmpenhos.reduce((acc, curr) => acc + curr.value, 0);
   }, [filteredEmpenhos]);
 
+  const totalRapInscrito = useMemo(() => {
+    return filteredEmpenhos.reduce((acc, curr) => acc + (curr.inscrito ?? curr.value), 0);
+  }, [filteredEmpenhos]);
+
+  const totalRapPago = useMemo(() => {
+    return filteredEmpenhos.reduce((acc, curr) => acc + curr.paid, 0);
+  }, [filteredEmpenhos]);
+
+  const rapPendentesCount = useMemo(() => {
+    return filteredEmpenhos.filter((curr) => (curr.saldo ?? curr.value) > 0).length;
+  }, [filteredEmpenhos]);
+
   const summaryLabel = useMemo(() => {
     if (activeFilter === 'exercicio') return 'Empenhado no exercício';
-    if (activeFilter === 'rap') return 'Restos a pagar (RAP)';
+    if (activeFilter === 'rap') return 'Saldo de restos a pagar';
     return 'Total de empenhos';
   }, [activeFilter]);
 
@@ -119,11 +144,20 @@ export const EmpenhosScreen: React.FC = () => {
           <Text style={styles.summaryValue}>
             {formatBRL(summarySum, false)}
           </Text>
+          {activeFilter === 'rap' && (
+            <Text style={styles.summarySubtext}>
+              Inscrito {formatBRL(totalRapInscrito, false)} · Pago {formatBRL(totalRapPago, false)}
+            </Text>
+          )}
         </View>
         <View style={styles.summaryRight}>
-          <Text style={styles.summaryLabel}>Empenhos</Text>
+          <Text style={styles.summaryLabel}>
+            {activeFilter === 'rap' ? 'Pendentes' : 'Empenhos'}
+          </Text>
           <Text style={[styles.summaryValue, { color: colors.blue }]}>
-            {filteredEmpenhos.length}
+            {activeFilter === 'rap'
+              ? `${rapPendentesCount} / ${filteredEmpenhos.length}`
+              : filteredEmpenhos.length}
           </Text>
         </View>
       </View>
@@ -288,6 +322,11 @@ const styles = StyleSheet.create({
     letterSpacing: -0.7,
     color: colors.ink,
     marginTop: 7,
+  },
+  summarySubtext: {
+    fontSize: 11,
+    color: colors.muted,
+    marginTop: 4,
   },
   searchBox: {
     flexDirection: 'row',
