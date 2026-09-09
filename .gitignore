@@ -58,6 +58,7 @@ download_obs.html
 supabase/.temp/
 .tmp/
 *.docx
+.expo/
 
 
 

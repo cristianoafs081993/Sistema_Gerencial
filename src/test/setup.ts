@@ -1,5 +1,7 @@
 import "@testing-library/jest-dom";
 
+(globalThis as any).__DEV__ = true;
+
 if (typeof window !== 'undefined') {
 Object.defineProperty(window, "matchMedia", {
   writable: true,

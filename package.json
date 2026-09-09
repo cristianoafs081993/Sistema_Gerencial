@@ -12,6 +12,8 @@
     "check:docs": "node scripts/check-docs-coverage.mjs",
     "generate:price-catalogs": "node scripts/generate-price-catalogs.mjs",
     "preview": "vite preview",
+    "mobile:start": "npm --prefix mobile run start",
+    "mobile:web": "npm --prefix mobile run web",
     "test": "vitest run",
     "test:watch": "vitest",
     "update-context": "node scripts/generate-llm-context.js"

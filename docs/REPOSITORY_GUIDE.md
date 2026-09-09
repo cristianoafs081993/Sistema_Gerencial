@@ -10,6 +10,7 @@ Aplicacao web de gestao para o IFRN com estes grupos principais:
 - documentos habeis e pagamentos
 - PFs e conciliacoes
 - contratos locais e contratos sincronizados por API
+- app mobile React Native / Expo (`mobile/` e [docs/mobile/README.md](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/docs/mobile/README.md))
 - modulos assistidos por IA
 - imports manuais por CSV, XLSX e PDF
 
