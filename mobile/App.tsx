@@ -58,7 +58,10 @@ export default function App() {
         {/* App Topbar & Campus Info with Notifications Bell Icon */}
         <Header
           notificationCount={unreadCount}
-          onPressNotification={() => setIsNotificationsOpen(true)}
+          onPressNotification={() => {
+            loadNotifications();
+            setIsNotificationsOpen(true);
+          }}
         />
 
         {/* Active Screen View */}
@@ -93,6 +96,7 @@ export default function App() {
           loading={notificationsLoading}
           unreadCount={unreadCount}
           onMarkAllAsRead={handleMarkAllAsRead}
+          onRefresh={loadNotifications}
           onNavigateToEmpenhos={() => {
             setCurrentTab('empenhos');
           }}

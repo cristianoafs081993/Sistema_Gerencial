@@ -518,7 +518,7 @@ export function interleaveEvents(
   empenhos: NotificationItem[],
   descentralizacoes: NotificationItem[],
   requisicoes: NotificationItem[] = [],
-  maxTotal = 20
+  maxTotal = 60
 ): NotificationItem[] {
   const result: NotificationItem[] = [];
   const maxLen = Math.max(empenhos.length, descentralizacoes.length, requisicoes.length);
@@ -656,7 +656,7 @@ export async function fetchNotifications(
       })
       .sort((a, b) => b.date.getTime() - a.date.getTime());
 
-    const interleaved = interleaveEvents(sortedEmpenhos, sortedDescentralizacoes, sortedRequisicoes, 20);
+    const interleaved = interleaveEvents(sortedEmpenhos, sortedDescentralizacoes, sortedRequisicoes, 60);
     if (interleaved.length > 0) {
       return interleaved;
     }

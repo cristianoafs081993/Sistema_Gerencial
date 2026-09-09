@@ -8,6 +8,7 @@ import {
   ScrollView,
   TouchableWithoutFeedback,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { colors } from '../constants/theme';
 import { formatBRL } from '../constants/data';
@@ -31,6 +32,7 @@ interface NotificationsModalProps {
   unreadCount: number;
   onMarkAllAsRead: () => void;
   onNavigateToEmpenhos: () => void;
+  onRefresh?: () => void;
 }
 
 const formatDatePtBR = (date?: Date | null): string => {
@@ -79,6 +81,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
   unreadCount,
   onMarkAllAsRead,
   onNavigateToEmpenhos,
+  onRefresh,
 }) => {
   const [activeTab, setActiveTab] = useState<TabFilter>('all');
 
@@ -206,7 +209,19 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
                   </Text>
                 </View>
               ) : (
-                <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
+                <ScrollView
+                  style={styles.list}
+                  showsVerticalScrollIndicator={false}
+                  refreshControl={
+                    onRefresh ? (
+                      <RefreshControl
+                        refreshing={Boolean(loading)}
+                        onRefresh={onRefresh}
+                        colors={[colors.blue]}
+                      />
+                    ) : undefined
+                  }
+                >
                   {filteredNotifications.map((item) => {
                     const badge = getStatusBadge(item.type, item.status);
                     return (

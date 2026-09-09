@@ -21,35 +21,39 @@ describe('SIAGES Mobile - Serviços de Integração ao Backend (Dados Reais)', (
     expect(isOrigemRecursoIgnoradaNoEmpenhado(undefined)).toBe(false);
   });
 
-  it('deve buscar e agregar métricas do exercício 2026 com destaque para o Planejado', async () => {
-    const metrics = await fetchDashboardMetrics('158366');
+  it(
+    'deve buscar e agregar métricas do exercício 2026 com destaque para o Planejado',
+    async () => {
+      const metrics = await fetchDashboardMetrics('158366');
 
-    expect(metrics).toBeDefined();
-    expect(metrics.instituicao).toBe('IFRN');
-    expect(metrics.campus).toBe('Campus Currais Novos');
-    expect(metrics.exercicio).toBe('2026');
+      expect(metrics).toBeDefined();
+      expect(metrics.instituicao).toBe('IFRN');
+      expect(metrics.campus).toBe('Campus Currais Novos');
+      expect(metrics.exercicio).toBe('2026');
 
-    // Validações do Planejado (Métrica Principal)
-    expect(metrics.planejado).toBeGreaterThan(3000000);
-    expect(metrics.totalAtividades).toBeGreaterThan(300);
-    expect(metrics.percentualExecutadoNum).toBeGreaterThan(60);
-    expect(metrics.aDescentralizar).toBe(metrics.planejado - metrics.descentralizado);
+      // Validações do Planejado (Métrica Principal)
+      expect(metrics.planejado).toBeGreaterThan(3000000);
+      expect(metrics.totalAtividades).toBeGreaterThan(300);
+      expect(metrics.percentualExecutadoNum).toBeGreaterThan(60);
+      expect(metrics.aDescentralizar).toBe(metrics.planejado - metrics.descentralizado);
 
-    // Validações orçamentárias exatas
-    expect(metrics.empenhado).toBeGreaterThan(2000000);
-    expect(metrics.descentralizado).toBeGreaterThan(2500000);
-    expect(metrics.saldoDisponivel).toBe(metrics.descentralizado - metrics.empenhado);
-    // Crédito disponível oficial importado do SIAFI (tela web de crédito disponível)
-    expect(metrics.creditoDisponivel).toBe(156909);
-    expect(metrics.percentualCreditoDisponivel).toBe('6,1%');
-    expect(metrics.creditoDisponivel).toBeLessThan(metrics.descentralizado);
-    expect(metrics.liquidado).toBeGreaterThan(1200000);
-    expect(metrics.pago).toBeGreaterThan(1100000);
-    expect(metrics.aPagar).toBe(metrics.liquidado - metrics.pago);
-    expect(metrics.contratosAVencerCount).toBeGreaterThanOrEqual(1);
+      // Validações orçamentárias exatas
+      expect(metrics.empenhado).toBeGreaterThan(2000000);
+      expect(metrics.descentralizado).toBeGreaterThan(2500000);
+      expect(metrics.saldoDisponivel).toBe(metrics.descentralizado - metrics.empenhado);
+      // Crédito disponível oficial importado do SIAFI (tela web de crédito disponível)
+      expect(metrics.creditoDisponivel).toBe(156909);
+      expect(metrics.percentualCreditoDisponivel).toBe('6,1%');
+      expect(metrics.creditoDisponivel).toBeLessThan(metrics.descentralizado);
+      expect(metrics.liquidado).toBeGreaterThan(1200000);
+      expect(metrics.pago).toBeGreaterThan(1100000);
+      expect(metrics.aPagar).toBe(metrics.liquidado - metrics.pago);
+      expect(metrics.contratosAVencerCount).toBeGreaterThanOrEqual(1);
 
-    expect(metrics.monthlyChart).toHaveLength(6);
-  });
+      expect(metrics.monthlyChart).toHaveLength(6);
+    },
+    20000
+  );
 
   it('deve buscar e mapear a lista de empenhos do exercício 2026 sem empenhos cancelados', async () => {
     const empenhos = await fetchEmpenhos('158366', 'exercicio');
@@ -62,7 +66,7 @@ describe('SIAGES Mobile - Serviços de Integração ao Backend (Dados Reais)', (
     expect(['liquidar', 'pagar', 'pago']).toContain(first.status);
     expect(first.date).toBeDefined();
     expect(first.nd).toBeDefined();
-  });
+  }, 20000);
 
   it('deve buscar e mapear os contratos do campus com cálculo de vigência', async () => {
     const contratos = await fetchContratos('158366');
@@ -76,23 +80,32 @@ describe('SIAGES Mobile - Serviços de Integração ao Backend (Dados Reais)', (
     expect(['shield', 'building', 'doc']).toContain(first.icon);
     expect(typeof first.warning).toBe('boolean');
     expect(first.remaining).toBeDefined();
-  });
+  }, 20000);
 
   it('deve buscar notificações da plataforma web intercalando empenhos, descentralizações e requisições', async () => {
     const notifications = await fetchNotifications('158366');
 
     expect(notifications.length).toBeGreaterThan(0);
-    expect(notifications.length).toBeLessThanOrEqual(20);
+    expect(notifications.length).toBeLessThanOrEqual(60);
 
     const types = new Set(notifications.map((n) => n.type));
-    expect(types.has('empenho') || types.has('descentralizacao') || types.has('requisicao')).toBe(true);
+    expect(types.has('empenho')).toBe(true);
+    expect(types.has('descentralizacao')).toBe(true);
+    expect(types.has('requisicao')).toBe(true);
+
+    const empenhosCount = notifications.filter((n) => n.type === 'empenho').length;
+    const descCount = notifications.filter((n) => n.type === 'descentralizacao').length;
+    const reqCount = notifications.filter((n) => n.type === 'requisicao').length;
+    expect(empenhosCount).toBeGreaterThan(0);
+    expect(descCount).toBeGreaterThan(0);
+    expect(reqCount).toBeGreaterThan(0);
 
     const first = notifications[0];
     expect(first.id).toBeDefined();
     expect(first.title).toBeDefined();
     expect(first.valor).toBeGreaterThanOrEqual(0);
     expect(first.date instanceof Date).toBe(true);
-  });
+  }, 20000);
 
   it('deve intercalar eventos em rodízio respeitando o limite máximo', () => {
     const mockEmpenhos: NotificationItem[] = [
