@@ -1,3 +1,4 @@
+import { parseMoney } from '../../../supabase/functions/_shared/pncpContracts';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,6 +43,36 @@ const formatDate = (value: string | null | undefined) => {
   return `${day}/${month}/${year}`;
 };
 
+const normalizeNumero = (value: string | number | null | undefined) =>
+  String(value ?? '').trim().replace(/^0+(?=\d)/, '');
+
+const sameMoney = (left: unknown, right: unknown) => {
+  const a = parseMoney(left as string | number);
+  const b = parseMoney(right as string | number);
+  return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) < 0.01;
+};
+
+type FaturaMatch =
+  | { kind: 'none' }
+  | { kind: 'ambiguous'; count: number }
+  | { kind: 'number'; fatura: ContratoApiFaturaRow }
+  | { kind: 'numberAndValue'; fatura: ContratoApiFaturaRow };
+
+function findFaturaMatch(instrumento: PncpInstrumentoCobranca, faturas: ContratoApiFaturaRow[]): FaturaMatch {
+  const numero = normalizeNumero(instrumento.numeroInstrumentoCobranca);
+  if (!numero) return { kind: 'none' };
+
+  const candidates = faturas.filter((fatura) => normalizeNumero(fatura.numero_instrumento_cobranca) === numero);
+  if (candidates.length === 0) return { kind: 'none' };
+
+  const valueMatches = candidates.filter((fatura) =>
+    instrumento.notaFiscal?.valorNotaFiscal != null && sameMoney(instrumento.notaFiscal.valorNotaFiscal, fatura.valor_bruto),
+  );
+  if (valueMatches.length === 1) return { kind: 'numberAndValue', fatura: valueMatches[0] };
+  if (candidates.length === 1) return { kind: 'number', fatura: candidates[0] };
+  return { kind: 'ambiguous', count: candidates.length };
+}
+
 export interface ContratoNfeRastreabilidadeProps {
   instrumentos: PncpInstrumentoCobranca[];
   faturasApi: ContratoApiFaturaRow[];
@@ -63,25 +94,8 @@ export function ContratoNfeRastreabilidade({
     setTimeout(() => setCopiedChave(null), 2500);
   };
 
-  // Mapeamento de faturas do Comprasnet por número do instrumento
-  const faturaByNumero = new Map<string, ContratoApiFaturaRow>();
-  for (const f of faturasApi) {
-    if (f.numero_instrumento_cobranca) {
-      faturaByNumero.set(f.numero_instrumento_cobranca.trim(), f);
-      // fallback sem zeros à esquerda
-      faturaByNumero.set(f.numero_instrumento_cobranca.trim().replace(/^0+/, ''), f);
-    }
-  }
-
-  const totalNfeValor = instrumentos.reduce((acc, inst) => {
-    const val = inst.notaFiscal?.valorNotaFiscal;
-    if (typeof val === 'number') return acc + val;
-    if (typeof val === 'string') {
-      const num = Number(val.replace(/\./g, '').replace(',', '.'));
-      return acc + (Number.isNaN(num) ? 0 : num);
-    }
-    return acc;
-  }, 0);
+  const totalNfeValor = instrumentos.reduce((sum, inst) =>
+    sum + (parseMoney(inst.notaFiscal?.valorNotaFiscal) || 0), 0);
 
   return (
     <div className="space-y-4">
@@ -102,7 +116,7 @@ export function ContratoNfeRastreabilidade({
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Chaves de 44 dígitos da SEFAZ, itens discriminados e conciliação direta com faturas atestadas no SIAFI.
+                Instrumentos publicados no PNCP, dados fiscais disponíveis e correspondência verificável com faturas do Compras.gov.br.
               </p>
             </div>
           </div>
@@ -171,13 +185,13 @@ export function ContratoNfeRastreabilidade({
       ) : (
         <div className="space-y-3">
           {instrumentos.map((inst) => {
-            const numeroClean = inst.numeroInstrumentoCobranca.trim();
-            const faturaConciliada = faturaByNumero.get(numeroClean) || faturaByNumero.get(numeroClean.replace(/^0+/, ''));
+            const faturaMatch = findFaturaMatch(inst, faturasApi);
+            const faturaConciliada = 'fatura' in faturaMatch ? faturaMatch.fatura : undefined;
             const chave = inst.chaveNFe || inst.notaFiscal?.chaveNotaFiscal;
             const valorNfe = inst.notaFiscal?.valorNotaFiscal
               ? (typeof inst.notaFiscal.valorNotaFiscal === 'number'
                   ? inst.notaFiscal.valorNotaFiscal
-                  : Number(String(inst.notaFiscal.valorNotaFiscal).replace(/\./g, '').replace(',', '.')))
+                  : parseMoney(inst.notaFiscal.valorNotaFiscal))
               : (faturaConciliada?.valor_bruto || 0);
 
             return (
@@ -197,20 +211,34 @@ export function ContratoNfeRastreabilidade({
                           Série {inst.notaFiscal.serie}
                         </Badge>
                       ) : null}
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] bg-status-success/10 text-status-success border-status-success/30 flex items-center gap-1"
-                      >
-                        <ShieldCheck className="h-3 w-3" />
-                        <span>{inst.notaFiscal?.tipoEventoMaisRecente || 'Autorizada SEFAZ'}</span>
-                      </Badge>
-                      {faturaConciliada ? (
-                        <Badge variant="default" className="text-[10px] bg-action-primary text-white">
-                          Conciliada no SIAFI ({faturaConciliada.situacao || 'Liquidada'})
+                      {inst.notaFiscal?.tipoEventoMaisRecente ? (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] bg-status-success/10 text-status-success border-status-success/30 flex items-center gap-1"
+                        >
+                          <ShieldCheck className="h-3 w-3" />
+                          <span>{inst.notaFiscal.tipoEventoMaisRecente}</span>
                         </Badge>
                       ) : (
                         <Badge variant="secondary" className="text-[10px] text-muted-foreground">
-                          Pendente de Ateste Local
+                          Situação fiscal não informada
+                        </Badge>
+                      )}
+                      {faturaMatch.kind === 'numberAndValue' ? (
+                        <Badge variant="default" className="text-[10px] bg-action-primary text-white">
+                          Correspondência por número e valor ({faturaConciliada?.situacao || 'sem situação'})
+                        </Badge>
+                      ) : faturaMatch.kind === 'number' ? (
+                        <Badge variant="outline" className="text-[10px] text-action-primary border-action-primary/30">
+                          Possível correspondência pelo número ({faturaConciliada?.situacao || 'sem situação'})
+                        </Badge>
+                      ) : faturaMatch.kind === 'ambiguous' ? (
+                        <Badge variant="secondary" className="text-[10px] text-muted-foreground">
+                          {faturaMatch.count} faturas com este número — conferir
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-[10px] text-muted-foreground">
+                          Sem correspondência identificada
                         </Badge>
                       )}
                     </div>
@@ -308,10 +336,10 @@ export function ContratoNfeRastreabilidade({
                               {inst.itens.map((item, idx) => {
                                 const valUnit = typeof item.valorUnitario === 'number'
                                   ? item.valorUnitario
-                                  : Number(String(item.valorUnitario).replace(/\./g, '').replace(',', '.'));
+                                  : parseMoney(item.valorUnitario);
                                 const valTot = typeof item.valor === 'number'
                                   ? item.valor
-                                  : Number(String(item.valor).replace(/\./g, '').replace(',', '.'));
+                                  : parseMoney(item.valor);
 
                                 return (
                                   <TableRow key={idx} className="text-xs">

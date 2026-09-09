@@ -1,11 +1,13 @@
 import { supabase } from '@/lib/supabase';
 import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import type { CreditoDisponivel } from '@/types';
+import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
 
-const CREDITOS_DISPONIVEIS_SELECT = 'id,ptres,metrica,valor,updated_at';
+const CREDITOS_DISPONIVEIS_SELECT = 'id,campus_uasg,ptres,metrica,valor,updated_at';
 
 type CreditoDisponivelRow = {
   id: string;
+  campus_uasg?: string | null;
   ptres: string;
   metrica?: string | null;
   valor: number | string;
@@ -21,10 +23,11 @@ const mapCreditoDisponivelRow = (item: CreditoDisponivelRow): CreditoDisponivel 
 });
 
 export const creditosDisponiveisService = {
-  async getAll(): Promise<CreditoDisponivel[]> {
+  async getAll(campusUasg = DEFAULT_IFRN_CAMPUS_UASG): Promise<CreditoDisponivel[]> {
     const { data, error } = await supabase
       .from('creditos_disponiveis')
       .select(CREDITOS_DISPONIVEIS_SELECT)
+      .eq('campus_uasg', campusUasg)
       .order('ptres', { ascending: true });
 
     if (error) {
@@ -32,7 +35,7 @@ export const creditosDisponiveisService = {
       const fallbackData = await fetchSupabaseRestRows<CreditoDisponivelRow>(
         'creditos_disponiveis',
         CREDITOS_DISPONIVEIS_SELECT,
-        { orderBy: 'ptres', ascending: true },
+        { orderBy: 'ptres', ascending: true, filters: { campus_uasg: campusUasg } },
       );
       return fallbackData.map(mapCreditoDisponivelRow);
     }
@@ -41,7 +44,7 @@ export const creditosDisponiveisService = {
       const fallbackData = await fetchSupabaseRestRows<CreditoDisponivelRow>(
         'creditos_disponiveis',
         CREDITOS_DISPONIVEIS_SELECT,
-        { orderBy: 'ptres', ascending: true },
+        { orderBy: 'ptres', ascending: true, filters: { campus_uasg: campusUasg } },
       );
       return fallbackData.map(mapCreditoDisponivelRow);
     }

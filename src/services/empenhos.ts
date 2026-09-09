@@ -3,11 +3,14 @@ import { supabase } from '@/lib/supabase';
 import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { Empenho } from '@/types';
 import { normalizeFunctionalComponentName } from '@/utils/functionalComponentLabels';
+import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
-const EMPENHOS_SELECT = 'id,numero,descricao,valor,dimensao,dimensao_id,componente_funcional,componente_funcional_id,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,favorecido_nome,favorecido_documento,valor_liquidado,data_empenho,status,atividade_id,created_at,updated_at,processo,historico_operacoes,valor_liquidado_oficial,valor_pago_oficial,saldo_rap_oficial,ultima_atualizacao_siafi,tipo,rap_inscrito,rap_a_liquidar,rap_liquidado,rap_pago,valor_liquidado_a_pagar';
+const EMPENHOS_SELECT = 'id,campus_uasg,numero,descricao,valor,dimensao,dimensao_id,componente_funcional,componente_funcional_id,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,favorecido_nome,favorecido_documento,valor_liquidado,data_empenho,status,atividade_id,created_at,updated_at,processo,historico_operacoes,valor_liquidado_oficial,valor_pago_oficial,saldo_rap_oficial,ultima_atualizacao_siafi,tipo,rap_inscrito,rap_a_liquidar,rap_liquidado,rap_pago,valor_liquidado_a_pagar';
 
 type EmpenhoRow = {
     id: string;
+    campus_uasg?: string | null;
     numero: string;
     descricao: string;
     valor: number | string;
@@ -79,24 +82,29 @@ const mapEmpenhoRow = (item: EmpenhoRow): Empenho => ({
 });
 
 export const empenhosService = {
-    async getAll(): Promise<Empenho[]> {
-        const { data, error } = await supabase
+    async getAll(campusUasg = DEFAULT_IFRN_CAMPUS_UASG, client: SupabaseClient = supabase): Promise<Empenho[]> {
+        const { data, error } = await client
             .from('empenhos')
             .select(EMPENHOS_SELECT)
+            .eq('campus_uasg', campusUasg)
             .order('created_at', { ascending: false });
 
         if (error) {
+            if (client !== supabase) throw error;
             console.warn('empenhosService.getAll: fallback para Supabase REST', error);
             const fallbackData = await fetchSupabaseRestRows<EmpenhoRow>('empenhos', EMPENHOS_SELECT, {
                 orderBy: 'created_at',
+                filters: { campus_uasg: campusUasg },
             });
             return fallbackData.map(mapEmpenhoRow);
         }
 
         if (!data || data.length === 0) {
+            if (client !== supabase) return [];
             console.warn('empenhosService.getAll: resultado vazio via supabase-js, consultando REST');
             const fallbackData = await fetchSupabaseRestRows<EmpenhoRow>('empenhos', EMPENHOS_SELECT, {
                 orderBy: 'created_at',
+                filters: { campus_uasg: campusUasg },
             });
             return fallbackData.map(mapEmpenhoRow);
         }

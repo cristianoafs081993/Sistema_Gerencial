@@ -44,6 +44,9 @@ export type AssistenteGerencialPriceResearchCandidate = {
   documentUrl?: string;
   itemDescription?: string;
   brand?: string;
+  priceKind?: 'homologado' | 'estimado' | 'nao_verificado';
+  documentSha256?: string;
+  requirements?: Array<{ attribute: string; expected: string; observed: string; status: 'atende' | 'nao_atende' | 'nao_informado' }>;
 };
 
 export type AssistenteGerencialPriceResearchItem = {
@@ -66,6 +69,7 @@ export type AssistenteGerencialPriceResearchItem = {
   candidatesCount: number;
   selectedCount: number;
   candidates: AssistenteGerencialPriceResearchCandidate[];
+  usedSynonyms?: string[];
 };
 
 export type AssistenteGerencialPriceResearchData = {
@@ -80,6 +84,7 @@ export type AssistenteGerencialPriceResearchData = {
   items: AssistenteGerencialPriceResearchItem[];
   complianceValid: boolean;
   complianceNotes: string[];
+  usedSynonyms?: string[];
 };
 
 export type AssistenteGerencialMessage = {

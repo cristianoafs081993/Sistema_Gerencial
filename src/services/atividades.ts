@@ -4,11 +4,13 @@ import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { Atividade } from '@/types';
 import { normalizeActivityName, normalizeFunctionalComponentName } from '@/utils/functionalComponentLabels';
 import { resolveTipoAtividade } from '@/utils/atividadeScopes';
+import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
 
-const ATIVIDADES_SELECT = 'id,dimensao,dimensao_id,componente_funcional,componente_funcional_id,processo,tipo_atividade,atividade,descricao,valor_total,saldo_disponivel,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,sync_active,created_at,updated_at';
+const ATIVIDADES_SELECT = 'id,campus_uasg,dimensao,dimensao_id,componente_funcional,componente_funcional_id,processo,tipo_atividade,atividade,descricao,valor_total,saldo_disponivel,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,sync_active,created_at,updated_at';
 
 type AtividadeRow = {
     id: string;
+    campus_uasg?: string | null;
     dimensao: string;
     dimensao_id?: string | null;
     componente_funcional: string;
@@ -52,16 +54,18 @@ const mapAtividadeRow = (item: AtividadeRow): Atividade => ({
 });
 
 export const atividadesService = {
-    async getAll(): Promise<Atividade[]> {
+    async getAll(campusUasg = DEFAULT_IFRN_CAMPUS_UASG): Promise<Atividade[]> {
         const { data, error } = await supabase
             .from('atividades')
             .select(ATIVIDADES_SELECT)
+            .eq('campus_uasg', campusUasg)
             .order('created_at', { ascending: false });
 
         if (error) {
             console.warn('atividadesService.getAll: fallback para Supabase REST', error);
             const fallbackData = await fetchSupabaseRestRows<AtividadeRow>('atividades', ATIVIDADES_SELECT, {
                 orderBy: 'created_at',
+                filters: { campus_uasg: campusUasg },
             });
             return fallbackData.map(mapAtividadeRow);
         }
@@ -70,6 +74,7 @@ export const atividadesService = {
             console.warn('atividadesService.getAll: resultado vazio via supabase-js, consultando REST');
             const fallbackData = await fetchSupabaseRestRows<AtividadeRow>('atividades', ATIVIDADES_SELECT, {
                 orderBy: 'created_at',
+                filters: { campus_uasg: campusUasg },
             });
             return fallbackData.map(mapAtividadeRow);
         }

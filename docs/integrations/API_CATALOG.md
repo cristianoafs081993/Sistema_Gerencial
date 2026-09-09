@@ -138,7 +138,9 @@ Observacao:
 
 Uso:
 
-- sincronizacao de contratos ativos e inativos, historico, empenhos, faturas, itens e vinculos fatura-item/fatura-empenho
+- sincronizacao de contratos ativos e inativos, historico, empenhos, faturas, itens, arquivos e vinculos fatura-item/fatura-empenho
+- recursos complementares: cronograma, garantias, responsaveis, prepostos, ocorrencias, despesas acessorias e terceirizados
+- as falhas dos recursos complementares são isoladas e não removem o último conteúdo válido
 
 Proxy local:
 
@@ -158,6 +160,9 @@ Sincronizacao automatica:
 - [sync-contratos-comprasnet/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-contratos-comprasnet/index.ts)
 - cron diario `sync-contratos-comprasnet-daily`, as `03:00` no horario de Brasilia, para as UGs `158366` e `158155`
 - o botao administrativo "Atualizar Comprasnet" apenas antecipa a mesma sincronizacao automatica
+- a sincronizacao aceita uma ou mais UASGs IFRN; o frontend consulta apenas a UASG ativa do usuário
+- `contratos_api_campus_scope` registra a relação contrato-campus: UASG direta ou evidência operacional por empenho/fatura para contratos originados na Reitoria
+- listas, detalhes, empenhos, faturas e liquidações filtram a UASG ativa; campus sem sincronização retorna estado vazio orientado, não dados de Currais Novos
 
 Base usada:
 
@@ -171,6 +176,14 @@ Endpoints observados:
 - `/contrato/{api_contrato_id}/faturas`
 - `/contrato/{api_contrato_id}/itens`
 - `/contrato/{api_contrato_id}/historico`
+- `/contrato/{api_contrato_id}/arquivos`
+- `/contrato/{api_contrato_id}/cronograma`
+- `/contrato/{api_contrato_id}/garantias`
+- `/contrato/{api_contrato_id}/responsaveis`
+- `/contrato/{api_contrato_id}/prepostos`
+- `/contrato/{api_contrato_id}/ocorrencias`
+- `/contrato/{api_contrato_id}/despesas_acessorias`
+- `/contrato/{api_contrato_id}/terceirizados`
 
 Descoberta publica em tempo real no modal de empenho:
 
@@ -204,6 +217,9 @@ Persistencia local:
 - `contratos_api_itens`
 - `contratos_api_fatura_itens`
 - `contratos_api_fatura_empenhos`
+- `contratos_api_documentos`
+- `contratos_api_compras_documentos`
+- `contratos_api_recursos`
 - `contratos_api_sync_runs`
 
 Observacao:
@@ -230,9 +246,14 @@ Observacao:
 - quando a API trouxer o `historico_item`, o drawer deve exibir tambem seus campos operacionais por termo: `tipo_historico`, `data_termo`, `quantidade`, `valor_unitario` e `valor_total`
 - no resumo de itens do drawer, `Contratado` e `Executado` tambem devem mostrar quantidade agregada: contratado pela soma de `historico_item[].quantidade` quando houver historico, e executado pela soma de `quantidade_faturado` nas faturas `Pago` ou `Siafi Apropriado`
 - quando houver `dados_item_faturado`, o drawer deve exibir tambem `quantidade_faturado` e `valor_unitario_faturado` na linha da fatura
+- quantidades recebidas com ponto ou virgula como separador decimal sao normalizadas sem remover a fracao; `contratos_api_itens.quantidade` e `contratos_api_fatura_itens.quantidade_faturado` aceitam `numeric(20,5)` para que valores elevados nao interrompam a sincronizacao da UG
 - a tela de contratos usa a lista sincronizada de `contratos_api` filtrada por `situacao_derivada`; dados locais de `contratos` e `contratos_empenhos` servem apenas como complemento para favoritos, CNPJ e saldos locais quando houver match por numero normalizado
-- Documentos e PDFs oficiais do contrato e seus termos aditivos sao consultados via API do PNCP em `https://pncp.gov.br/api/pncp/v1/orgaos/{cnpj}/contratos/{ano}/{sequencial}/arquivos`, armazenados persistentemente na tabela `contratos_api_documentos` e atualizados diariamente às 05:00 BRT pelo job `sync-contratos-pncp-documentos`. O modal `ContratoApiDetailsSheet.tsx` carrega os documentos diretamente do banco de dados (0 ms de espera) com suporte a reconsulta sob demanda via `pncpContratos.ts`.
-- Rastreabilidade de Notas Fiscais Eletrônicas (NF-e) e Instrumentos de Cobrança consultados via API do PNCP em `https://pncp.gov.br/api/pncp/v1/orgaos/{cnpj}/contratos/{ano}/{sequencial}/instrumentocobranca` através de `pncpInstrumentosCobranca.ts`, persistidos na tabela `contratos_api_instrumentos_cobranca` e sincronizados diariamente às 05:00 BRT pelo job `sync-contratos-pncp-documentos`. Expõe chave de acesso de 44 dígitos da SEFAZ, status de autorização fiscal, itens faturados discriminados com NCM/CFOP, cópia em 1 clique, link para o Portal da SEFAZ e conciliação automática com faturas do Comprasnet/SIAFI em `ContratoNfeRastreabilidade.tsx` com carregamento imediato a partir do banco de dados (0 ms de espera).
+
+Documentos PNCP e instrumentos de cobrança são consultados e persistidos no servidor
+por `sync-contratos-pncp-documentos`, com paginação completa e resultados independentes
+por recurso. Atualização manual autenticada por `contratoApiId`; cron em lotes de
+todas as unidades, sem escrita direta do navegador. Consultar
+[operação, ativação e erros](../ops/PNCP_CONTRACT_SYNC.md).
 
 ## 4A. Supabase Database para Energia Campus
 
@@ -710,6 +731,8 @@ Function chamada pela extensão na rota oficial de edição de ETP.
 
 ## 13. Assistente Gerencial - Pesquisa de Preços Textual e Auditoria de Editais (IN 65/2021)
 
+> Atualização v2 de 07/09/2026: a especificação vigente está em [Pesquisa de preços: precisão e recuperação](../ops/PRECOS_PRECISAO.md). A recuperação usa RRF local e resultados homologados por item no PNCP. A análise de descrições é distinguida da leitura efetiva de PDFs. Não há fallback entre modelos de embedding, aprovação automática por falha da IA nem certificação de conformidade. As descrições de auditoria e desempenho abaixo documentam o fluxo anterior.
+
 - Endpoint: `POST /functions/v1/assistente-gerencial`
 - Busca Textual Direta no PNCP: `GET https://pncp.gov.br/api/search/?q={termo}&tipos_documento=edital` utilizando cabeçalhos de navegador (`User-Agent`, `Origin: https://pncp.gov.br`, `Referer: https://pncp.gov.br/app/editais`) para evitar bloqueios WAF (`ECONNRESET`).
 - Recuperação de Documentos Oficiais: para cada contratação retornada, consulta `/arquivos` no PNCP para localizar PDFs de Edital, Termo de Referência ou Aviso de Dispensa com link de download direto.
@@ -719,6 +742,17 @@ Function chamada pela extensão na rota oficial de edição de ETP.
   - Fusão Contextual Item + Objeto do Edital: para evitar falsos negativos decorrentes de cadastros sucintos na linha da tabela de itens (ex: "NOTEBOOK DELL"), o sistema funde a denominação do item com o objeto detalhado da contratação e do edital antes de submeter ao auditor de IA.
   - Confronta a demanda do usuário com o texto do item licitado e do TR/Edital.
   - Se pertencer a categoria distinta (ex: equipamento médico para demanda de informática) ou for acessório desarmônico, classifica como `INCOMPATIVEL`, zera o score de similaridade e exclui obrigatoriamente o item da cesta de cálculo da mediana/média da IN 65/2021.
-  - Se compatível, gera parecer técnico fundamentado com trecho da especificação extraído do documento.
+- Se compatível, gera parecer técnico fundamentado com trecho da especificação extraído do documento.
 - Interface e Transparência: componente `PriceResearchChatCard` exibe itens aprovados e desconsiderados com distinção visual explícita (riscado e badge vermelho para incompatíveis), e modal de inspeção com parecer da IA e botão para abrir o PDF do Edital/TR.
+## 14. GovFlow Core SDK & MCP Tools (Inteligência Orçamentária e Contratual)
 
+Camada determinística de domínio e ferramentas agênticas baseadas no Model Context Protocol (MCP) para conciliação trilateral e auditoria de despesas:
+
+- **Localização dos Módulos**: `src/sdk/`
+  - `orcamento.ts`: KPIs consolidados de execução (`getPainelExecucao`), raio-X do PTRES (`getPtresResumo`), detalhamento de atividades e agrupamento por dimensões/naturezas de despesa.
+  - `empenhos.ts`: ficha cadastral/financeira de NEs (`getEmpenhoDetalhado`), pesquisa multifacetada de empenhos, consolidação de Restos a Pagar (`getRapPosicaoConsolidada`) e detecção de empenhos paralisados.
+  - `descentralizacoes.ts`: extrato analítico de Notas de Crédito (`getExtratoNotasCredito`), confronto com saldos contábeis oficiais do SIAFI e identificação de créditos livres não empenhados.
+  - `contratos.ts`: ficha do contrato com situações derivadas e aditivos (`getFichaContrato`), histórico de termos aditivos, empenhos vinculados, faturas e projeção financeira até o fim do exercício com detecção de insuficiência de saldo.
+  - `conciliacao.ts`: conciliação trilateral forense (`conciliarPtresCompleto`), cruzamento contrato x orçamento (`conciliarContratoComOrcamento`), rastreabilidade da despesa ponta a ponta (`rastrearTrilhaDespesa`) e varredura preventiva (`auditarSaudeOrcamentariaCampus`).
+  - `mcp/tools.ts`: definições com JSON Schema das ferramentas agênticas (`conciliar_saldo_ptres`, `consultar_painel_orcamentario`, `consultar_ficha_empenho`, `pesquisar_empenhos`, `consultar_extrato_descentralizacoes`, `consultar_ficha_contrato`, `projetar_necessidade_contrato`, `conciliar_contrato_orcamento`, `rastrear_trilha_despesa`, `auditar_inconsistencias_orcamentarias`) e despachante universal `dispatchMcpTool`.
+- **Integração com Assistente Gerencial**: a Edge Function `assistente-gerencial` identifica menções a códigos de PTRES (ex: `231798`), executa a conciliação trilateral direta de dados do banco e fundamenta o diagnóstico do Gemini, eliminando alucinações sobre supostos déficits orçamentários quando se trata de mero descompasso com o cadastro de atividades no SUAP.

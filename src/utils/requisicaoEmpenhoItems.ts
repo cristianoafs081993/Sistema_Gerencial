@@ -10,6 +10,7 @@ export type EmpenhoItemBalance = {
   item: PortalTransparenciaItemEmpenho;
   valorAtual: number;
   liquidadoCalculado: number;
+  enviadoCalculado?: number;
   saldoItem: number;
   liquidacoes: ContratoApiPublicLiquidacaoRow[];
 };
@@ -45,6 +46,7 @@ export function buildEmpenhoItemBalances(
   numeroEmpenho: string,
   itens: PortalTransparenciaItemEmpenho[],
   liquidacoes: ContratoApiPublicLiquidacaoRow[] = [],
+  enviadoPorItemKey: Map<string, number> = new Map(),
 ): EmpenhoItemBalance[] {
   const itemsBySubelemento = itens.reduce((map, item) => {
     const key = normalizeText(item.codigoSubelemento || item.descricaoSubelemento);
@@ -92,13 +94,20 @@ export function buildEmpenhoItemBalances(
     const sourceItemKey = buildEmpenhoItemSourceKey(numeroEmpenho, item);
     const valorAtual = Number(item.valorAtual || 0);
     const liquidadoCalculado = allocatedValues.get(sourceItemKey) ?? 0;
+    const key = sourceItemKey.trim().toLowerCase();
+    const desc = (item.descricao || item.descricaoSubelemento || `Subitem ${item.sequencial || 0}`).replace(/^item\s+compra\s*:\s*/i, '').trim().toLowerCase();
+    const descKey = `${normalizeEmpenhoNumero(numeroEmpenho)}|${desc}`;
+    const enviadoCalculado = enviadoPorItemKey.get(key) ?? enviadoPorItemKey.get(descKey) ?? 0;
+    const saldoOficial = Math.max(0, valorAtual - liquidadoCalculado);
+    const saldoItem = Math.max(0, saldoOficial - enviadoCalculado);
 
     return {
       sourceItemKey,
       item,
       valorAtual,
       liquidadoCalculado,
-      saldoItem: Math.max(0, valorAtual - liquidadoCalculado),
+      enviadoCalculado,
+      saldoItem,
       liquidacoes: allocatedLiquidacoes.get(sourceItemKey) ?? [],
     };
   });
@@ -142,15 +151,19 @@ export function buildRequisicaoItemsFromEmpenho(
 export function getRequisicaoItemAvailableBalance(
   item: Pick<RequisicaoFormItem, 'sourceItemKey' | 'sourceSnapshot'>,
   balances: EmpenhoItemBalance[],
+  enviadoPorItemKey?: Map<string, number>,
 ) {
   if (!item.sourceItemKey) return null;
   const freshBalance = balances.find((balance) => balance.sourceItemKey === item.sourceItemKey);
   if (freshBalance) return freshBalance.saldoItem;
   const valorAtual = item.sourceSnapshot?.valorAtual;
   const liquidadoCalculado = item.sourceSnapshot?.liquidadoCalculado;
+  const key = item.sourceItemKey.trim().toLowerCase();
+  const enviadoCalculado = enviadoPorItemKey?.get(key) ?? 0;
   if (typeof valorAtual === 'number' && typeof liquidadoCalculado === 'number') {
-    return Math.max(0, valorAtual - liquidadoCalculado);
+    return Math.max(0, valorAtual - liquidadoCalculado - enviadoCalculado);
   }
   const snapshotValue = item.sourceSnapshot?.saldoItem;
-  return typeof snapshotValue === 'number' ? snapshotValue : null;
+  return typeof snapshotValue === 'number' ? Math.max(0, snapshotValue - enviadoCalculado) : null;
 }
+

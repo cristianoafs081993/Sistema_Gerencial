@@ -6,6 +6,8 @@ import { isSuperAdminUser } from '@/lib/authz';
 import { supabase } from '@/lib/supabase';
 import { auditLogin, auditLogout } from '@/services/auditLog';
 import { fetchUserAccess, type UserAccessGroup, type UserOrg } from '@/services/userAccess';
+import { fetchUserCampus, saveUserCampus, type UserCampus } from '@/services/userCampus';
+import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
 
 type AuthContextValue = {
   session: Session | null;
@@ -21,6 +23,8 @@ type AuthContextValue = {
   screenAccessIds: string[];
   /** Órgão primário do usuário autenticado */
   userOrg: UserOrg | null;
+  userCampus: UserCampus;
+  updateUserCampus: (campusUasg: string) => Promise<UserCampus>;
   canAccessScreen: (screenId: string) => boolean;
   canAccessPath: (pathname: string) => boolean;
   signInWithPassword: (email: string, password: string) => Promise<AuthError | null>;
@@ -39,6 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userGroups, setUserGroups] = useState<UserAccessGroup[]>([]);
   const [screenAccessIds, setScreenAccessIds] = useState<string[]>([]);
   const [userOrg, setUserOrg] = useState<UserOrg | null>(null);
+  const [userCampus, setUserCampus] = useState<UserCampus>(() => ({ codigo: DEFAULT_IFRN_CAMPUS_UASG, nome: 'Currais Novos', aliases: ['Jucurutu', 'Parelhas'] }));
 
   // Ref para saber se já registramos o login desta sessão (evita duplicatas)
   const lastAuditedSessionId = useRef<string | null>(null);
@@ -91,6 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUserGroups([]);
       setScreenAccessIds([]);
       setUserOrg(null);
+      void fetchUserCampus(null).then(setUserCampus);
       setAccessError(null);
       setIsAccessLoading(false);
       return;
@@ -99,12 +105,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsAccessLoading(true);
     setAccessError(null);
 
-    fetchUserAccess(user, isSuperAdmin)
-      .then((access) => {
+    Promise.all([fetchUserAccess(user, isSuperAdmin), fetchUserCampus(user.id)])
+      .then(([access, campus]) => {
         if (!mounted) return;
         setUserGroups(access.groups);
         setScreenAccessIds(access.screenIds);
         setUserOrg(access.org);
+        setUserCampus(campus);
 
         // Registrar login na trilha de auditoria (apenas uma vez por sessão)
         const sessionId = session?.access_token?.slice(-16) ?? user.id;
@@ -156,6 +163,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return error;
   };
 
+  const updateUserCampus = async (campusUasg: string) => {
+    if (!user) throw new Error('Usuário não autenticado.');
+    const campus = await saveUserCampus(user.id, campusUasg);
+    setUserCampus(campus);
+    return campus;
+  };
+
   // ── Helpers de acesso ────────────────────────────────────────────────────
 
   const canAccessScreen = (screenId: string) => isSuperAdmin || screenAccessIds.includes(screenId);
@@ -181,6 +195,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         userGroups,
         screenAccessIds,
         userOrg,
+        userCampus,
+        updateUserCampus,
         canAccessScreen,
         canAccessPath,
         signInWithPassword,
@@ -202,4 +218,8 @@ export function useAuth() {
   }
 
   return context;
+}
+
+export function useOptionalAuth() {
+  return useContext(AuthContext) ?? null;
 }

@@ -190,6 +190,8 @@ describe('manutencaoService', () => {
         material: 'Arroz',
         quantidade: '12.5',
         unidade: 'KG',
+        valor_unitario: '4.50',
+        valor_total: '56.25',
         requisicao_compra_id: 'req-1',
         requisicao_numero: 'REQ-2026-0001',
         requisicao_status: 'enviada_fornecedor',
@@ -206,6 +208,8 @@ describe('manutencaoService', () => {
       ambiente_codigo: 'REFEITORIO',
       quantidade: 12.5,
       unidade: 'KG',
+      valor_unitario: 4.5,
+      valor_total: 56.25,
     });
   });
 });

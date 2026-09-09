@@ -138,7 +138,7 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 - `SupplierEmailDialog`: modal de solicitacao de cotacao de `PesquisaPrecos`, com cabecalho, corpo e rodape no mesmo padrao dos modais operacionais; o rodape oferece a acao secundaria `Historico de e-mails`, que abre um modal dedicado com os disparos registrados da pesquisa.
 - `PriceResearchValidation`: tela operacional de validação do QR Code da pesquisa de preços, baseada em `HeaderSubtitle`, `SectionPanel`, badges de status e blocos compactos para comparar hash informado e hash recalculado.
 - `PriceResearchEad`: subpagina operacional de capacitacao do modulo Pesquisa de Precos, com `HeaderSubtitle`, `SectionPanel`, lista de aulas, player responsivo 16:9 em iframe `youtube-nocookie.com` e painel de gestao exibido apenas para superadministrador.
-- `RequisicaoCompra`: pagina operacional que apresenta "Gestão de Requisições de Compra" no header global por meio de `HeaderSubtitle`, sem repetir o titulo na area de conteudo. O formulario usa filtro separado de favorecido e `Empenho / Nota de Empenho` em `Popover + Command` com selecao multipla, relevancia para numero completo da NE, contador no trigger e badges removiveis; os itens ficam agrupados por NE selecionada com saldo, carregamento e botao `Adicionar Item` em cada grupo.
+- `RequisicaoCompra`: pagina operacional que apresenta "Gestão de Requisições de Compra" no header global por meio de `HeaderSubtitle`, sem repetir o titulo na area de conteudo. O formulario usa filtro separado de favorecido e `Empenho / Nota de Empenho` em `Popover + Command` com selecao multipla, relevancia para numero completo da NE e contador no trigger; os itens ficam agrupados por NE selecionada com saldo, detalhamento, botao de remocao do empenho no cabecalho do grupo e botao `Adicionar Item` em cada grupo, eliminando badges redundantes abaixo do combobox.
 - `CommandPalette`: central de comandos e busca instantânea acionada por `Ctrl+K` ou `Cmd+K` e pelo cabeçalho global. Suporta busca direta por entidades com preview de saldos: pesquisa de Empenhos por número (ex: `2026NE...`), credor, processo ou PI com exibição de saldo disponível em tempo real, omitindo empenhos com saldo zero, e abertura imediata do `EmpenhoDialog`; pesquisa de Contratos por número, fornecedor ou objeto com abertura imediata do modal centralizado `ContratoApiDetailsSheet`; atalhos por prefixo (`ne `, `empenho `, `contrato `, `tela `, `acao `) e chips de escopo; atalhos para todos os módulos permitidos e ações rápidas (Nova Requisição, Pesquisa de Preços, Sincronizar SUAP).
 - `ContratoApiDetailsSheet`: modal centralizado (`Dialog`) de alta performance e acessibilidade para exibição detalhada de contratos, contendo métricas gerais de valor acumulado e executado, vigência, objeto, unidade de origem, histórico de termos aditivos, detalhamento por item/fatura com agrupamento em abas e faturas vinculadas.
 - `Layout`: shell global com sidebar responsiva com suporte a modo expandido (`w-72`) e modo compacto (*Rail Mode* `w-18`) com persistência em `localStorage`, tooltips flutuantes nos ícones, campo de busca com atalho visual `Ctrl K`, seletor de temas do SUAP (`SuapThemeSubMenu`) no menu de configurações do usuário e drawer mobile.
@@ -167,6 +167,16 @@ Rodape de tabela com seletor de quantidade, paginas e navegacao.
 
 
 - Almoxarifado: página operacional que combina HeaderActions, StatCard, FilterPanel, DataTablePanel, Tabs e Dialog para catálogo, saldos e movimentos, com estados explícitos de estoque crítico.
+- `InsumosDashboardView`: painel analítico autônomo e reutilizável (`src/components/refeitorio/InsumosDashboardView.tsx`) para gestão de insumos e consumo de materiais. Inclui toolbar de filtros (período, bloco, tipo de ambiente e insumo), cards executivos (Total de Requisições e Valor Total Gasto em R$), gráficos analíticos (Distribuição por Categoria em rosca, Valor Gasto com Insumos em barras, Consumo Geral de Insumos em barras com toggle Top 8/Todos e ranking Top 5 Ambientes), além de modal completo de Detalhamento Analítico com busca e paginação.
 O acordeao Resumo financeiro por dimensao segue a estrutura nativa do SUAP e exibe os totais das quatro colunas financeiras agrupados por dimensao.
 
 - Na revisão de documentos SUAP, o ícone de histórico fica ao lado do ícone de geração e carrega a última análise salva sem baixar novamente o PDF.
+
+### Consulta de contratos e empenhos (setembro de 2026)
+
+`RecordDetailsPage` apresenta detalhes dentro do shell com retorno e gestão de foco.
+`EmpenhoDialog` e `ContratoApiDetailsSheet` aceitam `presentation="page"` para os
+módulos de consulta; o padrão continua sendo modal nos demais consumidores.
+Empenhos adota `DataTablePanel`, colunas financeiras separadas e edição explícita.
+Contratos adota lista compacta, filtros de prazo/faturas e abas de detalhes.
+Consulte [o fluxo completo](../frontend/CONTRATOS_EMPENHOS_UI.md).

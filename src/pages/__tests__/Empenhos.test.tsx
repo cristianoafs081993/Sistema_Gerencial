@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { requisicoesCompraService } from '@/services/requisicoesCompra';
 import Empenhos from '@/pages/Empenhos';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,6 +23,12 @@ vi.mock('@/services/userFavorites', () => ({
   useUserFavorites: vi.fn(),
 }));
 
+vi.mock('@/services/requisicoesCompra', () => ({
+  requisicoesCompraService: {
+    listPermissions: vi.fn(),
+  },
+}));
+
 vi.mock('@/components/HeaderParts', () => ({
   HeaderActions: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
@@ -29,20 +37,36 @@ vi.mock('@/components/JsonImportDialog', () => ({
   JsonImportDialog: () => null,
 }));
 
+const mockedEmpenhoDialog = vi.fn();
 vi.mock('@/components/modals/EmpenhoDialog', () => ({
-  EmpenhoDialog: () => null,
+  EmpenhoDialog: (props: { open: boolean; onOpenChange: (open: boolean) => void; readOnly?: boolean }) => {
+    mockedEmpenhoDialog(props);
+    return props.open ? <button onClick={() => props.onOpenChange(false)}>Voltar aos empenhos</button> : null;
+  },
 }));
 
 const mockedUseData = vi.mocked(useData);
 const mockedUseAuth = vi.mocked(useAuth);
 const mockedUseUserFavorites = vi.mocked(useUserFavorites);
+const mockedRequisicoesCompraService = vi.mocked(requisicoesCompraService);
 
-const renderEmpenhos = () =>
-  render(
-    <TooltipProvider>
-      <Empenhos />
-    </TooltipProvider>,
+const renderEmpenhos = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Empenhos />
+      </TooltipProvider>
+    </QueryClientProvider>,
   );
+};
 
 const createEmpenho = (overrides: Partial<Empenho>): Empenho => ({
   id: 'empenho-1',
@@ -132,6 +156,25 @@ describe('Empenhos', () => {
     expect(screen.queryByText('2026NE000002')).not.toBeInTheDocument();
   });
 
+  it('exibe as colunas financeiras simplificadas e preserva a busca no retorno do detalhe', () => {
+    const current = mockedUseData();
+    mockedUseData.mockReturnValue({ ...current, empenhos: [createEmpenho({ processo: '23035.123/2026', planoInterno: 'PI-UNICO', valor: 1000, valorLiquidado: 400, valorPago: 250 })] });
+    renderEmpenhos();
+    for (const name of ['Empenhado', 'A liquidar']) expect(screen.getByRole('columnheader', { name })).toBeVisible();
+    expect(screen.queryByRole('columnheader', { name: 'Liquidado' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Pago' })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Buscar empenhos' }), { target: { value: '23035.123/2026' } });
+    const row = screen.getByRole('button', { name: '2026NE000001' }).closest('tr')!;
+    expect(within(row).getAllByRole('cell').slice(3, 5).map(cell => cell.textContent?.replace(/\s/g, ' '))).toEqual(['R$ 1.000,00', 'R$ 600,00']);
+    expect(screen.queryByRole('button', { name: /Ver detalhes do empenho/i })).not.toBeInTheDocument();
+    fireEvent.click(row);
+    expect(screen.queryByRole('textbox', { name: 'Buscar empenhos' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Voltar aos empenhos' }));
+    expect(screen.getByRole('textbox', { name: 'Buscar empenhos' })).toHaveValue('23035.123/2026');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Buscar empenhos' }), { target: { value: 'PI-UNICO' } });
+    expect(screen.getByRole('button', { name: '2026NE000001' })).toBeVisible();
+  });
+
   it('nao exibe credito disponivel nem botoes de upload legados no header da tela de empenhos', () => {
     mockedUseAuth.mockReturnValue({ isSuperAdmin: true } as never);
     renderEmpenhos();
@@ -149,7 +192,11 @@ describe('Empenhos', () => {
 
     expect(screen.getAllByText('Descrição')[0]).toBeInTheDocument();
     expect(screen.getAllByText('Empenho teste')[0]).toBeInTheDocument();
-    expect(screen.getAllByText('Tesouro • PI: PI-AD')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Tesouro • PI-AD')[0]).toBeInTheDocument();
+    expect(screen.queryByText(/Empenhos do exercício/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Valores acumulados por empenho/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Proc:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^PI:/i)).not.toBeInTheDocument();
   });
 
   it('alterna entre as abas de execucao e restos a pagar usando o layout folder tab', () => {
@@ -160,5 +207,86 @@ describe('Empenhos', () => {
 
     fireEvent.click(restosTab);
     expect(screen.getByText('Nenhum empenho encontrado.')).toBeInTheDocument();
+  });
+
+  it('restringe a lista de empenhos exibida para terceirizado com base nas permissoes atribuidas', async () => {
+    mockedUseAuth.mockReturnValue({
+      isSuperAdmin: false,
+      user: { id: 'usr-terceirizado', email: 'terceirizado@refeitorio.com', user_metadata: { matricula: '3128880' } },
+      userGroups: [{ id: 'grp-tc', name: 'Terceirizado', slug: 'terceirizado' }],
+    } as never);
+
+    mockedRequisicoesCompraService.listPermissions.mockResolvedValue([
+      { id: 'perm-1', userMatricula: '3128880', empenhoId: 'empenho-comum' },
+    ] as never);
+
+    renderEmpenhos();
+
+    expect(await screen.findByText('2026NE000002')).toBeInTheDocument();
+    expect(screen.queryByText('2026NE000001')).not.toBeInTheDocument();
+  });
+
+  it('exibe mensagem orientadora quando o terceirizado nao possui empenhos atribuidos', async () => {
+    mockedUseAuth.mockReturnValue({
+      isSuperAdmin: false,
+      user: { id: 'usr-terceirizado', email: 'terceirizado@refeitorio.com', user_metadata: { matricula: '3128880' } },
+      userGroups: [{ id: 'grp-tc', name: 'Terceirizado', slug: 'terceirizado' }],
+    } as never);
+
+    mockedRequisicoesCompraService.listPermissions.mockResolvedValue([]);
+
+    renderEmpenhos();
+
+    expect(await screen.findByText('Nenhum empenho atribuído')).toBeInTheDocument();
+    expect(screen.getByText(/Você não possui empenhos vinculados ao seu usuário no momento/i)).toBeInTheDocument();
+    expect(screen.queryByText('2026NE000001')).not.toBeInTheDocument();
+    expect(screen.queryByText('2026NE000002')).not.toBeInTheDocument();
+  });
+
+  it('passa readOnly=true para o EmpenhoDialog quando usuario e terceirizado', async () => {
+    mockedUseAuth.mockReturnValue({
+      isSuperAdmin: false,
+      user: { id: 'usr-terceirizado', email: 'terceirizado@refeitorio.com', user_metadata: { matricula: '3128880' } },
+      userGroups: [{ id: 'grp-tc', name: 'Terceirizado', slug: 'terceirizado' }],
+    } as never);
+
+    mockedRequisicoesCompraService.listPermissions.mockResolvedValue([
+      { id: 'perm-1', userMatricula: '3128880', empenhoId: 'empenho-comum' },
+    ] as never);
+
+    renderEmpenhos();
+
+    const empenhoBtn = await screen.findByRole('button', { name: '2026NE000002' });
+    fireEvent.click(empenhoBtn);
+
+    expect(mockedEmpenhoDialog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        open: true,
+        readOnly: true,
+        empenho: expect.objectContaining({ numero: '2026NE000002' }),
+      }),
+    );
+  });
+
+  it('permite que administradores visualizem todos os empenhos e abram o dialog sem readOnly', () => {
+    mockedUseAuth.mockReturnValue({
+      isSuperAdmin: true,
+      userGroups: [{ id: 'grp-admin', name: 'Superadmin', slug: 'superadmin' }],
+    } as never);
+
+    renderEmpenhos();
+
+    expect(screen.getByText('2026NE000001')).toBeInTheDocument();
+    expect(screen.getByText('2026NE000002')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '2026NE000001' }));
+
+    expect(mockedEmpenhoDialog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        open: true,
+        readOnly: false,
+        empenho: expect.objectContaining({ numero: '2026NE000001' }),
+      }),
+    );
   });
 });

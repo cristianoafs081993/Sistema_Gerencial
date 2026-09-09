@@ -4,6 +4,7 @@ type RestQueryOptions = {
   orderBy?: string;
   ascending?: boolean;
   limit?: number;
+  filters?: Record<string, string | number | boolean>;
 };
 
 export async function fetchSupabaseRestRows<T>(
@@ -22,6 +23,10 @@ export async function fetchSupabaseRestRows<T>(
 
   if (typeof options.limit === 'number') {
     url.searchParams.set('limit', String(options.limit));
+  }
+
+  for (const [key, value] of Object.entries(options.filters ?? {})) {
+    url.searchParams.set(key, `eq.${value}`);
   }
 
   const response = await fetch(url.toString(), {

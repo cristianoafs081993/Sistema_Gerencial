@@ -427,7 +427,7 @@ Opcionais:
 
 - `GEMINI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
 - `GEMINI_PRICE_RESEARCH_MODEL`
-  - default no código: `gemini-2.5-flash-lite`
+  - default no código: `gemini-3.8-flash` (com fallback automático para `gemini-2.5-flash` e `gemini-2.5-flash-lite`)
 
 Observações operacionais:
 
@@ -483,3 +483,9 @@ Separar conceitualmente:
 - variaveis necessarias para publicar Edge Functions
 - variaveis de ferramentas externas que nao sao essenciais ao sistema
 - propriedades do Apps Script usadas para integracoes Gmail
+
+## Sincronização de contratos PNCP
+
+A função usa SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no servidor. O cron requer
+a chave service_role no Vault, com nome pncp_sync_service_role_key (ou service_role_key).
+Nenhuma chave privilegiada é enviada ao frontend. Ver [ativação](PNCP_CONTRACT_SYNC.md).

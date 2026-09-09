@@ -68,6 +68,8 @@ export const filterEmpenhos = (empenhos: Empenho[], filters: EmpenhosFilters) =>
   return empenhos.filter((empenho) => {
     const matchesSearch =
       normalizeEmpenhoSearch(empenho.numero).includes(searchNormalized) ||
+      normalizeEmpenhoSearch(empenho.processo || '').includes(searchNormalized) ||
+      normalizeEmpenhoSearch(empenho.planoInterno || '').includes(searchNormalized) ||
       normalizeEmpenhoSearch(empenho.descricao).includes(searchNormalized) ||
       normalizeEmpenhoSearch(empenho.componenteFuncional || '').includes(searchNormalized) ||
       normalizeEmpenhoSearch(empenho.favorecidoNome || '').includes(searchNormalized) ||

@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "SIAGES Mobile",
+    "slug": "siages-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#133aa5",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#133aa5"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

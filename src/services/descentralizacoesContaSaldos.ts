@@ -1,11 +1,13 @@
 import { supabase } from '@/lib/supabase';
 import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import type { ContaDescentralizacaoSaldo } from '@/types';
+import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
 
-const CONTA_DESCENTRALIZACOES_SELECT = 'id,ptres,metrica,valor,updated_at';
+const CONTA_DESCENTRALIZACOES_SELECT = 'id,campus_uasg,ptres,metrica,valor,updated_at';
 
 type ContaDescentralizacaoSaldoRow = {
   id: string;
+  campus_uasg?: string | null;
   ptres: string;
   metrica?: string | null;
   valor: number | string;
@@ -29,10 +31,11 @@ const mapContaDescentralizacaoSaldoRow = (
 });
 
 export const descentralizacoesContaSaldosService = {
-  async getAll(): Promise<ContaDescentralizacaoSaldo[]> {
+  async getAll(campusUasg = DEFAULT_IFRN_CAMPUS_UASG): Promise<ContaDescentralizacaoSaldo[]> {
     const { data, error } = await supabase
       .from('descentralizacoes_conta_saldos')
       .select(CONTA_DESCENTRALIZACOES_SELECT)
+      .eq('campus_uasg', campusUasg)
       .order('ptres', { ascending: true });
 
     if (error) {
@@ -40,7 +43,7 @@ export const descentralizacoesContaSaldosService = {
       const fallbackData = await fetchSupabaseRestRows<ContaDescentralizacaoSaldoRow>(
         'descentralizacoes_conta_saldos',
         CONTA_DESCENTRALIZACOES_SELECT,
-        { orderBy: 'ptres', ascending: true },
+        { orderBy: 'ptres', ascending: true, filters: { campus_uasg: campusUasg } },
       );
       return fallbackData.map(mapContaDescentralizacaoSaldoRow);
     }
@@ -49,7 +52,7 @@ export const descentralizacoesContaSaldosService = {
       const fallbackData = await fetchSupabaseRestRows<ContaDescentralizacaoSaldoRow>(
         'descentralizacoes_conta_saldos',
         CONTA_DESCENTRALIZACOES_SELECT,
-        { orderBy: 'ptres', ascending: true },
+        { orderBy: 'ptres', ascending: true, filters: { campus_uasg: campusUasg } },
       );
       return fallbackData.map(mapContaDescentralizacaoSaldoRow);
     }
@@ -57,10 +60,11 @@ export const descentralizacoesContaSaldosService = {
     return (data as ContaDescentralizacaoSaldoRow[]).map(mapContaDescentralizacaoSaldoRow);
   },
 
-  async upsertBatch(rows: ContaDescentralizacaoSaldoInput[]): Promise<void> {
+  async upsertBatch(rows: ContaDescentralizacaoSaldoInput[], campusUasg = DEFAULT_IFRN_CAMPUS_UASG): Promise<void> {
     if (rows.length === 0) return;
 
     const payload = rows.map((row) => ({
+      campus_uasg: campusUasg,
       ptres: row.ptres.trim(),
       metrica: row.metrica?.trim() || '',
       valor: row.valor,
@@ -69,7 +73,7 @@ export const descentralizacoesContaSaldosService = {
 
     const { error } = await supabase
       .from('descentralizacoes_conta_saldos')
-      .upsert(payload, { onConflict: 'ptres' });
+      .upsert(payload, { onConflict: 'campus_uasg,ptres' });
 
     if (error) throw error;
   },

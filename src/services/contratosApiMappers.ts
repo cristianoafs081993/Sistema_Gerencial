@@ -14,13 +14,34 @@ export type ContratoApiFaturaEmpenhoPayload = ReturnType<typeof mapFaturaEmpenho
 
 export function toNumber(value: unknown): number {
   if (value == null) return 0;
-  if (typeof value === 'number') return value;
-  const cleaned = String(value)
-    .trim()
-    .replace(/\./g, '')
-    .replace(',', '.')
-    .replace(/[^\d.-]/g, '');
-  return Number(cleaned) || 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+
+  const raw = String(value).trim().replace(/[^\d,.-]/g, '');
+  if (!raw || raw === '-' || raw === '.' || raw === ',') return 0;
+
+  const sign = raw.startsWith('-') ? '-' : '';
+  const unsigned = raw.replace(/-/g, '');
+  const lastComma = unsigned.lastIndexOf(',');
+  const lastDot = unsigned.lastIndexOf('.');
+  let decimalIndex = -1;
+
+  if (lastComma >= 0 && lastDot >= 0) {
+    // A API mistura formatos brasileiro (1.234,56) e decimal (0.6376).
+    // Quando os dois separadores existem, o último é o decimal.
+    decimalIndex = Math.max(lastComma, lastDot);
+  } else if (lastComma >= 0) {
+    decimalIndex = lastComma;
+  } else if (lastDot >= 0) {
+    const dotGroups = unsigned.split('.');
+    const isThousandsOnly = dotGroups.length > 2 && dotGroups.slice(1).every((group) => group.length === 3);
+    decimalIndex = isThousandsOnly ? -1 : lastDot;
+  }
+
+  const normalized = decimalIndex >= 0
+    ? `${sign}${unsigned.slice(0, decimalIndex).replace(/[.,]/g, '') || '0'}.${unsigned.slice(decimalIndex + 1).replace(/[.,]/g, '')}`
+    : `${sign}${unsigned.replace(/[.,]/g, '')}`;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 export function toDate(value: unknown): string | null {
@@ -157,9 +178,21 @@ export function mapFatura(contratoApiId: string, raw: ApiFatura) {
     data_emissao: toDate(raw.data_emissao ?? raw.emissao),
     data_vencimento: toDate(raw.data_vencimento ?? raw.vencimento ?? raw.prazo),
     data_pagamento: toDate(raw.data_pagamento),
+    data_ateste: toDate(raw.data_ateste ?? raw.ateste),
+    data_protocolo: toDate(raw.data_protocolo ?? raw.protocolo),
+    processo: raw.processo == null ? null : String(raw.processo),
+    chave_nfe: raw.chave_nfe == null ? null : String(raw.chave_nfe),
+    justificativa: raw.justificativa == null && raw.justificativafatura_id == null
+      ? null : String(raw.justificativa ?? raw.justificativafatura_id),
+    informacao_complementar: raw.informacao_complementar == null && raw.infcomplementar == null
+      ? null : String(raw.informacao_complementar ?? raw.infcomplementar),
+    repactuacao: raw.repactuacao == null ? null : String(raw.repactuacao),
     situacao: String(raw.situacao ?? ''),
     valor_bruto: toNumber(raw.valor_bruto ?? raw.valor),
     valor_liquido: toNumber(raw.valor_liquido ?? raw.valorliquido),
+    juros: toNumber(raw.juros),
+    multa: toNumber(raw.multa),
+    glosa: toNumber(raw.glosa),
     raw_data: raw,
   };
 }

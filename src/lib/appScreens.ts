@@ -3,6 +3,7 @@ import {
   ArrowDownRight,
   Banknote,
   Bot,
+  Boxes,
   Building2,
   ClipboardList,
   Coins,
@@ -21,6 +22,7 @@ import {
   ShieldAlert,
   UserCog,
   Users,
+  UtensilsCrossed,
   Wand2,
   Warehouse,
   Zap,
@@ -32,9 +34,10 @@ export type AppScreenGroupId =
   | 'contratos'
   | 'licitacoes'
   | 'energia'
+  | 'operacoes'
+  | 'refeitorio'
   | 'documentos'
   | 'automacoes'
-  | 'operacoes'
   | 'administracao';
 
 export type AppScreenGroup = {
@@ -61,6 +64,7 @@ export const appScreenGroups: AppScreenGroup[] = [
   { id: 'financeiro', name: 'Financeiro', sortOrder: 20 },
   { id: 'contratos', name: 'Contratos', sortOrder: 30 },
   { id: 'licitacoes', name: 'Licitações', sortOrder: 35 },
+  { id: 'refeitorio', name: 'Refeitório', sortOrder: 36 },
   { id: 'energia', name: 'Energia', sortOrder: 37 },
   { id: 'operacoes', name: 'Operações', sortOrder: 38 },
   { id: 'documentos', name: 'Documentos', sortOrder: 40 },
@@ -81,7 +85,6 @@ export const appScreens: AppScreen[] = [
   { id: 'rastreabilidade-pfs', groupId: 'financeiro', name: 'Rastreabilidade de PFs', path: '/rastreabilidade-pfs', icon: ClipboardList, sortOrder: 50 },
   { id: 'conciliacao-pfs', groupId: 'financeiro', name: 'Conciliação de PFs', path: '/conciliacao-pfs', icon: ScanSearch, sortOrder: 60 },
   { id: 'contratos', groupId: 'contratos', name: 'Contratos', path: '/contratos', icon: FileStack, sortOrder: 10 },
-  { id: 'requisicao-compra', groupId: 'contratos', name: 'Requisição de Compra', path: '/requisicao-compra', icon: ClipboardList, sortOrder: 20 },
   { id: 'cadastro-terceirizados', groupId: 'contratos', name: 'Cadastro de Terceirizados', path: '/cadastro-terceirizados', icon: UserCog, sortOrder: 25 },
   { id: 'pesquisa-precos', groupId: 'licitacoes', name: 'Pesquisa de Preços', path: '/pesquisa-precos', icon: SearchCheck, sortOrder: 5 },
   { id: 'pesquisa-precos-ead', groupId: 'licitacoes', name: 'Capacitação EAD', path: '/pesquisa-precos/ead', icon: GraduationCap, sortOrder: 6, hiddenFromNavigation: true },
@@ -102,6 +105,9 @@ export const appScreens: AppScreen[] = [
   { id: 'suap', groupId: 'documentos', name: 'SUAP', path: '/suap', icon: FileStack, sortOrder: 40 },
   { id: 'economia-tempo', groupId: 'automacoes', name: 'Economia de Tempo', path: '/economia-tempo', icon: Clock3, sortOrder: 10 },
   { id: 'almoxarifado', groupId: 'operacoes', name: 'Almoxarifado', path: '/almoxarifado', icon: Warehouse, sortOrder: 10 },
+  { id: 'refeitorio', groupId: 'refeitorio', name: 'Refeitório', path: '/refeitorio', icon: UtensilsCrossed, sortOrder: 5, hiddenFromNavigation: true },
+  { id: 'refeitorio-insumos', groupId: 'refeitorio', name: 'Dashboard', path: '/refeitorio/insumos', icon: LayoutDashboard, sortOrder: 10 },
+  { id: 'requisicao-compra', groupId: 'refeitorio', name: 'Requisição de Compra', path: '/requisicao-compra', icon: ClipboardList, sortOrder: 20 },
   {
     id: 'controle-orgaos',
     groupId: 'administracao',
@@ -170,6 +176,9 @@ export const appScreens: AppScreen[] = [
 
 const impliedScreenAccess: Record<string, string[]> = {
   'pesquisa-precos': ['cadastro-fornecedores', 'pesquisa-precos-ead'],
+  'refeitorio': ['refeitorio-insumos', 'requisicao-compra'],
+  'requisicao-compra': ['refeitorio', 'refeitorio-insumos'],
+  'refeitorio-insumos': ['refeitorio', 'requisicao-compra'],
 };
 
 export function expandScreenAccessIds(screenIds: string[]) {

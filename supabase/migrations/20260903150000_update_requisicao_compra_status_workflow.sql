@@ -20,9 +20,9 @@ ALTER TABLE public.requisicoes_compra
   CHECK (status IN ('draft', 'enviada_fornecedor', 'liquidada'));
 
 -- 3. Atualizar política de exclusão
-DROP POLICY IF EXISTS Excluir requisicoes_compra ON public.requisicoes_compra;
+DROP POLICY IF EXISTS "Excluir requisicoes_compra" ON public.requisicoes_compra;
 
-CREATE POLICY Excluir requisicoes_compra
+CREATE POLICY "Excluir requisicoes_compra"
   ON public.requisicoes_compra FOR DELETE TO authenticated
   USING (
     (created_by = auth.uid() AND status = 'draft')
@@ -46,7 +46,7 @@ RETURNS uuid
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = public
-AS 
+AS $function$
 DECLARE
   v_id uuid := p_id;
   v_status text := coalesce(nullif(p_requisicao ->> 'status', ''), 'draft');
@@ -341,7 +341,7 @@ BEGIN
 
   RETURN v_id;
 END;
-;
+$function$;
 
 REVOKE ALL ON FUNCTION public.save_requisicao_compra(jsonb, jsonb, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.save_requisicao_compra(jsonb, jsonb, uuid) TO authenticated;

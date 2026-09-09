@@ -1,5 +1,8 @@
 import "@testing-library/jest-dom";
 
+(globalThis as any).__DEV__ = true;
+
+if (typeof window !== 'undefined') {
 Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: (query: string) => ({
@@ -17,3 +20,4 @@ Object.defineProperty(window, "matchMedia", {
 Element.prototype.scrollIntoView = Element.prototype.scrollIntoView ?? (() => {});
 
 document.elementFromPoint = document.elementFromPoint ?? (() => null);
+}

@@ -69,11 +69,16 @@ Uso:
 
 - responde perguntas gerenciais sobre dados do sistema em linguagem natural
 - conduz pesquisas de preços completas sob a Lei 14.133/2021 e IN SEGES/ME 65/2021, consultando Compras.gov.br e PNCP, auditando Editais/TRs com Gemini e retornando `priceResearchResult` com Mapa Comparativo, Despacho SUAP e exportação Excel
+- **Busca local v2**: recuperação por RRF, confirmação de preço por item, verificação conservadora de requisitos e leitura limitada de PDFs. Consulte [comportamento e implantação atualizados](PRECOS_PRECISAO.md); afirmações históricas de auditoria automática abaixo não descrevem a versão v2.
+- **Avaliação de Clareza da Demanda (IN 65/2021)**: quando o usuário solicita cotação com termos vagos ou genéricos (ex.: "computador" sem CPU/RAM/SSD, "cadeira" sem especificação ergonômica NR-17, "ar-condicionado" sem BTUs), o agente formula perguntas de esclarecimento pontuais e fornece opções rápidas de especificação (`||SUGESTOES||`) em vez de realizar consultas cegas
+- **Resolução Contextual por Histórico**: quando o usuário responde à pergunta de esclarecimento, a especificação técnica fornecida é mesclada com a demanda anterior e a pesquisa prossegue automaticamente
+- **Expansão Automática por Sinônimos Oficiais**: quando a consulta direta retornar menos de 3 cotações (mínimo exigido pelo Art. 6º da IN 65/2021), o agente consulta termos sinônimos oficiais homologados (ex.: "notebook" ⇄ "computador portátil", "laptop"; "projetor" ⇄ "projetor multimídia", "datashow") na base local e em seguida na busca externa para ampliar a amostra até atingir o patamar ideal (≥ 3), reportando os sinônimos utilizados e alertando a autoridade caso persista amostra reduzida
 - consulta fontes allowlisted e calcula agregações determinísticas antes de chamar o Gemini
 - cobre orçamento, empenhos, créditos disponíveis, documentos hábeis, financeiro, contratos API, PFs e conciliação
 - valida o usuário autenticado pelo JWT recebido e usa o cliente Supabase com esse mesmo token, respeitando RLS
 - para descentralizações, detalha total líquido por PTRES e PI e trata Campus Currais Novos como o escopo natural dos dados do sistema
 - para contratos, usa `contratos_api.situacao_derivada = true`, separa Campus `158366` e Reitoria `158155` com evidência operacional do campus, e calcula rankings por empenhado/saldo
+- **Conciliação Orçamentária Trilateral (SUAP x SIAFI)**: quando a mensagem do usuário referencia um código de PTRES (ex: `231798`), o backend busca integralmente todas as atividades, descentralizações e empenhos daquela origem de recurso sem limite arbitrário de paginação. Realiza a conciliação trilateral (`reconcilePtresData`), separando o saldo gerencial do SUAP (`Planejado - Empenhado`) do saldo contábil real do SIAFI (`Descentralizado - Empenhado`), explicando a nível de Plano Interno (PI) que divergências negativas no painel decorrem de empenhos emitidos com respaldo financeiro real da Reitoria que não foram cadastrados como atividades no Plano 8 do SUAP.
 
 Entrada esperada:
 
@@ -486,10 +491,14 @@ Local:
 Uso:
 
 - sincroniza contratos e empenhos de todas as 19 Unidades Gestoras (UASGs) do catálogo institucional do IFRN (`DEFAULT_PNCP_UASGS`) a partir de `https://contratos.comprasnet.gov.br/api`
-- busca contratos ativos, inativos, historico, empenhos, faturas e itens
+- busca contratos ativos, inativos, historico, empenhos, faturas, itens e arquivos
+- sincroniza recursos complementares por contrato: cronograma, garantias, responsáveis, prepostos, ocorrências, despesas acessórias e terceirizados
+- recursos complementares são atualizados de forma independente; falha isolada preserva o último dado válido e é registrada em `details.resource_errors`
+- normaliza ateste, protocolo, vencimento, processo, chave NF-e, glosa, juros, multa e repactuação das faturas
 - deriva `situacao_derivada`, `vigencia_inicio_derivada`, `vigencia_fim_derivada`, `situacao_derivada_motivo` e `campus_scope_reason` em `contratos_api`
+- grava `contratos_api_campus_scope` por UASG sincronizada; contratos da Reitoria só recebem vínculo quando houver empenho ou fatura comprovadamente do campus em processamento
 - considera ativo somente contrato com vigencia derivada pelo historico ainda vigente; termos de rescisao/cancelamento tornam o contrato inativo; sem historico, usa `vigencia_fim` da listagem como fallback com motivo registrado. Se o historico estiver vencido mas o contrato for ativo na API com faturas nos ultimos 120 dias, e reativado com motivo `historico_vencido_com_fatura_recente`
-- contratos da UG `158155` entram no escopo do campus somente com evidencia operacional estruturada do campus `158366`, como empenho ou fatura com UG/contratante do campus
+- contratos da UG `158155` entram no escopo do campus processado somente com evidencia operacional estruturada daquela UASG, como empenho ou fatura com UG/contratante do campus
 - contratos com UASG/origem `158366` cujo objeto indique atendimento a outro campus avancado, como Parelhas ou Jucurutu, sao marcados fora do escopo com `ug_campus_objeto_fora_currais_novos`
 - grava em `contratos_api_empenhos` os empenhos de todas as UASGs participantes do contrato, registrando sua respectiva `unidade_gestora`
 - deriva vinculos fatura-item de `dados_item_faturado`
@@ -501,6 +510,11 @@ Dependencias:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - opcional `CONTRATOS_SYNC_SECRET` para exigir o header `x-contratos-sync-secret`
 
+Migrations necessárias para os recursos adicionais:
+
+- `20260907090000_create_contratos_api_compras_documentos.sql`
+- `20260907103000_add_contratos_api_gestao_recursos.sql`
+
 Observacao:
 
 - publicada com `verify_jwt = false`, pois o cron chama a function por HTTP e a function usa service role apenas internamente
@@ -510,24 +524,15 @@ Observacao:
 
 ### `sync-contratos-pncp-documentos`
 
-Local:
+Sincroniza PDFs e instrumentos PNCP com paginação completa, validação de identidade
+e persistência no servidor. Aceita atualização manual autenticada por `contratoApiId`
+e lotes do cron com service role. `verify_jwt = true`; o handler também valida o
+usuário. Documentos e notas têm marcos de sucesso separados; falhas são registradas
+em `pncp_sync_error` sem zerar os dados já salvos. O cron roda a cada cinco minutos,
+com até cinco contratos por lote e TTL de 24 horas. Exige a migration de reparo e
+uma chave service role no Vault para o cron.
 
-- [sync-contratos-pncp-documentos/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-contratos-pncp-documentos/index.ts)
-
-Uso:
-
-- sincroniza periodicamente os documentos oficiais (PDFs de contratos, aditivos, apostilamentos) e instrumentos de cobrança (NF-e com chaves SEFAZ de 44 dígitos e itens) a partir da API pública do PNCP (`GET /orgaos/{cnpj}/contratos/{ano}/{seq}/arquivos` e `GET /orgaos/{cnpj}/contratos/{ano}/{seq}/instrumentocobranca`)
-- resolve o `sequencialContrato` exato no PNCP via API de Consulta por UASG/Ano, com cache em memória durante a execução para evitar limites de taxa (503)
-- faz upsert direto nas tabelas `contratos_api_documentos` e `contratos_api_instrumentos_cobranca`, atualizando as colunas de controle em `contratos_api` (`pncp_control_number`, `pncp_sequencial`, `pncp_ano`, `pncp_has_record`, `pncp_documentos_checked_at`, `pncp_documentos_count`, `pncp_instrumentos_checked_at`, `pncp_instrumentos_count`)
-
-Dependencias:
-
-- `SUPABASE_SERVICE_ROLE_KEY`
-
-Observacao:
-
-- publicada com `verify_jwt = false`, pois é chamada pelo cron do banco e pelo backend
-- agendada via `pg_cron` / `pg_net` para executar diariamente às **`05:00` no horário de Brasília (`08:00 UTC`)**, horário dedicado e posterior às sincronizações da madrugada (03:00 Comprasnet, 03:30 Licitações, 04:00/04:30 Transparência), garantindo zero contenção de recursos no servidor
+Detalhes: [PNCP_CONTRACT_SYNC.md](PNCP_CONTRACT_SYNC.md).
 
 ### `sync-licitacoes-pncp`
 
@@ -708,7 +713,7 @@ Dependências:
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - opcional `GEMINI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY` ou `GOOGLE_API_KEY`
-- opcional `GEMINI_PRICE_RESEARCH_MODEL`
+- opcional `GEMINI_PRICE_RESEARCH_MODEL`, com default `gemini-3.8-flash` e fallback automático para `gemini-2.5-flash` e `gemini-2.5-flash-lite`
 
 Observações:
 
@@ -849,3 +854,37 @@ Function versionada para revisão temporária de Termo de Referência e Estudo T
 - A dimensao de cada atividade e resolvida pela secao estrutural (accordion) que contem a tabela; o parser nao depende da ordem global de headings, que varia entre runtimes DOM.
 - A primeira execucao fica em `preview`; depois da conferencia, `apply_suap_plan_snapshot` atualiza/inclui os registros e arquiva os ausentes sem exclusao fisica.
 - O proxy continua aceitando exclusivamente `/plan_estrategico/plano_concluido/8/` sem parametros adicionais.
+
+## sync-precos-referencia
+
+> Versão de 07/09/2026: veja [precisão e implantação](PRECOS_PRECISAO.md). O incremento usa a última janela v2 concluída; gravação e cursor são transacionais. O handler exige autenticação mesmo com verificação JWT do gateway desativada. Os agendamentos passam a incluir retomada e embeddings. As notas de deploy abaixo são históricas e não confirmam publicação desta versão.
+
+Local:
+
+- [sync-precos-referencia/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-precos-referencia/index.ts)
+
+Finalidade:
+
+- sincronização da base local de preços de referência oficiais (Compras.gov.br e PNCP sob Lei 14.133/2021)
+- suporta 3 modos operacionais:
+  - `backfill_mensal`: ingere compras homologadas mês a mês a partir de janeiro, paginando com segurança de timeout
+  - `daily_delta`: sincronização incremental diária das últimas 24h a 48h a partir da data máxima sincronizada
+  - `generate_embeddings`: gera vetores de 768 dimensões com Gemini (`gemini-embedding-001`, `outputDimensionality: 768`) para registros pendentes
+- grava os itens em `preco_referencia_itens` com proteção de duplicatas `(numero_controle_pncp, numero_item)`
+- atualiza métricas e rastreabilidade na tabela `preco_referencia_sync_runs`
+
+Deploy e Permissões:
+
+- configurada com `--no-verify-jwt` para chamadas de background pelo `pg_net` / `pg_cron`
+- deploy remoto realizado com: `npx supabase functions deploy sync-precos-referencia --no-verify-jwt`
+
+Dependências de Ambiente:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `GEMINI_API_KEY` (Google AI Studio)
+
+Agendamento Automático:
+
+- agendada no `pg_cron` via migration `20260905110000_schedule_daily_sync_precos_referencia.sql`
+- job `sync-precos-referencia-daily` roda diariamente às 04:00 UTC via extensão `pg_net`

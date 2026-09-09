@@ -19,7 +19,7 @@ import { suapProcessFinanceService, type SuapProcessFinanceSummary } from '@/ser
 import { suapProcessosService } from '@/services/suapProcessos';
 import { suapScraperService } from '@/services/suapScraperService';
 import { processMappingsService } from '@/services/processMappings';
-import { buildSuapProcessFlowSummary } from '@/lib/suapProcessFlow';
+import { buildSuapProcessFlowSummary, selectSuapProcessMapping } from '@/lib/suapProcessFlow';
 import { authenticateExtensionAccessToken } from '@/lib/extensionSupabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { SuapProcesso } from '@/types';
@@ -62,7 +62,10 @@ function postSyncStatus(payload: SuapExtensionProcessSyncStatus) {
 
 async function postProcessFlow(context: SuapExtensionProcessContext, process: SuapProcesso | null, client?: SupabaseClient) {
   const mappings = await processMappingsService.listPublished(client);
-  const mapping = mappings.find((item) => item.id === context.route?.selectedMappingId) || mappings[0];
+  const mapping = selectSuapProcessMapping(mappings, {
+    selectedMappingId: context.route?.selectedMappingId,
+    assunto: process?.assunto,
+  });
   if (!mapping) return;
 
   const summary = buildSuapProcessFlowSummary(mapping, context.route, {

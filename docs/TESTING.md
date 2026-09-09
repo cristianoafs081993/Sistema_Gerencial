@@ -28,12 +28,18 @@ Pontos mais criticos devem ter cobertura preferencial:
 - integracoes, proxies, storage e Edge Functions
 - regras de encoding em textos de UI e documentacao
 
+Requisições de Compra:
+
+- A RLS e os vínculos `requisicao_compra_itens`/`requisicao_compra_empenhos` devem permitir que usuários do grupo `fiscais-de-contratos` visualizem as requisições e seus detalhes; o slug legado `fiscal-contratos` também deve continuar funcionando.
+- Validar que a correção de autorização não altera nem remove as requisições existentes, incluindo seus itens, empenhos vinculados e status.
+
 Contratos via Comprasnet:
 
 - regras puras de vigencia derivada devem cobrir maior `vigencia_fim` do historico, aditivo vencido sem renovacao, rescisao/cancelamento e fallback sem historico
 - a sincronizacao deve ter regressao garantindo que contratos retornados pelo endpoint de "ativos" nao aparecem como ativos quando o historico esta vencido
 - contratos da UG `158155` devem ter teste de escopo: entram somente com evidencia operacional estruturada do campus `158366`
 - a UI de contratos deve testar que o upload manual XLSX nao aparece, que o status da ultima sincronizacao e exibido ao superadmin e que a lista usa `situacao_derivada`
+- `contratosApiMappers.test.ts` deve cobrir numeros brasileiros e decimais com ponto retornados pela API, incluindo `quantidade` e `quantidade_faturado`, para impedir que a normalizacao infle valores e interrompa a sincronizacao
 
 Pregoes via PNCP:
 
@@ -165,3 +171,18 @@ Os testes do parser cobrem acentos, moeda brasileira, IDs de atividades e linhas
 - Verificar que a Edge Function consegue interpretar o HTML no runtime Deno sem depender de DOMParser global.
 
 - A revisão de documentos SUAP também testa persistência em suap_document_reviews, carregamento pelo modo latest e presença dos dois ícones no card: gerar e consultar a última análise salva.
+
+## Sincronização de contratos PNCP
+
+As regressões pncpSync, pncpContratos, pncpInstrumentosCobranca e
+ContratoApiDetailsSheet cobrem paginação, renovação, identidade, erro HTTP/banco,
+sucesso parcial, persistência no servidor e respostas atrasadas na UI.
+Ver [cenários e validação remota](ops/PNCP_CONTRACT_SYNC.md).
+
+## Escopo IFRN por campus
+
+- o catálogo mantém 19 UASGs e o padrão `158366`
+- a preferência do usuário persiste via RPC e rejeita UASG fora do catálogo
+- chaves de query e serviços carregam a UASG ativa, sem fallback silencioso para Currais Novos
+- contratos da Reitoria entram somente por empenho/fatura do campus selecionado; os detalhes filtram itens financeiros relacionados
+- a migration `20260907150000_add_user_campus_scope.sql` deve ser validada com métricas pré/pós de Currais Novos, ausência de nulos e teste RLS entre dois campi

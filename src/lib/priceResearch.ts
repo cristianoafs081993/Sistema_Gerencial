@@ -2183,7 +2183,7 @@ export function buildDespachoConclusivoSuapText(data: {
     `• Item ${i.itemNumber} - ${i.description}: ${i.quantity} ${i.unit} x ${formatCurrency(i.estimatedUnitPrice)} = ${formatCurrency(i.estimatedTotal || (i.estimatedUnitPrice * i.quantity))} (CV: ${(i.coefficientOfVariation ?? 0).toFixed(1)}%)`
   )).join('\n');
 
-  return `DESPACHO CONCLUSIVO - PESQUISA DE PREÇOS
+  return `MINUTA PARA REVISÃO - PESQUISA DE PREÇOS
 
 PROCESSO: ${data.processNumber || 'N/A'}
 OBJETO: ${data.objectDescription || data.demandSummary || data.title || 'Aquisição / Contratação de Bens e Serviços'}
@@ -2191,12 +2191,12 @@ DATA DA PESQUISA: ${dataPesquisa}
 RESPONSÁVEL: ${data.responsibleName || 'Agente Responsável'}
 
 1. DA FUNDAMENTAÇÃO LEGAL
-A presente pesquisa de preços foi conduzida em estrita observância ao art. 23 da Lei nº 14.133, de 1º de abril de 2021, e às disposições da Instrução Normativa SEGES/ME nº 65, de 7 de julho de 2021, utilizando prioritariamente as bases oficiais de dados do Portal Nacional de Contratações Públicas (PNCP) e do Painel de Preços / Compras.gov.br.
+Esta minuta apresenta referências de preços coletadas para análise do responsável. O enquadramento normativo e a adequação das fontes devem ser conferidos no processo administrativo.
 
 2. DA METODOLOGIA E DA MEMÓRIA DE CÁLCULO
-Para a fixação do valor estimado da contratação, foi adotado o método da ${metodoLabel} como medida de tendência central, garantindo a obtenção de uma cesta de preços homogênea e expurgando eventuais valores inexequíveis ou excessivamente elevados.
+Foi calculada a ${metodoLabel} dos preços selecionados. A medida estatística, isoladamente, não comprova homogeneidade técnica nem elimina valores inadequados.
 
-${data.methodologyJustification || 'A adoção da Mediana como parâmetro reflete com fidelidade os preços praticados no mercado público para itens de mesma natureza e padrão de desempenho.'}
+${data.methodologyJustification || 'A seleção das referências e a justificativa do método devem ser revisadas pelo responsável.'}
 
 3. DO QUADRO RESUMO DOS ITENS
 ${itemsTable}
@@ -2204,10 +2204,10 @@ ${itemsTable}
 VALOR TOTAL ESTIMADO DA CONTRATAÇÃO: ${totalFormatado}
 
 4. DA AUDITORIA DOCUMENTAL E SIMILARIDADE TÉCNICA
-Certifica-se que as contratações públicas paradigmas coletadas no PNCP tiveram seus Editais e Termos de Referência consultados e auditados, restando comprovada a equivalência técnica e de desempenho em relação à demanda do órgão.
+Conferir as evidências e limitações de cada referência. Análise da descrição do item não equivale à leitura do edital ou termo de referência. Trechos localizados por IA devem ser verificados no documento original.
 
 5. CONCLUSÃO
-Diante do exposto, submetem-se os autos à autoridade competente com a manifestação favorável quanto à razoabilidade e conformidade orçamentária dos valores estimados, restando a presente pesquisa apta a instruir a fase preparatória da contratação.
+Resultado preliminar, sujeito à complementação da amostra e à revisão humana. Esta minuta não certifica conformidade jurídica, orçamentária ou aptidão para conclusão da pesquisa.
 
 Currais Novos/RN, ${dataPesquisa}.
 

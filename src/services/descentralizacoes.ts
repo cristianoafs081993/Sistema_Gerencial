@@ -1,11 +1,13 @@
 import { supabase } from '@/lib/supabase';
 import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { Descentralizacao } from '@/types';
+import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
 
-const DESCENTRALIZACOES_SELECT = 'id,dimensao,dimensao_id,nota_credito,operacao_tipo,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,plano_interno_id,data_emissao,descricao,valor,created_at,updated_at';
+const DESCENTRALIZACOES_SELECT = 'id,campus_uasg,dimensao,dimensao_id,nota_credito,operacao_tipo,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,plano_interno_id,data_emissao,descricao,valor,created_at,updated_at';
 
 type DescentralizacaoRow = {
     id: string;
+    campus_uasg?: string | null;
     dimensao: string;
     dimensao_id?: string | null;
     nota_credito?: string | null;
@@ -53,16 +55,18 @@ const mapDescentralizacaoRow = (item: DescentralizacaoRow): Descentralizacao => 
 });
 
 export const descentralizacoesService = {
-    async getAll(): Promise<Descentralizacao[]> {
+    async getAll(campusUasg = DEFAULT_IFRN_CAMPUS_UASG): Promise<Descentralizacao[]> {
         const { data, error } = await supabase
             .from('descentralizacoes')
             .select(DESCENTRALIZACOES_SELECT)
+            .eq('campus_uasg', campusUasg)
             .order('data_emissao', { ascending: false, nullsFirst: false });
 
         if (error) {
             console.warn('descentralizacoesService.getAll: fallback para Supabase REST', error);
             const fallbackData = await fetchSupabaseRestRows<DescentralizacaoRow>('descentralizacoes', DESCENTRALIZACOES_SELECT, {
                 orderBy: 'data_emissao',
+                filters: { campus_uasg: campusUasg },
             });
             return fallbackData.map(mapDescentralizacaoRow);
         }
@@ -70,6 +74,7 @@ export const descentralizacoesService = {
         if (!data || data.length === 0) {
             const fallbackData = await fetchSupabaseRestRows<DescentralizacaoRow>('descentralizacoes', DESCENTRALIZACOES_SELECT, {
                 orderBy: 'data_emissao',
+                filters: { campus_uasg: campusUasg },
             });
             return fallbackData.map(mapDescentralizacaoRow);
         }

@@ -36,6 +36,8 @@ export interface ProcessMappingNode {
   templateName?: string;
   templateUrl?: string;
   responsible: string;
+  routingAliases?: string[];
+  flowRole?: 'primary' | 'exception';
   legalBasis?: string;
   inputDocuments?: string[];
   outputDocuments?: string[];

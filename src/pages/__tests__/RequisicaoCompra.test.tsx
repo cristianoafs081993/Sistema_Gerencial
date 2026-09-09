@@ -167,7 +167,7 @@ describe('RequisicaoCompraPage', () => {
     renderPage();
 
     const table = await screen.findByRole('table');
-    expect(within(table).getByRole('columnheader', { name: /Situação/i })).toBeInTheDocument();
+    expect(within(table).queryByRole('columnheader', { name: /Situação/i })).not.toBeInTheDocument();
     expect(within(table).getByRole('columnheader', { name: /Requisição/i })).toBeInTheDocument();
     expect(within(table).getByRole('columnheader', { name: /Valor Total/i })).toBeInTheDocument();
     expect(within(table).getByRole('columnheader', { name: /Referências/i })).toBeInTheDocument();
@@ -179,6 +179,7 @@ describe('RequisicaoCompraPage', () => {
     expect(within(table).getByText('00329/2025')).toBeInTheDocument();
     expect(within(table).getByRole('button', { name: /Editar requisição REQ-2026-0001/i })).toBeInTheDocument();
     expect(within(table).getByRole('button', { name: /Alterar situação da requisição REQ-2026-0001/i })).toBeInTheDocument();
+    expect(within(table).queryByRole('button', { name: /Marcar requisição REQ-2026-0001 como liquidada/i })).not.toBeInTheDocument();
     expect(within(table).queryByRole('button', { name: /Retornar requisição REQ-2026-0001 para rascunho/i })).not.toBeInTheDocument();
     expect(within(table).queryByRole('button', { name: /Encaminhar requisição REQ-2026-0001 para pagamento/i })).not.toBeInTheDocument();
     expect(within(table).queryAllByRole('row')).toHaveLength(2);
@@ -601,7 +602,7 @@ describe('RequisicaoCompraPage', () => {
     // Badges
     expect(screen.getAllByText('Rascunho').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Enviada ao Fornecedor').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('Encaminhado para pagamento').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Enviada para Pagamento').length).toBeGreaterThanOrEqual(1);
   });
 
   it('desconta do saldo do empenho o valor de requisicoes enviadas ao fornecedor e exibe detalhamento visual', async () => {
@@ -671,10 +672,10 @@ describe('RequisicaoCompraPage', () => {
     // Seleciona o empenho
     fireEvent.click(empenhoOption);
 
-    // No card do empenho, deve exibir o detalhamento com saldo oficial e dedução de enviadas
+    // No card do empenho, deve exibir o detalhamento com saldo oficial, retenção e saldo disponível efetivo
     expect(await screen.findByText(/10\.000,00/)).toBeInTheDocument(); // Saldo Oficial
     expect(screen.getByText(/2\.500,00/)).toBeInTheDocument(); // (-) Retenção
-    expect(screen.getAllByText(/7\.500,00/).length).toBeGreaterThanOrEqual(1); // Saldo Disponível
+    expect(screen.getAllByText(/7\.500,00/).length).toBeGreaterThanOrEqual(1); // Saldo Disponível efetivo
   });
 
   it('nao desconta do saldo do modulo quando a requisicao muda para status liquidada', async () => {

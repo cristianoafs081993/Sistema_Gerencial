@@ -411,7 +411,7 @@ function comparablePrice(item: SearchItem, row: PriceApiRow) {
   // If the units are exactly the same, they are compatible and can be converted via capacity.
   if (sourceMeasure && targetMeasure && sourceMeasure === targetMeasure) {
     if (sourceCapacity <= 0 || targetCapacity <= 0) {
-      return { price: originalPrice, compatible: true };
+      return { price: originalPrice, compatible: false };
     }
     return {
       price: originalPrice * (targetCapacity / sourceCapacity),
@@ -425,7 +425,7 @@ function comparablePrice(item: SearchItem, row: PriceApiRow) {
   // If they are convertible via physical scales
   if (source && target && source.dimension === target.dimension) {
     if (sourceCapacity <= 0 || targetCapacity <= 0) {
-      return { price: originalPrice, compatible: true };
+      return { price: originalPrice, compatible: false };
     }
     const sourceBaseAmount = sourceCapacity * source.scale;
     const targetBaseAmount = targetCapacity * target.scale;
@@ -435,8 +435,8 @@ function comparablePrice(item: SearchItem, row: PriceApiRow) {
     };
   }
 
-  // Otherwise, we do not perform automatic conversion, but we STILL treat them as compatible.
-  return { price: originalPrice, compatible: true };
+  // Unknown or non-convertible units must be reviewed before entering the basket.
+  return { price: originalPrice, compatible: false };
 }
 
 function buildPriceApiUrl(item: SearchItem, pageSize = 100, filters: SearchFilters = {}) {
@@ -584,7 +584,7 @@ async function rankWithGemini(item: SearchItem, candidates: RankedCandidate[]) {
     ?? Deno.env.get('GOOGLE_API_KEY');
   if (!apiKey || candidates.length === 0) return candidates;
 
-  const model = Deno.env.get('GEMINI_PRICE_RESEARCH_MODEL') ?? 'gemini-2.5-flash-lite';
+  const model = Deno.env.get('GEMINI_PRICE_RESEARCH_MODEL') ?? 'gemini-3.8-flash';
   const prompt = `Você auxilia uma pesquisa de preços pública. Classifique somente a aderência técnica dos registros oficiais ao item solicitado.
 Não altere preços, não invente dados e não conclua conformidade jurídica.
 Retorne JSON puro no formato {"rankings":[{"id":"...","score":0-100,"reason":"frase curta"}]}.
@@ -612,46 +612,51 @@ ${JSON.stringify(candidates.slice(0, MAX_CANDIDATES_FOR_AI).map((candidate) => (
     resultDate: candidate.resultDate,
   })))}`;
 
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.1,
-            responseMimeType: 'application/json',
-          },
-        }),
-      },
-    );
-    if (!response.ok) return candidates;
-    const payload = await response.json() as Record<string, unknown>;
-    const text = ((payload.candidates as Array<Record<string, unknown>> | undefined)?.[0]
-      ?.content as Record<string, unknown> | undefined)?.parts as Array<Record<string, unknown>> | undefined;
-    const parsed = JSON.parse(String(text?.[0]?.text ?? '{}')) as {
-      rankings?: Array<{ id?: string; score?: number; reason?: string }>;
-    };
-    const rankingMap = new Map(
-      (parsed.rankings ?? [])
-        .filter((ranking) => ranking.id)
-        .map((ranking) => [ranking.id as string, ranking]),
-    );
-
-    return candidates.map((candidate) => {
-      const ranking = rankingMap.get(candidate.id);
-      if (!ranking) return candidate;
-      return {
-        ...candidate,
-        aiScore: Math.max(0, Math.min(100, Number(ranking.score ?? candidate.aiScore))),
-        aiReason: textOrNull(ranking.reason) ?? candidate.aiReason,
+  const candidateModels = [...new Set([model, 'gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'].filter(Boolean))];
+  for (const m of candidateModels) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.1,
+              responseMimeType: 'application/json',
+            },
+          }),
+        },
+      );
+      if (!response.ok) continue;
+      const payload = await response.json() as Record<string, unknown>;
+      const text = ((payload.candidates as Array<Record<string, unknown>> | undefined)?.[0]
+        ?.content as Record<string, unknown> | undefined)?.parts as Array<Record<string, unknown>> | undefined;
+      const parsed = JSON.parse(String(text?.[0]?.text ?? '{}')) as {
+        rankings?: Array<{ id?: string; score?: number; reason?: string }>;
       };
-    });
-  } catch {
-    return candidates;
+      const rankingMap = new Map(
+        (parsed.rankings ?? [])
+          .filter((ranking) => ranking.id)
+          .map((ranking) => [ranking.id as string, ranking]),
+      );
+
+      return candidates.map((candidate) => {
+        const ranking = rankingMap.get(candidate.id);
+        if (!ranking) return candidate;
+        return {
+          ...candidate,
+          aiScore: Math.max(0, Math.min(100, Number(ranking.score ?? candidate.aiScore))),
+          aiReason: textOrNull(ranking.reason) ?? candidate.aiReason,
+        };
+      });
+    } catch {
+      // try next model
+    }
   }
+
+  return candidates;
 }
 
 async function searchOne(item: SearchItem, limit: number, filters: SearchFilters = {}) {

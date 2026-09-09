@@ -11,14 +11,19 @@ import {
 } from '@/services/contratosApiMappers';
 import { isContratoApiCampusEmpenho } from '@/utils/contratosApiStatus';
 import { buildEmpenhoLookupKeys, normalizeContratoNumero } from '@/utils/contratosSync';
+import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 
 const CONTRATOS_API_BASE = '/api-contratos/api';
-const DEFAULT_UASG = '158366';
+const DEFAULT_UASG = DEFAULT_IFRN_CAMPUS_UASG;
 const DEFAULT_PUBLIC_LIQUIDACOES_UASGS = [DEFAULT_UASG, '158155'];
 const DEFAULT_DISPLAY_UNIDADE_CODIGO = DEFAULT_UASG;
-const CONTRATOS_API_SYNC_RUNS_SELECT = 'id,unidade_codigo,started_at,finished_at,status,contratos_ativos,contratos_inativos,contratos_upserted,empenhos_upserted,faturas_upserted,itens_upserted,historicos_upserted,fatura_itens_upserted,fatura_empenhos_upserted,error_message,details';
+const CONTRATOS_API_SYNC_RUNS_SELECT = 'id,unidade_codigo,started_at,finished_at,status,contratos_ativos,contratos_inativos,contratos_upserted,empenhos_upserted,faturas_upserted,itens_upserted,historicos_upserted,fatura_itens_upserted,fatura_empenhos_upserted,arquivos_compras_upserted,recursos_complementares_upserted,error_message,details';
+const CONTRATOS_API_SYNC_RUNS_LEGACY_SELECT = 'id,unidade_codigo,started_at,finished_at,status,contratos_ativos,contratos_inativos,contratos_upserted,empenhos_upserted,faturas_upserted,itens_upserted,historicos_upserted,fatura_itens_upserted,fatura_empenhos_upserted,error_message,details';
 const CONTRATOS_API_HISTORICO_SELECT = 'id, contrato_api_id, api_historico_id, numero, tipo, qualificacao_termo, observacao, ug, codigo_unidade_origem, nome_unidade_origem, data_assinatura, data_publicacao, vigencia_inicio, vigencia_fim, valor_inicial, valor_global, num_parcelas, valor_parcela, novo_valor_global, novo_num_parcelas, novo_valor_parcela, data_inicio_novo_valor, retroativo, retroativo_valor, situacao_contrato';
+const CONTRATOS_API_FATURA_SELECT = 'id, contrato_api_id, api_fatura_id, numero_instrumento_cobranca, mes_referencia, ano_referencia, situacao, valor_bruto, valor_liquido, data_emissao, data_vencimento, data_pagamento, data_ateste, data_protocolo, processo, chave_nfe, justificativa, informacao_complementar, repactuacao, juros, multa, glosa, raw_data';
+const CONTRATOS_API_FATURA_LEGACY_SELECT = 'id, contrato_api_id, api_fatura_id, numero_instrumento_cobranca, mes_referencia, ano_referencia, situacao, valor_bruto, valor_liquido, data_emissao, data_vencimento, data_pagamento, raw_data';
 const MIGRATION_REQUIRED_MESSAGE =
   'MIGRATION_REQUIRED: tabelas do módulo de contratos API ainda não existem no banco. Aplique as migrations do Supabase.';
 
@@ -124,6 +129,9 @@ export interface ContratoApiRow {
   pncp_has_record?: boolean | null;
   pncp_documentos_checked_at?: string | null;
   pncp_documentos_count?: number | null;
+  pncp_instrumentos_checked_at?: string | null;
+  pncp_instrumentos_count?: number | null;
+  pncp_sync_error?: string | null;
 }
 
 export interface ContratoApiEmpenhoRow {
@@ -161,7 +169,18 @@ export interface ContratoApiFaturaRow {
   valor_bruto: number | null;
   valor_liquido: number | null;
   data_emissao: string | null;
+  data_vencimento?: string | null;
   data_pagamento: string | null;
+  data_ateste?: string | null;
+  data_protocolo?: string | null;
+  processo?: string | null;
+  chave_nfe?: string | null;
+  justificativa?: string | null;
+  informacao_complementar?: string | null;
+  repactuacao?: string | null;
+  juros?: number | null;
+  multa?: number | null;
+  glosa?: number | null;
   raw_data?: Record<string, unknown> | null;
 }
 
@@ -244,6 +263,42 @@ export interface ContratoApiDocumentoRow {
   updated_at?: string;
 }
 
+export interface ContratoApiComprasDocumentoRow {
+  id: string;
+  contrato_api_id: string;
+  api_arquivo_id: number;
+  tipo?: string | null;
+  processo?: string | null;
+  descricao?: string | null;
+  url: string;
+  origem?: string | null;
+  link_sei?: string | null;
+  raw_data?: Record<string, unknown> | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type ContratoApiRecursoTipo =
+  | 'cronograma' | 'garantias' | 'responsaveis' | 'prepostos'
+  | 'ocorrencias' | 'despesas_acessorias' | 'terceirizados';
+
+export interface ContratoApiRecursoRow {
+  id: string;
+  contrato_api_id: string;
+  tipo_recurso: ContratoApiRecursoTipo;
+  api_registro_id: number;
+  titulo?: string | null;
+  descricao?: string | null;
+  situacao?: string | null;
+  data_inicio?: string | null;
+  data_fim?: string | null;
+  vencimento?: string | null;
+  valor?: number | null;
+  raw_data?: Record<string, unknown> | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface ContratoApiInstrumentoCobrancaRow {
   id: string;
   contrato_api_id: string;
@@ -293,6 +348,8 @@ export interface ContratoApiDetails {
   faturaItens: ContratoApiFaturaItemRow[];
   faturaEmpenhos: ContratoApiFaturaEmpenhoRow[];
   documentos?: ContratoApiDocumentoRow[];
+  documentosCompras?: ContratoApiComprasDocumentoRow[];
+  recursos?: ContratoApiRecursoRow[];
   instrumentosCobranca?: ContratoApiInstrumentoCobrancaRow[];
 }
 
@@ -311,6 +368,8 @@ export interface ContratoApiSyncRun {
   historicos_upserted?: number;
   fatura_itens_upserted?: number;
   fatura_empenhos_upserted?: number;
+  arquivos_compras_upserted?: number;
+  recursos_complementares_upserted?: number;
   error_message: string | null;
   details: Record<string, unknown> | null;
 }
@@ -481,9 +540,9 @@ function getEmpenhoUnidadeGestora(rawEmpenho: unknown) {
   return match?.[0] ?? null;
 }
 
-function isEmpenhoFromDisplayUnidade(rawEmpenho: unknown) {
+function isEmpenhoFromDisplayUnidade(rawEmpenho: unknown, unidadeCodigo = DEFAULT_DISPLAY_UNIDADE_CODIGO) {
   const unidadeGestora = getEmpenhoUnidadeGestora(rawEmpenho);
-  return !unidadeGestora || unidadeGestora === DEFAULT_DISPLAY_UNIDADE_CODIGO;
+  return !unidadeGestora || unidadeGestora === unidadeCodigo;
 }
 
 function getEmpenhoApiId(rawEmpenho: unknown) {
@@ -492,11 +551,11 @@ function getEmpenhoApiId(rawEmpenho: unknown) {
   return String(record.id_empenho ?? record.id ?? '').trim();
 }
 
-function isLiquidacaoCacheRowVisible(row: LiquidacoesCacheRow) {
+function isLiquidacaoCacheRowVisible(row: LiquidacoesCacheRow, unidadeCodigo = DEFAULT_DISPLAY_UNIDADE_CODIGO) {
   const rawData = row.raw_data && typeof row.raw_data === 'object' ? row.raw_data : {};
   return (
-    isFaturaVisibleForDisplayUnidade((rawData as Record<string, unknown>).fatura) ||
-    isEmpenhoFromDisplayUnidade((rawData as Record<string, unknown>).contratoEmpenho)
+    isFaturaVisibleForDisplayUnidade((rawData as Record<string, unknown>).fatura, unidadeCodigo) ||
+    isEmpenhoFromDisplayUnidade((rawData as Record<string, unknown>).contratoEmpenho, unidadeCodigo)
   );
 }
 
@@ -504,6 +563,10 @@ function isDefaultPublicLiquidacoesUnidades(unidadeCodigos: string | string[]) {
   const received = normalizeUnidadeCodigos(unidadeCodigos).sort();
   const defaults = [...DEFAULT_PUBLIC_LIQUIDACOES_UASGS].sort();
   return received.length === defaults.length && received.every((value, index) => value === defaults[index]);
+}
+
+function getDisplayCampusFromLiquidacoesUnidades(unidadeCodigos: string | string[]) {
+  return normalizeUnidadeCodigos(unidadeCodigos).find((codigo) => codigo !== '158155') ?? DEFAULT_UASG;
 }
 
 function mapCacheRowToLiquidacao(row: LiquidacoesCacheRow): ContratoApiPublicLiquidacaoRow {
@@ -527,11 +590,14 @@ function mapCacheRowToLiquidacao(row: LiquidacoesCacheRow): ContratoApiPublicLiq
   };
 }
 
-async function getCachedLiquidacoesPublicasPorEmpenho(numeroEmpenho: string): Promise<LiquidacoesCacheLookup> {
+async function getCachedLiquidacoesPublicasPorEmpenho(
+  numeroEmpenho: string,
+  client: SupabaseClient = supabase,
+): Promise<LiquidacoesCacheLookup> {
   const lookupKey = buildCanonicalEmpenhoLookupKey(numeroEmpenho);
   if (!lookupKey) return { available: true, hasStatus: false, status: 'not_found', isFresh: false, rowsCount: 0, rows: [] };
 
-  const { data: status, error: statusError } = await supabase
+  const { data: status, error: statusError } = await client
     .from('contratos_api_empenho_liquidacoes_cache_status')
     .select(LIQUIDACOES_CACHE_STATUS_SELECT)
     .eq('empenho_lookup_key', lookupKey)
@@ -557,7 +623,7 @@ async function getCachedLiquidacoesPublicasPorEmpenho(numeroEmpenho: string): Pr
     };
   }
 
-  const { data: rows, error: rowsError } = await supabase
+  const { data: rows, error: rowsError } = await client
     .from('contratos_api_empenho_liquidacoes_cache')
     .select(LIQUIDACOES_CACHE_ROWS_SELECT)
     .eq('empenho_lookup_key', lookupKey)
@@ -569,7 +635,7 @@ async function getCachedLiquidacoesPublicasPorEmpenho(numeroEmpenho: string): Pr
   }
 
   const rawRows = (rows ?? []) as LiquidacoesCacheRow[];
-  const visibleRows = rawRows.filter(isLiquidacaoCacheRowVisible);
+  const visibleRows = rawRows.filter((row) => isLiquidacaoCacheRowVisible(row));
   const rowsCount = rawRows.length > 0 ? visibleRows.length : Number(typedStatus.rows_count ?? 0);
 
   return {
@@ -585,8 +651,9 @@ async function getCachedLiquidacoesPublicasPorEmpenho(numeroEmpenho: string): Pr
 async function getLiquidacoesCacheRowsViaFunction(
   numeroEmpenho: string,
   options: { readCacheOnly?: boolean; source: string },
+  client: SupabaseClient = supabase,
 ) {
-  const { data, error } = await supabase.functions.invoke('refresh-comprasnet-liquidacoes-cache', {
+  const { data, error } = await client.functions.invoke('refresh-comprasnet-liquidacoes-cache', {
     body: {
       empenhoNumero: numeroEmpenho,
       returnRows: true,
@@ -601,11 +668,15 @@ async function getLiquidacoesCacheRowsViaFunction(
   }
 
   const firstResult = (data as { results?: Array<{ rows?: LiquidacoesCacheRow[] }> } | null)?.results?.[0];
-  return (firstResult?.rows ?? []).filter(isLiquidacaoCacheRowVisible).map(mapCacheRowToLiquidacao);
+  return (firstResult?.rows ?? []).filter((row) => isLiquidacaoCacheRowVisible(row)).map(mapCacheRowToLiquidacao);
 }
 
-function triggerLiquidacoesCacheRefresh(numeroEmpenho: string, source = 'frontend-cache-miss') {
-  void supabase.functions
+function triggerLiquidacoesCacheRefresh(
+  numeroEmpenho: string,
+  source = 'frontend-cache-miss',
+  client: SupabaseClient = supabase,
+) {
+  void client.functions
     .invoke('refresh-comprasnet-liquidacoes-cache', {
       body: {
         empenhoNumero: numeroEmpenho,
@@ -684,6 +755,16 @@ function isMissingTableError(error: unknown): boolean {
   );
 }
 
+function isMissingColumnError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const e = error as { code?: string; message?: string; details?: string };
+  const message = `${e.message ?? ''} ${e.details ?? ''}`.toLowerCase();
+  return (
+    e.code === '42703' ||
+    (message.includes('column') && message.includes('does not exist'))
+  );
+}
+
 function throwMigrationRequired(error: unknown): never {
   if (isMissingTableError(error)) {
     throw new Error(MIGRATION_REQUIRED_MESSAGE);
@@ -691,14 +772,61 @@ function throwMigrationRequired(error: unknown): never {
   throw error;
 }
 
+async function isContratoApiVisibleForCampus(contratoApiId: string, campusUasg: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('contratos_api_campus_scope')
+    .select('contrato_api_id')
+    .eq('contrato_api_id', contratoApiId)
+    .eq('campus_uasg', campusUasg)
+    .maybeSingle();
+
+  if (!error) return Boolean(data);
+  if (isMissingTableError(error)) return true;
+  throwMigrationRequired(error);
+}
+
+async function getFaturasForContratoDetails(contratoApiId: string) {
+  const primary = await supabase
+    .from('contratos_api_faturas')
+    .select(CONTRATOS_API_FATURA_SELECT)
+    .eq('contrato_api_id', contratoApiId)
+    .order('data_emissao', { ascending: false });
+
+  if (!isMissingColumnError(primary.error)) return primary;
+
+  return supabase
+    .from('contratos_api_faturas')
+    .select(CONTRATOS_API_FATURA_LEGACY_SELECT)
+    .eq('contrato_api_id', contratoApiId)
+    .order('data_emissao', { ascending: false });
+}
+
 export const contratosApiService = {
-  async getContratosApi(onlyVigentes = true): Promise<ContratoApiRow[]> {
+  async getContratosApi(
+    onlyVigentes = true,
+    campusUasg = DEFAULT_UASG,
+    client: SupabaseClient = supabase,
+  ): Promise<ContratoApiRow[]> {
     const today = new Date().toISOString().slice(0, 10);
-    let query = supabase
+    let query = client
       .from('contratos_api')
-      .select('id, api_contrato_id, numero, fornecedor_nome, fornecedor_documento, unidade_codigo, unidade_nome, unidade_origem_codigo, unidade_origem_nome, objeto, processo, vigencia_inicio, vigencia_fim, vigencia_inicio_derivada, vigencia_fim_derivada, valor_global, valor_acumulado, situacao, situacao_derivada, situacao_derivada_motivo, campus_scope_reason, updated_at, categoria, prorrogavel:raw_data->>prorrogavel, pncp_sequencial, pncp_ano, pncp_control_number, pncp_has_record, pncp_documentos_checked_at, pncp_documentos_count')
-      .in('campus_scope_reason', ['ug_campus', 'reitoria_com_empenho_campus', 'reitoria_com_fatura_campus'])
+      .select('id, api_contrato_id, numero, fornecedor_nome, fornecedor_documento, unidade_codigo, unidade_nome, unidade_origem_codigo, unidade_origem_nome, objeto, processo, vigencia_inicio, vigencia_fim, vigencia_inicio_derivada, vigencia_fim_derivada, valor_global, valor_acumulado, situacao, situacao_derivada, situacao_derivada_motivo, campus_scope_reason, updated_at, categoria, prorrogavel:raw_data->>prorrogavel, pncp_sequencial, pncp_ano, pncp_control_number, pncp_has_record, pncp_documentos_checked_at, pncp_documentos_count, pncp_instrumentos_checked_at, pncp_instrumentos_count, pncp_sync_error')
       .order('numero', { ascending: true });
+
+    const { data: scopeRows, error: scopeError } = await client
+      .from('contratos_api_campus_scope')
+      .select('contrato_api_id')
+      .eq('campus_uasg', campusUasg);
+
+    if (!scopeError) {
+      const ids = Array.from(new Set((scopeRows ?? []).map((row) => row.contrato_api_id).filter(Boolean)));
+      if (ids.length === 0) return [];
+      query = query.in('id', ids);
+    } else if (isMissingTableError(scopeError)) {
+      query = query.in('campus_scope_reason', ['ug_campus', 'reitoria_com_empenho_campus', 'reitoria_com_fatura_campus']);
+    } else {
+      throwMigrationRequired(scopeError);
+    }
 
     if (onlyVigentes) {
       const hundredTwentyDaysAgo = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -713,7 +841,7 @@ export const contratosApiService = {
     return (data ?? []) as ContratoApiRow[];
   },
 
-  async getContratoApiByNumeroOrId(numeroOrId: string): Promise<ContratoApiRow | null> {
+  async getContratoApiByNumeroOrId(numeroOrId: string, campusUasg = DEFAULT_UASG): Promise<ContratoApiRow | null> {
     const clean = String(numeroOrId || '').trim();
     if (!clean) return null;
 
@@ -724,7 +852,7 @@ export const contratosApiService = {
         .select('id, api_contrato_id, numero, fornecedor_nome, fornecedor_documento, unidade_codigo, unidade_nome, unidade_origem_codigo, unidade_origem_nome, objeto, processo, vigencia_inicio, vigencia_fim, vigencia_inicio_derivada, vigencia_fim_derivada, valor_global, valor_acumulado, situacao, situacao_derivada, situacao_derivada_motivo, campus_scope_reason, updated_at, categoria, prorrogavel:raw_data->>prorrogavel')
         .eq('id', clean)
         .maybeSingle();
-      if (data) return data as ContratoApiRow;
+      if (data && await isContratoApiVisibleForCampus(String(data.id), campusUasg)) return data as ContratoApiRow;
     }
 
     // 2. Tenta por número normalizado (ex: 00280/2024 ou 280/2024)
@@ -736,14 +864,18 @@ export const contratosApiService = {
       .limit(1)
       .maybeSingle();
 
-    if (byNumero) return byNumero as ContratoApiRow;
+    if (byNumero && await isContratoApiVisibleForCampus(String(byNumero.id), campusUasg)) return byNumero as ContratoApiRow;
 
     return null;
   },
 
-  async getEmpenhosApi(contratoApiIds?: string[]): Promise<ContratoApiEmpenhoRow[]> {
+  async getEmpenhosApi(
+    contratoApiIds?: string[],
+    campusUasg = DEFAULT_UASG,
+    client: SupabaseClient = supabase,
+  ): Promise<ContratoApiEmpenhoRow[]> {
 
-    let query = supabase
+    let query = client
       .from('contratos_api_empenhos')
       .select('id, contrato_api_id, api_empenho_id, numero, unidade_gestora, gestao, data_emissao, credor, fonte_recurso, plano_interno, natureza_despesa, valor_empenhado, valor_a_liquidar, valor_liquidado, valor_pago, rp_inscrito, rp_a_pagar, raw_data');
 
@@ -755,9 +887,10 @@ export const contratosApiService = {
 
     if (error) throwMigrationRequired(error);
     const all = (data ?? []) as ContratoApiEmpenhoRow[];
-    if (!contratoApiIds || contratoApiIds.length === 0 || contratoApiIds.length <= 100) return all;
+    const visible = all.filter((row) => isContratoApiCampusEmpenho(row, campusUasg));
+    if (!contratoApiIds || contratoApiIds.length === 0 || contratoApiIds.length <= 100) return visible;
     const set = new Set(contratoApiIds);
-    return all.filter((row) => set.has(row.contrato_api_id));
+    return visible.filter((row) => set.has(row.contrato_api_id));
   },
 
   async getHistoricosApi(contratoApiIds?: string[]): Promise<ContratoApiHistoricoRow[]> {
@@ -779,10 +912,10 @@ export const contratosApiService = {
     return all.filter((row) => set.has(row.contrato_api_id));
   },
 
-  async getFaturasApi(contratoApiIds?: string[], period?: ContratoApiFaturasPeriod): Promise<ContratoApiFaturaRow[]> {
+  async getFaturasApi(contratoApiIds?: string[], period?: ContratoApiFaturasPeriod, campusUasg = DEFAULT_UASG): Promise<ContratoApiFaturaRow[]> {
     let query = supabase
       .from('contratos_api_faturas')
-      .select('id, contrato_api_id, api_fatura_id, numero_instrumento_cobranca, mes_referencia, ano_referencia, situacao, valor_bruto, valor_liquido, data_emissao, data_pagamento, raw_data');
+      .select(CONTRATOS_API_FATURA_SELECT);
 
     if (contratoApiIds && contratoApiIds.length > 0 && contratoApiIds.length <= 100) {
       query = query.in('contrato_api_id', contratoApiIds);
@@ -796,13 +929,34 @@ export const contratosApiService = {
       query = query.lte('data_emissao', period.dataEmissaoFim);
     }
 
-    const { data, error } = await query;
+    let { data, error } = await query;
+
+    if (isMissingColumnError(error)) {
+      let legacyQuery = supabase
+        .from('contratos_api_faturas')
+        .select(CONTRATOS_API_FATURA_LEGACY_SELECT);
+
+      if (contratoApiIds && contratoApiIds.length > 0 && contratoApiIds.length <= 100) {
+        legacyQuery = legacyQuery.in('contrato_api_id', contratoApiIds);
+      }
+
+      if (period?.dataEmissaoInicio) {
+        legacyQuery = legacyQuery.gte('data_emissao', period.dataEmissaoInicio);
+      }
+
+      if (period?.dataEmissaoFim) {
+        legacyQuery = legacyQuery.lte('data_emissao', period.dataEmissaoFim);
+      }
+
+      ({ data, error } = await legacyQuery);
+    }
 
     if (error) throwMigrationRequired(error);
     const all = (data ?? []) as ContratoApiFaturaRow[];
-    if (!contratoApiIds || contratoApiIds.length === 0 || contratoApiIds.length <= 100) return all;
+    const visible = all.filter((row) => isFaturaVisibleForDisplayUnidade(row.raw_data ?? row, campusUasg));
+    if (!contratoApiIds || contratoApiIds.length === 0 || contratoApiIds.length <= 100) return visible;
     const set = new Set(contratoApiIds);
-    return all.filter((row) => set.has(row.contrato_api_id));
+    return visible.filter((row) => set.has(row.contrato_api_id));
   },
 
   async getDocumentosApi(contratoApiIds?: string[]): Promise<ContratoApiDocumentoRow[]> {
@@ -824,8 +978,12 @@ export const contratosApiService = {
     return all.filter((row) => set.has(row.contrato_api_id));
   },
 
-  async getContratoApiDetails(contratoApiId: string): Promise<ContratoApiDetails> {
-    const [historicoResult, empenhosResult, itensResult, faturasResult, faturaItensResult, faturaEmpenhosResult, documentosResult] = await Promise.all([
+  async getContratoApiDetails(contratoApiId: string, campusUasg = DEFAULT_UASG): Promise<ContratoApiDetails> {
+    if (!(await isContratoApiVisibleForCampus(contratoApiId, campusUasg))) {
+      throw new Error('Contrato não está disponível para o campus selecionado.');
+    }
+
+    const [historicoResult, empenhosResult, itensResult, faturasResult, faturaItensResult, faturaEmpenhosResult, documentosResult, documentosComprasResult, recursosResult, instrumentosResult] = await Promise.all([
       supabase
         .from('contratos_api_historico')
         .select(CONTRATOS_API_HISTORICO_SELECT)
@@ -841,11 +999,7 @@ export const contratosApiService = {
         .select('id, contrato_api_id, api_item_id, catmatseritem_id, descricao_complementar, quantidade, valor_unitario, valor_total, numero_item_compra, historico_item')
         .eq('contrato_api_id', contratoApiId)
         .order('numero_item_compra', { ascending: true }),
-      supabase
-        .from('contratos_api_faturas')
-        .select('id, contrato_api_id, api_fatura_id, numero_instrumento_cobranca, mes_referencia, ano_referencia, situacao, valor_bruto, valor_liquido, data_emissao, data_pagamento, raw_data')
-        .eq('contrato_api_id', contratoApiId)
-        .order('data_emissao', { ascending: false }),
+      getFaturasForContratoDetails(contratoApiId),
       supabase
         .from('contratos_api_fatura_itens')
         .select('id, contrato_api_id, contrato_api_fatura_id, contrato_api_item_id, api_item_id, quantidade_faturado, valor_unitario_faturado, valor_total_faturado')
@@ -860,13 +1014,23 @@ export const contratosApiService = {
         .eq('contrato_api_id', contratoApiId)
         .order('sequencial_documento', { ascending: true }),
       supabase
+        .from('contratos_api_compras_documentos')
+        .select('id, contrato_api_id, api_arquivo_id, tipo, processo, descricao, url, origem, link_sei, raw_data, created_at, updated_at')
+        .eq('contrato_api_id', contratoApiId)
+        .order('api_arquivo_id', { ascending: true }),
+      supabase
+        .from('contratos_api_recursos')
+        .select('id, contrato_api_id, tipo_recurso, api_registro_id, titulo, descricao, situacao, data_inicio, data_fim, vencimento, valor, raw_data, created_at, updated_at')
+        .eq('contrato_api_id', contratoApiId)
+        .order('tipo_recurso', { ascending: true }),
+      supabase
         .from('contratos_api_instrumentos_cobranca')
         .select('id, contrato_api_id, sequencial_instrumento_cobranca, tipo_id, tipo_nome, tipo_descricao, numero_instrumento_cobranca, data_emissao, chave_nfe, data_consulta_nfe, status_response_nfe, valor_nota_fiscal, serie, tipo_evento_mais_recente, data_tipo_evento_mais_recente, nome_fornecedor, cnpj_fornecedor, municipio_fornecedor, itens, eventos, raw_data, created_at, updated_at')
         .eq('contrato_api_id', contratoApiId)
         .order('sequencial_instrumento_cobranca', { ascending: true }),
     ]);
 
-    const firstError =
+    const requiredError =
       historicoResult.error ||
       empenhosResult.error ||
       itensResult.error ||
@@ -875,7 +1039,16 @@ export const contratosApiService = {
       faturaEmpenhosResult.error ||
       documentosResult.error ||
       instrumentosResult.error;
-    const empenhos = (empenhosResult.data ?? []) as ContratoApiEmpenhoRow[];
+    if (requiredError) throwMigrationRequired(requiredError);
+
+    if (documentosComprasResult.error && !isMissingTableError(documentosComprasResult.error)) {
+      throwMigrationRequired(documentosComprasResult.error);
+    }
+    if (recursosResult.error && !isMissingTableError(recursosResult.error)) {
+      throwMigrationRequired(recursosResult.error);
+    }
+    const empenhos = ((empenhosResult.data ?? []) as ContratoApiEmpenhoRow[])
+      .filter((row) => isContratoApiCampusEmpenho(row, campusUasg));
     const empenhoIds = new Set(empenhos.map((empenho) => empenho.id));
     const apiEmpenhoIds = new Set(empenhos.map((empenho) => Number(empenho.api_empenho_id)));
 
@@ -886,7 +1059,7 @@ export const contratosApiService = {
     const linkedFaturaIds = new Set(faturaEmpenhos.map((fe) => fe.contrato_api_fatura_id));
 
     const faturas = ((faturasResult.data ?? []) as ContratoApiFaturaRow[]).filter((fatura) =>
-      isFaturaVisibleForDisplayUnidade(fatura.raw_data ?? fatura) || linkedFaturaIds.has(fatura.id)
+      isFaturaVisibleForDisplayUnidade(fatura.raw_data ?? fatura, campusUasg) || linkedFaturaIds.has(fatura.id)
     );
     const faturaIds = new Set(faturas.map((fatura) => fatura.id));
     const faturaItens = ((faturaItensResult.data ?? []) as ContratoApiFaturaItemRow[]).filter((item) =>
@@ -899,8 +1072,10 @@ export const contratosApiService = {
       itens: (itensResult.data ?? []) as ContratoApiItemRow[],
       faturas,
       faturaItens,
-      faturaEmpenhos,
+      faturaEmpenhos: faturaEmpenhos.filter((row) => faturaIds.has(row.contrato_api_fatura_id)),
       documentos: (documentosResult.data ?? []) as ContratoApiDocumentoRow[],
+      documentosCompras: (documentosComprasResult.data ?? []) as ContratoApiComprasDocumentoRow[],
+      recursos: (recursosResult.data ?? []) as ContratoApiRecursoRow[],
       instrumentosCobranca: (instrumentosResult.data ?? []) as ContratoApiInstrumentoCobrancaRow[],
     };
   },
@@ -908,15 +1083,16 @@ export const contratosApiService = {
   async getLiquidacoesPublicasPorEmpenho(
     numeroEmpenho: string,
     unidadeCodigos: string | string[] = DEFAULT_PUBLIC_LIQUIDACOES_UASGS,
+    client: SupabaseClient = supabase,
   ): Promise<ContratoApiPublicLiquidacaoRow[]> {
     if (isDefaultPublicLiquidacoesUnidades(unidadeCodigos)) {
-      const cached = await getCachedLiquidacoesPublicasPorEmpenho(numeroEmpenho);
+      const cached = await getCachedLiquidacoesPublicasPorEmpenho(numeroEmpenho, client);
       if (!cached.available) return [];
       if (cached.isFresh && cached.rows.length === 0 && cached.rowsCount > 0) {
         const privilegedRows = await getLiquidacoesCacheRowsViaFunction(numeroEmpenho, {
           readCacheOnly: true,
           source: 'frontend-cache-read-fallback',
-        });
+        }, client);
         if (privilegedRows) return privilegedRows;
       }
       if (cached.isFresh && cached.status !== 'error') return cached.rows;
@@ -924,7 +1100,7 @@ export const contratosApiService = {
       // Linhas antigas sao preferiveis a bloquear a tela aguardando a API publica.
       // A atualizacao continua em background e sera refletida na proxima consulta.
       if (cached.rows.length > 0) {
-        triggerLiquidacoesCacheRefresh(numeroEmpenho, 'frontend-cache-stale');
+        triggerLiquidacoesCacheRefresh(numeroEmpenho, 'frontend-cache-stale', client);
         return cached.rows;
       }
 
@@ -933,6 +1109,7 @@ export const contratosApiService = {
       triggerLiquidacoesCacheRefresh(
         numeroEmpenho,
         cached.hasStatus ? 'frontend-cache-stale' : 'frontend-cache-miss',
+        client,
       );
       return [];
     }
@@ -942,6 +1119,7 @@ export const contratosApiService = {
 
     const unidadeLista = normalizeUnidadeCodigos(unidadeCodigos);
     if (unidadeLista.length === 0) return [];
+    const displayCampusUasg = getDisplayCampusFromLiquidacoesUnidades(unidadeCodigos);
 
     const cacheKey = `${[...unidadeLista].sort().join(',')}:${Array.from(targetKeys).sort().join('|')}`;
 
@@ -971,7 +1149,7 @@ export const contratosApiService = {
               try {
                 const empenhos = await getEmpenhosPublicosPorContrato(contrato.api_contrato_id);
                 const matchingEmpenhos = empenhos.filter((empenho) =>
-                  hasEmpenhoMatch(targetKeys, empenho.numero ?? empenho.numero_empenho) && isEmpenhoFromDisplayUnidade(empenho),
+                  hasEmpenhoMatch(targetKeys, empenho.numero ?? empenho.numero_empenho) && isEmpenhoFromDisplayUnidade(empenho, displayCampusUasg),
                 );
 
                 if (matchingEmpenhos.length === 0) return null;
@@ -1005,7 +1183,7 @@ export const contratosApiService = {
                 return (faturas ?? []).flatMap((rawFatura) => {
                   const matchingEmpenhos = getFaturaEmpenhos(rawFatura).filter((rawEmpenho) =>
                     hasEmpenhoMatch(targetKeys, rawEmpenho.numero_empenho ?? rawEmpenho.numero) &&
-                    (!getEmpenhoApiId(rawEmpenho) || empenhoIds.has(getEmpenhoApiId(rawEmpenho)) || isFaturaVisibleForDisplayUnidade(rawFatura)),
+                    (!getEmpenhoApiId(rawEmpenho) || empenhoIds.has(getEmpenhoApiId(rawEmpenho)) || isFaturaVisibleForDisplayUnidade(rawFatura, displayCampusUasg)),
                   );
 
                   if (matchingEmpenhos.length === 0) return [];
@@ -1064,7 +1242,7 @@ export const contratosApiService = {
     );
   },
 
-  async getLastSyncRun(unidadeCodigo?: string): Promise<ContratoApiSyncRun | null> {
+  async getLastSyncRun(unidadeCodigo = DEFAULT_UASG): Promise<ContratoApiSyncRun | null> {
     let query = supabase
       .from('contratos_api_sync_runs')
       .select(CONTRATOS_API_SYNC_RUNS_SELECT)
@@ -1075,7 +1253,21 @@ export const contratosApiService = {
       query = query.eq('unidade_codigo', unidadeCodigo);
     }
 
-    const { data, error } = await query.maybeSingle();
+    let { data, error } = await query.maybeSingle();
+
+    if (isMissingColumnError(error)) {
+      let legacyQuery = supabase
+        .from('contratos_api_sync_runs')
+        .select(CONTRATOS_API_SYNC_RUNS_LEGACY_SELECT)
+        .order('started_at', { ascending: false })
+        .limit(1);
+
+      if (unidadeCodigo) {
+        legacyQuery = legacyQuery.eq('unidade_codigo', unidadeCodigo);
+      }
+
+      ({ data, error } = await legacyQuery.maybeSingle());
+    }
 
     if (error) throwMigrationRequired(error);
     return (data as ContratoApiSyncRun | null) ?? null;

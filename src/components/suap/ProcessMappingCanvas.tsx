@@ -56,6 +56,8 @@ export function ProcessMappingCanvas({ mapping, flow, selectedNodeId, onSelectNo
   const [zoom, setZoom] = useState(0.78);
   const nodesById = useMemo(() => new Map(mapping.nodes.map((node) => [node.id, node])), [mapping.nodes]);
   const laneHeight = 180;
+  const canvasWidth = Math.max(CANVAS_WIDTH, ...mapping.nodes.map((node) => node.position.x + nodeSize(node).width + 80));
+  const canvasHeight = Math.max(CANVAS_HEIGHT, mapping.lanes.length * laneHeight, ...mapping.nodes.map((node) => node.position.y + nodeSize(node).height + 80));
 
   const fit = () => setZoom(0.78);
   const zoomIn = () => setZoom((value) => Math.min(1.15, Number((value + 0.08).toFixed(2))));
@@ -76,7 +78,7 @@ export function ProcessMappingCanvas({ mapping, flow, selectedNodeId, onSelectNo
       </div>
 
       <div className="max-h-[760px] min-h-[580px] overflow-auto p-5 pt-20 [scrollbar-color:#cbd5e1_transparent]">
-        <div className="relative origin-top-left transition-transform duration-200" style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT, transform: `scale(${zoom})` }}>
+        <div className="relative origin-top-left transition-transform duration-200" style={{ width: canvasWidth, height: canvasHeight, transform: `scale(${zoom})` }}>
           <div className="absolute inset-0 rounded-2xl border border-slate-200/80 bg-[radial-gradient(#cbd5e1_0.8px,transparent_0.8px)] [background-size:18px_18px]" />
 
           {mapping.lanes.slice().sort((left, right) => left.order - right.order).map((lane) => (
@@ -87,7 +89,7 @@ export function ProcessMappingCanvas({ mapping, flow, selectedNodeId, onSelectNo
             </div>
           ))}
 
-          <svg className="absolute inset-0 z-10 h-full w-full overflow-visible" viewBox={`0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}`} aria-hidden="true">
+          <svg className="absolute inset-0 z-10 h-full w-full overflow-visible" viewBox={`0 0 ${canvasWidth} ${canvasHeight}`} aria-hidden="true">
             <defs>
               <marker id="mapping-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
                 <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />

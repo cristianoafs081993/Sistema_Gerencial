@@ -8,9 +8,17 @@ import {
   mapFatura,
   mapHistorico,
   mapItem,
+  mapFaturaItem,
+  toNumber,
 } from '@/services/contratosApiMappers';
 
 describe('contratosApiMappers', () => {
+  it('preserva decimais quando a API retorna ponto como separador decimal', () => {
+    expect(toNumber('0.6376')).toBe(0.6376);
+    expect(toNumber('1.00000')).toBe(1);
+    expect(toNumber('4.629.457,80')).toBe(4629457.8);
+  });
+
   it('mapeia contrato com unidade gestora aninhada no contratante', () => {
     expect(
       mapContrato(
@@ -175,6 +183,16 @@ describe('contratosApiMappers', () => {
       numero: '48161',
       emissao: '2023-05-08',
       vencimento: '2023-06-26',
+      ateste: '2023-05-12',
+      protocolo: '2023-05-09',
+      processo: '23035.000001/2023-01',
+      chave_nfe: '24260755806684000105550010000008641253540068',
+      justificativafatura_id: 'Ordem cronológica',
+      infcomplementar: 'AUTOMÁTICA',
+      repactuacao: 'Não',
+      juros: '1,25',
+      multa: '2,50',
+      glosa: '100,00',
       valor: '12.368,06',
       valorliquido: '12.368,06',
       mesref: '04',
@@ -204,6 +222,16 @@ describe('contratosApiMappers', () => {
       numero_instrumento_cobranca: '48161',
       data_emissao: '2023-05-08',
       data_vencimento: '2023-06-26',
+      data_ateste: '2023-05-12',
+      data_protocolo: '2023-05-09',
+      processo: '23035.000001/2023-01',
+      chave_nfe: '24260755806684000105550010000008641253540068',
+      justificativa: 'Ordem cronológica',
+      informacao_complementar: 'AUTOMÁTICA',
+      repactuacao: 'Não',
+      juros: 1.25,
+      multa: 2.5,
+      glosa: 100,
       valor_bruto: 12368.06,
       valor_liquido: 12368.06,
       mes_referencia: '04',
@@ -256,6 +284,21 @@ describe('contratosApiMappers', () => {
           valor_total: '201.994,80',
         },
       ],
+    });
+  });
+
+  it('preserva a quantidade decimal faturada retornada pela API', () => {
+    expect(
+      mapFaturaItem('contrato-api-1', 'fatura-api-1', 'item-api-1', {
+        id_item_contrato: 325154,
+        quantidade_faturado: '1.00000',
+        valorunitario_faturado: '0.6376',
+        valortotal_faturado: '0.6376',
+      }),
+    ).toMatchObject({
+      quantidade_faturado: 1,
+      valor_unitario_faturado: 0.6376,
+      valor_total_faturado: 0.6376,
     });
   });
 

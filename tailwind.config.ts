@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss";
 import tailwindcssAnimate from "tailwindcss-animate";
 import typography from "@tailwindcss/typography";
+import colors from "tailwindcss/colors";
 
 export default {
   darkMode: ["class"],
@@ -70,8 +71,14 @@ export default {
         "background-light": "#f4f6fa",
         "background-dark":  "#0d1117",
         "vibrant-blue":     "#3b82f6",
-        "purple":           "#a855f7",
-        "amber":            "#f59e0b",
+        "purple": {
+          ...colors.purple,
+          DEFAULT: "#a855f7",
+        },
+        "amber": {
+          ...colors.amber,
+          DEFAULT: "#f59e0b",
+        },
         "emerald-green":    "#10b981",
         border:      "hsl(var(--border))",
         input:       "hsl(var(--input))",

@@ -855,8 +855,8 @@ describe('Dashboard', () => {
       mockedUseQuery.mock.calls.some(([options]) => {
         const queryKey = options.queryKey as unknown[];
         return queryKey[0] === 'dashboard-contratos-api-faturas'
-          && queryKey[2] === `${currentYear}-01-01`
-          && queryKey[3] === `${currentYear}-12-31`;
+          && queryKey[3] === `${currentYear}-01-01`
+          && queryKey[4] === `${currentYear}-12-31`;
       }),
     ).toBe(true);
 
@@ -868,8 +868,8 @@ describe('Dashboard', () => {
         mockedUseQuery.mock.calls.some(([options]) => {
           const queryKey = options.queryKey as unknown[];
           return queryKey[0] === 'dashboard-contratos-api-faturas'
-            && queryKey[2] === '2025-01-01'
-            && queryKey[3] === '2025-12-31';
+            && queryKey[3] === '2025-01-01'
+            && queryKey[4] === '2025-12-31';
         }),
       ).toBe(true);
     });

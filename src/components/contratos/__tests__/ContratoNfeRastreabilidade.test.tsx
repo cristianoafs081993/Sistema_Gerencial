@@ -64,7 +64,7 @@ describe('ContratoNfeRastreabilidade', () => {
     expect(screen.getByText('Nota Fiscal Nº 864')).toBeInTheDocument();
     expect(screen.getByText(/ZONA OESTE COMERCIO LTDA/i)).toBeInTheDocument();
     expect(screen.getByText(/Autorização de Uso/i)).toBeInTheDocument();
-    expect(screen.getByText(/Conciliada no SIAFI/i)).toBeInTheDocument();
+    expect(screen.getByText(/Correspondência por número e valor/i)).toBeInTheDocument();
 
     // Chave formatada
     expect(screen.getByText(/2426 0755 8066 8400 0105 5500 1000 0008 6412 5354 0068/i)).toBeInTheDocument();
@@ -90,5 +90,22 @@ describe('ContratoNfeRastreabilidade', () => {
     expect(btn).toBeInTheDocument();
     fireEvent.click(btn);
     expect(onRefresh).toHaveBeenCalled();
+  });
+
+  it('não presume autorização fiscal, ateste ou pagamento quando não há evidência', () => {
+    const instrumento: PncpInstrumentoCobranca = {
+      sequencialInstrumentoCobranca: 2,
+      tipoNome: 'Nota Fiscal',
+      numeroInstrumentoCobranca: '005',
+      dataEmissaoDocumento: '2026-08-01',
+      notaFiscal: { chaveNotaFiscal: '123', valorNotaFiscal: 10 },
+      itens: [], eventos: [], raw: {},
+    };
+
+    render(<ContratoNfeRastreabilidade instrumentos={[instrumento]} faturasApi={[]} />);
+
+    expect(screen.getByText('Situação fiscal não informada')).toBeInTheDocument();
+    expect(screen.getByText('Sem correspondência identificada')).toBeInTheDocument();
+    expect(screen.queryByText(/Autorizada SEFAZ|Pendente de Ateste|Conciliada no SIAFI/i)).not.toBeInTheDocument();
   });
 });

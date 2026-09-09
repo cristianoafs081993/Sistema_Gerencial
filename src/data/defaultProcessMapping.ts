@@ -44,7 +44,7 @@ export const DEFAULT_PROCESS_MAPPING: ProcessMappingRecord = {
     {
       id: 'step-3', code: '3', title: 'Solicitar complementação', description: 'Registrar a pendência no processo e devolver à unidade responsável para correção.', type: 'task',
       laneId: 'lane-origin', position: { x: 890, y: 42 }, width: 220, height: 112, responsible: 'Unidade requisitante', slaDays: 3, color: '#2563eb',
-      outputDocuments: ['Pendência registrada'],
+      outputDocuments: ['Pendência registrada'], flowRole: 'exception',
     },
     {
       id: 'step-4', code: '4', title: 'Registrar a liquidação', description: 'Lançar a liquidação no sistema oficial e vincular os documentos fiscais ao processo.', type: 'task',
@@ -82,4 +82,86 @@ export const DEFAULT_PROCESS_MAPPING: ProcessMappingRecord = {
   ],
 };
 
-export const DEFAULT_PROCESS_MAPPINGS = [DEFAULT_PROCESS_MAPPING];
+export const DEFAULT_BOLSA_PROCESS_MAPPING: ProcessMappingRecord = {
+  id: 'liquidacao-pagamento-bolsas',
+  title: 'Liquidação e pagamento de bolsas de ensino, pesquisa ou extensão',
+  code: 'PROC-FIN-002',
+  description: 'Fluxo de instrução, liquidação e pagamento de bolsas no SUAP.',
+  category: 'Financeiro',
+  version: '1.0',
+  createdAt,
+  updatedAt: createdAt,
+  owner: 'COFINC/CN',
+  publicationStatus: 'published',
+  tags: ['SUAP', 'liquidação', 'pagamento', 'bolsas', 'ensino', 'pesquisa', 'extensão'],
+  lanes: [
+    { id: 'lane-coordenador', name: 'Coordenador do Projeto', color: '#2563eb', order: 0, height: 180 },
+    { id: 'lane-coordenacao', name: 'Coordenação responsável pelo projeto · COPEIN, COEX ou DIAC', color: '#7c3aed', order: 1, height: 180 },
+    { id: 'lane-diad-bolsas', name: 'DIAD', color: '#0891b2', order: 2, height: 180 },
+    { id: 'lane-cofinc-bolsas', name: 'COFINC', color: '#059669', order: 3, height: 180 },
+    { id: 'lane-dg', name: 'DG · Direção-Geral', color: '#d97706', order: 4, height: 180 },
+  ],
+  nodes: [
+    {
+      id: 'start', code: 'INÍCIO', title: 'Processo iniciado', description: 'O processo de pagamento de bolsa é aberto e preparado para instrução.', type: 'start',
+      laneId: 'lane-coordenador', position: { x: 28, y: 66 }, width: 64, height: 64, responsible: 'Coordenador do Projeto', color: '#0f766e',
+    },
+    {
+      id: 'bolsa-step-1', code: '1', title: 'Anexar documentação da bolsa', description: 'Reunir e anexar ao processo os documentos necessários ao pagamento da bolsa.', type: 'task',
+      laneId: 'lane-coordenador', position: { x: 138, y: 42 }, width: 220, height: 112, responsible: 'Coordenador do Projeto', slaDays: 2, color: '#2563eb',
+      outputDocuments: ['Processo com documentação da bolsa anexada'], systemName: 'SUAP · Processo', systemUrl: 'https://suap.ifrn.edu.br/',
+    },
+    {
+      id: 'bolsa-step-2', code: '2', title: 'Analisar documentação e encaminhar à DIAD', description: 'Analisar a documentação da bolsa e encaminhar o processo à DIAD para autorização da liquidação.', type: 'task',
+      laneId: 'lane-coordenacao', position: { x: 420, y: 222 }, width: 220, height: 112, responsible: 'Coordenação responsável pelo projeto', routingAliases: ['COPEIN', 'COEX', 'DIAC'], slaDays: 3, color: '#7c3aed',
+      inputDocuments: ['Processo com documentação da bolsa anexada'], outputDocuments: ['Documentação analisada'], systemName: 'SUAP · Processo', systemUrl: 'https://suap.ifrn.edu.br/',
+    },
+    {
+      id: 'bolsa-gateway-documentacao', code: 'GW1', title: 'Documentação completa?', description: 'Decisão sobre a completude da documentação antes da autorização da liquidação.', type: 'gateway', gatewayType: 'exclusive',
+      laneId: 'lane-coordenacao', position: { x: 704, y: 240 }, width: 76, height: 76, responsible: 'Coordenação responsável pelo projeto', routingAliases: ['COPEIN', 'COEX', 'DIAC'], color: '#7c3aed',
+    },
+    {
+      id: 'bolsa-step-complementacao', code: '2A', title: 'Solicitar complementação documental', description: 'Devolver o processo ao Coordenador do Projeto para complementar a documentação pendente.', type: 'task',
+      laneId: 'lane-coordenador', position: { x: 890, y: 42 }, width: 220, height: 112, responsible: 'Coordenador do Projeto', flowRole: 'exception', slaDays: 3, color: '#2563eb',
+      inputDocuments: ['Pendência documental'], outputDocuments: ['Documentação complementada'],
+    },
+    {
+      id: 'bolsa-step-3', code: '3', title: 'Autorizar a liquidação e encaminhar à COFINC', description: 'Autorizar a liquidação da bolsa e encaminhar o processo à COFINC.', type: 'task',
+      laneId: 'lane-diad-bolsas', position: { x: 890, y: 402 }, width: 220, height: 112, responsible: 'DIAD', routingAliases: ['DIAD'], slaDays: 2, color: '#0891b2',
+      inputDocuments: ['Documentação analisada'], outputDocuments: ['Liquidação autorizada'], systemName: 'SUAP · Processo', systemUrl: 'https://suap.ifrn.edu.br/',
+    },
+    {
+      id: 'bolsa-step-4', code: '4', title: 'Registrar a liquidação e encaminhar à DG', description: 'Registrar a liquidação da bolsa e encaminhar o processo à DG para autorização do pagamento.', type: 'task',
+      laneId: 'lane-cofinc-bolsas', position: { x: 1180, y: 582 }, width: 220, height: 112, responsible: 'COFINC', routingAliases: ['COFINC'], slaDays: 2, color: '#059669',
+      inputDocuments: ['Liquidação autorizada'], outputDocuments: ['Liquidação registrada'], systemName: 'SIAFI', systemUrl: 'https://www.gov.br/tesouronacional/pt-br/siafi/',
+    },
+    {
+      id: 'bolsa-step-5', code: '5', title: 'Autorizar o pagamento e encaminhar à COFINC', description: 'Autorizar o pagamento da bolsa e devolver o processo à COFINC para execução.', type: 'task',
+      laneId: 'lane-dg', position: { x: 1470, y: 762 }, width: 220, height: 112, responsible: 'DG · Direção-Geral', routingAliases: ['DG'], slaDays: 2, color: '#d97706',
+      inputDocuments: ['Liquidação registrada'], outputDocuments: ['Pagamento autorizado'],
+    },
+    {
+      id: 'bolsa-step-6', code: '6', title: 'Realizar o pagamento e concluir o processo', description: 'Realizar o pagamento da bolsa, registrar a conclusão e finalizar o processo.', type: 'task',
+      laneId: 'lane-cofinc-bolsas', position: { x: 1760, y: 582 }, width: 220, height: 112, responsible: 'COFINC', routingAliases: ['COFINC'], slaDays: 2, color: '#059669',
+      inputDocuments: ['Pagamento autorizado'], outputDocuments: ['Pagamento realizado'], systemName: 'SIAFI', systemUrl: 'https://www.gov.br/tesouronacional/pt-br/siafi/',
+    },
+    {
+      id: 'end', code: 'FIM', title: 'Processo concluído', description: 'O pagamento da bolsa foi realizado e registrado.', type: 'end',
+      laneId: 'lane-cofinc-bolsas', position: { x: 2050, y: 606 }, width: 64, height: 64, responsible: 'COFINC', color: '#0f766e',
+    },
+  ],
+  edges: [
+    { id: 'bolsa-edge-start-1', source: 'start', target: 'bolsa-step-1' },
+    { id: 'bolsa-edge-1-2', source: 'bolsa-step-1', target: 'bolsa-step-2' },
+    { id: 'bolsa-edge-2-gateway', source: 'bolsa-step-2', target: 'bolsa-gateway-documentacao' },
+    { id: 'bolsa-edge-gateway-complementacao', source: 'bolsa-gateway-documentacao', target: 'bolsa-step-complementacao', label: 'Não', condition: 'Documentação pendente', style: 'dashed' },
+    { id: 'bolsa-edge-complementacao-2', source: 'bolsa-step-complementacao', target: 'bolsa-step-2', label: 'Reanalisar', style: 'dashed' },
+    { id: 'bolsa-edge-gateway-3', source: 'bolsa-gateway-documentacao', target: 'bolsa-step-3', label: 'Sim', condition: 'Documentação completa' },
+    { id: 'bolsa-edge-3-4', source: 'bolsa-step-3', target: 'bolsa-step-4' },
+    { id: 'bolsa-edge-4-5', source: 'bolsa-step-4', target: 'bolsa-step-5' },
+    { id: 'bolsa-edge-5-6', source: 'bolsa-step-5', target: 'bolsa-step-6' },
+    { id: 'bolsa-edge-6-end', source: 'bolsa-step-6', target: 'end' },
+  ],
+};
+
+export const DEFAULT_PROCESS_MAPPINGS = [DEFAULT_PROCESS_MAPPING, DEFAULT_BOLSA_PROCESS_MAPPING];

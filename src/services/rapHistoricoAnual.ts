@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 
 import { supabase } from '@/lib/supabase';
+import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
 import { parseRapHistoricoAnualTable, type RapHistoricoAnualInput } from '@/utils/rapHistoricoAnual';
 
 export type RapHistoricoAnualRow = RapHistoricoAnualInput & {
@@ -28,6 +29,7 @@ type RapHistoricoAnualDbRow = {
   import_batch_id: string;
   source_file: string | null;
   imported_at: string;
+  campus_uasg?: string | null;
 };
 
 function decodeCsvBuffer(arrayBuffer: ArrayBuffer) {
@@ -91,10 +93,11 @@ export async function parseRapHistoricoAnualFile(file: File): Promise<RapHistori
 }
 
 export const rapHistoricoAnualService = {
-  async getLatestReport(): Promise<RapHistoricoAnualLatestReport> {
+  async getLatestReport(campusUasg = DEFAULT_IFRN_CAMPUS_UASG): Promise<RapHistoricoAnualLatestReport> {
     const { data: latest, error: latestError } = await supabase
       .from('rap_historico_anual')
       .select('import_batch_id,source_file,imported_at')
+      .eq('campus_uasg', campusUasg)
       .order('imported_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -106,6 +109,7 @@ export const rapHistoricoAnualService = {
       .from('rap_historico_anual')
       .select('id,ug_executora,ug_nome,ano,metrica,item_informacao_codigo,item_informacao_nome,valor,import_batch_id,source_file,imported_at')
       .eq('import_batch_id', latest.import_batch_id)
+      .eq('campus_uasg', campusUasg)
       .order('ug_executora', { ascending: true })
       .order('ano', { ascending: true })
       .order('item_informacao_codigo', { ascending: true });
@@ -119,7 +123,11 @@ export const rapHistoricoAnualService = {
     };
   },
 
-  async importReport(rows: RapHistoricoAnualInput[], sourceFile: string): Promise<void> {
+  async importReport(
+    rows: RapHistoricoAnualInput[],
+    sourceFile: string,
+    campusUasg = DEFAULT_IFRN_CAMPUS_UASG,
+  ): Promise<void> {
     if (rows.length === 0) return;
 
     const importedAt = new Date().toISOString();
@@ -135,6 +143,7 @@ export const rapHistoricoAnualService = {
       import_batch_id: importBatchId,
       source_file: sourceFile,
       imported_at: importedAt,
+      campus_uasg: campusUasg,
     }));
 
     const { error } = await supabase

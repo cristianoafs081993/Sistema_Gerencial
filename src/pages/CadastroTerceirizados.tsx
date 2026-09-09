@@ -485,7 +485,7 @@ export default function CadastroTerceirizadosPage() {
           <Card className="border-border-default shadow-soft">
             <CardHeader className="bg-primary/[0.01] border-b">
               <CardTitle>Vincular Contratos e Empenhos</CardTitle>
-              <CardDescription>Configure o escopo de visualização do terceirizado. Ele só poderá adicionar itens nestas referências nas suas Requisições de Compra.</CardDescription>
+              <CardDescription>Configure o escopo de visualização do terceirizado. Ele poderá consultar os empenhos e seus detalhes na tela de Empenhos e adicionar itens nestas referências nas suas Requisições de Compra.</CardDescription>
             </CardHeader>
             <CardContent className="pt-6 space-y-6">
               <div className="grid gap-4 md:grid-cols-[220px_1fr_auto] md:items-end">

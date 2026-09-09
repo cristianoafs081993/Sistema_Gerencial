@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 
 import { supabase } from '@/lib/supabase';
+import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
 import {
   aggregateCreditoDisponivelRows,
   parseCreditoDisponivelTable,
@@ -73,10 +74,11 @@ export async function parseCreditoDisponivelFile(file: File): Promise<CreditoDis
 }
 
 export const creditosDisponiveisDetalhesService = {
-  async getLatestReport(): Promise<CreditoDisponivelLatestReport> {
+  async getLatestReport(campusUasg = DEFAULT_IFRN_CAMPUS_UASG): Promise<CreditoDisponivelLatestReport> {
     const { data: latest, error: latestError } = await supabase
       .from('creditos_disponiveis_detalhes')
       .select('import_batch_id,source_file,imported_at')
+      .eq('campus_uasg', campusUasg)
       .order('imported_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -88,6 +90,7 @@ export const creditosDisponiveisDetalhesService = {
       .from('creditos_disponiveis_detalhes')
       .select('id,ptres,plano_interno,descricao,metrica,valor,import_batch_id,source_file,imported_at')
       .eq('import_batch_id', latest.import_batch_id)
+      .eq('campus_uasg', campusUasg)
       .order('ptres', { ascending: true })
       .order('plano_interno', { ascending: true });
 
@@ -100,7 +103,11 @@ export const creditosDisponiveisDetalhesService = {
     };
   },
 
-  async importReport(rows: CreditoDisponivelDetalheInput[], sourceFile: string): Promise<void> {
+  async importReport(
+    rows: CreditoDisponivelDetalheInput[],
+    sourceFile: string,
+    campusUasg = DEFAULT_IFRN_CAMPUS_UASG,
+  ): Promise<void> {
     if (rows.length === 0) return;
 
     const importedAt = new Date().toISOString();
@@ -113,11 +120,12 @@ export const creditosDisponiveisDetalhesService = {
     }));
     const { error: summaryError } = await supabase
       .from('creditos_disponiveis')
-      .upsert(summaryPayload, { onConflict: 'ptres' });
+      .upsert(summaryPayload.map((row) => ({ ...row, campus_uasg: campusUasg })), { onConflict: 'campus_uasg,ptres' });
 
     if (summaryError) throw summaryError;
 
     const detailPayload = rows.map((row) => ({
+      campus_uasg: campusUasg,
       ptres: row.ptres,
       plano_interno: row.planoInterno || null,
       descricao: row.descricao || null,

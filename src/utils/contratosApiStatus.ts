@@ -215,7 +215,7 @@ export function deriveContratoApiCampusScope(
   reitoriaUg = CONTRATOS_API_REITORIA_UG,
 ): ContratoApiCampusScope {
   if (contrato.unidade_codigo === campusUg || contrato.unidade_origem_codigo === campusUg) {
-    if (isContratoApiNonCurraisNovosScope(contrato)) {
+    if (campusUg === CONTRATOS_API_CAMPUS_UG && isContratoApiNonCurraisNovosScope(contrato)) {
       return { inScope: false, campus_scope_reason: 'ug_campus_objeto_fora_currais_novos' };
     }
     return { inScope: true, campus_scope_reason: 'ug_campus' };
@@ -243,6 +243,8 @@ export function buildContratoApiDerivedFields(
   empenhos: ContratoApiStatusEmpenho[],
   faturas: ContratoApiStatusFatura[],
   today = new Date(),
+  campusUg = CONTRATOS_API_CAMPUS_UG,
+  reitoriaUg = CONTRATOS_API_REITORIA_UG,
 ) {
   let status = deriveContratoApiStatus(contrato, historico, today);
 
@@ -269,7 +271,7 @@ export function buildContratoApiDerivedFields(
     }
   }
 
-  const scope = deriveContratoApiCampusScope(contrato, empenhos, faturas);
+  const scope = deriveContratoApiCampusScope(contrato, empenhos, faturas, campusUg, reitoriaUg);
 
   return {
     ...status,

@@ -98,6 +98,19 @@ type CreditoDisponivelRow = {
   updated_at?: string | null;
 };
 
+type AtividadeRow = {
+  id?: string | null;
+  atividade?: string | null;
+  descricao?: string | null;
+  valor_total?: number | string | null;
+  saldo_disponivel?: number | string | null;
+  dimensao?: string | null;
+  componente_funcional?: string | null;
+  origem_recurso?: string | null;
+  natureza_despesa?: string | null;
+  plano_interno?: string | null;
+};
+
 const CAMPUS_UG = '158366';
 const REITORIA_UG = '158155';
 
@@ -151,7 +164,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }
 
-export function detectAssistantIntent(message: string): AssistantIntent {
+export type HistoryMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
+export function isPriceResearchClarification(text: string): boolean {
+  const norm = normalizeText(text);
+  return (
+    /pesquisa de pre[çc]o|cota[çc][ãa]o|in\s*65/.test(norm) &&
+    (/esclare[çc]a|especifica[çc][ãa]o|detalh|muito gen[eé]ric|quais os requisitos|qual o formato|qual a configura[çc][ãa]o|qual o modelo|qual o tamanho|qual a capacidade/.test(norm) ||
+     /responda.*especifica|responder detalhando/.test(norm))
+  );
+}
+
+export function detectAssistantIntent(message: string, history?: HistoryMessage[]): AssistantIntent {
   const text = normalizeText(message);
 
   if (
@@ -160,6 +187,14 @@ export function detectAssistantIntent(message: string): AssistantIntent {
     ((/pesquis(ar|e|a)/.test(text) || /cot(ar|e|acao)/.test(text)) && (/item|itens|monitor|cadeira|mesa|computador|notebook|servico|aquisicao|compra|edital|termo de referencia|\btr\b/.test(text)))
   ) {
     return 'pesquisa_precos';
+  }
+
+  // Se houver histórico e o assistente solicitou esclarecimento de pesquisa de preços, mantém a intenção
+  if (history && history.length > 0) {
+    const lastAssistant = [...history].reverse().find((h) => h.role === 'assistant');
+    if (lastAssistant && isPriceResearchClarification(lastAssistant.content)) {
+      return 'pesquisa_precos';
+    }
   }
 
   if (/descentraliz|reitoria|ptres|plano interno|\bpi\b|nota de credito|\bnc\b/.test(text)) {
@@ -193,7 +228,296 @@ export type ExtractedDemandItem = {
   unit: string;
   catalogType: 'material' | 'service';
   suggestedCatalogCode?: string;
+  usedSynonyms?: string[];
 };
+
+export type DemandClarityResult = {
+  isClear: boolean;
+  reason?: string;
+  category?: string;
+  missingAttributes?: string[];
+  suggestedQuestions?: string[];
+  quickOptions?: string[];
+};
+
+export function assessDemandClarity(demand: ExtractedDemandItem): DemandClarityResult {
+  const desc = normalizeText(demand.description);
+  const tokens = desc.split(/\s+/).filter((t) => t.length > 1);
+
+  // Stop words comuns de compras públicas que não qualificam tecnicamente o item
+  const genericWords = new Set([
+    'de', 'do', 'da', 'para', 'com', 'sem', 'em', 'um', 'uma', 'uns', 'umas',
+    'item', 'itens', 'material', 'materiais', 'equipamento', 'equipamentos', 'aparelho', 'aparelhos',
+    'produto', 'produtos', 'aquisicao', 'compra', 'cotacao', 'preco', 'precos',
+    'unidade', 'unidades', 'modelo', 'tipo', 'padrao', 'novo', 'novos',
+    'fornecimento', 'servico', 'servicos', 'campus', 'ifrn', 'solicitacao',
+  ]);
+  const meaningfulTokens = tokens.filter((t) => !genericWords.has(t));
+  const isVeryShort = meaningfulTokens.length <= 2;
+
+  // 1. Informática / Computadores / Notebooks
+  if (/computador|notebook|laptop|desktop|microcomputador|pc\b|servidor/.test(desc)) {
+    const hasProcessor = /i[3579]|core|ryzen|xeon|intel|amd|m[1234]|ghz|octa|processador/.test(desc);
+    const hasRam = /\b\d+\s*(gb|gigas?)\b|memoria|ram/.test(desc);
+    const hasStorage = /ssd|nvme|hd|disco|armazenamento|512\s*gb|256\s*gb|1\s*tb/.test(desc);
+
+    if (!hasProcessor || !hasRam || !hasStorage) {
+      return {
+        isClear: false,
+        category: 'computadores',
+        reason: `Complete os requisitos de "${demand.description}": ${[!hasProcessor && 'processador', !hasRam && 'memória RAM', !hasStorage && 'armazenamento'].filter(Boolean).join(', ')}.`,
+        missingAttributes: [
+          'Formato (Notebook portátil, Desktop padrão, All-in-One ou Servidor)',
+          'Processador (ex.: Intel Core i5/i7 ou AMD Ryzen)',
+          'Memória RAM (ex.: 8GB, 16GB, 32GB)',
+          'Armazenamento (ex.: SSD 256GB, 512GB)',
+        ],
+        suggestedQuestions: [
+          'Qual o formato do equipamento: Computador Desktop, Notebook portátil ou Servidor?',
+          'Qual a configuração mínima exigida (Processador i5/i7/Ryzen, Memória RAM de 8GB/16GB e SSD de 256GB/512GB)?',
+          'Há necessidade de periféricos inclusos (Monitor com HDMI, teclado e mouse)?',
+        ],
+        quickOptions: [
+          'Notebook Intel Core i5, 16GB RAM, SSD 512GB, tela 15.6" Full HD',
+          'Desktop Intel Core i7, 16GB RAM, SSD 512GB com Monitor 24" Full HD',
+          'Notebook básico Intel Core i3, 8GB RAM, SSD 256GB',
+        ],
+      };
+    }
+  }
+
+  // 2. Monitores / Displays (excluindo notebooks e laptops cujo display é componente interno)
+  if (!/notebook|laptop/.test(desc) && (/monitor|display\b/.test(desc) || /\btela\s*(led|lcd|interativa|gamer|de\s+v[ií]deo|para\s+pc)\b/.test(desc))) {
+    const hasSize = /\b(19|21|22|23|24|27|29|32|34)\s*(pol|polegadas?|"|')\b/.test(desc);
+    const hasResolution = /full\s*hd|4k|2k|qhd|1080p|resolucao|ips|hdmi|displayport/.test(desc);
+
+    if (!hasSize && !hasResolution) {
+      return {
+        isClear: false,
+        category: 'monitores',
+        reason: `A descrição "${demand.description}" não informa o tamanho da tela ou resolução necessária.`,
+        missingAttributes: ['Tamanho da tela em polegadas', 'Resolução (Full HD, 4K)', 'Conexões (HDMI, DisplayPort)'],
+        suggestedQuestions: [
+          'Qual o tamanho da tela desejado (ex.: 24 polegadas, 27 polegadas ou ultrawide)?',
+          'Qual a resolução e portas de conexão exigidas (Full HD 1080p ou 4K, portas HDMI e DisplayPort)?',
+          'É necessário suporte com ajuste ergonômico de altura?',
+        ],
+        quickOptions: [
+          'Monitor 24 polegadas Full HD com porta HDMI e ajuste de altura',
+          'Monitor 27 polegadas 4K IPS com portas HDMI e DisplayPort',
+        ],
+      };
+    }
+  }
+
+  // 3. Cadeiras / Mobiliário
+  if (/cadeira|poltrona|assento|longarina/.test(desc)) {
+    const hasErgo = /ergonomica|nr\s*17|giratoria|bracos?|ajust|regul|operativa|presidente|diretor|fixa|espuma\s*injetada/.test(desc);
+
+    if (!hasErgo && isVeryShort) {
+      return {
+        isClear: false,
+        category: 'mobiliario',
+        reason: `A descrição "${demand.description}" não indica o modelo ou requisitos ergonômicos da cadeira.`,
+        missingAttributes: ['Modelo (operativa giratória, presidente, secretária ou fixa)', 'Padrão ergonômico NR-17 e braços reguláveis'],
+        suggestedQuestions: [
+          'Qual o modelo da cadeira: operativa giratória para escritório, presidente ou fixa para reunião/auditório?',
+          'Exige conformidade ergonômica com a Norma Regulamentadora NR-17 (com ajuste a gás e braços reguláveis)?',
+        ],
+        quickOptions: [
+          'Cadeira giratória operativa ergonômica padrão NR-17 com braços reguláveis e encosto em tela',
+          'Cadeira presidente giratória ergonômica em couro sintético com braços',
+          'Cadeira fixa interlocutor para reunião com estrutura metálica',
+        ],
+      };
+    }
+  }
+
+  // 4. Climatização / Ar-Condicionado
+  if (/ar[\s\-]*condicionad|climatizador|split|arcondicionado/.test(desc)) {
+    const hasBtu = /\b(9000|12000|18000|24000|30000|36000|48000|60000)\s*(btus?|btu)?\b|\b\d+\s*mil\s*btus?\b/.test(desc);
+    const hasTech = /inverter|hi\s*wall|piso\s*teto|cassete|220v/.test(desc);
+
+    if (!hasBtu && !hasTech) {
+      return {
+        isClear: false,
+        category: 'climatizacao',
+        reason: `A descrição "${demand.description}" não informa a capacidade térmica (BTUs) do equipamento.`,
+        missingAttributes: ['Capacidade térmica (BTUs)', 'Tecnologia Inverter ou Convencional', 'Voltagem (220V)'],
+        suggestedQuestions: [
+          'Qual a capacidade térmica em BTUs desejada (ex.: 9.000, 12.000, 18.000 ou 24.000 BTUs)?',
+          'Requer tecnologia Inverter para maior eficiência energética?',
+        ],
+        quickOptions: [
+          'Ar-condicionado Split Inverter 12.000 BTUs 220V ciclo frio',
+          'Ar-condicionado Split Inverter 18.000 BTUs 220V ciclo frio',
+          'Ar-condicionado Split Inverter 24.000 BTUs 220V ciclo frio',
+        ],
+      };
+    }
+  }
+
+  // 5. Projetores / Datashow
+  if (/projetor|datashow/.test(desc)) {
+    const hasLumens = /lumens?|ansi|\b\d{4}\s*(lm|lumens?)\b/.test(desc);
+    const hasRes = /full\s*hd|wxga|xga|laser|hdmi/.test(desc);
+
+    if (!hasLumens && !hasRes) {
+      return {
+        isClear: false,
+        category: 'audiovisual',
+        reason: `A descrição "${demand.description}" não especifica a luminosidade (lúmens) ou resolução do projetor.`,
+        missingAttributes: ['Luminosidade em lúmens ANSI', 'Resolução (Full HD, WXGA)'],
+        suggestedQuestions: [
+          'Qual a luminosidade necessária em lúmens ANSI (ex.: 3.500, 4.000 ou 5.000 lúmens)?',
+          'Qual a resolução exigida (Full HD 1080p ou WXGA)?',
+        ],
+        quickOptions: [
+          'Projetor multimídia 4.000 ANSI lúmens Full HD com conexões HDMI',
+          'Projetor multimídia 3.600 ANSI lúmens WXGA com HDMI',
+        ],
+      };
+    }
+  }
+
+  // 6. Termos genéricos de material ou serviço com 1 ou 2 palavras sem especificadores técnicos
+  const genericSingulars = [
+    'papel', 'caneta', 'cabo', 'tinta', 'toner', 'mesa', 'impressora', 'reforma',
+    'manutencao', 'limpeza', 'software', 'licenca', 'teclado', 'mouse', 'nobreak',
+    'veiculo', 'carro', 'pneu', 'combustivel', 'uniforme', 'remedio', 'medicamento',
+  ];
+
+  if (isVeryShort && genericSingulars.some((g) => desc.includes(g))) {
+    return {
+      isClear: false,
+      reason: `A descrição "${demand.description}" é muito resumida e requer especificações técnicas (dimensões, modelo, capacidade ou padrões normativos) para localização precisa no PNCP.`,
+      missingAttributes: ['Modelo ou dimensões', 'Capacidade ou material', 'Padrão ou finalidade de uso'],
+      suggestedQuestions: [
+        `Poderia detalhar o modelo, medidas, capacidade ou marca de referência para "${demand.description}"?`,
+        'Há alguma especificação técnica ou norma regulamentadora obrigatória para o item?',
+      ],
+      quickOptions: [
+        `Especificar detalhes de ${demand.description}`,
+        'Consultar opções mais comuns do catálogo CATMAT',
+      ],
+    };
+  }
+
+  return { isClear: true };
+}
+
+const OFFICIAL_SYNONYM_PATTERNS: Array<{ pattern: RegExp; synonyms: string[] }> = [
+  {
+    pattern: /\bnotebooks?\b/i,
+    synonyms: ['computador portátil', 'laptop', 'microcomputador portátil'],
+  },
+  {
+    pattern: /\bcomputador(es)?\b|\bdesktops?\b|\bmicrocomputador(es)?\b/i,
+    synonyms: ['microcomputador desktop', 'estação de trabalho', 'computador all in one'],
+  },
+  {
+    pattern: /\bmonitores?\b|\btelas?\b/i,
+    synonyms: ['monitor de vídeo', 'display led', 'monitor para computador'],
+  },
+  {
+    pattern: /\bprojetor(es)?\b|\bdatashow\b/i,
+    synonyms: ['projetor multimídia', 'projetor de vídeo', 'datashow', 'aparelho de projeção'],
+  },
+  {
+    pattern: /\bcadeiras?\b/i,
+    synonyms: ['cadeira operativa giratória', 'poltrona giratória para escritório', 'cadeira ergonômica com braços'],
+  },
+  {
+    pattern: /\bmesas?\b/i,
+    synonyms: ['estação de trabalho', 'mesa de escritório', 'mesa operativa'],
+  },
+  {
+    pattern: /\bar[\s\-]*condicionad(o|os)?\b|\bclimatizador(es)?\b/i,
+    synonyms: ['condicionador de ar split', 'aparelho de climatização', 'condicionador de ar'],
+  },
+  {
+    pattern: /\bcabos?\s+de\s+rede\b|\bcabos?\s+utp\b/i,
+    synonyms: ['patch cord rj45', 'cabo utp cat6', 'cabo de rede par trançado'],
+  },
+  {
+    pattern: /\bimpressoras?\b/i,
+    synonyms: ['aparelho multifuncional laser', 'multifuncional laser', 'impressora laser'],
+  },
+  {
+    pattern: /\bpapel\s+a4\b|\bsulfite\b/i,
+    synonyms: ['papel sulfite a4 alcalino 75g', 'resma papel sulfite a4', 'papel a4 75g'],
+  },
+  {
+    pattern: /\bcanetas?\b/i,
+    synonyms: ['caneta esferográfica', 'caneta escrita média'],
+  },
+  {
+    pattern: /\bteclados?\b/i,
+    synonyms: ['teclado usb abnt2', 'teclado para microcomputador'],
+  },
+  {
+    pattern: /\bmouses?\b/i,
+    synonyms: ['dispositivo apontador óptico', 'mouse óptico usb'],
+  },
+  {
+    pattern: /\bnobreaks?\b/i,
+    synonyms: ['fonte de alimentação ininterrupta', 'ups'],
+  },
+  {
+    pattern: /\bdisco\s+r[ií]gido\b|\bhd\s+externo\b/i,
+    synonyms: ['unidade de estado sólido ssd', 'unidade de armazenamento externa', 'ssd'],
+  },
+];
+
+export function getSynonymsForDemand(description: string, _catalogType: 'material' | 'service' = 'material'): string[] {
+  const clean = description.trim();
+  const synonyms: string[] = [];
+
+  for (const entry of OFFICIAL_SYNONYM_PATTERNS) {
+    if (entry.pattern.test(clean)) {
+      for (const syn of entry.synonyms) {
+        // Substitui o termo base na descrição original para manter qualificadores técnicos (ex.: "notebook i7 16gb" -> "computador portátil i7 16gb")
+        const substituted = clean.replace(entry.pattern, syn).trim();
+        if (substituted && substituted.toLowerCase() !== clean.toLowerCase() && !synonyms.includes(substituted)) {
+          synonyms.push(substituted);
+        }
+        // Adiciona também a forma canônica do sinônimo
+        if (!synonyms.includes(syn) && syn.toLowerCase() !== clean.toLowerCase()) {
+          synonyms.push(syn);
+        }
+      }
+    }
+  }
+
+  return synonyms.slice(0, 4);
+}
+
+export function mergeClarificationWithDemand(
+  originalDemand: ExtractedDemandItem,
+  clarificationText: string,
+): ExtractedDemandItem {
+  const cleanClarification = clarificationText.trim();
+  const parsedClarification = parseSingleDemandText(cleanClarification, originalDemand.itemNumber);
+  const explicitQuantity = cleanClarification.match(/(?:quantidade|qtd|quant\.?)\s*[:=]?\s*(\d+)|\b(\d+)\s*(?:unidades?|und|caixas?|pacotes?)\b/i);
+
+  const baseDesc = normalizeText(originalDemand.description);
+  const newDesc = normalizeText(cleanClarification);
+
+  let mergedDesc = cleanClarification;
+  if (!newDesc.includes(baseDesc) && !baseDesc.includes(newDesc)) {
+    mergedDesc = `${originalDemand.description} ${cleanClarification}`;
+  }
+
+  return {
+    ...originalDemand,
+    description: mergedDesc.trim(),
+    // Technical numbers (16 GB, 220 V, 12.000 BTU) never change the order quantity.
+    quantity: explicitQuantity && Number(explicitQuantity[1] || explicitQuantity[2]) > 0
+      ? Number(explicitQuantity[1] || explicitQuantity[2]) : originalDemand.quantity,
+    unit: /\b\d+\s*(?:unidades?|und|caixas?|pacotes?)\b/i.test(cleanClarification)
+      ? parsedClarification?.unit ?? originalDemand.unit : originalDemand.unit,
+  };
+}
 
 export function extractDemandItems(message: string): ExtractedDemandItem[] {
   const cleanMsg = message.trim();
@@ -231,11 +555,12 @@ function isServiceDescription(text: string): boolean {
 }
 
 function parseSingleDemandText(text: string, defaultNumber = '1'): ExtractedDemandItem | null {
+  const catalogMatch = text.match(/\b(CATMAT|CATSER)\s*[:#-]?\s*(\d{4,9})\b/i);
   let cleaned = text
-    .replace(/^(por\s+favor\s+)?(gostaria\s+de\s+)?(fazer\s+)?(uma\s+)?pesquis(ar|e|ando|a)?\s+(de\s+|os?\s+)?pre[çc]os?\s+(para|de|do|da)?\s*/i, '')
+    .replace(/^(por\s+favor\s+)?(gostaria\s+de\s+)?(fazer\s+)?(uma\s+)?(pesquis(ar|e|ando|a)|cot(ar|e|ando|a[çc][ãa]o))\s+(de\s+|os?\s+)?(pre[çc]os?\s+)?(para|de|do|da)?\s*/i, '')
     .replace(/^(quanto\s+custa|qual\s+(o\s+)?valor\s+estimado\s+(de|para|do|da)?)\s*/i, '')
-    .replace(/^cota[çc][ãa]o\s+(para|de|do|da)?\s*/i, '')
     .replace(/^aquisi[çc][ãa]o\s+(de|do|da)?\s*/i, '')
+    .replace(/^preciso\s+(cotar|pesquisar|comprar|adquirir)\s+/i, '')
     .trim();
 
   // Extract quantity and unit: e.g. "50 unidades de monitores..." or "20 cadeiras..." or "qtd: 10..."
@@ -243,7 +568,8 @@ function parseSingleDemandText(text: string, defaultNumber = '1'): ExtractedDema
   let unit = 'UN';
 
   const qtyMatch = cleaned.match(/(?:(?:quantidade|qtd|quant\.?)\s*[:=]?\s*(\d+))|^(?:(\d+)\s*(unidades?|und?|un|caixas?|cx|pct|pacotes?|servi[çc]os?|meses|horas?|h)?\s*(?:de\s+)?)/i);
-  if (qtyMatch) {
+  const startsWithTechnicalMeasure = /^\d+(?:[.,]\d+)?\s*(?:gb|tb|mb|btus?|v|w|kw|pol|polegadas?|cm|mm|kg|ml|g|l)\b/i.test(cleaned);
+  if (qtyMatch && !startsWithTechnicalMeasure) {
     const matchedQty = parseInt(qtyMatch[1] || qtyMatch[2] || '1', 10);
     if (!isNaN(matchedQty) && matchedQty > 0) {
       quantity = matchedQty;
@@ -268,7 +594,8 @@ function parseSingleDemandText(text: string, defaultNumber = '1'): ExtractedDema
     description: cleaned,
     quantity,
     unit,
-    catalogType: isServiceDescription(cleaned) ? 'service' : 'material',
+    catalogType: catalogMatch ? (catalogMatch[1].toUpperCase() === 'CATSER' ? 'service' : 'material') : isServiceDescription(cleaned) ? 'service' : 'material',
+    suggestedCatalogCode: catalogMatch?.[2],
   };
 }
 
@@ -682,6 +1009,161 @@ export function summarizePfs(sections: ContextSection[]) {
   };
 }
 
+export function extractPtresTarget(message: string): string | null {
+  const match = message.match(/\b(1\d{5}|2\d{5})\b/);
+  return match ? match[1] : null;
+}
+
+export type PtresReconciliationAnalysis = {
+  ptres: string;
+  planejadoSuap: number;
+  descentralizadoSiafi: number;
+  empenhadoSiafi: number;
+  saldoPlanejamentoSuap: number;
+  saldoRealSiafi: number;
+  situacaoGeral: 'REGULAR' | 'DESCOMPASSO_COM_SUAP' | 'DEFICIT_ORCAMENTARIO' | 'SUPERAVIT_SEM_EMPENHO';
+  divergenciasPi: Array<{
+    planoInterno: string;
+    planejado: number;
+    descentralizado: number;
+    empenhado: number;
+    saldoSuap: number;
+    saldoSiafi: number;
+    status: string;
+    observacao: string;
+  }>;
+  empenhosSemAtividadePlanejada: Array<{
+    numero: string;
+    descricao?: string;
+    planoInterno: string;
+    valor: number;
+  }>;
+  diagnostico: string;
+};
+
+export function reconcilePtresData(
+  ptres: string,
+  atividades: AtividadeRow[],
+  descentralizacoes: DescentralizacaoRow[],
+  empenhos: EmpenhoRow[]
+): PtresReconciliationAnalysis {
+  const cleanPtres = ptres.trim();
+  const ativs = atividades.filter((a) => String(a.origem_recurso || '').trim() === cleanPtres);
+  const descs = descentralizacoes.filter((d) => String(d.origem_recurso || '').trim() === cleanPtres);
+  const emps = empenhos.filter(
+    (e) => String(e.origem_recurso || '').trim() === cleanPtres && e.tipo !== 'rap'
+  );
+
+  const piSet = new Set<string>();
+  ativs.forEach((a) => piSet.add(String(a.plano_interno || 'SEM_PI').trim()));
+  descs.forEach((d) => piSet.add(String(d.plano_interno || 'SEM_PI').trim()));
+  emps.forEach((e) => piSet.add(String(e.plano_interno || 'SEM_PI').trim()));
+
+  let totalPlanejado = 0;
+  let totalDescentralizado = 0;
+  let totalEmpenhado = 0;
+
+  const divergenciasPi: PtresReconciliationAnalysis['divergenciasPi'] = [];
+  const empenhosSemAtividadePlanejada: PtresReconciliationAnalysis['empenhosSemAtividadePlanejada'] = [];
+
+  for (const pi of Array.from(piSet).sort()) {
+    const ativPi = ativs.filter((a) => String(a.plano_interno || 'SEM_PI').trim() === pi);
+    const descPi = descs.filter((d) => String(d.plano_interno || 'SEM_PI').trim() === pi);
+    const empPi = emps.filter((e) => String(e.plano_interno || 'SEM_PI').trim() === pi);
+
+    const planVal = ativPi.reduce((acc, a) => acc + toNumber(a.valor_total), 0);
+    const descVal = descPi.reduce((acc, d) => {
+      const v = toNumber(d.valor);
+      const op = String(d.operacao_tipo || '').toUpperCase();
+      const isEstorno = op.includes('ANULACAO') || op.includes('ESTORNO') || op.includes('DEVOLUCAO');
+      return isEstorno ? acc - v : acc + v;
+    }, 0);
+    const empVal = empPi.reduce((acc, e) => acc + toNumber(e.valor), 0);
+
+    totalPlanejado += planVal;
+    totalDescentralizado += descVal;
+    totalEmpenhado += empVal;
+
+    const saldoSuap = Number((planVal - empVal).toFixed(2));
+    const saldoSiafi = Number((descVal - empVal).toFixed(2));
+
+    let status = 'equilibrado';
+    let obs = '';
+
+    if (planVal === 0 && empVal > 0) {
+      status = 'sem_planejamento';
+      obs = `Empenho emitido (R$ ${empVal.toFixed(2)}) sem atividade planejada cadastrada no SUAP.`;
+      empPi.forEach((e) => {
+        empenhosSemAtividadePlanejada.push({
+          numero: String(e.numero || 'N/A'),
+          descricao: e.descricao || undefined,
+          planoInterno: pi,
+          valor: toNumber(e.valor),
+        });
+      });
+    } else if (saldoSuap < -0.01 && saldoSiafi >= 0) {
+      status = 'descompasso_planejamento_insuficiente';
+      obs = `Empenhado supera Planejado em R$ ${Math.abs(saldoSuap).toFixed(2)}, mas saldo real SIAFI está regular em R$ ${saldoSiafi.toFixed(2)}.`;
+      empPi.forEach((e) => {
+        empenhosSemAtividadePlanejada.push({
+          numero: String(e.numero || 'N/A'),
+          descricao: e.descricao || undefined,
+          planoInterno: pi,
+          valor: toNumber(e.valor),
+        });
+      });
+    } else if (saldoSiafi > 0.05) {
+      status = 'saldo_positivo_a_empenhar';
+      obs = `Saldo livre disponível para empenho no SIAFI: R$ ${saldoSiafi.toFixed(2)}.`;
+    }
+
+    divergenciasPi.push({
+      planoInterno: pi,
+      planejado: Number(planVal.toFixed(2)),
+      descentralizado: Number(descVal.toFixed(2)),
+      empenhado: Number(empVal.toFixed(2)),
+      saldoSuap,
+      saldoSiafi,
+      status,
+      observacao: obs,
+    });
+  }
+
+  const saldoPlanejamentoSuap = Number((totalPlanejado - totalEmpenhado).toFixed(2));
+  const saldoRealSiafi = Number((totalDescentralizado - totalEmpenhado).toFixed(2));
+
+  let situacaoGeral: PtresReconciliationAnalysis['situacaoGeral'] = 'REGULAR';
+  if (saldoRealSiafi < -0.01) {
+    situacaoGeral = 'DEFICIT_ORCAMENTARIO';
+  } else if (saldoPlanejamentoSuap < -0.01 && saldoRealSiafi >= 0) {
+    situacaoGeral = 'DESCOMPASSO_COM_SUAP';
+  } else if (saldoRealSiafi > 0.05) {
+    situacaoGeral = 'SUPERAVIT_SEM_EMPENHO';
+  }
+
+  let diagnostico = '';
+  if (situacaoGeral === 'DESCOMPASSO_COM_SUAP') {
+    diagnostico = `O PTRES ${cleanPtres} NÃO possui déficit contábil no SIAFI. O saldo real em conta é POSITIVO em R$ ${saldoRealSiafi.toFixed(2)}. O saldo negativo de R$ ${saldoPlanejamentoSuap.toFixed(2)} exibido no painel decorre exclusivamente da fórmula gerencial [Planejado SUAP - Empenhado SIAFI], pois foram emitidos empenhos com respaldo em Notas de Crédito reais da Reitoria que não constam com dotação suficiente nas atividades do Plano 8 do SUAP.`;
+  } else if (situacaoGeral === 'DEFICIT_ORCAMENTARIO') {
+    diagnostico = `Déficit orçamentário real no SIAFI: O total empenhado supera os créditos descentralizados líquidos recebidos no PTRES ${cleanPtres} em R$ ${Math.abs(saldoRealSiafi).toFixed(2)}.`;
+  } else {
+    diagnostico = `Situação regular para o PTRES ${cleanPtres}: Saldo real SIAFI de R$ ${saldoRealSiafi.toFixed(2)} e saldo SUAP de R$ ${saldoPlanejamentoSuap.toFixed(2)}.`;
+  }
+
+  return {
+    ptres: cleanPtres,
+    planejadoSuap: Number(totalPlanejado.toFixed(2)),
+    descentralizadoSiafi: Number(totalDescentralizado.toFixed(2)),
+    empenhadoSiafi: Number(totalEmpenhado.toFixed(2)),
+    saldoPlanejamentoSuap,
+    saldoRealSiafi,
+    situacaoGeral,
+    divergenciasPi,
+    empenhosSemAtividadePlanejada,
+    diagnostico,
+  };
+}
+
 export function buildGerencialAnalysis(message: string, sections: ContextSection[]): GerencialAnalysis {
   const intent = detectAssistantIntent(message);
   const descentralizacoes = summarizeDescentralizacoes(asRows<DescentralizacaoRow>(sections, 'descentralizacoes'));
@@ -693,6 +1175,34 @@ export function buildGerencialAnalysis(message: string, sections: ContextSection
   const empenhos = summarizeEmpenhos(asRows<EmpenhoRow>(sections, 'empenhos'));
   const creditos = summarizeCreditos(asRows<CreditoDisponivelRow>(sections, 'creditos_disponiveis'));
   const pfs = summarizePfs(sections);
+  const atividades = asRows<AtividadeRow>(sections, 'atividades');
+
+  const ptresTarget = extractPtresTarget(message);
+  const conciliacaoPtres = ptresTarget
+    ? reconcilePtresData(
+        ptresTarget,
+        atividades,
+        asRows<DescentralizacaoRow>(sections, 'descentralizacoes'),
+        asRows<EmpenhoRow>(sections, 'empenhos')
+      )
+    : undefined;
+
+  if (conciliacaoPtres) {
+    return {
+      intent: intent === 'geral' ? 'descentralizacoes' : intent,
+      summary: {
+        conciliacaoPtres,
+        descentralizacoes: descentralizacoes.summary,
+        empenhos: empenhos.summary,
+      },
+      evidence: {
+        conciliacaoPtres,
+        principaisDescentralizacoes: descentralizacoes.evidence.principaisLancamentos,
+        principaisEmpenhos: empenhos.evidence.principaisEmpenhos,
+      },
+      limitations: descentralizacoes.limitations,
+    };
+  }
 
   if (intent === 'descentralizacoes') {
     return { intent, ...descentralizacoes };

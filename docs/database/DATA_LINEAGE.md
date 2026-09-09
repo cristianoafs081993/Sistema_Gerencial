@@ -11,6 +11,13 @@ Mostrar a linhagem operacional dos dados de forma curta:
 
 ## Linhagens principais
 
+### Recorte por campus
+
+- preferência do usuário: `AuthContext` -> `user_campus_preferences` / RPC `set_user_campus_uasg` -> chaves de consulta do frontend
+- planejamento, empenhos, descentralizações e créditos: importação/sincronização -> `campus_uasg` -> `useDataQueries` -> Dashboard e telas orçamentárias
+- contratos Comprasnet: `sync-contratos-comprasnet` -> `contratos_api_campus_scope` por UASG, empenho ou fatura -> `contratosApiService` -> lista e detalhes de Contratos
+- ausência de lote no campus selecionado: estado de indisponibilidade orienta nova sincronização; não há cópia de dados de Currais Novos
+
 ### Orcamento base
 
 - entrada manual de atividades
@@ -111,9 +118,13 @@ Mostrar a linhagem operacional dos dados de forma curta:
     - `contratos_api_itens`
     - `contratos_api_fatura_itens`
     - `contratos_api_fatura_empenhos`
+    - `contratos_api_documentos`
+    - `contratos_api_compras_documentos`
+    - `contratos_api_recursos`
     - `contratos_api_sync_runs`
   - pagina: [Contratos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/Contratos.tsx)
 - observacao: a tela principal de contratos vem de `contratos_api` filtrada por `situacao_derivada = true`. A sincronizacao diaria busca UGs `158366` e `158155`; o endpoint de "ativos" do Comprasnet nao e confiavel sozinho, portanto a vigencia real e derivada do historico (`vigencia_fim_derivada` = maior `vigencia_fim` valida). Rescisao/cancelamento inativa o contrato; sem historico, `vigencia_fim` da listagem e fallback com motivo registrado. Como excecao para evitar falsos inativos por atraso no cadastro de aditivos, se a vigencia do historico estiver vencida mas o contrato constar como ativo no Comprasnet e possuir faturas emitidas ou pagas nos ultimos 120 dias, ele e reativado com o motivo `historico_vencido_com_fatura_recente`. Contratos da UG `158155` so entram com evidencia operacional estruturada do campus `158366`, como empenho ou fatura com UG/contratante do campus. Valor Total usa `contratos_api_historico` como fonte principal quando houver API, somando `valor_inicial` de cada termo; `valor_global` da API nao entra nessa metrica. Sem historico com `valor_inicial`, usa `contratos.valor` como fallback. A execucao por item soma faturas com situacao `Pago` ou `Siafi Apropriado` que tenham `dados_item_faturado`. O valor contratado por item no drawer soma `contratos_api_itens.historico_item[].valor_total` quando existir e cai para `contratos_api_itens.valor_total` sem historico do item. Em contratos, Valor Empenhado usa `contratos_api_empenhos.valor_empenhado` quando houver API, com fallback para o valor original do empenho local; os badges/popovers da lista principal mostram empenhos locais e completam com `contratos_api_empenhos` quando a API trouxer numeros ainda ausentes no vinculo local. Para RAP da API, `raw_data.rppago` e `raw_data.rpliquidado` alimentam o liquidado/pago de RAP, e o saldo atual vem de `rp_a_pagar` ou da diferenca derivada sobre a base RAP.
+  - compatibilidade de deploy: se as colunas complementares de faturas ou as tabelas de arquivos/recursos ainda estiverem em propagacao, a tela preserva a lista e os detalhes essenciais; os blocos opcionais ficam vazios ate a migration concluir. As quantidades de itens e de itens faturados usam cinco casas decimais e colunas `numeric(20,5)` para suportar o payload da API sem interromper a sincronizacao.
 
 ### Cache de liquidações Comprasnet por empenho
 
@@ -254,6 +265,21 @@ Mostrar a linhagem operacional dos dados de forma curta:
   - rota de reabertura: `/editor-documentos/:modelId?artifactId=<id>`
   - observacao: edicoes posteriores atualizam a versao aberta; uma nova geracao cria nova versao
 
+### Pesquisa de Precos e Base Local de Referencia
+
+- coleta e sincronizacao:
+  - fonte oficial: Compras.gov.br Dados Abertos (API `/modulo-contratacoes/2_consultarItensContratacoes_PNCP_14133`) e PNCP
+  - ingestao: Edge Function [sync-precos-referencia/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/sync-precos-referencia/index.ts)
+  - agendamento: `pg_cron` diário (`sync-precos-referencia-daily`) executando delta diário de 24h a 48h
+  - embeddings vetoriais: gerados via Google AI Studio Gemini API (`gemini-embedding-001`, dimensão 768)
+  - persistencia:
+    - `preco_referencia_itens`: cotações homologadas, metadados de órgão/fornecedor, `search_tsv` e coluna vetorial `embedding vector(768)`
+    - `preco_referencia_sync_runs`: controle de execução e métricas de sincronização
+- consulta e recuperacao híbrida:
+  - RPC SQL: `match_preco_referencia_hibrido`, combinando similaridade vetorial cosseno (50%), Full-Text Search em português (30%) e trigramas pg_trgm (20%)
+  - service frontend: [precoReferencia.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/precoReferencia.ts)
+  - consumidor conversacional: Edge Function [assistente-gerencial/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/assistente-gerencial/index.ts) consulta prioritariamente a base local antes de consultar APIs externas lentas
+
 ### Processos SUAP
 
 - entrada: HTML das caixas SUAP lido por `SuapSyncPanel` e `suapScraperService`
@@ -312,7 +338,7 @@ Mostrar a linhagem operacional dos dados de forma curta:
   - visualizacao da foto: URL assinada temporaria gerada pelo service
   - alerta do mapa: ocorrencias pendentes -> `ambiente_id` -> `manutencao_ambientes.bloco` -> `manutencao_blocos_mapa.nome`
   - observacao: o alerta pertence ao bloco exato do ambiente e nao depende de zona funcional
-  - consumo de insumos: `manutencao_checkin_materiais` e itens de `requisicao_compra_itens` de requisições não-rascunho -> view `manutencao_consumo_insumos` -> Dashboard de Insumos; requisições são posicionadas no ambiente `REFEITORIO` pela data `requisicoes_compra.consumo_iniciado_em`
+  - consumo de insumos: `manutencao_checkin_materiais` e itens de `requisicao_compra_itens` de requisições não-rascunho -> view `manutencao_consumo_insumos` (com projeção de `valor_unitario` e `valor_total`) -> Dashboard de Insumos (Card Valor Total Gasto e gráfico Valor Gasto com Insumos); requisições são posicionadas no ambiente `REFEITORIO` pela data `requisicoes_compra.consumo_iniciado_em`
 
 ### Retencoes FD-Reinf
 
@@ -381,3 +407,10 @@ Cadastros seguem inventoryService  operational_entities / measurement_units / ca
 - persistencia: resultado normalizado em `suap_document_reviews`, associado ao usuario, `suap_id` e `document_id`;
 - consulta: o icone de historico envia `reviewMode = latest` e carrega a ultima linha salva, sem solicitar o PDF novamente;
 - exportacao: o resultado exibido pode ser baixado em HTML ou impresso no navegador.
+
+## Documentos e instrumentos PNCP
+
+PNCP → sync-contratos-pncp-documentos → contratos_api_documentos e
+contratos_api_instrumentos_cobranca → ContratoApiDetailsSheet.
+O navegador solicita a atualização autenticada; não persiste respostas públicas
+diretamente. Falhas não avançam as datas de sucesso. Ver [operação](../ops/PNCP_CONTRACT_SYNC.md).

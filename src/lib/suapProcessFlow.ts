@@ -19,7 +19,7 @@ const tokens = (value: unknown) => normalize(value).split(/\s+/).filter((token) 
 
 export function getOrderedMappingNodes(mapping: ProcessMappingDefinition): ProcessMappingNode[] {
   return mapping.nodes
-    .filter((node) => !['start', 'end'].includes(node.type))
+    .filter((node) => ['task', 'subprocess', 'document'].includes(node.type) && node.flowRole !== 'exception')
     .slice()
     .sort((left, right) => left.position.x - right.position.x || left.position.y - right.position.y);
 }
@@ -34,7 +34,29 @@ function eventMatchesNode(event: SuapProcessRouteEvent, node: ProcessMappingNode
     .flatMap((value) => [normalize(value), ...tokens(value).filter((token) => token.length >= 4)])
     .filter(Boolean);
 
-  return candidates.some((candidate) => candidate.length >= 4 && eventText.includes(candidate));
+  if (candidates.some((candidate) => candidate.length >= 4 && eventText.includes(candidate))) return true;
+
+  return (node.routingAliases || []).some((alias) => {
+    const normalizedAlias = normalize(alias);
+    if (normalizedAlias.length < 2) return false;
+    return new RegExp(`(?:^| )${normalizedAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?: |$)`).test(eventText);
+  });
+}
+
+export function selectSuapProcessMapping<T extends Pick<ProcessMappingDefinition, 'id' | 'tags'>>(
+  mappings: T[],
+  options: { selectedMappingId?: string; assunto?: string } = {},
+): T | undefined {
+  const manuallySelected = mappings.find((mapping) => mapping.id === options.selectedMappingId);
+  if (manuallySelected) return manuallySelected;
+
+  const subject = normalize(options.assunto);
+  if (/\bbolsas?\b|\bbolsistas?\b/.test(subject)) {
+    return mappings.find((mapping) => mapping.id === 'liquidacao-pagamento-bolsas'
+      || mapping.tags?.some((tag) => normalize(tag) === 'bolsas')) || mappings[0];
+  }
+
+  return mappings.find((mapping) => mapping.id === 'liquidacao-pagamento-nota-fiscal') || mappings[0];
 }
 
 export function buildSuapProcessFlowSummary(

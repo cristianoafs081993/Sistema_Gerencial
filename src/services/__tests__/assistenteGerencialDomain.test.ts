@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  assessDemandClarity,
   buildGerencialAnalysis,
   calculateStatisticalSummary,
   detectAssistantIntent,
   extractDemandItems,
+  extractPtresTarget,
+  getSynonymsForDemand,
+  isPriceResearchClarification,
+  mergeClarificationWithDemand,
+  reconcilePtresData,
   summarizeContratos,
   summarizeDescentralizacoes,
+  type HistoryMessage,
 } from '../../../supabase/functions/assistente-gerencial/domain';
 
 describe('assistente-gerencial domain helpers', () => {
@@ -188,4 +195,159 @@ describe('assistente-gerencial domain helpers', () => {
     const item2 = extractDemandItems('gostaria de pesquisar o preco de cadeira escritorio giratoria');
     expect(item2[0].description).toContain('cadeira escritorio giratoria');
   });
+
+  it('avalia a clareza da demanda identificando itens vagos e formulando perguntas de esclarecimento', () => {
+    // 1. Demanda genérica de computadores sem CPU/RAM/armazenamento
+    const vaguePc = extractDemandItems('preciso cotar 10 computadores')[0];
+    const clarityPc = assessDemandClarity(vaguePc);
+    expect(clarityPc.isClear).toBe(false);
+    expect(clarityPc.category).toBe('computadores');
+    expect(clarityPc.missingAttributes).toBeDefined();
+    expect(clarityPc.suggestedQuestions?.length).toBeGreaterThan(0);
+    expect(clarityPc.quickOptions?.length).toBeGreaterThan(0);
+
+    // 2. Demanda genérica de cadeiras sem especificação ergonômica
+    const vagueChair = extractDemandItems('pesquisa de preco de 20 cadeiras')[0];
+    const clarityChair = assessDemandClarity(vagueChair);
+    expect(clarityChair.isClear).toBe(false);
+    expect(clarityChair.category).toBe('mobiliario');
+    expect(clarityChair.suggestedQuestions?.length).toBeGreaterThan(0);
+
+    // 3. Demanda de ar-condicionado sem BTUs
+    const vagueAc = extractDemandItems('cotar 4 aparelhos de ar-condicionado')[0];
+    const clarityAc = assessDemandClarity(vagueAc);
+    expect(clarityAc.isClear).toBe(false);
+    expect(clarityAc.category).toBe('climatizacao');
+
+    // 4. Demanda de projetor sem luminosidade (lúmens)
+    const vagueProj = extractDemandItems('pesquisa de 2 projetores datashow')[0];
+    const clarityProj = assessDemandClarity(vagueProj);
+    expect(clarityProj.isClear).toBe(false);
+    expect(clarityProj.category).toBe('audiovisual');
+
+    // 5. Demanda clara com especificação técnica completa
+    const clearPc = extractDemandItems('cotar 15 notebooks Intel Core i7 16GB SSD 512GB tela 15.6')[0];
+    const clarityClearPc = assessDemandClarity(clearPc);
+    expect(clarityClearPc.isClear).toBe(true);
+
+    const clearChair = extractDemandItems('cotar 30 cadeiras giratorias ergonomicas padrao NR-17 com bracos regulaveis')[0];
+    const clarityClearChair = assessDemandClarity(clearChair);
+    expect(clarityClearChair.isClear).toBe(true);
+  });
+
+  it('expande termos de busca por sinonimos oficiais para ampliar a amostra no PNCP', () => {
+    const synNotebook = getSynonymsForDemand('notebook');
+    expect(synNotebook).toEqual(expect.arrayContaining(['computador portátil', 'laptop']));
+
+    const synDesktop = getSynonymsForDemand('computador desktop');
+    expect(synDesktop.some((s) => s.includes('microcomputador') || s.includes('estação de trabalho'))).toBe(true);
+
+    const synCadeira = getSynonymsForDemand('cadeiras de escritorio');
+    expect(synCadeira.some((s) => s.includes('giratória') || s.includes('poltrona'))).toBe(true);
+
+    const synProjetor = getSynonymsForDemand('projetor');
+    expect(synProjetor.some((s) => s.includes('multimídia') || s.includes('datashow'))).toBe(true);
+
+    const synCabo = getSynonymsForDemand('cabos de rede');
+    expect(synCabo.some((s) => s.includes('patch cord') || s.includes('utp'))).toBe(true);
+  });
+
+  it('detecta intencao de pesquisa_precos ao receber resposta a pergunta de esclarecimento', () => {
+    const history: HistoryMessage[] = [
+      { role: 'user', content: 'pesquisa de preco de 10 computadores' },
+      {
+        role: 'assistant',
+        content: 'Para uma pesquisa de preco conforme a IN 65/2021, esclareca a configuracao: qual o processador e memoria RAM? ||SUGESTOES|| - Notebook i5 16GB SSD 512GB',
+      },
+    ];
+
+    expect(isPriceResearchClarification(history[1].content)).toBe(true);
+
+    // Resposta curta do usuário que normalmente seria classificada como 'geral'
+    const userClarification = 'Processador Core i5 16GB de RAM e SSD 512GB';
+    const detected = detectAssistantIntent(userClarification, history);
+    expect(detected).toBe('pesquisa_precos');
+  });
+
+  it('funde a resposta de esclarecimento com a demanda original', () => {
+    const originalDemand = extractDemandItems('pesquisar 10 computadores')[0];
+    expect(originalDemand.quantity).toBe(10);
+
+    const merged = mergeClarificationWithDemand(
+      originalDemand,
+      'Notebook Intel Core i5 16GB RAM SSD 512GB',
+    );
+
+    expect(merged.quantity).toBe(10);
+    expect(merged.description.toLowerCase()).toContain('intel core i5');
+    expect(merged.description.toLowerCase()).toContain('16gb');
+  });
+
+  it('extrai codigo de PTRES da mensagem do usuario', () => {
+    expect(extractPtresTarget('me ajude a entender pq o ptres 231798 esta negativo')).toBe('231798');
+    expect(extractPtresTarget('verificar saldo da origem 198307')).toBe('198307');
+    expect(extractPtresTarget('quanto foi gasto com limpeza?')).toBeNull();
+  });
+
+  it('reconcilia com exatidao o caso do PTRES 231798 separando SUAP e SIAFI', () => {
+    const atividades = [
+      { origem_recurso: '231798', plano_interno: 'CAPACITA', valor_total: 15000 },
+      { origem_recurso: '231798', plano_interno: 'LABS', valor_total: 41226.53 },
+      { origem_recurso: '231798', plano_interno: 'INTERSEC', valor_total: 837.50 },
+    ];
+    const descentralizacoes = [
+      { origem_recurso: '231798', plano_interno: 'L21B3P19ENN', valor: 1000, operacao_tipo: 'DESCENTRALIZACAO DE CREDITO' },
+      { origem_recurso: '231798', plano_interno: 'LABS', valor: 41226.53, operacao_tipo: 'DESCENTRALIZACAO DE CREDITO' },
+      { origem_recurso: '231798', plano_interno: 'CAPACITA', valor: 15000, operacao_tipo: 'DESCENTRALIZACAO DE CREDITO' },
+      { origem_recurso: '231798', plano_interno: 'INTERSEC', valor: 837.50, operacao_tipo: 'DESCENTRALIZACAO DE CREDITO' },
+    ];
+    const empenhos = [
+      { origem_recurso: '231798', plano_interno: 'L21B3P19ENN', numero: '2026NE000072', valor: 1000, tipo: 'exercicio' },
+      { origem_recurso: '231798', plano_interno: 'LABS', numero: '2026NE000010', valor: 41226.53, tipo: 'exercicio' },
+      { origem_recurso: '231798', plano_interno: 'CAPACITA', numero: '2026NE000020', valor: 15000, tipo: 'exercicio' },
+    ];
+
+    const result = reconcilePtresData('231798', atividades, descentralizacoes, empenhos);
+
+    expect(result.ptres).toBe('231798');
+    expect(result.planejadoSuap).toBe(57064.03);
+    expect(result.descentralizadoSiafi).toBe(58064.03);
+    expect(result.empenhadoSiafi).toBe(57226.53);
+    expect(result.saldoPlanejamentoSuap).toBe(-162.50);
+    expect(result.saldoRealSiafi).toBe(837.50);
+    expect(result.situacaoGeral).toBe('DESCOMPASSO_COM_SUAP');
+    expect(result.empenhosSemAtividadePlanejada[0].numero).toBe('2026NE000072');
+    expect(result.diagnostico).toContain('NÃO possui déficit contábil no SIAFI');
+    expect(result.diagnostico).toContain('POSITIVO em R$ 837.50');
+  });
+
+  it('integra conciliacaoPtres dentro de buildGerencialAnalysis quando mensagem contem PTRES', () => {
+    const analysis = buildGerencialAnalysis('por que o ptres 231798 esta negativo?', [
+      {
+        label: 'atividades',
+        count: 1,
+        rows: [{ origem_recurso: '231798', plano_interno: 'TESTE', valor_total: 100 }],
+      },
+      {
+        label: 'descentralizacoes',
+        count: 1,
+        rows: [{ origem_recurso: '231798', plano_interno: 'TESTE', valor: 200, operacao_tipo: 'DESCENTRALIZACAO' }],
+      },
+      {
+        label: 'empenhos',
+        count: 1,
+        rows: [{ origem_recurso: '231798', plano_interno: 'TESTE', valor: 150, tipo: 'exercicio' }],
+      },
+    ]);
+
+    expect(analysis.summary.conciliacaoPtres).toBeDefined();
+    const conc = analysis.summary.conciliacaoPtres as any;
+    expect(conc.ptres).toBe('231798');
+    expect(conc.planejadoSuap).toBe(100);
+    expect(conc.descentralizadoSiafi).toBe(200);
+    expect(conc.empenhadoSiafi).toBe(150);
+    expect(conc.saldoRealSiafi).toBe(50);
+    expect(conc.saldoPlanejamentoSuap).toBe(-50);
+  });
 });
+

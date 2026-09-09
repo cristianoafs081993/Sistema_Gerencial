@@ -52,6 +52,7 @@ const DashboardCloudscapePreview = lazy(() => import('./pages/DashboardCloudscap
 const ManutencaoAdmin = lazy(() => import('./pages/ManutencaoAdmin'));
 const ImportacaoDados = lazy(() => import('./pages/ImportacaoDados'));
 const Almoxarifado = lazy(() => import('./pages/Almoxarifado'));
+const RefeitorioInsumos = lazy(() => import('./pages/RefeitorioInsumos'));
 const ControleOrgaos = lazy(() => import('./pages/ControleOrgaos'));
 const AuditLog = lazy(() => import('./pages/AuditLog'));
 const PublicFeedback = lazy(() => import('./pages/PublicFeedback'));
@@ -125,6 +126,9 @@ const App = () => (
                   <Route path="/empenhos" element={<Empenhos />} />
                   <Route path="/contratos" element={<Contratos />} />
                   <Route path="/requisicao-compra" element={<RequisicaoCompra />} />
+                  <Route path="/refeitorio" element={<Navigate replace to="/requisicao-compra" />} />
+                  <Route path="/refeitorio/requisicoes" element={<Navigate replace to="/requisicao-compra" />} />
+                  <Route path="/refeitorio/insumos" element={<RefeitorioInsumos />} />
                   <Route path="/cadastro-terceirizados" element={<CadastroTerceirizados />} />
                   <Route path="/liquidacoes-pagamentos" element={<LiquidacoesPagamentos />} />
                   <Route path="/liquidacoes-pagamento" element={<Navigate replace to="/liquidacoes-pagamentos" />} />

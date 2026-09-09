@@ -1,6 +1,6 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import ManutencaoAdmin from '@/pages/ManutencaoAdmin';
+import ManutencaoAdmin, { formatMaterialDisplayName, getMaterialCategory } from '@/pages/ManutencaoAdmin';
 import { manutencaoService } from '@/services/manutencao';
 
 vi.mock('sonner', () => ({
@@ -34,16 +34,27 @@ vi.mock('@/services/manutencao', () => ({
 
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  AreaChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  BarChart: ({ children, layout, data }: { children: React.ReactNode; layout?: string; data?: any[] }) => (
+    <div data-testid="bar-chart" data-layout={layout} data-items-count={data?.length}>
+      {children}
+    </div>
+  ),
+  AreaChart: ({ children, data }: { children: React.ReactNode; data?: any[] }) => (
+    <div data-testid="area-chart" data-items-count={data?.length}>
+      {children}
+    </div>
+  ),
   PieChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   XAxis: () => null,
   YAxis: () => null,
   CartesianGrid: () => null,
   Tooltip: () => null,
-  Legend: () => null,
-  Bar: () => null,
-  Area: () => null,
+  Bar: ({ dataKey, name }: { dataKey?: string; name?: string }) => (
+    <div data-testid="bar-curve" data-key={dataKey} data-name={name} />
+  ),
+  Area: ({ dataKey, name }: { dataKey?: string; name?: string }) => (
+    <div data-testid="area-curve" data-key={dataKey} data-name={name} />
+  ),
   Pie: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   Cell: () => null,
 }));
@@ -155,6 +166,8 @@ const mockConsumosInsumos = [
     material: 'Arroz parboilizado',
     quantidade: 12.5,
     unidade: 'KG',
+    valor_unitario: 4.5,
+    valor_total: 56.25,
     requisicao_compra_id: 'req-1',
     requisicao_numero: 'REQ-2026-0001',
     requisicao_status: 'enviada_fornecedor' as const,
@@ -203,13 +216,13 @@ describe('ManutencaoAdmin', () => {
     fireEvent.click(insumosRadio);
 
     // KPIs do modo Insumos
-    expect(screen.getByText('Limpezas Registradas')).toBeInTheDocument();
-    expect(screen.getByText('Consumo Total de Insumos')).toBeInTheDocument();
-    expect(screen.getByText('Média por Registro')).toBeInTheDocument();
+    expect(screen.getByText('Total de Requisições')).toBeInTheDocument();
+    expect(screen.getByText('Valor Total Gasto')).toBeInTheDocument();
+    expect(screen.queryByText('Média por Registro')).not.toBeInTheDocument();
 
     // Gráficos e Rankings de Insumos
-    expect(screen.getByText('Evolução Temporal de Limpezas')).toBeInTheDocument();
-    expect(screen.getByText('Evolução Temporal de Insumos')).toBeInTheDocument();
+    expect(screen.getByText('Distribuição por Categoria')).toBeInTheDocument();
+    expect(screen.getByText('Valor Gasto com Insumos')).toBeInTheDocument();
     expect(screen.getByText('Consumo Geral de Insumos')).toBeInTheDocument();
     expect(screen.getByText('Top 5 Ambientes em Consumo de Insumos')).toBeInTheDocument();
 
@@ -340,13 +353,14 @@ describe('ManutencaoAdmin', () => {
     await waitFor(() => {
       expect(screen.getByText('Arroz parboilizado')).toBeInTheDocument();
       expect(screen.getAllByText('Refeitório').length).toBeGreaterThan(0);
-      expect(screen.getByText('Requisição de compra')).toBeInTheDocument();
+      expect(screen.getByText('Enviada ao fornecedor')).toBeInTheDocument();
+      expect(screen.queryByText('Requisição de compra')).not.toBeInTheDocument();
       expect(screen.getByText(/12\.5 KG/)).toBeInTheDocument();
       expect(screen.getByText(/REQ-2026-0001/)).toBeInTheDocument();
     });
   });
 
-  it('não exibe o histórico de limpezas como aba primária e abre o modal ao clicar em Detalhar no gráfico de limpezas', async () => {
+  it('não exibe o histórico de limpezas como aba primária e abre o modal de detalhamento de insumos ao clicar em Detalhar', async () => {
     render(
       <MemoryRouter>
         <ManutencaoAdmin />
@@ -361,16 +375,182 @@ describe('ManutencaoAdmin', () => {
     expect(screen.queryByRole('button', { name: /Histórico de Limpezas/ })).not.toBeInTheDocument();
 
     // Alterna para a visão de Insumos onde estão os gráficos operacionais
-    fireEvent.click(screen.getByText('Insumos'));
+    const insumosRadio = screen.getByDisplayValue('insumos');
+    fireEvent.change(insumosRadio, { target: { checked: true } });
+    fireEvent.click(insumosRadio);
 
-    // Clica no primeiro botão de Detalhar (Gráfico de Limpezas)
+    await waitFor(() => {
+      expect(screen.getByText('Distribuição por Categoria')).toBeInTheDocument();
+    });
+
+    // Clica no primeiro botão de Detalhar (Gráfico de Distribuição por Categoria)
     const detalharBtns = screen.getAllByRole('button', { name: /Detalhar/i });
     fireEvent.click(detalharBtns[0]);
 
-    // Deve abrir o modal de Detalhamento de Limpezas Realizadas
+    // Deve abrir o modal de Detalhamento de Consumo de Insumos
     await waitFor(() => {
-      expect(screen.getByText('Detalhamento de Limpezas Realizadas')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('Buscar por ambiente, responsável, material...')).toBeInTheDocument();
+      expect(screen.getByText('Detalhamento de Consumo de Insumos')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Buscar por ambiente, código, bloco...')).toBeInTheDocument();
     });
+  });
+
+  it('classifica corretamente materiais em categorias com getMaterialCategory', () => {
+    expect(getMaterialCategory('papel_higienico')).toBe('Higiene e Limpeza');
+    expect(getMaterialCategory('saco_lixo')).toBe('Higiene e Limpeza');
+    expect(getMaterialCategory('00020 - Fruta - apresentacao: natural, tipo: laranja pera')).toBe('Frutas');
+    expect(getMaterialCategory('00035 - Polpa De Fruta - apresentacao: congelada, tipo: goiaba vermelha')).toBe('Polpas de Frutas');
+    expect(getMaterialCategory('00007 - Legume In Natura - tipo: batata doce')).toBe('Legumes e Verduras');
+    expect(getMaterialCategory('00021 - Leite Fluido - integral')).toBe('Laticínios');
+    expect(getMaterialCategory('00046 - Queijo - manteiga')).toBe('Laticínios');
+    expect(getMaterialCategory('00038 - Bolo Alimenticio - sabor: trigo')).toBe('Panificação e Confeitaria');
+  });
+
+  it('formata nomes longos e técnicos de insumos com formatMaterialDisplayName', () => {
+    expect(formatMaterialDisplayName('papel_higienico')).toBe('Papel Higiênico (rolos)');
+    expect(formatMaterialDisplayName('sabonete_liquido')).toBe('Sabonete Líquido (L)');
+    expect(
+      formatMaterialDisplayName('00020 - Fruta - apresentacao: natural, tipo: laranja pera')
+    ).toBe('Fruta: Laranja pera');
+    expect(
+      formatMaterialDisplayName('00037 - Polpa De Fruta - sabor: maracuja')
+    ).toBe('Polpa: Maracuja');
+    expect(
+      formatMaterialDisplayName('00010 - Legume In Natura - variedade: batata inglesa')
+    ).toBe('Legume: Batata inglesa');
+    expect(
+      formatMaterialDisplayName('00015 - Desinfetante hospitalar')
+    ).toBe('Desinfetante hospitalar');
+    expect(formatMaterialDisplayName('')).toBe('Insumo');
+  });
+
+  it('exibe gráfico de insumos com layout vertical e suporte a alternância Top 8 / Todos quando há mais de 8 materiais', async () => {
+    // 10 materiais diferentes distribuídos
+    const mockConsumos10 = [
+      { material: '00020 - Fruta - tipo: laranja pera', quantidade: 25 },
+      { material: '00037 - Polpa De Fruta - sabor: maracuja', quantidade: 20 },
+      { material: '00010 - Legume In Natura - variedade: batata', quantidade: 18 },
+      { material: 'papel_higienico', quantidade: 15 },
+      { material: 'sabonete_liquido', quantidade: 12 },
+      { material: 'papel_toalha', quantidade: 10 },
+      { material: 'saco_lixo', quantidade: 8 },
+      { material: '00045 - Detergente neutro', quantidade: 7 },
+      { material: '00050 - Esponja multiuso', quantidade: 5 },
+      { material: '00060 - Álcool em gel 70%', quantidade: 3 },
+    ].map((item, idx) => ({
+      id: `consumo-${idx}`,
+      origem: 'checkin' as const,
+      consumo_em: new Date().toISOString(),
+      ambiente_id: 'amb-1',
+      ambiente_nome: 'Sala 101 - Informática',
+      ambiente_codigo: 'SALA-101',
+      ambiente_bloco: 'Bloco Acadêmico Central',
+      material: item.material,
+      quantidade: item.quantidade,
+      unidade: 'UN',
+    }));
+
+    vi.mocked(manutencaoService.getConsumosInsumos).mockResolvedValue(mockConsumos10);
+
+    render(
+      <MemoryRouter>
+        <ManutencaoAdmin />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('insumos')).toBeInTheDocument();
+    });
+
+    const insumosRadio = screen.getByDisplayValue('insumos');
+    fireEvent.change(insumosRadio, { target: { checked: true } });
+    fireEvent.click(insumosRadio);
+
+    await waitFor(() => {
+      expect(screen.getByText('Consumo Geral de Insumos')).toBeInTheDocument();
+    });
+
+    // O gráfico de barras de consumo geral deve ter layout vertical
+    const barCharts = screen.getAllByTestId('bar-chart');
+    const barChart = barCharts.find((el) => el.getAttribute('data-layout') === 'vertical')!;
+    expect(barChart).toBeDefined();
+    expect(barChart).toHaveAttribute('data-layout', 'vertical');
+
+    // Com 10 materiais, deve exibir os botões de alternância Top 8 e Todos (10)
+    expect(screen.getByRole('button', { name: 'Top 8' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Todos \(10\)/i })).toBeInTheDocument();
+
+    // No modo padrão Top 8, exibe 8 itens no gráfico
+    expect(barChart).toHaveAttribute('data-items-count', '8');
+
+    // Alterna para 'Todos (10)'
+    fireEvent.click(screen.getByRole('button', { name: /Todos \(10\)/i }));
+    expect(barChart).toHaveAttribute('data-items-count', '10');
+
+    // Retorna para 'Top 8'
+    fireEvent.click(screen.getByRole('button', { name: 'Top 8' }));
+    expect(barChart).toHaveAttribute('data-items-count', '8');
+  });
+
+  it('exibe o card de Valor Total Gasto e o gráfico de Valor Gasto com Insumos com a métrica de valor gasto', async () => {
+    const mockConsumoValor = [
+      {
+        id: 'consumo-val-1',
+        origem: 'requisicao_compra' as const,
+        consumo_em: new Date().toISOString(),
+        ambiente_id: 'amb-1',
+        ambiente_nome: 'Refeitório',
+        ambiente_codigo: 'REFEITORIO',
+        ambiente_bloco: 'Refeitório',
+        material: 'Fruta',
+        quantidade: 10,
+        unidade: 'KG',
+        valor_unitario: 5.5,
+        valor_total: 55.0,
+        requisicao_compra_id: 'req-val',
+        requisicao_numero: 'REQ-VAL-1',
+        requisicao_status: 'enviada_fornecedor' as const,
+      },
+    ];
+
+    vi.mocked(manutencaoService.getConsumosInsumos).mockResolvedValue(mockConsumoValor);
+
+    render(
+      <MemoryRouter>
+        <ManutencaoAdmin />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('insumos')).toBeInTheDocument();
+    });
+
+    const insumosRadio = screen.getByDisplayValue('insumos');
+    fireEvent.change(insumosRadio, { target: { checked: true } });
+    fireEvent.click(insumosRadio);
+
+    await waitFor(() => {
+      expect(screen.getByText('Valor Total Gasto')).toBeInTheDocument();
+    });
+
+    // Valida o card de Total de Requisições e a remoção de Média por Registro
+    expect(screen.getByText('Total de Requisições')).toBeInTheDocument();
+    expect(screen.queryByText('Média por Registro')).not.toBeInTheDocument();
+
+    // Valida que o valor formatado em R$ é exibido no card e na legenda
+    const currencyMatches = screen.getAllByText(/R\$\s*55,00/);
+    expect(currencyMatches.length).toBeGreaterThanOrEqual(1);
+
+    // Valida a presença de Distribuição por Categoria e ausência de Evolução de Limpezas
+    expect(screen.getByText('Distribuição por Categoria')).toBeInTheDocument();
+    expect(screen.queryByText('Evolução Temporal de Limpezas')).not.toBeInTheDocument();
+
+    // Valida o subtítulo da evolução temporal de insumos
+    expect(screen.getByText('Valor diário gasto com materiais e insumos repostos.')).toBeInTheDocument();
+
+    // Valida que a barra do gráfico de evolução de insumos consome a chave 'valor'
+    const barCurves = screen.getAllByTestId('bar-curve');
+    const valorCurve = barCurves.find((el) => el.getAttribute('data-key') === 'valor');
+    expect(valorCurve).toBeDefined();
+    expect(valorCurve).toHaveAttribute('data-name', 'Valor Gasto');
   });
 });

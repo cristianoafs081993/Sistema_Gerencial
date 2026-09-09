@@ -13,6 +13,7 @@ import {
   Plus,
   Pencil,
   Printer,
+  Search,
   Send,
   ShieldCheck,
   Trash2,
@@ -44,7 +45,7 @@ import { useData } from '@/contexts/DataContext';
 import { getAuthUserMatricula, permissionMatchesAuthUser } from '@/lib/terceirizadoIdentity';
 import { formatCurrency, formatarDocumento } from '@/lib/utils';
 import { contratosApiService, LIQUIDACOES_CACHE_UPDATED_EVENT } from '@/services/contratosApi';
-import { transparenciaService, type PortalTransparenciaItemEmpenho } from '@/services/transparencia';
+import { transparenciaService, normalizeEmpenhoNumero, type PortalTransparenciaItemEmpenho } from '@/services/transparencia';
 import { requisicoesCompraService } from '@/services/requisicoesCompra';
 import type { RequisicaoCompra, RequisicaoCompraItem, RequisicaoCompraRecord } from '@/types';
 import { getEmpenhoAvailableBalance } from '@/utils/empenhoBalance';
@@ -59,7 +60,7 @@ import { filterAndRankRequisicaoEmpenhos } from '@/utils/requisicaoEmpenhoSelect
 const STATUS_META: Record<string, { label: string; className: string }> = {
   draft: { label: 'Rascunho', className: 'border-slate-300 bg-slate-100 text-slate-700' },
   enviada_fornecedor: { label: 'Enviada ao Fornecedor', className: 'border-amber-300 bg-amber-50 text-amber-800' },
-  liquidada: { label: 'Encaminhado para pagamento', className: 'border-emerald-300 bg-emerald-50 text-emerald-800' },
+  liquidada: { label: 'Enviada para Pagamento', className: 'border-emerald-300 bg-emerald-50 text-emerald-800' },
   review: { label: 'Enviada ao Fornecedor', className: 'border-amber-300 bg-amber-50 text-amber-800' },
   approved: { label: 'Enviada ao Fornecedor', className: 'border-amber-300 bg-amber-50 text-amber-800' },
   rejected: { label: 'Rascunho', className: 'border-slate-300 bg-slate-100 text-slate-700' },
@@ -183,6 +184,40 @@ export default function RequisicaoCompraPage() {
     return map;
   }, [requisicoes, editingRequisicaoId]);
 
+  // Total retido / comprometido por item da NE em requisições com status 'enviada_fornecedor' (excluindo requisição em edição)
+  const enviadoFornecedorTotalByItemKey = useMemo(() => {
+    const map = new Map<string, number>();
+
+    requisicoes.forEach((req) => {
+      const isEnviada = req.status === 'enviada_fornecedor' || req.status === 'review' || req.status === 'approved';
+      if (!isEnviada) return;
+      if (editingRequisicaoId && req.id === editingRequisicaoId) return;
+
+      if (req.items && req.items.length > 0) {
+        req.items.forEach((item) => {
+          const itemValue = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
+          if (itemValue <= 0) return;
+
+          if (item.sourceItemKey) {
+            const key = item.sourceItemKey.trim().toLowerCase();
+            map.set(key, (map.get(key) ?? 0) + itemValue);
+          }
+
+          const empNumero = item.empenhoNumero || req.empenhoNumero;
+          if (empNumero && item.description) {
+            const cleanDesc = item.description.replace(/^item\s+compra\s*:\s*/i, '').trim().toLowerCase();
+            const descKey = `${normalizeEmpenhoNumero(empNumero)}|${cleanDesc}`;
+            if (!item.sourceItemKey) {
+              map.set(descKey, (map.get(descKey) ?? 0) + itemValue);
+            }
+          }
+        });
+      }
+    });
+
+    return map;
+  }, [requisicoes, editingRequisicaoId]);
+
   const selectedEmpenhos = useMemo(
     () => selectedEmpenhoIds
       .map((id) => empenhos.find((empenho) => empenho.id === id))
@@ -208,20 +243,6 @@ export default function RequisicaoCompraPage() {
     );
   }, [officialBalanceByEmpenhoId, enviadoFornecedorTotalByEmpenhoId, selectedEmpenhos]);
 
-  const selectedEmpenhoOptions = useMemo(() => {
-    const selectedIds = new Set(selectedEmpenhoIds);
-    return selectedEmpenhos
-      .filter((empenho) => selectedIds.has(empenho.id))
-      .map((empenho) => {
-        const effective = empenhoBalanceById.get(empenho.id) ?? getEmpenhoAvailableBalance(empenho);
-        const enviado = enviadoFornecedorTotalByEmpenhoId.get(empenho.id) ?? 0;
-        const extra = enviado > 0 ? ` (disp. c/ desconto de enviadas)` : '';
-        return {
-          id: empenho.id,
-          label: `${empenho.numero} - saldo ${formatCurrency(effective)}${extra}`,
-        };
-      });
-  }, [selectedEmpenhos, selectedEmpenhoIds, empenhoBalanceById, enviadoFornecedorTotalByEmpenhoId]);
 
 
   const filteredEmpenhos = useMemo(
@@ -287,11 +308,12 @@ export default function RequisicaoCompraPage() {
           empenho.numero,
           (portalEmpenhoItemQueries[index]?.data ?? []) as PortalTransparenciaItemEmpenho[],
           liquidacoesEmpenhoQueries[index]?.data ?? [],
+          enviadoFornecedorTotalByItemKey,
         ),
       );
     });
     return map;
-  }, [liquidacoesEmpenhoQueries, portalEmpenhoItemQueries, selectedEmpenhos]);
+  }, [liquidacoesEmpenhoQueries, portalEmpenhoItemQueries, selectedEmpenhos, enviadoFornecedorTotalByItemKey]);
 
   useEffect(() => {
     if (!isEditing || editingRequisicaoId || pendingAutoFillEmpenhoIds.length === 0) return;
@@ -401,14 +423,20 @@ export default function RequisicaoCompraPage() {
     return items
       .map((item, index) => {
         const isBalanceReady = item.empenhoId ? empenhoItemBalanceReadyById.get(item.empenhoId) === true : false;
-        const available = isBalanceReady ? getRequisicaoItemAvailableBalance(item, item.empenhoId ? empenhoItemBalancesById.get(item.empenhoId) ?? [] : []) : null;
+        const available = isBalanceReady
+          ? getRequisicaoItemAvailableBalance(
+              item,
+              item.empenhoId ? empenhoItemBalancesById.get(item.empenhoId) ?? [] : [],
+              enviadoFornecedorTotalByItemKey,
+            )
+          : null;
         const requested = item.quantity * item.unitPrice;
         return available !== null && requested > available
           ? { index, description: item.description, requested, available }
           : null;
       })
       .filter((item): item is { index: number; description: string; requested: number; available: number } => Boolean(item));
-  }, [empenhoItemBalanceReadyById, empenhoItemBalancesById, items]);
+  }, [empenhoItemBalanceReadyById, empenhoItemBalancesById, items, enviadoFornecedorTotalByItemKey]);
 
   const requisicaoTotalByEmpenhoId = useMemo(() => {
     const totals = new Map<string, number>();
@@ -547,7 +575,7 @@ export default function RequisicaoCompraPage() {
       if (status === 'enviada_fornecedor' || status === 'review') {
         successMessage = 'Requisição enviada ao fornecedor com sucesso.';
       } else if (status === 'liquidada') {
-        successMessage = 'Requisição encaminhada para pagamento com sucesso.';
+        successMessage = 'Requisição enviada para pagamento com sucesso.';
       }
       toast.success(successMessage, { id: loadingToast });
       setIsEditing(false);
@@ -564,7 +592,7 @@ export default function RequisicaoCompraPage() {
     }
   };
 
-  // Change Status (Rascunho <-> Enviada ao Fornecedor <-> Liquidada)
+  // Change Status (Rascunho <-> Enviada ao Fornecedor <-> Enviada para Pagamento)
   const handleChangeStatus = async (requisicaoId: string, status: RequisicaoCompra['status']) => {
     const targetStatusLabel = STATUS_META[status]?.label || status;
     const loadingToast = toast.loading(`Alterando situação para "${targetStatusLabel}"...`);
@@ -909,23 +937,6 @@ export default function RequisicaoCompraPage() {
                     </Command>
                   </PopoverContent>
                 </Popover>
-                {selectedEmpenhoOptions.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5" aria-label="Empenhos selecionados">
-                    {selectedEmpenhoOptions.map((option) => (
-                      <Badge key={option.id} variant="secondary" className="max-w-full gap-1 pr-1">
-                        <span className="max-w-[22rem] truncate" title={option.label}>{option.label}</span>
-                        <button
-                          type="button"
-                          className="rounded-full p-0.5 hover:bg-surface-hover"
-                          aria-label={`Remover ${option.label}`}
-                          onClick={() => handleRemoveSelectedEmpenho(option.id)}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                ) : null}
               </div>
             </div>
 
@@ -969,25 +980,37 @@ export default function RequisicaoCompraPage() {
                             <p className="text-xs text-text-muted mt-0.5">{empenho.favorecidoNome}</p>
                           ) : null}
                         </div>
-                        <div className={`grid gap-3 text-right text-sm ${enviadoFornecedorTotal > 0 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
-                          {enviadoFornecedorTotal > 0 && (
+                        <div className="flex items-center gap-3">
+                          <div className={`grid gap-3 text-right text-sm ${enviadoFornecedorTotal > 0 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
+                            {enviadoFornecedorTotal > 0 && (
+                              <div>
+                                <p className="text-text-muted text-xs">Saldo oficial (SIAFI)</p>
+                                <p className="font-mono text-xs font-semibold text-text-muted">{formatCurrency(officialBalance)}</p>
+                              </div>
+                            )}
                             <div>
-                              <p className="text-text-muted text-xs">Saldo oficial (SIAFI)</p>
-                              <p className="font-mono text-xs font-semibold text-text-muted">{formatCurrency(officialBalance)}</p>
+                              <p className="text-text-muted">Saldo disponível</p>
+                              <p className="font-mono font-bold text-text-primary">{formatCurrency(availableBalance)}</p>
                             </div>
-                          )}
-                          <div>
-                            <p className="text-text-muted">Saldo disponível</p>
-                            <p className="font-mono font-bold text-text-primary">{formatCurrency(availableBalance)}</p>
+                            <div>
+                              <p className={hasBalanceViolation ? 'text-status-error' : 'text-text-muted'}>Requisição</p>
+                              <p className={`font-mono font-bold ${hasBalanceViolation ? 'text-status-error' : 'text-text-primary'}`}>{formatCurrency(groupTotal)}</p>
+                            </div>
+                            <div>
+                              <p className="text-text-muted">Após requisição</p>
+                              <p className="font-mono font-bold text-text-primary">{formatCurrency(afterRequisicao)}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className={hasBalanceViolation ? 'text-status-error' : 'text-text-muted'}>Requisição</p>
-                            <p className={`font-mono font-bold ${hasBalanceViolation ? 'text-status-error' : 'text-text-primary'}`}>{formatCurrency(groupTotal)}</p>
-                          </div>
-                          <div>
-                            <p className="text-text-muted">Após requisição</p>
-                            <p className="font-mono font-bold text-text-primary">{formatCurrency(afterRequisicao)}</p>
-                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-text-muted hover:text-destructive hover:bg-destructive/10 shrink-0"
+                            title={`Remover empenho ${empenho.numero}`}
+                            onClick={() => handleRemoveSelectedEmpenho(empenho.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
 
@@ -1015,10 +1038,17 @@ export default function RequisicaoCompraPage() {
                             ) : (
                               groupItems.map(({ item, index }, groupIndex) => {
                                 const isGeneratedItem = item.sourceType === 'portal_transparencia_empenho_item';
+                                const freshBalance = item.sourceItemKey
+                                  ? empenhoItemBalances.find((b) => b.sourceItemKey === item.sourceItemKey)
+                                  : null;
                                 const itemAvailableBalance = isGeneratedItem
-                                  ? getRequisicaoItemAvailableBalance(item, empenhoItemBalances)
+                                  ? getRequisicaoItemAvailableBalance(item, empenhoItemBalances, enviadoFornecedorTotalByItemKey)
                                   : null;
                                 const isProvisionalItemBalance = isGeneratedItem && !isItemBalanceReady;
+                                const enviadoForItem = freshBalance?.enviadoCalculado ?? 0;
+                                const saldoOficial = freshBalance
+                                  ? Math.max(0, freshBalance.valorAtual - freshBalance.liquidadoCalculado)
+                                  : (itemAvailableBalance ?? 0) + enviadoForItem;
                                 const itemSubtotal = item.quantity * item.unitPrice;
                                 const hasItemBalanceViolation = itemAvailableBalance !== null && itemSubtotal > itemAvailableBalance;
                                 const quantityInputKey = item.sourceItemKey || `${item.empenhoId ?? empenho.id}-${index}`;
@@ -1087,9 +1117,19 @@ export default function RequisicaoCompraPage() {
                                     </TableCell>
                                     <TableCell className={`text-right font-mono text-xs font-bold leading-9 ${hasItemBalanceViolation ? 'text-status-error' : 'text-status-success'}`}>
                                       {itemAvailableBalance !== null
-                                        ? <span title={isProvisionalItemBalance ? 'Saldo base do subitem; as liquidações oficiais serão aplicadas quando o cache terminar.' : undefined}>
+                                        ? (
+                                          <span
+                                            title={
+                                              isProvisionalItemBalance
+                                                ? 'Saldo base do subitem; as liquidações oficiais serão aplicadas quando o cache terminar.'
+                                                : enviadoForItem > 0
+                                                  ? `Saldo oficial: ${formatCurrency(saldoOficial)} | (-) ${formatCurrency(enviadoForItem)} em requisições enviadas`
+                                                  : undefined
+                                            }
+                                          >
                                             {formatCurrency(itemAvailableBalance)}
                                           </span>
+                                        )
                                         : isGeneratedItem ? <span title={isItemBalanceError ? 'Não foi possível consultar as liquidações deste empenho' : 'O saldo detalhado será carregado após as liquidações'}>{isItemBalanceError ? 'Indisponível' : 'Carregando...'}</span> : '-'}
                                     </TableCell>
                                     <TableCell className="text-right font-mono font-bold text-text-primary leading-9">
@@ -1146,7 +1186,7 @@ export default function RequisicaoCompraPage() {
                     onClick={() => handleSaveRequisicao('liquidada')}
                   >
                     <Check className="h-4 w-4" />
-                    Encaminhado para pagamento
+                    Enviar para Pagamento
                   </Button>
                 )}
                 <Button
@@ -1220,8 +1260,8 @@ export default function RequisicaoCompraPage() {
 
             <Card className="border border-emerald-200 bg-emerald-50/40 p-4 shadow-soft">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-medium uppercase tracking-wider text-emerald-900">Encaminhadas para Pagamento</p>
-                <Badge variant="outline" className="border-emerald-300 bg-emerald-100 text-emerald-800">Encaminhado para pagamento</Badge>
+                <p className="text-xs font-medium uppercase tracking-wider text-emerald-900">Enviadas para Pagamento</p>
+                <Badge variant="outline" className="border-emerald-300 bg-emerald-100 text-emerald-800">Enviada para Pagamento</Badge>
               </div>
               <div className="mt-2 flex items-baseline justify-between">
                 <p className="font-mono text-2xl font-bold text-emerald-950">
@@ -1263,13 +1303,12 @@ export default function RequisicaoCompraPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-surface-subtle/50">
-                    <TableHead className="whitespace-nowrap">Situação</TableHead>
                     <TableHead>Requisição</TableHead>
                     <TableHead className="text-right">Valor Total</TableHead>
                     <TableHead>Criado por</TableHead>
                     <TableHead>Referências</TableHead>
                     <TableHead>Atualização</TableHead>
-                    <TableHead className="text-right pr-6 whitespace-nowrap">Ações</TableHead>
+                    <TableHead className="text-right pr-4">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1289,12 +1328,15 @@ export default function RequisicaoCompraPage() {
                     return (
                       <TableRow key={requisicao.id} className="hover:bg-surface-hover/20">
                         <TableCell className="align-top whitespace-nowrap">
-                          <Badge variant="outline" className={`font-ui text-xs font-bold ${statusInfo.className}`}>
-                            {statusInfo.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="align-top">
-                          <div className="font-ui font-bold text-text-primary">{requisicao.number}</div>
+                          <div className="flex items-center gap-2 whitespace-nowrap">
+                            <span className="font-ui font-bold text-text-primary text-xs sm:text-sm whitespace-nowrap">{requisicao.number}</span>
+                            <Badge
+                              variant="outline"
+                              className={`font-ui text-[10px] font-semibold px-1.5 py-0 leading-4 whitespace-nowrap shrink-0 ${statusInfo.className}`}
+                            >
+                              {statusInfo.label}
+                            </Badge>
+                          </div>
                         </TableCell>
                         <TableCell className="align-top text-right font-mono text-sm font-bold text-text-primary">
                           {formatCurrency(requisicao.totalValue ?? 0)}
@@ -1333,8 +1375,8 @@ export default function RequisicaoCompraPage() {
                         <TableCell className="align-top text-xs text-text-muted">
                           {new Date(requisicao.updatedAt).toLocaleDateString('pt-BR')}
                         </TableCell>
-                        <TableCell className="align-top text-right pr-6 whitespace-nowrap">
-                          <div className="flex flex-nowrap items-center justify-end gap-1.5">
+                        <TableCell className="align-top text-right pr-4 whitespace-nowrap">
+                          <div className="inline-flex items-center justify-end gap-1 flex-nowrap shrink-0">
                             <Button
                               type="button"
                               variant="outline"
@@ -1342,7 +1384,7 @@ export default function RequisicaoCompraPage() {
                               title="Imprimir Requisição em PDF"
                               aria-label={`Imprimir requisição ${requisicao.number}`}
                               onClick={() => void handlePrintPDF(requisicao)}
-                              className="h-8 px-2 shrink-0"
+                              className="h-8 w-8 p-0 shrink-0"
                             >
                               <Printer className="h-4 w-4" />
                             </Button>
@@ -1354,12 +1396,12 @@ export default function RequisicaoCompraPage() {
                               title="Editar Requisição"
                               aria-label={`Editar requisição ${requisicao.number}`}
                               onClick={() => handleEditRequisicao(requisicao)}
-                              className="h-8 px-2 shrink-0"
+                              className="h-8 w-8 p-0 shrink-0"
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
 
-                            {/* Seletor de Situação */}
+                            {/* Mudança de Situação */}
                             {isFiscalOrManager && (
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -1367,12 +1409,12 @@ export default function RequisicaoCompraPage() {
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    className="h-8 px-2.5 text-xs font-medium gap-1.5 shrink-0 hover:bg-surface-hover"
+                                    className="h-8 px-2.5 font-ui text-xs font-medium gap-1 shrink-0"
                                     title="Alterar situação da requisição"
                                     aria-label={`Alterar situação da requisição ${requisicao.number}`}
                                   >
                                     <span>Situação</span>
-                                    <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                                    <ChevronDown className="h-3 w-3 opacity-70" />
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-56">
@@ -1399,7 +1441,7 @@ export default function RequisicaoCompraPage() {
                                     className="gap-2 text-xs font-medium cursor-pointer text-emerald-900 focus:text-emerald-950 focus:bg-emerald-50"
                                   >
                                     <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                                    <span>Encaminhado para pagamento</span>
+                                    <span>Enviada para Pagamento</span>
                                     {isLiquidada && <Check className="ml-auto h-3.5 w-3.5 text-emerald-600" />}
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
@@ -1413,13 +1455,13 @@ export default function RequisicaoCompraPage() {
                                   <Button
                                     type="button"
                                     size="sm"
-                                    className="bg-amber-600 hover:bg-amber-700 text-white h-8 px-2.5 gap-1 text-xs font-semibold shrink-0 whitespace-nowrap"
+                                    className="bg-amber-600 hover:bg-amber-700 text-white h-8 px-2.5 gap-1 text-xs font-semibold shrink-0"
                                     title="Enviar ao Fornecedor"
                                     aria-label={`Enviar requisição ${requisicao.number} ao fornecedor`}
                                     onClick={() => handleChangeStatus(requisicao.id, 'enviada_fornecedor')}
                                   >
                                     <Send className="h-3.5 w-3.5" />
-                                    <span>Enviar ao Fornecedor</span>
+                                    <span>Enviar</span>
                                   </Button>
                                 )}
                                 {(isCreator || isFiscalOrManager) && (
@@ -1428,8 +1470,9 @@ export default function RequisicaoCompraPage() {
                                     variant="ghost"
                                     size="sm"
                                     aria-label={`Excluir requisição ${requisicao.number}`}
+                                    title="Excluir requisição"
                                     onClick={() => handleDeleteRequisicao(requisicao.id)}
-                                    className="h-8 px-2 text-destructive hover:bg-destructive/10 shrink-0"
+                                    className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10 shrink-0"
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>

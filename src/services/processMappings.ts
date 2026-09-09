@@ -43,6 +43,11 @@ function fallbackById(id?: string | null) {
   return DEFAULT_PROCESS_MAPPINGS.find((mapping) => mapping.id === id || mapping.code === id) || null;
 }
 
+function mergePublishedMappings(records: ProcessMappingRecord[]) {
+  const recordsById = new Set(records.map((record) => record.id));
+  return [...records, ...DEFAULT_PROCESS_MAPPINGS.filter((mapping) => !recordsById.has(mapping.id))];
+}
+
 export const processMappingsService = {
   async listPublished(client: SupabaseClient = supabase): Promise<ProcessMappingRecord[]> {
     if (typeof (client as { from?: unknown }).from !== 'function') return DEFAULT_PROCESS_MAPPINGS;
@@ -58,7 +63,7 @@ export const processMappingsService = {
     }
 
     const records = ((data || []) as ProcessMappingRow[]).map(normalizeRow);
-    return records.length ? records : DEFAULT_PROCESS_MAPPINGS;
+    return mergePublishedMappings(records);
   },
 
   async getById(id?: string | null): Promise<ProcessMappingRecord | null> {

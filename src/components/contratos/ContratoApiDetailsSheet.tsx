@@ -1,4 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { RecordDetailsPage } from '@/components/records/RecordDetailsPage';
+import { DataTablePanel } from '@/components/design-system/DataTablePanel';
+import { formatContractDate } from '@/utils/contractPresentation';
+import type { Empenho } from '@/types';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -46,30 +50,38 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs';
 import { cn, formatCurrency } from '@/lib/utils';
+import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
 import { getValorTotalFromHistorico } from '@/utils/contratosApiHistorico';
 import type {
   ContratoApiDetails,
+  ContratoApiComprasDocumentoRow,
   ContratoApiFaturaEmpenhoRow,
   ContratoApiFaturaItemRow,
   ContratoApiFaturaRow,
   ContratoApiHistoricoRow,
   ContratoApiItemRow,
+  ContratoApiRecursoRow,
   ContratoApiRow,
   ContratoApiSyncRun,
 } from '@/services/contratosApi';
 import {
-  buscarDocumentosContratoPncp,
+  sincronizarContratoPncp,
   buildPncpContratoWebUrl,
   type PncpDocumentoContrato,
   type PncpContratoRef,
 } from '@/services/pncpContratos';
 import {
-  buscarInstrumentosCobrancaPncp,
   type PncpInstrumentoCobranca,
 } from '@/services/pncpInstrumentosCobranca';
 import { ContratoNfeRastreabilidade } from '@/components/contratos/ContratoNfeRastreabilidade';
 
 interface ContratoApiDetailsSheetProps {
+  presentation?: 'dialog' | 'page';
+  error?: string | null;
+  onRetry?: () => void;
+  execution?: { valorGlobal: number; empenhado: number; rows: { id: string; numero: string; valor: number; saldo: number; liquidado: number; fonte: string; tipo: string; local?: Empenho }[] };
+  onOpenEmpenho?: (empenho: Empenho) => void;
+  campusUasg?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   contrato: ContratoApiRow | null;
@@ -87,7 +99,7 @@ const normalizeStatus = (value: string | null | undefined) =>
 
 const EXECUTED_ITEM_STATUSES = new Set(['pago', 'siafi apropriado']);
 const REITORIA_UG = '158155';
-const DISPLAY_UNIDADE_CODIGO = '158366';
+const DISPLAY_UNIDADE_CODIGO = DEFAULT_IFRN_CAMPUS_UASG;
 
 const isFaturaExecutada = (fatura?: ContratoApiFaturaRow) =>
   EXECUTED_ITEM_STATUSES.has(normalizeStatus(fatura?.situacao));
@@ -99,9 +111,9 @@ const getFaturaContratanteCodigo = (fatura: ContratoApiFaturaRow) => {
   return match?.[0] ?? null;
 };
 
-const isFaturaVisibleForDisplayUnidade = (fatura: ContratoApiFaturaRow) => {
+const isFaturaVisibleForDisplayUnidade = (fatura: ContratoApiFaturaRow, campusUasg = DISPLAY_UNIDADE_CODIGO) => {
   const codigoContratante = getFaturaContratanteCodigo(fatura);
-  return !codigoContratante || codigoContratante === DISPLAY_UNIDADE_CODIGO;
+  return !codigoContratante || codigoContratante === campusUasg;
 };
 
 const formatDate = (value: string | null | undefined) => {
@@ -110,6 +122,42 @@ const formatDate = (value: string | null | undefined) => {
   if (Number.isNaN(date.getTime())) return '-';
   return new Intl.DateTimeFormat('pt-BR').format(date);
 };
+
+function DocumentosComprasTable({ documentos }: { documentos: ContratoApiComprasDocumentoRow[] }) {
+  return (
+    <div className="overflow-x-auto rounded-md border border-border/70">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Documento</TableHead>
+            <TableHead>Tipo</TableHead>
+            <TableHead>Origem</TableHead>
+            <TableHead className="text-right">Ação</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {documentos.map((doc) => (
+            <TableRow key={doc.id}>
+              <TableCell>
+                <div className="font-medium text-foreground max-w-md truncate" title={doc.descricao ?? undefined}>
+                  {doc.descricao || `Arquivo ${doc.api_arquivo_id}`}
+                </div>
+                {doc.processo ? <div className="text-xs text-muted-foreground">Processo {doc.processo}</div> : null}
+              </TableCell>
+              <TableCell><Badge variant="secondary" className="text-[10px] font-normal">{doc.tipo || 'Documento'}</Badge></TableCell>
+              <TableCell className="text-xs text-muted-foreground">{doc.origem || 'Compras.gov.br'}</TableCell>
+              <TableCell className="text-right">
+                <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs text-action-primary border-action-primary/30 hover:bg-action-primary/10" onClick={() => window.open(doc.url, '_blank', 'noopener,noreferrer')} title="Abrir arquivo oficial">
+                  <Download className="h-3.5 w-3.5" /><span>Abrir arquivo</span>
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
 
 const normalizeDateValue = (value: unknown) => {
   if (!value) return null;
@@ -219,21 +267,23 @@ function SummaryMetric({
   label,
   value,
   helper,
+  fullValue = false,
 }: {
   icon: JSX.Element;
   label: string;
   value: string | number;
   helper?: string;
+  fullValue?: boolean;
 }) {
   return (
     <div className="rounded-md border border-border/70 bg-card p-3 shadow-sm">
-      <div className="flex items-start gap-3">
+      <div className={fullValue ? "space-y-2" : "flex items-start gap-3"}>
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-action-primary/10 text-action-primary">
           {icon}
         </span>
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase text-muted-foreground">{label}</p>
-          <p className="mt-1 truncate text-sm font-bold text-foreground">{value}</p>
+          <p className={fullValue ? "mt-1 font-data text-lg font-semibold text-foreground" : "mt-1 truncate text-sm font-bold text-foreground"}>{value}</p>
           {helper ? <p className="mt-1 text-xs text-muted-foreground">{helper}</p> : null}
         </div>
       </div>
@@ -289,8 +339,18 @@ function FaturaLine({
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             Emissão {formatDate(fatura.data_emissao)}
+            {fatura.data_ateste ? ` | Ateste ${formatDate(fatura.data_ateste)}` : ''}
+            {fatura.data_vencimento ? ` | Vencimento ${formatDate(fatura.data_vencimento)}` : ''}
             {empenhos.length > 0 ? ` | Empenho ${empenhos.map((item) => item.numero_empenho).filter(Boolean).join(', ')}` : ''}
           </p>
+          {(Number(fatura.glosa) > 0 || Number(fatura.juros) > 0 || Number(fatura.multa) > 0 || fatura.repactuacao) ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {Number(fatura.glosa) > 0 ? `Glosa ${formatCurrency(Number(fatura.glosa))}` : ''}
+              {Number(fatura.juros) > 0 ? `${Number(fatura.glosa) > 0 ? ' | ' : ''}Juros ${formatCurrency(Number(fatura.juros))}` : ''}
+              {Number(fatura.multa) > 0 ? `${Number(fatura.glosa) > 0 || Number(fatura.juros) > 0 ? ' | ' : ''}Multa ${formatCurrency(Number(fatura.multa))}` : ''}
+              {fatura.repactuacao ? ` | Repactuação: ${fatura.repactuacao}` : ''}
+            </p>
+          ) : null}
           {faturaItem ? (
             <p className="mt-1 text-xs text-muted-foreground">
               Qtd. {formatNumber(faturaItem.quantidade_faturado)} | Unitário {formatCurrency(faturaItem.valor_unitario_faturado ?? 0)}
@@ -308,6 +368,68 @@ function FaturaLine({
   );
 }
 
+const RECURSO_LABELS: Record<ContratoApiRecursoRow['tipo_recurso'], string> = {
+  cronograma: 'Cronograma',
+  garantias: 'Garantias',
+  responsaveis: 'Responsáveis',
+  prepostos: 'Prepostos',
+  ocorrencias: 'Ocorrências',
+  despesas_acessorias: 'Despesas acessórias',
+  terceirizados: 'Terceirizados',
+};
+
+function getRecursoDetails(recurso: ContratoApiRecursoRow) {
+  const raw = recurso.raw_data ?? {};
+  return [
+    raw.email ? String(raw.email) : null,
+    raw.celular ? String(raw.celular) : raw.telefonefixo ? String(raw.telefonefixo) : null,
+    raw.recorrencia_id ? `Recorrência: ${String(raw.recorrencia_id)}` : null,
+    raw.unidade ? `Unidade: ${String(raw.unidade)}` : null,
+    raw.jornada ? `Jornada: ${String(raw.jornada)}h` : null,
+    raw.notificapreposto ? `Notifica preposto: ${String(raw.notificapreposto)}` : null,
+  ].filter(Boolean).join(' | ');
+}
+
+function ContratoGestaoRecursos({ recursos }: { recursos: ContratoApiRecursoRow[] }) {
+  const grouped = Object.entries(RECURSO_LABELS).map(([tipo, label]) => ({
+    tipo: tipo as ContratoApiRecursoRow['tipo_recurso'],
+    label,
+    rows: recursos.filter((row) => row.tipo_recurso === tipo),
+  })).filter((group) => group.rows.length > 0);
+
+  if (grouped.length === 0) {
+    return <div className="rounded-md border border-dashed border-border/70 p-6 text-center text-sm text-muted-foreground">Nenhum recurso complementar sincronizado para este contrato.</div>;
+  }
+
+  return <div className="space-y-4">{grouped.map((group) => (
+    <div key={group.tipo} className="space-y-2">
+      <div className="flex items-center gap-2">
+        <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{group.label}</p>
+        <Badge variant="secondary" className="text-[10px]">{group.rows.length}</Badge>
+      </div>
+      <div className="overflow-x-auto rounded-md border border-border/70">
+        <Table>
+          <TableHeader><TableRow><TableHead>Registro</TableHead><TableHead>Período</TableHead><TableHead>Situação</TableHead><TableHead className="text-right">Valor</TableHead></TableRow></TableHeader>
+          <TableBody>{group.rows.map((row) => (
+            <TableRow key={row.id}>
+              <TableCell>
+                <p className="font-medium">{row.titulo || `${group.label} ${row.api_registro_id}`}</p>
+                {row.descricao ? <p className="mt-1 max-w-xl text-xs text-muted-foreground">{row.descricao}</p> : null}
+                {getRecursoDetails(row) ? <p className="mt-1 text-xs text-muted-foreground">{getRecursoDetails(row)}</p> : null}
+              </TableCell>
+              <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                {row.vencimento ? `Vence ${formatDate(row.vencimento)}` : row.data_inicio || row.data_fim ? `${formatDate(row.data_inicio)} a ${formatDate(row.data_fim)}` : '-'}
+              </TableCell>
+              <TableCell>{row.situacao ? <Badge variant="outline" className="text-[10px]">{row.situacao}</Badge> : '-'}</TableCell>
+              <TableCell className="whitespace-nowrap text-right">{row.valor == null ? '-' : formatCurrency(Number(row.valor))}</TableCell>
+            </TableRow>
+          ))}</TableBody>
+        </Table>
+      </div>
+    </div>
+  ))}</div>;
+}
+
 export function ContratoApiDetailsSheet({
   open,
   onOpenChange,
@@ -315,18 +437,27 @@ export function ContratoApiDetailsSheet({
   details,
   lastSyncRun,
   loading = false,
+  presentation = 'dialog',
+  error, onRetry, execution, onOpenEmpenho, campusUasg = DISPLAY_UNIDADE_CODIGO,
 }: ContratoApiDetailsSheetProps) {
+  const [detailTab, setDetailTab] = useState('resumo');
+  const pageMode = presentation === 'page';
+  const Header = pageMode ? 'div' : DialogHeader;
+  const Title = pageMode ? 'h1' : DialogTitle;
+  const Description = pageMode ? 'p' : DialogDescription;
+  useEffect(() => { if (open) setDetailTab('resumo'); }, [open, contrato?.id]);
   const rawFaturas = details?.faturas ?? [];
   const empenhoLinkedFaturaIds = new Set(
     (details?.faturaEmpenhos ?? []).map((fe) => fe.contrato_api_fatura_id)
   );
   const faturas = rawFaturas.filter(
-    (fatura) => isFaturaVisibleForDisplayUnidade(fatura) || empenhoLinkedFaturaIds.has(fatura.id)
+    (fatura) => isFaturaVisibleForDisplayUnidade(fatura, campusUasg) || empenhoLinkedFaturaIds.has(fatura.id)
   );
   const visibleFaturaIds = new Set(faturas.map((fatura) => fatura.id));
   const faturaItens = (details?.faturaItens ?? []).filter((item) => visibleFaturaIds.has(item.contrato_api_fatura_id));
   const faturaEmpenhos = (details?.faturaEmpenhos ?? []).filter((item) => visibleFaturaIds.has(item.contrato_api_fatura_id));
   const historico = details?.historico ?? [];
+  const recursos = details?.recursos ?? [];
   const itemById = new Map((details?.itens ?? []).map((item) => [item.id, item]));
   const faturaById = new Map(faturas.map((fatura) => [fatura.id, fatura]));
   const empenhosByFatura = buildFaturaEmpenhosMap(faturaEmpenhos);
@@ -376,165 +507,115 @@ export function ContratoApiDetailsSheet({
   const [isLoadingPncpInstrumentos, setIsLoadingPncpInstrumentos] = useState(false);
   const [pncpError, setPncpError] = useState<string | null>(null);
 
-  const fetchPncpDocs = useCallback((forceLive = false) => {
-    if (!contrato) return;
-
-    // Se já existem documentos e instrumentos sincronizados no banco de dados e não é refresh forçado, usa direto do banco
-    const dbDocs = details?.documentos;
-    const dbInsts = details?.instrumentosCobranca;
-
-    if (!forceLive && ((dbDocs && dbDocs.length > 0) || (dbInsts && dbInsts.length > 0))) {
-      if (dbDocs && dbDocs.length > 0) {
-        setPncpDocs(
-          dbDocs.map((d) => ({
-            sequencialDocumento: d.sequencial_documento,
-            titulo: d.titulo,
-            tipoDocumentoId: d.tipo_documento_id,
-            tipoDocumentoNome: d.tipo_documento_nome,
-            url: d.url,
-            uri: d.uri ?? undefined,
-            dataPublicacaoPncp: d.data_publicacao_pncp,
-            tamanho: d.tamanho,
-          }))
-        );
-      }
-
-      if (dbInsts && dbInsts.length > 0) {
-        setPncpInstrumentos(
-          dbInsts.map((inst) => ({
-            sequencialInstrumentoCobranca: inst.sequencial_instrumento_cobranca,
-            tipoNome: inst.tipo_nome,
-            tipoDescricao: inst.tipo_descricao,
-            numeroInstrumentoCobranca: inst.numero_instrumento_cobranca,
-            dataEmissaoDocumento: inst.data_emissao ?? '',
-            chaveNFe: inst.chave_nfe,
-            dataConsultaNFe: inst.data_consulta_nfe,
-            statusResponseNFe: inst.status_response_nfe,
-            notaFiscal: inst.chave_nfe
-              ? {
-                  chaveNotaFiscal: inst.chave_nfe,
-                  valorNotaFiscal: inst.valor_nota_fiscal ?? 0,
-                  serie: inst.serie ?? undefined,
-                  tipoEventoMaisRecente: inst.tipo_evento_mais_recente ?? undefined,
-                  dataTipoEventoMaisRecente: inst.data_tipo_evento_mais_recente ?? undefined,
-                  nomeFornecedor: inst.nome_fornecedor ?? undefined,
-                  cnpjFornecedor: inst.cnpj_fornecedor ?? undefined,
-                  municipioFornecedor: inst.municipio_fornecedor ?? undefined,
-                }
-              : null,
-            itens: (inst.itens as any[]) || [],
-            eventos: (inst.eventos as any[]) || [],
-            raw: (inst.raw_data as Record<string, unknown>) || {},
-          }))
-        );
-        setIsLoadingPncpInstrumentos(false);
-      }
-
-      let resolvedRef: PncpContratoRef | null = null;
-      if (contrato.pncp_control_number && contrato.pncp_sequencial) {
-        resolvedRef = {
-          cnpj: '10877412000168',
-          ano: contrato.pncp_ano || (contrato.vigencia_inicio ? new Date(contrato.vigencia_inicio).getFullYear() : new Date().getFullYear()),
-          sequencial: String(contrato.pncp_sequencial),
-          numeroControlePNCP: contrato.pncp_control_number,
-          hasPncpRecord: true,
-        };
-      } else if (dbDocs && dbDocs.length > 0) {
-        const firstUrl = dbDocs[0].url || dbDocs[0].uri || '';
-        const match = firstUrl.match(/orgaos\/(\d{14})\/contratos\/(\d{4})\/(\d+)\/arquivos/);
-        if (match) {
-          resolvedRef = {
-            cnpj: match[1],
-            ano: Number(match[2]),
-            sequencial: match[3],
-            numeroControlePNCP: contrato.pncp_control_number || `${match[1]}-2-${match[3].padStart(6, '0')}/${match[2]}`,
-            hasPncpRecord: true,
-          };
-        }
-      }
-      setPncpRef(resolvedRef);
-      setIsLoadingPncpDocs(false);
-
-      if ((!dbInsts || dbInsts.length === 0) && resolvedRef && resolvedRef.ano && resolvedRef.sequencial) {
-        setIsLoadingPncpInstrumentos(true);
-        buscarInstrumentosCobrancaPncp(resolvedRef, { contratoApiId: contrato.id })
-          .then((res) => setPncpInstrumentos(res.instrumentos))
-          .catch((err) => console.warn('Erro ao consultar instrumentos de cobrança:', err))
-          .finally(() => setIsLoadingPncpInstrumentos(false));
-      }
-      return;
-    }
-
-    // Se o banco já registrou que não possui registro no PNCP e foi checado recentemente, evita requisição
-    if (!forceLive && contrato.pncp_has_record === false && contrato.pncp_documentos_checked_at) {
-      setPncpDocs([]);
-      setPncpRef(null);
-      setPncpInstrumentos([]);
-      setIsLoadingPncpDocs(false);
-      setIsLoadingPncpInstrumentos(false);
-      return;
-    }
-
-    const abortController = new AbortController();
+  const pncpRequest = useRef(0);
+  const contratoId = contrato?.id;
+  const cachedDocuments = details?.documentos;
+  const comprasDocuments = details?.documentosCompras ?? [];
+  const cachedInstruments = details?.instrumentosCobranca;
+  const detailsLoaded = Boolean(details);
+  const fetchPncpDocs = useCallback(async (_forceLive = true) => {
+    if (!contratoId) return;
+    const request = ++pncpRequest.current;
     setIsLoadingPncpDocs(true);
     setIsLoadingPncpInstrumentos(true);
     setPncpError(null);
-
-    buscarDocumentosContratoPncp(contrato, { signal: abortController.signal })
-      .then((res) => {
-        setPncpDocs(res.documentos);
-        setPncpRef(res.ref);
-        if (res.error && res.documentos.length === 0) {
-          setPncpError(res.error);
-        }
-        if (res.ref && res.ref.ano && res.ref.sequencial) {
-          buscarInstrumentosCobrancaPncp(res.ref, { signal: abortController.signal })
-            .then((resInst) => setPncpInstrumentos(resInst.instrumentos))
-            .catch((err) => {
-              if ((err as Error)?.name !== 'AbortError') {
-                console.warn('Erro ao consultar instrumentos de cobrança:', err);
-              }
-            })
-            .finally(() => setIsLoadingPncpInstrumentos(false));
-        } else {
-          setIsLoadingPncpInstrumentos(false);
-        }
-      })
-      .catch((err) => {
-        if ((err as Error)?.name !== 'AbortError') {
-          console.warn('ContratoApiDetailsSheet: erro ao consultar documentos PNCP', err);
-          setPncpError('Não foi possível carregar os documentos do PNCP.');
-        }
-        setIsLoadingPncpInstrumentos(false);
-      })
-      .finally(() => {
+    try {
+      const result = await sincronizarContratoPncp(contratoId);
+      if (request !== pncpRequest.current) return;
+      if (result.ref !== undefined) setPncpRef(result.ref);
+      // Missing resource means failure: preserve the previous data on screen.
+      if (result.documentos !== undefined) setPncpDocs(result.documentos);
+      if (result.instrumentos !== undefined) setPncpInstrumentos(result.instrumentos);
+      if (result.errors.length) setPncpError(result.errors.join('; '));
+    } catch (error) {
+      if (request === pncpRequest.current) {
+        setPncpError(error instanceof Error ? error.message : 'Não foi possível sincronizar com o PNCP.');
+      }
+    } finally {
+      if (request === pncpRequest.current) {
         setIsLoadingPncpDocs(false);
-      });
-
-    return () => {
-      abortController.abort();
-    };
-  }, [contrato, details?.documentos]);
+        setIsLoadingPncpInstrumentos(false);
+      }
+    }
+  }, [contratoId]);
 
   useEffect(() => {
-    if (!open || !contrato) {
-      setPncpDocs([]);
-      setPncpRef(null);
-      setPncpInstrumentos([]);
-      setIsLoadingPncpDocs(false);
-      setIsLoadingPncpInstrumentos(false);
-      setPncpError(null);
-      return;
+    ++pncpRequest.current;
+    setPncpDocs([]);
+    setPncpInstrumentos([]);
+    setPncpRef(null);
+    setPncpError(null);
+    setIsLoadingPncpDocs(false);
+    setIsLoadingPncpInstrumentos(false);
+    if (!open || !contrato || !detailsLoaded) return;
+    const dbDocs = cachedDocuments || [];
+    const dbInsts = cachedInstruments || [];
+    setPncpDocs(
+      dbDocs.map((d) => ({
+        sequencialDocumento: d.sequencial_documento,
+        titulo: d.titulo,
+        tipoDocumentoId: d.tipo_documento_id,
+        tipoDocumentoNome: d.tipo_documento_nome,
+        url: d.url,
+        uri: d.uri ?? undefined,
+        dataPublicacaoPncp: d.data_publicacao_pncp,
+        tamanho: d.tamanho,
+      }))
+    );
+    setPncpInstrumentos(
+      dbInsts.map((inst) => ({
+        sequencialInstrumentoCobranca: inst.sequencial_instrumento_cobranca,
+        tipoNome: inst.tipo_nome,
+        tipoDescricao: inst.tipo_descricao,
+        numeroInstrumentoCobranca: inst.numero_instrumento_cobranca,
+        dataEmissaoDocumento: inst.data_emissao ?? '',
+        chaveNFe: inst.chave_nfe,
+        dataConsultaNFe: inst.data_consulta_nfe,
+        statusResponseNFe: inst.status_response_nfe,
+        notaFiscal: inst.chave_nfe
+          ? {
+              chaveNotaFiscal: inst.chave_nfe,
+              valorNotaFiscal: inst.valor_nota_fiscal ?? 0,
+              serie: inst.serie ?? undefined,
+              tipoEventoMaisRecente: inst.tipo_evento_mais_recente ?? undefined,
+              dataTipoEventoMaisRecente: inst.data_tipo_evento_mais_recente ?? undefined,
+              nomeFornecedor: inst.nome_fornecedor ?? undefined,
+              cnpjFornecedor: inst.cnpj_fornecedor ?? undefined,
+              municipioFornecedor: inst.municipio_fornecedor ?? undefined,
+            }
+          : null,
+        itens: (inst.itens as PncpInstrumentoCobranca['itens']) || [],
+        eventos: (inst.eventos as PncpInstrumentoCobranca['eventos']) || [],
+        raw: (inst.raw_data as Record<string, unknown>) || {},
+      }))
+    );
+    if (contrato.pncp_control_number && contrato.pncp_sequencial && contrato.pncp_ano) {
+      setPncpRef({
+        cnpj: contrato.pncp_control_number.split('-')[0],
+        ano: contrato.pncp_ano, sequencial: String(contrato.pncp_sequencial),
+        numeroControlePNCP: contrato.pncp_control_number, hasPncpRecord: true,
+      });
     }
+    setPncpError(contrato.pncp_sync_error || null);
+    const fresh = (date?: string | null) => Boolean(date && Date.now() - new Date(date).getTime() < 86400000);
+    // Negative cache expires as well. An old false flag must not block new queries forever.
+    if (!fresh(contrato.pncp_documentos_checked_at) || !fresh(contrato.pncp_instrumentos_checked_at)) {
+      void fetchPncpDocs();
+    }
+    // This ref is a request generation counter, not a DOM ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => { ++pncpRequest.current; };
+  }, [open, contrato, cachedDocuments, cachedInstruments, detailsLoaded, fetchPncpDocs]);
 
-    return fetchPncpDocs(false);
-  }, [open, contrato, fetchPncpDocs]);
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(90vh,880px)] w-[calc(100vw-2rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0 bg-background sm:rounded-2xl border border-border shadow-2xl">
-        <DialogHeader className="border-b border-border px-6 py-4 bg-card shrink-0">
-          <DialogTitle className="flex flex-wrap items-center gap-2">
+  const content = (<>
+        {pncpError ? (
+          <div role="alert" className="mx-6 my-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+            <strong>Sincronização PNCP incompleta.</strong> {pncpError}
+            <p>Os dados já carregados foram preservados. Tente atualizar novamente.</p>
+          </div>
+        ) : null}
+        <Header className="border-b border-border px-6 py-4 bg-card shrink-0">
+          <Title className="flex flex-wrap items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <FileText className="h-5 w-5" />
             </span>
@@ -552,11 +633,11 @@ export function ContratoApiDetailsSheet({
                 <span>Portal PNCP</span>
               </a>
             ) : null}
-          </DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground mt-1">
-            {contrato?.fornecedor_nome || 'Fornecedor não informado'} | Vigência {formatDate(contrato?.vigencia_inicio)} a {formatDate(contrato?.vigencia_fim)}
-          </DialogDescription>
-        </DialogHeader>
+          </Title>
+          <Description className="text-xs text-muted-foreground mt-1">
+            {contrato?.fornecedor_nome || 'Fornecedor não informado'} | Vigência {(pageMode ? formatContractDate : formatDate)(contrato?.vigencia_inicio)} a {(pageMode ? formatContractDate : formatDate)(contrato?.vigencia_fim)}
+          </Description>
+        </Header>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5 scrollbar-thin">
           {loading ? (
@@ -564,6 +645,8 @@ export function ContratoApiDetailsSheet({
               <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               Carregando itens, faturas e histórico do contrato...
             </div>
+          ) : pageMode && error ? (
+            <div role="alert" className="rounded-lg border border-destructive/30 p-6 space-y-3"><p>{error}</p><Button variant="outline" onClick={onRetry}>Tentar novamente</Button></div>
           ) : !details ? (
             <div className="py-16 text-center text-sm font-medium text-muted-foreground">Nenhum detalhe da API carregado.</div>
           ) : (
@@ -590,28 +673,28 @@ export function ContratoApiDetailsSheet({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <SummaryMetric
+            <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${pageMode ? '2xl:grid-cols-4' : 'xl:grid-cols-4'}`}>
+              <SummaryMetric fullValue={pageMode}
                 icon={<CircleDollarSign className="h-4 w-4" />}
-                label={valorTotalLabel}
-                value={formatCurrency(valorTotalApi)}
+                label={pageMode ? 'Valor global do contrato' : valorTotalLabel}
+                value={formatCurrency(pageMode && execution ? execution.valorGlobal : valorTotalApi)}
               />
-              <SummaryMetric
+              <SummaryMetric fullValue={pageMode}
                 icon={<Package className="h-4 w-4" />}
-                label="Itens"
-                value={details.itens.length}
-                helper={`${formatCurrency(valorExecutadoItens)} executado`}
+                label={pageMode ? 'Empenhado campus' : 'Itens'}
+                value={pageMode && execution ? formatCurrency(execution.empenhado) : details.itens.length}
+                helper={pageMode ? 'Empenhos vinculados à unidade' : `${formatCurrency(valorExecutadoItens)} executado`}
               />
-              <SummaryMetric
+              <SummaryMetric fullValue={pageMode}
                 icon={<ReceiptText className="h-4 w-4" />}
-                label="Faturas"
-                value={faturas.length}
-                helper={`${faturasExecutadas} executadas`}
+                label={pageMode ? 'A liquidar campus / saldo RAP' : 'Faturas'}
+                value={pageMode && execution ? formatCurrency(execution.rows.reduce((sum, row) => sum + row.saldo, 0)) : faturas.length}
+                helper={pageMode ? 'Saldos atuais dos empenhos vinculados' : `${faturasExecutadas} executadas`}
               />
-              <SummaryMetric
+              <SummaryMetric fullValue={pageMode}
                 icon={<CalendarClock className="h-4 w-4" />}
-                label="Última sincronização"
-                value={lastSyncLabel}
+                label={pageMode ? 'Faturas pendentes' : 'Última sincronização'}
+                value={pageMode ? faturas.length - faturasExecutadas : lastSyncLabel}
               />
             </div>
 
@@ -625,12 +708,27 @@ export function ContratoApiDetailsSheet({
             {hasReitoriaOrigin ? (
               <div className="flex gap-2 rounded-md border border-border/70 bg-muted/40 p-3 text-sm text-foreground">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>Contrato com origem na Reitoria. Valores globais do histórico podem representar o contrato central; a tela exibe somente faturas da UG {DISPLAY_UNIDADE_CODIGO} quando a API informa o contratante.</span>
+                <span>Contrato com origem na Reitoria. Valores globais do histórico podem representar o contrato central; a tela exibe somente faturas da UG {campusUasg} quando a API informa o contratante.</span>
               </div>
             ) : null}
 
-            <Accordion key={contrato?.id ?? 'sem-contrato'} type="multiple" className="space-y-3">
-              <AccordionItem value="historico" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+            {pageMode && <p className="text-xs text-muted-foreground">Última sincronização: {lastSyncLabel}</p>}
+            <Tabs value={detailTab} onValueChange={setDetailTab}>
+            {pageMode && <TabsList aria-label="Detalhes do contrato" className="h-auto flex-wrap justify-start">
+              <TabsTrigger value="resumo">Resumo e empenhos</TabsTrigger>
+              <TabsTrigger value="faturas">Faturas e pagamentos</TabsTrigger>
+              <TabsTrigger value="documentos">Vigência e documentos</TabsTrigger>
+            </TabsList>}
+            <TabsContent value={detailTab} forceMount className="space-y-4">
+            {pageMode && detailTab === 'resumo' && execution && <DataTablePanel title="Empenhos vinculados ao campus" className="mt-4">
+              <Table aria-label="Empenhos vinculados ao campus"><TableHeader><TableRow><TableHead>Empenho</TableHead><TableHead>Tipo</TableHead><TableHead className="text-right">Empenhado / base RAP</TableHead><TableHead className="text-right">Liquidado / liquidado-pago RAP</TableHead><TableHead className="text-right">A liquidar / saldo RAP</TableHead></TableRow></TableHeader>
+              <TableBody>{execution.rows.length ? execution.rows.map(row => <TableRow key={row.id}>
+                <TableCell>{row.local && onOpenEmpenho ? <button type="button" className="font-data text-primary hover:underline" onClick={() => onOpenEmpenho(row.local!)}>{row.numero}</button> : <span className="font-data">{row.numero}</span>}</TableCell>
+                <TableCell><p>{row.tipo}</p><p className="mt-1 text-xs text-muted-foreground">{row.fonte}</p></TableCell><TableCell className="font-data text-right whitespace-nowrap">{formatCurrency(row.valor)}</TableCell><TableCell className="font-data text-right whitespace-nowrap">{formatCurrency(row.liquidado)}</TableCell><TableCell className="font-data text-right whitespace-nowrap">{formatCurrency(row.saldo)}</TableCell>
+              </TableRow>) : <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Nenhum empenho vinculado ao campus.</TableCell></TableRow>}</TableBody></Table>
+            </DataTablePanel>}
+            <Accordion defaultValue={pageMode ? ['historico', 'itens', 'faturas', 'gestao-contratual', 'documentos', 'nfe-rastreabilidade'] : undefined} key={contrato?.id ?? 'sem-contrato'} type="multiple" className="space-y-3">
+              <AccordionItem hidden={pageMode && detailTab !== 'documentos'} value="historico" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
                 <AccordionTrigger className="gap-3 py-4 hover:no-underline">
                   <AccordionSectionTitle
                     icon={<History className="h-4 w-4" />}
@@ -690,7 +788,7 @@ export function ContratoApiDetailsSheet({
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem value="itens" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+              <AccordionItem hidden={pageMode && detailTab !== 'resumo'} value="itens" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
                 <AccordionTrigger className="gap-3 py-4 hover:no-underline">
                   <AccordionSectionTitle
                     icon={<Package className="h-4 w-4" />}
@@ -773,7 +871,7 @@ export function ContratoApiDetailsSheet({
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem value="faturas" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+              <AccordionItem hidden={pageMode && detailTab !== 'faturas'} value="faturas" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
                 <AccordionTrigger className="gap-3 py-4 hover:no-underline">
                   <AccordionSectionTitle
                     icon={<ReceiptText className="h-4 w-4" />}
@@ -890,24 +988,47 @@ export function ContratoApiDetailsSheet({
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem value="documentos" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+              <AccordionItem hidden={pageMode && detailTab !== 'documentos'} value="gestao-contratual" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
+                <AccordionTrigger className="gap-3 py-4 hover:no-underline">
+                  <AccordionSectionTitle
+                    icon={<CalendarClock className="h-4 w-4" />}
+                    title="Gestão contratual"
+                    description="Cronograma, garantias, responsáveis, prepostos, ocorrências, despesas e terceirizados."
+                    count={`${recursos.length} registros`}
+                  />
+                </AccordionTrigger>
+                <AccordionContent className="pb-4 pt-0">
+                  <ContratoGestaoRecursos recursos={recursos} />
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem hidden={pageMode && detailTab !== 'documentos'} value="documentos" className="rounded-md border border-border/70 bg-card px-4 shadow-sm">
                 <AccordionTrigger className="gap-3 py-4 hover:no-underline">
                   <AccordionSectionTitle
                     icon={<FileDown className="h-4 w-4" />}
-                    title="Documentos e Anexos Oficiais (PNCP)"
-                    description="Contrato assinado, termos aditivos e publicações em PDF disponibilizados no PNCP."
+                    title="Documentos e Anexos Oficiais"
+                    description="Arquivos do PNCP e do Compras.gov.br, com a fonte identificada."
                     count={
                       isLoadingPncpDocs
                         ? 'Carregando...'
-                        : pncpDocs.length > 0
-                          ? `${pncpDocs.length} ${pncpDocs.length === 1 ? 'documento' : 'documentos'}`
+                        : pncpDocs.length + comprasDocuments.length > 0
+                          ? `${pncpDocs.length + comprasDocuments.length} ${(pncpDocs.length + comprasDocuments.length) === 1 ? 'documento' : 'documentos'}`
                           : pncpRef?.hasPncpRecord
                             ? 'Publicado (sem PDF)'
-                            : 'Não localizado'
+                            : pncpError ? 'Falha na consulta' : 'Sem registro sincronizado'
                     }
                   />
                 </AccordionTrigger>
                 <AccordionContent className="pb-4 pt-0 space-y-3">
+                  {comprasDocuments.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="outline" className="text-[10px]">Compras.gov.br</Badge>
+                        <span>{comprasDocuments.length} {comprasDocuments.length === 1 ? 'arquivo encontrado' : 'arquivos encontrados'}</span>
+                      </div>
+                      <DocumentosComprasTable documentos={comprasDocuments} />
+                    </div>
+                  ) : null}
                   {isLoadingPncpDocs ? (
                     <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin text-primary" />
@@ -917,7 +1038,8 @@ export function ContratoApiDetailsSheet({
                     <div className="space-y-3">
                       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                         <span>
-                          {pncpDocs.length} {pncpDocs.length === 1 ? 'arquivo oficial encontrado' : 'arquivos oficiais encontrados'} no PNCP
+                          <Badge variant="outline" className="mr-2 text-[10px]">PNCP</Badge>
+                          {pncpDocs.length} {pncpDocs.length === 1 ? 'arquivo oficial encontrado' : 'arquivos oficiais encontrados'}
                           {pncpRef?.numeroControlePNCP ? ` (${pncpRef.numeroControlePNCP})` : ''}
                         </span>
                         <div className="flex items-center gap-3">
@@ -999,7 +1121,7 @@ export function ContratoApiDetailsSheet({
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground max-w-xl mx-auto">
-                        O registro deste contrato está publicado no PNCP para a UG {pncpRef.unidadeCodigo || 'do campus'}, porém o órgão ainda não disponibilizou arquivos PDF para download nesta contratação.
+                        O registro deste contrato está publicado no PNCP para a UG {pncpRef.unidadeCodigo || 'do campus'}, porém não há arquivos PDF sincronizados para esta contratação.
                       </p>
                       <div className="flex items-center justify-center gap-3 pt-1">
                         <Button
@@ -1023,13 +1145,13 @@ export function ContratoApiDetailsSheet({
                         </a>
                       </div>
                     </div>
-                  ) : (
+                  ) : comprasDocuments.length > 0 ? null : (
                     <div className="rounded-md border border-dashed border-border/70 p-6 text-center space-y-3">
                       <p className="text-sm font-medium text-foreground">
                         Nenhum documento do PNCP sincronizado no banco de dados.
                       </p>
                       <p className="text-xs text-muted-foreground max-w-lg mx-auto">
-                        Contratos anteriores à Lei 14.133/2021 ou pendentes de envio pelo órgão ao PNCP não constam no portal nacional.
+                        A ausência de arquivos sincronizados não confirma ausência de publicação no PNCP. Use a consulta para verificar.
                       </p>
                       <Button
                         size="sm"
@@ -1046,7 +1168,7 @@ export function ContratoApiDetailsSheet({
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem value="nfe-rastreabilidade" className="border border-border/80 rounded-xl px-4 py-1 bg-card shadow-xs">
+              <AccordionItem hidden={pageMode && detailTab !== 'faturas'} value="nfe-rastreabilidade" className="border border-border/80 rounded-xl px-4 py-1 bg-card shadow-xs">
                 <AccordionTrigger className="hover:no-underline py-3">
                   <div className="flex items-center gap-2 text-left">
                     <Receipt className="h-4 w-4 text-action-primary shrink-0" />
@@ -1074,11 +1196,13 @@ export function ContratoApiDetailsSheet({
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
+            </TabsContent>
+            </Tabs>
           </div>
         )}
         </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
+    </>);
+  if (pageMode) return open ? <RecordDetailsPage backLabel="Voltar aos contratos" onBack={() => onOpenChange(false)}>{content}</RecordDetailsPage> : null;
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="flex h-[min(90vh,880px)] w-[calc(100vw-2rem)] max-w-5xl flex-col gap-0 overflow-hidden p-0 bg-background sm:rounded-2xl border border-border shadow-2xl">{content}</DialogContent></Dialog>;
 
+}

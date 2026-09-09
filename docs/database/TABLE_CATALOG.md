@@ -2,6 +2,12 @@
 
 Este catalogo resume as tabelas e views mais relevantes para manutencao. Nao substitui as migrations.
 
+## Escopo por campus IFRN
+
+`user_campus_preferences` mantém a UASG ativa do usuário, inicialmente `158366` (Currais Novos), validada pelo catálogo `licitacoes_pncp_uasgs`. A migration `20260907150000_add_user_campus_scope.sql` acrescenta `campus_uasg` às bases orçamentárias, RAP, contratos locais e logs de importação, preserva os registros existentes em Currais Novos e aplica RLS por órgão + campus.
+
+`contratos_api_campus_scope` materializa o vínculo de contratos Comprasnet com cada campus. A origem do vínculo (`ug_campus`, `reitoria_com_empenho_campus` ou `reitoria_com_fatura_campus`) é gravada para auditoria; contratos da Reitoria sem evidência operacional não aparecem no campus.
+
 ## Orcamento e execucao
 
 ### `atividades`
@@ -494,6 +500,7 @@ Campos-chave:
 Regras:
 - `save_requisicao_compra` salva cabeçalho, empenhos vinculados e itens na mesma transação.
 - O fluxo utiliza 3 status: `draft` (Rascunho), `enviada_fornecedor` (Enviada ao Fornecedor) e `liquidada` (Liquidada).
+- A RLS permite leitura ao criador, superadministrador, `diretores`, `teste` e aos fiscais de contratos. O slug canônico atual é `fiscais-de-contratos`; `fiscal-contratos` permanece aceito para compatibilidade com instalações antigas.
 - Requisições em `enviada_fornecedor` exigem ao menos uma NE, itens com `empenho_id` e permissão explícita para terceirizados. O saldo disponível valida e abate concorrentemente outras requisições já enviadas ao fornecedor da mesma NE.
 - Requisições com status `liquidada` não acumulam desconto no módulo para evitar duplicidade com as liquidações oficiais registradas no SIAFI.
 - Itens de requisições com status diferente de `draft` compõem o consumo automático de insumos no ambiente canônico `REFEITORIO` / Refeitório. A data analítica é `consumo_iniciado_em`.
@@ -561,10 +568,10 @@ Consumido por:
 ### `terceirizado_permissions`
 
 Finalidade:
-- Controlar o escopo de contratos e empenhos que cada terceirizado pode ver/utilizar nas suas requisições.
+- Controlar o escopo de contratos e empenhos que cada terceirizado pode ver/utilizar nas suas requisições e consultar na tela `/empenhos`.
 - O vinculo principal usa `user_matricula`; `user_email` permanece como fallback legado.
 - A página `/cadastro-terceirizados`, dentro da edição do prestador, pode criar múltiplos vínculos de empenho em lote, mas cada empenho autorizado continua sendo persistido como uma linha individual nesta tabela.
-- Para o terceirizado de refeitório, vínculos com `contrato_id` são exibidos como contratos autorizados em `/contratos`; eles não liberam os empenhos do contrato sem vínculos diretos por `empenho_id`.
+- Para o terceirizado de refeitório, vínculos diretos por `empenho_id` liberam os empenhos autorizados para seleção em `/requisicao-compra` e para visualização detalhada em modo somente leitura em `/empenhos`. Vínculos com `contrato_id` são exibidos como contratos autorizados em `/contratos` e não expandem automaticamente os empenhos do contrato.
 
 Campos-chave:
 - `id`
@@ -578,6 +585,7 @@ Consumido por:
 - [requisicoesCompra.ts](file:///c:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/services/requisicoesCompra.ts)
 - [CadastroTerceirizados.tsx](file:///c:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/pages/CadastroTerceirizados.tsx)
 - [RequisicaoCompra.tsx](file:///c:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/pages/RequisicaoCompra.tsx)
+- [Empenhos.tsx](file:///c:/Users/3128880/Desktop/Programação/Sistema_Gerencial/src/pages/Empenhos.tsx)
 
 ## Importacoes auxiliares
 
@@ -942,6 +950,79 @@ Campos-chave:
 - `total_upserted`
 - `details`
 
+### `preco_referencia_itens`
+
+Finalidade:
+
+- base materializada de pesquisa de preços oficial (Compras.gov.br e PNCP sob Lei 14.133/2021 e IN SEGES/ME 65/2021)
+- suporte a pesquisa vetorial semântica com pgvector (`embedding vector(768)` e índice HNSW `idx_preco_ref_embedding_hnsw`)
+- suporte a busca Full-Text (`search_tsv tsvector` com dicionário português e índice GIN) e similaridade fonética/trigrama (`pg_trgm`)
+- consumida prioritariamente pelo Assistente Gerencial (`executeConversationalPriceResearch`) antes de consultar APIs externas lentas
+- alimentada pela Edge Function `sync-precos-referencia` e pelo job cron diário `sync-precos-referencia-daily`
+
+Campos-chave:
+
+- `id`
+- `numero_controle_pncp`
+- `numero_item`
+- `codigo_item_catalogo`
+- `tipo_catalogo`: `material` ou `servico`
+- `descricao_item`
+- `descricao_detalhada`
+- `unidade_medida`
+- `quantidade`
+- `valor_unitario` (preço homologado / cotação limpa)
+- `valor_total`
+- `marca`
+- `fornecedor_nome`
+- `fornecedor_cnpj`
+- `orgao_nome`
+- `orgao_cnpj`
+- `orgao_esfera`
+- `orgao_uf`
+- `uasg_codigo`
+- `modalidade_nome`
+- `ano_compra`
+- `data_publicacao_pncp`
+- `data_resultado`
+- `link_pncp`
+- `amostra_valida`
+- `embedding`: `vector(768)`
+- `search_tsv`: `tsvector` gerado automaticamente
+- `sync_run_id`: FK para `preco_referencia_sync_runs(id)`
+
+Função RPC associada:
+
+- `match_preco_referencia_hibrido(query_text, query_embedding, match_threshold, match_count, filter_uf, filter_esfera, max_lookback_days)`: calcula score ponderado (50% semântica vetorial, 30% FTS português, 20% trigrama)
+
+Consumido por:
+
+- [precoReferencia.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/precoReferencia.ts)
+- [assistente-gerencial/index.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/supabase/functions/assistente-gerencial/index.ts)
+
+### `preco_referencia_sync_runs`
+
+Finalidade:
+
+- trilha e controle de sincronizações da base de preços de referência (backfill mês a mês e delta diário de 24h/48h)
+
+Campos-chave:
+
+- `id`
+- `tipo_sync`: `backfill_mensal`, `daily_delta`, `manual`
+- `ano`
+- `mes`
+- `data_inicial`
+- `data_final`
+- `status`: `running`, `completed`, `partial_success`, `error`
+- `escopo`
+- `total_compras_consultadas`
+- `total_itens_ingeridos`
+- `total_embeddings_gerados`
+- `cursor_data`: JSONB com paginação e progresso
+- `started_at`
+- `finished_at`
+
 ## Energia Campus
 
 ### `energia_import_runs`
@@ -1168,7 +1249,7 @@ Finalidade:
 Campos-chave:
 
 - `origem` (`checkin` ou `requisicao_compra`)
-- `consumo_em`, `ambiente_*`, `material`, `quantidade`, `unidade`
+- `consumo_em`, `ambiente_*`, `material`, `quantidade`, `unidade`, `valor_unitario`, `valor_total`
 - `requisicao_compra_id`, `requisicao_numero`, `requisicao_status` (quando a origem é requisição)
 
 Observações operacionais:
@@ -1370,3 +1451,10 @@ Consumido por:
 - [dataImportLogsService.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/dataImportLogsService.ts)
 - [ImportacaoDados.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/ImportacaoDados.tsx)
 - [ObservabilityCenter.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/components/observabilidade/ObservabilityCenter.tsx)
+
+## Controle de sincronização PNCP em contratos_api
+
+A migration 20260905173000 adiciona pncp_sync_attempted_at e pncp_sync_error.
+Tentativas são independentes dos marcos de sucesso por documentos/instrumentos.
+A função enqueue_pncp_contract_sync é restrita a service_role e ao proprietário;
+usa credencial do Vault, sem segredo no texto do cron. Ver [operação](../ops/PNCP_CONTRACT_SYNC.md).

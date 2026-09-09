@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, useOptionalAuth } from '@/contexts/AuthContext';
 import { DashboardRapAnnualEvolutionPanel } from '@/components/dashboard/DashboardRapAnnualEvolutionPanel';
 import { rapHistoricoAnualService } from '@/services/rapHistoricoAnual';
 
@@ -20,6 +20,7 @@ vi.mock('recharts', () => ({
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: vi.fn(),
+  useOptionalAuth: vi.fn(),
 }));
 
 vi.mock('@/services/rapHistoricoAnual', () => ({
@@ -31,6 +32,7 @@ vi.mock('@/services/rapHistoricoAnual', () => ({
 }));
 
 const mockedUseAuth = vi.mocked(useAuth);
+const mockedUseOptionalAuth = vi.mocked(useOptionalAuth);
 const mockedService = vi.mocked(rapHistoricoAnualService);
 
 function renderPanel() {
@@ -49,6 +51,7 @@ describe('DashboardRapAnnualEvolutionPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedUseAuth.mockReturnValue({ isSuperAdmin: true } as never);
+    mockedUseOptionalAuth.mockReturnValue({ isSuperAdmin: true, userCampus: null } as never);
     mockedService.getLatestReport.mockResolvedValue({
       sourceFile: 'historico-rap.csv',
       importedAt: '2026-06-02T12:00:00.000Z',
@@ -127,6 +130,7 @@ describe('DashboardRapAnnualEvolutionPanel', () => {
 
   it('oculta importacao para usuario que nao e superadmin', async () => {
     mockedUseAuth.mockReturnValue({ isSuperAdmin: false } as never);
+    mockedUseOptionalAuth.mockReturnValue({ isSuperAdmin: false, userCampus: null } as never);
     renderPanel();
 
     expect(await screen.findByTestId('composed-chart')).toBeInTheDocument();
