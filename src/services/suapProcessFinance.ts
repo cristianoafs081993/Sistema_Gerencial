@@ -5,6 +5,7 @@ import { empenhosService } from '@/services/empenhos';
 import type { Contrato, ContratoEmpenho, Empenho, SuapProcesso } from '@/types';
 import { buildEmpenhoLookupKeys, normalizeContratoNumero } from '@/utils/contratosSync';
 import { getRapBaseVigente, getRapReferenceYear, getRapSaldoAtual } from '@/utils/rapMetrics';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type SuapProcessFinanceSummaryStatus =
   | 'ready'
@@ -371,11 +372,14 @@ type LiquidacoesCacheRow = {
 
 const LIQUIDACOES_CACHE_SELECT = 'id, empenho_numero, empenho_numero_api, contrato_api_id, contrato_numero, contrato_objeto, fatura_id, numero_instrumento_cobranca, situacao, valor_bruto, valor_liquido, data_emissao, data_vencimento, data_pagamento, data_liquidacao, processo, valor_empenho, subelemento';
 
-async function loadCachedLiquidacoesForEmpenhos(empenhoNumeros: string[]) {
+async function loadCachedLiquidacoesForEmpenhos(
+  empenhoNumeros: string[],
+  client: SupabaseClient = supabase,
+) {
   const lookupKeys = Array.from(new Set(empenhoNumeros.map(buildCanonicalEmpenhoLookupKey).filter(Boolean)));
   if (lookupKeys.length === 0) return new Map<string, ContratoApiPublicLiquidacaoRow[]>();
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from('contratos_api_empenho_liquidacoes_cache')
     .select(LIQUIDACOES_CACHE_SELECT)
     .in('empenho_lookup_key', lookupKeys)
@@ -413,14 +417,17 @@ async function loadCachedLiquidacoesForEmpenhos(empenhoNumeros: string[]) {
   return rowsByEmpenho;
 }
 
-async function loadLiquidacoesForEmpenhos(empenhoNumeros: string[]) {
-  const cachedRowsByEmpenho = await loadCachedLiquidacoesForEmpenhos(empenhoNumeros);
+async function loadLiquidacoesForEmpenhos(
+  empenhoNumeros: string[],
+  client: SupabaseClient = supabase,
+) {
+  const cachedRowsByEmpenho = await loadCachedLiquidacoesForEmpenhos(empenhoNumeros, client);
   const rowsByEmpenho = new Map(cachedRowsByEmpenho);
   const numerosUnicos = Array.from(new Set(empenhoNumeros.map((numero) => String(numero ?? '').trim()).filter(Boolean)));
 
   await Promise.all(numerosUnicos.map(async (numero) => {
     try {
-      const rows = await contratosApiService.getLiquidacoesPublicasPorEmpenho(numero);
+      const rows = await contratosApiService.getLiquidacoesPublicasPorEmpenho(numero, undefined, client);
       if (rows.length > 0) rowsByEmpenho.set(normalizeEmpenhoRef(numero), rows);
     } catch (error) {
       console.warn('suapProcessFinanceService: atualizacao de liquidacoes indisponivel', error);
@@ -431,9 +438,12 @@ async function loadLiquidacoesForEmpenhos(empenhoNumeros: string[]) {
 }
 
 export const suapProcessFinanceService = {
-  async getSummaryBySuapId(suapId: string): Promise<SuapProcessFinanceSummary> {
+  async getSummaryBySuapId(
+    suapId: string,
+    client: SupabaseClient = supabase,
+  ): Promise<SuapProcessFinanceSummary> {
     const { suapProcessosService } = await import('@/services/suapProcessos');
-    const processo = await suapProcessosService.getBySuapId(suapId);
+    const processo = await suapProcessosService.getBySuapId(suapId, client);
     if (!processo) return buildSuapProcessFinanceSummary({
       processo: null,
       empenhos: [],
@@ -444,16 +454,20 @@ export const suapProcessFinanceService = {
     });
 
     const [empenhos, contratos, contratosEmpenhos, contratosApi] = await Promise.all([
-      empenhosService.getAll(),
-      contratosService.getContratos(),
-      contratosService.getContratosEmpenhos(),
-      contratosApiService.getContratosApi(false),
+      empenhosService.getAll(undefined, client),
+      contratosService.getContratos(undefined, client),
+      contratosService.getContratosEmpenhos(undefined, client),
+      contratosApiService.getContratosApi(false, undefined, client),
     ]);
     const contratoNumero = getProcessContratoNumero(processo);
     const beneficiaryDocument = normalizeDigits(processo.cpfCnpj) || undefined;
     const beneficiaryName = processo.beneficiario?.trim() || undefined;
     const matchingApiContratos = resolveApiContratos(contratosApi, contratoNumero, beneficiaryName, beneficiaryDocument);
-    const contratosApiEmpenhos = await contratosApiService.getEmpenhosApi(matchingApiContratos.map((contrato) => contrato.id));
+    const contratosApiEmpenhos = await contratosApiService.getEmpenhosApi(
+      matchingApiContratos.map((contrato) => contrato.id),
+      undefined,
+      client,
+    );
     const preliminary = buildSuapProcessFinanceSummary({
       processo,
       empenhos,
@@ -462,7 +476,10 @@ export const suapProcessFinanceService = {
       contratosApi,
       contratosApiEmpenhos,
     });
-    const liquidacoesPorEmpenho = await loadLiquidacoesForEmpenhos(preliminary.empenhos.map((empenho) => empenho.numero));
+    const liquidacoesPorEmpenho = await loadLiquidacoesForEmpenhos(
+      preliminary.empenhos.map((empenho) => empenho.numero),
+      client,
+    );
 
     return buildSuapProcessFinanceSummary({
       processo,

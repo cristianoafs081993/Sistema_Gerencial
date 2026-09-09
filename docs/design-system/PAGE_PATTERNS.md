@@ -111,3 +111,17 @@ Para validacoes de layout sem risco para a rota oficial, usar uma rota isolada c
 6. tabelas de apoio com dados do `DataContext`, estados vazios e leitura tabular.
 
 A implementacao de referencia esta em `/dashboard-cloudscape-preview`; a rota `/` permanece o dashboard de producao.
+
+## Padrao 9: modelagem e gestao de processos BPMN (/mapeamentos)
+
+A tela de mapeamento operacional de processos adota arquitetura de estúdio interativo com suporte unificado às rotas `/mapeamentos` e `/mapeamentos/:mappingId`:
+
+1. **Top Navbar Especializada**: seletor de processos ativos com código e categoria, busca rápida em tempo real com realce no fluxo e alternador de três modos de visualização (Fluxograma, Matriz e Guia de Execução);
+2. **Sidebar Esquerda com Paleta**: lista de mapeamentos disponíveis com status, paleta de elementos rápidos (Tarefa, Decisão, Início/Fim e Conexão) e resumo de indicadores de governança (sistemas e modelos vinculados);
+3. **Visão Fluxograma (Canvas)**: raias operacionais (swimlanes) horizontais com cores setoriais, conectores ortogonais em degrau (90°) com setas e rótulos de condição, controles de zoom/pan, grade comutável e nós interativos com identificador `PASSO XX`;
+4. **Visão Matriz (Tabela Operacional)**: tabela densa com filtros por links de sistemas, modelos e pendências, com colunas para responsáveis, SLA, base legal e atalhos diretos;
+5. **Visão Guia de Execução**: visão orientada a tarefas com progresso geral animado, lista sequencial de cartões, checklists interativos funcionais e botões de acesso direto a sistemas oficiais;
+6. **Drawer de Detalhes (`NodeDetailDrawer`)**: gaveta lateral deslizante com abas de Links & Sistemas (com presets para SUAP, Compras.gov.br, SIAFI, PNCP, SEI e AGU), Procedimento detalhado, Checklist operacional e Conformidade com a Lei 14.133/2021;
+7. **Modais Auxiliares**: modais acessíveis para exportação/impressão em PDF e JSON, criação de novos processos e assistente IA para modelagem governamental;
+8. **Integração com o SUAP**: quando acessado com parâmetro `?suapId=...`, exibe banner de contexto do processo em tramitação e reflete a etapa atual do processo nos três modos de visão.
+

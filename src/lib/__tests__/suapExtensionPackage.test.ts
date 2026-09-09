@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.30');
+    expect(manifest.version).toBe('1.9.31');
     expect(manifest.host_permissions).toContain('<all_urls>');
     expect(manifest.permissions).toEqual(expect.arrayContaining(['activeTab', 'scripting', 'storage', 'alarms']));
     expect(manifest.background).toEqual({ service_worker: 'background.js' });
@@ -172,6 +172,8 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(backgroundScript).toContain('refresh_token');
     expect(backgroundScript).toContain('toPublicSession');
     expect(processScript).not.toContain('refreshToken: session.refreshToken');
+    expect(processScript).toContain("state.syncStatus.stage === 'error' && !state.hasFinanceSummary");
+    expect(processScript).toContain('renderFinanceEmpty(state.syncStatus.message)');
     expect(backgroundScript).toContain('chrome.alarms.create');
     expect(popup).toContain('id="siafi-list-select"');
     expect(popup).toContain('id="btn-siafi-fill"');

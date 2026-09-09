@@ -263,6 +263,28 @@ describe('process-document 1.9', () => {
     expect(summary?.querySelectorAll('.suape-copy').length).toBeGreaterThan(8);
   });
 
+  it('substitui o carregamento financeiro por erro quando o iframe falha', async () => {
+    const api = loadProcessScript();
+    await api.installToolkit();
+    await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeTruthy());
+    const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
+
+    window.dispatchEvent(new MessageEvent('message', {
+      origin: 'https://www.siages.com.br',
+      source: frame.contentWindow,
+      data: {
+        source: 'siages',
+        type: 'siages:suap-process-sync-status',
+        version: 1,
+        payload: { stage: 'error', message: 'A consulta financeira demorou demais. Tente novamente.', retryable: true },
+      },
+    }));
+
+    expect(document.getElementById('siages-suap-finance-panel')).toHaveTextContent(
+      'A consulta financeira demorou demais. Tente novamente.',
+    );
+  });
+
   it('renderiza o caminho BPMN compacto e o link para o mapa completo', async () => {
     const api = loadProcessScript();
     await api.installToolkit();

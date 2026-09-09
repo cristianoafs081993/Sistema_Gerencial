@@ -116,6 +116,7 @@ const App = () => (
                 </Route>
                 <Route path="/suap-extensao/plano-resumo" element={<SuapExtensionPlanSummary />} />
                 <Route element={<AppShell />}>
+                  <Route path="/mapeamentos" element={<SuapProcessMapping />} />
                   <Route path="/mapeamentos/:mappingId" element={<SuapProcessMapping />} />
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/atividades/*" element={<Navigate replace to="/planejamento/campus" />} />

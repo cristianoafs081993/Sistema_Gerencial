@@ -31,6 +31,7 @@ const PROCESSING_STATUSES = new Set([
   'consolidating_extraction',
 ]);
 const READY_STATUSES = new Set(['success', 'incomplete_extraction']);
+const FINANCE_QUERY_TIMEOUT_MS = 30_000;
 
 function postMessageToSuapParent(message: unknown) {
   try {
@@ -117,6 +118,19 @@ async function delay(milliseconds: number) {
   await new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
+async function withTimeout<T>(promise: Promise<T>, milliseconds: number, message: string): Promise<T> {
+  let timeoutId: number | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(message)), milliseconds);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+  }
+}
+
 export default function SuapExtensionProcessInfo() {
   const [context, setContext] = useState<SuapExtensionProcessContext | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -176,7 +190,12 @@ export default function SuapExtensionProcessInfo() {
       return process;
     };
     const publishFinance = async () => {
-      const summary = await suapProcessFinanceService.getSummaryBySuapId(context.suapId);
+      postSyncStatus({ stage: 'checking', message: 'Consultando empenhos no SIAGES...' });
+      const summary = await withTimeout(
+        suapProcessFinanceService.getSummaryBySuapId(context.suapId, extensionClient),
+        FINANCE_QUERY_TIMEOUT_MS,
+        'A consulta financeira demorou demais. Tente novamente.',
+      );
       if (active) postSummary(summary);
     };
 

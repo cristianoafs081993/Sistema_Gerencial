@@ -97,7 +97,7 @@ describe('SuapExtensionProcessInfo', () => {
     await sendContext();
 
     await waitFor(() => expect(suapProcessosService.getBySuapId).toHaveBeenCalledWith('987', extensionClient));
-    await waitFor(() => expect(suapProcessFinanceService.getSummaryBySuapId).toHaveBeenCalledWith('987'));
+    await waitFor(() => expect(suapProcessFinanceService.getSummaryBySuapId).toHaveBeenCalledWith('987', extensionClient));
     expect(postMessage).toHaveBeenCalledWith({
       source: 'siages',
       type: SUAP_EXTENSION_PROCESS_FINANCE_SUMMARY_TYPE,
@@ -113,6 +113,36 @@ describe('SuapExtensionProcessInfo', () => {
 
     await Promise.resolve();
     expect(suapProcessFinanceService.getSummaryBySuapId).not.toHaveBeenCalled();
+  });
+
+  it('publica erro acionavel quando a consulta financeira excede o limite', async () => {
+    vi.mocked(suapProcessFinanceService.getSummaryBySuapId).mockImplementation(() => new Promise(() => undefined));
+    const postMessage = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => undefined);
+    const realSetTimeout = window.setTimeout.bind(window);
+    vi.spyOn(window, 'setTimeout').mockImplementation(((handler: TimerHandler, timeout?: number, ...args: unknown[]) => {
+      if (timeout === 30_000) {
+        queueMicrotask(() => {
+          if (typeof handler === 'function') handler(...args);
+        });
+        return 30_000;
+      }
+      return realSetTimeout(handler, timeout, ...args);
+    }) as typeof window.setTimeout);
+
+    render(<SuapExtensionProcessInfo />);
+    await sendContext();
+
+    await waitFor(() => expect(postMessage).toHaveBeenCalledWith({
+      source: 'siages',
+      type: 'siages:suap-process-sync-status',
+      version: 1,
+      payload: {
+        stage: 'error',
+        message: 'A consulta financeira demorou demais. Tente novamente.',
+        retryable: true,
+      },
+    }, SUAP_EXTENSION_ORIGIN));
+    postMessage.mockRestore();
   });
 
   it('cadastra um processo ausente antes de publicar os dados', async () => {

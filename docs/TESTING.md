@@ -131,6 +131,9 @@ Rollout: executar A/B manual em 10 processos de pagamento representativos. Promo
 
 A pasta corrente e centralizada por `src/test/extensionFixtures.ts`. As suites `suapExtensionPackage`, `suapCommandPaletteGlobal`, `suapProcessDocumentExtension`, `suapTextExpander`, `suapExtensionDispatch`, `SuapExtensionProcessInfo`, `suapPlanContentScript` e `suapCloneAutomation` protegem manifesto e rotas, painel de processo, bridge segura, sincronizacao, Financeiro, atalhos, popup, Plano de Atividades e clonagem.
 
+- `suapProcessFinanceClient.test.ts` confirma que o cliente efemero da extensao percorre toda a cadeia financeira, sem retorno acidental ao cliente Supabase global.
+- `SuapExtensionProcessInfo.test.tsx` confirma que o mesmo cliente chega ao resumo financeiro; `suapProcessDocumentExtension.test.ts` garante que falhas e timeouts substituem o carregamento por mensagem acionavel.
+
 - `suapExtensionPackage.test.ts` protege a configuracao da paleta global: o modo generico cobre `<all_urls>` sem SIAGES, SUAP ou Comprasnet; o modo especializado do SUAP continua separado, e telas/acoes apontam para a origem publica do SIAGES. `suapCommandPaletteGlobal.test.ts` valida que, em um site comum, nao ha consulta em segundo plano e comandos do SUAP nao sao exibidos antes ou depois de abrir `Ctrl/Cmd+K`.
 
 - `suapExtensionAuth.test.ts` cobre a sessão persistente da extensão: renovação concorrente serializada, recriação idempotente do alarme, preservação em falha transitória, revogação definitiva e logout durante uma renovação. As respostas públicas do worker não podem conter `refreshToken`; `suapExtensionPackage.test.ts` garante esse contrato nos scripts distribuídos.
