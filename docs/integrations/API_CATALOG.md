@@ -722,13 +722,15 @@ Function chamada pela extensão na rota oficial de edição de ETP.
 ## Sincronizacao do Plano SUAP
 
 - Endpoint: `POST /functions/v1/sync-suap-plan`, sempre autenticado pelo JWT do SIAGES.
-- Acoes: `connect`, `connect-cookie`, `sync`, `sync-html`, `apply`, `status` e `disconnect`.
+- Acoes: `connect`, `connect-cookie`, `sync`, `sync-all`, `sync-html`, `apply`, `apply-batch`, `status` e `disconnect`.
+- `sync` continua sincronizando somente a UASG ativa, enquanto `sync-all` sincroniza as 44 unidades não vazias do seletor do Plano 8 em lote. Currais Novos permanece como unidade `19`, com UASG-pai `158366` e URL sem `unidade_gestora` para compatibilidade retroativa.
 - `sync` usa a sessao SUAP cifrada no backend. `sync-html` recebe somente o HTML capturado da URL canonica do Plano 8 e nao exige `suap_connections` nem novo login SUAP.
 - O HTML enviado pela extensao e validado por host/caminho, tamanho maximo de 15 MB e parser com IDs estaveis; URLs arbitrarias e conteudo incompleto sao rejeitados.
 - O parser captura a coluna oficial `Saldo disponível para empenho da atividade (R$)` e o snapshot/materialização preserva esse valor em `atividades.saldo_disponivel` para o drill-down do Dashboard.
 - A primeira execucao fica em `preview`; depois da conferencia, `apply_suap_plan_snapshot` atualiza/inclui os registros e arquiva os ausentes sem exclusao fisica.
 - O Campus nao depende da extensao. Quando a extensao e usada no popup, ela captura a aba SUAP atual e envia o HTML ao backend; na pagina Campus ela apenas dispara `siages:suap-plan-sync-request`.
 - O popup mantem o `runId` da previa em `chrome.storage.local` e oferece a aplicacao explicita pelo mesmo endpoint, sem abrir uma aba do SIAGES.
+- Para o lote, o popup/card mantém o `batchId`, mostra o resultado por unidade e usa `apply-batch` somente após a prévia. A aplicação de cada unidade continua isolada pela dupla `suap_unit_code` + `campus_uasg`; uma falha pode gerar status parcial sem apagar dados dos demais campi.
 
 ## 13. Assistente Gerencial - Pesquisa de Preços Textual e Auditoria de Editais (IN 65/2021)
 

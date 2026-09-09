@@ -165,7 +165,7 @@ Tambem validar o quadro Resumo financeiro por dimensao abaixo da Legenda, com um
 
 ## Sincronizacao SUAP -> Campus
 
-Os testes do parser cobrem acentos, moeda brasileira, IDs de atividades e linhas ocultas. A suite de seguranca cobre a permissao exclusiva do caminho canonico do Plano 8 no proxy. O fluxo remoto deve ser validado com HTML fixture para previa, aplicacao idempotente, alteracao de valor, nova atividade, arquivamento e falha sem commit parcial.
+Os testes do parser cobrem acentos, moeda brasileira, IDs de atividades e linhas ocultas. A suite de unidades cobre as 44 opções do seletor, round-trip das URLs, a URL legada sem query de Currais Novos, UASG-pai, unidades sistêmicas e rejeição de parâmetros inválidos. A suite de serviço cobre sincronização individual com UASG, lote completo, prévia de lote, aplicação individual e `apply-batch`. A suite de isolamento verifica chave composta, snapshots e diffs delimitados por `suap_unit_code` + `campus_uasg`, além do lock global do lote. A suite de segurança cobre a permissão exclusiva do caminho canônico do Plano 8 no proxy. O fluxo remoto deve ser validado com HTML fixture para prévia, aplicação idempotente, alteração de valor, nova atividade, arquivamento e falha sem commit parcial.
 
 - O popup na aba SUAP deve usar `chrome.scripting.executeScript`, enviar `action: "sync-html"` com HTML e `sourceUrl`, e nunca inserir linhas diretamente.
 - Apos uma previa, o popup deve exibir `Aplicar conferencia`, enviar `action: "apply"` com o `runId` persistido e ocultar o botao somente apos sucesso.

@@ -433,6 +433,8 @@ Ao abrir um documento relacionado a partir do processo, a nova instancia de `pro
 
 A central de importação de dados (`/importacao-dados`), no Módulo Orçamentário, monta `SuapPlanSyncCard`. Ao entrar, o card chama `sync-suap-plan` em segundo plano; ao concluir, os dados são recarregados. A primeira captura é uma prévia com contagem de novas, atualizadas e arquivadas; a aplicação ocorre após a confirmação do espelho inicial. Na tela de planejamento de atividades (`/planejamento/campus`), o card não é exibido diretamente, mantendo a visualização da tabela limpa.
 
+O seletor de unidade usa o catálogo completo do Plano 8 (`1` a `44`) e permite uma sincronização individual da UASG ativa ou a ação `Sincronizar todas as unidades`. A ação em lote cria prévias independentes por unidade, exibe sucessos e falhas e só materializa os snapshots após a confirmação. A seleção padrão de Currais Novos continua em `DG/CN` (`19`, UASG-pai `158366`) e usa a URL histórica sem query string.
+
 O parser le todas as tabelas de atividades do Plano 8, inclusive linhas com `hidden`, usando o ID do link `listar_requisicoes_despesa/8/<id>/` como chave estavel. Tambem captura a coluna oficial `Saldo disponível para empenho da atividade (R$)` e a sincronização a persiste em `atividades.saldo_disponivel`; o modal do Dashboard usa esse campo para exibir e filtrar o saldo. A extensao continua opcional para o fluxo automatico do Campus.
 
 - No acionamento manual pelo popup, estando na pagina do Plano 8, a extensao captura `document.documentElement.outerHTML` da aba SUAP ja autenticada e envia apenas `{ action: "sync-html", html, sourceUrl }` para `sync-suap-plan` com o JWT do SIAGES. Nao abre outra aba e nao pede novo login SUAP.

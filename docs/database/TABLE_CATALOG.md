@@ -1396,13 +1396,16 @@ Consumido por src/services/inventory.ts e src/pages/Almoxarifado.tsx.
 Sessões SUAP cifradas, de curta duração, vinculadas ao usuário e ao órgão. A tabela tem RLS e não concede leitura ao cliente; somente a Edge Function usa o conteúdo cifrado.
 
 ### `suap_plan_sync_runs`
-Histórico das capturas do Plano 8: modo (`preview`/`apply`), status, checksum, contagens, tempos e erro.
+Histórico das capturas do Plano 8: modo (`preview`/`apply`), status, checksum, contagens, tempos, erro, `batch_id`, `suap_unit_code` e `campus_uasg`. Registros legados sem unidade continuam representando Currais Novos (`19`/`158366`).
+
+### `suap_plan_sync_batches`
+Agrupa a sincronização de todas as unidades do seletor do Plano 8. Registra quantidade solicitada, sucessos, falhas, prévias, status (`running`/`preview`/`success`/`partial`/`failed`) e metadados da execução. A aplicação usa `apply-batch` e não mistura snapshots de unidades diferentes.
 
 ### `suap_plan_activity_snapshots`
-Snapshot normalizado e bruto de cada atividade capturada, por execução e ID estável do SUAP. Preserva `saldo_disponivel`, lido da coluna "Saldo disponível para empenho da atividade".
+Snapshot normalizado e bruto de cada atividade capturada, por execução, unidade (`suap_unit_code`), UASG-pai (`campus_uasg`) e ID estável do SUAP. Preserva `saldo_disponivel`, lido da coluna "Saldo disponível para empenho da atividade".
 
 ### Campos de sincronização em `atividades`
-`sync_source`, `suap_plan_id`, `suap_activity_id`, `sync_active` e `sync_last_seen_run_id` permitem upsert idempotente e arquivamento lógico dos itens ausentes. Para registros `suap_plan_8`, `saldo_disponivel` é a fonte oficial do saldo exibido no drill-down do Dashboard.
+`sync_source`, `suap_plan_id`, `suap_unit_code`, `suap_activity_id`, `campus_uasg`, `sync_active` e `sync_last_seen_run_id` permitem upsert idempotente e arquivamento lógico dos itens ausentes. A chave é composta também pela unidade SUAP, evitando colisão entre campi com o mesmo ID de atividade. Para registros `suap_plan_8`, `saldo_disponivel` é a fonte oficial do saldo exibido no drill-down do Dashboard.
 
 ### `suap_document_reviews`
 
