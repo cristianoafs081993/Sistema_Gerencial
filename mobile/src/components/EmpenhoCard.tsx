@@ -75,7 +75,9 @@ export const EmpenhoCard: React.FC<EmpenhoCardProps> = ({ item }) => {
           <IconCalendar size={14} color={colors.mutedText} />
           <Text style={styles.footerText}>{item.date}</Text>
         </View>
-        <Text style={styles.footerRight}>ND {item.nd}</Text>
+        <Text style={styles.footerRight}>
+          {item.tipo === 'rap' ? 'RAP · ' : ''}ND {item.nd}
+        </Text>
       </View>
     </View>
   );

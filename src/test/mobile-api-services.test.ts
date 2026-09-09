@@ -55,17 +55,31 @@ describe('SIAGES Mobile - Serviços de Integração ao Backend (Dados Reais)', (
     20000
   );
 
-  it('deve buscar e mapear a lista de empenhos do exercício 2026 sem empenhos cancelados', async () => {
-    const empenhos = await fetchEmpenhos('158366', 'exercicio');
+  it('deve buscar e mapear a lista de empenhos suportando tipo (exercício, rap e todos) sem cancelados', async () => {
+    // Default busca todos (exercício + rap)
+    const empenhosTodos = await fetchEmpenhos('158366');
+    expect(empenhosTodos.length).toBeGreaterThan(0);
+    expect(empenhosTodos.some((e) => e.tipo === 'exercicio')).toBe(true);
+    expect(empenhosTodos.some((e) => e.tipo === 'rap')).toBe(true);
 
-    expect(empenhos.length).toBeGreaterThan(0);
-    const first = empenhos[0];
+    const first = empenhosTodos[0];
     expect(first.id).toBeDefined();
     expect(first.name).toBeDefined();
     expect(first.value).toBeGreaterThanOrEqual(0);
     expect(['liquidar', 'pagar', 'pago']).toContain(first.status);
     expect(first.date).toBeDefined();
     expect(first.nd).toBeDefined();
+    expect(['exercicio', 'rap']).toContain(first.tipo);
+
+    // Filtro apenas exercício
+    const empenhosExercicio = await fetchEmpenhos('158366', 'exercicio');
+    expect(empenhosExercicio.length).toBeGreaterThan(0);
+    expect(empenhosExercicio.every((e) => e.tipo === 'exercicio')).toBe(true);
+
+    // Filtro apenas rap
+    const empenhosRap = await fetchEmpenhos('158366', 'rap');
+    expect(empenhosRap.length).toBeGreaterThan(0);
+    expect(empenhosRap.every((e) => e.tipo === 'rap')).toBe(true);
   }, 20000);
 
   it('deve buscar e mapear os contratos do campus com cálculo de vigência', async () => {

@@ -33,14 +33,18 @@ describe('SIAGES Mobile - Regras de Negócio e Dados do Protótipo', () => {
     expect(formatted).toContain('1.284.560,00');
   });
 
-  it('deve filtrar empenhos por status e busca de texto corretamente', () => {
+  it('deve filtrar empenhos por tipo (exercício / rap) e busca de texto corretamente', () => {
     // Amostra possui 4 empenhos
     expect(empenhosData).toHaveLength(4);
 
-    // Filtrar por status 'pagar'
-    const aPagar = empenhosData.filter((e) => e.status === 'pagar');
-    expect(aPagar).toHaveLength(1);
-    expect(aPagar[0].name).toBe('Grupo RL Soluções e Apoio');
+    // Filtrar por tipo 'exercicio'
+    const exercicio = empenhosData.filter((e) => e.tipo === 'exercicio');
+    expect(exercicio).toHaveLength(3);
+
+    // Filtrar por tipo 'rap'
+    const rap = empenhosData.filter((e) => e.tipo === 'rap');
+    expect(rap).toHaveLength(1);
+    expect(rap[0].id).toBe('2026NE000115');
 
     // Filtrar por busca textual
     const buscaInformatica = empenhosData.filter(

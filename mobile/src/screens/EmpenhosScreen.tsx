@@ -56,21 +56,26 @@ export const EmpenhosScreen: React.FC = () => {
         normalize(item.desc).includes(q);
 
       const matchesFilter =
-        activeFilter === 'all' || item.status === activeFilter;
+        activeFilter === 'all' || item.tipo === activeFilter;
 
       return matchesSearch && matchesFilter;
     });
   }, [empenhos, searchQuery, activeFilter]);
 
-  const totalEmpenhadoSum = useMemo(() => {
-    return empenhos.reduce((acc, curr) => acc + curr.value, 0);
-  }, [empenhos]);
+  const summarySum = useMemo(() => {
+    return filteredEmpenhos.reduce((acc, curr) => acc + curr.value, 0);
+  }, [filteredEmpenhos]);
+
+  const summaryLabel = useMemo(() => {
+    if (activeFilter === 'exercicio') return 'Empenhado no exercício';
+    if (activeFilter === 'rap') return 'Restos a pagar (RAP)';
+    return 'Total de empenhos';
+  }, [activeFilter]);
 
   const filterOptions: { id: EmpenhoFilter; label: string }[] = [
     { id: 'all', label: 'Todos' },
-    { id: 'liquidar', label: 'A liquidar' },
-    { id: 'pagar', label: 'A pagar' },
-    { id: 'pago', label: 'Pagos' },
+    { id: 'exercicio', label: 'Exercício' },
+    { id: 'rap', label: 'Restos a pagar' },
   ];
 
   if (loading && empenhos.length === 0) {
@@ -110,15 +115,15 @@ export const EmpenhosScreen: React.FC = () => {
       {/* Summary Strip */}
       <View style={styles.summaryStrip}>
         <View style={styles.summaryLeft}>
-          <Text style={styles.summaryLabel}>Empenhado no exercício</Text>
+          <Text style={styles.summaryLabel}>{summaryLabel}</Text>
           <Text style={styles.summaryValue}>
-            {formatBRL(totalEmpenhadoSum || 4147037, false)}
+            {formatBRL(summarySum, false)}
           </Text>
         </View>
         <View style={styles.summaryRight}>
           <Text style={styles.summaryLabel}>Empenhos</Text>
           <Text style={[styles.summaryValue, { color: colors.blue }]}>
-            {empenhos.length}
+            {filteredEmpenhos.length}
           </Text>
         </View>
       </View>

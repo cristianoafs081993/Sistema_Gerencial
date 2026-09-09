@@ -1,6 +1,6 @@
 export type TabType = 'dashboard' | 'empenhos' | 'contratos';
 
-export type EmpenhoFilter = 'all' | 'liquidar' | 'pagar' | 'pago';
+export type EmpenhoFilter = 'all' | 'exercicio' | 'rap';
 export type ContratoFilter = 'all' | 'vigente' | 'vencer';
 
 export interface EmpenhoItem {
@@ -14,6 +14,7 @@ export interface EmpenhoItem {
   badge: 'blue' | 'amber' | '';
   date: string;
   nd: string;
+  tipo?: 'exercicio' | 'rap';
 }
 
 export interface ContratoItem {

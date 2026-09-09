@@ -344,7 +344,7 @@ export async function fetchDashboardMetrics(
 
 export async function fetchEmpenhos(
   campusUasg = DEFAULT_CAMPUS_UASG,
-  tipoFilter: 'exercicio' | 'rap' | 'all' = 'exercicio'
+  tipoFilter: 'exercicio' | 'rap' | 'all' = 'all'
 ): Promise<EmpenhoItem[]> {
   try {
     let query = supabase
@@ -401,6 +401,7 @@ export async function fetchEmpenhos(
         badge,
         date: formatDatePtBR(row.data_empenho),
         nd: row.natureza_despesa || '339039',
+        tipo: (row.tipo as 'exercicio' | 'rap') || 'exercicio',
       };
     });
   } catch (err) {

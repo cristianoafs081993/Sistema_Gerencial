@@ -22,6 +22,7 @@ export const empenhosData: EmpenhoItem[] = [
     badge: 'blue',
     date: '04 set. 2026',
     nd: '339039',
+    tipo: 'exercicio',
   },
   {
     id: '2026NE000124',
@@ -34,6 +35,7 @@ export const empenhosData: EmpenhoItem[] = [
     badge: 'amber',
     date: '01 set. 2026',
     nd: '339037',
+    tipo: 'exercicio',
   },
   {
     id: '2026NE000119',
@@ -46,6 +48,7 @@ export const empenhosData: EmpenhoItem[] = [
     badge: '',
     date: '28 ago. 2026',
     nd: '449052',
+    tipo: 'exercicio',
   },
   {
     id: '2026NE000115',
@@ -58,6 +61,7 @@ export const empenhosData: EmpenhoItem[] = [
     badge: 'blue',
     date: '25 ago. 2026',
     nd: '339030',
+    tipo: 'rap',
   },
 ];
 
