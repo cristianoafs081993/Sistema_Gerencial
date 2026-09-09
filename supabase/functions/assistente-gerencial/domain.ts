@@ -334,7 +334,7 @@ export function assessDemandClarity(demand: ExtractedDemandItem): DemandClarityR
   }
 
   // 4. Climatização / Ar-Condicionado
-  if (/ar[\s\-]*condicionad|climatizador|split|arcondicionado/.test(desc)) {
+  if (/ar[\s-]*condicionad|climatizador|split|arcondicionado/.test(desc)) {
     const hasBtu = /\b(9000|12000|18000|24000|30000|36000|48000|60000)\s*(btus?|btu)?\b|\b\d+\s*mil\s*btus?\b/.test(desc);
     const hasTech = /inverter|hi\s*wall|piso\s*teto|cassete|220v/.test(desc);
 
@@ -432,7 +432,7 @@ const OFFICIAL_SYNONYM_PATTERNS: Array<{ pattern: RegExp; synonyms: string[] }> 
     synonyms: ['estação de trabalho', 'mesa de escritório', 'mesa operativa'],
   },
   {
-    pattern: /\bar[\s\-]*condicionad(o|os)?\b|\bclimatizador(es)?\b/i,
+    pattern: /\bar[\s-]*condicionad(o|os)?\b|\bclimatizador(es)?\b/i,
     synonyms: ['condicionador de ar split', 'aparelho de climatização', 'condicionador de ar'],
   },
   {
@@ -524,7 +524,7 @@ export function extractDemandItems(message: string): ExtractedDemandItem[] {
   const items: ExtractedDemandItem[] = [];
 
   // Check for numbered list (e.g. "1) ... 2) ..." or "1. ... 2. ..." or "Item 1: ...")
-  const numberedPattern = /(?:(?:^|\n|\s*)(?:item\s*)?(\d+)[\.\)\:\-]\s*)([^\n\d\.\)\:\-]+(?:(?!\n\s*(?:item\s*)?\d+[\.\)\:\-]).)*)/gis;
+  const numberedPattern = /(?:(?:^|\n|\s*)(?:item\s*)?(\d+)[.):-]\s*)([^\n\d.):-]+(?:(?!\n\s*(?:item\s*)?\d+[.):-]).)*)/gis;
   const matches = [...cleanMsg.matchAll(numberedPattern)];
 
   if (matches.length >= 2) {

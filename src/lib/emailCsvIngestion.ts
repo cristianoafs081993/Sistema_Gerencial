@@ -559,13 +559,13 @@ function toIsoDate(value: unknown): string | null {
     return dateOnly;
   }
 
-  const brMatch = dateOnly.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})$/);
+  const brMatch = dateOnly.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
   if (brMatch) {
     const [, day, month, year] = brMatch;
     return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   }
 
-  const shortYearMatch = dateOnly.match(/^(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{2})$/);
+  const shortYearMatch = dateOnly.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2})$/);
   if (shortYearMatch) {
     const [, day, month, shortYear] = shortYearMatch;
     const fullYear = Number(shortYear) > 70 ? `19${shortYear}` : `20${shortYear}`;

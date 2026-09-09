@@ -23,30 +23,34 @@ export default function App() {
   const notificationResponseListener = useRef<Notifications.EventSubscription | null>(null);
 
   useEffect(() => {
-    // 1. Register for push/local notifications
-    registerForPushNotificationsAsync();
+    try {
+      // 1. Register for push/local notifications
+      void registerForPushNotificationsAsync();
 
-    // 2. Listen to notification interactions (taps)
-    notificationResponseListener.current =
-      Notifications.addNotificationResponseReceivedListener((response) => {
-        const data = response.notification.request.content.data;
-        if (data?.screen === 'contratos') {
-          setContratosFilter((data.filter as ContratoFilter) || 'vencer');
-          setCurrentTab('contratos');
+      // 2. Listen to notification interactions (taps)
+      notificationResponseListener.current =
+        Notifications.addNotificationResponseReceivedListener((response) => {
+          const data = response.notification.request.content.data;
+          if (data?.screen === 'contratos') {
+            setContratosFilter((data.filter as ContratoFilter) || 'vencer');
+            setCurrentTab('contratos');
+          }
+        });
+
+      // 3. Trigger initial check notification if there are contracts to expire
+      const timer = setTimeout(() => {
+        void sendExpiringContractsNotification(11);
+      }, 2000);
+
+      return () => {
+        clearTimeout(timer);
+        if (notificationResponseListener.current) {
+          notificationResponseListener.current.remove();
         }
-      });
-
-    // 3. Trigger initial check notification if there are contracts to expire
-    const timer = setTimeout(() => {
-      sendExpiringContractsNotification(11);
-    }, 2000);
-
-    return () => {
-      clearTimeout(timer);
-      if (notificationResponseListener.current) {
-        notificationResponseListener.current.remove();
-      }
-    };
+      };
+    } catch (err) {
+      console.warn('Erro ao inicializar listeners de notificação:', err);
+    }
   }, []);
 
   const handleNavigateToContratosAlert = () => {

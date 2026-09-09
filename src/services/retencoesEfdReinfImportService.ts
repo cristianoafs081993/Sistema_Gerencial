@@ -327,7 +327,7 @@ export async function parseRetencoesEfdReinfCsv(file: File): Promise<RetencaoEfd
   const metricaIdx = rawHeaders.findIndex((h) => h.includes('metrica'));
   
   // O valor da retenção pode ser uma coluna chamada "valor retencao" ou a última coluna (inclusive se o cabeçalho estiver vazio no final)
-  let valorRetencaoIdx = rawHeaders.findIndex((h) => h.includes('retencao') || h.includes('retida'));
+  const valorRetencaoIdx = rawHeaders.findIndex((h) => h.includes('retencao') || h.includes('retida'));
 
   return normalizedRows
     .slice(headerRowIndex + 1)

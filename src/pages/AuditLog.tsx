@@ -70,15 +70,8 @@ export default function AuditLog() {
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
 
-  if (!isSuperAdmin) {
-    return (
-      <div className="flex items-center justify-center py-24 text-sm text-slate-500">
-        Acesso restrito ao superadministrador.
-      </div>
-    );
-  }
-
   const loadEntries = useCallback(async () => {
+    if (!isSuperAdmin) return;
     setIsLoading(true);
     try {
       let query = supabase
@@ -108,11 +101,12 @@ export default function AuditLog() {
     } finally {
       setIsLoading(false);
     }
-  }, [filterEmail, filterEventType, filterDateFrom, filterDateTo]);
+  }, [isSuperAdmin, filterEmail, filterEventType, filterDateFrom, filterDateTo]);
 
   useEffect(() => {
+    if (!isSuperAdmin) return;
     void loadEntries();
-  }, [loadEntries]);
+  }, [isSuperAdmin, loadEntries]);
 
   const handleExportCSV = () => {
     if (entries.length === 0) return;
@@ -140,6 +134,14 @@ export default function AuditLog() {
     link.click();
     URL.revokeObjectURL(url);
   };
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="flex items-center justify-center py-24 text-sm text-slate-500">
+        Acesso restrito ao superadministrador.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

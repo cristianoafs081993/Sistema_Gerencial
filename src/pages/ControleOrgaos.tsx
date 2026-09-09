@@ -85,15 +85,8 @@ export default function ControleOrgaos() {
       .filter((g) => g.screens.length > 0);
   }, []);
 
-  if (!isSuperAdmin) {
-    return (
-      <div className="flex items-center justify-center py-24 text-sm text-slate-500">
-        Acesso restrito ao superadministrador.
-      </div>
-    );
-  }
-
   const loadData = async () => {
+    if (!isSuperAdmin) return;
     setIsLoading(true);
     try {
       const [orgs, usersState] = await Promise.all([listOrgs(), listAdminUsersState()]);
@@ -121,8 +114,9 @@ export default function ControleOrgaos() {
   };
 
   useEffect(() => {
+    if (!isSuperAdmin) return;
     void loadData();
-  }, []);
+  }, [isSuperAdmin]);
 
   const handleSelectOrg = (org: AdminOrg) => {
     void loadOrgDetail(org.id);
@@ -218,6 +212,14 @@ export default function ControleOrgaos() {
       current.includes(userId) ? current.filter((id) => id !== userId) : [...current, userId],
     );
   };
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="flex items-center justify-center py-24 text-sm text-slate-500">
+        Acesso restrito ao superadministrador.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

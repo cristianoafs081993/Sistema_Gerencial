@@ -177,7 +177,7 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
       let suggestedSystem = formData.systemName || 'SUAP';
       let suggestedUrl = formData.systemUrl || 'https://suap.ifrn.edu.br/';
       let suggestedTemplate = formData.templateName || 'Modelo Padronizado AGU';
-      let suggestedTemplateUrl = formData.templateUrl || 'https://www.gov.br/agu/pt-br/composicao/cgu/cgu/modelos';
+      const suggestedTemplateUrl = formData.templateUrl || 'https://www.gov.br/agu/pt-br/composicao/cgu/cgu/modelos';
       let suggestedBasis = formData.legalBasis || 'Lei Federal nº 14.133/2021';
 
       if (lower.includes('dod') || lower.includes('demanda')) {

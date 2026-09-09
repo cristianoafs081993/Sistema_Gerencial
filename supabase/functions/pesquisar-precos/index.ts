@@ -713,7 +713,7 @@ async function resolvePncpSearchUrls(client: any, candidates: RankedCandidate[])
   for (const c of candidates) {
     if (c.sourceType === 'compras_gov_precos' && c.purchaseId && c.agencyCode) {
       const digits = c.purchaseId.replace(/\D/g, '');
-      let uasg = c.agencyCode;
+      const uasg = c.agencyCode;
       let number = '';
       let year = '';
       const dateVal = c.resultDate || c.purchaseDate;

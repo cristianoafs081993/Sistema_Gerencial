@@ -167,7 +167,7 @@ export function calculateEmpenhoAtividadeMatchScore(emp: Empenho, atv: Atividade
   }
 
   // Correspondência explícita do prefixo "ATIVIDADE ..." na descrição do empenho
-  const atividadePrefixMatch = emp.descricao?.match(/ATIVIDADE\s*[:\-]?\s*([^,.;]+)/i);
+  const atividadePrefixMatch = emp.descricao?.match(/ATIVIDADE\s*[:-]?\s*([^,.;]+)/i);
   if (atividadePrefixMatch) {
     const rawAtvInEmp = normalizeMatchingText(atividadePrefixMatch[1]);
     if (rawAtvInEmp.length >= 5) {
