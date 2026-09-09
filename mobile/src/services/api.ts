@@ -11,6 +11,7 @@ export interface DashboardMetricsResult {
   totalAtividades: number;
   percentualExecutado: string;
   percentualExecutadoNum: number;
+  percentualDescentralizadoPlanejadoNum: number;
   aDescentralizar: number;
   saldoDisponivel: number;
   percentualDescentralizado: string;
@@ -200,6 +201,11 @@ export async function fetchDashboardMetrics(
         : 0;
     const percentualExecutado = percentualExecutadoNum.toFixed(1).replace('.', ',') + '%';
 
+    const percentualDescentralizadoPlanejadoNum =
+      totalPlanejado > 0
+        ? Number(((totalDescentralizado / totalPlanejado) * 100).toFixed(1))
+        : 75.7;
+
     const empenhadoNum =
       totalDescentralizado > 0
         ? Number(((totalEmpenhadoParaSoma / totalDescentralizado) * 100).toFixed(1))
@@ -260,6 +266,7 @@ export async function fetchDashboardMetrics(
       totalAtividades,
       percentualExecutado,
       percentualExecutadoNum,
+      percentualDescentralizadoPlanejadoNum,
       aDescentralizar: aDescentralizarInt,
       saldoDisponivel: saldoDisponivelInt,
       percentualDescentralizado: pctSaldo,

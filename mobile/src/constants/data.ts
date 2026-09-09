@@ -117,6 +117,7 @@ export const dashboardData = {
   totalAtividades: 357,
   percentualExecutado: '60,7%',
   percentualExecutadoNum: 60.7,
+  percentualDescentralizadoPlanejadoNum: 87.5,
   aDescentralizar: 600000,
   saldoDisponivel: 1284560,
   percentualDescentralizado: '30,6%',

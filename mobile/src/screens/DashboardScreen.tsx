@@ -19,6 +19,7 @@ import {
   IconCheck,
   IconClock,
   IconRight,
+  IconChart,
 } from '../components/Icons';
 import { DonutChart } from '../components/DonutChart';
 import { ExecutionChart } from '../components/ExecutionChart';
@@ -127,10 +128,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             </Text>
           </View>
           <View style={styles.footRight}>
-            <Text style={styles.footLabel}>Empenhado</Text>
-            <Text style={styles.footValue}>{formatBRL(current.empenhado)}</Text>
+            <Text style={styles.footLabel}>A descentralizar</Text>
+            <Text style={styles.footValue}>{formatBRL(current.aDescentralizar)}</Text>
           </View>
-          <DonutChart percentage={current.percentualExecutadoNum} />
+          <DonutChart percentage={current.percentualDescentralizadoPlanejadoNum} />
         </View>
       </LinearGradient>
 
@@ -193,7 +194,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         </View>
       </View>
 
-      {/* Auxiliary Strip: A pagar & A descentralizar */}
+      {/* Auxiliary Strip: A pagar & Execução */}
       <View style={styles.auxStrip}>
         <View style={styles.auxItem}>
           <IconClock size={14} color="#64748b" />
@@ -202,8 +203,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         </View>
         <View style={styles.auxDivider} />
         <View style={styles.auxItem}>
-          <Text style={styles.auxLabel}>A descentralizar:</Text>
-          <Text style={styles.auxValue}>{formatBRL(current.aDescentralizar)}</Text>
+          <IconChart size={14} color="#64748b" />
+          <Text style={styles.auxLabel}>Execução no planejado:</Text>
+          <Text style={styles.auxValue}>{current.percentualExecutado}</Text>
         </View>
       </View>
 
