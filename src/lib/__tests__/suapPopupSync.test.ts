@@ -8,6 +8,8 @@ describe('popup da extensao: sincronizacao do Plano 8', () => {
   it('captura o Plano 8 autenticado e envia ao sincronizador, sem inserir linhas no cliente', () => {
     const popup = readFileSync(extensionFixturePath('popup.js'), 'utf8');
     expect(popup).toContain("action: 'sync-html'");
+    expect(popup).toContain("action: 'sync-all'");
+    expect(popup).toContain("action: 'apply-batch'");
     expect(popup).toContain("action: 'apply'");
     expect(popup).toContain('btn-apply-plan');
     expect(popup).toContain('chrome.scripting.executeScript');
@@ -23,6 +25,8 @@ describe('popup da extensao: sincronizacao do Plano 8', () => {
     const bridge = readFileSync(extensionFixturePath('siages-plan-sync.js'), 'utf8');
     expect(bridge).toContain('chrome.runtime.onMessage');
     expect(bridge).toContain('siages:suap-plan-sync-request');
-    expect(bridge).toContain("scope: 'campus'");
+    expect(bridge).toContain("scope = 'campus'");
+    expect(bridge).toContain("scope");
+    expect(bridge).toContain("'all'");
   });
 });

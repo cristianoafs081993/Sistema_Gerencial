@@ -5,14 +5,15 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { suapPlanSyncService, type SuapPlanSyncStatus, type SuapPlanSyncResult } from '@/services/suapPlanSyncService';
+import { suapPlanSyncService, type SuapPlanSyncBatchStatus, type SuapPlanSyncStatus, type SuapPlanSyncResult } from '@/services/suapPlanSyncService';
 
-type Props = { onSynced: () => void };
+type Props = { onSynced: () => void; campusUasg?: string };
 
 function statusLabel(status: SuapPlanSyncStatus['status'] | null) {
   if (status === 'running') return 'Sincronizando...';
   if (status === 'preview') return 'Conferência pendente';
   if (status === 'success') return 'Sincronizado';
+  if (status === 'partial') return 'Sincronização parcial';
   if (status === 'failed') return 'Falha na sincronização';
   if (status === 'reauth_required') return 'Conecte-se ao SUAP';
   return 'Aguardando conexão';
@@ -23,12 +24,18 @@ function syncResultMessage(result: SuapPlanSyncResult) {
     return `${result.sourceCount ?? 0} atividades encontradas. ${result.inserted ?? 0} novas, ${result.updated ?? 0} atualizações e ${result.archived ?? 0} serão arquivadas.`;
   }
   if (result.status === 'success') return 'Dados do SUAP aplicados ao planejamento Campus.';
+  if (result.status === 'partial') {
+    const failed = result.units?.filter((unit) => unit.status === 'failed').length ?? 0;
+    return `Sincronização concluída parcialmente. ${failed} unidade(s) falharam; os demais resultados foram preservados.`;
+  }
+  if (result.status === 'failed') return 'Nenhuma unidade foi sincronizada.';
   if (result.status === 'already_running') return 'Já existe uma sincronização em andamento.';
   return result.error ?? 'É necessário conectar-se ao SUAP.';
 }
 
-export function SuapPlanSyncCard({ onSynced }: Props) {
+export function SuapPlanSyncCard({ onSynced, campusUasg = '158366' }: Props) {
   const [status, setStatus] = useState<SuapPlanSyncStatus | null>(null);
+  const [batch, setBatch] = useState<SuapPlanSyncBatchStatus | null>(null);
   const [message, setMessage] = useState('');
   const [isBusy, setIsBusy] = useState(false);
   const [authMode, setAuthMode] = useState<'credentials' | 'cookie'>('credentials');
@@ -41,6 +48,7 @@ export function SuapPlanSyncCard({ onSynced }: Props) {
     try {
       const response = await suapPlanSyncService.status();
       setStatus(response.run);
+      setBatch(response.batch);
       if (response.run?.status === 'success') setMessage('Última execução concluída com sucesso.');
     } catch {
       // A consulta de status não deve impedir a tabela de abrir.
@@ -51,7 +59,7 @@ export function SuapPlanSyncCard({ onSynced }: Props) {
     setIsBusy(true);
     setStatus((previous) => previous ? { ...previous, status: 'running' } : null);
     try {
-      const result = await suapPlanSyncService.sync();
+      const result = await suapPlanSyncService.sync(undefined, campusUasg);
       setMessage(syncResultMessage(result));
       if (result.status === 'preview') {
         setStatus((previous) => previous ? { ...previous, status: 'preview', id: result.runId ?? previous.id } : null);
@@ -70,18 +78,33 @@ export function SuapPlanSyncCard({ onSynced }: Props) {
     }
   }, [onSynced, refreshStatus]);
 
+  const runSyncAll = useCallback(async () => {
+    setIsBusy(true);
+    setBatch((previous) => previous ? { ...previous, status: 'running' } : null);
+    try {
+      const result = await suapPlanSyncService.syncAll();
+      setMessage(syncResultMessage(result));
+      await refreshStatus();
+      if (result.status === 'success') onSynced();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Falha na sincronização de todas as unidades.');
+    } finally {
+      setIsBusy(false);
+    }
+  }, [onSynced, refreshStatus]);
+
   useEffect(() => {
     const receiveExtensionRequest = (event: MessageEvent) => {
       const payload = event.data?.payload;
       if (event.origin !== window.location.origin || event.source !== window ||
           event.data?.source !== 'siages-suap-extension' ||
           event.data?.type !== 'siages:suap-plan-sync-request' ||
-          event.data?.version !== 1 || payload?.planId !== 8 || payload?.scope !== 'campus') return;
-      void runSync();
+          ![1, 2].includes(event.data?.version) || payload?.planId !== 8) return;
+      void (payload?.scope === 'all' ? runSyncAll() : runSync());
     };
     window.addEventListener('message', receiveExtensionRequest);
     return () => window.removeEventListener('message', receiveExtensionRequest);
-  }, [runSync]);
+  }, [runSync, runSyncAll]);
 
   useEffect(() => {
     let active = true;
@@ -128,7 +151,24 @@ export function SuapPlanSyncCard({ onSynced }: Props) {
     }
   };
 
+  const applyBatchPreview = async () => {
+    if (!batch?.id) return;
+    setIsBusy(true);
+    try {
+      const result = await suapPlanSyncService.applyBatch(batch.id);
+      setMessage(syncResultMessage(result));
+      setBatch((previous) => previous ? { ...previous, status: result.status === 'partial' ? 'partial' : 'success' } : null);
+      onSynced();
+      await refreshStatus();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Não foi possível aplicar a conferência em lote.');
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
   const isPreview = status?.status === 'preview';
+  const isBatchPreview = batch?.status === 'preview';
   const needsConnection = showConnection || status?.status === 'reauth_required' || (!status && Boolean(message));
 
   return (
@@ -146,11 +186,11 @@ export function SuapPlanSyncCard({ onSynced }: Props) {
       <CardContent className="space-y-3 pt-0 text-xs text-muted-foreground">
         <p>{message || 'Os dados atuais permanecem visíveis enquanto o Plano 8 é consultado em segundo plano.'}</p>
 
-        {isPreview ? (
+        {isPreview || isBatchPreview ? (
           <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-900">
             <ShieldAlert className="h-4 w-4 shrink-0" />
-            <span className="flex-1">Revise a conferência antes de aplicar o primeiro espelho.</span>
-            <Button type="button" size="sm" onClick={() => void applyPreview()} disabled={isBusy}>
+            <span className="flex-1">Revise a conferência antes de aplicar o espelho do SUAP.</span>
+            <Button type="button" size="sm" onClick={() => void (isBatchPreview ? applyBatchPreview() : applyPreview())} disabled={isBusy}>
               <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Aplicar conferência
             </Button>
           </div>
@@ -177,6 +217,9 @@ export function SuapPlanSyncCard({ onSynced }: Props) {
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" onClick={() => void runSync()} disabled={isBusy}>
             <RefreshCw className={`mr-1 h-3.5 w-3.5 ${isBusy ? 'animate-spin' : ''}`} /> Sincronizar agora
+          </Button>
+          <Button type="button" variant="secondary" size="sm" onClick={() => void runSyncAll()} disabled={isBusy}>
+            <CloudDownload className={`mr-1 h-3.5 w-3.5 ${isBusy ? 'animate-pulse' : ''}`} /> Sincronizar todas as unidades
           </Button>
           {!needsConnection && status?.status !== 'success' ? (
             <Button type="button" variant="ghost" size="sm" onClick={() => setShowConnection(true)}>

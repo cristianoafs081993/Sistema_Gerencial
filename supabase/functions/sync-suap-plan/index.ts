@@ -2,12 +2,20 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { DOMParser as LinkedomDOMParser } from 'npm:linkedom@0.18.13';
 
 import { parseSuapPlanHtml, type SuapPlanActivity } from '../../../src/services/suapPlanParser.ts';
+import {
+  buildSuapPlanSourceUrl,
+  DEFAULT_SUAP_PLAN_UNIT,
+  getSuapPlanUnit,
+  getSuapPlanUnitForCampus,
+  parseSuapPlanUnitFromSourceUrl,
+  SUAP_PLAN_UNITS,
+} from '../../../src/lib/suapPlanUnits.ts';
 
 const SUAP_BASE_URL = 'https://suap.ifrn.edu.br';
-const PLAN_PATH = '/plan_estrategico/plano_concluido/8/';
-const SOURCE_URL = `${SUAP_BASE_URL}${PLAN_PATH}`;
 const CONNECTION_TTL_MS = 8 * 60 * 60 * 1000;
-const LOCK_TTL_MS = 10 * 60 * 1000;
+const LOCK_TTL_MS = 30 * 60 * 1000;
+const HTML_LIMIT = 15 * 1024 * 1024;
+const BATCH_CONCURRENCY = 4;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,11 +24,14 @@ const corsHeaders = {
 };
 
 type SyncBody = {
-  action?: 'connect' | 'connect-cookie' | 'sync' | 'sync-html' | 'apply' | 'status' | 'disconnect';
+  action?: 'connect' | 'connect-cookie' | 'sync' | 'sync-all' | 'sync-html' | 'apply' | 'apply-batch' | 'status' | 'disconnect';
   username?: string;
   password?: string;
   sessionId?: string;
   runId?: string;
+  batchId?: string;
+  suapUnitCode?: string;
+  campusUasg?: string;
   mode?: 'preview' | 'apply';
   html?: string;
   sourceUrl?: string;
@@ -149,7 +160,7 @@ async function loginSuap(username: string, password: string): Promise<string> {
 }
 
 async function validateSession(sessionId: string): Promise<void> {
-  const response = await fetch(SOURCE_URL, {
+  const response = await fetch(buildSuapPlanSourceUrl(DEFAULT_SUAP_PLAN_UNIT), {
     headers: { Cookie: `sessionid=${sessionId}`, Accept: 'text/html', 'User-Agent': 'SIAGES SUAP Sync/1.0' },
   });
   const html = await response.text();
@@ -166,11 +177,13 @@ function hex(buffer: ArrayBuffer): string {
   return Array.from(new Uint8Array(buffer), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function toSnapshot(activity: SuapPlanActivity, orgId: string, runId: string) {
+function toSnapshot(activity: SuapPlanActivity, orgId: string, runId: string, suapUnitCode: string, campusUasg: string) {
   return {
     run_id: runId,
     org_id: orgId,
     suap_plan_id: 8,
+    suap_unit_code: suapUnitCode,
+    campus_uasg: campusUasg,
     suap_activity_id: activity.suapActivityId,
     dimensao: activity.dimensao,
     atividade: activity.atividade,
@@ -238,33 +251,53 @@ function syncKey(dimensao: string, atividade: string): string {
   return `${fold(dimensao)}|${fold(atividade)}`;
 }
 
-function isPlanSourceUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'https:' && url.hostname === 'suap.ifrn.edu.br'
-      && !url.search && !url.hash
-      && /^\/plan_estrategico\/plano_concluido\/8\/?$/.test(url.pathname);
-  } catch {
-    return false;
-  }
+function sourceUrlForUnit(unitCode: string): string {
+  return buildSuapPlanSourceUrl(unitCode);
 }
-async function previewDiff(service: ReturnType<typeof createClient>, user: AuthenticatedUser, activities: SuapPlanActivity[]) {
+
+function resolveUnitCode(value: string | null | undefined): string {
+  const unit = getSuapPlanUnit(value);
+  if (!unit) throw new Error(`Unidade SUAP inválida: ${value ?? ''}.`);
+  return unit.value;
+}
+
+function resolveUnitForSync(body: SyncBody): string {
+  if (body.suapUnitCode) return resolveUnitCode(body.suapUnitCode);
+  if (body.campusUasg) return getSuapPlanUnitForCampus(body.campusUasg).value;
+  return DEFAULT_SUAP_PLAN_UNIT;
+}
+
+function parseSourceUnit(sourceUrl: string): string {
+  const unit = parseSuapPlanUnitFromSourceUrl(sourceUrl);
+  if (!unit) throw new Error('A URL de origem precisa ser o Plano 8 do SUAP com uma unidade_gestora válida.');
+  return unit;
+}
+
+async function previewDiff(
+  service: ReturnType<typeof createClient>,
+  user: AuthenticatedUser,
+  activities: SuapPlanActivity[],
+  suapUnitCode: string,
+) {
   const ids = activities.map((activity) => activity.suapActivityId);
   const incoming = new Set(ids);
   const incomingKeys = new Set(activities.map((activity) => syncKey(activity.dimensao, activity.atividade)));
   const { data, error } = await service
     .from('atividades')
-    .select('suap_activity_id,sync_active,sync_source,dimensao,atividade')
+    .select('suap_activity_id,suap_unit_code,sync_active,sync_source,dimensao,atividade')
     .eq('org_id', user.orgId)
-    .eq('tipo_atividade', 'campus');
+    .eq('tipo_atividade', 'campus')
+    .eq('campus_uasg', getSuapPlanUnit(suapUnitCode)?.parentUasg ?? '158366');
   if (error) throw error;
 
   const rows = data ?? [];
-  const canonical = rows.filter((row) => row.sync_source === 'suap_plan_8' && row.suap_activity_id);
+  const canonical = rows.filter((row) => row.sync_source === 'suap_plan_8'
+    && row.suap_activity_id && String(row.suap_unit_code ?? DEFAULT_SUAP_PLAN_UNIT) === suapUnitCode);
   const current = new Set(canonical.map((row) => String(row.suap_activity_id)));
   const legacyArchived = rows.filter((row) =>
     row.sync_active && !row.suap_activity_id && row.sync_source !== 'suap_plan_8' &&
-    incomingKeys.has(syncKey(String(row.dimensao ?? ''), String(row.atividade ?? ''))),
+    incomingKeys.has(syncKey(String(row.dimensao ?? ''), String(row.atividade ?? '')))
+      && String(row.suap_unit_code ?? DEFAULT_SUAP_PLAN_UNIT) === suapUnitCode,
   ).length;
 
   return {
@@ -279,6 +312,167 @@ async function writeSnapshots(service: ReturnType<typeof createClient>, rows: Re
     const { error } = await service.from('suap_plan_activity_snapshots').insert(rows.slice(index, index + 250));
     if (error) throw error;
   }
+}
+
+type PlanRunResult = {
+  status: 'preview' | 'success';
+  runId: string;
+  suapUnitCode: string;
+  sourceCount: number;
+  inserted: number;
+  updated: number;
+  archived: number;
+};
+
+class SuapReauthRequiredError extends Error {
+  constructor() {
+    super('Sessão do SUAP expirada.');
+    this.name = 'SuapReauthRequiredError';
+  }
+}
+
+async function fetchPlanHtml(sessionId: string, suapUnitCode: string): Promise<{ html: string; sourceUrl: string }> {
+  const sourceUrl = sourceUrlForUnit(suapUnitCode);
+  const response = await fetch(sourceUrl, {
+    headers: { Cookie: `sessionid=${sessionId}`, Accept: 'text/html', 'User-Agent': 'SIAGES SUAP Sync/1.0' },
+  });
+  const html = await response.text();
+  if (!response.ok || /<input[^>]+type=["']password["']/i.test(html) || /\/accounts\/login\//i.test(html)) {
+    throw new SuapReauthRequiredError();
+  }
+  if (!html || html.length > HTML_LIMIT) throw new Error('HTML do Plano 8 ausente ou maior que o limite permitido.');
+  return { html, sourceUrl };
+}
+
+async function hasAppliedRun(
+  service: ReturnType<typeof createClient>,
+  user: AuthenticatedUser,
+  suapUnitCode: string,
+): Promise<boolean> {
+  const { data, error } = await service
+    .from('suap_plan_sync_runs')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('org_id', user.orgId)
+    .eq('plan_id', 8)
+    .eq('scope', 'campus')
+    .eq('suap_unit_code', suapUnitCode)
+    .eq('status', 'success')
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return Boolean(data);
+}
+
+async function syncOneUnit(params: {
+  service: ReturnType<typeof createClient>;
+  user: AuthenticatedUser;
+  sessionId?: string;
+  html?: string;
+  sourceUrl?: string;
+  suapUnitCode: string;
+  mode?: 'preview' | 'apply';
+  batchId?: string;
+}): Promise<PlanRunResult> {
+  const { service, user, suapUnitCode, mode, batchId } = params;
+  const unit = getSuapPlanUnit(suapUnitCode);
+  if (!unit) throw new Error(`Unidade SUAP inválida: ${suapUnitCode}.`);
+  let html = params.html ?? '';
+  let sourceUrl = params.sourceUrl ?? sourceUrlForUnit(suapUnitCode);
+  if (!html) {
+    if (!params.sessionId) throw new Error('Sessão do SUAP não informada.');
+    const fetched = await fetchPlanHtml(params.sessionId, suapUnitCode);
+    html = fetched.html;
+    sourceUrl = fetched.sourceUrl;
+  }
+
+  const parsed = parseSuapPlanHtml(html, LinkedomDOMParser);
+  const checksum = hex(await sha256Text(JSON.stringify(parsed.activities)));
+  const isPreview = mode === 'preview' || !(await hasAppliedRun(service, user, suapUnitCode));
+  const { data: run, error: runError } = await service
+    .from('suap_plan_sync_runs')
+    .insert({
+      org_id: user.orgId,
+      user_id: user.id,
+      plan_id: 8,
+      scope: 'campus',
+      suap_unit_code: suapUnitCode,
+      campus_uasg: unit.parentUasg,
+      batch_id: batchId ?? null,
+      mode: isPreview ? 'preview' : 'apply',
+      status: 'running',
+      source_url: sourceUrl,
+      source_count: parsed.activities.length,
+      checksum,
+      metadata: { dimensions: parsed.dimensions, suap_unit_code: suapUnitCode },
+    })
+    .select('id')
+    .single();
+  if (runError || !run) throw runError ?? new Error('Não foi possível criar a execução.');
+
+  try {
+    await writeSnapshots(service, parsed.activities.map((activity) => toSnapshot(activity, user.orgId, run.id, suapUnitCode, unit.parentUasg)));
+    const diff = await previewDiff(service, user, parsed.activities, suapUnitCode);
+    if (isPreview) {
+      await service.from('suap_plan_sync_runs').update({
+        status: 'preview', mode: 'preview', finished_at: new Date().toISOString(),
+        inserted_count: diff.inserted, updated_count: diff.updated, archived_count: diff.archived,
+      }).eq('id', run.id);
+      return { status: 'preview', runId: run.id, suapUnitCode, sourceCount: parsed.activities.length, ...diff };
+    }
+
+    const { data: applied, error: applyError } = await service.rpc('apply_suap_plan_snapshot', { p_run_id: run.id });
+    if (applyError) throw applyError;
+    return {
+      status: 'success',
+      runId: run.id,
+      suapUnitCode,
+      sourceCount: parsed.activities.length,
+      inserted: Number(applied?.inserted ?? diff.inserted),
+      updated: Number(applied?.updated ?? diff.updated),
+      archived: Number(applied?.archived ?? diff.archived),
+    };
+  } catch (error) {
+    await service.from('suap_plan_sync_runs').update({
+      status: 'failed', finished_at: new Date().toISOString(), error_code: 'SYNC_FAILED',
+      error_message: error instanceof Error ? error.message : String(error),
+    }).eq('id', run.id);
+    throw error;
+  }
+}
+
+async function runWithConcurrency<T>(items: string[], concurrency: number, worker: (item: string) => Promise<T>) {
+  const results: Array<T | undefined> = [];
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (cursor < items.length) {
+      const index = cursor++;
+      results[index] = await worker(items[index]);
+    }
+  });
+  await Promise.all(workers);
+  return results as T[];
+}
+
+async function updateBatchStatus(service: ReturnType<typeof createClient>, batchId: string) {
+  const { data: runs, error } = await service
+    .from('suap_plan_sync_runs')
+    .select('status')
+    .eq('batch_id', batchId);
+  if (error) throw error;
+  const statuses = (runs ?? []).map((run) => run.status);
+  const failed = statuses.filter((status) => status === 'failed').length;
+  const previews = statuses.filter((status) => status === 'preview').length;
+  const successful = statuses.filter((status) => status === 'success').length;
+  const status = failed === statuses.length ? 'failed' : failed > 0 ? 'partial' : previews > 0 ? 'preview' : successful === statuses.length ? 'success' : 'running';
+  await service.from('suap_plan_sync_batches').update({
+    status,
+    success_count: successful,
+    failed_count: failed,
+    preview_count: previews,
+    finished_at: status === 'running' ? null : new Date().toISOString(),
+  }).eq('id', batchId);
+  return { status, successCount: successful, failedCount: failed, previewCount: previews };
 }
 
 Deno.serve(async (request) => {
@@ -314,7 +508,7 @@ Deno.serve(async (request) => {
     if (action === 'status') {
       const { data, error } = await service
         .from('suap_plan_sync_runs')
-        .select('id,status,mode,source_count,inserted_count,updated_count,archived_count,started_at,finished_at,error_code,error_message')
+        .select('id,status,mode,suap_unit_code,batch_id,source_count,inserted_count,updated_count,archived_count,started_at,finished_at,error_code,error_message')
         .eq('user_id', user.id)
         .eq('org_id', user.orgId)
         .eq('plan_id', 8)
@@ -323,7 +517,16 @@ Deno.serve(async (request) => {
         .limit(1)
         .maybeSingle();
       if (error) throw error;
-      return jsonResponse({ run: data ?? null });
+      const { data: batch } = await service
+        .from('suap_plan_sync_batches')
+        .select('id,status,requested_count,success_count,failed_count,preview_count,started_at,finished_at')
+        .eq('user_id', user.id)
+        .eq('org_id', user.orgId)
+        .eq('plan_id', 8)
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return jsonResponse({ run: data ?? null, batch: batch ?? null });
     }
 
     if (action === 'apply') {
@@ -342,16 +545,55 @@ Deno.serve(async (request) => {
       return jsonResponse({ status: 'success', runId: body.runId, ...(data ?? {}) });
     }
 
+    if (action === 'apply-batch') {
+      if (!body.batchId) return jsonResponse({ error: 'batchId é obrigatório.' }, 400);
+      const { data: runs, error: runsError } = await service
+        .from('suap_plan_sync_runs')
+        .select('id,status')
+        .eq('batch_id', body.batchId)
+        .eq('user_id', user.id)
+        .eq('org_id', user.orgId)
+        .eq('status', 'preview');
+      if (runsError) throw runsError;
+      const applied: Record<string, unknown>[] = [];
+      const failures: Array<{ runId: string; error: string }> = [];
+      for (const run of runs ?? []) {
+        try {
+          const { data, error } = await service.rpc('apply_suap_plan_snapshot', { p_run_id: run.id });
+          if (error) throw error;
+          applied.push({ runId: run.id, ...(data ?? {}) });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          failures.push({ runId: run.id, error: message });
+          await service.from('suap_plan_sync_runs').update({ status: 'failed', finished_at: new Date().toISOString(), error_code: 'APPLY_FAILED', error_message: message }).eq('id', run.id);
+        }
+      }
+      const batch = await updateBatchStatus(service, body.batchId);
+      return jsonResponse({ status: failures.length ? 'partial' : 'success', batchId: body.batchId, applied, failures, ...batch });
+    }
+
     const htmlSync = action === 'sync-html';
-    if (action !== 'sync' && !htmlSync) return jsonResponse({ error: 'Acao desconhecida.' }, 400);
+    const batchSync = action === 'sync-all';
+    if (action !== 'sync' && !htmlSync && !batchSync) return jsonResponse({ error: 'Acao desconhecida.' }, 400);
 
     let connection: Awaited<ReturnType<typeof getConnection>> = null;
     let html = '';
+    let suapUnitCode: string;
+    try {
+      suapUnitCode = resolveUnitForSync(body);
+    } catch (error) {
+      return jsonResponse({ error: error instanceof Error ? error.message : 'Unidade SUAP inválida.' }, 400);
+    }
     if (htmlSync) {
-      const sourceUrl = String(body.sourceUrl ?? SOURCE_URL);
-      if (!isPlanSourceUrl(sourceUrl)) return jsonResponse({ error: 'A URL de origem precisa ser exatamente o Plano 8 do SUAP.' }, 400);
+      const sourceUrl = String(body.sourceUrl ?? sourceUrlForUnit(DEFAULT_SUAP_PLAN_UNIT));
+      try {
+        suapUnitCode = parseSourceUnit(sourceUrl);
+      } catch (error) {
+        return jsonResponse({ error: error instanceof Error ? error.message : 'URL de origem inválida.' }, 400);
+      }
+      if (body.suapUnitCode && resolveUnitCode(body.suapUnitCode) !== suapUnitCode) return jsonResponse({ error: 'A unidade informada não corresponde à URL capturada.' }, 400);
       html = String(body.html ?? '');
-      if (!html || html.length > 15 * 1024 * 1024) return jsonResponse({ error: 'HTML do Plano 8 ausente ou maior que o limite permitido.' }, 413);
+      if (!html || html.length > HTML_LIMIT) return jsonResponse({ error: 'HTML do Plano 8 ausente ou maior que o limite permitido.' }, 413);
     } else {
       connection = await getConnection(service, user);
       if (!connection) return jsonResponse({ status: 'reauth_required', error: 'Conecte-se ao SUAP para sincronizar.' }, 401);
@@ -368,69 +610,59 @@ Deno.serve(async (request) => {
       .limit(1)
       .maybeSingle();
     if (running) return jsonResponse({ status: 'already_running', runId: running.id }, 409);
-    if (!htmlSync) {
-      const sessionId = await decryptSession(connection!.session_ciphertext);
-      const response = await fetch(SOURCE_URL, {
-        headers: { Cookie: `sessionid=${sessionId}`, Accept: 'text/html', 'User-Agent': 'SIAGES SUAP Sync/1.0' },
-      });
-      html = await response.text();
-      if (!response.ok || /<input[^>]+type=["']password["']/i.test(html) || /\/accounts\/login\//i.test(html)) {
-        await service.from('suap_connections').update({ revoked_at: new Date().toISOString() }).eq('id', connection!.id);
-        return jsonResponse({ status: 'reauth_required', error: 'Sessao do SUAP expirada.' }, 401);
-      }
-    }
-    const parsed = parseSuapPlanHtml(html, LinkedomDOMParser);
-    const checksum = hex(await sha256Text(JSON.stringify(parsed.activities)));
-    const hasAppliedRun = Boolean((await service
-      .from('suap_plan_sync_runs')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('org_id', user.orgId)
-      .eq('plan_id', 8)
-      .eq('scope', 'campus')
-      .eq('status', 'success')
-      .limit(1)
-      .maybeSingle()).data);
-    const isPreview = body.mode === 'preview' || !hasAppliedRun;
-
-    const { data: run, error: runError } = await service
-      .from('suap_plan_sync_runs')
-      .insert({
+    const sessionId = connection ? await decryptSession(connection.session_ciphertext) : undefined;
+    if (batchSync) {
+      const { data: batch, error: batchError } = await service.from('suap_plan_sync_batches').insert({
         org_id: user.orgId,
         user_id: user.id,
         plan_id: 8,
         scope: 'campus',
-        mode: isPreview ? 'preview' : 'apply',
+        mode: body.mode ?? 'apply',
         status: 'running',
-        source_url: SOURCE_URL,
-        source_count: parsed.activities.length,
-        checksum,
-        metadata: { dimensions: parsed.dimensions },
-      })
-      .select('id')
-      .single();
-    if (runError || !run) throw runError ?? new Error('Não foi possível criar a execução.');
+        requested_count: SUAP_PLAN_UNITS.length,
+      }).select('id').single();
+      if (batchError || !batch) throw batchError ?? new Error('Não foi possível criar o lote.');
+
+      const results: Array<PlanRunResult | { suapUnitCode: string; status: 'failed'; error: string }> = [];
+      await runWithConcurrency(SUAP_PLAN_UNITS.map((unit) => unit.value), BATCH_CONCURRENCY, async (unitCode) => {
+        try {
+          results.push(await syncOneUnit({ service, user, sessionId, suapUnitCode: unitCode, mode: body.mode, batchId: batch.id }));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          await service.from('suap_plan_sync_runs').insert({
+            org_id: user.orgId,
+            user_id: user.id,
+            plan_id: 8,
+            scope: 'campus',
+            suap_unit_code: unitCode,
+            campus_uasg: getSuapPlanUnit(unitCode)?.parentUasg ?? '158366',
+            batch_id: batch.id,
+            mode: body.mode ?? 'apply',
+            status: 'failed',
+            source_url: sourceUrlForUnit(unitCode),
+            error_code: error instanceof SuapReauthRequiredError ? 'REAUTH_REQUIRED' : 'SYNC_FAILED',
+            error_message: message,
+            finished_at: new Date().toISOString(),
+          });
+          results.push({ suapUnitCode: unitCode, status: 'failed', error: message });
+        }
+      });
+      if (results.some((result) => result.status === 'failed' && result.error === 'Sessão do SUAP expirada.')) {
+        await service.from('suap_connections').update({ revoked_at: new Date().toISOString() }).eq('id', connection!.id);
+      }
+      const batchStatus = await updateBatchStatus(service, batch.id);
+      return jsonResponse({ status: batchStatus.status, batchId: batch.id, units: results });
+    }
 
     try {
-      await writeSnapshots(service, parsed.activities.map((activity) => toSnapshot(activity, user.orgId, run.id)));
-      const diff = await previewDiff(service, user, parsed.activities);
-      if (isPreview) {
-        await service.from('suap_plan_sync_runs').update({
-          status: 'preview', mode: 'preview', finished_at: new Date().toISOString(),
-          inserted_count: diff.inserted, updated_count: diff.updated, archived_count: diff.archived,
-        }).eq('id', run.id);
-        return jsonResponse({ status: 'preview', runId: run.id, sourceCount: parsed.activities.length, ...diff });
-      }
-
-      const { data: applied, error: applyError } = await service.rpc('apply_suap_plan_snapshot', { p_run_id: run.id });
-      if (applyError) throw applyError;
+      const result = await syncOneUnit({ service, user, sessionId, html, sourceUrl: htmlSync ? String(body.sourceUrl ?? sourceUrlForUnit(suapUnitCode)) : undefined, suapUnitCode, mode: body.mode });
       if (connection) await service.from('suap_connections').update({ last_validated_at: new Date().toISOString() }).eq('id', connection.id);
-      return jsonResponse({ status: 'success', runId: run.id, sourceCount: parsed.activities.length, ...(applied ?? {}) });
+      return jsonResponse({ ...result, runId: result.runId, sourceCount: result.sourceCount });
     } catch (error) {
-      await service.from('suap_plan_sync_runs').update({
-        status: 'failed', finished_at: new Date().toISOString(), error_code: 'SYNC_FAILED',
-        error_message: error instanceof Error ? error.message : String(error),
-      }).eq('id', run.id);
+      if (error instanceof SuapReauthRequiredError) {
+        if (connection) await service.from('suap_connections').update({ revoked_at: new Date().toISOString() }).eq('id', connection.id);
+        return jsonResponse({ status: 'reauth_required', error: error.message }, 401);
+      }
       throw error;
     }
   } catch (error) {

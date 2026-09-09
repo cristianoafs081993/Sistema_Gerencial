@@ -1105,6 +1105,7 @@ export default function ImportacaoDados() {
           >
             <div className="space-y-4">
               <SuapPlanSyncCard
+                campusUasg={campusUasg}
                 onSynced={() => {
                   void refreshData();
                   void loadDatasetsStatus();

@@ -122,6 +122,6 @@ A tela de mapeamento operacional de processos adota arquitetura de estúdio inte
 4. **Visão Matriz (Tabela Operacional)**: tabela densa com filtros por links de sistemas, modelos e pendências, com colunas para responsáveis, SLA, base legal e atalhos diretos;
 5. **Visão Guia de Execução**: visão orientada a tarefas com progresso geral animado, lista sequencial de cartões, checklists interativos funcionais e botões de acesso direto a sistemas oficiais;
 6. **Drawer de Detalhes (`NodeDetailDrawer`)**: gaveta lateral deslizante com abas de Links & Sistemas (com presets para SUAP, Compras.gov.br, SIAFI, PNCP, SEI e AGU), Procedimento detalhado, Checklist operacional e Conformidade com a Lei 14.133/2021;
-7. **Modais Auxiliares**: modais acessíveis para exportação/impressão em PDF e JSON, criação de novos processos e assistente IA para modelagem governamental;
-8. **Integração com o SUAP**: quando acessado com parâmetro `?suapId=...`, exibe banner de contexto do processo em tramitação e reflete a etapa atual do processo nos três modos de visão.
+7. **Modais Auxiliares**: modais acessíveis para exportação/impressão em PDF e JSON e criação de novos processos;
+8. **Integração com o SUAP**: quando acessado com parâmetro `?suapId=...`, sincroniza os nós e reflete a etapa atual do processo nos modos de visão com interface limpa e foco no fluxo operacional.
 

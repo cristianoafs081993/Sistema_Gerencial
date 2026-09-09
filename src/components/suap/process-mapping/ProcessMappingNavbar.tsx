@@ -10,7 +10,6 @@ import {
   Plus,
   RotateCcw,
   Search,
-  Sparkles,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -57,9 +56,6 @@ export const ProcessMappingNavbar: React.FC<ProcessMappingNavbarProps> = ({
         <div className="flex items-center">
           <h1 className="font-bold text-sm sm:text-base tracking-tight text-slate-900 flex items-center">
             Mapeamento BPMN
-            <span className="text-slate-400 font-normal ml-2 hidden lg:inline text-xs">
-              | Gestão de Processos & Lei 14.133
-            </span>
           </h1>
         </div>
 
@@ -157,17 +153,6 @@ export const ProcessMappingNavbar: React.FC<ProcessMappingNavbarProps> = ({
 
       {/* Right: Actions */}
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          id="btn-ai-assistant"
-          onClick={onOpenAiModal}
-          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-md shadow-xs transition-colors"
-          title="Assistente IA Especialista em Processos & Compras"
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>IA Especialista</span>
-        </button>
-
         <button
           type="button"
           id="btn-export-process"

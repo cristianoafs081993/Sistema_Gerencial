@@ -3,6 +3,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const SAVINGS_EVENT_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/record-automation-savings-event`;
 const SECRET_STORAGE_KEY = 'automation-event-secret';
 const PLAN_PREVIEW_STORAGE_KEY = 'siages-suap-plan-preview';
+const PLAN_BATCH_PREVIEW_STORAGE_KEY = 'siages-suap-plan-batch-preview';
 const SIAFI_LISTS_QUERY = 'select=id,name,updated_at,rows&order=updated_at.desc';
 const SIAFI_MESSAGE_SOURCE = 'siages';
 const SIAFI_MESSAGE_TYPE = 'siafi:fill-favorecidos';
@@ -162,11 +163,32 @@ async function sendCapturedPlanSync(captured) {
   return payload;
 }
 
+async function sendAllPlanSync() {
+  const session = await getStoredExtensionSession();
+  if (!session?.accessToken) throw new Error('Entre no SIAGES no popup da extensao antes de sincronizar.');
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/sync-suap-plan`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${session.accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ action: 'sync-all' }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.error || `Falha no sincronizador SUAP (HTTP ${response.status}).`);
+  return payload;
+}
+
 async function setPlanPreview(run) {
   if (run?.runId) {
     await chrome.storage.local.set({ [PLAN_PREVIEW_STORAGE_KEY]: run });
-  } else {
+    await chrome.storage.local.remove(PLAN_BATCH_PREVIEW_STORAGE_KEY);
+  } else if (run?.batchId) {
+    await chrome.storage.local.set({ [PLAN_BATCH_PREVIEW_STORAGE_KEY]: run });
     await chrome.storage.local.remove(PLAN_PREVIEW_STORAGE_KEY);
+  } else {
+    await chrome.storage.local.remove([PLAN_PREVIEW_STORAGE_KEY, PLAN_BATCH_PREVIEW_STORAGE_KEY]);
   }
   await updatePlanPreviewButton();
 }
@@ -174,7 +196,9 @@ async function setPlanPreview(run) {
 async function updatePlanPreviewButton() {
   const stored = await chrome.storage.local.get(PLAN_PREVIEW_STORAGE_KEY);
   let preview = stored[PLAN_PREVIEW_STORAGE_KEY];
-  if (!preview?.runId) {
+  const batchStored = await chrome.storage.local.get(PLAN_BATCH_PREVIEW_STORAGE_KEY);
+  let batchPreview = batchStored[PLAN_BATCH_PREVIEW_STORAGE_KEY];
+  if (!preview?.runId && !batchPreview?.batchId) {
     try {
       const session = await getStoredExtensionSession();
       if (session?.accessToken) {
@@ -192,12 +216,16 @@ async function updatePlanPreviewButton() {
           preview = { ...payload.run, runId: payload.run.id };
           await chrome.storage.local.set({ [PLAN_PREVIEW_STORAGE_KEY]: preview });
         }
+        if (response.ok && payload?.batch?.status === 'preview') {
+          batchPreview = { ...payload.batch, batchId: payload.batch.id };
+          await chrome.storage.local.set({ [PLAN_BATCH_PREVIEW_STORAGE_KEY]: batchPreview });
+        }
       }
     } catch {
       // O botao continua oculto quando nao ha sessao ou a consulta de status falha.
     }
   }
-  const hasPreview = Boolean(preview?.runId || preview?.id);
+  const hasPreview = Boolean(preview?.runId || preview?.id || batchPreview?.batchId || batchPreview?.id);
   btnApplyPlan.hidden = !hasPreview;
   btnApplyPlan.disabled = !hasPreview;
 }
@@ -463,8 +491,11 @@ async function initializeSiafiFiller() {
 async function applyPlanPreview() {
   const stored = await chrome.storage.local.get(PLAN_PREVIEW_STORAGE_KEY);
   const preview = stored[PLAN_PREVIEW_STORAGE_KEY];
+  const batchStored = await chrome.storage.local.get(PLAN_BATCH_PREVIEW_STORAGE_KEY);
+  const batchPreview = batchStored[PLAN_BATCH_PREVIEW_STORAGE_KEY];
   const runId = preview?.runId || preview?.id;
-  if (!runId) throw new Error('Nenhuma conferencia pendente para aplicar.');
+  const batchId = batchPreview?.batchId || batchPreview?.id;
+  if (!runId && !batchId) throw new Error('Nenhuma conferencia pendente para aplicar.');
   const session = await getStoredExtensionSession();
   if (!session?.accessToken) throw new Error('Entre no SIAGES no popup da extensao antes de aplicar.');
   const response = await fetch(`${SUPABASE_URL}/functions/v1/sync-suap-plan`, {
@@ -474,23 +505,23 @@ async function applyPlanPreview() {
       Authorization: `Bearer ${session.accessToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ action: 'apply', runId }),
+    body: JSON.stringify(batchId ? { action: 'apply-batch', batchId } : { action: 'apply', runId }),
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload?.error || `Falha ao aplicar a conferencia (HTTP ${response.status}).`);
   await setPlanPreview(null);
   return payload;
 }
-async function requestCampusSync(tab) {
+async function requestCampusSync(tab, scope = 'campus') {
   if (!tab?.id) throw new Error('Nao foi possivel acessar a pagina Campus do SIAGES.');
   try {
-    await chrome.tabs.sendMessage(tab.id, { type: 'siages:suap-plan-sync-request' });
+    await chrome.tabs.sendMessage(tab.id, { type: 'siages:suap-plan-sync-request', scope });
   } catch {
     // A carga inicial do script ja dispara a sincronizacao; a mensagem pode chegar antes do listener.
   }
 }
 
-async function handleExtraction() {
+async function handleExtraction(scope = 'campus') {
   try {
     btnExtractEn.disabled = true;
     btnExtractAll.disabled = true;
@@ -501,7 +532,7 @@ async function handleExtraction() {
       throw new Error('Abra o Plano 8 do SUAP ou a pagina Campus do SIAGES antes de sincronizar.');
     }
 
-    if (isSuapPlanUrl(activeTab.url)) {
+    if (isSuapPlanUrl(activeTab.url) && scope === 'campus') {
       log('Capturando o HTML do Plano 8 na aba SUAP ja autenticada...', 'info');
       const captured = await capturePlanHtml(activeTab);
       const result = await sendCapturedPlanSync(captured);
@@ -515,8 +546,16 @@ async function handleExtraction() {
       return;
     }
 
-    log('Solicitando sincronizacao ao card do Campus...', 'info');
-    await requestCampusSync(activeTab);
+    if (isSuapPlanUrl(activeTab.url) && scope === 'all') {
+      log('Solicitando sincronizacao de todas as unidades do Plano 8...', 'info');
+      const result = await sendAllPlanSync();
+      if (result.status === 'preview' || result.status === 'partial') await setPlanPreview(result);
+      log(`Lote concluído: ${result.units?.filter((unit) => unit.status !== 'failed').length || 0} unidades processadas.`, result.status === 'partial' ? 'error' : 'success');
+      return;
+    }
+
+    log(scope === 'all' ? 'Solicitando sincronizacao de todas as unidades ao card do Campus...' : 'Solicitando sincronizacao ao card do Campus...', 'info');
+    await requestCampusSync(activeTab, scope);
     log('Solicitacao enviada. Acompanhe a previa e a aplicacao no card do Campus.', 'success');
   } catch (error) {
     console.error('Sync request error:', error);
@@ -527,8 +566,8 @@ async function handleExtraction() {
     await updatePlanPreviewButton();
   }
 }
-btnExtractEn.addEventListener('click', () => { void handleExtraction(); });
-btnExtractAll.addEventListener('click', () => { void handleExtraction(); });
+btnExtractEn.addEventListener('click', () => { void handleExtraction('campus'); });
+btnExtractAll.addEventListener('click', () => { void handleExtraction('all'); });
 btnApplyPlan.addEventListener('click', async () => {
   try {
     btnApplyPlan.disabled = true;

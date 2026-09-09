@@ -18,8 +18,6 @@ describe('SuapProcessMapping', () => {
     );
 
     expect(await screen.findByRole('heading', { name: 'Liquidação e pagamento de nota fiscal' })).toBeInTheDocument();
-    expect(screen.getByText('Mapa operacional')).toBeInTheDocument();
-    expect(screen.getByText('Guia de execução')).toBeInTheDocument();
     expect(screen.getAllByText('Registrar a liquidação')).not.toHaveLength(0);
 
     fireEvent.click(screen.getByRole('button', { name: /2 Validar documentação fiscal/i }));
