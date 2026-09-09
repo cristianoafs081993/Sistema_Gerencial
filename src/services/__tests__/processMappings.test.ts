@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { DEFAULT_BOLSA_PROCESS_MAPPING, DEFAULT_PROCESS_MAPPING } from '@/data/defaultProcessMapping';
+import { DEFAULT_BOLSA_PROCESS_MAPPING, DEFAULT_PROCESS_MAPPINGS } from '@/data/defaultProcessMapping';
 import { processMappingsService } from '@/services/processMappings';
 
 describe('processMappingsService', () => {
@@ -28,7 +28,9 @@ describe('processMappingsService', () => {
 
     expect(mappings.map((mapping) => mapping.id)).toEqual([
       DEFAULT_BOLSA_PROCESS_MAPPING.id,
-      DEFAULT_PROCESS_MAPPING.id,
+      ...DEFAULT_PROCESS_MAPPINGS
+        .filter((mapping) => mapping.id !== DEFAULT_BOLSA_PROCESS_MAPPING.id)
+        .map((mapping) => mapping.id),
     ]);
     expect(new Set(mappings.map((mapping) => mapping.id)).size).toBe(mappings.length);
   });

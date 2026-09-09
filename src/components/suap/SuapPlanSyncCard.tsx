@@ -76,7 +76,7 @@ export function SuapPlanSyncCard({ onSynced, campusUasg = '158366' }: Props) {
     } finally {
       setIsBusy(false);
     }
-  }, [onSynced, refreshStatus]);
+  }, [campusUasg, onSynced, refreshStatus]);
 
   const runSyncAll = useCallback(async () => {
     setIsBusy(true);
@@ -168,7 +168,7 @@ export function SuapPlanSyncCard({ onSynced, campusUasg = '158366' }: Props) {
   };
 
   const isPreview = status?.status === 'preview';
-  const isBatchPreview = batch?.status === 'preview';
+  const isBatchPreview = batch?.status === 'preview' || batch?.status === 'partial';
   const needsConnection = showConnection || status?.status === 'reauth_required' || (!status && Boolean(message));
 
   return (

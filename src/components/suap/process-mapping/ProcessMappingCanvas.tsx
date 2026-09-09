@@ -25,6 +25,7 @@ interface ProcessMappingCanvasProps {
   searchTerm?: string;
   onSelectNode: (node: ProcessMappingNode | null) => void;
   onUpdateMapping: (updated: ProcessMappingDefinition) => void;
+  onAddNode?: (type: 'task' | 'gateway' | 'end' | 'start') => void;
 }
 
 const DEFAULT_CANVAS_WIDTH = 2800;
@@ -38,6 +39,7 @@ export const ProcessMappingCanvas: React.FC<ProcessMappingCanvasProps> = ({
   searchTerm = '',
   onSelectNode,
   onUpdateMapping,
+  onAddNode,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -290,6 +292,38 @@ export const ProcessMappingCanvas: React.FC<ProcessMappingCanvasProps> = ({
           >
             <Trash2 className="h-4 w-4" />
           </button>
+        )}
+        {onAddNode && (
+          <>
+            <div className="h-4 w-px bg-slate-200 mx-0.5" />
+            <button
+              type="button"
+              onClick={() => onAddNode('task')}
+              className="flex items-center gap-1 px-2 py-1 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition"
+              title="Adicionar Tarefa"
+            >
+              <Plus className="h-3.5 w-3.5 text-emerald-600" />
+              <span>Tarefa</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onAddNode('gateway')}
+              className="flex items-center gap-1 px-2 py-1 text-xs font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition"
+              title="Adicionar Decisão"
+            >
+              <div className="w-2.5 h-2.5 border border-amber-600 rotate-45" />
+              <span>Decisão</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onAddNode('end')}
+              className="flex items-center gap-1 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 border border-slate-200 rounded-lg transition"
+              title="Adicionar Fim / Marco"
+            >
+              <div className="w-2.5 h-2.5 rounded-full border border-slate-600" />
+              <span>Fim</span>
+            </button>
+          </>
         )}
       </div>
 

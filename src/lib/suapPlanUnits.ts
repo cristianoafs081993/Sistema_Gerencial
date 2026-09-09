@@ -9,7 +9,7 @@ export type SuapPlanUnit = {
 };
 
 const SYSTEMIC_CODES = new Set([
-  'AUGE', 'CONTROL/RE', 'CORREG/RE', 'GABIN/RE', 'OUV/RE', 'PROAD/RE', 'PRODES/RE',
+  'AUDGE', 'CONTROL/RE', 'CORREG/RE', 'GABIN/RE', 'OUV/RE', 'PROAD/RE', 'PRODES/RE',
   'PROEN/RE', 'PROEX/RE', 'PROJU/RE', 'PROPI/RE', 'SECOL', 'DIAE/RE', 'DICI/RE',
   'DIGPE/RE', 'DINFRA/RE', 'DINT/RE', 'DITIC/RE',
 ]);

@@ -30,7 +30,6 @@ import {
   ProcessMappingNavbar,
   type ProcessMappingViewMode,
 } from '@/components/suap/process-mapping/ProcessMappingNavbar';
-import { ProcessMappingSidebar } from '@/components/suap/process-mapping/ProcessMappingSidebar';
 import { Button } from '@/components/ui/button';
 
 const STORAGE_KEY = 'siages_process_mappings_v2';
@@ -389,35 +388,24 @@ export default function SuapProcessMappingPage() {
         suapId={suapId}
       />
 
-      {/* Main Container with Sidebar + Canvas/Views */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar */}
-        <ProcessMappingSidebar
-          processes={processes}
-          activeProcess={activeProcess}
-          onSelectProcess={handleSelectProcess}
-          onOpenNewProcessModal={() => setIsNewProcessOpen(true)}
-          onAddNode={handleAddNodeFromPalette}
-          onActivateConnectMode={() => setViewMode('canvas')}
-        />
+      {/* Main Container: Full Width Canvas / Views */}
+      <main className="flex-1 relative flex flex-col overflow-hidden bg-slate-100">
+        <h1 className="sr-only">{activeProcess.title}</h1>
 
-        {/* Main Stage Content */}
-        <main className="flex-1 relative flex flex-col overflow-hidden bg-slate-100">
-          <h1 className="sr-only">{activeProcess.title}</h1>
-
-          {/* Views */}
-          {viewMode === 'canvas' && (
-            <div className="flex-1 flex flex-col min-h-0">
-              <ProcessMappingCanvas
-                mapping={activeProcess}
-                flow={flow}
-                selectedNode={selectedNode}
-                searchTerm={searchTerm}
-                onSelectNode={setSelectedNode}
-                onUpdateMapping={handleUpdateActiveProcess}
-              />
-            </div>
-          )}
+        {/* Views */}
+        {viewMode === 'canvas' && (
+          <div className="flex-1 flex flex-col min-h-0">
+            <ProcessMappingCanvas
+              mapping={activeProcess}
+              flow={flow}
+              selectedNode={selectedNode}
+              searchTerm={searchTerm}
+              onSelectNode={setSelectedNode}
+              onUpdateMapping={handleUpdateActiveProcess}
+              onAddNode={handleAddNodeFromPalette}
+            />
+          </div>
+        )}
 
           {viewMode === 'table' && (
             <div className="flex-1 overflow-y-auto">
@@ -439,7 +427,6 @@ export default function SuapProcessMappingPage() {
             </div>
           )}
         </main>
-      </div>
 
       {/* Slide-out Detail Drawer */}
       <ProcessMappingDetailDrawer

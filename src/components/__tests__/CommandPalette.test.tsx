@@ -3,11 +3,12 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { CommandPalette } from '@/components/CommandPalette';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, useOptionalAuth } from '@/contexts/AuthContext';
 import type { Empenho, Contrato, Atividade } from '@/types';
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: vi.fn(),
+  useOptionalAuth: vi.fn(),
 }));
 
 const queryClient = new QueryClient({
@@ -32,6 +33,7 @@ if (typeof window !== 'undefined') {
 }
 
 const mockedUseAuth = vi.mocked(useAuth);
+const mockedUseOptionalAuth = vi.mocked(useOptionalAuth);
 
 const mockEmpenhos: Empenho[] = [
   {
@@ -98,6 +100,9 @@ describe('CommandPalette — Entity Search & Navigation', () => {
     mockedUseAuth.mockReturnValue({
       canAccessScreen: vi.fn(() => true),
       session: { user: { id: 'user-1', email: 'user@ifrn.edu.br' } } as never,
+    } as never);
+    mockedUseOptionalAuth.mockReturnValue({
+      userCampus: { codigo: '158366', nome: 'Currais Novos' },
     } as never);
   });
 

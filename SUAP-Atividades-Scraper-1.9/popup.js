@@ -216,7 +216,7 @@ async function updatePlanPreviewButton() {
           preview = { ...payload.run, runId: payload.run.id };
           await chrome.storage.local.set({ [PLAN_PREVIEW_STORAGE_KEY]: preview });
         }
-        if (response.ok && payload?.batch?.status === 'preview') {
+        if (response.ok && (payload?.batch?.status === 'preview' || (payload?.batch?.status === 'partial' && payload?.batch?.preview_count > 0))) {
           batchPreview = { ...payload.batch, batchId: payload.batch.id };
           await chrome.storage.local.set({ [PLAN_BATCH_PREVIEW_STORAGE_KEY]: batchPreview });
         }

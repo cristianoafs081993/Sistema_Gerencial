@@ -117,7 +117,7 @@ A implementacao de referencia esta em `/dashboard-cloudscape-preview`; a rota `/
 A tela de mapeamento operacional de processos adota arquitetura de estúdio interativo com suporte unificado às rotas `/mapeamentos` e `/mapeamentos/:mappingId`:
 
 1. **Top Navbar Especializada**: seletor de processos ativos com código e categoria, busca rápida em tempo real com realce no fluxo e alternador de três modos de visualização (Fluxograma, Matriz e Guia de Execução);
-2. **Sidebar Esquerda com Paleta**: lista de mapeamentos disponíveis com status, paleta de elementos rápidos (Tarefa, Decisão, Início/Fim e Conexão) e resumo de indicadores de governança (sistemas e modelos vinculados);
+2. **Layout de Largura Total (Full Width)**: aproveitamento integral da largura da tela para o Canvas, Matriz e Guia sem barras laterais redundantes, com criação rápida de elementos (Tarefa, Decisão e Fim) integrada à barra de ferramentas flutuante do Canvas;
 3. **Visão Fluxograma (Canvas)**: raias operacionais (swimlanes) horizontais com cores setoriais, conectores ortogonais em degrau (90°) com setas e rótulos de condição, controles de zoom/pan, grade comutável e nós interativos com identificador `PASSO XX`;
 4. **Visão Matriz (Tabela Operacional)**: tabela densa com filtros por links de sistemas, modelos e pendências, com colunas para responsáveis, SLA, base legal e atalhos diretos;
 5. **Visão Guia de Execução**: visão orientada a tarefas com progresso geral animado, lista sequencial de cartões, checklists interativos funcionais e botões de acesso direto a sistemas oficiais;
