@@ -5,15 +5,15 @@ import SuapExtensionDocumentAnalysis from '@/pages/SuapExtensionDocumentAnalysis
 import { isValidSuapExtensionDocumentPdfResult, SUAP_EXTENSION_ORIGIN } from '@/lib/suapExtensionDispatch';
 
 const mocks = vi.hoisted(() => ({
-  setSession: vi.fn(),
-  stopAutoRefresh: vi.fn(),
   analyzeSuapDocument: vi.fn(),
   getLatestSuapDocumentReview: vi.fn(),
 }));
-const { setSession, stopAutoRefresh, analyzeSuapDocument, getLatestSuapDocumentReview } = mocks;
+const { analyzeSuapDocument, getLatestSuapDocumentReview } = mocks;
 
-vi.mock('@/lib/supabase', () => ({
-  supabase: { auth: { setSession: mocks.setSession, stopAutoRefresh: mocks.stopAutoRefresh } },
+const extensionMocks = vi.hoisted(() => ({ extensionClient: { from: vi.fn(), functions: { invoke: vi.fn() } } }));
+const extensionClient = extensionMocks.extensionClient;
+vi.mock('@/lib/extensionSupabase', () => ({
+  authenticateExtensionAccessToken: vi.fn().mockResolvedValue({ client: extensionMocks.extensionClient, user: { id: 'user-1' } }),
 }));
 
 vi.mock('@/services/suapDocumentReview', () => ({
@@ -36,7 +36,6 @@ describe('SuapExtensionDocumentAnalysis', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    setSession.mockResolvedValue({ data: { session: { user: { id: 'user-1' } } }, error: null });
     getLatestSuapDocumentReview.mockResolvedValue(null);
     analyzeSuapDocument.mockResolvedValue({
       documentType: 'tr', checkedAt: '2026-08-10T12:00:00.000Z', status: 'attention',
@@ -61,13 +60,12 @@ describe('SuapExtensionDocumentAnalysis', () => {
             suapId: '12345', processNumber: '23035.000001.2026-11', processUrl: 'https://suap.ifrn.edu.br/processo_eletronico/processo/12345/',
             documentId: '987', documentTitle: 'Termo de Referência: TR 2/2026', documentType: 'tr',
             documentOriginalPath: '/documento_eletronico/visualizar_documento/987/?original=sim',
-            extensionSession: { accessToken: 'access', refreshToken: 'refresh' },
+            extensionSession: { accessToken: 'access', expiresAt: 9999999999 },
           },
         },
       }));
     });
 
-    await waitFor(() => expect(setSession).toHaveBeenCalledOnce());
     expect(await screen.findByText('Baixando o PDF do documento pelo SUAP...')).toBeInTheDocument();
     await act(async () => {
       const bytes = new ArrayBuffer(8);
@@ -91,8 +89,7 @@ describe('SuapExtensionDocumentAnalysis', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ativar modo claro' }));
     expect(screen.getByRole('button', { name: 'Ativar modo escuro' })).toBeInTheDocument();
     expect(screen.getByRole('main')).toHaveClass('bg-slate-100');
-    expect(analyzeSuapDocument).toHaveBeenCalledWith(expect.objectContaining({ suapId: '12345', documentId: '987', documentType: 'tr', documentTitle: 'Termo de Referência: TR 2/2026', pageCount: 1 }));
-    expect(stopAutoRefresh).toHaveBeenCalledOnce();
+    expect(analyzeSuapDocument).toHaveBeenCalledWith(expect.objectContaining({ suapId: '12345', documentId: '987', documentType: 'tr', documentTitle: 'Termo de Referência: TR 2/2026', pageCount: 1 }), extensionClient);
     expect(screen.queryByText(/editar|aplicar automaticamente/i)).not.toBeInTheDocument();
   });
 
@@ -113,14 +110,14 @@ describe('SuapExtensionDocumentAnalysis', () => {
             suapId: '12345', processNumber: '23035.000001.2026-11', processUrl: 'https://suap.ifrn.edu.br/processo_eletronico/processo/12345/',
             documentId: '987', documentTitle: 'Termo de Referência: TR 2/2026', documentType: 'tr',
             documentOriginalPath: '/documento_eletronico/visualizar_documento/987/?original=sim', reviewMode: 'latest',
-            extensionSession: { accessToken: 'access', refreshToken: 'refresh' },
+            extensionSession: { accessToken: 'access', expiresAt: 9999999999 },
           },
         },
       }));
     });
 
     expect(await screen.findByText('Análise salva disponível.')).toBeInTheDocument();
-    expect(getLatestSuapDocumentReview).toHaveBeenCalledWith({ suapId: '12345', documentId: '987', documentType: 'tr' });
+    expect(getLatestSuapDocumentReview).toHaveBeenCalledWith({ suapId: '12345', documentId: '987', documentType: 'tr' }, extensionClient);
     expect(analyzeSuapDocument).not.toHaveBeenCalled();
   });
 });

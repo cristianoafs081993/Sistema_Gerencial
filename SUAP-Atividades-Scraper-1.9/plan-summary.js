@@ -477,7 +477,7 @@
   async function getExtensionSession() {
     if (!globalThis.SiagesExtensionAuth?.getSession) throw new Error('O serviço de autenticação da extensão não está disponível.');
     const currentSession = await globalThis.SiagesExtensionAuth.getSession();
-    if (!currentSession?.accessToken || !currentSession?.refreshToken) {
+    if (!currentSession?.accessToken) {
       throw new Error('Autentique a extensão no popup para consultar os dados do banco.');
     }
     return currentSession;

@@ -23,7 +23,7 @@ import {
 } from '@/services/suapDocumentReview';
 import type { SuapDocumentReviewFinding, SuapDocumentReviewResult } from '@/lib/suapDocumentReview';
 import { downloadSuapDocumentReview, printSuapDocumentReview } from '@/lib/suapDocumentReviewExport';
-import { supabase } from '@/lib/supabase';
+import { authenticateExtensionAccessToken } from '@/lib/extensionSupabase';
 
 const bundledWorkerUrl = (pdfWorkerAsset as { default?: unknown }).default;
 pdfjsLib.GlobalWorkerOptions.workerSrc = typeof bundledWorkerUrl === 'string'
@@ -188,12 +188,7 @@ export default function SuapExtensionDocumentAnalysis() {
       setResult(null);
       setSavedReviewMissing(false);
       setStatus('Autenticando a análise no SIAGES...');
-      const { data, error: sessionError } = await supabase.auth.setSession({
-        access_token: context.extensionSession.accessToken,
-        refresh_token: context.extensionSession.refreshToken,
-      });
-      if (sessionError || !data.session) throw sessionError ?? new Error('Não foi possível iniciar a sessão da análise.');
-      supabase.auth.stopAutoRefresh();
+      const { client } = await authenticateExtensionAccessToken(context.extensionSession.accessToken);
 
       if (context.reviewMode === 'latest') {
         setStatus('Carregando a última análise salva...');
@@ -201,7 +196,7 @@ export default function SuapExtensionDocumentAnalysis() {
           suapId: context.suapId,
           documentId: context.documentId,
           documentType: context.documentType,
-        });
+        }, client);
         if (!active) return;
         if (!savedReview) {
           setSavedReviewMissing(true);
@@ -228,7 +223,7 @@ export default function SuapExtensionDocumentAnalysis() {
         processNumber: context.processNumber,
         pdfBase64: bytesToBase64(bytes),
         pageCount,
-      });
+      }, client);
       if (active) {
         setResult(review);
         setStatus('Revisão concluída.');

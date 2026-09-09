@@ -1,5 +1,6 @@
 import { DEFAULT_PROCESS_MAPPING, DEFAULT_PROCESS_MAPPINGS } from '@/data/defaultProcessMapping';
 import { supabase } from '@/lib/supabase';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ProcessMappingDefinition, ProcessMappingPublicationStatus, ProcessMappingRecord } from '@/types/processMapping';
 
 type ProcessMappingRow = {
@@ -43,9 +44,9 @@ function fallbackById(id?: string | null) {
 }
 
 export const processMappingsService = {
-  async listPublished(): Promise<ProcessMappingRecord[]> {
-    if (typeof (supabase as { from?: unknown }).from !== 'function') return DEFAULT_PROCESS_MAPPINGS;
-    const { data, error } = await supabase
+  async listPublished(client: SupabaseClient = supabase): Promise<ProcessMappingRecord[]> {
+    if (typeof (client as { from?: unknown }).from !== 'function') return DEFAULT_PROCESS_MAPPINGS;
+    const { data, error } = await client
       .from('process_mappings')
       .select(select)
       .eq('status', 'published')

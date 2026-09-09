@@ -29,19 +29,19 @@ vi.mock('@/components/ui/tabs', () => ({
 
 vi.mock('@/components/dashboard/DashboardFiltersSheet', () => ({
   DashboardFiltersSheet: ({
-    onFilterDimensaoChange,
+    onFilterPlanoInternoChange,
     onDateStartChange,
     onDateEndChange,
     onClearFilters,
   }: {
-    onFilterDimensaoChange: (value: string) => void;
+    onFilterPlanoInternoChange: (value: string) => void;
     onDateStartChange: (value: string) => void;
     onDateEndChange: (value: string) => void;
     onClearFilters: () => void;
   }) => (
     <div>
-      <button type="button" onClick={() => onFilterDimensaoChange('EN')}>
-        filter-en
+      <button type="button" onClick={() => onFilterPlanoInternoChange('PI-EN')}>
+        filter-pi-en
       </button>
       <button type="button" onClick={() => onDateStartChange('2025-01-01')}>
         filter-start-2025
@@ -298,7 +298,7 @@ describe('Dashboard', () => {
           id: 'rap-en',
           numero: '2025NE0001',
           dimensao: '',
-          planoInterno: 'RAP-EN',
+          planoInterno: 'PI-EN',
           descricao: 'RAP do ensino',
           valor: 80,
           tipo: 'rap',
@@ -309,8 +309,8 @@ describe('Dashboard', () => {
         }),
       ],
       descentralizacoes: [
-        makeDescentralizacao({ id: 'desc-en', dimensao: 'EN - Ensino', valor: 70 }),
-        makeDescentralizacao({ id: 'desc-ad', dimensao: 'AD - Administracao', origemRecurso: 'ADM', valor: 20 }),
+        makeDescentralizacao({ id: 'desc-en', dimensao: 'EN - Ensino', valor: 70, planoInterno: 'PI-EN' }),
+        makeDescentralizacao({ id: 'desc-ad', dimensao: 'AD - Administracao', origemRecurso: 'ADM', valor: 20, planoInterno: 'PI-AD' }),
       ],
       contaDescentralizacoes: [
         {
@@ -362,7 +362,7 @@ describe('Dashboard', () => {
     expect(screen.getAllByRole('button', { name: 'Orçamento' })).toHaveLength(2);
     expect(screen.getAllByRole('button', { name: 'RAP' })).toHaveLength(2);
     expect(screen.getAllByRole('button', { name: 'Contratos' })).toHaveLength(2);
-    expect(screen.getAllByRole('button', { name: 'filter-en' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'filter-pi-en' })).toHaveLength(2);
     expect(screen.getByTestId('contract-execution-tab')).toBeInTheDocument();
     expect(within(screen.getByTestId('current-tab')).queryByTestId('contract-expense-period')).not.toBeInTheDocument();
     expect(within(screen.getByTestId('contract-execution-tab')).queryByTestId('contract-expense-period')).not.toBeInTheDocument();
@@ -875,7 +875,7 @@ describe('Dashboard', () => {
     });
   });
 
-  it('aplica filtro de dimensao usando inferencia por plano interno em exercicio e RAP', async () => {
+  it('aplica filtro de plano interno em exercicio e RAP', async () => {
     render(<Dashboard />);
 
     expect(screen.getByTestId('current-planejado')).toHaveTextContent('300');
@@ -883,15 +883,16 @@ describe('Dashboard', () => {
     expect(screen.getByTestId('current-empenhos-corrente')).toHaveTextContent('2');
     expect(screen.getByTestId('current-empenhos-rap')).toHaveTextContent('1');
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'filter-en' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'filter-pi-en' })[0]);
 
     await waitFor(() => {
       expect(screen.getByTestId('current-planejado')).toHaveTextContent('200');
     });
 
-    expect(screen.getByTestId('current-descentralizado')).toHaveTextContent('100');
+    expect(screen.getByTestId('current-descentralizado')).toHaveTextContent('70');
     expect(screen.getByTestId('current-empenhos-corrente')).toHaveTextContent('1');
     expect(screen.getByTestId('current-empenhos-rap')).toHaveTextContent('1');
+    expect(screen.getByText(/Plano Interno ativo: PI-EN/)).toBeInTheDocument();
   });
 
   it('mantem os totais principais ao selecionar uma dimensao no treemap', async () => {

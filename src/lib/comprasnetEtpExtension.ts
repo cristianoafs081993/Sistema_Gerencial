@@ -40,7 +40,7 @@ export type ComprasnetEtpPageContext = {
   fields: ComprasnetEtpFieldSnapshot[];
   theme: ComprasnetEtpThemeTokens;
   generationPreferences: ComprasnetEtpGenerationPreferences;
-  extensionSession?: { accessToken: string; refreshToken: string };
+  extensionSession?: { accessToken: string; expiresAt?: number };
 };
 
 export type ComprasnetEtpRequest =

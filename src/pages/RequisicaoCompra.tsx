@@ -13,7 +13,6 @@ import {
   Plus,
   Pencil,
   Printer,
-  RotateCcw,
   Send,
   ShieldCheck,
   Trash2,
@@ -60,7 +59,7 @@ import { filterAndRankRequisicaoEmpenhos } from '@/utils/requisicaoEmpenhoSelect
 const STATUS_META: Record<string, { label: string; className: string }> = {
   draft: { label: 'Rascunho', className: 'border-slate-300 bg-slate-100 text-slate-700' },
   enviada_fornecedor: { label: 'Enviada ao Fornecedor', className: 'border-amber-300 bg-amber-50 text-amber-800' },
-  liquidada: { label: 'Liquidada', className: 'border-emerald-300 bg-emerald-50 text-emerald-800' },
+  liquidada: { label: 'Encaminhado para pagamento', className: 'border-emerald-300 bg-emerald-50 text-emerald-800' },
   review: { label: 'Enviada ao Fornecedor', className: 'border-amber-300 bg-amber-50 text-amber-800' },
   approved: { label: 'Enviada ao Fornecedor', className: 'border-amber-300 bg-amber-50 text-amber-800' },
   rejected: { label: 'Rascunho', className: 'border-slate-300 bg-slate-100 text-slate-700' },
@@ -548,7 +547,7 @@ export default function RequisicaoCompraPage() {
       if (status === 'enviada_fornecedor' || status === 'review') {
         successMessage = 'Requisição enviada ao fornecedor com sucesso.';
       } else if (status === 'liquidada') {
-        successMessage = 'Requisição marcada como liquidada com sucesso.';
+        successMessage = 'Requisição encaminhada para pagamento com sucesso.';
       }
       toast.success(successMessage, { id: loadingToast });
       setIsEditing(false);
@@ -1147,7 +1146,7 @@ export default function RequisicaoCompraPage() {
                     onClick={() => handleSaveRequisicao('liquidada')}
                   >
                     <Check className="h-4 w-4" />
-                    Marcar como Liquidada
+                    Encaminhado para pagamento
                   </Button>
                 )}
                 <Button
@@ -1221,8 +1220,8 @@ export default function RequisicaoCompraPage() {
 
             <Card className="border border-emerald-200 bg-emerald-50/40 p-4 shadow-soft">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-medium uppercase tracking-wider text-emerald-900">Liquidadas</p>
-                <Badge variant="outline" className="border-emerald-300 bg-emerald-100 text-emerald-800">Liquidada</Badge>
+                <p className="text-xs font-medium uppercase tracking-wider text-emerald-900">Encaminhadas para Pagamento</p>
+                <Badge variant="outline" className="border-emerald-300 bg-emerald-100 text-emerald-800">Encaminhado para pagamento</Badge>
               </div>
               <div className="mt-2 flex items-baseline justify-between">
                 <p className="font-mono text-2xl font-bold text-emerald-950">
@@ -1260,18 +1259,17 @@ export default function RequisicaoCompraPage() {
               )}
             </div>
           ) : (
-            <div className="overflow-hidden rounded-radius-lg border border-border-default bg-surface-card shadow-soft">
+            <div className="overflow-x-auto rounded-radius-lg border border-border-default bg-surface-card shadow-soft">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-surface-subtle/50">
-                    <TableHead>Situação</TableHead>
+                    <TableHead className="whitespace-nowrap">Situação</TableHead>
                     <TableHead>Requisição</TableHead>
                     <TableHead className="text-right">Valor Total</TableHead>
                     <TableHead>Criado por</TableHead>
                     <TableHead>Referências</TableHead>
                     <TableHead>Atualização</TableHead>
-                    <TableHead>Observações</TableHead>
-                    <TableHead className="text-right pr-6">Ações</TableHead>
+                    <TableHead className="text-right pr-6 whitespace-nowrap">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1290,63 +1288,13 @@ export default function RequisicaoCompraPage() {
 
                     return (
                       <TableRow key={requisicao.id} className="hover:bg-surface-hover/20">
-                        <TableCell className="align-top">
-                          {isFiscalOrManager ? (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className={`h-7 px-2.5 font-ui text-xs font-bold gap-1.5 cursor-pointer hover:shadow-xs transition-all ${statusInfo.className}`}
-                                  title="Clique para alterar a situação desta requisição"
-                                >
-                                  <span>{statusInfo.label}</span>
-                                  <ChevronDown className="h-3 w-3 opacity-70" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="start" className="w-56">
-                                <DropdownMenuLabel className="text-xs text-text-muted">Alterar situação para:</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={() => handleChangeStatus(requisicao.id, 'draft')}
-                                  className="gap-2 text-xs font-medium cursor-pointer"
-                                >
-                                  <div className="h-2 w-2 rounded-full bg-slate-400" />
-                                  <span>Rascunho</span>
-                                  {isDraft && <Check className="ml-auto h-3.5 w-3.5 text-primary" />}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => handleChangeStatus(requisicao.id, 'enviada_fornecedor')}
-                                  className="gap-2 text-xs font-medium cursor-pointer text-amber-900 focus:text-amber-950 focus:bg-amber-50"
-                                >
-                                  <div className="h-2 w-2 rounded-full bg-amber-500" />
-                                  <span>Enviada ao Fornecedor</span>
-                                  {isEnviada && <Check className="ml-auto h-3.5 w-3.5 text-amber-600" />}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => handleChangeStatus(requisicao.id, 'liquidada')}
-                                  className="gap-2 text-xs font-medium cursor-pointer text-emerald-900 focus:text-emerald-950 focus:bg-emerald-50"
-                                >
-                                  <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                                  <span>Liquidada</span>
-                                  {isLiquidada && <Check className="ml-auto h-3.5 w-3.5 text-emerald-600" />}
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          ) : (
-                            <Badge variant="outline" className={`font-ui text-xs font-bold ${statusInfo.className}`}>
-                              {statusInfo.label}
-                            </Badge>
-                          )}
+                        <TableCell className="align-top whitespace-nowrap">
+                          <Badge variant="outline" className={`font-ui text-xs font-bold ${statusInfo.className}`}>
+                            {statusInfo.label}
+                          </Badge>
                         </TableCell>
                         <TableCell className="align-top">
                           <div className="font-ui font-bold text-text-primary">{requisicao.number}</div>
-                          {requisicao.title && (
-                            <div className="mt-1 max-w-[18rem] truncate text-xs text-text-muted" title={requisicao.title}>
-                              {requisicao.title}
-                            </div>
-                          )}
                         </TableCell>
                         <TableCell className="align-top text-right font-mono text-sm font-bold text-text-primary">
                           {formatCurrency(requisicao.totalValue ?? 0)}
@@ -1385,15 +1333,8 @@ export default function RequisicaoCompraPage() {
                         <TableCell className="align-top text-xs text-text-muted">
                           {new Date(requisicao.updatedAt).toLocaleDateString('pt-BR')}
                         </TableCell>
-                        <TableCell className="align-top text-xs text-text-secondary">
-                          {requisicao.notes ? (
-                            <span className="line-clamp-2 block max-w-[18rem]" title={requisicao.notes}>{requisicao.notes}</span>
-                          ) : (
-                            <span className="text-text-muted">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="align-top text-right pr-6">
-                          <div className="flex flex-wrap justify-end gap-1.5 items-center">
+                        <TableCell className="align-top text-right pr-6 whitespace-nowrap">
+                          <div className="flex flex-nowrap items-center justify-end gap-1.5">
                             <Button
                               type="button"
                               variant="outline"
@@ -1401,7 +1342,7 @@ export default function RequisicaoCompraPage() {
                               title="Imprimir Requisição em PDF"
                               aria-label={`Imprimir requisição ${requisicao.number}`}
                               onClick={() => void handlePrintPDF(requisicao)}
-                              className="h-8 px-2"
+                              className="h-8 px-2 shrink-0"
                             >
                               <Printer className="h-4 w-4" />
                             </Button>
@@ -1413,25 +1354,74 @@ export default function RequisicaoCompraPage() {
                               title="Editar Requisição"
                               aria-label={`Editar requisição ${requisicao.number}`}
                               onClick={() => handleEditRequisicao(requisicao)}
-                              className="h-8 px-2"
+                              className="h-8 px-2 shrink-0"
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
 
+                            {/* Seletor de Situação */}
+                            {isFiscalOrManager && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 px-2.5 text-xs font-medium gap-1.5 shrink-0 hover:bg-surface-hover"
+                                    title="Alterar situação da requisição"
+                                    aria-label={`Alterar situação da requisição ${requisicao.number}`}
+                                  >
+                                    <span>Situação</span>
+                                    <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
+                                  <DropdownMenuLabel className="text-xs text-text-muted">Alterar situação para:</DropdownMenuLabel>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => handleChangeStatus(requisicao.id, 'draft')}
+                                    className="gap-2 text-xs font-medium cursor-pointer"
+                                  >
+                                    <div className="h-2 w-2 rounded-full bg-slate-400" />
+                                    <span>Rascunho</span>
+                                    {isDraft && <Check className="ml-auto h-3.5 w-3.5 text-primary" />}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleChangeStatus(requisicao.id, 'enviada_fornecedor')}
+                                    className="gap-2 text-xs font-medium cursor-pointer text-amber-900 focus:text-amber-950 focus:bg-amber-50"
+                                  >
+                                    <div className="h-2 w-2 rounded-full bg-amber-500" />
+                                    <span>Enviada ao Fornecedor</span>
+                                    {isEnviada && <Check className="ml-auto h-3.5 w-3.5 text-amber-600" />}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleChangeStatus(requisicao.id, 'liquidada')}
+                                    className="gap-2 text-xs font-medium cursor-pointer text-emerald-900 focus:text-emerald-950 focus:bg-emerald-50"
+                                  >
+                                    <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                                    <span>Encaminhado para pagamento</span>
+                                    {isLiquidada && <Check className="ml-auto h-3.5 w-3.5 text-emerald-600" />}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+
                             {/* Ações para Rascunho */}
                             {isDraft && (
                               <>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  className="bg-amber-600 hover:bg-amber-700 text-white h-8 px-2.5 gap-1 text-xs font-semibold"
-                                  title="Enviar ao Fornecedor"
-                                  aria-label={`Enviar requisição ${requisicao.number} ao fornecedor`}
-                                  onClick={() => handleChangeStatus(requisicao.id, 'enviada_fornecedor')}
-                                >
-                                  <Send className="h-3.5 w-3.5" />
-                                  <span>Enviar ao Fornecedor</span>
-                                </Button>
+                                {!isFiscalOrManager && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    className="bg-amber-600 hover:bg-amber-700 text-white h-8 px-2.5 gap-1 text-xs font-semibold shrink-0 whitespace-nowrap"
+                                    title="Enviar ao Fornecedor"
+                                    aria-label={`Enviar requisição ${requisicao.number} ao fornecedor`}
+                                    onClick={() => handleChangeStatus(requisicao.id, 'enviada_fornecedor')}
+                                  >
+                                    <Send className="h-3.5 w-3.5" />
+                                    <span>Enviar ao Fornecedor</span>
+                                  </Button>
+                                )}
                                 {(isCreator || isFiscalOrManager) && (
                                   <Button
                                     type="button"
@@ -1439,72 +1429,11 @@ export default function RequisicaoCompraPage() {
                                     size="sm"
                                     aria-label={`Excluir requisição ${requisicao.number}`}
                                     onClick={() => handleDeleteRequisicao(requisicao.id)}
-                                    className="h-8 px-2 text-destructive hover:bg-destructive/10"
+                                    className="h-8 px-2 text-destructive hover:bg-destructive/10 shrink-0"
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
                                 )}
-                              </>
-                            )}
-
-                            {/* Ações para Enviada ao Fornecedor */}
-                            {isEnviada && (
-                              <>
-                                {isFiscalOrManager && (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-2.5 gap-1 text-xs font-semibold"
-                                    title="Marcar como Liquidada"
-                                    aria-label={`Marcar requisição ${requisicao.number} como liquidada`}
-                                    onClick={() => handleChangeStatus(requisicao.id, 'liquidada')}
-                                  >
-                                    <Check className="h-3.5 w-3.5" />
-                                    <span>Liquidar</span>
-                                  </Button>
-                                )}
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  title="Retornar para Rascunho"
-                                  aria-label={`Retornar requisição ${requisicao.number} para rascunho`}
-                                  onClick={() => handleChangeStatus(requisicao.id, 'draft')}
-                                  className="h-8 px-2 text-text-muted hover:text-text-primary"
-                                >
-                                  <RotateCcw className="h-3.5 w-3.5" />
-                                </Button>
-                              </>
-                            )}
-
-                            {/* Ações para Liquidada */}
-                            {isLiquidada && (
-                              <>
-                                {isFiscalOrManager && (
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 h-8 px-2.5 gap-1 text-xs font-medium"
-                                    title="Reabrir para Enviada ao Fornecedor"
-                                    aria-label={`Reabrir requisição ${requisicao.number} para enviada ao fornecedor`}
-                                    onClick={() => handleChangeStatus(requisicao.id, 'enviada_fornecedor')}
-                                  >
-                                    <Send className="h-3.5 w-3.5" />
-                                    <span>Reabrir</span>
-                                  </Button>
-                                )}
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  title="Retornar para Rascunho"
-                                  aria-label={`Retornar requisição ${requisicao.number} para rascunho`}
-                                  onClick={() => handleChangeStatus(requisicao.id, 'draft')}
-                                  className="h-8 px-2 text-text-muted hover:text-text-primary"
-                                >
-                                  <RotateCcw className="h-3.5 w-3.5" />
-                                </Button>
                               </>
                             )}
                           </div>

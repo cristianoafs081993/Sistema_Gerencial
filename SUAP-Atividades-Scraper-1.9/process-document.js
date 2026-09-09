@@ -160,6 +160,130 @@
       // O cache e apenas uma otimizacao; a consulta continua funcionando sem ele.
     }
     void storageSet('session', { [key]: persisted });
+    void storageSet('local', { [key]: persisted });
+    syncProcessToRegistry();
+  }
+
+  function extractProcessDataFromPage() {
+    const suapId = getProcessId();
+    const processNumber = getProcessNumber();
+    const result = {
+      suapId: suapId || '',
+      processNumber: processNumber || '',
+      caixa: '',
+      beneficiario: '',
+      cpfCnpj: '',
+      assunto: '',
+      fields: [],
+    };
+
+    // Lê linhas do toolkit lateral se presentes
+    document.querySelectorAll('.suape-data-row').forEach((row) => {
+      const label = cleanText(row.firstElementChild?.textContent);
+      const val = cleanText(row.querySelector('.suape-data-value')?.textContent);
+      if (label && val && val !== '-') {
+        result.fields.push({ label, value: val, category: 'Processo' });
+        const l = label.toLowerCase();
+        if (l.includes('beneficiário') || l.includes('beneficiario') || l === 'nome') result.beneficiario = val;
+        if (l.includes('cpf') || l.includes('cnpj')) result.cpfCnpj = val;
+        if (l.includes('assunto')) result.assunto = val;
+        if (l.includes('caixa')) result.caixa = val;
+      }
+    });
+
+    // Lê elementos e tabelas nativas do SUAP
+    const elements = document.querySelectorAll('tr, dl, .field, .form-row, p, div');
+    elements.forEach((el) => {
+      const text = cleanText(el.textContent);
+      if (!text || text.length > 300) return;
+
+      if (!result.beneficiario && /(?:interessad[oa]s?|favorecid[oa]|fornecedor)\s*[:：]\s*([^\n\r]+)/i.test(text)) {
+        const m = text.match(/(?:interessad[oa]s?|favorecid[oa]|fornecedor)\s*[:：]\s*([^\n\r]+)/i);
+        const val = cleanText(m?.[1]).replace(/\s*(?:tipo|setor|data|assunto|status|cpf|cnpj).*$/i, '');
+        if (val && val.length > 2 && val.length < 120) result.beneficiario = val;
+      }
+
+      if (!result.cpfCnpj) {
+        const m = text.match(/(?:cpf|cnpj)\s*[:：]?\s*(\d{2,3}\.?\d{3}\.?\d{3}(?:[/-]\d{2,4})?-\d{2})/i) ||
+                  text.match(/\b\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\b|\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/);
+        if (m?.[1] || m?.[0]) result.cpfCnpj = m[1] || m[0];
+      }
+
+      if (!result.assunto && /assunto\s*[:：]\s*([^\n\r]+)/i.test(text)) {
+        const m = text.match(/assunto\s*[:：]\s*([^\n\r]+)/i);
+        const val = cleanText(m?.[1]).replace(/\s*(?:interessado|setor|data|status|tipo).*$/i, '');
+        if (val && val.length > 3 && val.length < 250) result.assunto = val;
+      }
+
+      if (!result.caixa && /caixa\s*[:：]\s*([^\n\r]+)/i.test(text)) {
+        const m = text.match(/caixa\s*[:：]\s*([^\n\r]+)/i);
+        if (m?.[1]) result.caixa = cleanText(m[1]).substring(0, 60);
+      }
+    });
+
+    return result;
+  }
+
+  function syncProcessToRegistry() {
+    const suapId = getProcessId();
+    const processNumber = getProcessNumber();
+    if (!suapId && !processNumber) return;
+
+    const pageData = extractProcessDataFromPage();
+    const process = state.snapshot?.process || {
+      suapId: suapId || '',
+      numProcesso: processNumber || '',
+      caixa: pageData.caixa || '',
+      beneficiario: pageData.beneficiario || '',
+      cpfCnpj: pageData.cpfCnpj || '',
+      assunto: pageData.assunto || '',
+    };
+
+    const payload = {
+      suapId: suapId || '',
+      processNumber: processNumber || '',
+      process,
+      fields: pageData.fields || [],
+      title: document.title,
+      url: location.href,
+    };
+
+    if (globalThis.chrome?.runtime?.sendMessage) {
+      try {
+        chrome.runtime.sendMessage({
+          source: 'suape-process-registry',
+          type: 'register-process',
+          payload,
+        }, () => {
+          if (chrome.runtime?.lastError) {
+            // Ignora canal fechado
+          }
+        });
+      } catch {
+        // Ignora erro
+      }
+    }
+
+    if (globalThis.chrome?.storage?.local?.set && suapId) {
+      try {
+        chrome.storage.local.get('suape_active_processes', (stored) => {
+          const map = stored?.suape_active_processes || {};
+          map['tab_suap_' + suapId] = {
+            suapId,
+            processNumber: processNumber || `Processo #${suapId}`,
+            process,
+            fields: pageData.fields || [],
+            url: location.href,
+            title: document.title,
+            updatedAt: Date.now(),
+            activeAt: Date.now(),
+          };
+          chrome.storage.local.set({ suape_active_processes: map });
+        });
+      } catch {
+        // Ignora
+      }
+    }
   }
   async function restorePersistedProcessState() {
     const persisted = await readPersistedProcessState();
@@ -202,7 +326,7 @@
   async function getExtensionSession() {
     if (!globalThis.SiagesExtensionAuth?.getSession) throw new Error('O serviço de autenticação da extensão não está disponível.');
     const session = await globalThis.SiagesExtensionAuth.getSession();
-    if (!session?.accessToken || !session?.refreshToken) throw new Error('Entre no SIAGES pela aba Configurações.');
+    if (!session?.accessToken) throw new Error('Entre no SIAGES pela aba Configurações.');
     return session;
   }
   function buildContext(session) {
@@ -213,7 +337,7 @@
       payload: {
         suapId, processNumber: getProcessNumber(), processUrl: getProcessUrl(),
         route: { events: parseProcessRoute(), ...(state.selectedMappingId ? { selectedMappingId: state.selectedMappingId } : {}) },
-        ...(session ? { extensionSession: { accessToken: session.accessToken, refreshToken: session.refreshToken } } : {}),
+        ...(session ? { extensionSession: { accessToken: session.accessToken, ...(session.expiresAt ? { expiresAt: session.expiresAt } : {}) } } : {}),
       },
     };
   }
@@ -775,7 +899,7 @@
         documentId: documentInfo.documentId, documentTitle: documentInfo.documentTitle, documentType: documentInfo.documentType,
         documentOriginalPath: documentInfo.documentOriginalPath,
         ...(documentInfo.reviewMode ? { reviewMode: documentInfo.reviewMode } : {}),
-        ...(session ? { extensionSession: { accessToken: session.accessToken, refreshToken: session.refreshToken } } : {}),
+        ...(session ? { extensionSession: { accessToken: session.accessToken, ...(session.expiresAt ? { expiresAt: session.expiresAt } : {}) } } : {}),
       },
     };
     const overlay = document.createElement('div');
@@ -921,10 +1045,25 @@
     renderSummary(hasPersistedProcessState ? state.snapshot : { process: null, fallback: { suapId: getProcessId(), processNumber: getProcessNumber(), processUrl: getProcessUrl() } });
     renderShortcuts(); renderAiPanel(); renderSettings();
     if (state.hasFinanceSummary) renderFinanceSummary(state.financeSummary);
-    selectTab(state.activeTab || 'summary'); installDocumentAnalysis(); openProcessBridge();
+    selectTab(state.activeTab || 'summary'); installDocumentAnalysis(); openProcessBridge(); syncProcessToRegistry();
   }
   window.addEventListener('pagehide', persistProcessState);
   globalThis.chrome?.storage?.onChanged?.addListener((changes, area) => { if (area === 'sync' && changes[SNIPPETS_KEY]) { state.snippets = changes[SNIPPETS_KEY].newValue || { ...DEFAULT_SNIPPETS }; renderShortcuts(); } });
-  window.__siagesSuapProcessDocument = { getProcessId, getProcessNumber, buildContext, parseProcessRoute, installToolkit, installButton: installToolkit, installFinancePanel: openProcessBridge, openFinanceBridge: openProcessBridge, renderFinanceSummary, openModal, closeModal, openDocumentAnalysisModal, closeDocumentAnalysisModal, scanDocumentCards, installDocumentAnalysis, disposeDocumentAnalysis, classifyDocumentForAnalysis, downloadProcessPdfFromSuap, normalizeSnippetKey, selectTab, retrySync, toggleTheme, toggleMaximized, toggleCollapsed };
+  globalThis.chrome?.runtime?.onMessage?.addListener((message, _sender, sendResponse) => {
+    if (message?.source === 'suape-process-registry' && message?.type === 'get-process-data') {
+      sendResponse({
+        processData: {
+          suapId: getProcessId(),
+          processNumber: getProcessNumber(),
+          process: state.snapshot?.process || null,
+          title: document.title,
+          url: location.href,
+        },
+      });
+      return true;
+    }
+    return undefined;
+  });
+  window.__siagesSuapProcessDocument = { getProcessId, getProcessNumber, buildContext, parseProcessRoute, installToolkit, installButton: installToolkit, installFinancePanel: openProcessBridge, openFinanceBridge: openProcessBridge, renderFinanceSummary, openModal, closeModal, openDocumentAnalysisModal, closeDocumentAnalysisModal, scanDocumentCards, installDocumentAnalysis, disposeDocumentAnalysis, classifyDocumentForAnalysis, downloadProcessPdfFromSuap, normalizeSnippetKey, selectTab, retrySync, toggleTheme, toggleMaximized, toggleCollapsed, syncProcessToRegistry };
   if (!window.__SIAGES_SUAP_PROCESS_TEST__) void installToolkit();
 })();

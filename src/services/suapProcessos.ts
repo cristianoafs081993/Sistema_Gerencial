@@ -7,6 +7,7 @@ import {
 } from '@/types';
 import { fetchSupabaseRestRows } from '@/lib/supabaseRest';
 import { supabase } from '@/lib/supabase';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 type SuapProcessoRow = {
   id: string;
@@ -109,7 +110,7 @@ const upsertWorkflow = async (processoId: string, dadosCompletos: SuapDadosCompl
 };
 
 export const suapProcessosService = {
-  async getAll(): Promise<SuapProcesso[]> {
+  async getAll(client: SupabaseClient = supabase): Promise<SuapProcesso[]> {
     const fetchFallback = async () => {
       const [processos, memberships] = await Promise.all([
         fetchSupabaseRestRows<SuapProcessoRow>('processos', PROCESSOS_SELECT, {
@@ -123,11 +124,11 @@ export const suapProcessosService = {
     };
 
     const [processosResult, membershipsResult] = await Promise.all([
-      supabase
+      client
         .from('processos')
         .select(PROCESSOS_SELECT)
         .order('updated_at', { ascending: false }),
-      supabase
+      client
         .from('suap_processo_caixas')
         .select('processo_id,suap_caixas(nome)'),
     ]);
@@ -145,11 +146,11 @@ export const suapProcessosService = {
       (membershipsResult.data as SuapProcessoCaixaRow[] | null) || [],
     );
   },
-  async getBySuapId(suapId: string): Promise<SuapProcesso | null> {
+  async getBySuapId(suapId: string, client: SupabaseClient = supabase): Promise<SuapProcesso | null> {
     const normalizedSuapId = suapId.trim();
     if (!normalizedSuapId) return null;
 
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from('processos')
       .select(PROCESSOS_SELECT)
       .eq('suap_id', normalizedSuapId)

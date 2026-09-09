@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Suape - Canivete Suico do IFRN",
-  "version": "1.9.29",
+  "version": "1.9.30",
   "description": "Paleta Ctrl+K, resumo de processos, caminho BPMN, dados financeiros, atalhos e documentos com IA no SIAGES, SUAP e Comprasnet.",
   "permissions": [
     "activeTab",
+    "tabs",
     "scripting",
     "storage",
     "alarms"
@@ -14,6 +15,14 @@
   ],
   "action": {
     "default_popup": "popup.html"
+  },
+  "commands": {
+    "open-process-paste": {
+      "suggested_key": {
+        "default": "Alt+V"
+      },
+      "description": "Colar dados de processos identificados (Alt+V)"
+    }
   },
   "background": {
     "service_worker": "background.js"
@@ -59,6 +68,19 @@
       ],
       "js": [
         "click-hints.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "css": [
+        "process-paste-picker.css"
+      ],
+      "js": [
+        "process-paste-picker.js"
       ],
       "run_at": "document_idle",
       "all_frames": true

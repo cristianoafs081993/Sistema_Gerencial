@@ -26,6 +26,7 @@ function loadBackground(values: StorageValues) {
     },
     alarms: {
       create: vi.fn(),
+      get: vi.fn().mockResolvedValue(undefined),
       onAlarm: { addListener: (listener: (alarm: { name: string }) => void) => alarmListeners.push(listener) },
     },
   };
@@ -34,6 +35,7 @@ function loadBackground(values: StorageValues) {
 
   return {
     storage,
+    alarms: chromeApi.alarms,
     send: (message: { type: string }) => new Promise<unknown>((resolve) => {
       const keepChannelOpen = messageListeners[0](
         { source: AUTH_SOURCE, ...message },
@@ -52,6 +54,16 @@ afterEach(() => {
 });
 
 describe('autenticação persistente da extensão', () => {
+  it('recria o alarme de renovação quando o worker acorda sem ele', async () => {
+    const values: StorageValues = {
+      [SESSION_KEY]: { accessToken: 'ainda-valido', refreshToken: 'refresh', expiresAt: Date.now() / 1000 + 3600 },
+    };
+    const background = loadBackground(values);
+
+    await background.send({ type: 'get-session' });
+    expect(background.alarms.create).toHaveBeenCalledWith('siages-extension-session-refresh', { periodInMinutes: 15 });
+  });
+
   it('serializa renovações concorrentes e salva o refresh token mais recente', async () => {
     const values: StorageValues = {
       [SESSION_KEY]: { accessToken: 'expirado', refreshToken: 'refresh-antigo', expiresAt: 1 },
@@ -72,10 +84,11 @@ describe('autenticação persistente da extensão', () => {
     const responses = await Promise.all([first, second]);
 
     expect(responses).toEqual([
-      { ok: true, session: expect.objectContaining({ accessToken: 'novo-access', refreshToken: 'novo-refresh' }) },
-      { ok: true, session: expect.objectContaining({ accessToken: 'novo-access', refreshToken: 'novo-refresh' }) },
+      { ok: true, session: expect.objectContaining({ accessToken: 'novo-access' }) },
+      { ok: true, session: expect.objectContaining({ accessToken: 'novo-access' }) },
     ]);
     expect(values[SESSION_KEY]).toEqual(expect.objectContaining({ accessToken: 'novo-access', refreshToken: 'novo-refresh' }));
+    expect((responses[0] as { session: Record<string, unknown> }).session).not.toHaveProperty('refreshToken');
   });
 
   it('preserva a sessão quando a renovação falha e só a remove no logout explícito', async () => {
@@ -85,7 +98,7 @@ describe('autenticação persistente da extensão', () => {
     const background = loadBackground(values);
 
     const failedRefresh = await background.send({ type: 'get-session' });
-    expect(failedRefresh).toEqual({ ok: false, error: expect.stringContaining('não pôde ser renovada') });
+    expect(failedRefresh).toEqual({ ok: false, error: expect.stringContaining('continua salva') });
     expect(values[SESSION_KEY]).toEqual(storedSession);
     expect(background.storage.remove).not.toHaveBeenCalled();
 
@@ -103,11 +116,29 @@ describe('autenticação persistente da extensão', () => {
     const background = loadBackground(values);
 
     const refreshing = background.send({ type: 'get-session' });
-    await Promise.resolve();
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     await expect(background.send({ type: 'sign-out' })).resolves.toEqual({ ok: true, session: null });
 
     releaseRefresh({ ok: true, json: async () => ({ access_token: 'late-access', refresh_token: 'late-refresh', expires_in: 3600 }) });
     await expect(refreshing).resolves.toEqual({ ok: true, session: null });
+    expect(values[SESSION_KEY]).toBeUndefined();
+  });
+
+  it('remove a sessão somente quando o Supabase confirma que o refresh token foi revogado', async () => {
+    const values: StorageValues = {
+      [SESSION_KEY]: { accessToken: 'expirado', refreshToken: 'revogado', expiresAt: 1 },
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({ code: 'refresh_token_already_used' }),
+    }));
+    const background = loadBackground(values);
+
+    await expect(background.send({ type: 'get-session' })).resolves.toEqual({
+      ok: false,
+      error: expect.stringContaining('encerrada pelo SIAGES'),
+    });
     expect(values[SESSION_KEY]).toBeUndefined();
   });
 });

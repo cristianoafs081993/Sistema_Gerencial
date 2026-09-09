@@ -1,5 +1,6 @@
 import { getSupabaseFunctionErrorMessage } from '@/lib/supabaseFunctionErrors';
 import { supabase } from '@/lib/supabase';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   comprasnetEtpQuestions,
   normalizeComprasnetEtpText,
@@ -133,9 +134,9 @@ function buildLocalDraft(params: GenerateComprasnetEtpParams, warning?: string):
 }
 
 export const comprasnetEtpService = {
-  async generateDraft(params: GenerateComprasnetEtpParams): Promise<ComprasnetEtpDraftResult> {
+  async generateDraft(params: GenerateComprasnetEtpParams, client: SupabaseClient = supabase): Promise<ComprasnetEtpDraftResult> {
     try {
-      const { data, error } = await supabase.functions.invoke('gerar-etp-comprasnet', {
+      const { data, error } = await client.functions.invoke('gerar-etp-comprasnet', {
         body: buildPayload(params),
       });
       if (error) throw new Error(await getSupabaseFunctionErrorMessage(error));

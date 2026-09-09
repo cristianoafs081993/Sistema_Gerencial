@@ -39,7 +39,8 @@ import type { PreliminaryStudyPdfAnalysis } from '@/lib/preliminaryStudyProcessP
 import { preliminaryStudiesService } from '@/services/preliminaryStudies';
 import { comprasnetEtpService, type ComprasnetEtpDraftResult } from '@/services/comprasnetEtp';
 import { suapProcessosService } from '@/services/suapProcessos';
-import { supabase } from '@/lib/supabase';
+import { authenticateExtensionAccessToken } from '@/lib/extensionSupabase';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { SuapProcesso } from '@/types';
 import './comprasnet-etp-extension.css';
 
@@ -101,6 +102,7 @@ function buildAnswers(fields: ComprasnetEtpFieldSnapshot[]): ComprasnetEtpAnswer
 export default function ComprasnetEtpExtension() {
   const [context, setContext] = useState<ComprasnetEtpPageContext | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
+  const [extensionClient, setExtensionClient] = useState<SupabaseClient | null>(null);
   const [mode, setMode] = useState<Mode>('current');
   const [stage, setStage] = useState<Stage>('setup');
   const [status, setStatus] = useState('Aguardando a tela do Comprasnet.');
@@ -183,18 +185,16 @@ export default function ComprasnetEtpExtension() {
   useEffect(() => {
     if (!context?.extensionSession) return;
     let active = true;
-    void supabase.auth.setSession({
-      access_token: context.extensionSession.accessToken,
-      refresh_token: context.extensionSession.refreshToken,
-    }).then(({ data, error: sessionError }) => {
+    void authenticateExtensionAccessToken(context.extensionSession.accessToken).then(({ client }) => {
       if (!active) return;
-      if (sessionError || !data.session) {
-        setError('A sessão do SIAGES não pôde ser iniciada. Entre novamente pela extensão.');
-        return;
-      }
-      supabase.auth.stopAutoRefresh();
+      setExtensionClient(client);
       setSessionReady(true);
       setStatus('Sessão do SIAGES pronta para consultar o processo.');
+    }).catch(() => {
+      if (!active) return;
+      setExtensionClient(null);
+      setSessionReady(false);
+      setError('A sessão do SIAGES não pôde ser iniciada. Entre novamente pela extensão.');
     });
     return () => { active = false; };
   }, [context?.extensionSession]);
@@ -211,7 +211,8 @@ export default function ComprasnetEtpExtension() {
     try {
       setError(null);
       setStatus('Consultando o processo no SIAGES...');
-      const processos = await suapProcessosService.getAll();
+      if (!extensionClient) throw new Error('A sessão da extensão ainda não está pronta.');
+      const processos = await suapProcessosService.getAll(extensionClient);
       const found = processos.find((item) => normalizeProcessNumber(item.numProcesso || '') === normalized) || null;
       setProcesso(found);
       if (!found) {
@@ -234,7 +235,7 @@ export default function ComprasnetEtpExtension() {
       setAnalysis(null);
       setStatus('Não foi possível consultar o processo. A geração continuará com os dados disponíveis.');
     }
-  }, [processNumber]);
+  }, [extensionClient, processNumber]);
 
   useEffect(() => {
     if (!sessionReady || !context?.processNumber || autoLookupDoneRef.current) return;
@@ -342,6 +343,7 @@ export default function ComprasnetEtpExtension() {
     setStage('loading');
     setStatus('Preparando o rascunho do ETP...');
     try {
+      if (!extensionClient) throw new Error('A sessão da extensão ainda não está pronta.');
       const result = await comprasnetEtpService.generateDraft({
         processo,
         manualObject,
@@ -349,7 +351,7 @@ export default function ComprasnetEtpExtension() {
         questionnaireAnswers: buildAnswers(context.fields),
         supplementalSnippets: attachments.flatMap((attachment) => attachment.snippets),
         generationPreferences: preferences,
-      });
+      }, extensionClient);
       const scopedResult = mode === 'current' && context.fields[0]
         ? { ...result, sections: result.sections?.filter((section) => section.id === context.fields[0].id) }
         : result;

@@ -6,18 +6,14 @@ import {
   SUAP_EXTENSION_PROCESS_INFO_READY_MESSAGE,
 } from '@/lib/suapExtensionDispatch';
 import SuapExtensionProcessInfo from '@/pages/SuapExtensionProcessInfo';
-import { supabase } from '@/lib/supabase';
 import { suapProcessFinanceService } from '@/services/suapProcessFinance';
 import { suapProcessosService } from '@/services/suapProcessos';
 import { suapScraperService } from '@/services/suapScraperService';
 
-vi.mock('@/lib/supabase', () => ({
-  supabase: {
-    auth: {
-      setSession: vi.fn().mockResolvedValue({ data: { session: { user: { id: 'user-1' } } }, error: null }),
-      stopAutoRefresh: vi.fn(),
-    },
-  },
+const extensionMocks = vi.hoisted(() => ({ extensionClient: { from: vi.fn(), functions: { invoke: vi.fn() } } }));
+const extensionClient = extensionMocks.extensionClient;
+vi.mock('@/lib/extensionSupabase', () => ({
+  authenticateExtensionAccessToken: vi.fn().mockResolvedValue({ client: extensionMocks.extensionClient, user: { id: 'user-1' } }),
 }));
 
 vi.mock('@/services/suapProcessFinance', async () => {
@@ -40,6 +36,10 @@ vi.mock('@/services/suapScraperService', () => ({
   },
 }));
 
+vi.mock('@/services/processMappings', () => ({
+  processMappingsService: { listPublished: vi.fn().mockResolvedValue([]) },
+}));
+
 const processContext = {
   source: 'siages-suap-extension',
   type: 'siages:suap-process-context',
@@ -50,7 +50,7 @@ const processContext = {
     processUrl: 'https://suap.ifrn.edu.br/processo_eletronico/processo/987/',
     extensionSession: {
       accessToken: 'access-token',
-      refreshToken: 'refresh-token',
+      expiresAt: 9999999999,
     },
   },
 };
@@ -82,7 +82,7 @@ describe('SuapExtensionProcessInfo', () => {
     postMessage.mockRestore();
   });
 
-  it('usa a sessao privada da extensao para consultar e enviar o resumo financeiro', async () => {
+  it('usa somente o access token efêmero da extensão para consultar e enviar o resumo financeiro', async () => {
     const summary = {
       status: 'ready' as const,
       escopoContrato: true,
@@ -96,11 +96,7 @@ describe('SuapExtensionProcessInfo', () => {
     render(<SuapExtensionProcessInfo />);
     await sendContext();
 
-    await waitFor(() => expect(supabase.auth.setSession).toHaveBeenCalledWith({
-      access_token: 'access-token',
-      refresh_token: 'refresh-token',
-    }));
-    expect(supabase.auth.stopAutoRefresh).toHaveBeenCalledOnce();
+    await waitFor(() => expect(suapProcessosService.getBySuapId).toHaveBeenCalledWith('987', extensionClient));
     await waitFor(() => expect(suapProcessFinanceService.getSummaryBySuapId).toHaveBeenCalledWith('987'));
     expect(postMessage).toHaveBeenCalledWith({
       source: 'siages',
@@ -140,7 +136,7 @@ describe('SuapExtensionProcessInfo', () => {
       suapId: '987',
       numProcesso: processContext.payload.processNumber,
       url: processContext.payload.processUrl,
-    }], 'user-1'));
+    }], 'user-1', {}, extensionClient));
     expect(suapProcessosService.getBySuapId).toHaveBeenCalledTimes(2);
   });
 });

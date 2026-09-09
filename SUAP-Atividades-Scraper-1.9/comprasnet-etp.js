@@ -360,7 +360,7 @@
       fields,
       theme: getThemeTokens(),
       generationPreferences: await readPreferences(),
-      ...(extensionSession ? { extensionSession } : {}),
+      ...(extensionSession?.accessToken ? { extensionSession: { accessToken: extensionSession.accessToken, ...(extensionSession.expiresAt ? { expiresAt: extensionSession.expiresAt } : {}) } } : {}),
     };
   }
 

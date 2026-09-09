@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.29');
+    expect(manifest.version).toBe('1.9.30');
     expect(manifest.host_permissions).toContain('<all_urls>');
     expect(manifest.permissions).toEqual(expect.arrayContaining(['activeTab', 'scripting', 'storage', 'alarms']));
     expect(manifest.background).toEqual({ service_worker: 'background.js' });
@@ -157,7 +157,7 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(processScript).not.toContain('form.elements.password.value');
     expect(backgroundScript).toContain("message.type === 'sign-out'");
     expect(backgroundScript).toContain('refreshInFlight');
-    expect(backgroundScript).toContain('A sessão da extensão não pôde ser renovada agora');
+    expect(backgroundScript).toContain('Ela continua salva e a extensão tentará novamente');
     expect(processScript).toContain('SiagesExtensionAuth');
     expect(popupScript).toContain('SiagesExtensionAuth');
     expect(processScript).toContain('extension context invalidated');
@@ -170,6 +170,8 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(backgroundKey).toBe(planKey);
     expect(backgroundScript).toContain("const EXTENSION_SESSION_STORAGE_KEY = 'siages-extension-session'");
     expect(backgroundScript).toContain('refresh_token');
+    expect(backgroundScript).toContain('toPublicSession');
+    expect(processScript).not.toContain('refreshToken: session.refreshToken');
     expect(backgroundScript).toContain('chrome.alarms.create');
     expect(popup).toContain('id="siafi-list-select"');
     expect(popup).toContain('id="btn-siafi-fill"');
@@ -196,5 +198,32 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(clickHints).toContain('mnemonicFromLabel');
     expect(clickHints).toContain('assignInitialCodes');
     expect(clickHintsCss).toContain('#suape-click-hints-root');
+  });
+
+  it('inclui o seletor inteligente de colagem Alt+V com suporte multi-processos', () => {
+    const pastePicker = fs.readFileSync(extensionFixturePath('process-paste-picker.js'), 'utf8');
+    const pastePickerCss = fs.readFileSync(extensionFixturePath('process-paste-picker.css'), 'utf8');
+    const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
+
+    expect(pastePicker).toContain('window.__suapeProcessPastePickerLoaded');
+    expect(pastePicker).toContain("e.altKey && !e.ctrlKey && !e.metaKey && (e.key === 'v' || e.key === 'V' || e.code === 'KeyV')");
+    expect(pastePicker).toContain('extractIdentifiedFields');
+    expect(pastePicker).toContain('fetchActiveProcesses');
+    expect(pastePicker).toContain('suape-paste-overlay');
+    expect(pastePicker).toContain('suape-paste-modal');
+    expect(pastePickerCss).toContain('#suape-paste-overlay');
+    expect(pastePickerCss).toContain('.suape-paste-group-header');
+
+    expect(manifest.commands?.['open-process-paste']?.suggested_key?.default).toBe('Alt+V');
+    const pickerScript = manifest.content_scripts.find((entry: { js?: string[] }) =>
+      entry.js?.includes('process-paste-picker.js')
+    );
+    expect(pickerScript).toMatchObject({
+      matches: ['<all_urls>'],
+      css: ['process-paste-picker.css'],
+      js: ['process-paste-picker.js'],
+      run_at: 'document_idle',
+      all_frames: true,
+    });
   });
 });

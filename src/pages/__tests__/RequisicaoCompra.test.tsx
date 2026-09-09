@@ -171,13 +171,16 @@ describe('RequisicaoCompraPage', () => {
     expect(within(table).getByRole('columnheader', { name: /Requisição/i })).toBeInTheDocument();
     expect(within(table).getByRole('columnheader', { name: /Valor Total/i })).toBeInTheDocument();
     expect(within(table).getByRole('columnheader', { name: /Referências/i })).toBeInTheDocument();
+    expect(within(table).queryByRole('columnheader', { name: /Observações/i })).not.toBeInTheDocument();
     expect(within(table).getByText('REQ-2026-0001')).toBeInTheDocument();
     expect(within(table).getByText('Enviada ao Fornecedor')).toBeInTheDocument();
     expect(within(table).getByText(/2025NE000083/)).toBeInTheDocument();
     expect(within(table).getByText(/2025NE000084/)).toBeInTheDocument();
     expect(within(table).getByText('00329/2025')).toBeInTheDocument();
     expect(within(table).getByRole('button', { name: /Editar requisição REQ-2026-0001/i })).toBeInTheDocument();
-    expect(within(table).getByRole('button', { name: /Marcar requisição REQ-2026-0001 como liquidada/i })).toBeInTheDocument();
+    expect(within(table).getByRole('button', { name: /Alterar situação da requisição REQ-2026-0001/i })).toBeInTheDocument();
+    expect(within(table).queryByRole('button', { name: /Retornar requisição REQ-2026-0001 para rascunho/i })).not.toBeInTheDocument();
+    expect(within(table).queryByRole('button', { name: /Encaminhar requisição REQ-2026-0001 para pagamento/i })).not.toBeInTheDocument();
     expect(within(table).queryAllByRole('row')).toHaveLength(2);
   });
 
@@ -598,7 +601,7 @@ describe('RequisicaoCompraPage', () => {
     // Badges
     expect(screen.getAllByText('Rascunho').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Enviada ao Fornecedor').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('Liquidada').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Encaminhado para pagamento').length).toBeGreaterThanOrEqual(1);
   });
 
   it('desconta do saldo do empenho o valor de requisicoes enviadas ao fornecedor e exibe detalhamento visual', async () => {
@@ -738,4 +741,49 @@ describe('RequisicaoCompraPage', () => {
     expect(empenhoOption.textContent).not.toContain('Enviado:');
     expect(screen.queryByText(/2\.000,00.*enviadas/i)).not.toBeInTheDocument();
   });
+
+  it('renderiza os botoes de acoes em linha unica com flex-nowrap e sem o botao redundante de liquidar/encaminhar', async () => {
+    mockedService.listRecentRequisicoes.mockResolvedValue([
+      {
+        id: 'req-enviada-1',
+        title: 'Serviço de Manutenção',
+        number: 'REQ-2026-0099',
+        status: 'enviada_fornecedor',
+        createdBy: 'admin-1',
+        createdByEmail: 'admin@ifrn.edu.br',
+        totalValue: 1200,
+        createdAt: new Date('2026-08-01T10:00:00Z'),
+        updatedAt: new Date('2026-08-01T10:00:00Z'),
+      },
+    ] as never);
+
+    renderPage();
+
+    const table = await screen.findByRole('table');
+    const printBtn = within(table).getByRole('button', {
+      name: /Imprimir requisição REQ-2026-0099/i,
+    });
+    expect(printBtn).toBeInTheDocument();
+
+    expect(within(table).getByRole('button', {
+      name: /Alterar situação da requisição REQ-2026-0099/i,
+    })).toBeInTheDocument();
+
+    // Ícone de retornar e botões legados não devem estar na coluna de ações
+    expect(within(table).queryByRole('button', {
+      name: /Retornar requisição REQ-2026-0099 para rascunho/i,
+    })).not.toBeInTheDocument();
+    expect(within(table).queryByRole('button', {
+      name: /Encaminhar requisição REQ-2026-0099 para pagamento/i,
+    })).not.toBeInTheDocument();
+    expect(screen.queryByText('Liquidar')).not.toBeInTheDocument();
+
+    const actionsContainer = printBtn.closest('div');
+    expect(actionsContainer).toHaveClass('flex-nowrap');
+    expect(actionsContainer).not.toHaveClass('flex-wrap');
+
+    const actionsCell = printBtn.closest('td');
+    expect(actionsCell).toHaveClass('whitespace-nowrap');
+  });
 });
+

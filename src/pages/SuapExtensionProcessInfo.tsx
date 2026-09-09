@@ -20,7 +20,8 @@ import { suapProcessosService } from '@/services/suapProcessos';
 import { suapScraperService } from '@/services/suapScraperService';
 import { processMappingsService } from '@/services/processMappings';
 import { buildSuapProcessFlowSummary } from '@/lib/suapProcessFlow';
-import { supabase } from '@/lib/supabase';
+import { authenticateExtensionAccessToken } from '@/lib/extensionSupabase';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { SuapProcesso } from '@/types';
 
 const PROCESSING_STATUSES = new Set([
@@ -59,8 +60,8 @@ function postSyncStatus(payload: SuapExtensionProcessSyncStatus) {
   postMessageToSuapParent({ source: 'siages', type: SUAP_EXTENSION_PROCESS_SYNC_STATUS_TYPE, version: 1, payload });
 }
 
-async function postProcessFlow(context: SuapExtensionProcessContext, process: SuapProcesso | null) {
-  const mappings = await processMappingsService.listPublished();
+async function postProcessFlow(context: SuapExtensionProcessContext, process: SuapProcesso | null, client?: SupabaseClient) {
+  const mappings = await processMappingsService.listPublished(client);
   const mapping = mappings.find((item) => item.id === context.route?.selectedMappingId) || mappings[0];
   if (!mapping) return;
 
@@ -163,9 +164,10 @@ export default function SuapExtensionProcessInfo() {
   useEffect(() => {
     if (!context) return;
     let active = true;
+    let extensionClient: SupabaseClient | undefined;
     const isActive = () => active;
     const publishProcess = async () => {
-      const process = await suapProcessosService.getBySuapId(context.suapId);
+      const process = await suapProcessosService.getBySuapId(context.suapId, extensionClient);
       if (!active) return process;
       postSnapshot(context, process);
       return process;
@@ -180,14 +182,9 @@ export default function SuapExtensionProcessInfo() {
       if (!extensionSession) throw new Error('Entre no SIAGES pela aba Configuracoes para sincronizar este processo.');
 
       postSyncStatus({ stage: 'checking', message: 'Consultando o processo no SIAGES...' });
-      const { data, error } = await supabase.auth.setSession({
-        access_token: extensionSession.accessToken,
-        refresh_token: extensionSession.refreshToken,
-      });
-      if (error || !data.session) throw error ?? new Error('Nao foi possivel iniciar a sessao da extensao.');
-      // O service worker da extensao e o unico responsavel por renovar este refresh token.
-      supabase.auth.stopAutoRefresh();
-      const tenantId = data.session.user.id;
+      const authenticated = await authenticateExtensionAccessToken(extensionSession.accessToken);
+      extensionClient = authenticated.client;
+      const tenantId = authenticated.user.id;
 
       let process = await publishProcess();
       if (!process) {
@@ -196,12 +193,12 @@ export default function SuapExtensionProcessInfo() {
           suapId: context.suapId,
           numProcesso: context.processNumber,
           url: context.processUrl,
-        }], tenantId);
+        }], tenantId, {}, extensionClient);
         process = await publishProcess();
       }
       if (!process) throw new Error('Nao foi possivel registrar o processo no SIAGES.');
 
-      await postProcessFlow(context, process);
+      await postProcessFlow(context, process, extensionClient);
       await publishFinance();
       if (READY_STATUSES.has(process.status)) {
         postSyncStatus({ stage: 'ready', message: 'Dados do processo atualizados.' });
@@ -216,7 +213,7 @@ export default function SuapExtensionProcessInfo() {
         const bytes = await waitForPdf(context, isActive);
         if (!active) return;
         postSyncStatus({ stage: 'uploading-pdf', message: 'Salvando o PDF do processo...' });
-        await suapScraperService.storePdfBytesForProcess({ suapId: context.suapId }, bytes, tenantId, () => undefined);
+        await suapScraperService.storePdfBytesForProcess({ suapId: context.suapId }, bytes, tenantId, () => undefined, extensionClient);
         process = await publishProcess();
       }
 
@@ -226,6 +223,7 @@ export default function SuapExtensionProcessInfo() {
           tenantId,
           () => undefined,
           { force: retryCount > 0 },
+          extensionClient,
         );
         postSyncStatus({
           stage: result.queued ? 'queued' : 'processing',

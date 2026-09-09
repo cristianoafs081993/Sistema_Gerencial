@@ -19,7 +19,8 @@ import {
   isRapReinscrito,
 } from '@/utils/rapMetrics';
 import { useData } from '@/contexts/DataContext';
-import { extractDimensionCode, getDimensionLabel, matchesDimensionFilter } from '@/utils/dimensionFilters';
+import { extractDimensionCode, getDimensionLabel } from '@/utils/dimensionFilters';
+import { matchesPlanoInternoFilter } from '@/utils/planoInternoFilters';
 import {
   buildDescentralizacaoSummaryRows,
   getFilteredDescentralizacaoSummaryTotal,
@@ -1027,7 +1028,7 @@ export default function Dashboard() {
   } = useData();
   const [hoveredBudgetDimension, setHoveredBudgetDimension] = useState<string | null>(null);
   const [selectedBudgetDimensionCode, setSelectedBudgetDimensionCode] = useState<string | null>(null);
-  const [filterDimensao, setFilterDimensao] = useState('all');
+  const [filterPlanoInterno, setFilterPlanoInterno] = useState('all');
   const [filterOrigem, setFilterOrigem] = useState('all');
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
@@ -1037,17 +1038,6 @@ export default function Dashboard() {
   const [projectionTargetMonths, setProjectionTargetMonths] = useState(12);
   const [contractsWithRenewalAllowed, setContractsWithRenewalAllowed] = useState<string[]>([]);
   const isContractExecutionTabActive = activeTab === 'contratos';
-
-  const effectiveFilterDimensao = useMemo(() => {
-    if (filterDimensao === 'all') return 'all';
-    return extractDimensionCode(filterDimensao) || 'all';
-  }, [filterDimensao]);
-
-  useEffect(() => {
-    if (filterDimensao !== 'all' && effectiveFilterDimensao === 'all') {
-      setFilterDimensao('all');
-    }
-  }, [filterDimensao, effectiveFilterDimensao]);
 
   const origensDisponiveis = useMemo(() => {
     const origens = new Set<string>();
@@ -1067,17 +1057,33 @@ export default function Dashboard() {
     return Array.from(origens).sort();
   }, [atividades, empenhos, descentralizacoes, contaDescentralizacoes]);
 
+  const planosInternosDisponiveis = useMemo(() => {
+    const planos = new Set<string>();
+
+    atividades.forEach((atividade) => {
+      const pi = atividade.planoInterno?.trim();
+      if (pi) planos.add(pi);
+    });
+    empenhos.forEach((empenho) => {
+      const pi = empenho.planoInterno?.trim();
+      if (pi) planos.add(pi);
+    });
+    descentralizacoes.forEach((descentralizacao) => {
+      const pi = descentralizacao.planoInterno?.trim();
+      if (pi) planos.add(pi);
+    });
+    return Array.from(planos).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [atividades, empenhos, descentralizacoes]);
+
   const filteredData = useMemo(() => {
     const filteredAtividades = atividades.filter((atividade) => {
-      const matchDimensao = matchesDimensionFilter({
-        dimensionValue: atividade.dimensao,
-        planInternal: atividade.planoInterno,
-        description: atividade.descricao,
-        filterValue: effectiveFilterDimensao,
+      const matchPlano = matchesPlanoInternoFilter({
+        planoInterno: atividade.planoInterno,
+        filterValue: filterPlanoInterno,
       });
       const matchOrigem = filterOrigem === 'all' || atividade.origemRecurso === filterOrigem;
 
-      return matchDimensao && matchOrigem;
+      return matchPlano && matchOrigem;
     });
 
     const empenhosCorrente = empenhos.filter((empenho) => empenho.tipo === 'exercicio');
@@ -1093,40 +1099,34 @@ export default function Dashboard() {
     };
 
     const filteredEmpenhosCorrente = empenhosCorrente.filter((empenho) => {
-      const matchDimensao = matchesDimensionFilter({
-        dimensionValue: empenho.dimensao,
-        planInternal: empenho.planoInterno,
-        description: empenho.descricao,
-        filterValue: effectiveFilterDimensao,
+      const matchPlano = matchesPlanoInternoFilter({
+        planoInterno: empenho.planoInterno,
+        filterValue: filterPlanoInterno,
       });
       const matchOrigem = filterOrigem === 'all' || empenho.origemRecurso === filterOrigem;
 
-      return matchDimensao && matchOrigem && matchDateRange(empenho.dataEmpenho) && empenho.status !== 'cancelado';
+      return matchPlano && matchOrigem && matchDateRange(empenho.dataEmpenho) && empenho.status !== 'cancelado';
     });
 
     const filteredEmpenhosRap = empenhosRap.filter((empenho) => {
-      const matchDimensao = matchesDimensionFilter({
-        dimensionValue: empenho.dimensao,
-        planInternal: empenho.planoInterno,
-        description: empenho.descricao,
-        filterValue: effectiveFilterDimensao,
+      const matchPlano = matchesPlanoInternoFilter({
+        planoInterno: empenho.planoInterno,
+        filterValue: filterPlanoInterno,
       });
       const matchOrigem = filterOrigem === 'all' || empenho.origemRecurso === filterOrigem;
 
-      return matchDimensao && matchOrigem && matchDateRange(empenho.dataEmpenho) && empenho.status !== 'cancelado';
+      return matchPlano && matchOrigem && matchDateRange(empenho.dataEmpenho) && empenho.status !== 'cancelado';
     });
 
     const filteredDescentralizacoes = descentralizacoes.filter((descentralizacao) => {
       if (isExcludedDescentralizacaoOrigem(descentralizacao.origemRecurso)) return false;
-      const matchDimensao = matchesDimensionFilter({
-        dimensionValue: descentralizacao.dimensao,
-        planInternal: descentralizacao.planoInterno,
-        description: descentralizacao.descricao,
-        filterValue: effectiveFilterDimensao,
+      const matchPlano = matchesPlanoInternoFilter({
+        planoInterno: descentralizacao.planoInterno,
+        filterValue: filterPlanoInterno,
       });
       const matchOrigem = filterOrigem === 'all' || descentralizacao.origemRecurso === filterOrigem;
 
-      return matchDimensao && matchOrigem;
+      return matchPlano && matchOrigem;
     });
 
     return {
@@ -1135,7 +1135,7 @@ export default function Dashboard() {
       empenhosRap: filteredEmpenhosRap,
       descentralizacoes: filteredDescentralizacoes,
     };
-  }, [atividades, empenhos, descentralizacoes, effectiveFilterDimensao, filterOrigem, dateStart, dateEnd]);
+  }, [atividades, empenhos, descentralizacoes, filterPlanoInterno, filterOrigem, dateStart, dateEnd]);
 
   const dashboardDescentralizacoes = useMemo(
     () => descentralizacoes.filter((d) => !isExcludedDescentralizacaoOrigem(d.origemRecurso)),
@@ -1155,11 +1155,16 @@ export default function Dashboard() {
     [dashboardDescentralizacoes, dashboardContaDescentralizacoes],
   );
 
-  const totalDescentralizado = getFilteredDescentralizacaoSummaryTotal({
-    rows: resumoDescentralizacoes,
-    filterDimensao: effectiveFilterDimensao,
-    filterOrigem,
-  });
+  const totalDescentralizado = useMemo(() => {
+    if (filterPlanoInterno !== 'all') {
+      return filteredData.descentralizacoes.reduce((sum, d) => sum + d.valor, 0);
+    }
+    return getFilteredDescentralizacaoSummaryTotal({
+      rows: resumoDescentralizacoes,
+      filterDimensao: 'all',
+      filterOrigem,
+    });
+  }, [filterPlanoInterno, filteredData.descentralizacoes, resumoDescentralizacoes, filterOrigem]);
 
   const empenhosCorrenteParaSoma = useMemo(() => {
     if (filterOrigem !== 'all') {
@@ -1611,16 +1616,6 @@ export default function Dashboard() {
       .sort((a, b) => (b.value || 0) - (a.value || 0));
   }, [filteredData]);
 
-  const filteredBudgetDimension = useMemo(() => {
-    if (effectiveFilterDimensao === 'all') return null;
-
-    return (
-      budgetTreemapData.find((item) => item.dimensionCode === effectiveFilterDimensao)?.name ||
-      getDimensionLabel(effectiveFilterDimensao) ||
-      null
-    );
-  }, [budgetTreemapData, effectiveFilterDimensao]);
-
   const selectedBudgetDimension = useMemo(() => {
     if (!selectedBudgetDimensionCode) return null;
 
@@ -1631,7 +1626,7 @@ export default function Dashboard() {
     );
   }, [budgetTreemapData, selectedBudgetDimensionCode]);
 
-  const activeBudgetDimension = selectedBudgetDimension || filteredBudgetDimension;
+  const activeBudgetDimension = selectedBudgetDimension;
   const highlightedBudgetDimension = hoveredBudgetDimension || activeBudgetDimension;
 
   const handleBudgetDimensionSelect = (dimensionValue?: string | null) => {
@@ -1646,24 +1641,23 @@ export default function Dashboard() {
     const dimensionMap = new Map<string, Record<string, string | number>>();
     const origemSet = new Set<string>();
 
-    resumoDescentralizacoes.forEach((descentralizacao) => {
-      const matchesDimensao = matchesDimensionFilter({
-        dimensionValue: descentralizacao.dimensao,
-        planInternal: descentralizacao.planoInterno,
-        description: descentralizacao.descricao,
-        filterValue: effectiveFilterDimensao,
-      });
-      const matchesOrigem = filterOrigem === 'all' || descentralizacao.origemRecurso === filterOrigem;
+    const sourceRows =
+      filterPlanoInterno !== 'all'
+        ? filteredData.descentralizacoes.map((d) => ({
+            dimensao: d.dimensao || 'Sem Dimensao',
+            origemRecurso: d.origemRecurso || 'Sem Origem',
+            valor: d.valor,
+          }))
+        : resumoDescentralizacoes.filter((d) => filterOrigem === 'all' || d.origemRecurso === filterOrigem);
 
-      if (!matchesDimensao || !matchesOrigem) return;
-
-      const dimensao = descentralizacao.dimensao || 'Sem Dimensao';
-      const origem = descentralizacao.origemRecurso || 'Sem Origem';
+    sourceRows.forEach((item) => {
+      const dimensao = item.dimensao || 'Sem Dimensao';
+      const origem = item.origemRecurso || 'Sem Origem';
 
       origemSet.add(origem);
 
       const dimensionItem = dimensionMap.get(dimensao) || { name: dimensao };
-      dimensionItem[origem] = ((dimensionItem[origem] as number) || 0) + descentralizacao.valor;
+      dimensionItem[origem] = ((dimensionItem[origem] as number) || 0) + item.valor;
       dimensionMap.set(dimensao, dimensionItem);
     });
 
@@ -1680,7 +1674,7 @@ export default function Dashboard() {
       }),
       uniqueOrigens: Array.from(origemSet).sort(),
     };
-  }, [resumoDescentralizacoes, effectiveFilterDimensao, filterOrigem]);
+  }, [filterPlanoInterno, filteredData.descentralizacoes, resumoDescentralizacoes, filterOrigem]);
 
   const dadosRapPorOrigem = useMemo(() => {
     const map = new Map<string, { baseVigente: number; liquidadoNoAno: number; saldoAtual: number }>();
@@ -1709,8 +1703,8 @@ export default function Dashboard() {
   }, [filteredData, rapReferenceYear]);
 
   const clearFilters = () => {
-    setFilterDimensao('all');
     setFilterOrigem('all');
+    setFilterPlanoInterno('all');
     setDateStart('');
     setDateEnd('');
     setHoveredBudgetDimension(null);
@@ -1718,9 +1712,12 @@ export default function Dashboard() {
   };
 
   const hasActiveFilters =
-    filterDimensao !== 'all' || filterOrigem !== 'all' || dateStart !== '' || dateEnd !== '';
-  const activeFiltersCount = [filterDimensao !== 'all', filterOrigem !== 'all', dateStart !== '' || dateEnd !== ''].filter(Boolean).length;
-  const activeDimensionLabel = getDimensionLabel(effectiveFilterDimensao);
+    filterOrigem !== 'all' || filterPlanoInterno !== 'all' || dateStart !== '' || dateEnd !== '';
+  const activeFiltersCount = [
+    filterOrigem !== 'all',
+    filterPlanoInterno !== 'all',
+    dateStart !== '' || dateEnd !== '',
+  ].filter(Boolean).length;
 
   return (
     <div className="animate-fade-in space-y-6 pb-10">
@@ -1753,15 +1750,16 @@ export default function Dashboard() {
 
             <DashboardFiltersSheet
               buttonClassName="relative h-8 gap-2 border-border-default bg-surface-card text-xs text-text-primary shadow-sm transition-all hover:bg-surface-subtle sm:h-9 sm:text-sm"
-              filterDimensao={filterDimensao}
               filterOrigem={filterOrigem}
+              filterPlanoInterno={filterPlanoInterno}
               dateStart={dateStart}
               dateEnd={dateEnd}
               origensDisponiveis={origensDisponiveis}
+              planosInternosDisponiveis={planosInternosDisponiveis}
               hasActiveFilters={hasActiveFilters}
               activeFiltersCount={activeFiltersCount}
-              onFilterDimensaoChange={setFilterDimensao}
               onFilterOrigemChange={setFilterOrigem}
+              onFilterPlanoInternoChange={setFilterPlanoInterno}
               onDateStartChange={setDateStart}
               onDateEndChange={setDateEnd}
               onClearFilters={clearFilters}
@@ -1793,35 +1791,36 @@ export default function Dashboard() {
 
           <DashboardFiltersSheet
             buttonClassName="relative gap-2 border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50"
-            filterDimensao={filterDimensao}
             filterOrigem={filterOrigem}
+            filterPlanoInterno={filterPlanoInterno}
             dateStart={dateStart}
             dateEnd={dateEnd}
             origensDisponiveis={origensDisponiveis}
+            planosInternosDisponiveis={planosInternosDisponiveis}
             hasActiveFilters={hasActiveFilters}
             activeFiltersCount={activeFiltersCount}
-            onFilterDimensaoChange={setFilterDimensao}
             onFilterOrigemChange={setFilterOrigem}
+            onFilterPlanoInternoChange={setFilterPlanoInterno}
             onDateStartChange={setDateStart}
             onDateEndChange={setDateEnd}
             onClearFilters={clearFilters}
           />
         </div>
 
-        {activeTab !== 'contratos' && activeDimensionLabel ? (
+        {activeTab !== 'contratos' && filterPlanoInterno !== 'all' ? (
           <div className="mb-6 flex items-center gap-3">
             <Badge
               variant="secondary"
               className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 font-ui text-xs font-semibold text-primary"
             >
-              Dimensao ativa: {activeDimensionLabel}
+              Plano Interno ativo: {filterPlanoInterno}
             </Badge>
             <Button
               type="button"
               variant="ghost"
               size="sm"
               className="h-8 px-2 text-xs text-text-muted hover:text-text-primary"
-              onClick={() => setFilterDimensao('all')}
+              onClick={() => setFilterPlanoInterno('all')}
             >
               Limpar selecao
             </Button>

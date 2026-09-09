@@ -20,19 +20,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { DIMENSOES } from '@/types';
 
 type DashboardFiltersSheetProps = {
   buttonClassName: string;
-  filterDimensao: string;
   filterOrigem: string;
+  filterPlanoInterno: string;
   dateStart: string;
   dateEnd: string;
   origensDisponiveis: string[];
+  planosInternosDisponiveis: string[];
   hasActiveFilters: boolean;
   activeFiltersCount: number;
-  onFilterDimensaoChange: (value: string) => void;
   onFilterOrigemChange: (value: string) => void;
+  onFilterPlanoInternoChange: (value: string) => void;
   onDateStartChange: (value: string) => void;
   onDateEndChange: (value: string) => void;
   onClearFilters: () => void;
@@ -40,15 +40,16 @@ type DashboardFiltersSheetProps = {
 
 export function DashboardFiltersSheet({
   buttonClassName,
-  filterDimensao,
   filterOrigem,
+  filterPlanoInterno,
   dateStart,
   dateEnd,
   origensDisponiveis,
+  planosInternosDisponiveis,
   hasActiveFilters,
   activeFiltersCount,
-  onFilterDimensaoChange,
   onFilterOrigemChange,
+  onFilterPlanoInternoChange,
   onDateStartChange,
   onDateEndChange,
   onClearFilters,
@@ -75,21 +76,6 @@ export function DashboardFiltersSheet({
         </SheetHeader>
         <div className="grid gap-4 py-4">
           <div className="space-y-2">
-            <Label>Dimensao</Label>
-            <Select value={filterDimensao} onValueChange={onFilterDimensaoChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Todas" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                {DIMENSOES.map((d) => (
-                  <SelectItem key={d.codigo} value={d.codigo}>{d.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
             <Label>Origem de Recurso</Label>
             <Select value={filterOrigem} onValueChange={onFilterOrigemChange}>
               <SelectTrigger>
@@ -99,6 +85,21 @@ export function DashboardFiltersSheet({
                 <SelectItem value="all">Todas</SelectItem>
                 {origensDisponiveis.map((origem) => (
                   <SelectItem key={origem} value={origem}>{origem}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Plano Interno (PI)</Label>
+            <Select value={filterPlanoInterno} onValueChange={onFilterPlanoInternoChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                {planosInternosDisponiveis.map((plano) => (
+                  <SelectItem key={plano} value={plano}>{plano}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

@@ -127,7 +127,7 @@ A pasta corrente e centralizada por `src/test/extensionFixtures.ts`. As suites `
 
 - `suapExtensionPackage.test.ts` protege a configuracao da paleta global: o modo generico cobre `<all_urls>` sem SIAGES, SUAP ou Comprasnet; o modo especializado do SUAP continua separado, e telas/acoes apontam para a origem publica do SIAGES. `suapCommandPaletteGlobal.test.ts` valida que, em um site comum, nao ha consulta em segundo plano e comandos do SUAP nao sao exibidos antes ou depois de abrir `Ctrl/Cmd+K`.
 
-- `suapExtensionAuth.test.ts` cobre a sessão persistente da extensão: renovação concorrente serializada, preservação da sessão quando a renovação falha e logout explícito durante uma renovação em andamento. `suapExtensionPackage.test.ts` também garante que o service worker, o popup e os content scripts usem a mesma anon key do projeto.
+- `suapExtensionAuth.test.ts` cobre a sessão persistente da extensão: renovação concorrente serializada, recriação idempotente do alarme, preservação em falha transitória, revogação definitiva e logout durante uma renovação. As respostas públicas do worker não podem conter `refreshToken`; `suapExtensionPackage.test.ts` garante esse contrato nos scripts distribuídos.
 
 - No Plano de Atividades concluído 8, cobrir a ordenação nos cabeçalhos das tabelas originais e o checkbox `Exibir somente atividades com saldo` inserido no card nativo de filtros, sem esconder linhas com saldo positivo.
 

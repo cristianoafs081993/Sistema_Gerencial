@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   normalizeSuapDocumentText,
   parseSuapProcessDocumentManifest,
@@ -284,6 +285,7 @@ async function storeProcessPdf(
   pdfBytes: ArrayBuffer | Uint8Array,
   tenantId: string,
   log: SyncProgressCallback,
+  client: SupabaseClient = supabase,
 ) {
   const bytes = pdfBytes instanceof Uint8Array ? pdfBytes : new Uint8Array(pdfBytes);
   if (bytes.length < 4 || String.fromCharCode(...bytes.slice(0, 4)) !== '%PDF') {
@@ -292,7 +294,7 @@ async function storeProcessPdf(
 
   log(`[${proc.suapId}] Fazendo upload do PDF para o bucket suap-pdfs...`);
   const storagePath = `${tenantId}/${proc.suapId}.pdf`;
-  const { error: uploadErr } = await supabase.storage
+  const { error: uploadErr } = await client.storage
     .from('suap-pdfs')
     .upload(storagePath, new Blob([bytes], { type: 'application/pdf' }), {
       contentType: 'application/pdf',
@@ -302,7 +304,7 @@ async function storeProcessPdf(
   if (uploadErr) throw new Error(`Upload do PDF falhou: ${uploadErr.message}`);
 
   const now = new Date().toISOString();
-  const { data: statusUpdated, error: updateError } = await supabase
+  const { data: statusUpdated, error: updateError } = await client
     .from('processos')
     .update({ pdf_url: storagePath, status: 'pdf_uploaded', updated_at: now })
     .eq('tenant_id', tenantId)
@@ -315,7 +317,7 @@ async function storeProcessPdf(
   // O PDF completo continua canônico, mas uma geração em segundo plano não pode
   // regredir o status de uma extração que já foi enfileirada ou concluída.
   if (!statusUpdated) {
-    const { error: canonicalUrlError } = await supabase
+    const { error: canonicalUrlError } = await client
       .from('processos')
       .update({ pdf_url: storagePath, updated_at: now })
       .eq('tenant_id', tenantId)
@@ -555,8 +557,9 @@ export const suapScraperService = {
     processes: ScrapedProcesso[],
     tenantId: string,
     options: InventorySyncOptions = {},
+    client: SupabaseClient = supabase,
   ): Promise<SyncedProcesso[]> {
-    const { data: existingList, error: selectErr } = await supabase
+    const { data: existingList, error: selectErr } = await client
       .from('processos')
       .select('id, suap_id, status, num_processo, pdf_url')
       .eq('tenant_id', tenantId);
@@ -578,7 +581,7 @@ export const suapScraperService = {
           if (proc.caixa) patch.caixa = proc.caixa;
 
           if (Object.keys(patch).length > 1) {
-            await supabase
+            await client
               .from('processos')
               .update(patch)
               .eq('tenant_id', tenantId)
@@ -608,7 +611,7 @@ export const suapScraperService = {
       if (proc.numProcesso) payload.num_processo = proc.numProcesso;
       if (proc.caixa) payload.caixa = proc.caixa;
 
-      const { data: inserted, error: insertError } = await supabase
+      const { data: inserted, error: insertError } = await client
         .from('processos')
         .insert(payload)
         .select('id')
@@ -711,8 +714,9 @@ export const suapScraperService = {
     pdfBytes: ArrayBuffer | Uint8Array,
     tenantId: string,
     log: SyncProgressCallback,
+    client: SupabaseClient = supabase,
   ) {
-    return storeProcessPdf(proc, pdfBytes, tenantId, log);
+    return storeProcessPdf(proc, pdfBytes, tenantId, log, client);
   },
 
   async runAiExtractionForProcess(
@@ -725,8 +729,9 @@ export const suapScraperService = {
       inputDocumentIds?: string[];
       stageMetrics?: Record<string, unknown>;
     } = {},
+    client: SupabaseClient = supabase,
   ): Promise<AiExtractionQueueResult> {
-    const { data: existing, error: fetchError } = await supabase
+    const { data: existing, error: fetchError } = await client
       .from('processos')
       .select('status, pdf_url')
       .eq('tenant_id', tenantId)
@@ -747,7 +752,7 @@ export const suapScraperService = {
 
     log(`[${proc.suapId}] Executando extracao por Inteligencia Artificial...`);
     const aiInvocation = inputStrategy === 'eligible_documents'
-      ? supabase.functions.invoke('process-pdf', {
+      ? client.functions.invoke('process-pdf', {
           body: {
             suap_id: proc.suapId,
             input_strategy: inputStrategy,
@@ -756,10 +761,10 @@ export const suapScraperService = {
           },
         })
       : options.stageMetrics
-        ? supabase.functions.invoke('process-pdf', {
+        ? client.functions.invoke('process-pdf', {
             body: { suap_id: proc.suapId, stage_metrics: options.stageMetrics },
           })
-        : supabase.functions.invoke('process-pdf', {
+        : client.functions.invoke('process-pdf', {
             body: { suap_id: proc.suapId },
           });
     const { data: aiRes, error: aiErr } = await aiInvocation;

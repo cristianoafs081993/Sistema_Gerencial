@@ -17,7 +17,7 @@ import {
 import { HeaderActions, HeaderSubtitle } from '@/components/HeaderParts';
 import { useData } from '@/contexts/DataContext';
 import { DIMENSOES, type Atividade, type Descentralizacao, type Empenho } from '@/types';
-import { matchesDimensionFilter } from '@/utils/dimensionFilters';
+import { matchesPlanoInternoFilter } from '@/utils/planoInternoFilters';
 import { formatCurrency } from '@/lib/utils';
 import { isOrigemRecursoIgnoradaNoEmpenhado } from '@/pages/Dashboard';
 import { Badge } from '@/components/ui/badge';
@@ -153,8 +153,8 @@ export default function DashboardCloudscapePreview() {
     refreshData,
   } = useData();
   const [activeTab, setActiveTab] = useState<PreviewTab>('orcamento');
-  const [filterDimensao, setFilterDimensao] = useState('all');
   const [filterOrigem, setFilterOrigem] = useState('all');
+  const [filterPlanoInterno, setFilterPlanoInterno] = useState('all');
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -165,17 +165,34 @@ export default function DashboardCloudscapePreview() {
     [atividades, empenhos],
   );
 
+  const planosInternosDisponiveis = useMemo(() => {
+    const planos = new Set<string>();
+    atividades.forEach((item) => {
+      const pi = item.planoInterno?.trim();
+      if (pi) planos.add(pi);
+    });
+    empenhos.forEach((item) => {
+      const pi = item.planoInterno?.trim();
+      if (pi) planos.add(pi);
+    });
+    descentralizacoes.forEach((item) => {
+      const pi = item.planoInterno?.trim();
+      if (pi) planos.add(pi);
+    });
+    return Array.from(planos).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [atividades, empenhos, descentralizacoes]);
+
   const filtered = useMemo(() => {
     const activityMatches = (item: Atividade) =>
-      (filterDimensao === 'all' || matchesDimensionFilter(item.dimensao, filterDimensao)) &&
+      matchesPlanoInternoFilter({ planoInterno: item.planoInterno, filterValue: filterPlanoInterno }) &&
       (filterOrigem === 'all' || item.origemRecurso === filterOrigem) &&
       matchesDateFilter(item, dateStart, dateEnd);
     const empenhoMatches = (item: Empenho) =>
-      (filterDimensao === 'all' || matchesDimensionFilter(item.dimensao, filterDimensao)) &&
+      matchesPlanoInternoFilter({ planoInterno: item.planoInterno, filterValue: filterPlanoInterno }) &&
       (filterOrigem === 'all' || item.origemRecurso === filterOrigem) &&
       matchesDateFilter(item, dateStart, dateEnd);
     const descentralizacaoMatches = (item: Descentralizacao) =>
-      (filterDimensao === 'all' || matchesDimensionFilter(item.dimensao, filterDimensao)) &&
+      matchesPlanoInternoFilter({ planoInterno: item.planoInterno, filterValue: filterPlanoInterno }) &&
       (filterOrigem === 'all' || item.origemRecurso === filterOrigem) &&
       matchesDateFilter(item, dateStart, dateEnd);
 
@@ -184,7 +201,7 @@ export default function DashboardCloudscapePreview() {
       empenhos: empenhos.filter(empenhoMatches),
       descentralizacoes: descentralizacoes.filter(descentralizacaoMatches),
     };
-  }, [atividades, empenhos, descentralizacoes, filterDimensao, filterOrigem, dateStart, dateEnd]);
+  }, [atividades, empenhos, descentralizacoes, filterPlanoInterno, filterOrigem, dateStart, dateEnd]);
 
   const metrics = useMemo(() => {
     const currentEmpenhos = filtered.empenhos.filter((item) => item.tipo === 'exercicio' && item.status !== 'cancelado');
@@ -265,10 +282,10 @@ export default function DashboardCloudscapePreview() {
     };
   }, [filtered]);
 
-  const activeFiltersCount = [filterDimensao !== 'all', filterOrigem !== 'all', Boolean(dateStart || dateEnd)].filter(Boolean).length;
+  const activeFiltersCount = [filterOrigem !== 'all', filterPlanoInterno !== 'all', Boolean(dateStart || dateEnd)].filter(Boolean).length;
   const clearFilters = () => {
-    setFilterDimensao('all');
     setFilterOrigem('all');
+    setFilterPlanoInterno('all');
     setDateStart('');
     setDateEnd('');
   };
@@ -322,17 +339,17 @@ export default function DashboardCloudscapePreview() {
                 </SheetHeader>
                 <div className="space-y-5 py-6">
                   <div className="space-y-2">
-                    <Label htmlFor="preview-dimensao">Dimensão</Label>
-                    <select id="preview-dimensao" value={filterDimensao} onChange={(event) => setFilterDimensao(event.target.value)} className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 shadow-sm outline-none transition focus:border-[#2f9e41] focus:ring-2 focus:ring-[#2f9e41]/20">
-                      <option value="all">Todas as dimensões</option>
-                      {DIMENSOES.map((dimension) => <option key={dimension.codigo} value={dimension.codigo}>{dimension.nome}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
                     <Label htmlFor="preview-origem">Origem de recurso</Label>
                     <select id="preview-origem" value={filterOrigem} onChange={(event) => setFilterOrigem(event.target.value)} className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 shadow-sm outline-none transition focus:border-[#2f9e41] focus:ring-2 focus:ring-[#2f9e41]/20">
                       <option value="all">Todas as origens</option>
                       {origensDisponiveis.map((origin) => <option key={origin} value={origin}>{origin}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="preview-pi">Plano Interno (PI)</Label>
+                    <select id="preview-pi" value={filterPlanoInterno} onChange={(event) => setFilterPlanoInterno(event.target.value)} className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 shadow-sm outline-none transition focus:border-[#2f9e41] focus:ring-2 focus:ring-[#2f9e41]/20">
+                      <option value="all">Todos</option>
+                      {planosInternosDisponiveis.map((pi) => <option key={pi} value={pi}>{pi}</option>)}
                     </select>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">

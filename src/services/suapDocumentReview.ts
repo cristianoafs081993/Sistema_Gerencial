@@ -4,6 +4,7 @@ import {
   type SuapDocumentReviewType,
 } from '@/lib/suapDocumentReview';
 import { supabase } from '@/lib/supabase';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export const SUAP_DOCUMENT_REVIEW_FUNCTION = 'analisar-documento-licitacao';
 export const SUAP_DOCUMENT_REVIEW_TABLE = 'suap_document_reviews';
@@ -35,9 +36,9 @@ type LatestSuapDocumentReviewInput = {
   documentType: SuapDocumentReviewType;
 };
 
-export async function analyzeSuapDocument(input: AnalyzeSuapDocumentInput): Promise<SuapDocumentReviewResult> {
+export async function analyzeSuapDocument(input: AnalyzeSuapDocumentInput, client: SupabaseClient = supabase): Promise<SuapDocumentReviewResult> {
   const { suapId: _suapId, documentId: _documentId, ...functionInput } = input;
-  const { data, error } = await supabase.functions.invoke(SUAP_DOCUMENT_REVIEW_FUNCTION, {
+  const { data, error } = await client.functions.invoke(SUAP_DOCUMENT_REVIEW_FUNCTION, {
     body: functionInput,
   });
 
@@ -52,12 +53,12 @@ export async function analyzeSuapDocument(input: AnalyzeSuapDocumentInput): Prom
     documentTitle: input.documentTitle,
     processNumber: input.processNumber,
     result,
-  });
+  }, client);
   return result;
 }
 
-export async function saveSuapDocumentReview(input: SavedSuapDocumentReviewInput) {
-  const { error } = await supabase.from(SUAP_DOCUMENT_REVIEW_TABLE).insert({
+export async function saveSuapDocumentReview(input: SavedSuapDocumentReviewInput, client: SupabaseClient = supabase) {
+  const { error } = await client.from(SUAP_DOCUMENT_REVIEW_TABLE).insert({
     suap_id: input.suapId,
     document_id: input.documentId,
     document_type: input.documentType,
@@ -70,8 +71,8 @@ export async function saveSuapDocumentReview(input: SavedSuapDocumentReviewInput
   if (error) throw new Error(`A análise foi concluída, mas não pôde ser salva para consulta futura: ${error.message}`);
 }
 
-export async function getLatestSuapDocumentReview(input: LatestSuapDocumentReviewInput): Promise<SuapDocumentReviewResult | null> {
-  const { data, error } = await supabase
+export async function getLatestSuapDocumentReview(input: LatestSuapDocumentReviewInput, client: SupabaseClient = supabase): Promise<SuapDocumentReviewResult | null> {
+  const { data, error } = await client
     .from(SUAP_DOCUMENT_REVIEW_TABLE)
     .select('result')
     .eq('suap_id', input.suapId)

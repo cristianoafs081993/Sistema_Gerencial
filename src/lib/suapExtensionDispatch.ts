@@ -9,10 +9,10 @@ export type SuapExtensionProcessContext = {
   suapId: string;
   processNumber?: string;
   processUrl: string;
-  /** Sessao efemera enviada pelo armazenamento privado da extensao. */
+  /** JWT efêmero enviado pelo worker; nunca inclui refresh token. */
   extensionSession?: {
     accessToken: string;
-    refreshToken: string;
+    expiresAt?: number;
   };
   route?: SuapProcessRouteSnapshot;
 };
@@ -67,7 +67,7 @@ export type SuapExtensionDocumentAnalysisContext = {
   reviewMode?: 'latest';
   extensionSession?: {
     accessToken: string;
-    refreshToken: string;
+    expiresAt?: number;
   };
 };
 
@@ -192,11 +192,9 @@ export function isValidSuapExtensionDocumentAnalysisContext(value: unknown): val
     (payload.extensionSession !== undefined && (
       typeof payload.extensionSession !== 'object' ||
       typeof payload.extensionSession.accessToken !== 'string' ||
-      typeof payload.extensionSession.refreshToken !== 'string' ||
       !payload.extensionSession.accessToken ||
-      !payload.extensionSession.refreshToken ||
       payload.extensionSession.accessToken.length > 10000 ||
-      payload.extensionSession.refreshToken.length > 10000
+      (payload.extensionSession.expiresAt !== undefined && (!Number.isFinite(payload.extensionSession.expiresAt) || payload.extensionSession.expiresAt <= 0))
     ))
   ) return false;
 
@@ -326,11 +324,9 @@ export function isValidSuapExtensionProcessContext(value: unknown): value is Sua
     (payload.extensionSession !== undefined && (
       typeof payload.extensionSession !== 'object' ||
       typeof payload.extensionSession.accessToken !== 'string' ||
-      typeof payload.extensionSession.refreshToken !== 'string' ||
       !payload.extensionSession.accessToken ||
-      !payload.extensionSession.refreshToken ||
       payload.extensionSession.accessToken.length > 10000 ||
-      payload.extensionSession.refreshToken.length > 10000
+      (payload.extensionSession.expiresAt !== undefined && (!Number.isFinite(payload.extensionSession.expiresAt) || payload.extensionSession.expiresAt <= 0))
     ))
   ) {
     return false;
@@ -358,7 +354,7 @@ export function getSuapExtensionProcessContext(event: MessageEvent, expectedSour
     ...(extensionSession ? {
       extensionSession: {
         accessToken: extensionSession.accessToken,
-        refreshToken: extensionSession.refreshToken,
+        ...(extensionSession.expiresAt ? { expiresAt: extensionSession.expiresAt } : {}),
       },
     } : {}),
     ...(route ? { route } : {}),
