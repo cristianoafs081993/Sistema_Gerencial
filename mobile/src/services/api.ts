@@ -1,12 +1,17 @@
 import { supabase, DEFAULT_CAMPUS_UASG } from '../lib/supabase';
-import { EmpenhoItem, ContratoItem } from '../types';
-import { dashboardData, empenhosData, contratosData } from '../constants/data';
+import { EmpenhoItem, ContratoItem, NotificationItem } from '../types';
+import { dashboardData, empenhosData, contratosData, mockNotificationsData } from '../constants/data';
 
 export interface DashboardMetricsResult {
   exercicio: string;
   usuario: string;
   campus: string;
   instituicao: string;
+  planejado: number;
+  totalAtividades: number;
+  percentualExecutado: string;
+  percentualExecutadoNum: number;
+  aDescentralizar: number;
   saldoDisponivel: number;
   percentualDescentralizado: string;
   descentralizado: number;
@@ -88,6 +93,12 @@ export async function fetchDashboardMetrics(
   campusUasg = DEFAULT_CAMPUS_UASG
 ): Promise<DashboardMetricsResult> {
   try {
+    // 0. Fetch atividades do campus para o Planejado
+    const { data: atividadesRows } = await supabase
+      .from('atividades')
+      .select('valor_total')
+      .eq('campus_uasg', campusUasg);
+
     // 1. Fetch empenhos do exercício corrente (tipo = 'exercicio' e não cancelados)
     const { data: empenhosRows, error: empenhosError } = await supabase
       .from('empenhos')
@@ -167,8 +178,27 @@ export async function fetchDashboardMetrics(
             .reduce((acc, r) => acc + (Number(r.valor) || 0), 0)
         : 2584623.54;
 
-    const saldoDisponivel = Math.max(0, totalDescentralizado - totalEmpenhadoParaSoma);
-    const aPagar = Math.max(0, totalLiquidado - totalPago);
+    // Planejado (total das atividades orçadas)
+    const totalPlanejado =
+      atividadesRows && atividadesRows.length > 0
+        ? atividadesRows.reduce((acc, r) => acc + (Number(r.valor_total) || 0), 0)
+        : 3414691.10;
+    const totalAtividades = atividadesRows?.length || 357;
+
+    const planejadoInt = Math.round(totalPlanejado);
+    const descentralizadoInt = Math.round(totalDescentralizado);
+    const empenhadoInt = Math.round(totalEmpenhadoParaSoma);
+    const aDescentralizarInt = planejadoInt - descentralizadoInt;
+    const saldoDisponivelInt = Math.max(0, descentralizadoInt - empenhadoInt);
+    const liquidadoInt = Math.round(totalLiquidado);
+    const pagoInt = Math.round(totalPago);
+    const aPagarInt = Math.max(0, liquidadoInt - pagoInt);
+
+    const percentualExecutadoNum =
+      totalPlanejado > 0
+        ? Number(((totalEmpenhadoParaSoma / totalPlanejado) * 100).toFixed(1))
+        : 0;
+    const percentualExecutado = percentualExecutadoNum.toFixed(1).replace('.', ',') + '%';
 
     const empenhadoNum =
       totalDescentralizado > 0
@@ -178,7 +208,7 @@ export async function fetchDashboardMetrics(
 
     const saldoNum =
       totalDescentralizado > 0
-        ? Number(((saldoDisponivel / totalDescentralizado) * 100).toFixed(1))
+        ? Number(((saldoDisponivelInt / totalDescentralizado) * 100).toFixed(1))
         : 0;
     const pctSaldo = saldoNum.toFixed(1).replace('.', ',') + '%';
 
@@ -226,17 +256,22 @@ export async function fetchDashboardMetrics(
       usuario: 'Cristiano',
       campus: 'Campus Currais Novos',
       instituicao: 'IFRN',
-      saldoDisponivel: Math.round(saldoDisponivel),
+      planejado: planejadoInt,
+      totalAtividades,
+      percentualExecutado,
+      percentualExecutadoNum,
+      aDescentralizar: aDescentralizarInt,
+      saldoDisponivel: saldoDisponivelInt,
       percentualDescentralizado: pctSaldo,
-      descentralizado: Math.round(totalDescentralizado),
-      empenhado: Math.round(totalEmpenhadoParaSoma),
+      descentralizado: descentralizadoInt,
+      empenhado: empenhadoInt,
       percentualEmpenhado: pctEmpenhado,
       empenhadoDescentralizadoPct: empenhadoNum,
-      liquidado: Math.round(totalLiquidado),
+      liquidado: liquidadoInt,
       liquidadoPct: pctLiquidado,
-      pago: Math.round(totalPago),
+      pago: pagoInt,
       pagoPct: pctPago,
-      aPagar: Math.round(aPagar),
+      aPagar: aPagarInt,
       totalEmpenhos: empenhosRows.length,
       contratosValorGlobal: Math.round(contratosGlobal || 50651970),
       contratosVigentes: contratosVigentes || 54,
@@ -389,3 +424,200 @@ export async function fetchContratos(
     return contratosData;
   }
 }
+
+function parseNotificationDate(value: Date | string | number | undefined | null): Date {
+  if (!value) return new Date(0);
+  if (value instanceof Date) return isNaN(value.getTime()) ? new Date(0) : value;
+  if (typeof value === 'number') return new Date(value);
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return new Date(0);
+    if (trimmed.includes('/')) {
+      const [datePart, timePart] = trimmed.split(' ');
+      const parts = datePart.split('/');
+      if (parts.length === 3) {
+        const [d, m, y] = parts;
+        const time = timePart || '12:00:00';
+        const iso = `${y.length === 2 ? '20' + y : y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T${time}`;
+        const parsed = new Date(iso);
+        if (!isNaN(parsed.getTime())) return parsed;
+      }
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      const parsed = new Date(`${trimmed}T12:00:00`);
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? new Date(0) : d;
+}
+
+function extractDocNumber(numero?: string | null): number {
+  if (!numero) return 0;
+  const match = numero.match(/(\d{4})[A-Za-z]+(\d+)/);
+  if (match) {
+    const year = parseInt(match[1], 10);
+    const seq = parseInt(match[2], 10);
+    return year * 10_000_000 + seq;
+  }
+  const digits = numero.replace(/\D/g, '');
+  return digits ? parseInt(digits, 10) : 0;
+}
+
+export function interleaveEvents(
+  empenhos: NotificationItem[],
+  descentralizacoes: NotificationItem[],
+  requisicoes: NotificationItem[] = [],
+  maxTotal = 20
+): NotificationItem[] {
+  const result: NotificationItem[] = [];
+  const maxLen = Math.max(empenhos.length, descentralizacoes.length, requisicoes.length);
+
+  for (let i = 0; i < maxLen && result.length < maxTotal; i++) {
+    if (requisicoes[i] && result.length < maxTotal) {
+      result.push(requisicoes[i]);
+    }
+    if (descentralizacoes[i] && result.length < maxTotal) {
+      result.push(descentralizacoes[i]);
+    }
+    if (empenhos[i] && result.length < maxTotal) {
+      result.push(empenhos[i]);
+    }
+  }
+
+  return result;
+}
+
+export async function fetchNotifications(
+  campusUasg = DEFAULT_CAMPUS_UASG
+): Promise<NotificationItem[]> {
+  try {
+    const [empenhosRes, descRes, reqRes] = await Promise.all([
+      // 1. Empenhos do exercício mais recentes
+      supabase
+        .from('empenhos')
+        .select('id, numero, valor, data_empenho, favorecido_nome, status, dimensao, descricao, created_at')
+        .eq('campus_uasg', campusUasg)
+        .eq('tipo', 'exercicio')
+        .neq('status', 'cancelado')
+        .order('data_empenho', { ascending: false })
+        .limit(20),
+
+      // 2. Descentralizações mais recentes
+      supabase
+        .from('descentralizacoes')
+        .select('id, nota_credito, valor, data_emissao, plano_interno, origem_recurso, dimensao, descricao, created_at')
+        .eq('campus_uasg', campusUasg)
+        .order('data_emissao', { ascending: false })
+        .limit(20),
+
+      // 3. Requisições enviadas ao fornecedor
+      supabase
+        .from('requisicoes_compra')
+        .select('id, number, title, status, created_by_email, created_at, updated_at, requisicao_compra_itens(quantity, unit_price)')
+        .in('status', ['enviada_fornecedor', 'review', 'approved'])
+        .order('updated_at', { ascending: false })
+        .limit(20),
+    ]);
+
+    // Mapear descentralizações
+    const sortedDescentralizacoes: NotificationItem[] = (descRes.data || [])
+      .map((d: any) => {
+        const docDate = parseNotificationDate(d.data_emissao || d.created_at);
+        const createdDate = parseNotificationDate(d.created_at || d.data_emissao);
+        const effectiveDate = docDate.getTime() > 0 ? docDate : createdDate;
+
+        return {
+          id: `desc-${d.id || d.nota_credito}`,
+          type: 'descentralizacao' as const,
+          date: effectiveDate,
+          documentDate: docDate,
+          title: d.nota_credito ? `Descentralização ${d.nota_credito}` : 'Descentralização de Crédito',
+          subtitle: d.origem_recurso ? `Origem: ${d.origem_recurso}` : 'Origem não informada',
+          description: d.descricao || (d.plano_interno ? `PI: ${d.plano_interno}` : ''),
+          valor: Number(d.valor) || 0,
+          dimensao: d.dimensao || undefined,
+          status: 'NC',
+          numeroDocumento: d.nota_credito,
+        };
+      })
+      .sort((a, b) => {
+        const dateDiff = b.date.getTime() - a.date.getTime();
+        if (dateDiff !== 0) return dateDiff;
+        const numA = extractDocNumber(a.numeroDocumento);
+        const numB = extractDocNumber(b.numeroDocumento);
+        return numB - numA;
+      });
+
+    // Mapear empenhos
+    const sortedEmpenhos: NotificationItem[] = (empenhosRes.data || [])
+      .map((e: any) => {
+        const docDate = parseNotificationDate(e.data_empenho || e.created_at);
+        const createdDate = parseNotificationDate(e.created_at || e.data_empenho);
+        const effectiveDate = docDate.getTime() > 0 ? docDate : createdDate;
+
+        return {
+          id: `emp-${e.id || e.numero}`,
+          type: 'empenho' as const,
+          date: effectiveDate,
+          documentDate: docDate,
+          title: `Empenho ${e.numero}`,
+          subtitle: e.favorecido_nome || 'Favorecido não informado',
+          description: e.descricao || '',
+          valor: Number(e.valor) || 0,
+          dimensao: e.dimensao || undefined,
+          status: e.status || 'pendente',
+          numeroDocumento: e.numero,
+        };
+      })
+      .sort((a, b) => {
+        const numA = extractDocNumber(a.numeroDocumento);
+        const numB = extractDocNumber(b.numeroDocumento);
+        if (numA !== 0 && numB !== 0 && numA !== numB) {
+          return numB - numA;
+        }
+        return b.date.getTime() - a.date.getTime();
+      });
+
+    // Mapear requisições
+    const sortedRequisicoes: NotificationItem[] = (reqRes.data || [])
+      .map((r: any) => {
+        const docDate = parseNotificationDate(r.updated_at || r.created_at);
+        const createdDate = parseNotificationDate(r.created_at || r.updated_at);
+        const effectiveDate = docDate.getTime() > 0 ? docDate : createdDate;
+
+        const totalValor = (r.requisicao_compra_itens || []).reduce(
+          (sum: number, item: any) => sum + ((Number(item.quantity) || 0) * (Number(item.unit_price) || 0)),
+          0
+        );
+
+        return {
+          id: `req-${r.id || r.number}`,
+          type: 'requisicao' as const,
+          date: effectiveDate,
+          documentDate: docDate,
+          title: r.number ? `Requisição ${r.number}` : 'Requisição de Compra',
+          subtitle: r.created_by_email ? `Criador: ${r.created_by_email}` : 'Enviada ao Fornecedor',
+          description: r.title || '',
+          valor: totalValor,
+          status: 'enviada_fornecedor',
+          numeroDocumento: r.number,
+        };
+      })
+      .sort((a, b) => b.date.getTime() - a.date.getTime());
+
+    const interleaved = interleaveEvents(sortedEmpenhos, sortedDescentralizacoes, sortedRequisicoes, 20);
+    if (interleaved.length > 0) {
+      return interleaved;
+    }
+    return mockNotificationsData;
+  } catch (err) {
+    console.warn('Erro ao buscar notificações do backend, usando mock:', err);
+    return mockNotificationsData;
+  }
+}
+

@@ -97,7 +97,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         </View>
       </View>
 
-      {/* Balance Card (Gradient) */}
+      {/* Planejado Hero Card (Gradient) */}
       <LinearGradient
         colors={colors.gradientBalance}
         start={{ x: 0, y: 0 }}
@@ -106,17 +106,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       >
         <View style={styles.eyebrow}>
           <IconWallet size={17} color={colors.blueTextSubtle} />
-          <Text style={styles.eyebrowText}>Saldo disponível</Text>
+          <Text style={styles.eyebrowText}>Total Planejado</Text>
         </View>
 
         <Text style={styles.moneyBig}>
           <Text style={styles.moneySmall}>R$ </Text>
-          {formatBRL(current.saldoDisponivel, false).replace('R$', '').trim()}
+          {formatBRL(current.planejado, false).replace('R$', '').trim()}
           <Text style={styles.moneyCents}>,00</Text>
         </Text>
 
         <Text style={styles.subtleText}>
-          {current.percentualDescentralizado} do orçamento descentralizado
+          {current.totalAtividades} atividades · {current.percentualExecutado} executado
         </Text>
 
         <View style={styles.balanceFoot}>
@@ -128,9 +128,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           </View>
           <View style={styles.footRight}>
             <Text style={styles.footLabel}>Empenhado</Text>
-            <Text style={styles.footValue}>{current.percentualEmpenhado}</Text>
+            <Text style={styles.footValue}>{formatBRL(current.empenhado)}</Text>
           </View>
-          <DonutChart percentage={current.empenhadoDescentralizadoPct} />
+          <DonutChart percentage={current.percentualExecutadoNum} />
         </View>
       </LinearGradient>
 
@@ -150,7 +150,21 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           </Text>
         </View>
 
-        {/* Metric 2: Liquidado */}
+        {/* Metric 2: Saldo disponível */}
+        <View style={styles.metricCard}>
+          <View style={styles.metricLabelRow}>
+            <IconWallet size={16} color={colors.blue} />
+            <Text style={styles.metricLabel}>Saldo disponível</Text>
+          </View>
+          <Text style={styles.metricValue}>
+            {formatBRL(current.saldoDisponivel, false)}
+          </Text>
+          <Text style={styles.metricSub}>
+            {current.percentualDescentralizado} do descentralizado
+          </Text>
+        </View>
+
+        {/* Metric 3: Liquidado */}
         <View style={styles.metricCard}>
           <View style={styles.metricLabelRow}>
             <IconLayers size={16} color={colors.blue} />
@@ -164,7 +178,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           </Text>
         </View>
 
-        {/* Metric 3: Pago */}
+        {/* Metric 4: Pago */}
         <View style={styles.metricCard}>
           <View style={styles.metricLabelRow}>
             <IconCheck size={16} color={colors.green} />
@@ -177,17 +191,19 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             {current.pagoPct} do liquidado
           </Text>
         </View>
+      </View>
 
-        {/* Metric 4: A pagar */}
-        <View style={styles.metricCard}>
-          <View style={styles.metricLabelRow}>
-            <IconClock size={16} color={colors.blue} />
-            <Text style={styles.metricLabel}>A pagar</Text>
-          </View>
-          <Text style={styles.metricValue}>
-            {formatBRL(current.aPagar, false)}
-          </Text>
-          <Text style={styles.metricSub}>Liquidado − pago</Text>
+      {/* Auxiliary Strip: A pagar & A descentralizar */}
+      <View style={styles.auxStrip}>
+        <View style={styles.auxItem}>
+          <IconClock size={14} color="#64748b" />
+          <Text style={styles.auxLabel}>A pagar:</Text>
+          <Text style={styles.auxValue}>{formatBRL(current.aPagar)}</Text>
+        </View>
+        <View style={styles.auxDivider} />
+        <View style={styles.auxItem}>
+          <Text style={styles.auxLabel}>A descentralizar:</Text>
+          <Text style={styles.auxValue}>{formatBRL(current.aDescentralizar)}</Text>
         </View>
       </View>
 
@@ -439,5 +455,35 @@ const styles = StyleSheet.create({
     color: '#7f8ba0',
     fontSize: 12,
     lineHeight: 20,
+  },
+  auxStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    marginTop: 10,
+  },
+  auxItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  auxDivider: {
+    width: 1,
+    height: 14,
+    backgroundColor: '#cbd5e1',
+  },
+  auxLabel: {
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  auxValue: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.ink,
   },
 });

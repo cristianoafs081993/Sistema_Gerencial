@@ -1,4 +1,4 @@
-import { EmpenhoItem, ContratoItem } from '../types';
+import { EmpenhoItem, ContratoItem, NotificationItem } from '../types';
 
 export const formatBRL = (value: number, includeDecimals = true): string => {
   return value.toLocaleString('pt-BR', {
@@ -8,6 +8,7 @@ export const formatBRL = (value: number, includeDecimals = true): string => {
     maximumFractionDigits: includeDecimals ? 2 : 0,
   });
 };
+
 
 export const empenhosData: EmpenhoItem[] = [
   {
@@ -112,6 +113,11 @@ export const dashboardData = {
   usuarioNomeCompleto: 'Cristiano Farias',
   campus: 'Campus Currais Novos',
   instituicao: 'IFRN',
+  planejado: 4800000,
+  totalAtividades: 357,
+  percentualExecutado: '60,7%',
+  percentualExecutadoNum: 60.7,
+  aDescentralizar: 600000,
   saldoDisponivel: 1284560,
   percentualDescentralizado: '30,6%',
   descentralizado: 4200000,
@@ -126,5 +132,84 @@ export const dashboardData = {
   totalEmpenhos: 128,
   contratosValorGlobal: 12840600,
   contratosVigentes: 18,
+  contratosAVencerCount: 11,
   referencia: '08 set. 2026 · 08:42',
 };
+
+export const mockNotificationsData: NotificationItem[] = [
+  {
+    id: 'req-1',
+    type: 'requisicao',
+    date: new Date('2026-09-04T14:10:30'),
+    documentDate: new Date('2026-09-04'),
+    title: 'Requisição REQ-2026-0006',
+    subtitle: 'Criador: valnizzamaria@gmail.com',
+    description: 'Requisição de Compra REQ-2026-0006',
+    valor: 302.0,
+    status: 'enviada_fornecedor',
+    numeroDocumento: 'REQ-2026-0006',
+  },
+  {
+    id: 'desc-1',
+    type: 'descentralizacao',
+    date: new Date('2026-09-04T12:00:00'),
+    documentDate: new Date('2026-09-04'),
+    title: 'Descentralização 2026NC001008',
+    subtitle: 'Origem: 231798',
+    description: 'PROCESSO 23421.003691.2026-95',
+    valor: 837.5,
+    dimensao: 'EN - Ensino',
+    numeroDocumento: '2026NC001008',
+  },
+  {
+    id: 'emp-1',
+    type: 'empenho',
+    date: new Date('2026-02-24T12:00:00'),
+    documentDate: new Date('2026-02-24'),
+    title: 'Empenho 2026NE000013',
+    subtitle: 'INST.FED. DO RN/CAMPUS CURRAIS NOVOS',
+    description: 'RECURSO PARA PAGAMENTO DE AUXILIO TRANSPORTE',
+    valor: 94377.12,
+    dimensao: 'AE - Atividades Estudantis',
+    status: 'pendente',
+    numeroDocumento: '2026NE000013',
+  },
+  {
+    id: 'req-2',
+    type: 'requisicao',
+    date: new Date('2026-09-04T12:03:53'),
+    documentDate: new Date('2026-09-04'),
+    title: 'Requisição REQ-2026-0005',
+    subtitle: 'Criador: valnizzamaria@gmail.com',
+    description: 'Requisição de Compra REQ-2026-0005',
+    valor: 843.6,
+    status: 'enviada_fornecedor',
+    numeroDocumento: 'REQ-2026-0005',
+  },
+  {
+    id: 'desc-2',
+    type: 'descentralizacao',
+    date: new Date('2026-09-03T12:00:00'),
+    documentDate: new Date('2026-09-03'),
+    title: 'Descentralização 2026NC001005',
+    subtitle: 'Origem: 261941',
+    description: 'REFORCO NO PROGRAMA ALIMENTACAO ESTUDANTIL',
+    valor: 30000.0,
+    dimensao: 'AE - Atividades Estudantis',
+    numeroDocumento: '2026NC001005',
+  },
+  {
+    id: 'emp-2',
+    type: 'empenho',
+    date: new Date('2026-02-24T12:00:00'),
+    documentDate: new Date('2026-02-24'),
+    title: 'Empenho 2026NE000012',
+    subtitle: 'INST.FED. DO RN/CAMPUS CURRAIS NOVOS',
+    description: 'RECURSO PARA PAGAMENTO DE BOLSA PAFE',
+    valor: 110000.0,
+    dimensao: 'AE - Atividades Estudantis',
+    status: 'pendente',
+    numeroDocumento: '2026NE000012',
+  },
+];
+

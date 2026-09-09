@@ -42,3 +42,20 @@ export interface ChartMonthData {
   xBlue: number;
   xLight: number;
 }
+
+export type NotificationType = 'empenho' | 'descentralizacao' | 'requisicao';
+
+export interface NotificationItem {
+  id: string;
+  type: NotificationType;
+  date: Date;
+  documentDate?: Date;
+  title: string;
+  subtitle: string;
+  description: string;
+  valor: number;
+  dimensao?: string;
+  status?: string;
+  numeroDocumento?: string;
+}
+

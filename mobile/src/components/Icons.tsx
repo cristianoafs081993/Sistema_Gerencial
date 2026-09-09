@@ -95,3 +95,33 @@ export const IconBell: React.FC<IconProps> = ({ size = 22, color = 'currentColor
     <Path d="M13.73 21a2 2 0 0 1-3.46 0" />
   </Svg>
 );
+
+export const IconReceipt: React.FC<IconProps> = ({ size = 20, color = 'currentColor', strokeWidth = 1.8 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" />
+    <Path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+    <Path d="M12 17.5v-11" />
+  </Svg>
+);
+
+export const IconLandmark: React.FC<IconProps> = ({ size = 20, color = 'currentColor', strokeWidth = 1.8 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M3 21h18M5 21V10l7-5 7 5v11M9 14v4M15 14v4" />
+  </Svg>
+);
+
+export const IconSend: React.FC<IconProps> = ({ size = 20, color = 'currentColor', strokeWidth = 1.8 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="m22 2-7 20-4-9-9-4Z" />
+    <Path d="M22 2 11 13" />
+  </Svg>
+);
+
+export const IconCheckCheck: React.FC<IconProps> = ({ size = 18, color = 'currentColor', strokeWidth = 2 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="m18 6-7 7-3-3" />
+    <Path d="m22 10-7 7-2-2" />
+    <Path d="m2 13 3 3 4-4" />
+  </Svg>
+);
+
