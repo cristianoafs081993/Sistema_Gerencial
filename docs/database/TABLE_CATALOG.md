@@ -873,7 +873,7 @@ Campos-chave:
 Observacoes operacionais:
 
 - a chave unica e `ata_key`, derivada de unidade gerenciadora e numero da ata
-- leitura fica liberada para usuarios autenticados; escrita ocorre pela Edge Function com service role
+- leitura fica liberada para usuarios autenticados e publico anonimo (via migration `20260909212000_grant_anon_atas_read.sql` para consumo no aplicativo mobile); escrita ocorre pela Edge Function com service role
 
 ### `atas_registro_precos_itens`
 
@@ -935,6 +935,7 @@ Consumido por:
 
 - [atasRegistroPrecos.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/services/atasRegistroPrecos.ts)
 - [AtasRegistroPrecos.tsx](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/src/pages/AtasRegistroPrecos.tsx)
+- [mobile/src/services/api.ts](/C:/Users/crist/OneDrive/Desktop/Obsidian/01%20-%20Projetos/Apps/Sistema_Gerencial/mobile/src/services/api.ts) (Aba Licitações / Atas no App Mobile)
 
 ### `atas_registro_precos_sync_runs`
 

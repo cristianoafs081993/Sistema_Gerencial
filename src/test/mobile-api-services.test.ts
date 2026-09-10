@@ -5,6 +5,8 @@ import {
   fetchEmpenhos,
   fetchContratos,
   fetchNotifications,
+  fetchPregoes,
+  fetchAtas,
   interleaveEvents,
   isOrigemRecursoIgnoradaNoEmpenhado,
 } from '../../mobile/src/services/api';
@@ -142,5 +144,39 @@ describe('SIAGES Mobile - Serviços de Integração ao Backend (Dados Reais)', (
     const result = interleaveEvents(mockEmpenhos, mockDesc, mockReq, 10);
     expect(result.map((item) => item.id)).toEqual(['r1', 'd1', 'e1', 'e2']);
   });
+
+  it('deve buscar e mapear pregões eletrônicos integrados ao PNCP', async () => {
+    const pregoes = await fetchPregoes('158366');
+
+    expect(pregoes.length).toBeGreaterThan(0);
+    const first = pregoes[0];
+    expect(first.id).toBeDefined();
+    expect(first.numero).toBeDefined();
+    expect(first.objeto).toBeDefined();
+    expect(first.modalidade).toBeDefined();
+    expect(first.uasgCodigo).toBeDefined();
+    expect(first.valor).toBeGreaterThanOrEqual(0);
+    expect(['homologado', 'estimado']).toContain(first.tipoValor);
+    expect(['Aberta', 'Futura', 'Encerrada', 'Em andamento']).toContain(first.statusProposta);
+    expect(['green', 'blue', 'amber', 'muted']).toContain(first.badgeColor);
+    expect(typeof first.srp).toBe('boolean');
+  }, 20000);
+
+  it('deve buscar e mapear atas de registro de preços com cálculo de vínculo e vigência', async () => {
+    const atas = await fetchAtas('158366');
+
+    expect(atas.length).toBeGreaterThan(0);
+    const first = atas[0];
+    expect(first.id).toBeDefined();
+    expect(first.numeroAta).toBeDefined();
+    expect(first.objeto).toBeDefined();
+    expect(first.unidadeGerenciadoraCodigo).toBeDefined();
+    expect(['gerenciadora', 'participante', 'aderente', 'outro']).toContain(first.vinculo);
+    expect(['vigente', 'vencer', 'expirada']).toContain(first.statusVigencia);
+    expect(typeof first.diasRestantes).toBe('number');
+    expect(first.totalItens).toBeGreaterThanOrEqual(0);
+    expect(first.totalAdesoes).toBeGreaterThanOrEqual(0);
+  }, 20000);
 });
+
 

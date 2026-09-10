@@ -125,3 +125,13 @@ export const IconCheckCheck: React.FC<IconProps> = ({ size = 18, color = 'curren
   </Svg>
 );
 
+export const IconGavel: React.FC<IconProps> = ({ size = 22, color = 'currentColor', strokeWidth = 1.7 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="m14 13-7.5 7.5c-.8.8-2 .8-2.8 0s-.8-2 0-2.8L11 10" />
+    <Path d="m16 16 6-6" />
+    <Path d="m8 8 6-6" />
+    <Path d="m9 7 8 8" />
+    <Path d="m21 11-8-8" />
+  </Svg>
+);
+

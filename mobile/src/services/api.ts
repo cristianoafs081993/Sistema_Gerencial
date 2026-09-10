@@ -1,6 +1,6 @@
 import { supabase, DEFAULT_CAMPUS_UASG } from '../lib/supabase';
-import { EmpenhoItem, ContratoItem, NotificationItem } from '../types';
-import { dashboardData, empenhosData, contratosData, mockNotificationsData } from '../constants/data';
+import { EmpenhoItem, ContratoItem, NotificationItem, PregaoItem, AtaItem } from '../types';
+import { dashboardData, empenhosData, contratosData, mockNotificationsData, pregoesData, atasData } from '../constants/data';
 
 export interface DashboardMetricsResult {
   exercicio: string;
@@ -700,4 +700,154 @@ export async function fetchNotifications(
     return mockNotificationsData;
   }
 }
+
+export async function fetchPregoes(
+  campusUasg = DEFAULT_CAMPUS_UASG
+): Promise<PregaoItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from('licitacoes_pncp')
+      .select('*')
+      .order('data_abertura_proposta', { ascending: false, nullsFirst: false })
+      .limit(100);
+
+    if (error) throw error;
+    if (!data || data.length === 0) return pregoesData;
+
+    const now = new Date().getTime();
+
+    return data.map((row: any) => {
+      const encTime = row.data_encerramento_proposta
+        ? new Date(row.data_encerramento_proposta).getTime()
+        : null;
+      const abTime = row.data_abertura_proposta
+        ? new Date(row.data_abertura_proposta).getTime()
+        : null;
+
+      let statusProposta: PregaoItem['statusProposta'] = 'Encerrada';
+      let badgeColor: PregaoItem['badgeColor'] = 'muted';
+
+      if (encTime && encTime > now) {
+        if (abTime && abTime > now) {
+          statusProposta = 'Futura';
+          badgeColor = 'blue';
+        } else {
+          statusProposta = 'Aberta';
+          badgeColor = 'green';
+        }
+      } else if (!encTime && abTime && abTime > now) {
+        statusProposta = 'Futura';
+        badgeColor = 'blue';
+      } else if (!encTime && abTime && abTime <= now) {
+        statusProposta = 'Em andamento';
+        badgeColor = 'amber';
+      }
+
+      const valorHomologado = Number(row.valor_total_homologado) || 0;
+      const valorEstimado = Number(row.valor_total_estimado) || 0;
+      const valor = valorHomologado > 0 ? valorHomologado : valorEstimado;
+      const tipoValor: 'homologado' | 'estimado' = valorHomologado > 0 ? 'homologado' : 'estimado';
+
+      return {
+        id: String(row.id || row.numero_compra),
+        numero: row.numero_compra || 'N/D',
+        objeto: row.objeto_compra || 'Sem descrição do objeto',
+        modalidade: row.modalidade_nome || 'Pregão Eletrônico',
+        uasgCodigo: String(row.uasg_codigo || ''),
+        uasgNome: row.uasg_nome || 'IFRN',
+        valor,
+        tipoValor,
+        statusProposta,
+        badgeColor,
+        dataAbertura: formatDatePtBR(row.data_abertura_proposta),
+        dataPublicacao: formatDatePtBR(row.data_publicacao_pncp),
+        srp: Boolean(row.srp),
+        link: row.link_sistema_origem || undefined,
+        processo: row.processo || undefined,
+      };
+    });
+  } catch (err) {
+    console.warn('Erro ao buscar pregões, usando mock:', err);
+    return pregoesData;
+  }
+}
+
+export async function fetchAtas(
+  campusUasg = DEFAULT_CAMPUS_UASG
+): Promise<AtaItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from('atas_registro_precos_resumo')
+      .select('*')
+      .order('data_vigencia_inicial', { ascending: false, nullsFirst: false })
+      .limit(100);
+
+    if (error) throw error;
+    if (!data || data.length === 0) return atasData;
+
+    const now = new Date().getTime();
+
+    return data.map((row: any) => {
+      const uasg = String(campusUasg);
+      let vinculo: AtaItem['vinculo'] = 'outro';
+
+      if (String(row.unidade_gerenciadora_codigo) === uasg) {
+        vinculo = 'gerenciadora';
+      } else if (
+        Array.isArray(row.unidades_participantes) &&
+        row.unidades_participantes.includes(uasg)
+      ) {
+        vinculo = 'participante';
+      } else if (
+        Array.isArray(row.unidades_aderentes) &&
+        row.unidades_aderentes.includes(uasg)
+      ) {
+        vinculo = 'aderente';
+      }
+
+      let statusVigencia: AtaItem['statusVigencia'] = 'vigente';
+      let badgeVigencia: AtaItem['badgeVigencia'] = 'green';
+      let diasRestantes = 0;
+
+      if (row.data_vigencia_final) {
+        const fimTime = new Date(row.data_vigencia_final).getTime();
+        const diffMs = fimTime - now;
+        diasRestantes = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+        if (diasRestantes < 0) {
+          statusVigencia = 'expirada';
+          badgeVigencia = 'muted';
+          diasRestantes = 0;
+        } else if (diasRestantes <= 30) {
+          statusVigencia = 'vencer';
+          badgeVigencia = 'amber';
+        } else {
+          statusVigencia = 'vigente';
+          badgeVigencia = 'green';
+        }
+      }
+
+      return {
+        id: String(row.id || row.numero_ata),
+        numeroAta: row.numero_ata || 'N/D',
+        numeroCompra: row.numero_compra || undefined,
+        objeto: row.objeto || 'Sem descrição do objeto',
+        unidadeGerenciadoraCodigo: String(row.unidade_gerenciadora_codigo || ''),
+        unidadeGerenciadoraNome: row.unidade_gerenciadora_nome || 'IFRN',
+        vinculo,
+        vigenciaInicio: formatDatePtBR(row.data_vigencia_inicial),
+        vigenciaFim: formatDatePtBR(row.data_vigencia_final),
+        statusVigencia,
+        diasRestantes,
+        totalItens: Number(row.total_itens) || 0,
+        totalAdesoes: Number(row.total_adesoes) || 0,
+        badgeVigencia,
+      };
+    });
+  } catch (err) {
+    console.warn('Erro ao buscar atas, usando mock:', err);
+    return atasData;
+  }
+}
+
 

@@ -3,6 +3,8 @@ import {
   dashboardData,
   empenhosData,
   contratosData,
+  pregoesData,
+  atasData,
   formatBRL,
 } from '../../mobile/src/constants/data';
 
@@ -73,5 +75,48 @@ describe('SIAGES Mobile - Regras de Negócio e Dados do Protótipo', () => {
     // Contratos vigentes sem alerta
     const vigentesSemAlerta = contratosData.filter((c) => !c.warning);
     expect(vigentesSemAlerta).toHaveLength(2);
+  });
+
+  it('deve validar dados de pregões do protótipo e filtros por status e SRP', () => {
+    expect(pregoesData.length).toBeGreaterThanOrEqual(3);
+
+    // Validação de propriedades
+    const first = pregoesData[0];
+    expect(first.id).toBeDefined();
+    expect(first.numero).toBeDefined();
+    expect(first.objeto).toBeDefined();
+    expect(first.valor).toBeGreaterThan(0);
+    expect(['homologado', 'estimado']).toContain(first.tipoValor);
+    expect(['Aberta', 'Futura', 'Encerrada', 'Em andamento']).toContain(first.statusProposta);
+
+    // Filtro SRP
+    const srpItems = pregoesData.filter((p) => p.srp);
+    expect(srpItems.length).toBeGreaterThan(0);
+
+    // Filtro por propostas abertas
+    const abertos = pregoesData.filter((p) => p.statusProposta === 'Aberta');
+    expect(abertos.length).toBeGreaterThan(0);
+  });
+
+  it('deve validar dados de atas do protótipo e filtros por vigência e vínculo com campus', () => {
+    expect(atasData.length).toBeGreaterThanOrEqual(3);
+
+    const first = atasData[0];
+    expect(first.id).toBeDefined();
+    expect(first.numeroAta).toBeDefined();
+    expect(first.objeto).toBeDefined();
+    expect(first.unidadeGerenciadoraCodigo).toBeDefined();
+    expect(['gerenciadora', 'participante', 'aderente', 'outro']).toContain(first.vinculo);
+    expect(['vigente', 'vencer', 'expirada']).toContain(first.statusVigencia);
+    expect(typeof first.diasRestantes).toBe('number');
+    expect(first.totalItens).toBeGreaterThan(0);
+
+    // Filtro atas a vencer
+    const aVencer = atasData.filter((a) => a.statusVigencia === 'vencer');
+    expect(aVencer.length).toBeGreaterThanOrEqual(1);
+
+    // Filtro vínculo participante ou gerenciadora
+    const doCampus = atasData.filter((a) => a.vinculo === 'gerenciadora' || a.vinculo === 'participante');
+    expect(doCampus.length).toBeGreaterThan(0);
   });
 });

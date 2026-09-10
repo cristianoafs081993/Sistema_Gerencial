@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../constants/theme';
 import { TabType } from '../types';
-import { IconGrid, IconWallet, IconDoc } from './Icons';
+import { IconGrid, IconWallet, IconDoc, IconGavel } from './Icons';
 
 interface BottomNavProps {
   currentTab: TabType;
@@ -36,6 +36,13 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       label: 'Contratos',
       icon: (isActive) => (
         <IconDoc size={21} color={isActive ? colors.blue : colors.navInactive} />
+      ),
+    },
+    {
+      id: 'licitacoes',
+      label: 'Licitações',
+      icon: (isActive) => (
+        <IconGavel size={21} color={isActive ? colors.blue : colors.navInactive} />
       ),
     },
   ];

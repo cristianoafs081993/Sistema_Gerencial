@@ -10,6 +10,7 @@ import { NotificationsModal } from './src/components/NotificationsModal';
 import { DashboardScreen } from './src/screens/DashboardScreen';
 import { EmpenhosScreen } from './src/screens/EmpenhosScreen';
 import { ContratosScreen } from './src/screens/ContratosScreen';
+import { LicitacoesScreen } from './src/screens/LicitacoesScreen';
 import { fetchNotifications } from './src/services/api';
 
 export default function App() {
@@ -80,6 +81,8 @@ export default function App() {
               onClearInitialFilter={() => setContratosFilter('all')}
             />
           )}
+
+          {currentTab === 'licitacoes' && <LicitacoesScreen />}
         </View>
 
         {/* Bottom Navigation */}
