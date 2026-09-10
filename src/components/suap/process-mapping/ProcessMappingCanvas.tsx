@@ -1,6 +1,7 @@
 import React, { useCallback, useImperativeHandle, useRef, useState } from 'react';
 import {
   MousePointer2,
+  Trash2,
 } from 'lucide-react';
 
 import type {
@@ -73,12 +74,35 @@ export const ProcessMappingCanvas = React.forwardRef<ProcessMappingCanvasHandle,
     // Selected Edge State
     const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
 
+    // Dragging Edge Waypoint State
+    const [draggingEdgeWaypoint, setDraggingEdgeWaypoint] = useState<{
+      edgeId: string;
+      controlPointIndex: number;
+      axis: 'x' | 'y' | 'both';
+    } | null>(null);
+
     // Grid toggle
     const [showGrid, setShowGrid] = useState(true);
 
     const handleSelectEdge = (edgeId: string | null) => {
       setSelectedEdgeId(edgeId);
       onSelectedEdgeChange?.(Boolean(edgeId));
+    };
+
+    const handleStartDragControlPoint = (
+      edge: ProcessMappingEdge,
+      controlPointIndex: number,
+      axis: 'x' | 'y' | 'both',
+      e: React.MouseEvent
+    ) => {
+      e.stopPropagation();
+      handleSelectEdge(edge.id);
+      onSelectNode(null);
+      setDraggingEdgeWaypoint({
+        edgeId: edge.id,
+        controlPointIndex,
+        axis,
+      });
     };
 
     // Calculate dynamic canvas bounds
@@ -93,6 +117,7 @@ export const ProcessMappingCanvas = React.forwardRef<ProcessMappingCanvasHandle,
     );
 
     const nodesById = new Map(mapping.nodes.map((node) => [node.id, node]));
+    const selectedEdge = mapping.edges.find((e) => e.id === selectedEdgeId);
 
     // Background Pan Handlers
     const handleMouseDownBackground = (e: React.MouseEvent) => {
@@ -127,14 +152,31 @@ export const ProcessMappingCanvas = React.forwardRef<ProcessMappingCanvasHandle,
           n.id === draggingNodeId ? { ...n, position: { x: newX, y: newY } } : n
         );
         onUpdateMapping({ ...mapping, nodes: updatedNodes });
+      } else if (draggingEdgeWaypoint) {
+        const mouseCanvasX = Math.round((e.clientX - pan.x) / zoom / 10) * 10;
+        const mouseCanvasY = Math.round((e.clientY - pan.y) / zoom / 10) * 10;
+
+        const updatedEdges = mapping.edges.map((edge) => {
+          if (edge.id !== draggingEdgeWaypoint.edgeId) return edge;
+          const waypoints = edge.waypoints && edge.waypoints.length > 0 ? [...edge.waypoints] : [{ x: mouseCanvasX, y: mouseCanvasY }];
+          const prevW = waypoints[draggingEdgeWaypoint.controlPointIndex] || { x: mouseCanvasX, y: mouseCanvasY };
+          const newW = {
+            x: draggingEdgeWaypoint.axis === 'y' ? prevW.x : mouseCanvasX,
+            y: draggingEdgeWaypoint.axis === 'x' ? prevW.y : mouseCanvasY,
+          };
+          waypoints[draggingEdgeWaypoint.controlPointIndex] = newW;
+          return { ...edge, waypoints };
+        });
+        onUpdateMapping({ ...mapping, edges: updatedEdges });
       }
     },
-    [isPanning, panStart, draggingNodeId, pan, dragOffset, zoom, mapping, onUpdateMapping]
+    [isPanning, panStart, draggingNodeId, draggingEdgeWaypoint, pan, dragOffset, zoom, mapping, onUpdateMapping]
   );
 
   const handleMouseUp = () => {
     setIsPanning(false);
     setDraggingNodeId(null);
+    setDraggingEdgeWaypoint(null);
   };
 
   // Wheel Zoom / Pan
@@ -209,6 +251,37 @@ export const ProcessMappingCanvas = React.forwardRef<ProcessMappingCanvasHandle,
     if (nextLabel === null) return;
     const updatedEdges = mapping.edges.map((e) =>
       e.id === edge.id ? { ...e, label: nextLabel.trim() || undefined } : e
+    );
+    onUpdateMapping({ ...mapping, edges: updatedEdges });
+  };
+
+  // Change Edge Anchors
+  const handleChangeEdgeSourceAnchor = (edgeId: string, anchor: 'auto' | 'top' | 'bottom' | 'left' | 'right') => {
+    const updatedEdges = mapping.edges.map((e) =>
+      e.id === edgeId ? { ...e, sourceAnchor: anchor } : e
+    );
+    onUpdateMapping({ ...mapping, edges: updatedEdges });
+  };
+
+  const handleChangeEdgeTargetAnchor = (edgeId: string, anchor: 'auto' | 'top' | 'bottom' | 'left' | 'right') => {
+    const updatedEdges = mapping.edges.map((e) =>
+      e.id === edgeId ? { ...e, targetAnchor: anchor } : e
+    );
+    onUpdateMapping({ ...mapping, edges: updatedEdges });
+  };
+
+  // Toggle Edge Style (solid vs dashed)
+  const handleToggleEdgeStyle = (edgeId: string) => {
+    const updatedEdges = mapping.edges.map((e) =>
+      e.id === edgeId ? { ...e, style: (e.style === 'dashed' ? 'solid' : 'dashed') as 'solid' | 'dashed' } : e
+    );
+    onUpdateMapping({ ...mapping, edges: updatedEdges });
+  };
+
+  // Reset Edge Waypoints & Custom Anchors
+  const handleResetEdgeWaypoints = (edgeId: string) => {
+    const updatedEdges = mapping.edges.map((e) =>
+      e.id === edgeId ? { ...e, waypoints: undefined, sourceAnchor: undefined, targetAnchor: undefined } : e
     );
     onUpdateMapping({ ...mapping, edges: updatedEdges });
   };
@@ -296,6 +369,101 @@ export const ProcessMappingCanvas = React.forwardRef<ProcessMappingCanvasHandle,
         )}
       </div>
 
+      {/* Floating Edge Settings Bar when an edge is selected */}
+      {selectedEdge && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-white/95 backdrop-blur-md border border-slate-200 shadow-xl rounded-xl px-3 py-1.5 flex items-center gap-2.5 text-xs text-slate-700 animate-in fade-in slide-in-from-top-2 duration-150 select-none">
+          <div className="flex items-center gap-1.5 pr-2 border-r border-slate-200">
+            <span className="font-bold text-[11px] text-blue-600 uppercase tracking-wider">Conexão</span>
+            {selectedEdge.label ? (
+              <span className="bg-blue-50 text-blue-800 font-semibold px-2 py-0.5 rounded text-[11px] max-w-[130px] truncate border border-blue-200/60">
+                {selectedEdge.label}
+              </span>
+            ) : (
+              <span className="text-[10px] text-slate-400 italic">Sem rótulo</span>
+            )}
+          </div>
+
+          {/* Source Anchor */}
+          <div className="flex items-center gap-1">
+            <span className="text-[11px] text-slate-400 font-medium">Saída:</span>
+            <select
+              value={selectedEdge.sourceAnchor || 'auto'}
+              onChange={(e) => handleChangeEdgeSourceAnchor(selectedEdge.id, e.target.value as any)}
+              className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded px-1.5 py-0.5 text-[11px] font-medium cursor-pointer focus:ring-1 focus:ring-blue-500"
+              title="Porta de saída do nó de origem"
+            >
+              <option value="auto">Auto</option>
+              <option value="right">Direita</option>
+              <option value="bottom">Baixo</option>
+              <option value="top">Cima</option>
+              <option value="left">Esquerda</option>
+            </select>
+          </div>
+
+          {/* Target Anchor */}
+          <div className="flex items-center gap-1">
+            <span className="text-[11px] text-slate-400 font-medium">Entrada:</span>
+            <select
+              value={selectedEdge.targetAnchor || 'auto'}
+              onChange={(e) => handleChangeEdgeTargetAnchor(selectedEdge.id, e.target.value as any)}
+              className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded px-1.5 py-0.5 text-[11px] font-medium cursor-pointer focus:ring-1 focus:ring-blue-500"
+              title="Porta de entrada do nó de destino"
+            >
+              <option value="auto">Auto</option>
+              <option value="left">Esquerda</option>
+              <option value="top">Cima</option>
+              <option value="bottom">Baixo</option>
+              <option value="right">Direita</option>
+            </select>
+          </div>
+
+          <div className="h-3.5 w-px bg-slate-200" />
+
+          {/* Style Toggle */}
+          <button
+            type="button"
+            onClick={() => handleToggleEdgeStyle(selectedEdge.id)}
+            className="px-2 py-0.5 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 text-[11px] font-medium transition cursor-pointer"
+            title="Alternar estilo da linha"
+          >
+            {selectedEdge.style === 'dashed' ? 'Tracejada' : 'Contínua'}
+          </button>
+
+          {/* Edit Label */}
+          <button
+            type="button"
+            onClick={() => handleEditEdgeLabel(selectedEdge)}
+            className="px-2 py-0.5 rounded bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 text-[11px] font-medium transition cursor-pointer"
+            title="Editar condição ou texto da ramificação"
+          >
+            Rótulo
+          </button>
+
+          {/* Reset Custom Path */}
+          {(selectedEdge.waypoints?.length || selectedEdge.sourceAnchor || selectedEdge.targetAnchor) && (
+            <button
+              type="button"
+              onClick={() => handleResetEdgeWaypoints(selectedEdge.id)}
+              className="px-2 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-[11px] font-medium transition cursor-pointer"
+              title="Restaurar traçado automático original"
+            >
+              Restaurar Traçado
+            </button>
+          )}
+
+          {/* Delete Edge */}
+          <button
+            type="button"
+            onClick={handleDeleteSelectedEdge}
+            className="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition cursor-pointer ml-0.5"
+            title="Excluir linha selecionada"
+            aria-label="Excluir conexão"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Transformable Canvas Workspace */}
       <div
         className="relative origin-top-left transition-transform duration-75"
@@ -374,12 +542,14 @@ export const ProcessMappingCanvas = React.forwardRef<ProcessMappingCanvasHandle,
                   edge={edge}
                   sourceNode={source}
                   targetNode={target}
+                  allEdges={mapping.edges}
                   isSelected={selectedEdgeId === edge.id}
-                  onSelectEdge={(e) => {
+                  onSelect={(e) => {
                     handleSelectEdge(e.id);
                     onSelectNode(null);
                   }}
                   onEditLabel={handleEditEdgeLabel}
+                  onStartDragControlPoint={handleStartDragControlPoint}
                 />
               );
             })}

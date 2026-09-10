@@ -59,6 +59,7 @@ export interface ProcessMappingEdge {
   style?: 'solid' | 'dashed';
   sourceAnchor?: 'top' | 'bottom' | 'left' | 'right' | 'auto';
   targetAnchor?: 'top' | 'bottom' | 'left' | 'right' | 'auto';
+  waypoints?: { x: number; y: number }[];
 }
 
 export interface ProcessMappingLane {

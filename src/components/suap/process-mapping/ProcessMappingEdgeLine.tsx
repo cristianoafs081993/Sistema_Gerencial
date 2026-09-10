@@ -6,20 +6,29 @@ interface ProcessMappingEdgeLineProps {
   edge: ProcessMappingEdge;
   sourceNode: ProcessMappingNode;
   targetNode: ProcessMappingNode;
+  allEdges?: ProcessMappingEdge[];
   isSelected: boolean;
   onSelect: (edge: ProcessMappingEdge) => void;
   onEditLabel: (edge: ProcessMappingEdge) => void;
+  onStartDragControlPoint?: (
+    edge: ProcessMappingEdge,
+    controlPointIndex: number,
+    axis: 'x' | 'y' | 'both',
+    e: React.MouseEvent
+  ) => void;
 }
 
 export const ProcessMappingEdgeLine: React.FC<ProcessMappingEdgeLineProps> = ({
   edge,
   sourceNode,
   targetNode,
+  allEdges,
   isSelected,
   onSelect,
   onEditLabel,
+  onStartDragControlPoint,
 }) => {
-  const { path, labelPoint } = calculateEdgePath(sourceNode, targetNode, edge);
+  const { path, labelPoint, controlPoints } = calculateEdgePath(sourceNode, targetNode, edge, allEdges);
 
   return (
     <g className="connector-group cursor-pointer select-none group" onClick={() => onSelect(edge)}>
@@ -28,11 +37,11 @@ export const ProcessMappingEdgeLine: React.FC<ProcessMappingEdgeLineProps> = ({
         d={path}
         fill="none"
         stroke="transparent"
-        strokeWidth="16"
+        strokeWidth="18"
         className="cursor-pointer"
       />
 
-      {/* Visible stepped orthogonal line */}
+      {/* Visible stepped orthogonal line with rounded corners */}
       <path
         d={path}
         fill="none"
@@ -76,6 +85,38 @@ export const ProcessMappingEdgeLine: React.FC<ProcessMappingEdgeLineProps> = ({
           </text>
         </g>
       )}
+
+      {/* Draggable Control Points / Waypoint Handles when edge is selected */}
+      {isSelected &&
+        controlPoints.map((cp, idx) => (
+          <g
+            key={`cp-${edge.id}-${idx}`}
+            transform={`translate(${cp.x}, ${cp.y})`}
+            className="cursor-pointer"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              onStartDragControlPoint?.(edge, cp.index, cp.axis, e);
+            }}
+          >
+            {/* Wider hit circle */}
+            <circle r="14" fill="transparent" />
+            {/* Outer styled ring */}
+            <circle
+              r="6.5"
+              fill="#ffffff"
+              stroke="#2563eb"
+              strokeWidth="2.5"
+              className="transition-transform hover:scale-125 filter drop-shadow-md"
+              style={{
+                cursor: cp.axis === 'x' ? 'ew-resize' : cp.axis === 'y' ? 'ns-resize' : 'move',
+              }}
+            />
+            {/* Center dot */}
+            <circle r="2.5" fill="#2563eb" pointerEvents="none" />
+            {/* Hover tooltip title */}
+            <title>{cp.label || 'Arraste para ajustar a posição da linha'}</title>
+          </g>
+        ))}
     </g>
   );
 };
