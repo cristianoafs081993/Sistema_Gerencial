@@ -594,16 +594,16 @@
     const section = createElement('section', 'suape-flow-card');
     const header = createElement('div', 'suape-flow-header');
     const heading = createElement('div', 'suape-flow-heading');
-    heading.append(createElement('span', 'suape-flow-eyebrow', 'Caminho do processo'), createElement('strong', 'suape-flow-title', summary.mappingTitle));
-    heading.appendChild(createElement('span', 'suape-flow-version', `v${summary.mappingVersion}`));
+    heading.appendChild(createElement('span', 'suape-flow-eyebrow', 'Caminho do processo'));
     header.appendChild(heading);
     const open = createElement('a', 'suape-flow-open', 'Mapa completo ↗'); open.href = `${SIAGES_ORIGIN}${summary.fullPagePath}`; open.target = '_blank'; open.rel = 'noreferrer'; header.appendChild(open); section.appendChild(header);
-    if (state.mappings.length > 1) {
-      const chooser = createElement('label', 'suape-flow-chooser'); chooser.appendChild(createElement('span', '', 'Mapeamento aplicado'));
-      const select = document.createElement('select'); select.className = 'suape-flow-select';
-      state.mappings.forEach((mapping) => { const option = document.createElement('option'); option.value = mapping.id; option.textContent = `${mapping.title} · v${mapping.version}`; option.selected = mapping.id === state.selectedMappingId || mapping.id === summary.mappingId; select.appendChild(option); });
-      select.addEventListener('change', async () => { state.selectedMappingId = select.value; const key = getProcessMappingKey(); await storageSet('local', { [key]: state.selectedMappingId }); state.flow = null; renderSummary(); restartBridge(); }); chooser.appendChild(select); section.appendChild(chooser);
-    }
+    const mappingsToDisplay = state.mappings.length > 0
+      ? state.mappings
+      : [{ id: summary.mappingId, title: summary.mappingTitle, version: summary.mappingVersion }];
+    const chooser = createElement('label', 'suape-flow-chooser'); chooser.appendChild(createElement('span', '', 'Mapeamento aplicado'));
+    const select = document.createElement('select'); select.className = 'suape-flow-select';
+    mappingsToDisplay.forEach((mapping) => { const option = document.createElement('option'); option.value = mapping.id; option.textContent = `${mapping.title} · v${mapping.version}`; option.selected = mapping.id === state.selectedMappingId || mapping.id === summary.mappingId; select.appendChild(option); });
+    select.addEventListener('change', async () => { state.selectedMappingId = select.value; const key = getProcessMappingKey(); await storageSet('local', { [key]: state.selectedMappingId }); state.flow = null; renderSummary(); restartBridge(); }); chooser.appendChild(select); section.appendChild(chooser);
     const list = createElement('div', 'suape-flow-list');
     summary.steps.forEach((step) => {
       const item = createElement('div', `suape-flow-step suape-flow-step-${step.status}`);
