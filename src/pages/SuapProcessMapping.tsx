@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -20,7 +20,10 @@ import type {
 } from '@/types/processMapping';
 
 import { ProcessMappingAiModal } from '@/components/suap/process-mapping/ProcessMappingAiModal';
-import { ProcessMappingCanvas } from '@/components/suap/process-mapping/ProcessMappingCanvas';
+import {
+  ProcessMappingCanvas,
+  type ProcessMappingCanvasHandle,
+} from '@/components/suap/process-mapping/ProcessMappingCanvas';
 import { ProcessMappingDetailDrawer } from '@/components/suap/process-mapping/ProcessMappingDetailDrawer';
 import { ProcessMappingExecutionGuide } from '@/components/suap/process-mapping/ProcessMappingExecutionGuide';
 import { ProcessMappingExportModal } from '@/components/suap/process-mapping/ProcessMappingExportModal';
@@ -83,6 +86,12 @@ export default function SuapProcessMappingPage() {
   const [viewMode, setViewMode] = useState<ProcessMappingViewMode>('canvas');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedNode, setSelectedNode] = useState<ProcessMappingNode | null>(null);
+
+  // Canvas controls & state (forwarded from header)
+  const canvasRef = useRef<ProcessMappingCanvasHandle>(null);
+  const [canvasZoom, setCanvasZoom] = useState<number>(0.85);
+  const [showGrid, setShowGrid] = useState<boolean>(true);
+  const [hasSelectedEdge, setHasSelectedEdge] = useState<boolean>(false);
 
   // External Process Integration (SUAP)
   const [process, setProcess] = useState<SuapProcesso | null>(null);
@@ -386,6 +395,16 @@ export default function SuapProcessMappingPage() {
         onOpenExportModal={() => setIsExportOpen(true)}
         onResetDefaults={handleResetDefaults}
         suapId={suapId}
+        zoom={canvasZoom}
+        onZoomIn={() => canvasRef.current?.zoomIn()}
+        onZoomOut={() => canvasRef.current?.zoomOut()}
+        onFitView={() => canvasRef.current?.fitView()}
+        onResetZoom={() => canvasRef.current?.resetZoom()}
+        showGrid={showGrid}
+        onToggleGrid={() => canvasRef.current?.toggleGrid()}
+        onAddNode={handleAddNodeFromPalette}
+        hasSelectedEdge={hasSelectedEdge}
+        onDeleteSelectedEdge={() => canvasRef.current?.deleteSelectedEdge()}
       />
 
       {/* Main Container: Full Width Canvas / Views */}
@@ -396,6 +415,7 @@ export default function SuapProcessMappingPage() {
         {viewMode === 'canvas' && (
           <div className="flex-1 flex flex-col min-h-0 h-full">
             <ProcessMappingCanvas
+              ref={canvasRef}
               mapping={activeProcess}
               flow={flow}
               selectedNode={selectedNode}
@@ -403,6 +423,9 @@ export default function SuapProcessMappingPage() {
               onSelectNode={setSelectedNode}
               onUpdateMapping={handleUpdateActiveProcess}
               onAddNode={handleAddNodeFromPalette}
+              onZoomChange={setCanvasZoom}
+              onGridChange={setShowGrid}
+              onSelectedEdgeChange={setHasSelectedEdge}
             />
           </div>
         )}

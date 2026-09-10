@@ -2,14 +2,20 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft,
+  CircleDot,
+  Diamond,
   Download,
   GitBranch,
+  Grid,
   Layers,
   ListOrdered,
+  Maximize2,
+  Minus,
   PlayCircle,
   Plus,
   RotateCcw,
   Search,
+  Trash2,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -30,6 +36,17 @@ interface ProcessMappingNavbarProps {
   onOpenExportModal: () => void;
   onResetDefaults: () => void;
   suapId?: string;
+  // Canvas specific tools
+  zoom?: number;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+  onFitView?: () => void;
+  onResetZoom?: () => void;
+  showGrid?: boolean;
+  onToggleGrid?: () => void;
+  onAddNode?: (type: 'task' | 'gateway' | 'end' | 'start') => void;
+  hasSelectedEdge?: boolean;
+  onDeleteSelectedEdge?: () => void;
 }
 
 export const ProcessMappingNavbar: React.FC<ProcessMappingNavbarProps> = ({
@@ -45,6 +62,16 @@ export const ProcessMappingNavbar: React.FC<ProcessMappingNavbarProps> = ({
   onOpenExportModal,
   onResetDefaults,
   suapId,
+  zoom,
+  onZoomIn,
+  onZoomOut,
+  onFitView,
+  onResetZoom,
+  showGrid,
+  onToggleGrid,
+  onAddNode,
+  hasSelectedEdge,
+  onDeleteSelectedEdge,
 }) => {
   return (
     <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 shrink-0 sticky top-0 z-30 select-none">
@@ -84,6 +111,111 @@ export const ProcessMappingNavbar: React.FC<ProcessMappingNavbarProps> = ({
             <Plus className="w-3.5 h-3.5" />
           </button>
         </div>
+
+        {/* Canvas Tools in Header (Zoom & Add Node) */}
+        {viewMode === 'canvas' && (
+          <div className="hidden lg:flex items-center gap-2 pl-3 border-l border-slate-200">
+            {/* Zoom Controls */}
+            <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg p-0.5 shadow-2xs">
+              <button
+                type="button"
+                onClick={onZoomOut}
+                className="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded transition"
+                title="Reduzir zoom"
+                aria-label="Reduzir zoom"
+              >
+                <Minus className="w-3.5 h-3.5" />
+              </button>
+              <span className="font-mono text-[11px] font-bold text-slate-600 px-1 min-w-[36px] text-center select-none">
+                {Math.round((zoom ?? 0.85) * 100)}%
+              </span>
+              <button
+                type="button"
+                onClick={onZoomIn}
+                className="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded transition"
+                title="Aumentar zoom"
+                aria-label="Aumentar zoom"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+              <div className="h-3.5 w-px bg-slate-200 mx-0.5" />
+              <button
+                type="button"
+                onClick={onFitView}
+                className="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded transition"
+                title="Ajustar visualização"
+                aria-label="Ajustar visualização"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={onResetZoom}
+                className="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded transition"
+                title="Restaurar zoom"
+                aria-label="Restaurar zoom"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={onToggleGrid}
+                className={`p-1 rounded transition ${
+                  showGrid ? 'bg-white text-emerald-700 shadow-2xs font-bold' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
+                }`}
+                title="Alternar grade"
+                aria-label="Alternar grade"
+              >
+                <Grid className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Quick Node Creation Palette */}
+            {onAddNode && (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => onAddNode('task')}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition shadow-2xs"
+                  title="Adicionar Tarefa"
+                >
+                  <Plus className="w-3 h-3 text-emerald-600" />
+                  <span>Tarefa</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onAddNode('gateway')}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition shadow-2xs"
+                  title="Adicionar Decisão / Condição"
+                >
+                  <Diamond className="w-3 h-3 text-amber-600" />
+                  <span>Decisão</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onAddNode('end')}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition shadow-2xs"
+                  title="Adicionar Fim de Processo"
+                >
+                  <CircleDot className="w-3 h-3 text-rose-600" />
+                  <span>Fim</span>
+                </button>
+              </div>
+            )}
+
+            {hasSelectedEdge && onDeleteSelectedEdge && (
+              <button
+                type="button"
+                onClick={onDeleteSelectedEdge}
+                className="flex items-center gap-1 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg transition"
+                title="Excluir conexão selecionada"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden xl:inline">Excluir Conexão</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Middle: Search & View Modes */}
