@@ -44,9 +44,17 @@ const ACTIVE_ID_KEY = 'siages_active_mapping_id';
 function loadStoredProcesses(): ProcessMappingRecord[] {
   const local = loadLocalStoredMappings();
   if (local.length > 0) {
-    const existingIds = new Set(local.map((p) => p.id));
-    const missingDefaults = DEFAULT_PROCESS_MAPPINGS.filter((d) => !existingIds.has(d.id));
-    return [...local, ...missingDefaults];
+    const localMap = new Map(local.map((p) => [p.id, p]));
+    const mergedDefaults = DEFAULT_PROCESS_MAPPINGS.map((d) => {
+      const saved = localMap.get(d.id);
+      if (!saved) return d;
+      const savedTime = saved.updatedAt ? new Date(saved.updatedAt).getTime() : 0;
+      const defTime = d.updatedAt ? new Date(d.updatedAt).getTime() : 0;
+      return defTime > savedTime ? d : saved;
+    });
+    const defaultIds = new Set(DEFAULT_PROCESS_MAPPINGS.map((d) => d.id));
+    const extraCustom = local.filter((p) => !defaultIds.has(p.id));
+    return [...mergedDefaults, ...extraCustom];
   }
   return DEFAULT_PROCESS_MAPPINGS;
 }

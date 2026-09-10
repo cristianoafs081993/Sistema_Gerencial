@@ -46,12 +46,30 @@ function postSummary(summary: SuapProcessFinanceSummary) {
 }
 
 function postSnapshot(context: SuapExtensionProcessContext, process: SuapProcesso | null) {
+  const mergedProcess: SuapProcesso | null = process ? {
+    ...process,
+    assunto: process.assunto || context.assunto,
+    beneficiario: process.beneficiario || context.beneficiario,
+    cpfCnpj: process.cpfCnpj || context.cpfCnpj,
+    caixa: process.caixa || context.caixa,
+  } : (context.assunto || context.beneficiario || context.cpfCnpj || context.caixa ? {
+    id: context.suapId,
+    suapId: context.suapId,
+    url: context.processUrl,
+    status: 'pending_extraction',
+    numProcesso: context.processNumber,
+    assunto: context.assunto,
+    beneficiario: context.beneficiario,
+    cpfCnpj: context.cpfCnpj,
+    caixa: context.caixa,
+  } as SuapProcesso : null);
+
   postMessageToSuapParent({
     source: 'siages',
     type: SUAP_EXTENSION_PROCESS_SNAPSHOT_TYPE,
     version: 1,
     payload: {
-      process,
+      process: mergedProcess,
       fallback: { suapId: context.suapId, processNumber: context.processNumber, processUrl: context.processUrl },
     },
   });
@@ -62,10 +80,20 @@ function postSyncStatus(payload: SuapExtensionProcessSyncStatus) {
 }
 
 async function postProcessFlow(context: SuapExtensionProcessContext, process: SuapProcesso | null, client?: SupabaseClient) {
-  const mappings = await processMappingsService.listPublished(client);
+  let activeClient = client;
+  if (!activeClient && context.extensionSession?.accessToken) {
+    try {
+      const authenticated = await authenticateExtensionAccessToken(context.extensionSession.accessToken);
+      activeClient = authenticated.client;
+    } catch {
+      // Ignora falha de autenticação e usa fallback local
+    }
+  }
+  const mappings = await processMappingsService.listPublished(activeClient);
+  const resolvedAssunto = process?.assunto?.trim() || context.route?.assunto?.trim() || context.assunto?.trim();
   const mapping = selectSuapProcessMapping(mappings, {
     selectedMappingId: context.route?.selectedMappingId,
-    assunto: process?.assunto,
+    assunto: resolvedAssunto,
   });
   if (!mapping) return;
 
@@ -154,6 +182,7 @@ export default function SuapExtensionProcessInfo() {
         stopReadySignal();
         setContext(nextContext);
         setStatus('Consultando o processo no SIAGES...');
+        postSnapshot(nextContext, null);
         void postProcessFlow(nextContext, null);
         return;
       }

@@ -36,8 +36,10 @@ vi.mock('@/services/suapScraperService', () => ({
   },
 }));
 
+import { DEFAULT_PROCESS_MAPPINGS } from '@/data/defaultProcessMapping';
+
 vi.mock('@/services/processMappings', () => ({
-  processMappingsService: { listPublished: vi.fn().mockResolvedValue([]) },
+  processMappingsService: { listPublished: vi.fn().mockImplementation(() => Promise.resolve(DEFAULT_PROCESS_MAPPINGS)) },
 }));
 
 const processContext = {
@@ -162,11 +164,95 @@ describe('SuapExtensionProcessInfo', () => {
     render(<SuapExtensionProcessInfo />);
     await sendContext();
 
+
     await waitFor(() => expect(suapScraperService.syncProcessListInSupabase).toHaveBeenCalledWith([{
       suapId: '987',
       numProcesso: processContext.payload.processNumber,
       url: processContext.payload.processUrl,
     }], 'user-1', {}, extensionClient));
     expect(suapProcessosService.getBySuapId).toHaveBeenCalledTimes(2);
+  });
+
+  it('envia o snapshot inicial e o fluxo de bolsas imediatamente ao receber o contexto da extensão com assunto de bolsas', async () => {
+    const postMessage = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => undefined);
+    const bolsasContext = {
+      ...processContext,
+      payload: {
+        ...processContext.payload,
+        assunto: 'Pagamento de Bolsas de Extensão',
+        beneficiario: 'Bolsista Fulano',
+        caixa: 'Coordenação de Extensão',
+      },
+    };
+
+    render(<SuapExtensionProcessInfo />);
+    await sendContext(bolsasContext);
+
+    // Deve emitir o snapshot com os dados capturados da página
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'siages',
+      type: 'siages:suap-process-snapshot',
+      payload: expect.objectContaining({
+        process: expect.objectContaining({
+          assunto: 'Pagamento de Bolsas de Extensão',
+          beneficiario: 'Bolsista Fulano',
+          caixa: 'Coordenação de Extensão',
+        }),
+      }),
+    }), SUAP_EXTENSION_ORIGIN);
+
+    // Deve emitir o fluxo de Bolsas imediatamente (sem cair no fallback de Nota Fiscal)
+    await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'siages',
+      type: 'siages:suap-process-flow',
+      payload: expect.objectContaining({
+        summary: expect.objectContaining({
+          mappingId: 'liquidacao-pagamento-bolsas',
+        }),
+      }),
+    }), SUAP_EXTENSION_ORIGIN));
+
+    postMessage.mockRestore();
+  });
+
+  it('mantém o fluxo de bolsas mesmo se o processo salvo no banco ainda não possuir assunto', async () => {
+    vi.mocked(suapProcessosService.getBySuapId).mockResolvedValue({
+      id: 'process-1',
+      suapId: '987',
+      url: processContext.payload.processUrl,
+      status: 'success',
+      numProcesso: processContext.payload.processNumber,
+      assunto: null as unknown as string,
+    });
+    const postMessage = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => undefined);
+    const bolsasContext = {
+      ...processContext,
+      payload: {
+        ...processContext.payload,
+        assunto: 'Pagamento de bolsa de pesquisa',
+      },
+    };
+
+    render(<SuapExtensionProcessInfo />);
+    await sendContext(bolsasContext);
+
+    await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'siages',
+      type: 'siages:suap-process-flow',
+      payload: expect.objectContaining({
+        summary: expect.objectContaining({
+          mappingId: 'liquidacao-pagamento-bolsas',
+        }),
+      }),
+    }), SUAP_EXTENSION_ORIGIN));
+
+    // Nenhuma chamada deve ter selecionado nota fiscal
+    const flowCalls = postMessage.mock.calls.filter((call) => (call[0] as { type?: string })?.type === 'siages:suap-process-flow');
+    flowCalls.forEach((call) => {
+      const payload = (call[0] as { payload?: { summary?: { mappingId?: string } } })?.payload;
+      expect(payload?.summary?.mappingId).toBe('liquidacao-pagamento-bolsas');
+    });
+
+    postMessage.mockRestore();
   });
 });

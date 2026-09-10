@@ -154,6 +154,26 @@ describe('process-document 1.9', () => {
     expect(api.getProcessId()).toBe('789');
   });
 
+  it('extrai assunto e dados da página no payload do contexto', () => {
+    document.body.innerHTML = '<main><aside id="timeline"><div>Recebido por COFINC/CN</div></aside> <p>Processo 23035.000001.2026-11</p> <p>Assunto: Pagamento de Bolsas do Edital 01/2026</p> <p>Interessado: Bolsista Maria</p> <p>CPF: 123.456.789-00</p></main>';
+    window.history.replaceState(null, '', '/processo_eletronico/processo/321/');
+    const api = loadProcessScript();
+    const context = api.buildContext();
+
+    expect(context).toMatchObject({
+      payload: {
+        suapId: '321',
+        processNumber: '23035.000001.2026-11',
+        assunto: 'Pagamento de Bolsas do Edital 01/2026',
+        beneficiario: 'Bolsista Maria',
+        cpfCnpj: '123.456.789-00',
+        route: expect.objectContaining({
+          assunto: 'Pagamento de Bolsas do Edital 01/2026',
+        }),
+      },
+    });
+  });
+
   it('injeta uma unica vez no topo da lateral e cria as cinco abas', async () => {
     const api = loadProcessScript();
     await api.installToolkit();

@@ -332,11 +332,16 @@
   function buildContext(session) {
     const suapId = getProcessId();
     if (!suapId) return null;
+    const pageData = extractProcessDataFromPage();
     return {
       source: 'siages-suap-extension', type: 'siages:suap-process-context', version: 1,
       payload: {
         suapId, processNumber: getProcessNumber(), processUrl: getProcessUrl(),
-        route: { events: parseProcessRoute(), ...(state.selectedMappingId ? { selectedMappingId: state.selectedMappingId } : {}) },
+        assunto: pageData.assunto || '',
+        beneficiario: pageData.beneficiario || '',
+        cpfCnpj: pageData.cpfCnpj || '',
+        caixa: pageData.caixa || '',
+        route: { events: parseProcessRoute(), assunto: pageData.assunto || '', ...(state.selectedMappingId ? { selectedMappingId: state.selectedMappingId } : {}) },
         ...(session ? { extensionSession: { accessToken: session.accessToken, ...(session.expiresAt ? { expiresAt: session.expiresAt } : {}) } } : {}),
       },
     };

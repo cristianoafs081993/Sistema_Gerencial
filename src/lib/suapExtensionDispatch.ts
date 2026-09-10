@@ -9,6 +9,10 @@ export type SuapExtensionProcessContext = {
   suapId: string;
   processNumber?: string;
   processUrl: string;
+  assunto?: string;
+  beneficiario?: string;
+  cpfCnpj?: string;
+  caixa?: string;
   /** JWT efêmero enviado pelo worker; nunca inclui refresh token. */
   extensionSession?: {
     accessToken: string;
@@ -314,12 +318,17 @@ export function isValidSuapExtensionProcessContext(value: unknown): value is Sua
     !/^\d+$/.test(payload.suapId) ||
     typeof payload.processUrl !== 'string' ||
     (payload.processNumber !== undefined && typeof payload.processNumber !== 'string') ||
+    (payload.assunto !== undefined && typeof payload.assunto !== 'string') ||
+    (payload.beneficiario !== undefined && typeof payload.beneficiario !== 'string') ||
+    (payload.cpfCnpj !== undefined && typeof payload.cpfCnpj !== 'string') ||
+    (payload.caixa !== undefined && typeof payload.caixa !== 'string') ||
     (payload.route !== undefined && (
       typeof payload.route !== 'object' ||
       !Array.isArray(payload.route.events) ||
       payload.route.events.length > 200 ||
       payload.route.events.some((event) => !event || typeof event !== 'object' || typeof event.id !== 'string' || typeof event.label !== 'string' || typeof event.rawText !== 'string' || typeof event.order !== 'number') ||
-      (payload.route.selectedMappingId !== undefined && typeof payload.route.selectedMappingId !== 'string')
+      (payload.route.selectedMappingId !== undefined && typeof payload.route.selectedMappingId !== 'string') ||
+      (payload.route.assunto !== undefined && typeof payload.route.assunto !== 'string')
     )) ||
     (payload.extensionSession !== undefined && (
       typeof payload.extensionSession !== 'object' ||
@@ -346,11 +355,15 @@ export function getSuapExtensionProcessContext(event: MessageEvent, expectedSour
     return null;
   }
 
-  const { suapId, processUrl, processNumber, extensionSession, route } = event.data.payload;
+  const { suapId, processUrl, processNumber, assunto, beneficiario, cpfCnpj, caixa, extensionSession, route } = event.data.payload;
   return {
     suapId,
     processUrl,
     processNumber: processNumber?.trim() || undefined,
+    assunto: typeof assunto === 'string' ? assunto.trim() || undefined : undefined,
+    beneficiario: typeof beneficiario === 'string' ? beneficiario.trim() || undefined : undefined,
+    cpfCnpj: typeof cpfCnpj === 'string' ? cpfCnpj.trim() || undefined : undefined,
+    caixa: typeof caixa === 'string' ? caixa.trim() || undefined : undefined,
     ...(extensionSession ? {
       extensionSession: {
         accessToken: extensionSession.accessToken,

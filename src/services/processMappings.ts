@@ -74,9 +74,13 @@ function normalizeRow(row: ProcessMappingRow): ProcessMappingRecord {
 
 function fallbackById(id?: string | null) {
   if (!id) return DEFAULT_PROCESS_MAPPING;
+  const def = DEFAULT_PROCESS_MAPPINGS.find((mapping) => mapping.id === id || mapping.code === id) || null;
   const local = loadLocalStoredMappings().find((mapping) => mapping.id === id || mapping.code === id);
-  if (local) return local;
-  return DEFAULT_PROCESS_MAPPINGS.find((mapping) => mapping.id === id || mapping.code === id) || null;
+  if (!local) return def || DEFAULT_PROCESS_MAPPING;
+  if (!def) return local;
+  const localTime = local.updatedAt ? new Date(local.updatedAt).getTime() : 0;
+  const defTime = def.updatedAt ? new Date(def.updatedAt).getTime() : 0;
+  return defTime > localTime ? def : local;
 }
 
 export function mergePublishedMappings(
@@ -86,31 +90,40 @@ export function mergePublishedMappings(
   const localMap = new Map<string, ProcessMappingRecord>();
   localMappings.forEach((m) => localMap.set(m.id, m));
 
+  const defaultMap = new Map<string, ProcessMappingRecord>();
+  DEFAULT_PROCESS_MAPPINGS.forEach((d) => defaultMap.set(d.id, d));
+
   const result: ProcessMappingRecord[] = [];
   const handledIds = new Set<string>();
+
+  const getTime = (r?: ProcessMappingRecord | null) => (r?.updatedAt ? new Date(r.updatedAt).getTime() : 0);
 
   // 1. Process remote records (database)
   for (const remote of remoteRecords) {
     handledIds.add(remote.id);
     const local = localMap.get(remote.id);
-    if (local) {
-      const localTime = local.updatedAt ? new Date(local.updatedAt).getTime() : 0;
-      const remoteTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
-      if (localTime >= remoteTime) {
-        result.push(local);
-      } else {
-        result.push(remote);
-      }
-    } else {
-      result.push(remote);
+    const def = defaultMap.get(remote.id);
+
+    let candidate = remote;
+    if (local && getTime(local) >= getTime(candidate)) {
+      candidate = local;
     }
+    if (def && getTime(def) > getTime(candidate)) {
+      candidate = def;
+    }
+    result.push(candidate);
   }
 
   // 2. Process local mappings not yet in remote records
   for (const local of localMappings) {
     if (!handledIds.has(local.id)) {
       handledIds.add(local.id);
-      result.push(local);
+      const def = defaultMap.get(local.id);
+      if (def && getTime(def) > getTime(local)) {
+        result.push(def);
+      } else {
+        result.push(local);
+      }
     }
   }
 
@@ -176,12 +189,16 @@ export const processMappingsService = {
       }
 
       const remote = normalizeRow(data as ProcessMappingRow);
-      if (local) {
-        const localTime = local.updatedAt ? new Date(local.updatedAt).getTime() : 0;
-        const remoteTime = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
-        return localTime >= remoteTime ? local : remote;
+      const def = DEFAULT_PROCESS_MAPPINGS.find((mapping) => mapping.id === id || mapping.code === id);
+      let candidate = remote;
+      const getTime = (r?: ProcessMappingRecord | null) => (r?.updatedAt ? new Date(r.updatedAt).getTime() : 0);
+      if (local && getTime(local) >= getTime(candidate)) {
+        candidate = local;
       }
-      return remote;
+      if (def && getTime(def) > getTime(candidate)) {
+        candidate = def;
+      }
+      return candidate;
     } catch {
       return local || fallback;
     }
@@ -218,22 +235,32 @@ export const processMappingsService = {
           payload.id = record.id;
         }
 
-        const { data: existing } = await client
+        const { data: existing, error: selectErr } = await client
           .from('process_mappings')
           .select('id')
           .eq('slug', slug)
           .eq('version', record.version || '1.0')
           .maybeSingle();
 
+        if (selectErr) {
+          console.warn('processMappingsService.saveMapping: consulta de mapeamento existente falhou', selectErr);
+        }
+
         if (existing?.id) {
-          await client
+          const { error: updateErr } = await client
             .from('process_mappings')
             .update(payload)
             .eq('id', existing.id);
+          if (updateErr) {
+            console.warn('processMappingsService.saveMapping: falha ao atualizar no Supabase', updateErr);
+          }
         } else {
-          await client
+          const { error: insertErr } = await client
             .from('process_mappings')
             .insert(payload);
+          if (insertErr) {
+            console.warn('processMappingsService.saveMapping: falha ao inserir no Supabase', insertErr);
+          }
         }
       } catch (err) {
         console.warn('processMappingsService.saveMapping: salvo localmente, sincronização remota ignorada', err);

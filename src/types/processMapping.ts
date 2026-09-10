@@ -104,6 +104,7 @@ export interface SuapProcessRouteEvent {
 export interface SuapProcessRouteSnapshot {
   events: SuapProcessRouteEvent[];
   selectedMappingId?: string;
+  assunto?: string;
 }
 
 export type SuapProcessFlowStepStatus = 'completed' | 'current' | 'next' | 'pending' | 'not_confirmed';
