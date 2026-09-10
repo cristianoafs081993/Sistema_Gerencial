@@ -16,6 +16,9 @@ import { atividadesService } from '@/services/atividades';
 import { descentralizacoesService } from '@/services/descentralizacoes';
 import { empenhosService } from '@/services/empenhos';
 import { buildSuapPlanSummary } from '@/services/suapPlanSummary';
+import { useOptionalAuth } from '@/contexts/AuthContext';
+import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
+import { getSuapPlanUnitForCampus } from '@/lib/suapPlanUnits';
 
 type PlanData = {
   atividades: Atividade[];
@@ -32,6 +35,7 @@ function postMessageToSuapParent(message: unknown) {
 }
 
 export default function SuapExtensionPlanSummary() {
+  const auth = useOptionalAuth();
   const [context, setContext] = useState<SuapExtensionPlanContext | null>(null);
   const [data, setData] = useState<PlanData | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -39,10 +43,12 @@ export default function SuapExtensionPlanSummary() {
 
   useEffect(() => {
     let active = true;
+    const campusUasg = auth?.userCampus.codigo ?? DEFAULT_IFRN_CAMPUS_UASG;
+    const suapUnitCode = getSuapPlanUnitForCampus(campusUasg).value;
     Promise.all([
-      atividadesService.getAll(),
-      descentralizacoesService.getAll(),
-      empenhosService.getAll(),
+      atividadesService.getAll(campusUasg, suapUnitCode),
+      descentralizacoesService.getAll(campusUasg),
+      empenhosService.getAll(campusUasg),
     ])
       .then(([atividades, descentralizacoes, empenhos]) => {
         if (active) setData({ atividades, descentralizacoes, empenhos });
@@ -51,7 +57,7 @@ export default function SuapExtensionPlanSummary() {
         if (active) setLoadError(true);
       });
     return () => { active = false; };
-  }, []);
+  }, [auth?.userCampus.codigo]);
 
   useEffect(() => {
     let attempts = 0;

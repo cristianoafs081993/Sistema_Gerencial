@@ -5,9 +5,18 @@ import { DEFAULT_BOLSA_PROCESS_MAPPING, DEFAULT_PROCESS_MAPPING } from '@/data/d
 import SuapProcessMappingPage from '@/pages/SuapProcessMapping';
 import { processMappingsService } from '@/services/processMappings';
 
-vi.mock('@/services/processMappings', () => ({
-  processMappingsService: { getById: vi.fn().mockResolvedValue(DEFAULT_PROCESS_MAPPING) },
-}));
+vi.mock('@/services/processMappings', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/processMappings')>();
+  const { DEFAULT_PROCESS_MAPPING, DEFAULT_PROCESS_MAPPINGS } = await import('@/data/defaultProcessMapping');
+  return {
+    ...actual,
+    processMappingsService: {
+      ...actual.processMappingsService,
+      getById: vi.fn().mockResolvedValue(DEFAULT_PROCESS_MAPPING),
+      listPublished: vi.fn().mockResolvedValue(DEFAULT_PROCESS_MAPPINGS),
+    },
+  };
+});
 
 describe('SuapProcessMapping', () => {
   it('renderiza o mapa completo, o guia e os detalhes de uma etapa', async () => {

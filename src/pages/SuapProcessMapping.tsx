@@ -10,7 +10,11 @@ import {
 
 import { DEFAULT_PROCESS_MAPPINGS } from '@/data/defaultProcessMapping';
 import { buildSuapProcessFlowSummary } from '@/lib/suapProcessFlow';
-import { processMappingsService } from '@/services/processMappings';
+import {
+  loadLocalStoredMappings,
+  processMappingsService,
+  saveLocalStoredMappings,
+} from '@/services/processMappings';
 import { suapProcessosService } from '@/services/suapProcessos';
 import type { SuapProcesso } from '@/types';
 import type {
@@ -35,32 +39,16 @@ import {
 } from '@/components/suap/process-mapping/ProcessMappingNavbar';
 import { Button } from '@/components/ui/button';
 
-const STORAGE_KEY = 'siages_process_mappings_v2';
 const ACTIVE_ID_KEY = 'siages_active_mapping_id';
 
 function loadStoredProcesses(): ProcessMappingRecord[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_PROCESS_MAPPINGS;
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      // Ensure all defaults exist
-      const existingIds = new Set(parsed.map((p) => p.id));
-      const missingDefaults = DEFAULT_PROCESS_MAPPINGS.filter((d) => !existingIds.has(d.id));
-      return [...parsed, ...missingDefaults];
-    }
-    return DEFAULT_PROCESS_MAPPINGS;
-  } catch {
-    return DEFAULT_PROCESS_MAPPINGS;
+  const local = loadLocalStoredMappings();
+  if (local.length > 0) {
+    const existingIds = new Set(local.map((p) => p.id));
+    const missingDefaults = DEFAULT_PROCESS_MAPPINGS.filter((d) => !existingIds.has(d.id));
+    return [...local, ...missingDefaults];
   }
-}
-
-function saveStoredProcesses(processes: ProcessMappingRecord[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(processes));
-  } catch {
-    // ignore
-  }
+  return DEFAULT_PROCESS_MAPPINGS;
 }
 
 export default function SuapProcessMappingPage() {
@@ -130,7 +118,7 @@ export default function SuapProcessMappingPage() {
             map.set(currentMap.id, currentMap);
           }
           const merged = Array.from(map.values());
-          saveStoredProcesses(merged);
+          saveLocalStoredMappings(merged);
           return merged;
         });
 
@@ -179,7 +167,8 @@ export default function SuapProcessMappingPage() {
   // Persistir lista de processos sempre que for alterada
   const handleUpdateProcessList = useCallback((updatedList: ProcessMappingRecord[]) => {
     setProcesses(updatedList);
-    saveStoredProcesses(updatedList);
+    saveLocalStoredMappings(updatedList);
+    void processMappingsService.saveAll(updatedList);
   }, []);
 
   const activeProcess = useMemo(() => {
@@ -209,9 +198,11 @@ export default function SuapProcessMappingPage() {
         updatedAt: new Date().toISOString(),
       };
       const updatedList = processes.map((p) => (p.id === fullRecord.id ? fullRecord : p));
-      handleUpdateProcessList(updatedList);
+      setProcesses(updatedList);
+      saveLocalStoredMappings(updatedList);
+      void processMappingsService.saveMapping(fullRecord);
     },
-    [activeProcess, processes, handleUpdateProcessList]
+    [activeProcess, processes]
   );
 
   // Handler para atualizar um nó a partir do Drawer

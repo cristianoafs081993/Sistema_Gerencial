@@ -8,13 +8,15 @@ import { empenhosService } from '@/services/empenhos';
 import { dataQueryKeys } from '@/contexts/dataQueryKeys';
 import { useOptionalAuth } from '@/contexts/AuthContext';
 import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
+import { getSuapPlanUnitForCampus } from '@/lib/suapPlanUnits';
 
 export function useDataQueries() {
   const auth = useOptionalAuth();
   const campusUasg = auth?.userCampus.codigo ?? DEFAULT_IFRN_CAMPUS_UASG;
+  const suapUnitCode = getSuapPlanUnitForCampus(campusUasg).value;
   const { data: atividades = [], isLoading: isLoadingAtividades } = useQuery({
-    queryKey: [...dataQueryKeys.atividades, campusUasg],
-    queryFn: () => atividadesService.getAll(campusUasg),
+    queryKey: [...dataQueryKeys.atividades, campusUasg, suapUnitCode],
+    queryFn: () => atividadesService.getAll(campusUasg, suapUnitCode),
   });
 
   const { data: empenhos = [], isLoading: isLoadingEmpenhos } = useQuery({

@@ -400,6 +400,7 @@ Cadastros seguem inventoryService  operational_entities / measurement_units / ca
 - materialização: função SQL `apply_suap_plan_snapshot` grava `atividades` com `sync_source = suap_plan_8`, `suap_unit_code` e `campus_uasg`, persistindo o valor em `saldo_disponivel`;
 - ação em lote: `suap_plan_sync_batches` agrupa as execuções, mantendo prévias, falhas e aplicação por unidade sem misturar campi;
 - ausência na captura: `sync_active = false` somente dentro da mesma unidade e UASG-pai, preservando registros e histórico de Currais Novos e dos demais campi.
+- leitura: `atividadesService.getAll` descarta linhas arquivadas e, para o Plano 8, filtra a unidade SUAP ativa além do UASG-pai. O caso legado sem `suap_unit_code` permanece associado a Currais Novos (`19`); atividades manuais não são excluídas por esse filtro.
 
 ## Analise e historico de documentos SUAP
 

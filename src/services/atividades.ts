@@ -5,8 +5,10 @@ import { Atividade } from '@/types';
 import { normalizeActivityName, normalizeFunctionalComponentName } from '@/utils/functionalComponentLabels';
 import { resolveTipoAtividade } from '@/utils/atividadeScopes';
 import { DEFAULT_IFRN_CAMPUS_UASG } from '@/lib/ifrnCampuses';
+import { DEFAULT_SUAP_PLAN_UNIT, getSuapPlanUnitForCampus } from '@/lib/suapPlanUnits';
 
-const ATIVIDADES_SELECT = 'id,campus_uasg,dimensao,dimensao_id,componente_funcional,componente_funcional_id,processo,tipo_atividade,atividade,descricao,valor_total,saldo_disponivel,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,sync_active,created_at,updated_at';
+const SUAP_PLAN_SYNC_SOURCE = 'suap_plan_8';
+const ATIVIDADES_SELECT = 'id,campus_uasg,dimensao,dimensao_id,componente_funcional,componente_funcional_id,processo,tipo_atividade,atividade,descricao,valor_total,saldo_disponivel,origem_recurso,origem_recurso_id,natureza_despesa,natureza_despesa_id,plano_interno,sync_source,suap_unit_code,sync_active,created_at,updated_at';
 
 type AtividadeRow = {
     id: string;
@@ -26,10 +28,32 @@ type AtividadeRow = {
     natureza_despesa: string;
     natureza_despesa_id?: string | null;
     plano_interno: string;
+    sync_source?: string | null;
+    suap_unit_code?: string | null;
     sync_active?: boolean | null;
     created_at: string;
     updated_at: string;
 };
+
+/**
+ * Mantém o planejamento exibido isolado da unidade SUAP ativa.
+ *
+ * O UASG-pai não é suficiente para distinguir todas as unidades do SUAP:
+ * Currais Novos, Jucurutu, Parelhas e o Polo de Inovação compartilham 158366.
+ * Registros manuais continuam visíveis e registros arquivados nunca entram
+ * nos indicadores atuais.
+ */
+export function filterAtividadeRowsForRead(
+    rows: AtividadeRow[],
+    suapUnitCode: string = DEFAULT_SUAP_PLAN_UNIT,
+): AtividadeRow[] {
+    return rows.filter((item) => {
+        if (item.sync_active === false) return false;
+        if (item.sync_source !== SUAP_PLAN_SYNC_SOURCE) return true;
+
+        return String(item.suap_unit_code || DEFAULT_SUAP_PLAN_UNIT) === suapUnitCode;
+    });
+}
 
 const mapAtividadeRow = (item: AtividadeRow): Atividade => ({
     id: item.id,
@@ -54,7 +78,10 @@ const mapAtividadeRow = (item: AtividadeRow): Atividade => ({
 });
 
 export const atividadesService = {
-    async getAll(campusUasg = DEFAULT_IFRN_CAMPUS_UASG): Promise<Atividade[]> {
+    async getAll(
+        campusUasg = DEFAULT_IFRN_CAMPUS_UASG,
+        suapUnitCode = getSuapPlanUnitForCampus(campusUasg).value,
+    ): Promise<Atividade[]> {
         const { data, error } = await supabase
             .from('atividades')
             .select(ATIVIDADES_SELECT)
@@ -67,7 +94,7 @@ export const atividadesService = {
                 orderBy: 'created_at',
                 filters: { campus_uasg: campusUasg },
             });
-            return fallbackData.map(mapAtividadeRow);
+            return filterAtividadeRowsForRead(fallbackData, suapUnitCode).map(mapAtividadeRow);
         }
 
         if (!data || data.length === 0) {
@@ -76,10 +103,10 @@ export const atividadesService = {
                 orderBy: 'created_at',
                 filters: { campus_uasg: campusUasg },
             });
-            return fallbackData.map(mapAtividadeRow);
+            return filterAtividadeRowsForRead(fallbackData, suapUnitCode).map(mapAtividadeRow);
         }
 
-        return (data as AtividadeRow[]).map(mapAtividadeRow);
+        return filterAtividadeRowsForRead(data as AtividadeRow[], suapUnitCode).map(mapAtividadeRow);
     },
 
     async create(atividade: Omit<Atividade, 'id' | 'createdAt' | 'updatedAt'>): Promise<Atividade> {

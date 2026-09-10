@@ -609,7 +609,10 @@
       const item = createElement('div', `suape-flow-step suape-flow-step-${step.status}`);
       const dot = createElement('span', 'suape-flow-dot');
       const body = createElement('div', 'suape-flow-step-body');
-      const title = createElement('div', 'suape-flow-step-title'); title.append(createElement('span', 'suape-flow-code', step.code), createElement('strong', '', step.title));
+      const title = createElement('div', 'suape-flow-step-title');
+      const titleStrong = createElement('strong', '', step.title);
+      titleStrong.title = step.title;
+      title.append(createElement('span', 'suape-flow-code', step.code), titleStrong);
       const meta = createElement('div', 'suape-flow-step-meta', [step.responsible, step.status === 'completed' ? 'Concluída' : step.status === 'current' ? 'Etapa atual' : step.status === 'next' ? 'Próxima etapa' : 'Pendente'].join(' · '));
       body.append(title, meta); if (step.evidence) body.appendChild(createElement('div', 'suape-flow-evidence', `SUAP: ${step.evidence}`)); item.append(dot, body); list.appendChild(item);
     });

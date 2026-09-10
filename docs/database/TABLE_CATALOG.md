@@ -37,6 +37,7 @@ Observacoes operacionais:
 - para a dimensao `EN`, `atividade` deve armazenar apenas o nome final da atividade, sem prefixos como `44 - COMPONENTE FUNCIONAL (PROEN):` e sem repetir o componente antes do nome
 - `tipo_atividade` define a aba da tela de planejamento entre `campus`, `sistemico` e `emendas-parlamentares`
 - no backfill atual, registros da dimensao `EN` foram classificados como `sistemico`; os demais ficaram em `campus`
+- `sync_source = 'suap_plan_8'` usa `suap_unit_code` junto com `campus_uasg`; a leitura do frontend considera apenas a unidade ativa e `sync_active <> false`. Isso evita somar, em Currais Novos (`158366`), as unidades SUAP irmãs que compartilham o mesmo UASG-pai.
 
 Consumido por:
 

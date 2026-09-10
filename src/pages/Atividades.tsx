@@ -34,6 +34,7 @@ import { atividadesService } from '@/services/atividades';
 import { Atividade, DIMENSOES, TipoAtividade } from '@/types';
 import { resolveTipoAtividade } from '@/utils/atividadeScopes';
 import { matchesDimensionFilter } from '@/utils/dimensionFilters';
+import { getSuapPlanUnitForCampus } from '@/lib/suapPlanUnits';
 
 type PlanningScope = TipoAtividade;
 
@@ -119,7 +120,7 @@ function PlanningScopeSwitcher({ currentScope }: { currentScope: PlanningScope }
 
 export default function Atividades() {
   const { scope } = useParams<{ scope?: string }>();
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, userCampus } = useAuth();
 
   const [atividades, setAtividades] = useState<Atividade[]>([]);
   const [isPageLoading, setIsPageLoading] = useState(true);
@@ -148,7 +149,8 @@ export default function Atividades() {
   const fetchAtividades = useCallback(async () => {
     try {
       setIsPageLoading(true);
-      const data = await atividadesService.getAll();
+      const suapUnitCode = getSuapPlanUnitForCampus(userCampus.codigo).value;
+      const data = await atividadesService.getAll(userCampus.codigo, suapUnitCode);
       setAtividades(data || []);
     } catch (error) {
       console.error('Erro ao buscar atividades:', error);
@@ -156,7 +158,7 @@ export default function Atividades() {
     } finally {
       setIsPageLoading(false);
     }
-  }, []);
+  }, [userCampus.codigo]);
 
   useEffect(() => {
     void fetchAtividades();

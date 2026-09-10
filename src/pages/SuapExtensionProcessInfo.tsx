@@ -154,6 +154,7 @@ export default function SuapExtensionProcessInfo() {
         stopReadySignal();
         setContext(nextContext);
         setStatus('Consultando o processo no SIAGES...');
+        void postProcessFlow(nextContext, null);
         return;
       }
     };
