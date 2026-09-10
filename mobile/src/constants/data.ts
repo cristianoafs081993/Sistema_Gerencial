@@ -1,4 +1,4 @@
-import { EmpenhoItem, ContratoItem, NotificationItem, PregaoItem, AtaItem } from '../types';
+import { EmpenhoItem, ContratoItem, NotificationItem, PregaoItem, AtaItem, PtresItem } from '../types';
 
 export const formatBRL = (value: number, includeDecimals = true): string => {
   return value.toLocaleString('pt-BR', {
@@ -112,6 +112,17 @@ export const contratosData: ContratoItem[] = [
   },
 ];
 
+export const defaultPtresList: PtresItem[] = [
+  { code: 'all', name: 'Todos os recursos (PTRES)', shortLabel: 'Todos' },
+  { code: '231796', name: 'PROAD · Gestão Administrativa', shortLabel: '231796' },
+  { code: '261941', name: 'DIAE · Assistência Estudantil (Alimentação)', shortLabel: '261941' },
+  { code: '231802', name: 'PROEN · Ensino e PCD / Assistência', shortLabel: '231802' },
+  { code: '231798', name: 'PROEN · Ações de Ensino (21B3)', shortLabel: '231798' },
+  { code: '171166', name: 'DIGPE · Ações de Capacitação', shortLabel: '171166' },
+  { code: '260296', name: 'PROEN · Ações de Ensino (PCDs)', shortLabel: '260296' },
+  { code: '230446', name: 'PNAE · Alimentação Escolar', shortLabel: '230446' },
+];
+
 export const dashboardData = {
   exercicio: '2026',
   usuario: 'Cristiano',
@@ -119,6 +130,8 @@ export const dashboardData = {
   usuarioNomeCompleto: 'Cristiano Farias',
   campus: 'Campus Currais Novos',
   instituicao: 'IFRN',
+  selectedPtres: 'all',
+  availablePtres: defaultPtresList,
   planejado: 4800000,
   totalAtividades: 357,
   percentualExecutado: '60,7%',

@@ -33,9 +33,10 @@ O app mobile conecta-se diretamente ao Supabase através da biblioteca `@supabas
 
 1. **Dashboard (Visão Geral - 01)**:
    - Identificação do campus: `IFRN / Campus Currais Novos`.
-   - Card de Crédito Disponível com gradiente (`#10307e` a `#234fc8`), valor em tempo real e rosca de progresso empenhado/descentralizado.
-   - Grid de indicadores de execução: Planejado, Descentralizado, Empenhado, Liquidado e Pago.
-   - Restos a Pagar com saldo apurado em conformidade com o SIORG/SIAFI web.
+   - **Filtro funcional por PTRES / Origem de Recurso**: Seletor interativo no topo (`[ 🏷️ PTRES: Todos ▾ ]` ou `[ 🏷️ PTRES 231796 ▾ ]`) que abre modal com busca e opções consolidadas (`Todos`, `231796 - PROAD`, `261941 - DIAE`, `231802 - PROEN`, `231798 - PROEN`, `171166 - DIGPE`, `260296 - PROEN`, etc.), recalculando instantaneamente Planejado, Descentralizado, Empenhado, Crédito Disponível, Liquidado, Pago e o gráfico de evolução semestral.
+   - Card Hero de **Total Planejado**: com gradiente (`#10307e` a `#234fc8`), valor em tempo real, quantidade de atividades e rosca de progresso empenhado/descentralizado.
+   - Grid de indicadores de execução: Empenhado, Crédito Disponível (oficial SIAFI), Liquidado e Pago.
+   - Faixa auxiliar: A pagar e percentual de execução no planejado.
    - Card de **Execução no Semestre**: Gráfico vetorial SVG dinâmico com barras pareadas escaladas proporcionalmente aos valores reais.
    - Card de alerta contratual dinâmico: indica a quantidade de contratos prestes a vencer e redireciona com 1 toque para a aba de Contratos com filtro ativo.
 

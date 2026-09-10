@@ -1,12 +1,14 @@
 import { supabase, DEFAULT_CAMPUS_UASG } from '../lib/supabase';
-import { EmpenhoItem, ContratoItem, NotificationItem, PregaoItem, AtaItem } from '../types';
-import { dashboardData, empenhosData, contratosData, mockNotificationsData, pregoesData, atasData } from '../constants/data';
+import { EmpenhoItem, ContratoItem, NotificationItem, PregaoItem, AtaItem, PtresItem } from '../types';
+import { dashboardData, empenhosData, contratosData, mockNotificationsData, pregoesData, atasData, defaultPtresList } from '../constants/data';
 
 export interface DashboardMetricsResult {
   exercicio: string;
   usuario: string;
   campus: string;
   instituicao: string;
+  selectedPtres?: string;
+  availablePtres?: PtresItem[];
   planejado: number;
   totalAtividades: number;
   percentualExecutado: string;
@@ -37,6 +39,26 @@ export interface DashboardMetricsResult {
     pago: number;
   }[];
 }
+
+export const matchesPtres = (origemRecurso?: string | null, targetPtres?: string): boolean => {
+  if (!targetPtres || targetPtres === 'all') return true;
+  if (!origemRecurso) return false;
+  const o = String(origemRecurso).trim().toLowerCase();
+  const t = String(targetPtres).trim().toLowerCase();
+  return o === t || o.startsWith(`${t} `) || o.startsWith(`${t}-`) || o.startsWith(`${t}/`);
+};
+
+export const KNOWN_PTRES_NAMES: Record<string, string> = {
+  '231796': 'PROAD · Gestão Administrativa',
+  '261941': 'DIAE · Assistência Estudantil (Alimentação)',
+  '231802': 'PROEN · Ensino e PCD / Assistência',
+  '231798': 'PROEN · Ações de Ensino (21B3)',
+  '171166': 'DIGPE · Ações de Capacitação',
+  '260296': 'PROEN · Ações de Ensino (PCDs)',
+  '230446': 'PNAE · Alimentação Escolar',
+  '231795': 'Equipamentos e TI',
+  '231799': 'Saúde Estudantil',
+};
 
 export const isOrigemRecursoIgnoradaNoEmpenhado = (origem?: string | null): boolean => {
   if (!origem) return false;
@@ -93,13 +115,14 @@ const getDaysRemaining = (endDateStr?: string | null): { days: number; text: str
 };
 
 export async function fetchDashboardMetrics(
-  campusUasg = DEFAULT_CAMPUS_UASG
+  campusUasg = DEFAULT_CAMPUS_UASG,
+  selectedPtres = 'all'
 ): Promise<DashboardMetricsResult> {
   try {
     // 0. Fetch atividades do campus para o Planejado
     const { data: atividadesRows } = await supabase
       .from('atividades')
-      .select('valor_total')
+      .select('valor_total, origem_recurso')
       .eq('campus_uasg', campusUasg);
 
     // 1. Fetch empenhos do exercício corrente (tipo = 'exercicio' e não cancelados)
@@ -110,7 +133,7 @@ export async function fetchDashboardMetrics(
       .eq('tipo', 'exercicio')
       .neq('status', 'cancelado');
 
-    // 2. Fetch descentralizacoes (excluindo 230446)
+    // 2. Fetch descentralizacoes
     const { data: descRows } = await supabase
       .from('descentralizacoes')
       .select('valor, origem_recurso')
@@ -123,7 +146,7 @@ export async function fetchDashboardMetrics(
       .eq('unidade_codigo', campusUasg);
 
     // 4. Fetch crédito disponível do lote mais recente da tela web (creditos_disponiveis_detalhes)
-    let creditoDisponivelOficial: number | null = null;
+    let creditoRows: any[] = [];
     try {
       const { data: latestBatch } = await supabase
         .from('creditos_disponiveis_detalhes')
@@ -134,24 +157,79 @@ export async function fetchDashboardMetrics(
         .maybeSingle();
 
       if (latestBatch?.import_batch_id) {
-        const { data: creditoRows } = await supabase
+        const { data: cRows } = await supabase
           .from('creditos_disponiveis_detalhes')
-          .select('valor')
+          .select('ptres, descricao, valor')
           .eq('import_batch_id', latestBatch.import_batch_id)
           .eq('campus_uasg', campusUasg);
 
-        if (creditoRows && creditoRows.length > 0) {
-          creditoDisponivelOficial = creditoRows.reduce((acc, r) => acc + (Number(r.valor) || 0), 0);
+        if (cRows && cRows.length > 0) {
+          creditoRows = cRows;
         }
       }
     } catch (err) {
       console.warn('Não foi possível obter crédito disponível de creditos_disponiveis_detalhes:', err);
     }
 
+    // Extrai a lista dinâmica de PTRES disponíveis
+    const ptresSet = new Set<string>();
+    const descMap: Record<string, string> = {};
+
+    creditoRows.forEach((r: any) => {
+      if (r.ptres) {
+        ptresSet.add(r.ptres);
+        if (r.descricao && !descMap[r.ptres]) descMap[r.ptres] = r.descricao;
+      }
+    });
+
+    (atividadesRows || []).forEach((r: any) => {
+      if (r.origem_recurso) {
+        const code = String(r.origem_recurso).split(/[\s\-\/]/)[0];
+        if (/^\d+$/.test(code)) ptresSet.add(code);
+      }
+    });
+
+    (empenhosRows || []).forEach((r: any) => {
+      if (r.origem_recurso) {
+        const code = String(r.origem_recurso).split(/[\s\-\/]/)[0];
+        if (/^\d+$/.test(code)) ptresSet.add(code);
+      }
+    });
+
+    (descRows || []).forEach((r: any) => {
+      if (r.origem_recurso) {
+        const code = String(r.origem_recurso).split(/[\s\-\/]/)[0];
+        if (/^\d+$/.test(code)) ptresSet.add(code);
+      }
+    });
+
+    const priority = ['231796', '261941', '231802', '231798', '171166', '260296', '230446'];
+    const sortedPtresCodes = Array.from(ptresSet)
+      .filter((p) => /^\d+$/.test(p))
+      .sort((a, b) => {
+        const idxA = priority.indexOf(a);
+        const idxB = priority.indexOf(b);
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return a.localeCompare(b);
+      });
+
+    const availablePtres: PtresItem[] = [
+      { code: 'all', name: 'Todos os recursos (PTRES)', shortLabel: 'Todos' },
+      ...sortedPtresCodes.map((code) => ({
+        code,
+        name: KNOWN_PTRES_NAMES[code] || descMap[code] || `PTRES ${code}`,
+        shortLabel: code,
+      })),
+    ];
+
     if (empenhosError || !empenhosRows || empenhosRows.length === 0) {
       console.warn('Usando fallback do dashboard:', empenhosError);
       return {
         ...dashboardData,
+        selectedPtres,
+        availablePtres,
         contratosAVencerCount: 11,
         monthlyChart: [
           { month: 'Jan', liquidado: 757, pago: 708 },
@@ -162,6 +240,29 @@ export async function fetchDashboardMetrics(
           { month: 'Jun', liquidado: 340, pago: 310 },
         ],
       };
+    }
+
+    const isFiltered = selectedPtres && selectedPtres !== 'all';
+
+    // Filtragem por PTRES
+    const activeAtividades = isFiltered
+      ? (atividadesRows || []).filter((a: any) => matchesPtres(a.origem_recurso, selectedPtres))
+      : (atividadesRows || []);
+
+    const activeEmpenhos = isFiltered
+      ? (empenhosRows || []).filter((e: any) => matchesPtres(e.origem_recurso, selectedPtres))
+      : (empenhosRows || []);
+
+    const activeDesc = isFiltered
+      ? (descRows || []).filter((d: any) => matchesPtres(d.origem_recurso, selectedPtres))
+      : (descRows || []).filter((d: any) => !isOrigemRecursoIgnoradaNoEmpenhado(d.origem_recurso));
+
+    let creditoDisponivelOficial: number | null = null;
+    if (creditoRows && creditoRows.length > 0) {
+      const activeCred = isFiltered
+        ? creditoRows.filter((c: any) => matchesPtres(c.ptres, selectedPtres))
+        : creditoRows;
+      creditoDisponivelOficial = activeCred.reduce((acc: number, r: any) => acc + (Number(r.valor) || 0), 0);
     }
 
     // Totais do exercício alinhados com o Dashboard.tsx da web
@@ -175,13 +276,15 @@ export async function fetchDashboardMetrics(
       monthlyDataMap[m] = { liquidado: 0, pago: 0 };
     });
 
-    empenhosRows.forEach((row) => {
+    activeEmpenhos.forEach((row: any) => {
       const val = Number(row.valor) || 0;
       const liq = Number(row.valor_liquidado_oficial ?? row.valor_liquidado ?? 0);
       const pag = Number(row.valor_pago_oficial ?? 0);
 
-      // Na web, a soma do empenhado descentralizado desconsidera a origem 230446 (PNAE)
-      if (!isOrigemRecursoIgnoradaNoEmpenhado(row.origem_recurso)) {
+      // Na web, a soma do empenhado descentralizado desconsidera a origem 230446 (PNAE) quando em visão global
+      if (!isFiltered && isOrigemRecursoIgnoradaNoEmpenhado(row.origem_recurso)) {
+        // Ignora na soma geral de descentralizado
+      } else {
         totalEmpenhadoParaSoma += val;
       }
 
@@ -199,20 +302,18 @@ export async function fetchDashboardMetrics(
       }
     });
 
-    // Descentralizado filtrando origem 230446
+    // Descentralizado
     const totalDescentralizado =
-      descRows && descRows.length > 0
-        ? descRows
-            .filter((r) => !isOrigemRecursoIgnoradaNoEmpenhado(r.origem_recurso))
-            .reduce((acc, r) => acc + (Number(r.valor) || 0), 0)
-        : 2584623.54;
+      activeDesc.length > 0
+        ? activeDesc.reduce((acc: number, r: any) => acc + (Number(r.valor) || 0), 0)
+        : (isFiltered ? 0 : 2584623.54);
 
     // Planejado (total das atividades orçadas)
     const totalPlanejado =
-      atividadesRows && atividadesRows.length > 0
-        ? atividadesRows.reduce((acc, r) => acc + (Number(r.valor_total) || 0), 0)
-        : 3414691.10;
-    const totalAtividades = atividadesRows?.length || 357;
+      activeAtividades.length > 0
+        ? activeAtividades.reduce((acc: number, r: any) => acc + (Number(r.valor_total) || 0), 0)
+        : (isFiltered ? 0 : 3414691.10);
+    const totalAtividades = activeAtividades.length;
 
     const planejadoInt = Math.round(totalPlanejado);
     const descentralizadoInt = Math.round(totalDescentralizado);
@@ -235,7 +336,7 @@ export async function fetchDashboardMetrics(
     const percentualDescentralizadoPlanejadoNum =
       totalPlanejado > 0
         ? Number(((totalDescentralizado / totalPlanejado) * 100).toFixed(1))
-        : 75.7;
+        : (descentralizadoInt > 0 ? 100 : 0);
 
     const empenhadoNum =
       totalDescentralizado > 0
@@ -255,17 +356,18 @@ export async function fetchDashboardMetrics(
         : 0;
     const pctSaldo = saldoNum.toFixed(1).replace('.', ',') + '%';
 
-    const pctLiquidado =
+    const liquidadoNum =
       totalEmpenhadoParaSoma > 0
-        ? ((totalLiquidado / totalEmpenhadoParaSoma) * 100).toFixed(1).replace('.', ',') + '%'
-        : '0,0%';
+        ? Number(((totalLiquidado / totalEmpenhadoParaSoma) * 100).toFixed(1))
+        : 0;
+    const pctLiquidado = liquidadoNum.toFixed(1).replace('.', ',') + '%';
 
-    const pctPago =
+    const pagoNum =
       totalLiquidado > 0
-        ? ((totalPago / totalLiquidado) * 100).toFixed(1).replace('.', ',') + '%'
-        : '0,0%';
+        ? Number(((totalPago / totalLiquidado) * 100).toFixed(1))
+        : 0;
+    const pctPago = pagoNum.toFixed(1).replace('.', ',') + '%';
 
-    // Contratos totals
     let contratosGlobal = 0;
     let contratosVigentes = 0;
     let contratosAVencerCount = 0;
@@ -290,8 +392,8 @@ export async function fetchDashboardMetrics(
     // Monta os 6 meses para o gráfico (Jan a Jun ou meses com execução)
     const monthlyChart = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'].map((m) => ({
       month: m,
-      liquidado: Math.round(monthlyDataMap[m]?.liquidado || (m === 'Jan' ? 757 : m === 'Fev' ? 538 : 0)),
-      pago: Math.round(monthlyDataMap[m]?.pago || (m === 'Jan' ? 708 : m === 'Fev' ? 499 : 0)),
+      liquidado: Math.round(monthlyDataMap[m]?.liquidado || 0),
+      pago: Math.round(monthlyDataMap[m]?.pago || 0),
     }));
 
     return {
@@ -299,6 +401,8 @@ export async function fetchDashboardMetrics(
       usuario: 'Cristiano',
       campus: 'Campus Currais Novos',
       instituicao: 'IFRN',
+      selectedPtres,
+      availablePtres,
       planejado: planejadoInt,
       totalAtividades,
       percentualExecutado,
@@ -318,7 +422,7 @@ export async function fetchDashboardMetrics(
       pago: pagoInt,
       pagoPct: pctPago,
       aPagar: aPagarInt,
-      totalEmpenhos: empenhosRows.length,
+      totalEmpenhos: activeEmpenhos.length,
       contratosValorGlobal: Math.round(contratosGlobal || 50651970),
       contratosVigentes: contratosVigentes || 54,
       contratosAVencerCount: contratosAVencerCount || 11,
@@ -326,9 +430,11 @@ export async function fetchDashboardMetrics(
       monthlyChart,
     };
   } catch (err) {
-    console.error('Erro ao calcular métricas do dashboard:', err);
+    console.warn('Erro ao buscar métricas do Supabase, usando mock:', err);
     return {
       ...dashboardData,
+      selectedPtres,
+      availablePtres: defaultPtresList,
       contratosAVencerCount: 11,
       monthlyChart: [
         { month: 'Jan', liquidado: 757, pago: 708 },

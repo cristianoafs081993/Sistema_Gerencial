@@ -9,10 +9,22 @@ import {
   fetchAtas,
   interleaveEvents,
   isOrigemRecursoIgnoradaNoEmpenhado,
+  matchesPtres,
 } from '../../mobile/src/services/api';
 import type { NotificationItem } from '../../mobile/src/types';
 
 describe('SIAGES Mobile - Serviços de Integração ao Backend (Dados Reais)', () => {
+  it('deve identificar correspondência de PTRES / Origem de Recurso corretamente', () => {
+    expect(matchesPtres('231796', '231796')).toBe(true);
+    expect(matchesPtres('231796 - PROAD', '231796')).toBe(true);
+    expect(matchesPtres('231796/2026', '231796')).toBe(true);
+    expect(matchesPtres('231798', '231796')).toBe(false);
+    expect(matchesPtres('231798', 'all')).toBe(true);
+    expect(matchesPtres(null, 'all')).toBe(true);
+    expect(matchesPtres(null, '231796')).toBe(false);
+    expect(matchesPtres(undefined, '231796')).toBe(false);
+  });
+
   it('deve identificar corretamente origens de recursos ignoradas no cálculo de empenhado descentralizado (ex: 230446)', () => {
     expect(isOrigemRecursoIgnoradaNoEmpenhado('230446')).toBe(true);
     expect(isOrigemRecursoIgnoradaNoEmpenhado('AD.20RL.230446.3')).toBe(true);
@@ -32,6 +44,9 @@ describe('SIAGES Mobile - Serviços de Integração ao Backend (Dados Reais)', (
       expect(metrics.instituicao).toBe('IFRN');
       expect(metrics.campus).toBe('Campus Currais Novos');
       expect(metrics.exercicio).toBe('2026');
+      expect(metrics.selectedPtres).toBe('all');
+      expect(metrics.availablePtres?.length).toBeGreaterThan(5);
+      expect(metrics.availablePtres?.some((p) => p.code === '231796')).toBe(true);
 
       // Validações do Planejado (Métrica Principal)
       expect(metrics.planejado).toBeGreaterThan(3000000);
@@ -56,6 +71,21 @@ describe('SIAGES Mobile - Serviços de Integração ao Backend (Dados Reais)', (
     },
     20000
   );
+
+  it('deve filtrar métricas do dashboard por PTRES específico (ex: 231796 - PROAD)', async () => {
+    const metrics = await fetchDashboardMetrics('158366', '231796');
+
+    expect(metrics.selectedPtres).toBe('231796');
+    expect(metrics.planejado).toBe(2354779);
+    expect(metrics.totalAtividades).toBe(221);
+    expect(metrics.descentralizado).toBe(1758921);
+    expect(metrics.empenhado).toBe(1632850);
+    expect(metrics.creditoDisponivel).toBe(126071);
+    expect(metrics.liquidado).toBe(897124);
+    expect(metrics.pago).toBe(838896);
+    expect(metrics.aPagar).toBe(58228);
+    expect(metrics.aDescentralizar).toBe(595858);
+  }, 20000);
 
   it('deve buscar e mapear a lista de empenhos suportando tipo (exercício, rap e todos) sem cancelados', async () => {
     // Default busca todos (exercício + rap)

@@ -135,3 +135,22 @@ export const IconGavel: React.FC<IconProps> = ({ size = 22, color = 'currentColo
   </Svg>
 );
 
+export const IconFilter: React.FC<IconProps> = ({ size = 20, color = 'currentColor', strokeWidth = 1.8 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+  </Svg>
+);
+
+export const IconChevronDown: React.FC<IconProps> = ({ size = 20, color = 'currentColor', strokeWidth = 2 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="m6 9 6 6 6-6" />
+  </Svg>
+);
+
+export const IconClose: React.FC<IconProps> = ({ size = 20, color = 'currentColor', strokeWidth = 2 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M18 6 6 18M6 6l12 12" />
+  </Svg>
+);
+
+

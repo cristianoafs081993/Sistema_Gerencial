@@ -6,6 +6,12 @@ export type LicitacaoSubTab = 'pregoes' | 'atas';
 export type PregaoFilter = 'all' | 'abertas' | 'encerradas' | 'srp';
 export type AtaFilter = 'all' | 'vigentes' | 'vencer' | 'campus';
 
+export interface PtresItem {
+  code: string;
+  name: string;
+  shortLabel?: string;
+}
+
 export interface PregaoItem {
   id: string;
   numero: string;

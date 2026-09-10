@@ -20,9 +20,12 @@ import {
   IconClock,
   IconRight,
   IconChart,
+  IconFilter,
+  IconChevronDown,
 } from '../components/Icons';
 import { DonutChart } from '../components/DonutChart';
 import { ExecutionChart } from '../components/ExecutionChart';
+import { PtresFilterModal } from '../components/PtresFilterModal';
 import {
   fetchDashboardMetrics,
   DashboardMetricsResult,
@@ -38,11 +41,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const [metrics, setMetrics] = useState<DashboardMetricsResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedPtres, setSelectedPtres] = useState<string>('all');
+  const [isPtresModalOpen, setIsPtresModalOpen] = useState(false);
 
-  const loadData = useCallback(async (isRefresh = false) => {
+  const loadData = useCallback(async (ptres = selectedPtres, isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     try {
-      const data = await fetchDashboardMetrics();
+      const data = await fetchDashboardMetrics(undefined, ptres);
       setMetrics(data);
     } catch (err) {
       console.error('Erro ao carregar dados do dashboard:', err);
@@ -50,11 +55,16 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [selectedPtres]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const handleSelectPtres = (code: string) => {
+    setSelectedPtres(code);
+    loadData(code, true);
+  };
 
   if (loading && !metrics) {
     return (
@@ -72,31 +82,79 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       ? 'Um contrato merece atenção'
       : `${alertCount} contratos merecem atenção`;
 
-  return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => loadData(true)}
-          colors={[colors.blue]}
-          tintColor={colors.blue}
-        />
-      }
-    >
-      {/* Greeting */}
-      <Text style={styles.greeting}>Olá, {current.usuario}</Text>
+  const currentPtresItem = current.availablePtres?.find((p) => p.code === selectedPtres);
+  const ptresButtonLabel =
+    selectedPtres === 'all'
+      ? 'PTRES: Todos'
+      : `PTRES ${selectedPtres}`;
 
-      {/* Title Row */}
-      <View style={styles.titleRow}>
-        <Text style={styles.titleText}>Visão geral</Text>
-        <View style={styles.yearBadge}>
-          <IconCalendar size={14} color="#51627b" />
-          <Text style={styles.yearText}>{current.exercicio}</Text>
+  return (
+    <View style={styles.screenWrapper}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => loadData(selectedPtres, true)}
+            colors={[colors.blue]}
+            tintColor={colors.blue}
+          />
+        }
+      >
+        {/* Greeting */}
+        <Text style={styles.greeting}>Olá, {current.usuario}</Text>
+
+        {/* Title Row with PTRES Filter Button */}
+        <View style={styles.titleRow}>
+          <Text style={styles.titleText}>Visão geral</Text>
+          <TouchableOpacity
+            style={[
+              styles.ptresBadge,
+              selectedPtres !== 'all' && styles.ptresBadgeActive,
+            ]}
+            onPress={() => setIsPtresModalOpen(true)}
+            activeOpacity={0.7}
+          >
+            <IconFilter
+              size={13}
+              color={selectedPtres !== 'all' ? colors.white : colors.blue}
+            />
+            <Text
+              style={[
+                styles.ptresBadgeText,
+                selectedPtres !== 'all' && styles.ptresBadgeTextActive,
+              ]}
+              numberOfLines={1}
+            >
+              {ptresButtonLabel}
+            </Text>
+            <IconChevronDown
+              size={12}
+              color={selectedPtres !== 'all' ? colors.white : '#64748b'}
+            />
+          </TouchableOpacity>
         </View>
-      </View>
+
+        {/* Active PTRES filter indicator banner */}
+        {selectedPtres !== 'all' && (
+          <View style={styles.activeFilterBanner}>
+            <View style={styles.activeFilterLeft}>
+              <IconFilter size={12} color={colors.blue} />
+              <Text style={styles.activeFilterText} numberOfLines={1}>
+                {currentPtresItem?.name || `PTRES ${selectedPtres}`}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.clearFilterBtn}
+              onPress={() => handleSelectPtres('all')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.clearFilterBtnText}>Ver todos ✕</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
       {/* Planejado Hero Card (Gradient) */}
       <LinearGradient
@@ -234,20 +292,34 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         <IconRight size={16} color={colors.amber} />
       </TouchableOpacity>
 
-      {/* Footer note with real timestamp */}
-      <View style={styles.footerContainer}>
-        <Text style={styles.footerNote}>
-          Referência: {current.referencia}
-        </Text>
-        <Text style={styles.footerNote}>
-          Dados integrados em tempo real ao Supabase (IFRN · Campus Currais Novos)
-        </Text>
-      </View>
-    </ScrollView>
+        {/* Footer note with real timestamp */}
+        <View style={styles.footerContainer}>
+          <Text style={styles.footerNote}>
+            Referência: {current.referencia}
+          </Text>
+          <Text style={styles.footerNote}>
+            Dados integrados em tempo real ao Supabase (IFRN · Campus Currais Novos)
+          </Text>
+        </View>
+      </ScrollView>
+
+      {/* PTRES Selection Modal */}
+      <PtresFilterModal
+        visible={isPtresModalOpen}
+        onClose={() => setIsPtresModalOpen(false)}
+        options={current.availablePtres || []}
+        selectedCode={selectedPtres}
+        onSelect={handleSelectPtres}
+      />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  screenWrapper: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -279,7 +351,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 19,
+    marginBottom: 16,
   },
   titleText: {
     fontSize: 27,
@@ -287,21 +359,65 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.ink,
   },
-  yearBadge: {
+  ptresBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingVertical: 7,
-    paddingHorizontal: 9,
-    backgroundColor: colors.white,
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#ecf1ff',
     borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 9,
+    borderColor: '#d7e2fc',
+    borderRadius: 10,
   },
-  yearText: {
+  ptresBadgeActive: {
+    backgroundColor: colors.blue,
+    borderColor: colors.blue,
+  },
+  ptresBadgeText: {
     fontSize: 12,
-    color: '#51627b',
-    fontWeight: '500',
+    fontWeight: '700',
+    color: colors.blue,
+    maxWidth: 130,
+  },
+  ptresBadgeTextActive: {
+    color: colors.white,
+  },
+  activeFilterBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 11,
+    marginBottom: 14,
+    marginTop: -4,
+  },
+  activeFilterLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+    marginRight: 8,
+  },
+  activeFilterText: {
+    fontSize: 11,
+    color: '#1e40af',
+    fontWeight: '600',
+  },
+  clearFilterBtn: {
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+    borderRadius: 6,
+    backgroundColor: '#dbeafe',
+  },
+  clearFilterBtnText: {
+    fontSize: 11,
+    color: '#1d4ed8',
+    fontWeight: '700',
   },
   balanceCard: {
     padding: 22,
