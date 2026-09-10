@@ -227,7 +227,7 @@ export const ProcessMappingCanvas: React.FC<ProcessMappingCanvasProps> = ({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onWheel={handleWheel}
-      className="relative flex-1 w-full h-[720px] overflow-hidden bg-slate-100 select-none cursor-grab active:cursor-grabbing border border-slate-200 rounded-xl shadow-xs"
+      className="relative flex-1 w-full h-full min-h-0 overflow-hidden bg-slate-100 select-none cursor-grab active:cursor-grabbing"
     >
       {/* Floating Toolbar (Top Left) */}
       <div className="absolute left-4 top-4 z-20 flex items-center gap-1 rounded-xl border border-slate-200 bg-white/95 p-1 shadow-sm backdrop-blur">
@@ -353,7 +353,7 @@ export const ProcessMappingCanvas: React.FC<ProcessMappingCanvasProps> = ({
       >
         {/* Background Grid */}
         {showGrid && (
-          <div className="canvas-background absolute inset-0 pointer-events-none rounded-2xl border border-slate-200/80 bg-[radial-gradient(#94a3b8_0.8px,transparent_0.8px)] [background-size:20px_20px] opacity-40" />
+          <div className="canvas-background absolute inset-0 pointer-events-none bg-[radial-gradient(#94a3b8_0.8px,transparent_0.8px)] [background-size:20px_20px] opacity-40" />
         )}
 
         {/* Swimlanes (Raias Horizontais) */}

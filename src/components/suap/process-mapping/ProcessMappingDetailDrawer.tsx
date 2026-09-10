@@ -10,7 +10,6 @@ import {
   Link2,
   Plus,
   Scale,
-  Sparkles,
   Trash2,
   User,
   X,
@@ -44,7 +43,7 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
   onDeleteNode,
 }) => {
   const [formData, setFormData] = useState<ProcessMappingNode | null>(null);
-  const [activeTab, setActiveTab] = useState<'links' | 'procedure' | 'checklist' | 'compliance'>('links');
+  const [activeTab, setActiveTab] = useState<'links' | 'procedure' | 'checklist'>('links');
 
   // Input states for adding new items
   const [newChecklistText, setNewChecklistText] = useState('');
@@ -53,7 +52,6 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
   const [newLinkTitle, setNewLinkTitle] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
   const [newLinkCategory, setNewLinkCategory] = useState<ProcessMappingLink['category']>('system');
-  const [isAiLoading, setIsAiLoading] = useState(false);
 
   useEffect(() => {
     if (node) {
@@ -169,58 +167,6 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
     handleChange('customLinks', next);
   };
 
-  // AI Suggestion trigger (rich heuristic knowledge base + fallback)
-  const handleAiSuggest = () => {
-    setIsAiLoading(true);
-    setTimeout(() => {
-      const lower = formData.title.toLowerCase();
-      let suggestedSystem = formData.systemName || 'SUAP';
-      let suggestedUrl = formData.systemUrl || 'https://suap.ifrn.edu.br/';
-      let suggestedTemplate = formData.templateName || 'Modelo Padronizado AGU';
-      const suggestedTemplateUrl = formData.templateUrl || 'https://www.gov.br/agu/pt-br/composicao/cgu/cgu/modelos';
-      let suggestedBasis = formData.legalBasis || 'Lei Federal nº 14.133/2021';
-
-      if (lower.includes('dod') || lower.includes('demanda')) {
-        suggestedSystem = 'SUAP - Módulo Compras e DOD';
-        suggestedUrl = 'https://suap.ifrn.edu.br/';
-        suggestedTemplate = 'Modelo de DOD AGU - Lei 14.133/2021';
-        suggestedBasis = 'Art. 12, VII da Lei Federal nº 14.133/2021 e IN SEGES nº 58/2022';
-      } else if (lower.includes('etp') || lower.includes('estudo')) {
-        suggestedSystem = 'Compras.gov.br - ETP Digital';
-        suggestedUrl = 'https://etp.comprasnet.gov.br/';
-        suggestedTemplate = 'Minuta Padrão de ETP - AGU';
-        suggestedBasis = 'Art. 18, §1º da Lei 14.133/2021';
-      } else if (lower.includes('tr') || lower.includes('termo de referência')) {
-        suggestedSystem = 'Compras.gov.br - TR Digital';
-        suggestedUrl = 'https://tr.compras.gov.br/';
-        suggestedTemplate = 'Minuta de Termo de Referência AGU';
-        suggestedBasis = 'Art. 6º, XXIII e Art. 40 da Lei nº 14.133/2021';
-      } else if (lower.includes('preço') || lower.includes('pesquisa') || lower.includes('cotação')) {
-        suggestedSystem = 'Painel de Preços do Governo Federal';
-        suggestedUrl = 'https://paineldeprecos.planejamento.gov.br/';
-        suggestedTemplate = 'Mapa Comparativo de Preços SEGES';
-        suggestedBasis = 'Art. 23 da Lei 14.133/2021 e IN SEGES/ME nº 65/2021';
-      } else if (lower.includes('liquidação') || lower.includes('pagamento') || lower.includes('empenho')) {
-        suggestedSystem = 'SIAFI / SUAP Financeiro';
-        suggestedUrl = 'https://suap.ifrn.edu.br/';
-        suggestedTemplate = 'Despacho de Liquidação de Despesa';
-        suggestedBasis = 'Lei nº 4.320/1964 e Lei nº 14.133/2021';
-      }
-
-      const updated: ProcessMappingNode = {
-        ...formData,
-        systemName: suggestedSystem,
-        systemUrl: suggestedUrl,
-        templateName: suggestedTemplate,
-        templateUrl: suggestedTemplateUrl,
-        legalBasis: suggestedBasis,
-      };
-      setFormData(updated);
-      onUpdateNode(updated);
-      setIsAiLoading(false);
-    }, 450);
-  };
-
   return (
     <div className="fixed inset-y-0 right-0 z-50 w-full max-w-xl bg-white shadow-2xl border-l border-slate-200 flex flex-col font-ui text-slate-900 animate-in slide-in-from-right duration-200">
       {/* Drawer Header */}
@@ -319,19 +265,6 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
           <CheckCircle2 className="w-3.5 h-3.5" />
           <span>Checklist ({formData.checklist?.length || 0})</span>
         </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('compliance')}
-          className={`py-2.5 px-3 border-b-2 transition-colors flex items-center gap-1.5 ${
-            activeTab === 'compliance'
-              ? 'border-blue-600 text-blue-700 font-bold'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Scale className="w-3.5 h-3.5" />
-          <span>Status & Regras</span>
-        </button>
       </div>
 
       {/* Drawer Body */}
@@ -339,25 +272,6 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
         {/* TAB 1: Links & Sistemas */}
         {activeTab === 'links' && (
           <div className="space-y-5">
-            {/* Quick AI Enrich Action */}
-            <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 flex items-center justify-between gap-3">
-              <div>
-                <p className="font-bold text-purple-900 text-xs">Sugerir Links e Referências com IA</p>
-                <p className="text-[11px] text-purple-700 mt-0.5">
-                  Preencher automaticamente sistemas federais, modelos AGU e bases da Lei 14.133/2021.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleAiSuggest}
-                disabled={isAiLoading}
-                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-xs transition-colors shadow-2xs disabled:opacity-50"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>{isAiLoading ? 'Analisando...' : 'Sugerir'}</span>
-              </button>
-            </div>
-
             {/* Sistema Oficial */}
             <div className="space-y-2 border border-slate-200 rounded-xl p-3.5 bg-slate-50/50">
               <label className="block text-xs font-bold text-slate-800">
@@ -505,9 +419,9 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
         {/* TAB 2: Procedimento */}
         {activeTab === 'procedure' && (
           <div className="space-y-4">
-            {/* Title & Code */}
-            <div className="grid grid-cols-4 gap-2">
-              <div className="col-span-1">
+            {/* Title, Code & Status */}
+            <div className="grid grid-cols-12 gap-2">
+              <div className="col-span-3">
                 <label className="block text-[11px] font-bold text-slate-600 mb-1">Código</label>
                 <input
                   type="text"
@@ -516,15 +430,40 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
                   className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono"
                 />
               </div>
-              <div className="col-span-3">
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">Título da Atividade</label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => handleChange('title', e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold"
-                />
+              <div className="col-span-5">
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">Status da Etapa</label>
+                <select
+                  value={formData.status || 'pending'}
+                  onChange={(e) => handleChange('status', e.target.value as ProcessMappingStepStatus)}
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium"
+                >
+                  <option value="pending">⚪ Pendente</option>
+                  <option value="in_progress">🔵 Em Andamento</option>
+                  <option value="completed">🟢 Concluída</option>
+                  <option value="blocked">🔴 Bloqueada</option>
+                </select>
               </div>
+              <div className="col-span-4">
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">Tipo de Fluxo</label>
+                <select
+                  value={formData.flowRole || 'primary'}
+                  onChange={(e) => handleChange('flowRole', e.target.value as 'primary' | 'exception')}
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
+                >
+                  <option value="primary">Principal</option>
+                  <option value="exception">Exceção</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-600 mb-1">Título da Atividade</label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={(e) => handleChange('title', e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold"
+              />
             </div>
 
             {/* Description */}
@@ -730,65 +669,6 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
                 <Plus className="w-3.5 h-3.5" /> Adicionar Item ao Checklist
               </button>
             </form>
-          </div>
-        )}
-
-        {/* TAB 4: Conformidade & Status */}
-        {activeTab === 'compliance' && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1.5">
-                Status Operacional da Etapa
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { value: 'pending', label: 'Pendente', desc: 'Aguardando início' },
-                  { value: 'in_progress', label: 'Em Andamento', desc: 'Em execução ativa' },
-                  { value: 'completed', label: 'Concluída', desc: 'Etapa finalizada' },
-                  { value: 'blocked', label: 'Bloqueada', desc: 'Pendência documental' },
-                ].map((st) => (
-                  <div
-                    key={st.value}
-                    onClick={() => handleChange('status', st.value as ProcessMappingStepStatus)}
-                    className={`p-2.5 rounded-xl border cursor-pointer transition-colors ${
-                      formData.status === st.value
-                        ? 'border-emerald-600 bg-emerald-50 text-emerald-900 font-bold shadow-2xs'
-                        : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
-                    }`}
-                  >
-                    <p className="text-xs">{st.label}</p>
-                    <span className="text-[10px] text-slate-400 font-normal">{st.desc}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                Papel no Fluxo
-              </label>
-              <select
-                value={formData.flowRole || 'primary'}
-                onChange={(e) => handleChange('flowRole', e.target.value as 'primary' | 'exception')}
-                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
-              >
-                <option value="primary">Fluxo Principal (Caminho Feliz)</option>
-                <option value="exception">Fluxo de Exceção (Diligência / Correção / Retorno)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                Observações de Auditoria e Governança
-              </label>
-              <textarea
-                rows={3}
-                value={formData.notes || ''}
-                onChange={(e) => handleChange('notes', e.target.value)}
-                placeholder="Orientações e cuidados de auditoria para esta etapa..."
-                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
-              />
-            </div>
           </div>
         )}
       </div>

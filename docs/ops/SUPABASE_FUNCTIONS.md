@@ -847,7 +847,7 @@ Function versionada para revisão temporária de Termo de Referência e Estudo T
 - Funcao autenticada para sincronizar o Plano 8 do SUAP com a visao Campus do SIAGES.
 - Acoes: `connect`, `connect-cookie`, `sync`, `sync-all`, `sync-html`, `apply`, `apply-batch`, `status` e `disconnect`.
 - `sync` mantém o fluxo individual e recebe a UASG do campus ativo; `sync-all` percorre as 44 opções não vazias do seletor do Plano 8, em paralelo controlado, criando um lote auditável. A unidade padrão continua sendo `19` (DG/CN, Currais Novos, UASG-pai `158366`) e sua URL legada permanece sem query string.
-- O lote retorna prévias por unidade; `apply` aplica uma execução individual e `apply-batch` aplica somente as prévias do lote, preservando isolamento por `suap_unit_code` e `campus_uasg`. Falhas de uma unidade ficam como `partial` e não impedem a conclusão das demais.
+- O lote retorna prévias por unidade em blocos retomáveis de até quatro unidades por chamada; o cliente continua automaticamente usando `batchId` até concluir. `apply` aplica uma execução individual e `apply-batch` aplica somente as prévias do lote, preservando isolamento por `suap_unit_code` e `campus_uasg`. Falhas de uma unidade ficam como `partial` e não impedem a conclusão das demais.
 - A sessao SUAP e cifrada no backend em `suap_connections`; o navegador recebe apenas um identificador opaco e nunca persiste matricula, senha ou cookie.
 - `sync-html` aceita somente o HTML da pagina canonica do Plano 8, com limite de 15 MB, e permite que a extensao envie a captura da aba SUAP ja autenticada sem abrir o SIAGES ou exigir novo login SUAP.
 - A captura inclui linhas ocultas, valida IDs e grava snapshots antes da reconciliacao transacional.

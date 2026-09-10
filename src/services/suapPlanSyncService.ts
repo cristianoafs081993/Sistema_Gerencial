@@ -34,6 +34,12 @@ export type SuapPlanSyncResult = {
   inserted?: number;
   updated?: number;
   archived?: number;
+  requestedCount?: number;
+  completedCount?: number;
+  remainingCount?: number;
+  successCount?: number;
+  failedCount?: number;
+  previewCount?: number;
   error?: string;
 };
 
@@ -78,8 +84,8 @@ export const suapPlanSyncService = {
     return invoke<SuapPlanSyncResult>({ action: 'sync', mode, campusUasg });
   },
 
-  syncAll(mode?: 'preview' | 'apply') {
-    return invoke<SuapPlanSyncResult>({ action: 'sync-all', mode });
+  syncAll(mode?: 'preview' | 'apply', batchId?: string) {
+    return invoke<SuapPlanSyncResult>({ action: 'sync-all', mode, ...(batchId ? { batchId } : {}) });
   },
 
   syncHtml(html: string, sourceUrl: string, mode?: 'preview' | 'apply') {

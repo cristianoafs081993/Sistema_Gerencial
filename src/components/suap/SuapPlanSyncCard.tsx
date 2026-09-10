@@ -20,6 +20,9 @@ function statusLabel(status: SuapPlanSyncStatus['status'] | null) {
 }
 
 function syncResultMessage(result: SuapPlanSyncResult) {
+  if (result.status === 'running') {
+    return `Sincronização em andamento: ${result.completedCount ?? 0}/${result.requestedCount ?? 44} unidades processadas.`;
+  }
   if (result.status === 'preview') {
     return `${result.sourceCount ?? 0} atividades encontradas. ${result.inserted ?? 0} novas, ${result.updated ?? 0} atualizações e ${result.archived ?? 0} serão arquivadas.`;
   }
@@ -82,7 +85,12 @@ export function SuapPlanSyncCard({ onSynced, campusUasg = '158366' }: Props) {
     setIsBusy(true);
     setBatch((previous) => previous ? { ...previous, status: 'running' } : null);
     try {
-      const result = await suapPlanSyncService.syncAll();
+      let result = await suapPlanSyncService.syncAll();
+      while (result.status === 'running' && result.batchId) {
+        setMessage(syncResultMessage(result));
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        result = await suapPlanSyncService.syncAll(undefined, result.batchId);
+      }
       setMessage(syncResultMessage(result));
       await refreshStatus();
       if (result.status === 'success') onSynced();

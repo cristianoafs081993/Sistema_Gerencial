@@ -14,8 +14,10 @@ import {
 const SUAP_BASE_URL = 'https://suap.ifrn.edu.br';
 const CONNECTION_TTL_MS = 8 * 60 * 60 * 1000;
 const LOCK_TTL_MS = 30 * 60 * 1000;
+const BATCH_RUN_LOCK_TTL_MS = 5 * 60 * 1000;
 const HTML_LIMIT = 15 * 1024 * 1024;
-const BATCH_CONCURRENCY = 4;
+const BATCH_CHUNK_SIZE = 4;
+const BATCH_CONCURRENCY = 2;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -455,16 +457,42 @@ async function runWithConcurrency<T>(items: string[], concurrency: number, worke
 }
 
 async function updateBatchStatus(service: ReturnType<typeof createClient>, batchId: string) {
+  const { data: batch, error: batchError } = await service
+    .from('suap_plan_sync_batches')
+    .select('requested_count')
+    .eq('id', batchId)
+    .maybeSingle();
+  if (batchError) throw batchError;
+
   const { data: runs, error } = await service
     .from('suap_plan_sync_runs')
-    .select('status')
+    .select('suap_unit_code,status,started_at')
     .eq('batch_id', batchId);
   if (error) throw error;
-  const statuses = (runs ?? []).map((run) => run.status);
+
+  const latestRuns = new Map<string, string>();
+  for (const run of [...(runs ?? [])].sort((left, right) =>
+    new Date(String(right.started_at)).getTime() - new Date(String(left.started_at)).getTime())) {
+    const unitCode = String(run.suap_unit_code ?? '');
+    if (unitCode && !latestRuns.has(unitCode)) latestRuns.set(unitCode, run.status);
+  }
+  const statuses = [...latestRuns.values()];
   const failed = statuses.filter((status) => status === 'failed').length;
   const previews = statuses.filter((status) => status === 'preview').length;
   const successful = statuses.filter((status) => status === 'success').length;
-  const status = failed === statuses.length ? 'failed' : failed > 0 ? 'partial' : previews > 0 ? 'preview' : successful === statuses.length ? 'success' : 'running';
+  const requestedCount = Number(batch?.requested_count ?? SUAP_PLAN_UNITS.length);
+  const completedCount = statuses.length;
+  const status = completedCount < requestedCount
+    ? 'running'
+    : failed === completedCount
+      ? 'failed'
+      : failed > 0
+        ? 'partial'
+        : previews > 0
+          ? 'preview'
+          : successful === completedCount
+            ? 'success'
+            : 'running';
   await service.from('suap_plan_sync_batches').update({
     status,
     success_count: successful,
@@ -472,7 +500,39 @@ async function updateBatchStatus(service: ReturnType<typeof createClient>, batch
     preview_count: previews,
     finished_at: status === 'running' ? null : new Date().toISOString(),
   }).eq('id', batchId);
-  return { status, successCount: successful, failedCount: failed, previewCount: previews };
+  return {
+    status,
+    requestedCount,
+    completedCount,
+    remainingCount: Math.max(requestedCount - completedCount, 0),
+    successCount: successful,
+    failedCount: failed,
+    previewCount: previews,
+  };
+}
+
+async function failStaleBatchRuns(service: ReturnType<typeof createClient>, batchId: string) {
+  const cutoff = new Date(Date.now() - BATCH_RUN_LOCK_TTL_MS).toISOString();
+  const { data: staleRuns, error: staleRunsError } = await service
+    .from('suap_plan_sync_runs')
+    .select('id')
+    .eq('batch_id', batchId)
+    .eq('status', 'running')
+    .lt('started_at', cutoff);
+  if (staleRunsError) throw staleRunsError;
+  const staleIds = (staleRuns ?? []).map((run) => run.id).filter(Boolean);
+  if (!staleIds.length) return;
+
+  const { error } = await service
+    .from('suap_plan_sync_runs')
+    .update({
+      status: 'failed',
+      finished_at: new Date().toISOString(),
+      error_code: 'BATCH_TIMEOUT_RECOVERED',
+      error_message: 'Execução recuperada após o timeout da chamada anterior.',
+    })
+    .in('id', staleIds);
+  if (error) throw error;
 }
 
 Deno.serve(async (request) => {
@@ -598,9 +658,29 @@ Deno.serve(async (request) => {
       connection = await getConnection(service, user);
       if (!connection) return jsonResponse({ status: 'reauth_required', error: 'Conecte-se ao SUAP para sincronizar.' }, 401);
     }
+    if (batchSync) {
+      let recoverBatchId = body.batchId;
+      if (!recoverBatchId) {
+        const { data: latestRunningBatch, error: latestRunningBatchError } = await service
+          .from('suap_plan_sync_batches')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('org_id', user.orgId)
+          .eq('plan_id', 8)
+          .eq('scope', 'campus')
+          .eq('status', 'running')
+          .order('started_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (latestRunningBatchError) throw latestRunningBatchError;
+        recoverBatchId = latestRunningBatch?.id;
+      }
+      if (recoverBatchId) await failStaleBatchRuns(service, recoverBatchId);
+    }
+
     const { data: running } = await service
       .from('suap_plan_sync_runs')
-      .select('id,started_at')
+      .select('id,started_at,batch_id')
       .eq('user_id', user.id)
       .eq('org_id', user.orgId)
       .eq('plan_id', 8)
@@ -609,22 +689,89 @@ Deno.serve(async (request) => {
       .gt('started_at', new Date(Date.now() - LOCK_TTL_MS).toISOString())
       .limit(1)
       .maybeSingle();
-    if (running) return jsonResponse({ status: 'already_running', runId: running.id }, 409);
+    if (running) {
+      if (batchSync && running.batch_id) {
+        const batchStatus = await updateBatchStatus(service, running.batch_id);
+        return jsonResponse({ status: 'running', batchId: running.batch_id, units: [], ...batchStatus });
+      }
+      return jsonResponse({ status: 'already_running', runId: running.id }, 409);
+    }
     const sessionId = connection ? await decryptSession(connection.session_ciphertext) : undefined;
     if (batchSync) {
-      const { data: batch, error: batchError } = await service.from('suap_plan_sync_batches').insert({
-        org_id: user.orgId,
-        user_id: user.id,
-        plan_id: 8,
-        scope: 'campus',
-        mode: body.mode ?? 'apply',
-        status: 'running',
-        requested_count: SUAP_PLAN_UNITS.length,
-      }).select('id').single();
-      if (batchError || !batch) throw batchError ?? new Error('Não foi possível criar o lote.');
+      let batch: { id: string } | null = null;
+      if (body.batchId) {
+        const { data: existingBatch, error: existingBatchError } = await service
+          .from('suap_plan_sync_batches')
+          .select('id,status')
+          .eq('id', body.batchId)
+          .eq('user_id', user.id)
+          .eq('org_id', user.orgId)
+          .maybeSingle();
+        if (existingBatchError) throw existingBatchError;
+        if (!existingBatch) return jsonResponse({ error: 'Lote de sincronização não encontrado.' }, 404);
+        if (existingBatch.status !== 'running') {
+          const batchStatus = await updateBatchStatus(service, existingBatch.id);
+          return jsonResponse({ status: batchStatus.status, batchId: existingBatch.id, units: [], ...batchStatus });
+        }
+        batch = { id: existingBatch.id };
+      } else {
+        const { data: runningBatch, error: runningBatchError } = await service
+          .from('suap_plan_sync_batches')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('org_id', user.orgId)
+          .eq('plan_id', 8)
+          .eq('scope', 'campus')
+          .eq('status', 'running')
+          .gt('started_at', new Date(Date.now() - LOCK_TTL_MS).toISOString())
+          .order('started_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (runningBatchError) throw runningBatchError;
+        if (runningBatch) {
+          const batchStatus = await updateBatchStatus(service, runningBatch.id);
+          return jsonResponse({ status: batchStatus.status, batchId: runningBatch.id, units: [], ...batchStatus });
+        }
+
+        const { data: createdBatch, error: batchError } = await service.from('suap_plan_sync_batches').insert({
+          org_id: user.orgId,
+          user_id: user.id,
+          plan_id: 8,
+          scope: 'campus',
+          mode: body.mode ?? 'apply',
+          status: 'running',
+          requested_count: SUAP_PLAN_UNITS.length,
+        }).select('id').single();
+        if (batchError || !createdBatch) throw batchError ?? new Error('Não foi possível criar o lote.');
+        batch = { id: createdBatch.id };
+      }
+
+      const { data: existingRuns, error: existingRunsError } = await service
+        .from('suap_plan_sync_runs')
+        .select('suap_unit_code,status,started_at')
+        .eq('batch_id', batch.id);
+      if (existingRunsError) throw existingRunsError;
+      const latestRuns = new Map<string, string>();
+      for (const run of [...(existingRuns ?? [])].sort((left, right) =>
+        new Date(String(right.started_at)).getTime() - new Date(String(left.started_at)).getTime())) {
+        const unitCode = String(run.suap_unit_code ?? '');
+        if (unitCode && !latestRuns.has(unitCode)) latestRuns.set(unitCode, run.status);
+      }
+      const completedUnits = new Set([...latestRuns.entries()]
+        .filter(([, status]) => status === 'preview' || status === 'success')
+        .map(([unitCode]) => unitCode));
+      const pendingUnits = SUAP_PLAN_UNITS
+        .map((unit) => unit.value)
+        .filter((unitCode) => !completedUnits.has(unitCode))
+        .slice(0, BATCH_CHUNK_SIZE);
+
+      if (!pendingUnits.length) {
+        const batchStatus = await updateBatchStatus(service, batch.id);
+        return jsonResponse({ status: batchStatus.status, batchId: batch.id, units: [], ...batchStatus });
+      }
 
       const results: Array<PlanRunResult | { suapUnitCode: string; status: 'failed'; error: string }> = [];
-      await runWithConcurrency(SUAP_PLAN_UNITS.map((unit) => unit.value), BATCH_CONCURRENCY, async (unitCode) => {
+      await runWithConcurrency(pendingUnits, BATCH_CONCURRENCY, async (unitCode) => {
         try {
           results.push(await syncOneUnit({ service, user, sessionId, suapUnitCode: unitCode, mode: body.mode, batchId: batch.id }));
         } catch (error) {
@@ -651,7 +798,7 @@ Deno.serve(async (request) => {
         await service.from('suap_connections').update({ revoked_at: new Date().toISOString() }).eq('id', connection!.id);
       }
       const batchStatus = await updateBatchStatus(service, batch.id);
-      return jsonResponse({ status: batchStatus.status, batchId: batch.id, units: results });
+      return jsonResponse({ status: batchStatus.status, batchId: batch.id, units: results, ...batchStatus });
     }
 
     try {

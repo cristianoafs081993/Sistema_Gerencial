@@ -163,9 +163,7 @@ async function sendCapturedPlanSync(captured) {
   return payload;
 }
 
-async function sendAllPlanSync() {
-  const session = await getStoredExtensionSession();
-  if (!session?.accessToken) throw new Error('Entre no SIAGES no popup da extensao antes de sincronizar.');
+async function postAllPlanSync(session, batchId) {
   const response = await fetch(`${SUPABASE_URL}/functions/v1/sync-suap-plan`, {
     method: 'POST',
     headers: {
@@ -173,11 +171,53 @@ async function sendAllPlanSync() {
       Authorization: `Bearer ${session.accessToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ action: 'sync-all' }),
+    body: JSON.stringify({ action: 'sync-all', ...(batchId ? { batchId } : {}) }),
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.error || `Falha no sincronizador SUAP (HTTP ${response.status}).`);
+  return { response, payload };
+}
+
+async function connectPlanSyncFromSuapSession(session) {
+  const cookie = await chrome.cookies.get({
+    url: 'https://suap.ifrn.edu.br/plan_estrategico/plano_concluido/8/',
+    name: 'sessionid',
+  });
+  if (!cookie?.value) {
+    throw new Error('Faça login no SUAP na aba atual e tente sincronizar novamente.');
+  }
+
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/sync-suap-plan`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${session.accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ action: 'connect-cookie', sessionId: cookie.value }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.error || `Não foi possível reutilizar a sessão do SUAP (HTTP ${response.status}).`);
   return payload;
+}
+
+async function sendAllPlanSync() {
+  const session = await getStoredExtensionSession();
+  if (!session?.accessToken) throw new Error('Entre no SIAGES no popup da extensao antes de sincronizar.');
+
+  let batchId;
+  let reauthAttempts = 0;
+  while (true) {
+    let { response, payload } = await postAllPlanSync(session, batchId);
+    if (response.status === 401 && payload?.status === 'reauth_required' && reauthAttempts < 2) {
+      reauthAttempts += 1;
+      await connectPlanSyncFromSuapSession(session);
+      continue;
+    }
+    if (!response.ok) throw new Error(payload?.error || `Falha no sincronizador SUAP (HTTP ${response.status}).`);
+    if (payload?.status !== 'running' || !payload?.batchId) return payload;
+    batchId = payload.batchId;
+    await delay(100);
+  }
 }
 
 async function setPlanPreview(run) {
@@ -550,7 +590,15 @@ async function handleExtraction(scope = 'campus') {
       log('Solicitando sincronizacao de todas as unidades do Plano 8...', 'info');
       const result = await sendAllPlanSync();
       if (result.status === 'preview' || result.status === 'partial') await setPlanPreview(result);
-      log(`Lote concluído: ${result.units?.filter((unit) => unit.status !== 'failed').length || 0} unidades processadas.`, result.status === 'partial' ? 'error' : 'success');
+      const processedCount = Number.isFinite(Number(result.completedCount))
+        ? Number(result.completedCount)
+        : result.units?.filter((unit) => unit.status !== 'failed').length || 0;
+      const failedCount = Number(result.failedCount) || result.units?.filter((unit) => unit.status === 'failed').length || 0;
+      const suffix = failedCount ? ` ${failedCount} falharam.` : '';
+      log(`Lote concluído: ${processedCount} unidade(s) processada(s).${suffix}`, result.status === 'partial' ? 'error' : 'success');
+      if (result.status === 'preview' || result.status === 'partial') {
+        log('Prévia concluída. Clique em Aplicar conferencia para materializar os dados no SIAGES.', 'info');
+      }
       return;
     }
 
@@ -574,7 +622,11 @@ btnApplyPlan.addEventListener('click', async () => {
     statusEl.innerHTML = '';
     log('Aplicando a conferencia no SIAGES...', 'info');
     const result = await applyPlanPreview();
-    log(`Aplicacao concluida: ${result.inserted || 0} novas, ${result.updated || 0} atualizadas, ${result.archived || 0} arquivadas.`, 'success');
+    const applied = Array.isArray(result.applied) ? result.applied : [];
+    const inserted = Number(result.inserted) || applied.reduce((total, item) => total + (Number(item.inserted) || 0), 0);
+    const updated = Number(result.updated) || applied.reduce((total, item) => total + (Number(item.updated) || 0), 0);
+    const archived = Number(result.archived) || applied.reduce((total, item) => total + (Number(item.archived) || 0), 0);
+    log(`Aplicacao concluida: ${inserted} novas, ${updated} atualizadas, ${archived} arquivadas. Recarregue o SIAGES para atualizar os dados visíveis.`, 'success');
   } catch (error) {
     console.error('Apply preview error:', error);
     log(error instanceof Error ? error.message : 'Nao foi possivel aplicar a conferencia.', 'error');

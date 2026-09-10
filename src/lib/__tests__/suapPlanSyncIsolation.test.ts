@@ -30,4 +30,13 @@ describe('isolamento do Plano 8 entre unidades', () => {
     expect(functionSource).toContain('LOCK_TTL_MS = 30 * 60 * 1000');
     expect(functionSource).toContain("action === 'sync-all'");
   });
+
+  it('processa o lote em blocos retomáveis para evitar timeout da requisição única', () => {
+    expect(functionSource).toContain('BATCH_CHUNK_SIZE = 4');
+    expect(functionSource).toContain('BATCH_RUN_LOCK_TTL_MS = 5 * 60 * 1000');
+    expect(functionSource).toContain(".slice(0, BATCH_CHUNK_SIZE)");
+    expect(functionSource).toContain("body.batchId");
+    expect(functionSource).toContain('remainingCount');
+    expect(functionSource).toContain('failStaleBatchRuns');
+  });
 });

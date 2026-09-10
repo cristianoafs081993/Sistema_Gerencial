@@ -35,6 +35,13 @@ describe('suapPlanSyncService', () => {
     });
   });
 
+  it('retoma um lote pelo batchId sem criar uma nova sincronização', async () => {
+    await suapPlanSyncService.syncAll(undefined, 'batch-em-andamento');
+    expect(invokeMock).toHaveBeenCalledWith('sync-suap-plan', {
+      body: { action: 'sync-all', mode: undefined, batchId: 'batch-em-andamento' },
+    });
+  });
+
   it('aplica lote e execução individual por endpoints distintos', async () => {
     await suapPlanSyncService.apply('run-currais');
     await suapPlanSyncService.applyBatch('batch-all');

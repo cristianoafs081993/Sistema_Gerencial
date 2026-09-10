@@ -730,7 +730,8 @@ Function chamada pela extensão na rota oficial de edição de ETP.
 - A primeira execucao fica em `preview`; depois da conferencia, `apply_suap_plan_snapshot` atualiza/inclui os registros e arquiva os ausentes sem exclusao fisica.
 - O Campus nao depende da extensao. Quando a extensao e usada no popup, ela captura a aba SUAP atual e envia o HTML ao backend; na pagina Campus ela apenas dispara `siages:suap-plan-sync-request`.
 - O popup mantem o `runId` da previa em `chrome.storage.local` e oferece a aplicacao explicita pelo mesmo endpoint, sem abrir uma aba do SIAGES.
-- Para o lote, o popup/card mantém o `batchId`, mostra o resultado por unidade e usa `apply-batch` somente após a prévia. A aplicação de cada unidade continua isolada pela dupla `suap_unit_code` + `campus_uasg`; uma falha pode gerar status parcial sem apagar dados dos demais campi.
+- Para o lote, o popup/card mantém o `batchId`, processa até quatro unidades por chamada, continua automaticamente enquanto o status for `running`, mostra o resultado por unidade e usa `apply-batch` somente após a prévia. A aplicação de cada unidade continua isolada pela dupla `suap_unit_code` + `campus_uasg`; uma falha pode gerar status parcial sem apagar dados dos demais campi.
+- Quando o lote é solicitado diretamente em uma aba SUAP já autenticada, a extensão tenta primeiro a conexão existente; se o backend pedir reautenticação, lê o cookie `sessionid` via permissão `cookies`, chama `connect-cookie` e repete o lote. O cookie não é exibido em logs.
 
 ## 13. Assistente Gerencial - Pesquisa de Preços Textual e Auditoria de Editais (IN 65/2021)
 

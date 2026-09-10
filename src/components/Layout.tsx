@@ -217,6 +217,8 @@ export function Layout({ children }: LayoutProps) {
   });
 
   const isConsultor = location.pathname === '/consultor';
+  const isMapeamentos = location.pathname.startsWith('/mapeamentos');
+  const isFullScreenPage = isConsultor || isMapeamentos;
   const userEmail = session?.user?.email || null;
   const orgLabel = isAccessLoading ? 'Carregando órgão...' : userOrg?.name || 'Órgão não vinculado';
 
@@ -778,8 +780,20 @@ export function Layout({ children }: LayoutProps) {
             </div>
           </header>
 
-          <main className={cn('min-h-0 flex-1 overflow-y-auto app-bg-soft animate-fade-in', isConsultor ? 'p-0' : 'p-4 sm:p-6 lg:p-8')}>
-            <div className={cn('mx-auto w-full max-w-[1600px]', isConsultor && 'max-w-none')}>{children}</div>
+          <main
+            className={cn(
+              'min-h-0 flex-1 app-bg-soft animate-fade-in',
+              isFullScreenPage ? 'p-0 overflow-hidden flex flex-col' : 'p-4 sm:p-6 lg:p-8 overflow-y-auto'
+            )}
+          >
+            <div
+              className={cn(
+                'mx-auto w-full',
+                isFullScreenPage ? 'max-w-none flex-1 flex flex-col min-h-0' : 'max-w-[1600px]'
+              )}
+            >
+              {children}
+            </div>
           </main>
         </div>
 

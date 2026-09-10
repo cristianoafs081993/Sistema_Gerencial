@@ -371,7 +371,7 @@ export default function SuapProcessMappingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col font-ui text-slate-900 antialiased selection:bg-emerald-500 selection:text-white">
+    <div className="h-full flex-1 flex flex-col min-h-0 bg-slate-100 font-ui text-slate-900 antialiased selection:bg-emerald-500 selection:text-white">
       {/* Top Navigation */}
       <ProcessMappingNavbar
         processes={processes}
@@ -389,12 +389,12 @@ export default function SuapProcessMappingPage() {
       />
 
       {/* Main Container: Full Width Canvas / Views */}
-      <main className="flex-1 relative flex flex-col overflow-hidden bg-slate-100">
+      <main className="flex-1 relative flex flex-col overflow-hidden bg-slate-100 min-h-0">
         <h1 className="sr-only">{activeProcess.title}</h1>
 
         {/* Views */}
         {viewMode === 'canvas' && (
-          <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 flex flex-col min-h-0 h-full">
             <ProcessMappingCanvas
               mapping={activeProcess}
               flow={flow}

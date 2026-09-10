@@ -117,11 +117,11 @@ A implementacao de referencia esta em `/dashboard-cloudscape-preview`; a rota `/
 A tela de mapeamento operacional de processos adota arquitetura de estúdio interativo com suporte unificado às rotas `/mapeamentos` e `/mapeamentos/:mappingId`:
 
 1. **Top Navbar Especializada**: seletor de processos ativos com código e categoria, busca rápida em tempo real com realce no fluxo e alternador de três modos de visualização (Fluxograma, Matriz e Guia de Execução);
-2. **Layout de Largura Total (Full Width)**: aproveitamento integral da largura da tela para o Canvas, Matriz e Guia sem barras laterais redundantes, com criação rápida de elementos (Tarefa, Decisão e Fim) integrada à barra de ferramentas flutuante do Canvas;
+2. **Integração Edge-to-Edge no Shell**: integração direta ao shell principal (`Layout.tsx`) sem margens externas superiores ou laterais redundantes (`p-0` e `max-w-none`), preenchendo 100% da altura e largura úteis entre o header e a sidebar da aplicação, com ferramentas integradas e canvas infinito sem bordas artificiais de cartão;
 3. **Visão Fluxograma (Canvas)**: raias operacionais (swimlanes) horizontais com cores setoriais, conectores ortogonais em degrau (90°) com setas e rótulos de condição, controles de zoom/pan, grade comutável e nós interativos com identificador `PASSO XX`;
 4. **Visão Matriz (Tabela Operacional)**: tabela densa com filtros por links de sistemas, modelos e pendências, com colunas para responsáveis, SLA, base legal e atalhos diretos;
 5. **Visão Guia de Execução**: visão orientada a tarefas com progresso geral animado, lista sequencial de cartões, checklists interativos funcionais e botões de acesso direto a sistemas oficiais;
-6. **Drawer de Detalhes (`NodeDetailDrawer`)**: gaveta lateral deslizante com abas de Links & Sistemas (com presets para SUAP, Compras.gov.br, SIAFI, PNCP, SEI e AGU), Procedimento detalhado, Checklist operacional e Conformidade com a Lei 14.133/2021;
+6. **Drawer de Detalhes (`NodeDetailDrawer`)**: gaveta lateral deslizante com abas de Links & Sistemas (com presets para SUAP, Compras.gov.br, SIAFI, PNCP, SEI e AGU), Procedimento detalhado (com status da etapa, papel no fluxo, SLA e base legal) e Checklist operacional;
 7. **Modais Auxiliares**: modais acessíveis para exportação/impressão em PDF e JSON e criação de novos processos;
 8. **Integração com o SUAP**: quando acessado com parâmetro `?suapId=...`, sincroniza os nós e reflete a etapa atual do processo nos modos de visão com interface limpa e foco no fluxo operacional.
 
