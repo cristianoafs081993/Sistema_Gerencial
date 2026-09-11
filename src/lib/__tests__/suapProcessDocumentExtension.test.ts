@@ -617,4 +617,194 @@ describe('process-document 1.9', () => {
     expect(form.querySelector('[data-auth-message]')).toHaveTextContent('A matrícula do SUAP não autentica neste campo.');
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('posiciona os botoes de minimizar e maximizar na mesma linha do titulo SIAGES', async () => {
+    const api = loadProcessScript();
+    await api.installToolkit();
+
+    const root = document.getElementById('siages-suap-toolkit')!;
+    const brandRow = root.querySelector('.suape-brand-row')!;
+    expect(brandRow).toBeTruthy();
+
+    const title = brandRow.querySelector('.suape-brand-title');
+    expect(title).toHaveTextContent('SIAGES');
+
+    const actions = brandRow.querySelector('.suape-header-actions');
+    expect(actions).toBeTruthy();
+    expect(actions?.querySelector('[data-action="collapse"]')).toBeTruthy();
+    expect(actions?.querySelector('[data-action="maximize"]')).toBeTruthy();
+  });
+
+  it('permite colapsar e expandir secoes e caminho do processo persistindo o estado', async () => {
+    const api = loadProcessScript();
+    await api.installToolkit();
+    await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeTruthy());
+    const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
+
+    window.dispatchEvent(new MessageEvent('message', {
+      origin: 'https://www.siages.com.br', source: frame.contentWindow,
+      data: { source: 'siages', type: 'siages:suap-process-snapshot', version: 1, payload: {
+        fallback: { suapId: '321', processNumber: '23035.000001.2026-11' },
+        process: { suapId: '321', numProcesso: '23035.000001.2026-11', status: 'success', beneficiario: 'Fornecedor Alfa', cpfCnpj: '12345678000190', assunto: 'Servico', dadosCompletos: {} },
+      } },
+    }));
+
+    window.dispatchEvent(new MessageEvent('message', {
+      origin: 'https://www.siages.com.br', source: frame.contentWindow,
+      data: { source: 'siages', type: 'siages:suap-process-flow', version: 1, payload: {
+        summary: {
+          mappingId: 'bolsas', mappingTitle: 'Bolsas', mappingVersion: '1.0', fullPagePath: '/processos/bolsas',
+          steps: [{ code: '01', title: 'Solicitacao', responsible: 'Setor', status: 'completed' }],
+        },
+      } },
+    }));
+
+    const summaryPanel = document.querySelector('[data-panel="summary"]')!;
+    const processSectionHeader = summaryPanel.querySelector('.suape-section-header') as HTMLButtonElement;
+    expect(processSectionHeader).toBeTruthy();
+    expect(processSectionHeader.getAttribute('aria-expanded')).toBe('true');
+
+    const processSectionBody = summaryPanel.querySelector('.suape-section-body') as HTMLDivElement;
+    expect(processSectionBody.style.display).not.toBe('none');
+
+    // Click to collapse
+    processSectionHeader.click();
+    expect(processSectionHeader.getAttribute('aria-expanded')).toBe('false');
+    expect(processSectionBody.style.display).toBe('none');
+    expect(localValues['siages-toolkit-sections-collapsed']).toContain('suape-sec-processo');
+
+    // Flow section toggle
+    const flowToggle = summaryPanel.querySelector('.suape-flow-toggle') as HTMLButtonElement;
+    expect(flowToggle).toBeTruthy();
+    expect(flowToggle.getAttribute('aria-expanded')).toBe('true');
+
+    const flowBody = summaryPanel.querySelector('.suape-flow-body') as HTMLDivElement;
+    expect(flowBody.style.display).not.toBe('none');
+
+    flowToggle.click();
+    expect(flowToggle.getAttribute('aria-expanded')).toBe('false');
+    expect(flowBody.style.display).toBe('none');
+    expect(localValues['siages-toolkit-sections-collapsed']).toContain('suape-sec-caminho-do-processo');
+  });
+
+  it('permite ao usuário clicar em uma etapa para torná-la a etapa atual e persistir a seleção', async () => {
+    const api = loadProcessScript();
+    await api.installToolkit();
+    await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeTruthy());
+    const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
+
+    window.dispatchEvent(new MessageEvent('message', {
+      origin: 'https://www.siages.com.br', source: frame.contentWindow,
+      data: { source: 'siages', type: 'siages:suap-process-flow', version: 1, payload: {
+        summary: {
+          mappingId: 'bolsas', mappingTitle: 'Bolsas', mappingVersion: '1.0', fullPagePath: '/processos/bolsas',
+          currentNodeId: 'step-1',
+          steps: [
+            { nodeId: 'step-1', code: '01', title: 'Solicitacao', responsible: 'Setor A', status: 'current' },
+            { nodeId: 'step-2', code: '02', title: 'Analise', responsible: 'Setor B', status: 'next' },
+            { nodeId: 'step-3', code: '03', title: 'Pagamento', responsible: 'Setor C', status: 'pending' },
+          ],
+        },
+      } },
+    }));
+
+    const summaryPanel = document.querySelector('[data-panel="summary"]')!;
+    const steps = summaryPanel.querySelectorAll('.suape-flow-step');
+    expect(steps).toHaveLength(3);
+
+    // Click step 3 to make it current
+    const step3 = summaryPanel.querySelector('[data-node-id="step-3"]') as HTMLElement;
+    expect(step3).toBeTruthy();
+    step3.click();
+
+    expect(localValues['siages-process-step:321:bolsas']).toBe('step-3');
+    // Não deve exibir barra ou aviso de etapa manual
+    expect(summaryPanel.querySelector('.suape-flow-manual-bar')).toBeNull();
+    expect(summaryPanel.querySelector('.suape-flow-note')).toBeNull();
+
+    // Step 1 and 2 are now completed, step 3 is current
+    expect(summaryPanel.querySelector('[data-node-id="step-1"]')?.className).toContain('suape-flow-step-completed');
+    expect(summaryPanel.querySelector('[data-node-id="step-2"]')?.className).toContain('suape-flow-step-completed');
+    expect(summaryPanel.querySelector('[data-node-id="step-3"]')?.className).toContain('suape-flow-step-current');
+
+    // Clicar novamente na mesma etapa atual desativa a seleção manual e restaura automático
+    step3.click();
+    await waitFor(() => expect(localValues['siages-process-step:321:bolsas']).toBeUndefined());
+  });
+
+  it('exibe botão de check discreto na etapa atual e dispara a automação avançando a etapa', async () => {
+    const api = loadProcessScript();
+    await api.installToolkit();
+    await waitFor(() => expect(document.getElementById('siages-suap-finance-frame')).toBeTruthy());
+    const frame = document.getElementById('siages-suap-finance-frame') as HTMLIFrameElement;
+
+    window.dispatchEvent(new MessageEvent('message', {
+      origin: 'https://www.siages.com.br', source: frame.contentWindow,
+      data: { source: 'siages', type: 'siages:suap-process-flow', version: 1, payload: {
+        summary: {
+          mappingId: 'bolsas', mappingTitle: 'Bolsas', mappingVersion: '1.0', fullPagePath: '/processos/bolsas',
+          currentNodeId: 'step-1',
+          steps: [
+            {
+              nodeId: 'step-1',
+              code: '01',
+              title: 'Solicitacao',
+              responsible: 'Setor A',
+              status: 'current',
+              automation: {
+                enabled: true,
+                title: 'Concluir solicitação e avançar',
+                action: 'advance_step',
+                autoAdvanceStep: true,
+                feedbackMessage: 'Solicitação concluída!',
+              },
+            },
+            {
+              nodeId: 'step-2',
+              code: '02',
+              title: 'Analise',
+              responsible: 'Setor B',
+              status: 'next',
+            },
+            {
+              nodeId: 'step-3',
+              code: '03',
+              title: 'Pagamento',
+              responsible: 'Setor C',
+              status: 'pending',
+            },
+          ],
+        },
+      } },
+    }));
+
+    const summaryPanel = document.querySelector('[data-panel="summary"]')!;
+    const currentStep = summaryPanel.querySelector('[data-node-id="step-1"]') as HTMLElement;
+    expect(currentStep).toBeTruthy();
+
+    // Botão de check discreto deve estar presente apenas na etapa atual
+    const checkBtn = currentStep.querySelector('.suape-flow-step-check') as HTMLButtonElement;
+    expect(checkBtn).toBeTruthy();
+    expect(checkBtn.getAttribute('title')).toBe('Concluir solicitação e avançar');
+
+    const nextStep = summaryPanel.querySelector('[data-node-id="step-2"]') as HTMLElement;
+    expect(nextStep.querySelector('.suape-flow-step-check')).toBeNull();
+
+    // Clicar no botão de check dispara a automação e avança para a próxima etapa (step-2)
+    checkBtn.click();
+
+    await waitFor(() => {
+      expect(localValues['siages-process-step:321:bolsas']).toBe('step-2');
+    });
+
+    // Step 1 agora está concluído e step 2 tornou-se o atual
+    expect(summaryPanel.querySelector('[data-node-id="step-1"]')?.className).toContain('suape-flow-step-completed');
+    expect(summaryPanel.querySelector('[data-node-id="step-2"]')?.className).toContain('suape-flow-step-current');
+
+    // Toast de feedback é exibido
+    const root = document.getElementById('siages-suap-toolkit')!;
+    const toast = root.querySelector('.suape-automation-toast');
+    expect(toast).toBeTruthy();
+    expect(toast?.textContent).toBe('Solicitação concluída!');
+  });
 });

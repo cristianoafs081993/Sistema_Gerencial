@@ -20,6 +20,24 @@ export interface ProcessMappingLink {
   category: 'system' | 'template' | 'legislation' | 'tutorial' | 'other';
 }
 
+export type ProcessMappingAutomationAction =
+  | 'advance_step'
+  | 'open_url'
+  | 'copy_text'
+  | 'suap_document'
+  | 'custom_webhook';
+
+export interface ProcessMappingAutomation {
+  enabled: boolean;
+  title: string;
+  action: ProcessMappingAutomationAction;
+  targetUrl?: string;
+  templateText?: string;
+  documentType?: string;
+  autoAdvanceStep?: boolean;
+  feedbackMessage?: string;
+}
+
 export interface ProcessMappingNode {
   id: string;
   code: string;
@@ -48,6 +66,7 @@ export interface ProcessMappingNode {
   notes?: string;
   color?: string;
   iconName?: string;
+  automation?: ProcessMappingAutomation;
 }
 
 export interface ProcessMappingEdge {
@@ -105,6 +124,7 @@ export interface SuapProcessRouteSnapshot {
   events: SuapProcessRouteEvent[];
   selectedMappingId?: string;
   assunto?: string;
+  manualCurrentStepNodeId?: string;
 }
 
 export type SuapProcessFlowStepStatus = 'completed' | 'current' | 'next' | 'pending' | 'not_confirmed';
@@ -118,6 +138,7 @@ export interface SuapProcessFlowStep {
   evidence?: string;
   laneName?: string;
   description?: string;
+  automation?: ProcessMappingAutomation;
 }
 
 export interface SuapProcessFlowSummary {
@@ -131,4 +152,5 @@ export interface SuapProcessFlowSummary {
   steps: SuapProcessFlowStep[];
   confidence: 'high' | 'medium' | 'low' | 'none';
   note?: string;
+  isManualCurrentStep?: boolean;
 }

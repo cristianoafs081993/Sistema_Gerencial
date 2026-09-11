@@ -100,6 +100,7 @@ async function postProcessFlow(context: SuapExtensionProcessContext, process: Su
   const summary = buildSuapProcessFlowSummary(mapping, context.route, {
     suapId: context.suapId,
     processCompleted: Boolean(process?.dadosCompletos?.workflow?.concluido),
+    manualCurrentStepNodeId: context.route?.manualCurrentStepNodeId,
   });
 
   postMessageToSuapParent({

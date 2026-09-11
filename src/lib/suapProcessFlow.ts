@@ -62,7 +62,7 @@ export function selectSuapProcessMapping<T extends Pick<ProcessMappingDefinition
 export function buildSuapProcessFlowSummary(
   mapping: ProcessMappingDefinition,
   route: SuapProcessRouteSnapshot | undefined,
-  options: { suapId?: string; processCompleted?: boolean } = {},
+  options: { suapId?: string; processCompleted?: boolean; manualCurrentStepNodeId?: string } = {},
 ): SuapProcessFlowSummary {
   const events = route?.events || [];
   const nodes = getOrderedMappingNodes(mapping);
@@ -80,13 +80,19 @@ export function buildSuapProcessFlowSummary(
     .map((node, index) => (matches.has(node.id) ? index : -1))
     .filter((index) => index >= 0);
   const lastMatchedIndex = matchedIndexes.length ? Math.max(...matchedIndexes) : -1;
-  const currentIndex = options.processCompleted ? -1 : lastMatchedIndex;
+  const autoCurrentIndex = options.processCompleted ? -1 : lastMatchedIndex;
+
+  const manualNodeId = options.manualCurrentStepNodeId || route?.manualCurrentStepNodeId;
+  const manualIndex = manualNodeId ? nodes.findIndex((node) => node.id === manualNodeId) : -1;
+  const isManual = manualIndex >= 0;
+
+  const currentIndex = isManual ? manualIndex : autoCurrentIndex;
   const nextIndex = options.processCompleted ? -1 : (currentIndex >= 0 ? currentIndex + 1 : 0);
 
   const steps: SuapProcessFlowStep[] = nodes.map((node, index) => {
     const evidence = matches.get(node.id);
     let status: SuapProcessFlowStep['status'] = 'pending';
-    if (options.processCompleted || (evidence && index < currentIndex)) status = 'completed';
+    if (options.processCompleted || (isManual ? index < currentIndex : (evidence && index < currentIndex))) status = 'completed';
     else if (index === currentIndex) status = 'current';
     else if (index === nextIndex) status = 'next';
     else if (evidence) status = 'not_confirmed';
@@ -100,17 +106,20 @@ export function buildSuapProcessFlowSummary(
       evidence: evidence?.label || evidence?.rawText,
       laneName: laneForNode(mapping, node)?.name,
       description: node.description,
+      automation: node.automation,
     };
   });
 
   const matchedCount = matches.size;
-  const confidence: SuapProcessFlowSummary['confidence'] = !events.length
-    ? 'none'
-    : matchedCount >= Math.max(2, Math.ceil(nodes.length * 0.6))
-      ? 'high'
-      : matchedCount > 0
-        ? 'medium'
-        : 'low';
+  const confidence: SuapProcessFlowSummary['confidence'] = isManual
+    ? 'high'
+    : (!events.length
+      ? 'none'
+      : matchedCount >= Math.max(2, Math.ceil(nodes.length * 0.6))
+        ? 'high'
+        : matchedCount > 0
+          ? 'medium'
+          : 'low');
 
   return {
     mappingId: mapping.id,
@@ -122,10 +131,13 @@ export function buildSuapProcessFlowSummary(
     nextNodeId: nextIndex >= 0 ? nodes[nextIndex]?.id : undefined,
     steps,
     confidence,
-    note: !events.length
-      ? 'O histórico de trâmites ainda não foi identificado nesta página do SUAP.'
-      : confidence === 'low'
-        ? 'Os trâmites encontrados não foram suficientes para confirmar a etapa atual.'
-        : undefined,
+    isManualCurrentStep: isManual,
+    note: isManual
+      ? undefined
+      : (!events.length
+        ? 'O histórico de trâmites ainda não foi identificado nesta página do SUAP.'
+        : confidence === 'low'
+          ? 'Os trâmites encontrados não foram suficientes para confirmar a etapa atual.'
+          : undefined),
   };
 }

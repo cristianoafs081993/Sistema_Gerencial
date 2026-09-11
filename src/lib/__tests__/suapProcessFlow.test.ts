@@ -64,4 +64,51 @@ describe('suapProcessFlow', () => {
     expect(selectSuapProcessMapping(DEFAULT_PROCESS_MAPPINGS.slice().reverse(), { assunto: 'Pagamento de nota fiscal' })?.id)
       .toBe(DEFAULT_PROCESS_MAPPING.id);
   });
+
+  it('permite definir manualmente a etapa atual com ajuste dos status anterior e posterior', () => {
+    const summary = buildSuapProcessFlowSummary(DEFAULT_PROCESS_MAPPING, {
+      events: [
+        { id: 'route-1', label: 'Recebido por COFINC/CN', rawText: 'Recebido por COFINC/CN', unit: 'COFINC/CN', order: 0 },
+      ],
+    }, { manualCurrentStepNodeId: 'step-5' });
+
+    expect(summary.currentNodeId).toBe('step-5');
+    expect(summary.nextNodeId).toBe('step-6');
+    expect(summary.isManualCurrentStep).toBe(true);
+    expect(summary.note).toBeUndefined();
+
+    expect(summary.steps.find((s) => s.nodeId === 'step-1')?.status).toBe('completed');
+    expect(summary.steps.find((s) => s.nodeId === 'step-2')?.status).toBe('completed');
+    expect(summary.steps.find((s) => s.nodeId === 'step-4')?.status).toBe('completed');
+    expect(summary.steps.find((s) => s.nodeId === 'step-5')?.status).toBe('current');
+    expect(summary.steps.find((s) => s.nodeId === 'step-6')?.status).toBe('next');
+  });
+
+  it('propaga as configurações de automação da etapa para os passos do fluxo', () => {
+    const mappingWithAutomation = {
+      ...DEFAULT_PROCESS_MAPPING,
+      nodes: DEFAULT_PROCESS_MAPPING.nodes.map((node) =>
+        node.id === 'step-4'
+          ? {
+              ...node,
+              automation: {
+                enabled: true,
+                title: 'Registrar Liquidação no SIAFI',
+                action: 'open_url' as const,
+                targetUrl: 'https://siafi.tesouro.gov.br/processo/{processNumber}',
+                autoAdvanceStep: true,
+              },
+            }
+          : node
+      ),
+    };
+
+    const summary = buildSuapProcessFlowSummary(mappingWithAutomation, { events: [] });
+    const step4 = summary.steps.find((s) => s.nodeId === 'step-4');
+
+    expect(step4?.automation).toBeDefined();
+    expect(step4?.automation?.enabled).toBe(true);
+    expect(step4?.automation?.title).toBe('Registrar Liquidação no SIAFI');
+    expect(step4?.automation?.action).toBe('open_url');
+  });
 });

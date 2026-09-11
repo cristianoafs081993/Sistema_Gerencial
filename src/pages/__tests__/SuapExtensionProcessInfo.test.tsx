@@ -255,4 +255,45 @@ describe('SuapExtensionProcessInfo', () => {
 
     postMessage.mockRestore();
   });
+
+  it('respeita a etapa atual definida manualmente no contexto da rota', async () => {
+    vi.mocked(suapProcessosService.getBySuapId).mockResolvedValue({
+      id: 'process-1',
+      suapId: '987',
+      url: processContext.payload.processUrl,
+      status: 'success',
+      numProcesso: processContext.payload.processNumber,
+      assunto: 'Pagamento de bolsa',
+    });
+    const postMessage = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => undefined);
+    const contextWithManualStep = {
+      ...processContext,
+      payload: {
+        ...processContext.payload,
+        assunto: 'Pagamento de bolsa',
+        route: {
+          events: [],
+          selectedMappingId: 'liquidacao-pagamento-bolsas',
+          manualCurrentStepNodeId: 'bolsa-step-4',
+        },
+      },
+    };
+
+    render(<SuapExtensionProcessInfo />);
+    await sendContext(contextWithManualStep);
+
+    await waitFor(() => expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'siages',
+      type: 'siages:suap-process-flow',
+      payload: expect.objectContaining({
+        summary: expect.objectContaining({
+          mappingId: 'liquidacao-pagamento-bolsas',
+          currentNodeId: 'bolsa-step-4',
+          isManualCurrentStep: true,
+        }),
+      }),
+    }), SUAP_EXTENSION_ORIGIN));
+
+    postMessage.mockRestore();
+  });
 });

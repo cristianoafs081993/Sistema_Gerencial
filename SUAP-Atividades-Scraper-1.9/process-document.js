@@ -10,9 +10,11 @@
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ucWh3eXJ6aGd5a2pseXlxb2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyNzk4NjIsImV4cCI6MjA4NTg1NTg2Mn0.g9h5nF0l8yKG-yjQRI8i_mq084IzKTrH64F2FpreVIg';
   const THEME_KEY = 'siages-toolkit-theme';
   const COLLAPSED_KEY = 'siages-toolkit-collapsed';
+  const SECTIONS_COLLAPSED_KEY = 'siages-toolkit-sections-collapsed';
   const SNIPPETS_KEY = 'siages-snippets';
   const PROCESS_STATE_KEY_PREFIX = 'siages-process-state:';
   const PROCESS_MAPPING_KEY_PREFIX = 'siages-process-mapping:';
+  const PROCESS_STEP_KEY_PREFIX = 'siages-process-step:';
   const DOCUMENT_REVIEW_MAX_BYTES = 20 * 1024 * 1024;
   const DOCUMENT_VIEWER_PATH = /^\/documento_eletronico\/visualizar_documento(?:_digitalizado)?\/(\d+)\/?$/;
   const DEFAULT_SNIPPETS = {
@@ -24,7 +26,8 @@
   const state = {
     activeTab: 'summary', theme: 'dark', collapsed: false, maximized: false, snapshot: null,
     syncStatus: { stage: 'checking', message: 'Preparando a consulta do processo...' },
-    financeSummary: null, hasFinanceSummary: false, flow: null, selectedMappingId: '', mappings: [], snippets: { ...DEFAULT_SNIPPETS }, editingKey: null,
+    financeSummary: null, hasFinanceSummary: false, flow: null, selectedMappingId: '', manualStepNodeId: '', mappings: [], snippets: { ...DEFAULT_SNIPPETS }, editingKey: null,
+    collapsedSections: new Set(),
   };
   let documentAnalysisObserver = null;
   let documentAnalysisCleanup = null;
@@ -111,6 +114,11 @@
   function getProcessMappingKey(suapId = getProcessId()) {
     return suapId ? `${PROCESS_MAPPING_KEY_PREFIX}${suapId}` : '';
   }
+  function getProcessCurrentStepKey(mappingId, suapId = getProcessId()) {
+    if (!suapId) return '';
+    const mid = mappingId || state.selectedMappingId || state.flow?.summary?.mappingId || 'default';
+    return `${PROCESS_STEP_KEY_PREFIX}${suapId}:${mid}`;
+  }
   function parseProcessRoute() {
     const containers = Array.from(document.querySelectorAll('#timeline > *, aside.right > *, aside > *, [id*="timeline"] > *, [class*="timeline"] > *'));
     const candidates = containers.length ? containers : Array.from(document.querySelectorAll('main div, main li, main article'));
@@ -151,6 +159,8 @@
       snapshot: state.snapshot,
       syncStatus: state.syncStatus,
       activeTab: state.activeTab,
+      collapsedSections: Array.from(state.collapsedSections || []),
+      manualStepNodeId: state.manualStepNodeId || '',
       ...(state.hasFinanceSummary ? { financeSummary: state.financeSummary } : {}),
       ...(state.flow ? { flow: state.flow } : {}),
     };
@@ -294,6 +304,10 @@
       state.syncStatus = { stage: 'ready', message: 'Dados do processo atualizados.' };
     }
     if (typeof persisted.activeTab === 'string') state.activeTab = persisted.activeTab;
+    if (typeof persisted.manualStepNodeId === 'string') state.manualStepNodeId = persisted.manualStepNodeId;
+    if (Array.isArray(persisted.collapsedSections)) {
+      state.collapsedSections = new Set(persisted.collapsedSections);
+    }
     if (Object.prototype.hasOwnProperty.call(persisted, 'financeSummary')) {
       state.financeSummary = persisted.financeSummary;
       state.hasFinanceSummary = true;
@@ -316,12 +330,231 @@
       storage.set(values, resolve);
     });
   }
+  function storageRemove(area, key) {
+    return new Promise((resolve) => {
+      const storage = globalThis.chrome?.storage?.[area];
+      if (!storage?.remove) return resolve();
+      storage.remove(key, resolve);
+    });
+  }
+  function applyStepOverrideToSummary(summary, manualNodeId) {
+    if (!summary?.steps?.length) return;
+    if (!manualNodeId) {
+      summary.isManualCurrentStep = false;
+      return;
+    }
+    const targetIndex = summary.steps.findIndex((s) => s.nodeId === manualNodeId);
+    if (targetIndex < 0) return;
+
+    summary.isManualCurrentStep = true;
+    summary.currentNodeId = manualNodeId;
+    summary.nextNodeId = summary.steps[targetIndex + 1]?.nodeId;
+    summary.note = undefined;
+
+    summary.steps.forEach((step, index) => {
+      if (index < targetIndex) {
+        step.status = 'completed';
+      } else if (index === targetIndex) {
+        step.status = 'current';
+      } else if (index === targetIndex + 1) {
+        step.status = 'next';
+      } else {
+        step.status = 'pending';
+      }
+    });
+  }
+  function selectManualCurrentStep(nodeId) {
+    const summary = state.flow?.summary;
+    if (!summary) return;
+    if (state.manualStepNodeId === nodeId) {
+      resetManualCurrentStep();
+      return;
+    }
+    state.manualStepNodeId = nodeId;
+    const key = getProcessCurrentStepKey(summary.mappingId);
+    if (key) {
+      void storageSet('local', { [key]: state.manualStepNodeId });
+    }
+    applyStepOverrideToSummary(summary, state.manualStepNodeId);
+    persistProcessState();
+    renderSummary();
+    restartBridge();
+  }
+  function resetManualCurrentStep() {
+    const summary = state.flow?.summary;
+    state.manualStepNodeId = '';
+    if (summary) {
+      const key = getProcessCurrentStepKey(summary.mappingId);
+      if (key) void storageRemove('local', key);
+    }
+    persistProcessState();
+    restartBridge();
+  }
+  function showAutomationFeedback(message, isSuccess = true) {
+    const root = document.getElementById(ROOT_ID);
+    if (!root) return;
+    let toast = root.querySelector('.suape-automation-toast');
+    if (!toast) {
+      toast = createElement('div', 'suape-automation-toast');
+      root.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.dataset.state = isSuccess ? 'success' : 'info';
+    toast.classList.add('suape-toast-visible');
+    if (toast._timer) clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => {
+      toast.classList.remove('suape-toast-visible');
+    }, 3500);
+  }
+  async function triggerStepAutomation(step, summary, button) {
+    if (button) {
+      button.classList.add('suape-flow-step-check-active');
+      setTimeout(() => button.classList.remove('suape-flow-step-check-active'), 800);
+    }
+
+    const automation = step.automation;
+    const process = state.snapshot?.process;
+    const fallback = state.snapshot?.fallback;
+    const full = process?.dadosCompletos || {};
+
+    const suapId = process?.suapId || fallback?.suapId || getProcessId();
+    const processNumber = process?.numProcesso || fallback?.processNumber || getProcessNumber();
+    const beneficiario = process?.beneficiario || '';
+    const cpfCnpj = process?.cpfCnpj || '';
+    const assunto = process?.assunto || '';
+    const valor = full?.val_nf || '';
+    const contrato = process?.contrato || full?.contrato_numero || '';
+    const empenhosList = normalizeEmpenhos(full?.empenhos);
+    const empenho = empenhosList[0] || '';
+
+    const replacePlaceholders = (template) => {
+      if (!template || typeof template !== 'string') return '';
+      return template
+        .replace(/\{suapId\}/gi, suapId)
+        .replace(/\{processNumber\}/gi, processNumber)
+        .replace(/\{numProcesso\}/gi, processNumber)
+        .replace(/\{beneficiario\}/gi, beneficiario)
+        .replace(/\{cpfCnpj\}/gi, cpfCnpj)
+        .replace(/\{assunto\}/gi, assunto)
+        .replace(/\{valor\}/gi, valor)
+        .replace(/\{etapa\}/gi, step.title)
+        .replace(/\{contrato\}/gi, contrato)
+        .replace(/\{empenho\}/gi, empenho);
+    };
+
+    const advanceToNextStep = () => {
+      if (!summary?.steps?.length) return false;
+      const currentIndex = summary.steps.findIndex((s) => s.nodeId === step.nodeId);
+      if (currentIndex >= 0 && currentIndex < summary.steps.length - 1) {
+        const nextNodeId = summary.steps[currentIndex + 1].nodeId;
+        selectManualCurrentStep(nextNodeId);
+        return true;
+      }
+      return false;
+    };
+
+    const frame = document.getElementById(BRIDGE_FRAME_ID);
+    if (frame?.contentWindow) {
+      frame.contentWindow.postMessage({
+        source: 'siages-suap-extension',
+        type: 'siages:suap-step-automation-triggered',
+        version: 1,
+        payload: { suapId, stepId: step.nodeId, stepTitle: step.title, automation },
+      }, SIAGES_ORIGIN);
+    }
+
+    if (!automation || !automation.enabled) {
+      const advanced = advanceToNextStep();
+      showAutomationFeedback(advanced ? `Etapa "${step.title}" concluída. Avançado para a próxima etapa.` : `Etapa final "${step.title}" concluída!`);
+      return;
+    }
+
+    const action = automation.action || 'advance_step';
+    let feedback = automation.feedbackMessage;
+
+    if (action === 'advance_step') {
+      const advanced = advanceToNextStep();
+      if (!feedback) {
+        feedback = advanced
+          ? `Etapa "${step.title}" concluída. Avançado para a próxima etapa.`
+          : `Etapa final "${step.title}" concluída!`;
+      }
+    } else if (action === 'open_url') {
+      const targetUrl = replacePlaceholders(automation.targetUrl);
+      if (targetUrl) {
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      }
+      if (automation.autoAdvanceStep !== false) {
+        advanceToNextStep();
+      }
+      if (!feedback) feedback = targetUrl ? 'Sistema aberto em nova aba.' : 'Automação executada.';
+    } else if (action === 'copy_text') {
+      const textToCopy = replacePlaceholders(automation.templateText);
+      if (textToCopy) {
+        await copyText(textToCopy, button);
+      }
+      if (automation.autoAdvanceStep) {
+        advanceToNextStep();
+      }
+      if (!feedback) feedback = 'Texto da etapa copiado para a área de transferência!';
+    } else if (action === 'suap_document') {
+      const docType = cleanText(automation.documentType || 'despacho').toLowerCase();
+      const subject = encodeURIComponent(replacePlaceholders(automation.title || `Documento - ${step.title}`));
+      const createUrl = `/documento_eletronico/adicionar_documento/?tipo=${encodeURIComponent(docType)}&assunto=${subject}`;
+      window.open(createUrl, '_blank', 'noopener,noreferrer');
+      if (automation.autoAdvanceStep) {
+        advanceToNextStep();
+      }
+      if (!feedback) feedback = 'Iniciada a criação do documento no SUAP.';
+    } else if (action === 'custom_webhook') {
+      const webhookUrl = replacePlaceholders(automation.targetUrl);
+      if (webhookUrl) {
+        try {
+          await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              source: 'siages-suap-extension',
+              suapId,
+              processNumber,
+              beneficiario,
+              cpfCnpj,
+              step: step.title,
+              stepCode: step.code,
+              timestamp: new Date().toISOString(),
+            }),
+          });
+        } catch {
+          // Ignora falha de rede em webhook externo
+        }
+      }
+      if (automation.autoAdvanceStep) {
+        advanceToNextStep();
+      }
+      if (!feedback) feedback = 'Webhook disparado com sucesso!';
+    }
+
+    showAutomationFeedback(feedback || 'Automação concluída com sucesso!');
+  }
   function isExtensionContextInvalidated(error) {
     return String(error?.message || error || '').toLowerCase().includes('extension context invalidated');
   }
   function formatAuthError(error) {
     if (isExtensionContextInvalidated(error)) return 'A extens\u00e3o foi atualizada. Recarregue a p\u00e1gina do SUAP e tente novamente.';
     return error instanceof Error ? error.message : 'Falha na autenticacao.';
+  }
+  function isSectionCollapsed(sectionId) {
+    return state.collapsedSections ? state.collapsedSections.has(sectionId) : false;
+  }
+  function toggleSectionCollapsed(sectionId, isCollapsed) {
+    if (!state.collapsedSections) state.collapsedSections = new Set();
+    if (isCollapsed) {
+      state.collapsedSections.add(sectionId);
+    } else {
+      state.collapsedSections.delete(sectionId);
+    }
+    persistProcessState();
+    void storageSet('local', { [SECTIONS_COLLAPSED_KEY]: Array.from(state.collapsedSections) });
   }
   async function getExtensionSession() {
     if (!globalThis.SiagesExtensionAuth?.getSession) throw new Error('O serviço de autenticação da extensão não está disponível.');
@@ -341,7 +574,12 @@
         beneficiario: pageData.beneficiario || '',
         cpfCnpj: pageData.cpfCnpj || '',
         caixa: pageData.caixa || '',
-        route: { events: parseProcessRoute(), assunto: pageData.assunto || '', ...(state.selectedMappingId ? { selectedMappingId: state.selectedMappingId } : {}) },
+        route: {
+          events: parseProcessRoute(),
+          assunto: pageData.assunto || '',
+          ...(state.selectedMappingId ? { selectedMappingId: state.selectedMappingId } : {}),
+          ...(state.manualStepNodeId ? { manualCurrentStepNodeId: state.manualStepNodeId } : {}),
+        },
         ...(session ? { extensionSession: { accessToken: session.accessToken, ...(session.expiresAt ? { expiresAt: session.expiresAt } : {}) } } : {}),
       },
     };
@@ -413,9 +651,16 @@
     root.innerHTML = `
       <div class="suape-shell">
         <header class="suape-header">
-          <div class="suape-brand"><div><strong>SIAGES</strong><small>Sistema Integrado de Administração e Gestão Estratégica</small></div></div>
-          <button type="button" class="suape-icon-button" data-action="collapse" aria-label="Minimizar painel" title="Minimizar painel">−</button>
-          <button type="button" class="suape-icon-button" data-action="maximize" aria-label="Maximizar painel" title="Maximizar painel">⛶</button>
+          <div class="suape-brand">
+            <div class="suape-brand-row">
+              <strong class="suape-brand-title">SIAGES</strong>
+              <div class="suape-header-actions">
+                <button type="button" class="suape-icon-button" data-action="collapse" aria-label="Minimizar painel" title="Minimizar painel">−</button>
+                <button type="button" class="suape-icon-button" data-action="maximize" aria-label="Maximizar painel" title="Maximizar painel">⛶</button>
+              </div>
+            </div>
+            <small class="suape-brand-subtitle">Sistema Integrado de Administração e Gestão Estratégica</small>
+          </div>
         </header>
         <nav class="suape-tabs" role="tablist" aria-label="Ferramentas">
           <button class="suape-tab" role="tab" data-tab="summary" aria-selected="true">Resumo</button>
@@ -517,10 +762,40 @@
     row.append(labelElement, valueElement, button); container.appendChild(row);
   }
   function appendSection(container, title, rows) {
+    const sectionId = 'suape-sec-' + cleanText(title).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-');
+    const isCollapsed = isSectionCollapsed(sectionId);
     const section = createElement('section', 'suape-section');
-    section.appendChild(createElement('h3', 'suape-section-title', title));
-    rows(section);
-    if (section.children.length > 1) container.appendChild(section);
+    if (isCollapsed) section.classList.add('suape-section-collapsed');
+
+    const header = createElement('button', 'suape-section-header');
+    header.type = 'button';
+    header.setAttribute('aria-expanded', String(!isCollapsed));
+    header.setAttribute('aria-controls', `${sectionId}-body`);
+
+    const titleSpan = createElement('span', 'suape-section-title', title);
+    const chevron = createElement('span', 'suape-section-chevron', isCollapsed ? '▸' : '▾');
+    header.append(titleSpan, chevron);
+
+    const body = createElement('div', 'suape-section-body');
+    body.id = `${sectionId}-body`;
+    if (isCollapsed) body.style.display = 'none';
+
+    rows(body);
+
+    header.addEventListener('click', () => {
+      const currentlyCollapsed = body.style.display === 'none';
+      const nextCollapsed = !currentlyCollapsed;
+      body.style.display = nextCollapsed ? 'none' : 'block';
+      header.setAttribute('aria-expanded', String(!nextCollapsed));
+      chevron.textContent = nextCollapsed ? '▸' : '▾';
+      section.classList.toggle('suape-section-collapsed', nextCollapsed);
+      toggleSectionCollapsed(sectionId, nextCollapsed);
+    });
+
+    if (body.children.length > 0) {
+      section.append(header, body);
+      container.appendChild(section);
+    }
   }
   function renderSyncStatus(container) {
     const status = createElement('div', 'suape-status', state.syncStatus.message);
@@ -596,33 +871,143 @@
   function renderProcessFlow(container) {
     if (!state.flow?.summary) return;
     const summary = state.flow.summary;
+    const sectionId = 'suape-sec-caminho-do-processo';
+    const isCollapsed = isSectionCollapsed(sectionId);
+
     const section = createElement('section', 'suape-flow-card');
+    if (isCollapsed) section.classList.add('suape-flow-collapsed');
+
     const header = createElement('div', 'suape-flow-header');
-    const heading = createElement('div', 'suape-flow-heading');
-    heading.appendChild(createElement('span', 'suape-flow-eyebrow', 'Caminho do processo'));
-    header.appendChild(heading);
-    const open = createElement('a', 'suape-flow-open', 'Mapa completo ↗'); open.href = `${SIAGES_ORIGIN}${summary.fullPagePath}`; open.target = '_blank'; open.rel = 'noreferrer'; header.appendChild(open); section.appendChild(header);
+
+    const toggle = createElement('button', 'suape-flow-toggle');
+    toggle.type = 'button';
+    toggle.setAttribute('aria-expanded', String(!isCollapsed));
+    toggle.setAttribute('aria-controls', 'suape-flow-body');
+
+    const eyebrow = createElement('span', 'suape-flow-eyebrow', 'Caminho do processo');
+    const chevron = createElement('span', 'suape-flow-chevron', isCollapsed ? '▸' : '▾');
+    toggle.append(eyebrow, chevron);
+    header.appendChild(toggle);
+
+    const open = createElement('a', 'suape-flow-open', 'Mapa completo ↗');
+    open.href = `${SIAGES_ORIGIN}${summary.fullPagePath}`;
+    open.target = '_blank';
+    open.rel = 'noreferrer';
+    header.appendChild(open);
+    section.appendChild(header);
+
+    const body = createElement('div', 'suape-flow-body');
+    body.id = 'suape-flow-body';
+    if (isCollapsed) body.style.display = 'none';
+
     const mappingsToDisplay = state.mappings.length > 0
       ? state.mappings
       : [{ id: summary.mappingId, title: summary.mappingTitle, version: summary.mappingVersion }];
-    const chooser = createElement('label', 'suape-flow-chooser'); chooser.appendChild(createElement('span', '', 'Mapeamento aplicado'));
-    const select = document.createElement('select'); select.className = 'suape-flow-select';
-    mappingsToDisplay.forEach((mapping) => { const option = document.createElement('option'); option.value = mapping.id; option.textContent = `${mapping.title} · v${mapping.version}`; option.selected = mapping.id === state.selectedMappingId || mapping.id === summary.mappingId; select.appendChild(option); });
-    select.addEventListener('change', async () => { state.selectedMappingId = select.value; const key = getProcessMappingKey(); await storageSet('local', { [key]: state.selectedMappingId }); state.flow = null; renderSummary(); restartBridge(); }); chooser.appendChild(select); section.appendChild(chooser);
+    const chooser = createElement('label', 'suape-flow-chooser');
+    chooser.appendChild(createElement('span', '', 'Mapeamento aplicado'));
+    const select = document.createElement('select');
+    select.className = 'suape-flow-select';
+    mappingsToDisplay.forEach((mapping) => {
+      const option = document.createElement('option');
+      option.value = mapping.id;
+      option.textContent = `${mapping.title} · v${mapping.version}`;
+      option.selected = mapping.id === state.selectedMappingId || mapping.id === summary.mappingId;
+      select.appendChild(option);
+    });
+    select.addEventListener('change', async () => {
+      state.selectedMappingId = select.value;
+      const key = getProcessMappingKey();
+      await storageSet('local', { [key]: state.selectedMappingId });
+      const stepKey = getProcessCurrentStepKey(state.selectedMappingId);
+      state.manualStepNodeId = await storageGet('local', stepKey, '');
+      state.flow = null;
+      renderSummary();
+      restartBridge();
+    });
+    chooser.appendChild(select);
+    body.appendChild(chooser);
+
     const list = createElement('div', 'suape-flow-list');
     summary.steps.forEach((step) => {
-      const item = createElement('div', `suape-flow-step suape-flow-step-${step.status}`);
+      const isCurrent = step.status === 'current';
+      const item = createElement('div', `suape-flow-step suape-flow-step-${step.status}${isCurrent ? ' suape-flow-step-is-current' : ''}`);
+      item.dataset.nodeId = step.nodeId;
+      item.setAttribute('role', 'button');
+      item.setAttribute('tabindex', '0');
+      item.setAttribute('title', isCurrent
+        ? (summary.isManualCurrentStep
+            ? 'Etapa atual definida manualmente. Clique para restaurar detecção automática.'
+            : 'Etapa atual identificada.')
+        : 'Clique para definir como etapa atual deste processo.');
+
       const dot = createElement('span', 'suape-flow-dot');
-      const body = createElement('div', 'suape-flow-step-body');
+      const stepBody = createElement('div', 'suape-flow-step-body');
       const title = createElement('div', 'suape-flow-step-title');
       const titleStrong = createElement('strong', '', step.title);
       titleStrong.title = step.title;
       title.append(createElement('span', 'suape-flow-code', step.code), titleStrong);
-      const meta = createElement('div', 'suape-flow-step-meta', [step.responsible, step.status === 'completed' ? 'Concluída' : step.status === 'current' ? 'Etapa atual' : step.status === 'next' ? 'Próxima etapa' : 'Pendente'].join(' · '));
-      body.append(title, meta); if (step.evidence) body.appendChild(createElement('div', 'suape-flow-evidence', `SUAP: ${step.evidence}`)); item.append(dot, body); list.appendChild(item);
+      const statusLabel = step.status === 'completed'
+        ? 'Concluída'
+        : step.status === 'current'
+          ? 'Etapa atual'
+          : step.status === 'next'
+            ? 'Próxima etapa'
+            : 'Pendente';
+      const meta = createElement('div', 'suape-flow-step-meta', [step.responsible, statusLabel].join(' · '));
+      stepBody.append(title, meta);
+      if (step.evidence) stepBody.appendChild(createElement('div', 'suape-flow-evidence', `SUAP: ${step.evidence}`));
+      item.append(dot, stepBody);
+
+      if (isCurrent) {
+        const checkBtn = createElement('button', 'suape-flow-step-check');
+        checkBtn.type = 'button';
+        const automationTitle = step.automation?.title || 'Concluir etapa e disparar automação';
+        checkBtn.setAttribute('title', automationTitle);
+        checkBtn.setAttribute('aria-label', automationTitle);
+        checkBtn.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+
+        checkBtn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          void triggerStepAutomation(step, summary, checkBtn);
+        });
+        checkBtn.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            event.stopPropagation();
+            void triggerStepAutomation(step, summary, checkBtn);
+          }
+        });
+        item.appendChild(checkBtn);
+      }
+
+      item.addEventListener('click', () => {
+        void selectManualCurrentStep(step.nodeId);
+      });
+      item.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          void selectManualCurrentStep(step.nodeId);
+        }
+      });
+      list.appendChild(item);
     });
-    section.appendChild(list);
-    if (summary.note) section.appendChild(createElement('div', 'suape-flow-note', summary.note));
+    body.appendChild(list);
+
+    if (!summary.isManualCurrentStep && summary.note) {
+      body.appendChild(createElement('div', 'suape-flow-note', summary.note));
+    }
+    section.appendChild(body);
+
+    toggle.addEventListener('click', () => {
+      const currentlyCollapsed = body.style.display === 'none';
+      const nextCollapsed = !currentlyCollapsed;
+      body.style.display = nextCollapsed ? 'none' : 'block';
+      toggle.setAttribute('aria-expanded', String(!nextCollapsed));
+      chevron.textContent = nextCollapsed ? '▸' : '▾';
+      section.classList.toggle('suape-flow-collapsed', nextCollapsed);
+      toggleSectionCollapsed(sectionId, nextCollapsed);
+    });
+
     container.appendChild(section);
   }
 
@@ -993,7 +1378,16 @@
         if (isSiagesFrameMessage(event, frame, 'siages:suap-process-info-ready')) { postContext(); return; }
         if (isSiagesFrameMessage(event, frame, 'siages:suap-process-snapshot')) { state.snapshot = event.data.payload; persistProcessState(); renderSummary(); return; }
         if (isSiagesFrameMessage(event, frame, 'siages:suap-process-sync-status')) { state.syncStatus = event.data.payload; persistProcessState(); renderSummary(); if (state.syncStatus.stage === 'error' && !state.hasFinanceSummary) renderFinanceEmpty(state.syncStatus.message); return; }
-        if (isSiagesFrameMessage(event, frame, 'siages:suap-process-flow')) { state.flow = event.data.payload; state.mappings = event.data.payload?.mappings || []; persistProcessState(); renderSummary(); return; }
+        if (isSiagesFrameMessage(event, frame, 'siages:suap-process-flow')) {
+          state.flow = event.data.payload;
+          state.mappings = event.data.payload?.mappings || [];
+          if (state.manualStepNodeId && state.flow?.summary) {
+            applyStepOverrideToSummary(state.flow.summary, state.manualStepNodeId);
+          }
+          persistProcessState();
+          renderSummary();
+          return;
+        }
         if (isSiagesFrameMessage(event, frame, 'siages:suap-process-finance-summary')) { renderFinanceSummary(event.data.payload); return; }
         if (isSiagesFrameMessage(event, frame, 'siages:suap-process-pdf-request')) {
           const suapId = event.data.payload?.suapId; if (suapId !== getProcessId()) return;
@@ -1045,9 +1439,30 @@
 
   async function installToolkit() {
     if (!getProcessId() || document.getElementById(ROOT_ID)) return;
-    const [theme, collapsed, storedSnippets, selectedMappingId] = await Promise.all([storageGet('local', THEME_KEY, 'dark'), storageGet('local', COLLAPSED_KEY, false), storageGet('sync', SNIPPETS_KEY, null), storageGet('local', getProcessMappingKey(), '')]);
+    const processMappingKey = getProcessMappingKey();
+    const [theme, collapsed, storedSnippets, selectedMappingId, storedCollapsedSections] = await Promise.all([
+      storageGet('local', THEME_KEY, 'dark'),
+      storageGet('local', COLLAPSED_KEY, false),
+      storageGet('sync', SNIPPETS_KEY, null),
+      storageGet('local', processMappingKey, ''),
+      storageGet('local', SECTIONS_COLLAPSED_KEY, []),
+    ]);
     const hasPersistedProcessState = await restorePersistedProcessState();
-    state.theme = theme === 'light' ? 'light' : 'dark'; state.collapsed = Boolean(collapsed); state.selectedMappingId = typeof selectedMappingId === 'string' ? selectedMappingId : ''; state.snippets = storedSnippets && Object.keys(storedSnippets).length ? storedSnippets : { ...DEFAULT_SNIPPETS };
+    state.theme = theme === 'light' ? 'light' : 'dark';
+    state.collapsed = Boolean(collapsed);
+    state.selectedMappingId = typeof selectedMappingId === 'string' ? selectedMappingId : '';
+    state.snippets = storedSnippets && Object.keys(storedSnippets).length ? storedSnippets : { ...DEFAULT_SNIPPETS };
+    if (Array.isArray(storedCollapsedSections) && storedCollapsedSections.length && !state.collapsedSections?.size) {
+      state.collapsedSections = new Set(storedCollapsedSections);
+    }
+    const stepKey = getProcessCurrentStepKey(state.selectedMappingId);
+    const storedManualStep = await storageGet('local', stepKey, '');
+    if (storedManualStep && typeof storedManualStep === 'string') {
+      state.manualStepNodeId = storedManualStep;
+    }
+    if (state.manualStepNodeId && state.flow?.summary) {
+      applyStepOverrideToSummary(state.flow.summary, state.manualStepNodeId);
+    }
     if (!storedSnippets) await storageSet('sync', { [SNIPPETS_KEY]: state.snippets });
     const root = buildShell(); isolateTabTitles(root); const host = findToolkitHost(); host.prepend(root); fitToolkitToHost(host, root);
     renderSummary(hasPersistedProcessState ? state.snapshot : { process: null, fallback: { suapId: getProcessId(), processNumber: getProcessNumber(), processUrl: getProcessUrl() } });

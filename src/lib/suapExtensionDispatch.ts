@@ -328,7 +328,8 @@ export function isValidSuapExtensionProcessContext(value: unknown): value is Sua
       payload.route.events.length > 200 ||
       payload.route.events.some((event) => !event || typeof event !== 'object' || typeof event.id !== 'string' || typeof event.label !== 'string' || typeof event.rawText !== 'string' || typeof event.order !== 'number') ||
       (payload.route.selectedMappingId !== undefined && typeof payload.route.selectedMappingId !== 'string') ||
-      (payload.route.assunto !== undefined && typeof payload.route.assunto !== 'string')
+      (payload.route.assunto !== undefined && typeof payload.route.assunto !== 'string') ||
+      (payload.route.manualCurrentStepNodeId !== undefined && typeof payload.route.manualCurrentStepNodeId !== 'string')
     )) ||
     (payload.extensionSession !== undefined && (
       typeof payload.extensionSession !== 'object' ||

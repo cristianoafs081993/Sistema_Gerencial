@@ -13,9 +13,12 @@ import {
   Trash2,
   User,
   X,
+  Zap,
 } from 'lucide-react';
 
 import type {
+  ProcessMappingAutomation,
+  ProcessMappingAutomationAction,
   ProcessMappingChecklistItem,
   ProcessMappingLane,
   ProcessMappingLink,
@@ -43,7 +46,7 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
   onDeleteNode,
 }) => {
   const [formData, setFormData] = useState<ProcessMappingNode | null>(null);
-  const [activeTab, setActiveTab] = useState<'links' | 'procedure' | 'checklist'>('links');
+  const [activeTab, setActiveTab] = useState<'links' | 'procedure' | 'checklist' | 'automations'>('links');
 
   // Input states for adding new items
   const [newChecklistText, setNewChecklistText] = useState('');
@@ -167,6 +170,31 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
     handleChange('customLinks', next);
   };
 
+  const handleAutomationChange = <K extends keyof ProcessMappingAutomation>(
+    field: K,
+    value: ProcessMappingAutomation[K]
+  ) => {
+    const current: ProcessMappingAutomation = formData.automation || {
+      enabled: true,
+      title: 'Concluir e avançar etapa',
+      action: 'advance_step',
+      autoAdvanceStep: true,
+    };
+    const updatedAutomation: ProcessMappingAutomation = { ...current, [field]: value };
+    handleChange('automation', updatedAutomation);
+  };
+
+  const handleApplyAutomationPreset = (preset: Partial<ProcessMappingAutomation>) => {
+    const current: ProcessMappingAutomation = formData.automation || {
+      enabled: true,
+      title: 'Concluir e avançar etapa',
+      action: 'advance_step',
+      autoAdvanceStep: true,
+    };
+    const updatedAutomation: ProcessMappingAutomation = { ...current, ...preset, enabled: true };
+    handleChange('automation', updatedAutomation);
+  };
+
   return (
     <div className="fixed inset-y-0 right-0 z-50 w-full max-w-xl bg-white shadow-2xl border-l border-slate-200 flex flex-col font-ui text-slate-900 animate-in slide-in-from-right duration-200">
       {/* Drawer Header */}
@@ -264,6 +292,19 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
         >
           <CheckCircle2 className="w-3.5 h-3.5" />
           <span>Checklist ({formData.checklist?.length || 0})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('automations')}
+          className={`py-2.5 px-3 border-b-2 transition-colors flex items-center gap-1.5 ${
+            activeTab === 'automations'
+              ? 'border-blue-600 text-blue-700 font-bold'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Zap className="w-3.5 h-3.5" />
+          <span>Automações{formData.automation?.enabled ? ' (1)' : ''}</span>
         </button>
       </div>
 
@@ -669,6 +710,264 @@ export const ProcessMappingDetailDrawer: React.FC<ProcessMappingDetailDrawerProp
                 <Plus className="w-3.5 h-3.5" /> Adicionar Item ao Checklist
               </button>
             </form>
+          </div>
+        )}
+
+        {/* TAB 4: Automações */}
+        {activeTab === 'automations' && (
+          <div className="space-y-4">
+            {/* Header explicativo */}
+            <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl space-y-1">
+              <div className="flex items-center gap-1.5 text-blue-800 font-bold text-xs">
+                <Zap className="w-3.5 h-3.5 text-blue-600" />
+                <span>Automação do Botão de Check</span>
+              </div>
+              <p className="text-[11px] text-blue-700 leading-relaxed">
+                Configure a ação disparada pelo botão de check discreto exibido na etapa atual do painel do SUAP.
+              </p>
+            </div>
+
+            {/* Switch Habilitar Automação */}
+            <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/60">
+              <div>
+                <span className="block text-xs font-bold text-slate-800">Ativar automação nesta etapa</span>
+                <span className="block text-[11px] text-slate-500">
+                  Exibe o botão de check na etapa atual quando este processo estiver em andamento
+                </span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.automation?.enabled ?? false}
+                  onChange={(e) => handleAutomationChange('enabled', e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+              </label>
+            </div>
+
+            {/* Presets Rápidos */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold text-slate-600">
+                Presets Rápidos de Automação
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  {
+                    label: '⚡ Concluir e Avançar',
+                    preset: {
+                      title: 'Concluir conferência e avançar etapa',
+                      action: 'advance_step' as ProcessMappingAutomationAction,
+                      autoAdvanceStep: true,
+                      feedbackMessage: 'Etapa concluída e avançada com sucesso!',
+                    },
+                  },
+                  {
+                    label: '📋 Copiar Despacho',
+                    preset: {
+                      title: 'Copiar minuta de despacho',
+                      action: 'copy_text' as ProcessMappingAutomationAction,
+                      templateText: 'Certifico a conformidade da etapa {etapa} para o processo {processNumber}, referente ao credor {beneficiario}.',
+                      autoAdvanceStep: true,
+                      feedbackMessage: 'Minuta de despacho copiada!',
+                    },
+                  },
+                  {
+                    label: '🔗 Abrir SIAFI',
+                    preset: {
+                      title: 'Abrir SIAFI Web',
+                      action: 'open_url' as ProcessMappingAutomationAction,
+                      targetUrl: 'https://www.gov.br/tesouronacional/pt-br/siafi/',
+                      autoAdvanceStep: false,
+                      feedbackMessage: 'SIAFI aberto em nova aba.',
+                    },
+                  },
+                  {
+                    label: '📄 Minuta no SUAP',
+                    preset: {
+                      title: 'Criar documento no SUAP',
+                      action: 'suap_document' as ProcessMappingAutomationAction,
+                      documentType: 'despacho',
+                      templateText: 'Processo: {processNumber}\nBeneficiário: {beneficiario}\nEtapa: {etapa}',
+                      autoAdvanceStep: true,
+                      feedbackMessage: 'Automação de documento SUAP acionada!',
+                    },
+                  },
+                ].map((item) => (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={() => handleApplyAutomationPreset(item.preset)}
+                    className="px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-50 text-emerald-800 border border-slate-200 hover:border-emerald-300 text-[11px] font-semibold transition-colors shadow-2xs"
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Título da Automação */}
+            <div className="space-y-1">
+              <label className="block text-[11px] font-bold text-slate-600">
+                Título / Rótulo da Automação
+              </label>
+              <input
+                type="text"
+                placeholder="Ex: Concluir conferência e registrar liquidação"
+                value={formData.automation?.title || ''}
+                onChange={(e) => handleAutomationChange('title', e.target.value)}
+                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
+              />
+              <span className="text-[10px] text-slate-400">
+                Exibido no tooltip do botão de check discreto no SUAP.
+              </span>
+            </div>
+
+            {/* Tipo de Ação */}
+            <div className="space-y-1">
+              <label className="block text-[11px] font-bold text-slate-600">
+                Ação Executada ao Clicar
+              </label>
+              <select
+                value={formData.automation?.action || 'advance_step'}
+                onChange={(e) =>
+                  handleAutomationChange('action', e.target.value as ProcessMappingAutomationAction)
+                }
+                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium"
+              >
+                <option value="advance_step">⚡ Concluir etapa e avançar para a próxima</option>
+                <option value="open_url">🔗 Abrir sistema ou link externo com dados do processo</option>
+                <option value="copy_text">📋 Copiar texto / minuta parametrizada para a área de transferência</option>
+                <option value="suap_document">📄 Gerar / clonar documento no SUAP</option>
+                <option value="custom_webhook">🌐 Disparar requisição Webhook HTTP</option>
+              </select>
+            </div>
+
+            {/* Campos condicionais por ação */}
+            {(formData.automation?.action === 'open_url' || formData.automation?.action === 'custom_webhook') && (
+              <div className="space-y-1 p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                <label className="block text-[11px] font-bold text-slate-700">
+                  {formData.automation?.action === 'open_url' ? 'URL do Sistema / Destino' : 'URL do Webhook (POST)'}
+                </label>
+                <input
+                  type="text"
+                  placeholder="https://... (ex: https://suap.ifrn.edu.br/ ou SIAFI)"
+                  value={formData.automation?.targetUrl || ''}
+                  onChange={(e) => handleAutomationChange('targetUrl', e.target.value)}
+                  className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono text-[11px]"
+                />
+                <span className="text-[10px] text-slate-500">
+                  Suporta placeholders dinâmicos (veja abaixo).
+                </span>
+              </div>
+            )}
+
+            {formData.automation?.action === 'copy_text' && (
+              <div className="space-y-1 p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                <label className="block text-[11px] font-bold text-slate-700">
+                  Texto / Minuta a ser Copiado
+                </label>
+                <textarea
+                  rows={4}
+                  placeholder="Digite o texto padronizado. As tags como {processNumber} serão preenchidas automaticamente..."
+                  value={formData.automation?.templateText || ''}
+                  onChange={(e) => handleAutomationChange('templateText', e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono text-[11px]"
+                />
+              </div>
+            )}
+
+            {formData.automation?.action === 'suap_document' && (
+              <div className="space-y-3 p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold text-slate-700">
+                    Tipo de Documento no SUAP
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: despacho, termo, certidao, relatorio"
+                    value={formData.automation?.documentType || ''}
+                    onChange={(e) => handleAutomationChange('documentType', e.target.value)}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold text-slate-700">
+                    Minuta / Conteúdo Padrão
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="Conteúdo a ser inserido no documento..."
+                    value={formData.automation?.templateText || ''}
+                    onChange={(e) => handleAutomationChange('templateText', e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono text-[11px]"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Opção de Avançar Etapa */}
+            {formData.automation?.action !== 'advance_step' && (
+              <label className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={formData.automation?.autoAdvanceStep ?? true}
+                  onChange={(e) => handleAutomationChange('autoAdvanceStep', e.target.checked)}
+                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span className="text-xs text-slate-700 font-medium">
+                  Avançar automaticamente para a próxima etapa após disparar esta ação
+                </span>
+              </label>
+            )}
+
+            {/* Mensagem de Feedback */}
+            <div className="space-y-1">
+              <label className="block text-[11px] font-bold text-slate-600">
+                Mensagem de Feedback (Toast)
+              </label>
+              <input
+                type="text"
+                placeholder="Ex: Etapa concluída com sucesso!"
+                value={formData.automation?.feedbackMessage || ''}
+                onChange={(e) => handleAutomationChange('feedbackMessage', e.target.value)}
+                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
+              />
+            </div>
+
+            {/* Variáveis Dinâmicas Disponíveis */}
+            <div className="space-y-1.5 pt-2 border-t border-slate-100">
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Variáveis Dinâmicas Disponíveis
+              </label>
+              <div className="flex flex-wrap gap-1">
+                {[
+                  '{processNumber}',
+                  '{suapId}',
+                  '{beneficiario}',
+                  '{cpfCnpj}',
+                  '{assunto}',
+                  '{valor}',
+                  '{etapa}',
+                ].map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    title={`Clique para inserir ${tag}`}
+                    onClick={() => {
+                      if (formData.automation?.action === 'copy_text' || formData.automation?.action === 'suap_document') {
+                        handleAutomationChange('templateText', (formData.automation?.templateText || '') + ` ${tag}`);
+                      } else if (formData.automation?.action === 'open_url' || formData.automation?.action === 'custom_webhook') {
+                        handleAutomationChange('targetUrl', (formData.automation?.targetUrl || '') + tag);
+                      }
+                    }}
+                    className="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-[10px] transition-colors"
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>
