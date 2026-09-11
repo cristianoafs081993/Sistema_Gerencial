@@ -31,6 +31,7 @@ Pontos mais criticos devem ter cobertura preferencial:
 Requisições de Compra:
 
 - A RLS e os vínculos `requisicao_compra_itens`/`requisicao_compra_empenhos` devem permitir que usuários do grupo `fiscais-de-contratos` visualizem as requisições e seus detalhes; o slug legado `fiscal-contratos` também deve continuar funcionando.
+- Usuários que visualizam o menu `refeitorio` devem visualizar a lista completa de requisições do próprio órgão e seus itens/empenhos vinculados, sem ganhar permissão de escrita.
 - Validar que a correção de autorização não altera nem remove as requisições existentes, incluindo seus itens, empenhos vinculados e status.
 
 Contratos via Comprasnet:
