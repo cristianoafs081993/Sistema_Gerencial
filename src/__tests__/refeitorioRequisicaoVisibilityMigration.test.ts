@@ -7,6 +7,10 @@ const migrationSql = readFileSync(
   join(process.cwd(), 'supabase/migrations/20260911100000_allow_refeitorio_viewers_read_requisicoes.sql'),
   'utf8',
 );
+const orgMembershipMigrationSql = readFileSync(
+  join(process.cwd(), 'supabase/migrations/20260914120000_backfill_izaelson_org_membership.sql'),
+  'utf8',
+);
 
 describe('migration de visibilidade das requisições no Refeitório', () => {
   it('usa o acesso ao menu Refeitório para liberar leitura compartilhada', () => {
@@ -26,5 +30,11 @@ describe('migration de visibilidade das requisições no Refeitório', () => {
     expect(migrationSql).toContain('Leitura de requisicao_compra_empenhos');
     expect(migrationSql).not.toContain('CREATE POLICY "Atualizar requisicoes_compra"');
     expect(migrationSql).not.toContain('CREATE POLICY "Excluir requisicoes_compra"');
+  });
+
+  it('mantém o vínculo do usuário do Refeitório com o órgão correto', () => {
+    expect(orgMembershipMigrationSql).toContain("lower(auth_user.email) = 'izaelson.lima@ifrn.edu.br'");
+    expect(orgMembershipMigrationSql).toContain("org.slug = 'ifrn-cn'");
+    expect(orgMembershipMigrationSql).toContain('ON CONFLICT (user_id) DO NOTHING');
   });
 });
