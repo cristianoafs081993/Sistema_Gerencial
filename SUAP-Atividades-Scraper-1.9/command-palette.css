@@ -884,13 +884,19 @@ body.dark #suape-cp-overlay:not([data-theme="light"]),
   display: flex !important;
   flex-direction: column !important;
   gap: 16px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  align-self: stretch !important;
 }
 
 /* Metric Cards */
 .suape-cp-metric-grid {
   display: grid !important;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   gap: 12px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  align-self: stretch !important;
 }
 
 .suape-cp-metric-card {
@@ -898,6 +904,10 @@ body.dark #suape-cp-overlay:not([data-theme="light"]),
   background: var(--suape-cp-chip-bg) !important;
   border: 1px solid var(--suape-cp-border) !important;
   border-radius: 12px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  margin: 0 !important;
 }
 
 .suape-cp-metric-card.metric-highlight {
@@ -1008,4 +1018,25 @@ body.dark #suape-cp-overlay:not([data-theme="light"]),
   font-size: 12px !important;
   color: var(--suape-cp-text-muted) !important;
   margin-top: 4px !important;
+}
+
+/* Keep the details layout independent from host-page global CSS. */
+@media (max-width: 700px) {
+  .suape-cp-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  #suape-cp-detail-overlay {
+    padding: 12px !important;
+  }
+
+  .suape-cp-detail-body {
+    padding: 16px !important;
+  }
+
+  .suape-cp-metric-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
 }

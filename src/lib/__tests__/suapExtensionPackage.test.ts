@@ -8,7 +8,7 @@ describe('pacote da extensao Suape 1.9', () => {
   it('mantem versao, permissoes e scripts restritos as rotas corretas', () => {
     const manifest = JSON.parse(fs.readFileSync(extensionFixturePath('manifest.json'), 'utf8'));
 
-    expect(manifest.version).toBe('1.9.32');
+    expect(manifest.version).toBe('1.9.42');
     expect(manifest.host_permissions).toContain('<all_urls>');
     expect(manifest.permissions).toEqual(expect.arrayContaining(['activeTab', 'scripting', 'storage', 'alarms', 'cookies']));
     expect(manifest.background).toEqual({ service_worker: 'background.js' });
@@ -18,6 +18,7 @@ describe('pacote da extensao Suape 1.9', () => {
     const plan = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('plan-summary.js'));
     const comprasnet = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('comprasnet-etp.js'));
     const siafi = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('siafi-favorecidos.js'));
+    const siafiPredocAlert = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('siafi-predoc-alert.js'));
     const commandPalettes = manifest.content_scripts.filter((entry: { js: string[] }) => entry.js.includes('command-palette.js'));
     const clickHints = manifest.content_scripts.find((entry: { js: string[] }) => entry.js.includes('click-hints.js'));
     const suapCommandPalette = commandPalettes.find((entry: { matches: string[] }) => entry.matches.includes('https://suap.ifrn.edu.br/*'));
@@ -52,6 +53,12 @@ describe('pacote da extensao Suape 1.9', () => {
       js: ['siafi-favorecidos.js'],
       run_at: 'document_idle',
       all_frames: true,
+    });
+    expect(siafiPredocAlert).toMatchObject({
+      matches: ['https://siafi.tesouro.gov.br/*'],
+      css: ['siafi-predoc-alert.css'],
+      js: ['siafi-predoc-alert.js'],
+      run_at: 'document_idle',
     });
     expect(globalCommandPalette).toMatchObject({
       matches: ['<all_urls>'],
@@ -92,6 +99,9 @@ describe('pacote da extensao Suape 1.9', () => {
     expect(cpCss).toContain('.suape-cp-group-title.process-group');
     expect(cpCss).toContain('.suape-cp-chip-count.count-teal');
     expect(cpCss).toContain('.suape-cp-kbd-shortcut');
+    expect(cpCss).toContain('grid-template-columns: repeat(4, minmax(0, 1fr)) !important;');
+    expect(cpCss).toContain('width: 100% !important;');
+    expect(cpCss).toContain('@media (max-width: 700px)');
     expect(cpScript).toContain("const IS_SUAP_PAGE = window.location.hostname === 'suap.ifrn.edu.br';");
     expect(cpScript).toContain('if (!IS_SUAP_PAGE) return null;');
   });
