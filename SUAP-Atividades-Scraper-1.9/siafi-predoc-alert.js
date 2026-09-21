@@ -10,6 +10,7 @@
   const CANCEL_ID = `${FORM_ID}:btnCancelarAlteracaoDocumentoHabil`;
   const SAVE_DRAFT_ID = `${FORM_ID}:salvarRascunho_botao`;
   const PAYMENT_PANEL_PREFIX = `${PAYMENT_TABLE_ID}_painel_`;
+  const PAYMENT_TAB_LABEL = 'Dados de Pagamento';
   const OVERLAY_ID = 'suape-siafi-predoc-overlay';
   const MESSAGE = 'Preencha o pré-doc antes de sair ou registrar as alterações.';
 
@@ -36,6 +37,50 @@
     return document.getElementById(PAYMENT_TABLE_ID);
   }
 
+  function isVisible(element) {
+    if (!element || element.hidden) return false;
+    const style = window.getComputedStyle(element);
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+    return element.offsetParent !== null || element.getClientRects().length > 0;
+  }
+
+  function isActiveTabElement(element) {
+    if (!element) return false;
+    if (element.getAttribute('aria-selected') === 'true' || element.getAttribute('data-active') === 'true') return true;
+    const className = typeof element.className === 'string' ? element.className : '';
+    return /(?:^|\s)(?:active|selected|ui-tabs-active|ui-tabs-selected|ui-state-active)(?:\s|$)/i.test(className);
+  }
+
+  function getTabTargetId(element) {
+    const reference = element?.getAttribute('aria-controls') || element?.getAttribute('data-target') || element?.getAttribute('href');
+    if (!reference) return null;
+    const match = reference.trim().match(/^#(.+)$/);
+    return match ? match[1] : null;
+  }
+
+  function isPaymentTabActive() {
+    const tabs = document.getElementById(TABS_ID);
+    if (!tabs) return false;
+
+    const normalizedLabel = PAYMENT_TAB_LABEL.toLocaleLowerCase();
+    const candidates = Array.from(tabs.querySelectorAll('a, button, input, li, [role="tab"]'));
+    const tabLabel = candidates.find((element) => {
+      const label = cleanText(element.value || element.textContent).toLocaleLowerCase();
+      return label === normalizedLabel || element.id.toLocaleLowerCase().includes('dadospagamento');
+    });
+
+    if (!tabLabel) return false;
+
+    const tabItem = tabLabel.closest('li, [role="tab"], .tab, .nav-item') || tabLabel;
+    if (isActiveTabElement(tabItem) || isActiveTabElement(tabLabel)) return true;
+
+    const targetId = getTabTargetId(tabLabel) || getTabTargetId(tabItem);
+    if (targetId && isVisible(document.getElementById(targetId))) return true;
+
+    const paymentTable = getPaymentTable();
+    return Boolean(paymentTable && isVisible(paymentTable));
+  }
+
   function isCondhEditPage() {
     return Boolean(getForm() && document.getElementById(TABS_ID));
   }
@@ -59,8 +104,9 @@
 
   function refreshState() {
     const condhPage = isCondhEditPage();
+    const paymentTabActive = condhPage && isPaymentTabActive();
     lastKnownCondhPage = condhPage;
-    if (!condhPage) {
+    if (!paymentTabActive) {
       lastKnownPendingCount = 0;
       return;
     }
@@ -71,7 +117,7 @@
 
   function hasPendingPredocs() {
     refreshState();
-    return lastKnownCondhPage && lastKnownPendingCount > 0;
+    return lastKnownCondhPage && isPaymentTabActive() && lastKnownPendingCount > 0;
   }
 
   function getClickable(target) {
@@ -288,6 +334,7 @@
       FORM_ID,
       PAYMENT_TABLE_ID,
       TABS_ID,
+      PAYMENT_TAB_LABEL,
       REGISTER_ID,
       REGISTER_CURRENT_ID,
       CANCEL_ID,
@@ -295,6 +342,7 @@
       getPredocRows,
       isPredocFilled,
       getPendingPredocCount,
+      isPaymentTabActive,
       hasPendingPredocs,
       refreshState,
       openDialog,

@@ -7,10 +7,12 @@ import { extensionFixturePath } from '@/test/extensionFixtures';
 type PredocApi = {
   PAYMENT_TABLE_ID: string;
   TABS_ID: string;
+  PAYMENT_TAB_LABEL: string;
   REGISTER_ID: string;
   REGISTER_CURRENT_ID: string;
   SAVE_DRAFT_ID: string;
   getPendingPredocCount: () => number;
+  isPaymentTabActive: () => boolean;
   hasPendingPredocs: () => boolean;
   refreshState: () => void;
   destroy: () => void;
@@ -26,12 +28,14 @@ function rowHtml(index: number, filled = false) {
   </tr>`;
 }
 
-function renderPage(rows = rowHtml(0)) {
+function renderPage(rows = rowHtml(0), activeTab = 'Dados de Pagamento') {
+  const isActive = (label: string) => (activeTab === label ? 'class="ui-tabs-selected ui-state-active" aria-selected="true"' : '');
   document.body.innerHTML = `
     <form id="form_manterDocumentoHabil">
       <div id="form_manterDocumentoHabil:abasDocHabil">
-        <input id="form_manterDocumentoHabil:abaDadosBasicosId" type="button" value="Dados Básicos" />
-        <input id="form_manterDocumentoHabil:abaDetacustos" type="button" value="Detacustos" />
+        <input id="form_manterDocumentoHabil:abaDadosBasicosId" type="button" value="Dados Básicos" ${isActive('Dados Básicos')} />
+        <input id="form_manterDocumentoHabil:abaDadosPagamentoId" type="button" value="Dados de Pagamento" ${isActive('Dados de Pagamento')} />
+        <input id="form_manterDocumentoHabil:abaDetacustos" type="button" value="Detacustos" ${isActive('Detacustos')} />
       </div>
       <div id="form_manterDocumentoHabil:lista_DPgtoOB"><table><tbody>${rows}</tbody></table></div>
       <div id="form_manterDocumentoHabil:lista_DPgtoOB_painel">
@@ -79,6 +83,8 @@ describe('guardião de pré-doc do SIAFI', () => {
 
   it('identifica qualquer linha sem pré-doc', () => {
     const api = loadScript();
+    expect(api.PAYMENT_TAB_LABEL).toBe('Dados de Pagamento');
+    expect(api.isPaymentTabActive()).toBe(true);
     expect(api.getPendingPredocCount()).toBe(1);
     expect(api.hasPendingPredocs()).toBe(true);
 
@@ -106,6 +112,24 @@ describe('guardião de pré-doc do SIAFI', () => {
     (document.querySelector('[data-action="continue"]') as HTMLButtonElement)?.click();
     await Promise.resolve();
     expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('não alerta nem bloqueia ações quando outra aba está ativa', () => {
+    renderPage(rowHtml(0), 'Detacustos');
+    const registerHandler = vi.fn();
+    document.querySelector('#form_manterDocumentoHabil\\:btnRegistrarAlteracaoDocumentoHabil')?.addEventListener('click', registerHandler);
+    const api = loadScript();
+
+    expect(api.isPaymentTabActive()).toBe(false);
+    expect(api.hasPendingPredocs()).toBe(false);
+
+    clickById('form_manterDocumentoHabil:btnRegistrarAlteracaoDocumentoHabil');
+    expect(registerHandler).toHaveBeenCalledTimes(1);
+    expect(document.getElementById('suape-siafi-predoc-overlay')).toHaveAttribute('hidden');
+
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
   });
 
   it('bloqueia Registrar Alterações, mas permite a consistência', () => {
